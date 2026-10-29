@@ -1,0 +1,20 @@
+# systemd unit for openaow-server (e.g. /etc/systemd/system/openaow-server.service)
+#   systemctl daemon-reload && systemctl enable --now openaow-server
+# Open UDP 38100 (master), UDP 38110-38199 (rooms) and TCP 38100 (status) in the firewall.
+[Unit]
+Description=Open Art Of War dedicated server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=openaow
+ExecStart=/usr/local/bin/openaow-server --name "openaow.imister.tech" --log-file /var/log/openaow-server.log
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log
+
+[Install]
+WantedBy=multi-user.target

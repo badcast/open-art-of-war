@@ -1,0 +1,175 @@
+{
+  "classes": {
+    "aow22": "GameApp",
+    "a": "EngineCore",
+    "b": "BluetoothNetwork",
+    "c": "GameConstants",
+    "d": "SoundManager",
+    "e": "BitmapFont",
+    "f": "GameWorld",
+    "g": "PlatformConfig",
+    "h": "ResourceOffsets",
+    "i": "SimulationCore",
+    "j": "HttpReporter",
+    "k": "SmsHandler"
+  },
+  "class_descriptions": {
+    "aow22": "MIDlet entry point, application lifecycle (startApp, pauseApp, destroyApp)",
+    "a": "Core engine canvas and main game loop (fixed timestep, double buffer, rendering, input handling, asset streaming)",
+    "b": "Bluetooth multiplayer networking (discovery, connection, RFCOMM/L2CAP transport)",
+    "c": "Game balance constants, unit definition IDs, weapon stats, building types, and faction color palette LUT",
+    "d": "Audio manager for MIDI background music (/s0) and sound effects (/d0) with volume control",
+    "e": "Bitmap font renderer supporting multiple font textures (/s, /t, /d), metrics and string formatting",
+    "f": "High-level game world, campaign progression, UI menus, in-game HUD, minimap, orders dispatch, RMS save/load",
+    "g": "Device profile and platform configuration, carrier/vendor metadata, string table helper",
+    "h": "Asset offsets, binary resource sizes, font glyph index constants",
+    "i": "RTS simulation core, entity management (SoA unit table), combat resolution, ballistics, line-of-sight fog-of-war, A* pathfinding",
+    "j": "HTTP error/telemetry reporter for remote crash diagnostics",
+    "k": "Legacy SMS monetization and carrier billing handler"
+  },
+  "methods": {
+    "GameApp": {
+      "startApp": "startApp",
+      "pauseApp": "pauseApp",
+      "destroyApp": "destroyApp"
+    },
+    "EngineCore": {
+      "run": "runGameLoop",
+      "paint": "paintCanvas",
+      "keyPressed": "handleKeyPressed",
+      "keyReleased": "handleKeyReleased",
+      "pointerPressed": "handlePointerPressed",
+      "pointerReleased": "handlePointerReleased",
+      "pointerDragged": "handlePointerDragged",
+      "hideNotify": "onHide",
+      "showNotify": "onShow",
+      "a()": "startGameThread",
+      "b()": "destroyGame",
+      "c()": "pauseGame",
+      "d()": "resumeGame",
+      "q()": "renderFrame",
+      "r()": "tickSimulation",
+      "p()": "renderLoadingScreen",
+      "i()": "showSplashScreens",
+      "b(int)": "setLoadingProgress",
+      "j()": "loadLevelData",
+      "k()": "loadTileSprites",
+      "l()": "loadUnitSprites",
+      "m()": "loadLocalizationStrings",
+      "n()": "loadGameRules",
+      "o()": "initEngineSystems",
+      "s()": "unloadLevel",
+      "t()": "loadFontGlyphs",
+      "u()": "initAudio",
+      "v()": "initGraphics",
+      "w()": "initPalettes",
+      "y()": "loadMission",
+      "z()": "cleanupResources",
+      "A()": "updateGameTick",
+      "a(boolean)": "requestRepaint",
+      "d": "resumeGame",
+      "c": "pauseGame",
+      "b": "destroyGame",
+      "a": "startGameThread"
+    },
+    "SoundManager": {
+      "a()": "play",
+      "b()": "stop",
+      "c()": "close",
+      "a(int)": "setVolume",
+      "b(int)": "setLoopCount",
+      "playerUpdate": "playerUpdate",
+      "m8a()": "getState"
+    },
+    "BitmapFont": {
+      "b()": "resetFont",
+      "a(String, Graphics)": "drawString",
+      "a(int, Graphics)": "drawGlyph"
+    },
+    "GameWorld": {
+      "a(int)": "setGameState",
+      "b()": "onEnterMenu",
+      "p()": "renderMenuUI",
+      "o()": "renderSpectatorUI",
+      "a(boolean)": "renderWorldHUD",
+      "l()": "updateWorldLogic",
+      "saveGame": "saveGameStateToRMS",
+      "loadGame": "loadGameStateFromRMS"
+    },
+    "SimulationCore": {
+      "a(boolean)": "updateCombat",
+      "b()": "tickSimulation",
+      "m55c()": "postTickUpdate",
+      "x()": "updateFogOfWar",
+      "u()": "updateProjectiles",
+      "w()": "updateProductionQueues",
+      "v()": "checkPlacementCollision",
+      "z()": "updateAiDecisionTree"
+    }
+  },
+  "unit_data_offsets": {
+    "0": {
+      "name": "tileX",
+      "desc": "Tile X coordinate on map (0..127)"
+    },
+    "101": {
+      "name": "tileY",
+      "desc": "Tile Y coordinate on map (0..127)"
+    },
+    "202": {
+      "name": "subTileX",
+      "desc": "Fine sub-tile pixel offset X (0..29)"
+    },
+    "303": {
+      "name": "subTileY",
+      "desc": "Fine sub-tile pixel offset Y (0..29)"
+    },
+    "404": {
+      "name": "targetTileX",
+      "desc": "Destination / order target Tile X"
+    },
+    "505": {
+      "name": "targetTileY",
+      "desc": "Destination / order target Tile Y"
+    },
+    "1010": {
+      "name": "targetEntityId",
+      "desc": "Target unit or building ID"
+    },
+    "1414": {
+      "name": "maxHp",
+      "desc": "Maximum hit points"
+    },
+    "1616": {
+      "name": "currentHp",
+      "desc": "Current hit points"
+    },
+    "2323": {
+      "name": "unitTypeId",
+      "desc": "Unit or building archetype ID"
+    },
+    "4747": {
+      "name": "facingDirection",
+      "desc": "Facing orientation (0..15)"
+    },
+    "4848": {
+      "name": "actionState",
+      "desc": "FSM State (0: Idle, 1: Move, 2: Attack, 3: Die, 4: Build, 5: Harvest)"
+    },
+    "5454": {
+      "name": "factionId",
+      "desc": "Player faction owner (0: Player/Resistance, 1: AI/Confederation)"
+    }
+  },
+  "constants": {
+    "FIXED_POINT_SHIFT": 8,
+    "TILE_PIXEL_SIZE": 30,
+    "MAX_UNITS": 100,
+    "MAP_MAX_WIDTH": 128,
+    "MAP_MAX_HEIGHT": 128,
+    "SIMULATION_TPS": 20,
+    "SIMULATION_TIMESTEP_MS": 50,
+    "MENU_TPS": 10,
+    "MENU_TIMESTEP_MS": 100
+  }
+}

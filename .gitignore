@@ -1,0 +1,55 @@
+# Build directories & CMake artifacts
+build/
+build_*/
+bin/
+FROM_SOURCE/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+CMakeUserPresets.json
+view/*.png
+assets/
+
+# Compiled object files & libraries
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.elf
+*.exe
+
+# Tools & Third-party standalone binaries
+tools/jadx/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cache/
+.clangd/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Saves & Logs
+saves/
+*.log
+*.sf2
+
+imgui.ini

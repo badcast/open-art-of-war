@@ -1,0 +1,3705 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: OpenArtOfWar 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-24 23:00+0500\n"
+"PO-Revision-Date: 2026-10-24 23:00+0500\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "MAIN MENU"
+msgstr "ГЛАВНОЕ МЕНЮ"
+
+msgid "CAMPAIGN"
+msgstr "КАМПАНИЯ"
+
+msgid "CUSTOM GAME"
+msgstr "ПРОСТАЯ ИГРА"
+
+msgid "TEST MAP"
+msgstr "ТЕСТОВАЯ КАРТА"
+
+msgid "SETTINGS"
+msgstr "НАСТРОЙКИ"
+
+msgid "HELP"
+msgstr "ПОМОЩЬ"
+
+msgid "ABOUT"
+msgstr "ОБ ИГРЕ"
+
+msgid "EXIT"
+msgstr "ВЫХОД"
+
+msgid "[ SELECT ]"
+msgstr "[ ВЫБРАТЬ ]"
+
+msgid "[ EXIT ]"
+msgstr "[ ВЫХОД ]"
+
+msgid "Select"
+msgstr "Выбор"
+
+msgid "Exit"
+msgstr "Выход"
+
+msgid "Back"
+msgstr "Назад"
+
+msgid "Toggle"
+msgstr "Переключить"
+
+msgid "GAME PAUSED"
+msgstr "ИГРА ПРИОСТАНОВЛЕНА"
+
+msgid "CONTINUE"
+msgstr "ПРОДОЛЖИТЬ"
+
+msgid "OBJECTIVES"
+msgstr "ЗАДАНИЕ"
+
+msgid "CONSTRUCTION"
+msgstr "СТРОИТЕЛЬСТВО"
+
+msgid "SOUND & MUSIC"
+msgstr "ЗВУК И МУЗЫКА"
+
+msgid "RESTART MISSION"
+msgstr "НАЧАТЬ ЗАНОВО"
+
+msgid "1. CONTINUE"
+msgstr "1. ПРОДОЛЖИТЬ ИГРУ"
+
+msgid "2. OBJECTIVES"
+msgstr "2. ЗАДАНИЕ МИССИИ"
+
+msgid "3. BASE CONSTRUCTION"
+msgstr "3. СТРОИТЕЛЬСТВО БАЗЫ"
+
+msgid "4. SOUND & MUSIC"
+msgstr "4. ЗВУК И МУЗЫКА"
+
+msgid "5. RESTART MISSION"
+msgstr "5. НАЧАТЬ ЗАНОВО"
+
+msgid "6. MAIN MENU"
+msgstr "6. ГЛАВНОЕ МЕНЮ"
+
+msgid "[ SELECT / ENTER ]"
+msgstr "[ ВЫБРАТЬ / ENTER ]"
+
+msgid "[ BACK / ESC ]"
+msgstr "[ НАЗАД / ESC ]"
+
+msgid "MISSION OBJECTIVES"
+msgstr "ЦЕЛИ ЗАДАНИЯ"
+
+msgid " - OBJECTIVES"
+msgstr " - ЗАДАНИЕ"
+
+msgid "PRIMARY OBJECTIVES:"
+msgstr "ОСНОВНЫЕ ЗАДАЧИ:"
+
+msgid "OPERATION BRIEFING:"
+msgstr "ОПИСАНИЕ ОПЕРАЦИИ:"
+
+msgid "CONTINUE (ESC)"
+msgstr "ПРОДОЛЖИТЬ (ESC)"
+
+msgid "Press SPACE, ENTER or Click to return"
+msgstr "Нажмите ПРОБЕЛ, ENTER или ЛКМ для возврата"
+
+msgid "BASE CONSTRUCTION (RESISTANCE)"
+msgstr "СТРОИТЕЛЬСТВО БАЗЫ (СОПРОТИВЛЕНИЕ)"
+
+msgid "BASE CONSTRUCTION"
+msgstr "СТРОИТЕЛЬСТВО БАЗЫ"
+
+msgid "[ SELECT & PLACE ]"
+msgstr "[ ВЫБРАТЬ И РАЗМЕСТИТЬ ]"
+
+msgid "[ CANCEL / ESC ]"
+msgstr "[ ОТМЕНА / ESC ]"
+
+msgid "Cost: $"
+msgstr "Стоимость: $"
+
+msgid "Power: "
+msgstr "Энергия: "
+
+msgid " kW"
+msgstr " кВт"
+
+msgid "SELECT CAMPAIGN MISSION"
+msgstr "ВЫБОР МИССИИ КАМПАНИИ"
+
+msgid "OBJECTIVES:"
+msgstr "ЗАДАЧИ:"
+
+msgid "BRIEFING:"
+msgstr "БРИФИНГ:"
+
+msgid "START MISSION"
+msgstr "НАЧАТЬ МИССИЮ"
+
+msgid "BACK"
+msgstr "НАЗАД"
+
+msgid "MISSION BRIEFING - FREEDOM FOR LIBERTY"
+msgstr "БРИФИНГ МИССИИ - FREEDOM FOR LIBERTY"
+
+msgid "START MISSION [ENTER]"
+msgstr "НАЧАТЬ МИССИЮ [ENTER]"
+
+msgid "MISSION BRIEFING"
+msgstr "БРИФИНГ ЗАДАНИЯ"
+
+msgid "RESISTANCE HIGH COMMAND - SECTOR REPORT"
+msgstr "КОМАНДОВАНИЕ СОПРОТИВЛЕНИЯ - ОТЧЕТ ПО СЕКТОРУ"
+
+msgid "OPERATIONAL OBJECTIVES:"
+msgstr "ЦЕЛИ ОПЕРАЦИИ:"
+
+msgid "PRESS [SPACE] OR [ENTER] TO BEGIN MISSION"
+msgstr "НАЖМИТЕ [ПРОБЕЛ] ИЛИ [ENTER] ДЛЯ НАЧАЛА"
+
+msgid "AUDIO & SYSTEM SETTINGS"
+msgstr "НАСТРОЙКИ ЗВУКА И СИСТЕМЫ"
+
+msgid "Sound & Music"
+msgstr "Звук и Музыка"
+
+msgid "Language"
+msgstr "Язык"
+
+msgid "English"
+msgstr "English"
+
+msgid "Russian"
+msgstr "Русский"
+
+msgid "ON"
+msgstr "ВКЛ"
+
+msgid "OFF"
+msgstr "ВЫКЛ"
+
+msgid "Synthesizer"
+msgstr "Синтезатор"
+
+msgid "Graphics"
+msgstr "Графика"
+
+msgid "Pixel-Perfect High-Res"
+msgstr "Высокое разрешение (Pixel-Perfect)"
+
+msgid "Press [1] to toggle Sound, [2] to toggle Language"
+msgstr "Нажмите [1] для переключения звука, [2] для выбора языка"
+
+msgid "BACK (ESC / ENTER)"
+msgstr "НАЗАД (ESC / ENTER)"
+
+msgid "HELP & CONTROLS"
+msgstr "ПОМОЩЬ И УПРАВЛЕНИЕ"
+
+msgid "- Mouse: LMB - select unit / box selection."
+msgstr "- Управление мышью: ЛКМ - выбор юнита / рамка выделения."
+
+msgid "- Orders: RMB on ground - move, RMB on enemy - attack."
+msgstr "- Приказы: ПКМ на карту - перемещение, ПКМ на врага - атака."
+
+msgid "- Camera: Arrow keys, WASD, or move mouse to screen edges."
+msgstr "- Камера: Стрелки, WASD, или перемещение мыши к краям экрана."
+
+msgid "- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets."
+msgstr "- Строительство (B): Штаб, Генератор, Казарма, Завод, Локатор, Турели."
+
+msgid "- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS."
+msgstr "- Производство (1..7): Пехотинец, Гренадер, Снайпер, Койот, Броненосец, Носорог, Дикобраз."
+
+msgid "- Siege mode (G): Deploy Sniper and Rhino heavy tank."
+msgstr "- Осадный режим (G): Развертывание Снайпера и тяжелого танка Носорог."
+
+msgid "- Hotkeys: F12 - debug overlay, Space / ESC - pause."
+msgstr "- Быстрые клавиши: F12 - панель отладки, Пробел / ESC - пауза."
+
+msgid "ABOUT OPEN ART OF WAR"
+msgstr "ОБ ИГРЕ OPEN ART OF WAR"
+
+msgid "ABOUT GAME"
+msgstr "ОБ ИГРЕ"
+
+msgid "Version"
+msgstr "Версия"
+
+msgid "Author"
+msgstr "Автор"
+
+msgid "Porting: Modern C++17, SDL3, ImGui"
+msgstr "Портирование: Modern C++17/20, SDL3, ImGui"
+
+msgid "Central Peru is occupied by the army of the Confederation."
+msgstr "Вся центральная часть Перу находится под контролем"
+
+msgid "The Resistance stands ready to strike for freedom!"
+msgstr "армии Конфедерации. Сопротивление готово нанести удар!"
+
+msgid "RESEARCH"
+msgstr "ИССЛЕДОВАНИЯ"
+
+msgid "INFANTRY"
+msgstr "ПЕХОТА"
+
+msgid "VEHICLES"
+msgstr "ТЕХНИКА"
+
+msgid "BASE"
+msgstr "БАЗА"
+
+msgid "ORDERS"
+msgstr "ПРИКАЗЫ"
+
+msgid "MENU"
+msgstr "МЕНЮ"
+
+msgid "READY"
+msgstr "ГОТОВО"
+
+msgid "LOCK"
+msgstr "БЛОК"
+
+msgid "BUILDING PLACEMENT: "
+msgstr "РАЗМЕЩЕНИЕ: "
+
+msgid " (LMB - build, RMB - cancel)"
+msgstr " (ЛКМ - построить на карте, ПКМ - отмена)"
+
+msgid "Select building to construct"
+msgstr "Выберите здание для постройки"
+
+msgid "BODY ARMOR"
+msgstr "БРОНЕЖИЛЕТЫ"
+
+msgid "+30% armor and HP for infantry"
+msgstr "+30% броня и здоровье всей пехоты"
+
+msgid "SPECIAL TRAINING"
+msgstr "СПЕЦПОДГОТОВКА"
+
+msgid "+25% movement speed for infantry"
+msgstr "+25% скорость передвижения пехоты"
+
+msgid "OPTICS"
+msgstr "ОПТИКА"
+
+msgid "+1.5 range and +25% infantry damage"
+msgstr "+1.5 дальность и +25% урон пехоты"
+
+msgid "MEDIC STATION"
+msgstr "МЕДПУНКТ"
+
+msgid "+40 max HP and healing for infantry"
+msgstr "+40 макс. HP и лечение всей пехоты"
+
+msgid "TANK ARMOR"
+msgstr "БРОНЯ ТАНКОВ"
+
+msgid "+25% durability for all vehicles"
+msgstr "+25% прочность всей бронетехники"
+
+msgid "AFTERBURNER"
+msgstr "ФОРСАЖ"
+
+msgid "+25% vehicle movement speed"
+msgstr "+25% скорость движения бронетехники"
+
+msgid "SIEGE CANNONS"
+msgstr "ОСАДНЫЕ ОРУДИЯ"
+
+msgid "+25% heavy firepower"
+msgstr "+25% огневая мощь тяжелой техники"
+
+msgid "LOGISTICS"
+msgstr "ЛОГИСТИКА"
+
+msgid "Emergency supply +$600 credits"
+msgstr "Экстренная поставка +$600 кредитов"
+
+msgid "[LAB REQUIRED] Construct Research Lab to unlock"
+msgstr "[ТРЕБУЕТСЯ ЛАБОРАТОРИЯ] Постройте лабораторию для исследований"
+
+msgid "[RESEARCHED] "
+msgstr "[ИЗУЧЕНО] "
+
+msgid "Researching: "
+msgstr "Исследование: "
+
+msgid "Select technology to research"
+msgstr "Выберите технологию для исследования"
+
+msgid "LABORATORY REQUIRED FOR RESEARCH!"
+msgstr "ТРЕБУЕТСЯ ЛАБОРАТОРИЯ ДЛЯ ИССЛЕДОВАНИЙ!"
+
+msgid "THIS TECHNOLOGY IS ALREADY RESEARCHED!"
+msgstr "ЭТА ТЕХНОЛОГИЯ УЖЕ ИЗУЧЕНА!"
+
+msgid "ANOTHER RESEARCH IS ALREADY IN PROGRESS!"
+msgstr "ДРУГОЕ ИССЛЕДОВАНИЕ УЖЕ ВЫПОЛНЯЕТСЯ!"
+
+msgid "INSUFFICIENT CREDITS FOR RESEARCH!"
+msgstr "НЕДОСТАТОЧНО КРЕДИТОВ ДЛЯ ИССЛЕДОВАНИЯ!"
+
+msgid "RIFLEMAN"
+msgstr "СТРЕЛОК"
+
+msgid "Standard Resistance infantry rifleman"
+msgstr "Базовый боец Сопротивления с автоматом"
+
+msgid "GRENADIER"
+msgstr "ГРЕНАДЕР"
+
+msgid "Heavy rocket soldier vs vehicles and walls"
+msgstr "Ракетчик против бронетехники и стен"
+
+msgid "SNIPER"
+msgstr "СНАЙПЕР"
+
+msgid "Long-range sniper (Camouflage mode [G])"
+msgstr "Дальнобойный снайпер (Режим маскировки [G])"
+
+msgid "ASSAULT TROOPER"
+msgstr "ШТУРМОВИК"
+
+msgid "Heavy assault infantryman"
+msgstr "Штурмовой тяжелый пехотинец Сопротивления"
+
+msgid "[BARRACKS REQUIRED] Construct Barracks to recruit "
+msgstr "[ТРЕБУЕТСЯ КАЗАРМА] Постройте казарму для найма "
+
+msgid "ACTIVE BARRACKS: #"
+msgstr "АКТИВНАЯ КАЗАРМА: #"
+
+msgid " [PRIMARY RALLY POINT]"
+msgstr " [ОСНОВНАЯ ТОЧКА ВЫХОДА]"
+
+msgid "TRAINING: "
+msgstr "ПОДГОТОВКА: "
+
+msgid " (QUEUE: "
+msgstr " (ОЧЕРЕДЬ: "
+
+msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO RECRUIT"
+msgstr "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ НАЙМА"
+
+msgid "BARRACKS NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
+msgstr "КАЗАРМА НЕ ПОСТРОЕНА. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"
+
+msgid "BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"
+msgstr "ТРЕБУЕТСЯ КАЗАРМА ДЛЯ НАЙМА ПЕХОТЫ!"
+
+msgid "COYOTE"
+msgstr "КОЙОТ"
+
+msgid "Fast scout buggy (spawns at Factory)"
+msgstr "Быстрый разведывательный броневик (спавн у Завода)"
+
+msgid "ARMADILLO"
+msgstr "БРОНЕНОСЕЦ"
+
+msgid "Main battle tank of Resistance"
+msgstr "Основной боевой танк Сопротивления"
+
+msgid "RHINO"
+msgstr "НОСОРОГ"
+
+msgid "Heavy twin-cannon tank (Siege mode [G])"
+msgstr "Тяжелый двуствольный танк (Осадный режим [G])"
+
+msgid "PORCUPINE"
+msgstr "ДИКОБРАЗ"
+
+msgid "Multiple Launch Rocket System (MLRS)"
+msgstr "Реактивная система залпового огня (РСЗО)"
+
+msgid "[FACTORY REQUIRED] Construct Factory to build "
+msgstr "[ТРЕБУЕТСЯ ЗАВОД] Постройте завод техники для производства "
+
+msgid "ACTIVE FACTORY: #"
+msgstr "АКТИВНЫЙ ЗАВОД: #"
+
+msgid "PRODUCTION: "
+msgstr "ПРОИЗВОДСТВО: "
+
+msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO BUILD VEHICLES"
+msgstr "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ СБОРКИ ТЕХНИКИ"
+
+msgid "FACTORY NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
+msgstr "ЗАВОД ТЕХНИКИ НЕ ПОСТРОЕН. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"
+
+msgid "VEHICLE FACTORY REQUIRED FOR PRODUCTION!"
+msgstr "ТРЕБУЕТСЯ ЗАВОД ТЕХНИКИ ДЛЯ ПРОИЗВОДСТВА!"
+
+msgid "BARRACKS (CLICK: SET PRIMARY)"
+msgstr "КАЗАРМЫ (КЛИК: ВЫБРАТЬ ОСНОВНУЮ)"
+
+msgid "NO BARRACKS"
+msgstr "НЕТ КАЗАРМ"
+
+msgid "BARRACKS #"
+msgstr "КАЗАРМА #"
+
+msgid " [PRIMARY]"
+msgstr " [ОСНОВНАЯ]"
+
+msgid "FACTORIES (CLICK: SET PRIMARY)"
+msgstr "ЗАВОДЫ (КЛИК: ВЫБРАТЬ ОСНОВНОЙ)"
+
+msgid "NO FACTORIES"
+msgstr "НЕТ ЗАВОДОВ"
+
+msgid "FACTORY #"
+msgstr "ЗАВОД #"
+
+msgid "Base grouping: Click Barracks or Factory to set primary rally point."
+msgstr "Группировка баз: Клик по казарме или заводу назначает точку появления подкреплений."
+
+msgid "Assigned primary Barracks #"
+msgstr "Назначена основная Казарма #"
+
+msgid "Assigned primary Factory #"
+msgstr "Назначен основной Завод #"
+
+msgid "ATTACK-MOVE"
+msgstr "АТАКА-ХОД"
+
+msgid "Units advance to destination, attacking all encountered enemies"
+msgstr "Юниты идут к точке, уничтожая всех встреченных врагов"
+
+msgid "SIEGE"
+msgstr "ОСАДА"
+
+msgid "Toggle Siege mode for Sniper and Rhino"
+msgstr "Переключить осадный режим Снайпера и Носорога"
+
+msgid "STOP"
+msgstr "СТОП"
+
+msgid "Immediately halt all orders and movement"
+msgstr "Немедленно остановить все приказы и стрельбу"
+
+msgid "DEFEND"
+msgstr "ОБОРОНА"
+
+msgid "Hold current position and engage enemies in range"
+msgstr "Удерживать текущую позицию и атаковать в радиусе"
+
+msgid "TACTICAL ORDERS: Select units and issue a command"
+msgstr "ТАКТИЧЕСКИЕ ПРИКАЗЫ: Выберите юнитов и нажмите команду"
+
+msgid "Attack-Move [A] is the primary offensive tactic for Resistance forces!"
+msgstr "Атака на ходу [A] - базовый режим наступления повстанцев!"
+
+msgid "ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)"
+msgstr "АТАКА-ДВИЖЕНИЕ [A]: укажите точку (ЛКМ - подтвердить, ПКМ/ESC - отмена)"
+
+msgid "GAME SAVED (F5)"
+msgstr "ИГРА СОХРАНЕНА (F5)"
+
+msgid "GAME LOADED (F9)"
+msgstr "ИГРА ЗАГРУЖЕНА (F9)"
+
+msgid "TEST MAP: Test passages, wall destruction and AI!"
+msgstr "ТЕСТОВАЯ КАРТА: Проверьте проходы, разрушение стен и ИИ!"
+
+msgid "MISSION ACCOMPLISHED!"
+msgstr "ЗАДАНИЕ ВЫПОЛНЕНО!"
+
+msgid "Press SPACE / ENTER to return to menu"
+msgstr "Нажмите ПРОБЕЛ / ENTER для перехода в меню"
+
+msgid "MISSION FAILED!"
+msgstr "ЗАДАНИЕ ПРОВАЛЕНО!"
+
+msgid "Press SPACE / ENTER to retry"
+msgstr "Нажмите ПРОБЕЛ / ENTER для повтора"
+
+msgid "HEADQUARTERS"
+msgstr "ШТАБ"
+
+msgid "Resistance Command Center. Provides radar and logistics."
+msgstr "Командный центр Сопротивления. Обеспечивает снабжение и радар."
+
+msgid "POWER PLANT"
+msgstr "ГЕНЕРАТОР"
+
+msgid "Power Plant (+100 kW). Supplies energy to factories and defenses."
+msgstr "Электростанция (+100 кВт). Снабжает энергией заводы и оборону."
+
+msgid "BARRACKS"
+msgstr "КАЗАРМА"
+
+msgid "Infantry Training: Rifleman, Grenadier, Sniper."
+msgstr "Подготовка бойцов: Пехотинец, Гренадер, Снайпер."
+
+msgid "FACTORY"
+msgstr "ЗАВОД"
+
+msgid "Vehicle Factory: Coyote, Armadillo, Rhino, and Porcupine MLRS."
+msgstr "Военный завод: Койот, Броненосец, Носорог и РСЗО Дикобраз."
+
+msgid "RESEARCH LAB"
+msgstr "ЛАБОРАТОРИЯ"
+
+msgid "Scientific center for combat research upgrades (RESEARCH tab)."
+msgstr "Научно-технический центр для исследования улучшений (вкладка ИССЛЕД.)."
+
+msgid "BUNKER"
+msgstr "БУНКЕР"
+
+msgid "Reinforced machine-gun bunker for perimeter defense."
+msgstr "Бетонный пулеметный ДОТ Сопротивления для обороны периметра."
+
+msgid "TURRET"
+msgstr "ВЫШКА"
+
+msgid "Watchtower with heavy machine gun and extended vision."
+msgstr "Сторожевая вышка с крупнокалиберным пулеметом и дальним обзором."
+
+msgid "WALL"
+msgstr "СТЕНА"
+
+msgid "Reinforced concrete wall (1x1) to block enemy armor."
+msgstr "Бетонное заграждение (1x1) для блокирования проходов бронетехнике."
+
+msgid "Mission 1: The Return"
+msgstr "Миссия 1: Возвращение"
+
+msgid "Map: m37 (Southern Jungle)"
+msgstr "Карта: m37 (Южные джунгли)"
+
+msgid ""
+"- Establish base.\n"
+"- Destroy Confederation base."
+msgstr ""
+"- Построить базу.\n"
+"- Уничтожить базу Конфедерации."
+
+msgid "We can no longer endure this oppression! The Confederation only hides behind noble words while plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost and prepare to strike."
+msgstr "Мы не должны и дальше терпеть это угнетение! Конфедерация только прикрывается благими намерениями, грабя народ Перу. Пришло время вернуть нашу свободу! Высаживаемся в районе перевала и готовим плацдарм для наступления."
+
+msgid "Mission 2: Jungle"
+msgstr "Миссия 2: Джунгли"
+
+msgid "Map: m42 (Rainforest)"
+msgstr "Карта: m42 (Тропический лес)"
+
+msgid ""
+"- Capture the pass.\n"
+"- Repel counter-attacks and eliminate Confederation forces."
+msgstr ""
+"- Захватить перевал.\n"
+"- Отразить атаки и уничтожить силы Конфедерации."
+
+msgid "The central region of Peru is occupied by Confederation forces. Over three months they fortified the high ground. Launch a surprise strike through the dense jungle."
+msgstr "Вся центральная часть Перу находится под контролем армии конфедерации. За три месяца оккупации они укрепили ключевые высоты. Мы должны нанести неожиданный удар через джунгли."
+
+msgid "Mission 3: Sabotage"
+msgstr "Миссия 3: Диверсия"
+
+msgid "Map: m43 (River Valley)"
+msgstr "Карта: m43 (Речная долина)"
+
+msgid ""
+"- Guide sabotage squad.\n"
+"- Eliminate Confederation outposts in the sector."
+msgstr ""
+"- Провести диверсионный отряд.\n"
+"- Подавить силы Конфедерации в секторе."
+
+msgid "Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy ammo and fuel depots."
+msgstr "Наш план сработал! Разведка докладывает, что конвои снабжения противника движутся по долине реки. Отрежьте врага от боеприпасов и топлива."
+
+msgid "Mission 4: The Gorge"
+msgstr "Миссия 4: Ущелье"
+
+msgid "Map: m43 (Mountain Canyon)"
+msgstr "Карта: m43 (Горный каньон)"
+
+msgid ""
+"- Break through mountain canyon.\n"
+"- Destroy Confederation defense fortifications."
+msgstr ""
+"- Прорваться через горный каньон.\n"
+"- Уничтожить укрепления Конфедерации."
+
+msgid "Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. Assault the fortifications!"
+msgstr "Подразделение выдвигается к перевалу по запланированному маршруту. Враг заблокировал ущелье тяжелыми турелями. Штурмуйте укрепления!"
+
+msgid "Mission 5: Matter of Seconds"
+msgstr "Миссия 5: Счет на секунды"
+
+msgid "Map: m26 (Desert Outpost)"
+msgstr "Карта: m26 (Пустынный форпост)"
+
+msgid ""
+"- Defend the base and construct factories.\n"
+"- Eliminate enemy armor divisions."
+msgstr ""
+"- Захватить базу и развернуть заводы.\n"
+"- Ликвидировать вражескую бронетехнику."
+
+msgid "The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy armor to strike back."
+msgstr "Противник бросает в бой танковые соединения. Счет идет на секунды! Разверните заводы и подготовьте тяжелые танки для контрудара."
+
+msgid "Mission 6: Radio Station"
+msgstr "Миссия 6: Радиостанция"
+
+msgid "Map: m35 (Highland Plateau)"
+msgstr "Карта: m35 (Холмистое плато)"
+
+msgid ""
+"- Capture the communications relay.\n"
+"- Annihilate Confederation plateau garrison."
+msgstr ""
+"- Захватить передатчик связи.\n"
+"- Уничтожить базу Конфедерации на плато."
+
+msgid "The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces and hold the plateau."
+msgstr "Радиоузел на стратегической высоте позволит перехватывать все приказы штаба Конфедерации. Выбейте врага с высоты и удерживайте позицию."
+
+msgid "Mission 7: Lima"
+msgstr "Миссия 7: Лима"
+
+msgid "Map: m44 (Outskirts of Lima)"
+msgstr "Карта: m44 (Пригород Лимы)"
+
+msgid ""
+"- Assault the capital city of Lima.\n"
+"- Total destruction of Confederation Headquarters!"
+msgstr ""
+"- Штурмовать столицу Лиму.\n"
+"- Полное уничтожение штаба Конфедерации!"
+
+msgid "Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike for the liberation of Peru!"
+msgstr "Наконец-то, мы стоим на пороге в наше светлое будущее! Нам остался всего один решительный бой! И сегодня мы обязаны победить ради свободы Перу!"
+
+msgid "Mission 8: Skirmish"
+msgstr "Миссия 8: Схватка"
+
+msgid "Map: m0 (Training Ground)"
+msgstr "Карта: m0 (Учебный полигон)"
+
+msgid ""
+"- Construct your base.\n"
+"- Destroy enemy forces."
+msgstr ""
+"- Построить базу.\n"
+"- Уничтожить вражескую группировку."
+
+msgid "Open skirmish for sector control. Test your strategy and tactics against fortified Confederation positions."
+msgstr "Свободная схватка за контроль над сектором. Проверьте вашу тактику против укрепленной базы Конфедерации."
+
+msgid "Mission 9: The Ford"
+msgstr "Миссия 9: Брод"
+
+msgid "Map: brod (The Ford Crossing)"
+msgstr "Карта: brod (Брод)"
+
+msgid ""
+"- Defend the river crossing.\n"
+"- Destroy Confederation fortress base."
+msgstr ""
+"- Оборонять речную переправу.\n"
+"- Уничтожить базу Конфедерации."
+
+msgid "The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post."
+msgstr "Река делит сектор на две части. Единственное место переправы - брод в центре, плотно прикрытый бункерами врага. Прорвите оборону на реке и уничтожьте вражеский командный пункт."
+
+msgid "Mission 10: Canyon"
+msgstr "Миссия 10: Каньон"
+
+msgid "Map: canyon (Desert Canyon)"
+msgstr "Карта: canyon (Пустынный каньон)"
+
+msgid ""
+"- Secure the canyon gorge.\n"
+"- Crush enemy armored units in the valley."
+msgstr ""
+"- Захватить ущелье каньона.\n"
+"- Разгромить вражескую бронетехнику в долине."
+
+msgid "Confederation armor is positioned in the narrow canyon passes. Maneuver through the rocky terrain and capture the sector."
+msgstr "Бронетехника Конфедерации заняла узкие проходы в каньоне. Маневрируйте между скал и захватите весь сектор."
+
+msgid "Mission 11: Oasis"
+msgstr "Миссия 11: Оазис"
+
+msgid "Map: oasis (Desert Oasis)"
+msgstr "Карта: oasis (Пустынный оазис)"
+
+msgid ""
+"- Control strategic water oases.\n"
+"- Eradicate Confederation desert outpost."
+msgstr ""
+"- Установить контроль над оазисами.\n"
+"- Ликвидировать пустынный форпост Конфедерации."
+
+msgid "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
+msgstr "Древние оазисы в пустыне дают ключевые ресурсы в этих безжизненных песках. Захватите источники воды и штурмуйте базу противника."
+
+msgid "Test Map (Polygon)"
+msgstr "Тестовая карта (Полигон)"
+
+msgid "Map: AI & Pathfinding Polygon"
+msgstr "Карта: Полигон ИИ и проходимости"
+
+msgid ""
+"- Verify pathfinding in narrow and closed passages.\n"
+"- Test wall destruction and AI rebuilding.\n"
+"- Test Attack-Move [A]."
+msgstr ""
+"- Проверить проходимость узких проходов и закрытых стен.\n"
+"- Проверить разрушаемость стен и отстройку базы ИИ.\n"
+"- Проверить атаку в движении [A]."
+
+msgid "Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls."
+msgstr "Специальный тестовый полигон: 1) Сектор закрытых стен (юнит подходит вплотную к закрытому проходу и ждет открытия пути или пробивает стену), 2) Узкий коридор, перекрытый вражеским юнитом, 3) Лабиринт препятствий, 4) Укрепленная база ИИ с авто-восстановлением зданий и стен."
+
+msgid "Open Art Of War Character Archetype Editor"
+msgstr "Редактор архетипов Open Art Of War"
+
+msgid "SDL error: "
+msgstr "Ошибка SDL: "
+
+msgid "SDL_image error: "
+msgstr "Ошибка SDL_image: "
+
+msgid "SDL window error: "
+msgstr "Ошибка окна SDL: "
+
+msgid "SDL renderer error: "
+msgstr "Ошибка рендерера SDL: "
+
+msgid "Could not find the assets folder with graphics data."
+msgstr "Не найдена папка assets с графическими данными."
+
+msgid "No YAML files found in assets/characters."
+msgstr "В assets/characters не найдено файлов YAML."
+
+msgid "Invalid YAML"
+msgstr "Ошибка YAML"
+
+msgid "The YAML root must be a map."
+msgstr "Корневой элемент YAML должен быть словарём."
+
+msgid "Loaded: "
+msgstr "Загружено: "
+
+msgid "Could not load YAML: "
+msgstr "Не удалось загрузить YAML: "
+
+msgid "Could not open file for writing: "
+msgstr "Не удалось открыть файл для записи: "
+
+msgid "Failed to write file: "
+msgstr "Ошибка записи файла: "
+
+msgid "Saved: "
+msgstr "Сохранено: "
+
+msgid "YAML save error: "
+msgstr "Ошибка YAML при сохранении: "
+
+msgid "Ready"
+msgstr "Готово"
+
+msgid "File"
+msgstr "Файл"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Load selected"
+msgstr "Загрузить выбранный"
+
+msgid "Refresh list"
+msgstr "Обновить список"
+
+msgid "Archetypes"
+msgstr "Архетипы"
+
+msgid "%zu archetypes"
+msgstr "%zu конфигураций"
+
+msgid "Search by name or ID"
+msgstr "Поиск по имени или ID"
+
+msgid "Properties"
+msgstr "Параметры"
+
+msgid "Select a YAML configuration from the list."
+msgstr "Выберите YAML-конфигурацию в списке."
+
+msgid "Preview"
+msgstr "Предпросмотр"
+
+msgid "Unsaved changes"
+msgstr "Есть несохранённые изменения"
+
+msgid "General"
+msgstr "Основное"
+
+msgid "Name"
+msgstr "Название"
+
+msgid "Description"
+msgstr "Описание"
+
+msgid "Faction"
+msgstr "Сторона"
+
+msgid "Category (unit/building)"
+msgstr "Категория (unit/building)"
+
+msgid "Internal type"
+msgstr "Внутренний тип"
+
+msgid "Class"
+msgstr "Класс"
+
+msgid "Archetype ID"
+msgstr "ID архетипа"
+
+msgid "Building index"
+msgstr "Индекс здания"
+
+msgid "Size and stats"
+msgstr "Размер и характеристики"
+
+msgid "Width (tiles)"
+msgstr "Ширина в клетках"
+
+msgid "Height (tiles)"
+msgstr "Высота в клетках"
+
+msgid "Maximum health"
+msgstr "Максимум здоровья"
+
+msgid "Sight radius (tiles)"
+msgstr "Радиус обзора (клетки)"
+
+msgid "Move speed (pixels per tick)"
+msgstr "Скорость (пикселей за тик)"
+
+msgid "Production"
+msgstr "Производство"
+
+msgid "Cost"
+msgstr "Стоимость"
+
+msgid "Credit cost"
+msgstr "Стоимость в кредитах"
+
+msgid "Power (+/-)"
+msgstr "Мощность (+/-)"
+
+msgid "Build time"
+msgstr "Время производства"
+
+msgid "Produced in"
+msgstr "Где производится"
+
+msgid "Icon composite ID"
+msgstr "ID иконки"
+
+msgid "Prerequisites (one per line)"
+msgstr "Предпосылки (по одной на строку)"
+
+msgid "Combat"
+msgstr "Бой"
+
+msgid "Can attack"
+msgstr "Может атаковать"
+
+msgid "Damage"
+msgstr "Урон"
+
+msgid "Range (tiles)"
+msgstr "Дальность (клетки)"
+
+msgid "Cooldown (seconds)"
+msgstr "Перезарядка (сек.)"
+
+msgid "Shots per burst"
+msgstr "Выстрелов в очереди"
+
+msgid "Burst interval (seconds)"
+msgstr "Интервал очереди (сек.)"
+
+msgid "Projectile"
+msgstr "Снаряд"
+
+msgid "Rotating turret"
+msgstr "Поворотная башня"
+
+msgid "Rotating radar"
+msgstr "Поворотная антенна"
+
+msgid "Animation"
+msgstr "Анимация"
+
+msgid "Sprite sheet"
+msgstr "Лист спрайтов"
+
+msgid "Base sequence"
+msgstr "Базовая последовательность"
+
+msgid "Composite ID"
+msgstr "Составной спрайт"
+
+msgid "Rubble composite base"
+msgstr "База обломков"
+
+msgid "Attack offset"
+msgstr "Смещение атаки"
+
+msgid "Walk frames"
+msgstr "Кадров ходьбы"
+
+msgid "Idle frames"
+msgstr "Кадров покоя"
+
+msgid "Death frames"
+msgstr "Кадров гибели"
+
+msgid "Abilities"
+msgstr "Способности"
+
+msgid "Siege mode"
+msgstr "Режим осады"
+
+msgid "Siege archetype ID"
+msgstr "ID осадного архетипа"
+
+msgid "Parent archetype ID"
+msgstr "ID родительского архетипа"
+
+msgid "Independent turret"
+msgstr "Независимая башня"
+
+msgid "Filename for Save As"
+msgstr "Имя файла для Сохранить как"
+
+msgid "Save As"
+msgstr "Сохранить как"
+
+msgid "Reload file"
+msgstr "Перезагрузить файл"
+
+msgid "Idle"
+msgstr "Покой"
+
+msgid "Move"
+msgstr "Движение"
+
+msgid "Attack"
+msgstr "Атака"
+
+msgid "Death"
+msgstr "Гибель"
+
+msgid "Loop"
+msgstr "Цикл"
+
+msgid "Facing %d/7"
+msgstr "Направление %d/7"
+
+msgid "Speed %.1fx"
+msgstr "Скорость %.1fx"
+
+msgid "Attack range"
+msgstr "Радиус атаки"
+
+msgid "Construction"
+msgstr "Строительство"
+
+msgid "Health"
+msgstr "Прочность"
+
+msgid "Powered"
+msgstr "Питание"
+
+msgid "Preview zoom"
+msgstr "Масштаб предпросмотра"
+
+msgid "Game sprites and animation sequences from assets/data"
+msgstr "Игровые спрайты и последовательности из assets/data"
+
+msgid "Open Art Of War Map Editor - [openaow-mapeditor]"
+msgstr "Редактор карт Open Art Of War - [openaow-mapeditor]"
+
+msgid "Undo action"
+msgstr "Отмена действия (Undo)"
+
+msgid "Redo action"
+msgstr "Повтор действия (Redo)"
+
+msgid "Map saved: "
+msgstr "Карта сохранена: "
+
+msgid "Player start point (HQ): "
+msgstr "Стартовая точка игрока (HQ): "
+
+msgid "Enemy start point (HQ): "
+msgstr "Стартовая точка врага (HQ): "
+
+msgid "Eyedropper: selected tile #"
+msgstr "Пипетка: выбран тайл #"
+
+msgid "+30% Resources, +10% Speed"
+msgstr "+30% ресурсов, +10% скорости"
+
+msgid "+5 tiles HQ build radius for buildings and walls"
+msgstr "+5 клеток к радиусу застройки вокруг штаба"
+
+msgid "-20% AI Resources"
+msgstr "-20% ресурсов ИИ"
+
+msgid "-50% AI Resources"
+msgstr "-50% ресурсов ИИ"
+
+msgid "AI Difficulty"
+msgstr "Сложность ИИ"
+
+msgid "ATTACK-MOVE [Q]: select target (LMB to confirm, RMB/ESC to cancel)"
+msgstr "АТАКА-ХОД [Q]: выберите цель (ЛКМ — подтвердить, ПКМ / Esc — отмена)"
+
+msgid "Arrow keys - navigate, Enter - select"
+msgstr "Стрелки — выбор, Enter — подтвердить"
+
+msgid "Attack-move: units engage every enemy on the way"
+msgstr "Атака-ход: юниты атакуют всех врагов по пути"
+
+msgid "BASE EXPANSION"
+msgstr "РАСШИРЕНИЕ БАЗЫ"
+
+msgid "BUILD"
+msgstr "ЗДАНИЯ"
+
+msgid "Barracks"
+msgstr "Казарма"
+
+msgid "Build vehicles at the primary Factory"
+msgstr "Производство техники на основном заводе"
+
+msgid "Cancel / game menu"
+msgstr "Отмена / меню игры"
+
+msgid "Click a row to change the value"
+msgstr "Нажмите на строку, чтобы изменить значение"
+
+msgid "Click or press Enter to begin"
+msgstr "Нажмите кнопку мыши или Enter, чтобы начать"
+
+msgid "Click or press Enter to return to the main menu"
+msgstr "Нажмите кнопку мыши или Enter для выхода в главное меню"
+
+msgid "Drag the map"
+msgstr "Перетаскивание карты"
+
+msgid "Easy"
+msgstr "Легко"
+
+msgid "FORTRESS FLAMETHROWER"
+msgstr "ОГНЕМЁТ КРЕПОСТИ"
+
+msgid "FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"
+msgstr "ОГНЕМЁТ ДЛЯ КРЕПОСТИ ИССЛЕДОВАН!"
+
+msgid "Factory"
+msgstr "Завод"
+
+msgid "Fair AI, No Handicap"
+msgstr "Честный ИИ, без форы"
+
+msgid "HQ BUILD RADIUS INCREASED (+5 TILES)!"
+msgstr "РАДИУС ЗАСТРОЙКИ УВЕЛИЧЕН (+5 КЛЕТОК)!"
+
+msgid "Hard"
+msgstr "Сложно"
+
+msgid "Hardcore"
+msgstr "Хардкор"
+
+msgid "Interface language"
+msgstr "Язык интерфейса"
+
+msgid "FREEDOM FOR LIBERTY"
+msgstr "FREEDOM FOR LIBERTY"
+
+msgid "LMB"
+msgstr "ЛКМ"
+
+msgid "LMB - build, RMB / Esc - cancel"
+msgstr "ЛКМ — построить, ПКМ / Esc — отмена"
+
+msgid "MMB"
+msgstr "СКМ"
+
+msgid "Medium"
+msgstr "Средне"
+
+msgid "Move, or attack the target under the cursor"
+msgstr "Движение или атака цели под курсором"
+
+msgid "Music and sound effects"
+msgstr "Музыка и звуковые эффекты"
+
+msgid "POWER"
+msgstr "ЭНЕРГИЯ"
+
+msgid "RMB"
+msgstr "ПКМ"
+
+msgid "Recruit infantry at the primary Barracks"
+msgstr "Набор пехоты в основной казарме"
+
+msgid "Scroll the camera"
+msgstr "Прокрутка камеры"
+
+msgid "Select unit / drag to box-select"
+msgstr "Выбор юнита / рамка выделения"
+
+msgid "Select units and issue a command"
+msgstr "Выберите юнитов и отдайте приказ"
+
+msgid "Selected"
+msgstr "Выбрано"
+
+msgid "Siege mode for Sniper and Rhino"
+msgstr "Режим осады для снайпера и «Носорога»"
+
+msgid "TECH"
+msgstr "НАУКА"
+
+msgid "Upgrades Fortress with auxiliary flamethrower (targets <= 1 tile)"
+msgstr "Дополнительный огнемёт для «Крепости» (цели в радиусе 1 клетки)"
+
+msgid "W A S D / Arrows"
+msgstr "W A S D / Стрелки"
+
+msgid "Wheel"
+msgstr "Колесо"
+
+msgid "Zoom (over the map) / scroll lists (over the sidebar)"
+msgstr "Масштаб (над картой) / прокрутка списка (над панелью)"
+
+msgid "queue"
+msgstr "очередь"
+
+msgid "(none)"
+msgstr "(нет)"
+
+msgid "A fights in red team colors on the left, B in blue on the right."
+msgstr "A воюет слева в красных цветах, B справа в синих."
+
+#, c-format
+msgid "A units: %d"
+msgstr "Юнитов A: %d"
+
+msgid "A uses the current (unsaved) values; colors: green = better, red = worse."
+msgstr "Для A берутся текущие (несохранённые) значения; зелёный — лучше, красный — хуже."
+
+msgid "A vs B"
+msgstr "A против B"
+
+msgid "A wins"
+msgstr "Победа A"
+
+#, c-format
+msgid "A wins %d (%.0f%%) | B wins %d (%.0f%%) | draws %d | avg %.1f s | survivors A %.1f, B %.1f"
+msgstr "Победы A %d (%.0f%%) | Победы B %d (%.0f%%) | ничьи %d | в среднем %.1f с | выжило A %.1f, B %.1f"
+
+msgid "Alive"
+msgstr "Живы"
+
+msgid "Attack range, tiles"
+msgstr "Дальность атаки, клеток"
+
+msgid "B advances"
+msgstr "B наступает"
+
+#, c-format
+msgid "B units: %d"
+msgstr "Юнитов B: %d"
+
+msgid "B wins"
+msgstr "Победа B"
+
+msgid "Battle started"
+msgstr "Бой начат"
+
+#, c-format
+msgid "Battle time: %.1f s"
+msgstr "Время боя: %.1f с"
+
+#, c-format
+msgid "Battles: %d"
+msgstr "Боёв: %d"
+
+msgid "Build time, s"
+msgstr "Время постройки, с"
+
+msgid "Compare"
+msgstr "Сравнение"
+
+msgid "Cooldown, s"
+msgstr "Перезарядка, с"
+
+msgid "DPS"
+msgstr "Урон/с"
+
+msgid "DPS per 100 credits"
+msgstr "Урон/с на 100 кредитов"
+
+msgid "Damage dealt"
+msgstr "Нанесено урона"
+
+msgid "Damage per shot"
+msgstr "Урон за выстрел"
+
+msgid "Difference"
+msgstr "Разница"
+
+#, c-format
+msgid "Distance: %d tiles"
+msgstr "Дистанция: %d клеток"
+
+msgid "Draw"
+msgstr "Ничья"
+
+msgid "Fit view"
+msgstr "Вписать вид"
+
+msgid "Footprint, tiles"
+msgstr "Площадь, клеток"
+
+msgid "HP left"
+msgstr "Осталось HP"
+
+msgid "HP per 100 credits"
+msgstr "HP на 100 кредитов"
+
+msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Fit arena"
+msgstr "СКМ: сдвиг | Колесо: масштаб | 2×СКМ: вписать арену"
+
+msgid "Max HP"
+msgstr "Макс. HP"
+
+msgid "Min range, tiles"
+msgstr "Мин. дальность, клеток"
+
+msgid "Mirror match (same as A)"
+msgstr "Зеркальный бой (тот же юнит, что A)"
+
+msgid "Move speed"
+msgstr "Скорость движения"
+
+msgid "Opponent B"
+msgstr "Противник B"
+
+msgid "Parameter"
+msgstr "Параметр"
+
+msgid "Pause"
+msgstr "Пауза"
+
+msgid "Pick unit B to compare."
+msgstr "Выберите юнита B для сравнения."
+
+msgid "Power, kW"
+msgstr "Энергия, кВт"
+
+msgid "Restart"
+msgstr "Заново"
+
+msgid "Resume"
+msgstr "Продолжить"
+
+msgid "Run batch (no rendering)"
+msgstr "Серия боёв (без отрисовки)"
+
+msgid "Save A first: swapping reloads both files"
+msgstr "Сначала сохраните A: обмен перезагружает оба файла"
+
+msgid "Side"
+msgstr "Сторона"
+
+msgid "Sight radius, tiles"
+msgstr "Радиус обзора, клеток"
+
+msgid "Simulation"
+msgstr "Симуляция"
+
+#, c-format
+msgid "Spacing %.0f px"
+msgstr "Интервал %.0f px"
+
+msgid "Start battle"
+msgstr "Начать бой"
+
+msgid "Step 0.1 s"
+msgstr "Шаг 0,1 с"
+
+msgid "Stop"
+msgstr "Стоп"
+
+msgid "Swap A <-> B"
+msgstr "Поменять A и B"
+
+#, c-format
+msgid "Time limit %.0f s"
+msgstr "Лимит %.0f с"
+
+msgid "Time to kill the other, s"
+msgstr "Время уничтожения соперника, с"
+
+msgid "current values, unsaved edits included"
+msgstr "текущие значения, включая несохранённые правки"
+
+msgid "(RMB - cancel one)"
+msgstr "(ПКМ — отменить один)"
+
+msgid "+20% damage for all vehicles"
+msgstr "+20% урона всей технике"
+
+msgid "Armored machine-gun carrier"
+msgstr "Бронированный пулемётный транспорт"
+
+msgid "Build vehicles at the selected or primary Factory (RMB - cancel)"
+msgstr "Техника строится на выбранном или основном заводе (ПКМ — отмена)"
+
+msgid "COMBAT STIMULANTS"
+msgstr "БОЕВЫЕ СТИМУЛЯТОРЫ"
+
+msgid "CONFEDERACY"
+msgstr "КОНФЕДЕРАЦИЯ"
+
+msgid "FLAMETHROWER"
+msgstr "ОГНЕМЁТЧИК"
+
+msgid "FORTRESS"
+msgstr "КРЕПОСТЬ"
+
+msgid "GRAD"
+msgstr "ГРАД"
+
+msgid "HAMMER"
+msgstr "МОЛОТ"
+
+msgid "HEAVY ASSAULT"
+msgstr "ТЯЖЁЛЫЙ ШТУРМОВИК"
+
+msgid "HEAVY SHELLS"
+msgstr "ТЯЖЁЛЫЕ СНАРЯДЫ"
+
+msgid "Heavy tank (Siege mode [G])"
+msgstr "Тяжёлый танк (осадный режим [G])"
+
+msgid "INSUFFICIENT CREDITS!"
+msgstr "НЕДОСТАТОЧНО КРЕДИТОВ!"
+
+msgid "MARCH"
+msgstr "МАРШ"
+
+msgid "Main battle tank of Confederation"
+msgstr "Основной боевой танк Конфедерации"
+
+msgid "RESEARCH COMPLETE: "
+msgstr "ИССЛЕДОВАНИЕ ЗАВЕРШЕНО: "
+
+msgid "RESISTANCE"
+msgstr "СОПРОТИВЛЕНИЕ"
+
+msgid "Recruit infantry at the selected or primary Barracks (RMB - cancel)"
+msgstr "Пехота обучается в выбранной или основной казарме (ПКМ — отмена)"
+
+msgid "Rocket infantry vs vehicles and walls"
+msgstr "Ракетная пехота против техники и стен"
+
+msgid "Short-range flame infantry vs infantry"
+msgstr "Огнемётная пехота ближнего боя против пехоты"
+
+msgid "Standard Confederation infantry rifleman"
+msgstr "Стандартный стрелок пехоты Конфедерации"
+
+msgid "TECH CENTER REQUIRED FOR RESEARCH!"
+msgstr "ДЛЯ ИССЛЕДОВАНИЙ НУЖЕН ТЕХ-ЦЕНТР!"
+
+msgid "ZEUS"
+msgstr "ЗЕВС"
+
+msgid "[LAB REQUIRED] Research is paused until a Laboratory is built"
+msgstr "[НУЖНА ЛАБОРАТОРИЯ] Исследования стоят, пока не построена лаборатория"
+
+msgid "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
+msgstr "[НУЖЕН ТЕХ-ЦЕНТР] Исследования стоят, пока не построен тех-центр"
+
+msgid "SIEGE ARTILLERY"
+msgstr "ОСАДНАЯ АРТИЛЛЕРИЯ"
+
+msgid "+20% vehicle damage, unlocks the Rhino siege mode"
+msgstr "+20% урона технике, открывает осадный режим «Носорога»"
+
+msgid " (default)"
+msgstr " (по умолчанию)"
+
+msgid "+ Add Weapon"
+msgstr "+ Добавить оружие"
+
+msgid "Delay min / max (s)"
+msgstr "Задержка мин / макс (с)"
+
+msgid "Firing delay"
+msgstr "Задержка стрельбы"
+
+msgid "Fixed"
+msgstr "Постоянная"
+
+msgid "Heavy vehicle"
+msgstr "Тяжёлая техника"
+
+msgid "In the game the wreck stays 120 s and sinks one stage at a time."
+msgstr "В игре остов лежит 120 с и уходит в землю по одной стадии."
+
+msgid "Light vehicle"
+msgstr "Лёгкая техника"
+
+msgid "Muzzle: exit point [X=Forward along facing, Y=Lateral]."
+msgstr "Ствол: точка вылета [X = вперёд по направлению, Y = вбок]."
+
+msgid "Muzzle: exit point on the rotating turret [X=Forward, Y=Lateral]."
+msgstr "Ствол: точка вылета на вращающейся башне [X = вперёд, Y = вбок]."
+
+msgid "Preview corpse"
+msgstr "Показать тело"
+
+msgid "Preview stage (-1 = play)"
+msgstr "Стадия в превью (-1 = проигрывать)"
+
+msgid "Preview wreck"
+msgstr "Показать остов"
+
+msgid "Random (min - max)"
+msgstr "Переменная (мин - макс)"
+
+#, c-format
+msgid "Random delay %.2f - %.2f s (average used above)"
+msgstr "Случайная задержка %.2f - %.2f с (выше — среднее)"
+
+msgid "Rubble 2x2"
+msgstr "Руины 2x2"
+
+msgid "Rubble 3x3"
+msgstr "Руины 3x3"
+
+msgid "Rubble 4x4"
+msgstr "Руины 4x4"
+
+msgid "Stages"
+msgstr "Стадии"
+
+msgid "Use default wreck"
+msgstr "Остов по умолчанию"
+
+msgid "Vehicle"
+msgstr "Техника"
+
+msgid "Wreck"
+msgstr "Остов"
+
+#, c-format
+msgid "Wreck composite %d, %d stage(s)%s"
+msgstr "Композит остова %d, стадий: %d%s"
+
+msgid "Infantry leaves a corpse instead of a wreck: the last frame of its death sequence (death_sequences / flame_death_sequences in Animation)."
+msgstr "Пехота оставляет тело, а не остов: последний кадр анимации смерти (death_sequences / flame_death_sequences в разделе «Анимация»)."
+
+msgid "(unknown)"
+msgstr "(неизвестно)"
+
+msgid "Archetype"
+msgstr "Архетип"
+
+#, c-format
+msgid "Build menu icon: %d"
+msgstr "Иконка в меню стройки: %d"
+
+msgid "Building"
+msgstr "Здание"
+
+#, c-format
+msgid "Faction: %s   Class: %s   Internal type: %s"
+msgstr "Фракция: %s   Класс: %s   Внутренний тип: %s"
+
+#, c-format
+msgid "Faction: %s   Structure type: %s"
+msgstr "Фракция: %s   Тип здания: %s"
+
+#, c-format
+msgid "Hull turn: %.2f s per 45 degrees"
+msgstr "Поворот корпуса: %.2f с на 45°"
+
+#, c-format
+msgid "Produced in: %s (follows from the archetype)"
+msgstr "Производится в: %s (следует из архетипа)"
+
+#, c-format
+msgid "Sprites: archetype %d - idle sequence %d, move sequence %d"
+msgstr "Спрайты: архетип %d — покой %d, движение %d"
+
+#, c-format
+msgid "Sprites: building %d of the game data"
+msgstr "Спрайты: здание %d из данных игры"
+
+msgid "infantry"
+msgstr "пехота"
+
+msgid "vehicle"
+msgstr "техника"
+
+msgid "barracks"
+msgstr "казарма"
+
+msgid "factory"
+msgstr "завод"
+
+#. Character description (assets/characters, by id)
+msgid "bunker_conf.description"
+msgstr "Тяжёлый дот Конфедерации из армированного бетона с автоматической пулемётной амбразурой."
+
+#. Character description (assets/characters, by id)
+msgid "command_center_conf.description"
+msgstr "Главный штаб сил Конфедерации. Координирует операции, обеспечивает поставки кредитов и базовую энергию (+50 кВт)."
+
+#. Character description (assets/characters, by id)
+msgid "infantry_center_conf.description"
+msgstr "Казарма регулярной пехоты Конфедерации: обучает стрелков, тяжёлых штурмовиков с ракетомётами и огнемётчиков."
+
+#. Character description (assets/characters, by id)
+msgid "missile_turret_conf.description"
+msgstr "Автоматическая ракетная башня дальнего действия Конфедерации с независимой поворотной пусковой установкой."
+
+#. Character description (assets/characters, by id)
+msgid "power_generator_conf.description"
+msgstr "Мощная электростанция (+100 кВт). Питает танковые заводы, тех-центры и ракетные башни."
+
+#. Character description (assets/characters, by id)
+msgid "radar_locator_conf.description"
+msgstr "Радиолокационная вышка Конфедерации с вращающейся антенной для обзора большой территории."
+
+#. Character description (assets/characters, by id)
+msgid "tech_center_conf.description"
+msgstr "Военный научно-технический комплекс: открывает улучшения для танков «Зевс» и РСЗО «Град»."
+
+#. Character description (assets/characters, by id)
+msgid "vehicle_factory_conf.description"
+msgstr "Завод тяжёлой бронетехники: выпускает машины ТМ-40 «Крепость», танки Т-21 «Молот», Т-22 «Зевс» и РСЗО «Град»."
+
+#. Character description (assets/characters, by id)
+msgid "wall_conf.description"
+msgstr "Прочная стена из армированного бетона, перекрывающая проходы и сдерживающая противника."
+
+#. Character description (assets/characters, by id)
+msgid "flamethrower_conf.description"
+msgstr "Специалист по зачистке укрытий, бункеров и зарослей. Наносит огромный урон струёй высокотемпературного пламени."
+
+#. Character description (assets/characters, by id)
+msgid "fortress_conf.description"
+msgstr "Сверхтяжёлая штурмовая машина Конфедерации с усиленной бронёй и огнемётным вооружением."
+
+#. Character description (assets/characters, by id)
+msgid "grad_conf.description"
+msgstr "Реактивная система залпового огня дальнего действия. В осадном режиме выставляет опоры и становится артиллерией."
+
+#. Character description (assets/characters, by id)
+msgid "grad_conf_siege.description"
+msgstr "Развёрнутая батарея РСЗО «Град»: максимальная дальность поражения вражеских укреплений."
+
+#. Character description (assets/characters, by id)
+msgid "hammer_conf.description"
+msgstr "Основной боевой танк Конфедерации со скорострельной пушкой и башней кругового вращения."
+
+#. Character description (assets/characters, by id)
+msgid "heavy_assault_conf.description"
+msgstr "Штурмовик Конфедерации в экзокостюме с гранатомётом: специалист по прорыву бронетехники и баз."
+
+#. Character description (assets/characters, by id)
+msgid "rifleman_conf.description"
+msgstr "Пехотинец регулярной армии Конфедерации в тактическом бронежилете с автоматической винтовкой."
+
+#. Character description (assets/characters, by id)
+msgid "zeus_conf.description"
+msgstr "Элитный тяжёлый танк Конфедерации с двумя пушками и ракетной установкой на башне."
+
+#. Character description (assets/characters, by id)
+msgid "barracks_res.description"
+msgstr "Полевой учебный лагерь партизан: стрелок, гренадер, снайпер. Прикрыт оборонительным пулемётом."
+
+#. Character description (assets/characters, by id)
+msgid "bunker_res.description"
+msgstr "Бетонный пулемётный бункер Сопротивления для защиты периметра базы от пехоты и лёгкой разведки."
+
+#. Character description (assets/characters, by id)
+msgid "factory_res.description"
+msgstr "Военный завод: выпускает багги «Койот», танки «Броненосец», тяжёлые танки «Носорог» и РСЗО «Дикобраз»."
+
+#. Character description (assets/characters, by id)
+msgid "guard_tower_res.description"
+msgstr "Сторожевая вышка Сопротивления с крупнокалиберным пулемётом и увеличенным радиусом обзора."
+
+#. Character description (assets/characters, by id)
+msgid "headquarters_res.description"
+msgstr "Главный командный пункт партизан Сопротивления. Обеспечивает снабжение, энергию (+50 кВт) и тактический радар."
+
+#. Character description (assets/characters, by id)
+msgid "powerplant_res.description"
+msgstr "Электрогенератор (+100 кВт). Даёт энергию заводам, казармам и оборонительным башням."
+
+#. Character description (assets/characters, by id)
+msgid "research_lab_res.description"
+msgstr "Подземная научно-инженерная лаборатория: открывает тяжёлую технику («Носорог», «Дикобраз») и осадные режимы."
+
+#. Character description (assets/characters, by id)
+msgid "wall_res.description"
+msgstr "Разрушаемая баррикада из мешков с песком и колючей проволоки, задерживающая вражескую технику."
+
+#. Character description (assets/characters, by id)
+msgid "assault_tank_res.description"
+msgstr "Средний штурмовой танк Сопротивления: сбалансированная броня, скорострельная пушка и поворотная башня."
+
+#. Character description (assets/characters, by id)
+msgid "coyote_res.description"
+msgstr "Быстрый разведывательный багги с пулемётной башней кругового вращения. Лучший для разведки и зачистки пехоты."
+
+#. Character description (assets/characters, by id)
+msgid "grenadier_res.description"
+msgstr "Тяжёлый штурмовой партизан, бьющий гранатами по укреплениям и скоплениям пехоты."
+
+#. Character description (assets/characters, by id)
+msgid "heavy_tank_res.description"
+msgstr "Тяжёлый танк прорыва с усиленной лобовой бронёй. После исследования превращается в дальнобойное осадное орудие."
+
+#. Character description (assets/characters, by id)
+msgid "heavy_tank_res_siege.description"
+msgstr "Осадная позиция «Носорога»: опоры выставлены, тяжёлые фугасные снаряды обстреливают позиции врага."
+
+#. Character description (assets/characters, by id)
+msgid "mlrs_res.description"
+msgstr "Мобильная реактивная система залпового огня. Обрушивает разрушительные ракетные залпы на базы и стены врага."
+
+#. Character description (assets/characters, by id)
+msgid "rifleman_res.description"
+msgstr "Лёгкий пехотинец Сопротивления с автоматом."
+
+#. Character description (assets/characters, by id)
+msgid "sniper_res.description"
+msgstr "Стрелок с большой дальностью огня. Может залечь в укрытии (осадный режим [G])."
+
+#. Character description (assets/characters, by id)
+msgid "sniper_res_siege.description"
+msgstr "Снайпер лёжа: максимальная дальность и урон, пока он неподвижен."
+
+#, c-format
+msgid "Description (po key %s):"
+msgstr "Описание (ключ перевода %s):"
+
+#, c-format
+msgid "Siege description (po key %s):"
+msgstr "Описание осадного режима (ключ перевода %s):"
+
+msgid "(no translation yet - add it to po/en.po and po/ru.po)"
+msgstr "(перевода пока нет — добавьте его в po/en.po и po/ru.po)"
+
+msgid "SELECT MAP"
+msgstr "ВЫБОР КАРТЫ"
+
+msgid "START GAME"
+msgstr "НАЧАТЬ ИГРУ"
+
+msgid "MAP SIZE:"
+msgstr "РАЗМЕР КАРТЫ:"
+
+msgid ""
+"- Build up your base.\n"
+"- Destroy the enemy base and all enemy forces."
+msgstr ""
+"- Развивайте базу.\n"
+"- Уничтожьте базу противника и все его силы."
+
+msgid "DIFFICULTY"
+msgstr "СЛОЖНОСТЬ"
+
+msgid "VIDEO"
+msgstr "ВИДЕО"
+
+msgid "GRAPHICS"
+msgstr "ГРАФИКА"
+
+msgid "AUDIO"
+msgstr "ЗВУК"
+
+msgid "GAME"
+msgstr "ИГРА"
+
+msgid "Window mode"
+msgstr "Режим окна"
+
+msgid "Window, borderless fullscreen or exclusive fullscreen"
+msgstr "Окно, полноэкранный без рамки или эксклюзивный полный экран"
+
+msgid "Windowed"
+msgstr "Оконный"
+
+msgid "Borderless"
+msgstr "Без рамки"
+
+msgid "Fullscreen"
+msgstr "Полный экран"
+
+msgid "Desktop"
+msgstr "Рабочий стол"
+
+msgid "Resolution"
+msgstr "Разрешение"
+
+msgid "Display mode of the monitor"
+msgstr "Режим дисплея монитора"
+
+msgid "Size of the game window"
+msgstr "Размер окна игры"
+
+msgid "VSync"
+msgstr "Вертикальная синхронизация"
+
+msgid "Wait for the monitor refresh, no tearing"
+msgstr "Ждать обновления монитора, без разрывов кадра"
+
+msgid "FPS limit"
+msgstr "Лимит FPS"
+
+msgid "Cap on frames per second"
+msgstr "Ограничение числа кадров в секунду"
+
+msgid "Unlimited"
+msgstr "Без лимита"
+
+msgid "Show FPS"
+msgstr "Показывать FPS"
+
+msgid "Frame counter in the corner of the screen"
+msgstr "Счётчик кадров в углу экрана"
+
+msgid "Graphics quality"
+msgstr "Качество графики"
+
+msgid "Fog of war detail and smooth sprite scaling"
+msgstr "Детализация тумана войны и сглаживание спрайтов"
+
+msgid "Low"
+msgstr "Низкое"
+
+msgid "High"
+msgstr "Высокое"
+
+msgid "Default zoom"
+msgstr "Масштаб по умолчанию"
+
+msgid "Map zoom when a mission starts"
+msgstr "Масштаб карты в начале миссии"
+
+msgid "Minimum zoom"
+msgstr "Минимальный масштаб"
+
+msgid "How far the mouse wheel zooms out"
+msgstr "Насколько колесо мыши отдаляет карту"
+
+msgid "Maximum zoom"
+msgstr "Максимальный масштаб"
+
+msgid "How far the mouse wheel zooms in"
+msgstr "Насколько колесо мыши приближает карту"
+
+msgid "Music volume"
+msgstr "Громкость музыки"
+
+msgid "Volume of the soundtrack"
+msgstr "Громкость саундтрека"
+
+msgid "Effects volume"
+msgstr "Громкость эффектов"
+
+msgid "Volume of the sound effects"
+msgstr "Громкость звуковых эффектов"
+
+msgid "DEFAULTS"
+msgstr "ПО УМОЛЧАНИЮ"
+
+msgid "Arrows change the value, Tab switches the page"
+msgstr "Стрелки меняют значение, Tab переключает вкладку"
+
+msgid "KEEP THESE DISPLAY SETTINGS?"
+msgstr "ОСТАВИТЬ ЭТИ НАСТРОЙКИ ЭКРАНА?"
+
+msgid "The previous settings come back automatically in"
+msgstr "Прежние настройки вернутся автоматически через"
+
+msgid "s"
+msgstr "с"
+
+msgid "KEEP"
+msgstr "ОСТАВИТЬ"
+
+msgid "REVERT"
+msgstr "ВЕРНУТЬ"
+
+msgid "Ultra"
+msgstr "Ультра"
+
+msgid "Preset: fog of war detail and sprite scaling"
+msgstr "Пресет: детализация тумана войны и масштабирование спрайтов"
+
+msgid "Sprites at 1/3 of the resolution"
+msgstr "Спрайты в 1/3 разрешения"
+
+msgid "Sprites at 1/2 of the resolution"
+msgstr "Спрайты в 1/2 разрешения"
+
+msgid "Original resolution with smoothing"
+msgstr "Оригинальное разрешение со сглаживанием"
+
+msgid "Smoothing"
+msgstr "Сглаживание"
+
+msgid "Smooth scaling of the sprites instead of hard pixels"
+msgstr "Плавное масштабирование спрайтов вместо резких пикселей"
+
+msgid "Original resolution"
+msgstr "Оригинальное разрешение"
+
+# Map titles (the "title" key of assets/maps/*.json is the msgid)
+msgid "Pukalpa"
+msgstr "Пукальпа"
+
+msgid "Ukayali Shore"
+msgstr "Берег Укаяли"
+
+msgid "Capture of Miguel"
+msgstr "Захват Мигеля"
+
+msgid "Outpost / Meat Grinder"
+msgstr "Застава / Мясорубка"
+
+msgid "Outpost"
+msgstr "Застава"
+
+msgid "Meat Grinder"
+msgstr "Мясорубка"
+
+msgid "Gorge Assault"
+msgstr "Штурм в ущелье"
+
+msgid "Last Stand"
+msgstr "Последний бой"
+
+msgid "Demo Map"
+msgstr "Демо-карта"
+
+msgid "Matter of Seconds"
+msgstr "Счет на секунды"
+
+msgid "Radio Station"
+msgstr "Радиостанция"
+
+msgid "The Return"
+msgstr "Возвращение"
+
+msgid "Jungle"
+msgstr "Джунгли"
+
+msgid "Sabotage"
+msgstr "Диверсия"
+
+msgid "The Gorge"
+msgstr "Ущелье"
+
+msgid "Lima"
+msgstr "Лима"
+
+msgid "Sabotage / The Gorge"
+msgstr "Диверсия / Ущелье"
+
+msgid "MAP EDITOR"
+msgstr "РЕДАКТОР КАРТ"
+
+msgid "Map editor (openaow-mapeditor) not found next to the game"
+msgstr "Редактор карт (openaow-mapeditor) не найден рядом с игрой"
+
+# Research (original technology names and descriptions)
+msgid "POWER SUIT"
+msgstr "Энергетический костюм"
+
+msgid "+2 armor for all infantry."
+msgstr "Увеличивает броню всей пехоты на 2."
+
+msgid "BIO SUIT"
+msgstr "Био-костюм"
+
+msgid ""
+"Health regeneration of all infantry is 3 times faster.\n"
+"Requires: Power Suit."
+msgstr ""
+"Для всей пехоты скорость регенерации здоровья увеличивается в 3 раза.\n"
+"Требует: Энергетический костюм."
+
+msgid "RAPID FIRE"
+msgstr "Повыш. скорострельность"
+
+msgid "Rate of fire of Assault infantry +50%."
+msgstr "Скорострельность штурмовиков увеличивается на 50%."
+
+msgid "ARMOR-PIERCING ROUNDS"
+msgstr "Бронебойные пули"
+
+msgid "Damage of Assault infantry +40%."
+msgstr "Поражающая способность штурмовиков увеличивается на 40%."
+
+msgid "IMPROVED SMALL ROCKETS"
+msgstr "Усил. малые ракеты"
+
+msgid "Damage of Heavy Assault infantry +40%."
+msgstr "Поражающая способность тяжелых штурмовиков увеличивается на 40%."
+
+msgid "LAVA FUEL MIX"
+msgstr "Горючая смесь 'Лава'"
+
+msgid "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
+msgstr "Позволяет создавать огнеметчиков. Огнемет не причиняет вреда пехоте и технике Конфедерации, благодаря огнеупорной броне."
+
+msgid "VULCAN HEAVY FLAMETHROWER"
+msgstr "Тяж. огнемет 'Вулкан'"
+
+msgid ""
+"A heavy flamethrower is mounted on the TM-40 Fortress.\n"
+"Requires: Lava Fuel Mix."
+msgstr ""
+"Тяжелый огнемет устанавливается на ТМ-40 'Крепость'.\n"
+"Требует: Горючая смесь 'Лава'."
+
+msgid "Damage of Zeus and Hammer tanks +25%."
+msgstr "Увеличивает поражающую способность танков 'Зевс' и 'Молот' на 25%."
+
+msgid "REINFORCED ENGINE"
+msgstr "Усиленный двигатель"
+
+msgid "Speed of all vehicles +1."
+msgstr "Увеличивает скорость всей техники на 1."
+
+msgid "POWER ARMOR"
+msgstr "Энергетическая броня"
+
+msgid ""
+"+2 armor for all vehicles.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Увеличивает броню всей техники на 2.\n"
+"Требует: Усиленный двигатель."
+
+msgid "DAMAGE DIAGNOSTICS"
+msgstr "Диагностика повреждений"
+
+msgid ""
+"Vehicle repair is 3 times faster.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Увеличивает скорость ремонта техники в 3 раза.\n"
+"Требует: Усиленный двигатель."
+
+msgid "FAST RELOAD"
+msgstr "Быстрая перезарядка"
+
+msgid ""
+"Reload time of Zeus and Hammer tanks is shorter.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Снижает время перезарядки танков 'Зевс' и 'Молот'.\n"
+"Требует: Усиленный двигатель."
+
+msgid "ROCKET LAUNCHER MOUNT"
+msgstr "Маш. ракетная установка"
+
+msgid ""
+"A turret with heavy rockets is mounted on the Zeus tank.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Поворотная ракетная установка с тяжелыми ракетами. Устанавливается на танк 'Зевс'.\n"
+"Требует: Усиленный двигатель"
+
+msgid "GRAD-5 MLRS"
+msgstr "РСЗО Град-5"
+
+msgid "Unlocks production of the Grad-5 multiple launch rocket system."
+msgstr "Позволяет производить реактивную систему залпового огня 'Град-5'."
+
+msgid "GRAD-10 MLRS"
+msgstr "РСЗО Град-10"
+
+msgid ""
+"Grad-5 upgrade: rocket range +15%, damage +30%.\n"
+"Requires: Grad-5 MLRS."
+msgstr ""
+"Модернизация РСЗО 'Град-5'. Увеличивает дальность полета ракет на 15% и поражающую способность - на 30%.\n"
+"Требует: РСЗО 'Град-5'."
+
+msgid "REINFORCED GENERATOR"
+msgstr "Усиленный генератор"
+
+msgid "Power output +30%."
+msgstr "Увеличивает количество вырабатываемой энергии на 30%."
+
+msgid "TITANIUM PLATING"
+msgstr "Титановая обшивка"
+
+msgid "Armor of all structures +50%."
+msgstr "Увеличивает броню всех сооружений на 50%."
+
+msgid "ACTIVE WALL ARMOR"
+msgstr "Активная броня стен"
+
+msgid "Walls are twice as durable."
+msgstr "Увеличивает прочность стен в 2 раза."
+
+msgid "WARNING SYSTEM"
+msgstr "Система предупреждения"
+
+msgid "Unlocks the construction of radar locators."
+msgstr "Позволяет строить локаторы."
+
+msgid "EXPRESS INFANTRY SCHOOL"
+msgstr "Экспресс-школа пехоты"
+
+msgid "Infantry training time -30%."
+msgstr "Снижает время подготовки пехоты на 30%."
+
+msgid "ASSEMBLY LINE UPGRADE"
+msgstr "Модернизация конвейера"
+
+msgid "Vehicle production time -30%."
+msgstr "Снижает время производства техники на 30%."
+
+msgid "FINANCE DEPARTMENT"
+msgstr "Финансовый отдел"
+
+msgid "Income +20%."
+msgstr "Увеличивает финансирование на 20%."
+
+msgid "MOTIVATION SYSTEM"
+msgstr "Система мотивации"
+
+msgid "Reward for every destroyed enemy unit +50%."
+msgstr "Вознаграждение за каждого уничтоженного юнита противника увеличивается на 50%."
+
+msgid "COMMUNICATION SYSTEM"
+msgstr "Система связи"
+
+msgid "Base building radius +25%."
+msgstr "Увеличивает радиус строительства базы на 25%."
+
+msgid "TITANIUM VEST"
+msgstr "Титановый бронежилет"
+
+msgid "+1 armor for all infantry."
+msgstr "Увеличивает броню всей пехоты на 1."
+
+msgid "PERSONAL MEDKIT"
+msgstr "Персональная аптечка"
+
+msgid "Health regeneration of all infantry is 3 times faster."
+msgstr "Для всей пехоты скорость регенерации здоровья увеличивается в 3 раза."
+
+msgid "Rate of fire of riflemen +50%."
+msgstr "Скорострельность пехотинцев увеличивается на 50%."
+
+msgid "STIMULANTS"
+msgstr "Допинг"
+
+msgid "Speed of all infantry +1."
+msgstr "Увеличивает скорость всей пехоты на 1."
+
+msgid "LONG-RANGE ROCKETS"
+msgstr "Ракеты дальнего радиуса"
+
+msgid "Grenadier vision and firing range +1."
+msgstr "Увеличивает зрение и дальность стрельбы гренадеров на 1."
+
+msgid "SNIPERS"
+msgstr "Снайперы"
+
+msgid "Unlocks Sniper infantry."
+msgstr "Позволяет создавать снайперов."
+
+msgid "HORNET-10 RIFLE"
+msgstr "Винтовка 'Шершень-10'"
+
+msgid ""
+"Sniper vision and firing range +2, damage +20%.\n"
+"Requires: Snipers."
+msgstr ""
+"Увеличивает зрение, дальность стрельбы снайперов на 2, а также поражающую способность на 20%.\n"
+"Требует: Снайперы."
+
+msgid "HEAVY MACHINE GUN"
+msgstr "Тяжелый маш. пулемет"
+
+msgid "Damage of Coyote and Armadillo +15%."
+msgstr "Увеличивает поражающую способность койотов и броненосцев на 15%."
+
+msgid "TITANIUM ARMOR"
+msgstr "Титановая броня"
+
+msgid ""
+"+1 armor for all vehicles.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Увеличивает броню всей техники на 1.\n"
+"Требует: Усиленный двигатель."
+
+msgid "REPAIR KIT"
+msgstr "Ремонтный комплект"
+
+msgid ""
+"Reload time of the Rhino tank is shorter.\n"
+"Requires: Reinforced Engine."
+msgstr ""
+"Снижает время перезарядки танка 'Носорог'.\n"
+"Требует: Усиленный двигатель."
+
+msgid "SIEGE MODE"
+msgstr "Осадный режим"
+
+msgid "Allows the Rhino tank to switch to siege mode."
+msgstr "Позволяет переводить танк 'Носорог' в осадный режим."
+
+msgid "PORCUPINE SAM LAUNCHER"
+msgstr "ПРК 'Дикобраз'"
+
+msgid "Unlocks production of the Porcupine rocket launcher."
+msgstr "Позволяет производить ПРК 'Дикобраз'."
+
+msgid "PORCUPINE UPGRADE"
+msgstr "Модернизация 'Дикобраза'"
+
+msgid ""
+"Porcupine upgrade: rocket range +2, damage +15%.\n"
+"Requires: Porcupine rocket launcher."
+msgstr ""
+"Модернизация ПРК 'Дикобраз'. Увеличивает дальность полета ракет на 2 и поражающую способность - на 15%.\n"
+"Требует: ПРК 'Дикобраз'."
+
+msgid "ARMORED PLATING"
+msgstr "Бронированная обшивка"
+
+msgid "FROG MINE"
+msgstr "Мина 'Лягушка'"
+
+msgid "Jumps and explodes in the air, hitting infantry and vehicles within 1 tile."
+msgstr "Подпрыгивает и взрывается в воздухе, поражая пехоту и технику в радиусе 1 клетки."
+
+msgid "MONITOR LIZARD MINE"
+msgstr "Мина 'Варан'"
+
+msgid "A heavy mine that triggers only when a vehicle drives over it."
+msgstr "Тяжелая мина, срабатывающая только при наезде техники."
+
+msgid "ACCELERATED INFANTRY COURSES"
+msgstr "Ускор. курсы пехоты"
+
+msgid "PROPAGANDA DEPARTMENT"
+msgstr "Отдел пропаганды"
+
+msgid "RESEARCH REQUIRED TO TRAIN THIS UNIT!"
+msgstr "ДЛЯ ЭТОГО ЮНИТА НУЖНО ИССЛЕДОВАНИЕ!"
+
+msgid "RESEARCH REQUIRED TO BUILD THIS UNIT!"
+msgstr "ДЛЯ ЭТОГО ЮНИТА НУЖНО ИССЛЕДОВАНИЕ!"
+
+msgid "REQUIRES: "
+msgstr "ТРЕБУЕТ: "
+
+msgid "[REQUIRES] "
+msgstr "[ТРЕБУЕТ] "
+
+msgid "[RESEARCH REQUIRED] "
+msgstr "[НУЖНО ИССЛЕДОВАНИЕ] "
+
+msgid "RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"
+msgstr "ДЛЯ ПОСТРОЙКИ ЛОКАТОРОВ НУЖНО ИССЛЕДОВАНИЕ!"
+
+msgid "HQ BUILD RADIUS INCREASED (+25%)!"
+msgstr "РАДИУС СТРОИТЕЛЬСТВА БАЗЫ УВЕЛИЧЕН (+25%)!"
+
+msgid "DESTROY"
+msgstr "УНИЧТОЖИТЬ"
+
+msgid "CONFIRM?"
+msgstr "ТОЧНО?"
+
+msgid "Structure"
+msgstr "Строение"
+
+msgid "Render API"
+msgstr "API рендера"
+
+msgid "Takes effect after the window is recreated"
+msgstr "Вступит в силу после пересоздания окна"
+
+msgid "Graphics interface that draws the game"
+msgstr "Графический интерфейс, которым рисуется игра"
+
+msgid "Apply render API"
+msgstr "Применить API рендера"
+
+msgid "Applied on the next start of the game"
+msgstr "Применится при следующем запуске игры"
+
+msgid "Recreates the window, then asks to keep it"
+msgstr "Пересоздаёт окно и спрашивает, оставить ли его"
+
+msgid "RECREATE WINDOW"
+msgstr "ПЕРЕСОЗДАТЬ ОКНО"
+
+msgid "KEEP THIS RENDER API?"
+msgstr "ОСТАВИТЬ ЭТОТ API РЕНДЕРА?"
+
+msgid "Needs the SDL GPU render API"
+msgstr "Нужен API рендера SDL GPU"
+
+msgid "Color grading"
+msgstr "Цветокоррекция"
+
+msgid "Off"
+msgstr "Выкл."
+
+msgid "Natural"
+msgstr "Естественная"
+
+msgid "Vivid"
+msgstr "Яркая"
+
+msgid "Cinematic"
+msgstr "Кинематографичная"
+
+msgid "Dusk"
+msgstr "Сумерки"
+
+msgid "Night"
+msgstr "Ночь"
+
+msgid "The picture as drawn"
+msgstr "Картинка как есть"
+
+msgid "A little more contrast and colour"
+msgstr "Чуть больше контраста и цвета"
+
+msgid "Strong colours"
+msgstr "Насыщенные цвета"
+
+msgid "Muted colours, warm light, dark corners"
+msgstr "Приглушённые цвета, тёплый свет, затемнённые углы"
+
+msgid "Evening light"
+msgstr "Вечерний свет"
+
+msgid "Night: explosions light up the dark"
+msgstr "Ночь: взрывы освещают темноту"
+
+msgid "Glow"
+msgstr "Свечение"
+
+msgid "Explosions, shots and projectiles glow"
+msgstr "Взрывы, выстрелы и снаряды светятся"
+
+msgid "Pixel filter"
+msgstr "Фильтр пикселей"
+
+msgid "Crisp pixels with smooth edges when zoomed"
+msgstr "Чёткие пиксели со сглаженными краями при увеличении"
+
+msgid "Sharp"
+msgstr "Чёткий"
+
+msgid "Standard"
+msgstr "Обычный"
+
+msgid "Army color"
+msgstr "Цвет армии"
+
+msgid "Color of your units (classic: the original sheets)"
+msgstr "Цвет ваших юнитов (классический — исходные спрайты)"
+
+msgid "Classic"
+msgstr "Классический"
+
+msgid "Blue"
+msgstr "Синий"
+
+msgid "Red"
+msgstr "Красный"
+
+msgid "Green"
+msgstr "Зелёный"
+
+msgid "Yellow"
+msgstr "Жёлтый"
+
+msgid "Purple"
+msgstr "Фиолетовый"
+
+msgid "Orange"
+msgstr "Оранжевый"
+
+msgid "Cyan"
+msgstr "Бирюзовый"
+
+msgid "White"
+msgstr "Белый"
+
+msgid "NETWORK GAME"
+msgstr "СЕТЕВАЯ ИГРА"
+
+msgid "Random"
+msgstr "Случайно"
+
+msgid "Team"
+msgstr "Команда"
+
+msgid "YOUR GAME"
+msgstr "ВАША ИГРА"
+
+msgid "GAME ROOM"
+msgstr "КОМНАТА ИГРЫ"
+
+msgid "PLAYERS"
+msgstr "ИГРОКИ"
+
+msgid "NOT READY"
+msgstr "НЕ ГОТОВ"
+
+msgid "START"
+msgstr "НАЧАТЬ"
+
+msgid "LEAVE"
+msgstr "ВЫЙТИ"
+
+msgid "The host starts the game"
+msgstr "Игру начинает хост"
+
+msgid "Click a number on the map to start there, again to leave it to chance. Click your faction, team and colour to change them."
+msgstr "Щёлкните номер на карте, чтобы начать там, ещё раз — чтобы оставить случаю. Фракцию, команду и цвет меняет щелчок по ним."
+
+msgid "Enter: chat"
+msgstr "Enter: чат"
+
+msgid "Connecting..."
+msgstr "Подключение..."
+
+msgid "CANCEL"
+msgstr "ОТМЕНА"
+
+msgid "Your name"
+msgstr "Ваше имя"
+
+msgid "LOCAL NETWORK"
+msgstr "ЛОКАЛЬНАЯ СЕТЬ"
+
+msgid "INTERNET"
+msgstr "ИНТЕРНЕТ"
+
+msgid "Looking for games on the local network..."
+msgstr "Поиск игр в локальной сети..."
+
+msgid "Address of the host (host or host:port, port 38100 by default)"
+msgstr "Адрес хоста (хост или хост:порт, по умолчанию порт 38100)"
+
+msgid "To be reachable from the internet the host forwards UDP port 38100 on its router. A server list and room codes through openaow.imister.tech come with the dedicated server."
+msgstr "Чтобы хост был доступен из интернета, на его роутере нужно пробросить UDP-порт 38100. Список серверов и коды комнат через openaow.imister.tech появятся вместе с выделенным сервером."
+
+msgid "CREATE GAME"
+msgstr "СОЗДАТЬ ИГРУ"
+
+msgid "JOIN"
+msgstr "ПОДКЛЮЧИТЬСЯ"
+
+msgid "Enter an address: host or host:port"
+msgstr "Введите адрес: хост или хост:порт"
+
+msgid "Cannot create the game: "
+msgstr "Не удалось создать игру: "
+
+msgid "Cannot connect: "
+msgstr "Не удалось подключиться: "
+
+msgid "The connection was lost"
+msgstr "Соединение потеряно"
+
+msgid "Not admitted: "
+msgstr "Не пустили: "
+
+msgid "Resistance"
+msgstr "Сопротивление"
+
+msgid "Confederation"
+msgstr "Конфедерация"
+
+msgid "CONNECT"
+msgstr "ПОДКЛЮЧИТЬСЯ"
+
+msgid "SERVER"
+msgstr "СЕРВЕР"
+
+msgid "REFRESH"
+msgstr "ОБНОВИТЬ"
+
+msgid "No open rooms: create one, or join by code"
+msgstr "Открытых комнат нет: создайте свою или войдите по коду"
+
+msgid "Room code"
+msgstr "Код комнаты"
+
+msgid "JOIN BY CODE"
+msgstr "ВОЙТИ ПО КОДУ"
+
+msgid "CREATE ON SERVER"
+msgstr "СОЗДАТЬ НА СЕРВЕРЕ"
+
+msgid "Direct connection: host or host:port (port 38100 by default; the host forwards UDP 38100)"
+msgstr "Прямое подключение: хост или хост:порт (по умолчанию 38100; хост пробрасывает UDP 38100)"
+
+msgid "A room code has six characters"
+msgstr "В коде комнаты шесть символов"
+
+msgid "Server: "
+msgstr "Сервер: "
+
+msgid "connecting..."
+msgstr "подключение..."
+
+msgid "OUT OF SYNC at tick "
+msgstr "РАССИНХРОН на тике "
+
+msgid ": the players' games differ, the result is not reliable"
+msgstr ": игры игроков различаются, результату нельзя доверять"
+
+msgid "Connection lost: reconnecting..."
+msgstr "Соединение потеряно: переподключение..."
+
+msgid "Catching up with the match: "
+msgstr "Догоняем матч: "
+
+msgid "Waiting for the host..."
+msgstr "Ожидание хоста..."
+
+msgid "Downloading the map..."
+msgstr "Загрузка карты..."
+
+msgid "AI"
+msgstr "ИИ"
+
+msgid "+ AI PLAYER"
+msgstr "+ ИИ-ИГРОК"
+
+msgid "PAUSED by "
+msgstr "ПАУЗА: "
+
+msgid "P to go on"
+msgstr "P — продолжить"
+
+msgid "code"
+msgstr "код"
+
+msgid "MILITARY RANK"
+msgstr "ЗВАНИЕ"
+
+msgid "RANK & SERVICE RECORD"
+msgstr "ЗВАНИЕ И ДОСТИЖЕНИЯ"
+
+msgid "Commander of Peru Resistance Forces"
+msgstr "Командующий силами Сопротивления Перу"
+
+msgid "Military Rank: Lieutenant-General"
+msgstr "Воинское звание: Генерал-лейтенант"
+
+msgid "Faction: Resistance (Red)"
+msgstr "Фракция: Сопротивление (Красные)"
+
+msgid "Campaign Victories: 8 of 8"
+msgstr "Победы в кампаниях: 8 из 8"
+
+msgid "Confederation Bases Destroyed: 24"
+msgstr "Уничтожено баз Конфедерации: 24"
+
+msgid "Medals: Liberator Star, Medal of Courage"
+msgstr "Награды: Звезда Освободителя, Медаль за Отвагу"
+
+msgid "Combat Readiness: 100%"
+msgstr "Боевая готовность: 100%"
+
+msgid "Technology name"
+msgstr "Название технологии"
+
+msgid "Technology description"
+msgstr "Описание технологии"
+
+msgid "Research cost (credits)"
+msgstr "Цена исследования (кредиты)"
+
+msgid "Icon: %d"
+msgstr "Значок: %d"
+
+msgid "Effect"
+msgstr "Эффект"
+
+msgid "Value"
+msgstr "Значение"
+
+msgid "Second value"
+msgstr "Второе значение"
+
+msgid "Unit A"
+msgstr "Юнит A"
+
+msgid "Unit B"
+msgstr "Юнит B"
+
+msgid "Requires"
+msgstr "Требует"
+
+msgid "Player only"
+msgstr "Только для игрока"
+
+msgid "Save research"
+msgstr "Сохранить исследования"
+
+msgid "Reload"
+msgstr "Перечитать"
+
+msgid "Technology #%d"
+msgstr "Технология №%d"
+
+msgid "The research file could not be loaded."
+msgstr "Файл исследований не загрузился."
+
+msgid "No research list in "
+msgstr "Нет списка исследований в "
+
+msgid "Value / second value: see the effect list in game/Research.hpp"
+msgstr "Значения: см. список эффектов в game/Research.hpp"
+
+msgid "Research"
+msgstr "Исследования"
+
+msgid "Shows the edited character on a canvas: idle, moving, attacking, dying."
+msgstr "Показывает редактируемого персонажа на холсте: стоит, идёт, атакует, погибает."
+
+msgid "Puts the edited character (A) next to another one (B) and compares their numbers."
+msgstr "Ставит редактируемого персонажа (A) рядом с другим (B) и сравнивает их показатели."
+
+msgid "Runs a battle of A against B with the game's combat rules."
+msgstr "Запускает бой A против B по боевым правилам игры."
+
+msgid "Edits the technology trees of both factions (assets/characters/research_*.yaml)."
+msgstr "Правка деревьев технологий обеих фракций (assets/characters/research_*.yaml)."
+
+msgid "Standing still animation."
+msgstr "Анимация покоя."
+
+msgid "Walking animation: the unit drives right, turns around and returns."
+msgstr "Анимация движения: юнит едет вправо, разворачивается и возвращается."
+
+msgid "Fires the weapons at the target point with the current weapon settings."
+msgstr "Стрельба по точке цели с текущими настройками оружия."
+
+msgid "Death animation of the unit or building."
+msgstr "Анимация гибели юнита или здания."
+
+msgid "Shows the remains left after death, stage by stage."
+msgstr "Показывает остов, остающийся после гибели, стадию за стадией."
+
+msgid "Plays the burning death variant of infantry."
+msgstr "Показывает вариант гибели пехоты от огня."
+
+msgid "Back to the mobile form (hotkey G)."
+msgstr "Вернуть подвижную форму (клавиша G)."
+
+msgid "Switches the unit to its stationary siege form (hotkey G)."
+msgstr "Переводит юнит в неподвижную осадную форму (клавиша G)."
+
+msgid "Restart the death animation again and again."
+msgstr "Повторять анимацию гибели по кругу."
+
+msgid "Resets the camera position and zoom."
+msgstr "Сбрасывает положение и масштаб камеры."
+
+msgid "Direction of the hull, 0-7 in 45 degree steps. Also set with the right mouse button on the canvas."
+msgstr "Направление корпуса, 0-7 с шагом 45°. Также задаётся правой кнопкой мыши на холсте."
+
+msgid "Direction of the turret, 0-7. Also set with the left mouse button on the canvas."
+msgstr "Направление башни, 0-7. Также задаётся левой кнопкой мыши на холсте."
+
+msgid "The turret follows the hull direction."
+msgstr "Башня поворачивается вместе с корпусом."
+
+msgid "Playback speed of the preview animations."
+msgstr "Скорость воспроизведения анимаций."
+
+msgid "Flight speed of bullets and shells in pixels per second (combat.bullet_speed)."
+msgstr "Скорость полёта пуль и снарядов в пикселях в секунду (combat.bullet_speed)."
+
+msgid "Speed multiplier of shot and hit animations (combat.fx_speed)."
+msgstr "Множитель скорости анимации выстрела и попадания (combat.fx_speed)."
+
+msgid "Magnification of the canvas. The mouse wheel over the canvas does the same."
+msgstr "Масштаб холста. То же делает колесо мыши над холстом."
+
+msgid "Puts the target point back in front of the unit."
+msgstr "Возвращает точку цели перед юнитом."
+
+msgid "Draws the attack range as a red circle (the minimum range is drawn inside it)."
+msgstr "Рисует дальность атаки красным кругом (минимальная дальность — внутри него)."
+
+msgid "Draws the sight radius as a green circle."
+msgstr "Рисует радиус обзора зелёным кругом."
+
+msgid "Draws a 5x5 tile grid under the character."
+msgstr "Рисует сетку 5x5 клеток под персонажем."
+
+msgid "Shows damage, DPS, range and burst figures over the canvas."
+msgstr "Показывает урон, DPS, дальность и очередь поверх холста."
+
+msgid "Health shown in the preview: damaged units and buildings look different."
+msgstr "Здоровье в превью: повреждённые юниты и здания выглядят иначе."
+
+msgid "Construction progress of the building shown in the preview."
+msgstr "Степень достройки здания в превью."
+
+msgid "Building with or without power (radars and turrets stop without it)."
+msgstr "Здание с питанием или без (без питания радары и башни не работают)."
+
+msgid "Shows the siege form of the unit with its own stats and weapon."
+msgstr "Показывает осадную форму юнита с её характеристиками и оружием."
+
+msgid "Filters the list by name, id, number or faction."
+msgstr "Фильтр списка по имени, id, номеру или фракции."
+
+msgid "Show units and buildings."
+msgstr "Показать юнитов и здания."
+
+msgid "Show units only."
+msgstr "Только юниты."
+
+msgid "Show buildings only."
+msgstr "Только здания."
+
+msgid "Width of this panel in pixels. The splitter between the panels works too."
+msgstr "Ширина этой панели в пикселях. Можно также тянуть разделитель между панелями."
+
+msgid "Narrow panel."
+msgstr "Узкая панель."
+
+msgid "Medium panel."
+msgstr "Средняя панель."
+
+msgid "Wide panel."
+msgstr "Широкая панель."
+
+msgid "Identity of the character: id, name and what it is in the game."
+msgstr "Идентификация персонажа: id, имя и что это в игре."
+
+msgid "Footprint, health, sight and speed."
+msgstr "Размер, здоровье, обзор и скорость."
+
+msgid "Price, build time and power of the character."
+msgstr "Цена, время производства и мощность."
+
+msgid "Settings shared by all weapons, and the weapons list."
+msgstr "Общие настройки оружия и список оружия."
+
+msgid "Which sprite sequences the game uses (derived from the archetype, read only)."
+msgstr "Какие спрайтовые последовательности использует игра (следуют из архетипа, только чтение)."
+
+msgid "Siege mode and upgraded / baseline forms."
+msgstr "Осадный режим и улучшенные / базовые формы."
+
+msgid "Unique text id of the configuration, e.g. rifleman_conf. The description in po/*.po is found by it."
+msgstr "Уникальный текстовый id конфигурации, например rifleman_conf. По нему ищется описание в po/*.po."
+
+msgid "Name shown in the game."
+msgstr "Название, которое видно в игре."
+
+msgid "Kind of building. The faction, structure type and sprites follow from it."
+msgstr "Вид здания. Из него следуют фракция, тип постройки и спрайты."
+
+msgid "Kind of unit. The faction, class, production building and sprites follow from it."
+msgstr "Вид юнита. Из него следуют фракция, класс, здание-производитель и спрайты."
+
+msgid "Width of the building on the map in tiles."
+msgstr "Ширина здания на карте в клетках."
+
+msgid "Height of the building on the map in tiles."
+msgstr "Высота здания на карте в клетках."
+
+msgid "Health points of the unit or building."
+msgstr "Очки здоровья юнита или здания."
+
+msgid "How far it sees, in tiles."
+msgstr "Как далеко он видит, в клетках."
+
+msgid "Speed of the unit in internal simulation units."
+msgstr "Скорость юнита во внутренних единицах симуляции."
+
+msgid "Price in credits."
+msgstr "Цена в кредитах."
+
+msgid "Positive: the building generates power. Negative: it consumes power."
+msgstr "Положительное — здание вырабатывает энергию, отрицательное — потребляет."
+
+msgid "Seconds to train the unit or build the building."
+msgstr "Секунд на производство юнита или строительство здания."
+
+msgid "Icon of the building in the construction menu (cameo composite)."
+msgstr "Значок здания в меню строительства (композит-картинка)."
+
+msgid "Whether the building shoots. If off, the weapons are ignored."
+msgstr "Стреляет ли здание. Если выключено, оружие игнорируется."
+
+msgid "Flight speed of projectiles in pixels per second. Used by the preview."
+msgstr "Скорость полёта снарядов в пикселях в секунду. Используется превью."
+
+msgid "Speed multiplier of the shot and hit animations in the preview."
+msgstr "Множитель скорости анимаций выстрела и попадания в превью."
+
+msgid "Random deviation of a shot in degrees. 0 = every shot hits the aimed point."
+msgstr "Случайный разброс выстрела в градусах. 0 — каждый выстрел точно в цель."
+
+msgid "The turret turns independently of the hull."
+msgstr "Башня поворачивается независимо от корпуса."
+
+msgid "The radar dish of the building rotates."
+msgstr "Антенна радара здания вращается."
+
+msgid "Pivot of the turret relative to the hull centre in pixels (hull faces south)."
+msgstr "Центр вращения башни относительно центра корпуса в пикселях (корпус смотрит на юг)."
+
+msgid "Removes the custom value: the game default for this unit is used."
+msgstr "Убирает своё значение: берётся значение игры по умолчанию для этого юнита."
+
+msgid "Disabled weapons are neither used nor tested."
+msgstr "Отключённое оружие не используется и не проверяется."
+
+msgid "Deletes this weapon from the list."
+msgstr "Удаляет это оружие из списка."
+
+msgid "Name of the weapon (information only)."
+msgstr "Название оружия (только для справки)."
+
+msgid "Kind of projectile: decides the flight, the hit effect and the default spread."
+msgstr "Тип снаряда: определяет полёт, эффект попадания и разброс по умолчанию."
+
+msgid "Damage of one shot."
+msgstr "Урон одного выстрела."
+
+msgid "Maximum firing distance in tiles."
+msgstr "Максимальная дальность стрельбы в клетках."
+
+msgid "Closer targets cannot be attacked (artillery). 0 = no limit."
+msgstr "Ближние цели атаковать нельзя (артиллерия). 0 — без ограничения."
+
+msgid "Fixed: the same pause after every attack. Random: a new pause between min and max each time."
+msgstr "Фиксированная: одна и та же пауза после каждой атаки. Случайная: новая пауза между минимумом и максимумом."
+
+msgid "Shortest and longest pause between attack cycles in seconds."
+msgstr "Самая короткая и самая длинная пауза между циклами атаки в секундах."
+
+msgid "Pause between attack cycles in seconds."
+msgstr "Пауза между циклами атаки в секундах."
+
+msgid "Shots in one attack cycle."
+msgstr "Выстрелов в одном цикле атаки."
+
+msgid "Time between shots of one burst."
+msgstr "Время между выстрелами одной очереди."
+
+msgid "Share of the damage dealt to targets next to the hit point. 0 = single target."
+msgstr "Доля урона по целям рядом с точкой попадания. 0 — только одна цель."
+
+msgid "Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways."
+msgstr "Откуда вылетают снаряды, относительно корпуса (или башни): X вперёд, Y вбок."
+
+msgid "The weapon only works after the matching technology is researched."
+msgstr "Оружие работает только после изучения нужной технологии."
+
+msgid "The weapon is used only for targets closer than this."
+msgstr "Оружие применяется только по целям ближе этого расстояния."
+
+msgid "Adds a second weapon (e.g. a flamethrower for close targets)."
+msgstr "Добавляет второе оружие (например огнемёт для ближних целей)."
+
+msgid "Adds the main weapon."
+msgstr "Добавляет основное оружие."
+
+msgid "Preview only: pretend the research for the second weapon is done."
+msgstr "Только превью: считать изученной технологию для второго оружия."
+
+msgid "Preview only: which weapon fires. Auto picks by distance."
+msgstr "Только превью: какое оружие стреляет. Авто — по расстоянию."
+
+msgid "Preview the siege form (hotkey G)."
+msgstr "Показать осадную форму (клавиша G)."
+
+msgid "The unit can switch to a stationary siege form."
+msgstr "Юнит может переходить в неподвижную осадную форму."
+
+msgid "Archetype number of the siege form."
+msgstr "Номер архетипа осадной формы."
+
+msgid "For siege / baseline forms: the base unit they belong to."
+msgstr "Для осадных / базовых форм: к какому юниту они относятся."
+
+msgid "Stats and weapon of the siege form stored in this file."
+msgstr "Характеристики и оружие осадной формы, хранящиеся в этом файле."
+
+msgid "Whether the siege form is available."
+msgstr "Доступна ли осадная форма."
+
+msgid "Archetype number of the siege form (14-18)."
+msgstr "Номер архетипа осадной формы (14-18)."
+
+msgid "Name of the siege form."
+msgstr "Название осадной формы."
+
+msgid "Sight radius in tiles."
+msgstr "Радиус обзора в клетках."
+
+msgid "Speed in the siege form. 0 = cannot move."
+msgstr "Скорость в осадной форме. 0 — не двигается."
+
+msgid "Creates a siege form with its own stats and weapon."
+msgstr "Создаёт осадную форму со своими характеристиками и оружием."
+
+msgid "Weapon of the unit before the research upgrade."
+msgstr "Оружие юнита до улучшения исследованием."
+
+msgid "Writes the character to its file (Ctrl+S)."
+msgstr "Записывает персонажа в его файл (Ctrl+S)."
+
+msgid "File name inside assets/characters for a copy."
+msgstr "Имя файла в assets/characters для копии."
+
+msgid "Saves a copy under the typed file name and opens it."
+msgstr "Сохраняет копию под введённым именем и открывает её."
+
+msgid "Discards unsaved edits and reads the file again."
+msgstr "Отбрасывает несохранённые правки и читает файл заново."
+
+msgid "Shows the corpse left by the infantry."
+msgstr "Показывает труп, остающийся от пехоты."
+
+msgid "Number of burial stages of the wreck."
+msgstr "Число стадий погребения остова."
+
+msgid "Stage shown in the preview. -1 plays all the stages in a loop."
+msgstr "Стадия в превью. -1 — все стадии по кругу."
+
+msgid "Shows the wreck in the preview."
+msgstr "Показывает остов в превью."
+
+msgid "Removes the custom wreck: the game default for this unit is used."
+msgstr "Убирает свой остов: берётся остов по умолчанию для этого юнита."
+
+msgid "Character to compare with or to fight against."
+msgstr "Персонаж для сравнения или боя."
+
+msgid "Swaps the characters. Save A first: both files are reloaded."
+msgstr "Меняет персонажей местами. Сначала сохраните A: оба файла перечитываются."
+
+msgid "Distance between A and B on the canvas."
+msgstr "Расстояние между A и B на холсте."
+
+msgid "Table of numbers: green = better, red = worse."
+msgstr "Таблица показателей: зелёный — лучше, красный — хуже."
+
+msgid "How many units of A fight."
+msgstr "Сколько юнитов A участвует в бою."
+
+msgid "How many units of B fight."
+msgstr "Сколько юнитов B участвует в бою."
+
+msgid "Starting distance between the sides in tiles."
+msgstr "Начальное расстояние между сторонами в клетках."
+
+msgid "B walks toward A from the start. Off: B stands and waits."
+msgstr "B идёт на A с начала боя. Выключено: B стоит на месте."
+
+msgid "The battle is a draw when this time runs out."
+msgstr "Если время вышло, бой считается ничьей."
+
+msgid "Starts a battle with the current settings."
+msgstr "Запускает бой с текущими настройками."
+
+msgid "Starts the battle again."
+msgstr "Запускает бой заново."
+
+msgid "Pauses the battle."
+msgstr "Ставит бой на паузу."
+
+msgid "Continues the battle."
+msgstr "Продолжает бой."
+
+msgid "Advances a paused battle by 0.1 s."
+msgstr "Продвигает бой на паузе на 0,1 с."
+
+msgid "Ends the battle."
+msgstr "Заканчивает бой."
+
+msgid "Frames all the fighters."
+msgstr "Показывает всех бойцов."
+
+msgid "Speed of the battle."
+msgstr "Скорость боя."
+
+msgid "How many battles the batch runs."
+msgstr "Сколько боёв проведёт серия."
+
+msgid "Runs many battles at once without drawing and shows the win statistics."
+msgstr "Проводит много боёв сразу без отрисовки и показывает статистику побед."
+
+msgid "Technology tree of the Confederation (Tech Center)."
+msgstr "Дерево технологий Конфедерации (Технический центр)."
+
+msgid "Technology tree of the Resistance (Laboratory)."
+msgstr "Дерево технологий Сопротивления (Лаборатория)."
+
+msgid "Writes the tree to assets/characters/research_<faction>.yaml (Ctrl+S)."
+msgstr "Записывает дерево в assets/characters/research_<фракция>.yaml (Ctrl+S)."
+
+msgid "Name of the technology (a translation key from po/*.po)."
+msgstr "Название технологии (ключ перевода из po/*.po)."
+
+msgid "Text shown in the game (a translation key from po/*.po)."
+msgstr "Текст в игре (ключ перевода из po/*.po)."
+
+msgid "Price of the technology in credits."
+msgstr "Цена технологии в кредитах."
+
+msgid "Picture of the technology in the research menu."
+msgstr "Картинка технологии в меню исследований."
+
+msgid "What the technology does. Value and second value depend on it."
+msgstr "Что делает технология. От неё зависят значение и второе значение."
+
+msgid "Main number of the effect: percent, points or tiles (see the effect)."
+msgstr "Основное число эффекта: проценты, очки или клетки (зависит от эффекта)."
+
+msgid "Extra number of the effect, e.g. the damage bonus of range upgrades."
+msgstr "Дополнительное число эффекта, например бонус урона у улучшений дальности."
+
+msgid "The unit the effect is about. Siege forms count as their base unit."
+msgstr "Юнит, к которому относится эффект. Осадные формы считаются базовым юнитом."
+
+msgid "A second unit the effect is about (optional)."
+msgstr "Второй юнит, к которому относится эффект (необязательно)."
+
+msgid "Technology that has to be researched first. The tree is drawn from it."
+msgstr "Технология, которую надо изучить раньше. По ней строится дерево."
+
+msgid "The effect is meaningless for the AI, so the AI skips it."
+msgstr "Эффект не имеет смысла для ИИ, он его пропускает."
+
+msgid "Browser of all sprites with their dependencies, and exports of the sprites for repacking the assets."
+msgstr "Обзор всех спрайтов с их зависимостями и экспорт спрайтов для перепаковки assets."
+
+msgid "Show the objects of every group."
+msgstr "Показать объекты всех групп."
+
+msgid "Show only units (sequences of the archetype, death animations, wrecks)."
+msgstr "Только юниты (последовательности архетипа, анимации гибели, остовы)."
+
+msgid "Show only buildings, walls and the construction scaffolding."
+msgstr "Только здания, стены и строительные леса."
+
+msgid "Show only terrain: the tiles of the tilesets and the decorations of the maps."
+msgstr "Только местность: тайлы тайлсетов и декорации карт."
+
+msgid "Show the rest: interface, effects, projectiles and sprites nobody uses."
+msgstr "Остальное: интерфейс, эффекты, снаряды и спрайты, которые никто не использует."
+
+msgid "Filters the objects by name, faction, kind or number."
+msgstr "Фильтр объектов по имени, фракции, виду или номеру."
+
+msgid "Folder the files are written to (it is created when missing). Relative paths start at the current folder."
+msgstr "Каталог, куда пишутся файлы (создаётся, если его нет). Относительный путь считается от текущего каталога."
+
+msgid "Opens the system dialog to pick the output folder."
+msgstr "Открывает системный диалог выбора каталога вывода."
+
+msgid "Writes one PNG atlas and one JSON for every object, plus index.json."
+msgstr "Записывает PNG-атлас и JSON для каждого объекта, а также index.json."
+
+msgid "Writes the PNG atlas and the JSON of the object picked in the list."
+msgstr "Записывает PNG-атлас и JSON выбранного в списке объекта."
+
+msgid "Include the sprites used by units."
+msgstr "Включить спрайты юнитов."
+
+msgid "Include the sprites used by buildings and walls."
+msgstr "Включить спрайты зданий и стен."
+
+msgid "Include the terrain tiles and map decorations."
+msgstr "Включить тайлы местности и декорации карт."
+
+msgid "Include the interface, effects and all the other sprites."
+msgstr "Включить интерфейс, эффекты и все остальные спрайты."
+
+msgid "How many sprites are in a row of the big PNG. The cells are as large as the biggest sprite."
+msgstr "Сколько спрайтов в строке большого PNG. Ячейка равна самому большому спрайту."
+
+msgid "One PNG with the chosen groups one after another instead of a file per group."
+msgstr "Один PNG с выбранными группами подряд вместо файла на каждую группу."
+
+msgid "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the cells."
+msgstr "Записывает все спрайты выбранных групп по порядку id строками и столбцами PNG, плюс JSON с ячейками."
+
+msgid "Sprite Tools"
+msgstr "Инструменты спрайтов"
+
+msgid "Terrain"
+msgstr "Местность"
+
+msgid "Other"
+msgstr "Прочее"
+
+msgid "Search sprite objects"
+msgstr "Поиск объектов спрайтов"
+
+msgid "Output folder"
+msgstr "Каталог вывода"
+
+msgid "Choose folder..."
+msgstr "Выбрать каталог..."
+
+msgid "Export all objects"
+msgstr "Экспорт всех объектов"
+
+msgid "Export selected object"
+msgstr "Экспорт выбранного объекта"
+
+msgid "Export objects"
+msgstr "Экспорт объектов"
+
+msgid "SINGLE SPRITE EXPORT"
+msgstr "ЭКСПОРТ СПРАЙТОВ ОДНИМ ФАЙЛОМ"
+
+msgid "Columns"
+msgstr "Столбцы"
+
+msgid "All in one file"
+msgstr "Всё в одном файле"
+
+msgid "Export sprites"
+msgstr "Экспорт спрайтов"
+
+msgid "One PNG atlas and one JSON per object (unit, building, tileset) with all the sprites it depends on."
+msgstr "Один PNG-атлас и один JSON на объект (юнит, здание, тайлсет) со всеми спрайтами, от которых он зависит."
+
+msgid "Every sprite in the order of its id, in rows and columns of one big PNG per group."
+msgstr "Все спрайты по порядку id, строками и столбцами одного большого PNG на группу."
+
+msgid "%d objects, %zu sprites"
+msgstr "Объектов: %d, спрайтов: %zu"
+
+msgid "Pick an object in the list: its dependencies (sequences, composites, animations, sprites) are shown here."
+msgstr "Выберите объект в списке: здесь показаны его зависимости (последовательности, композиты, анимации, спрайты)."
+
+msgid "%zu sprites, %zu composites, %zu animations, %zu sequences, %zu buildings"
+msgstr "Спрайтов: %zu, композитов: %zu, анимаций: %zu, последовательностей: %zu, зданий: %zu"
+
+msgid "The sprite data could not be loaded."
+msgstr "Не удалось загрузить данные спрайтов."
+
+msgid "Choose an output folder first."
+msgstr "Сначала выберите каталог вывода."
+
+msgid "IMPORT SPRITES"
+msgstr "ИМПОРТ СПРАЙТОВ"
+
+msgid "WARNING: the import writes into assets/sprites and assets/data/graphics_data.json. Your data there may be overwritten."
+msgstr "ВНИМАНИЕ: импорт пишет в assets/sprites и assets/data/graphics_data.json. Ваши данные там могут быть перезаписаны."
+
+msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to graphics_data.json."
+msgstr "Читает экспортированные файлы объектов и спрайтов из каталога: пиксели изменённых спрайтов возвращаются в листы, изменённые строки таблиц — в graphics_data.json."
+
+msgid "Import folder"
+msgstr "Каталог импорта"
+
+msgid "Choose import folder..."
+msgstr "Выбрать каталог импорта..."
+
+msgid "Import sprites"
+msgstr "Импорт спрайтов"
+
+msgid "Overwrite assets?"
+msgstr "Перезаписать assets?"
+
+msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/graphics_data.json with what is in the folder. Your data there may be lost."
+msgstr "Импорт перезапишет листы спрайтов в assets/sprites и таблицы в assets/data/graphics_data.json тем, что лежит в каталоге. Ваши данные там могут быть потеряны."
+
+msgid "Import and overwrite"
+msgstr "Импортировать и перезаписать"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Select all shown"
+msgstr "Выбрать все показанные"
+
+msgid "Clear selection"
+msgstr "Снять выделение"
+
+msgid "Selected: %zu (Ctrl+click: add, Shift+click: range)"
+msgstr "Выбрано: %zu (Ctrl+клик: добавить, Shift+клик: диапазон)"
+
+msgid "Selected: %zu"
+msgstr "Выбрано: %zu"
+
+msgid "Compress sprites"
+msgstr "Сжать спрайты"
+
+msgid "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."
+msgstr "Каталог с файлами прежнего экспорта (.json объектов и sprites_*.json)."
+
+msgid "Opens the system dialog to pick the folder to import from."
+msgstr "Открывает системный диалог выбора каталога, откуда импортировать."
+
+msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/graphics_data.json, you are asked first."
+msgstr "Записывает изменённые спрайты и строки таблиц обратно в assets. Перезаписывает assets/sprites и assets/data/graphics_data.json, сначала спросит подтверждения."
+
+msgid "Packed atlas"
+msgstr "Упакованный атлас"
+
+msgid "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."
+msgstr "Вписывает спрайты группы в пустые места друг друга (сначала самые большие) и обрезает картинку: намного меньше сетки. «Столбцы» и «Сжать» игнорируются."
+
+msgid "Starting the game..."
+msgstr "Запуск игры..."
+
+msgid "Loading graphics..."
+msgstr "Загрузка графики..."
+
+msgid "Preparing the renderer..."
+msgstr "Подготовка отрисовки..."
+
+msgid "Loading sound and music..."
+msgstr "Загрузка звука и музыки..."
+
+msgid "Loading units and buildings..."
+msgstr "Загрузка юнитов и зданий..."
+
+msgid "Preparing the interface..."
+msgstr "Подготовка интерфейса..."
+
+msgid "Loading the match..."
+msgstr "Загрузка матча..."
+
+msgid "No other map has a start position for everybody in the room."
+msgstr "Нет другой карты со стартовой позицией для каждого в комнате."
+
+msgid "Players on this map: "
+msgstr "Игроков на карте: "
+
+msgid "A map holds 8 players at most: no more start positions"
+msgstr "Карта вмещает не больше 8 игроков: больше точек старта нельзя"
+
+msgid "Start position added: "
+msgstr "Точка старта добавлена: "
+
+msgid "Start position removed: "
+msgstr "Точка старта убрана: "
+
+msgid "players"
+msgstr "игроков"
+
+msgid "PREBUILT BASES"
+msgstr "ГОТОВЫЕ БАЗЫ"
+
+msgid "FROM SCRATCH"
+msgstr "С НУЛЯ"
+
+msgid "SIDE"
+msgstr "СТОРОНА"
+
+msgid "Color"
+msgstr "Цвет"
+
+msgid "Click a value to pick from the list, arrows step through it, Tab switches the page"
+msgstr "Клик по значению открывает список, стрелки листают его, Tab переключает страницу"
+
+msgid "Click: pick from a list. Arrows: step. Tab: next page"
+msgstr "Клик: список. Стрелки: листать. Tab: страница"
+
+msgid "RESTART THE GAME?"
+msgstr "ПЕРЕЗАПУСТИТЬ ИГРУ?"
+
+msgid "The mission starts over: the progress made so far is lost."
+msgstr "Миссия начнётся заново: достигнутый прогресс будет потерян."
+
+msgid "LEAVE THE MATCH?"
+msgstr "ПОКИНУТЬ МАТЧ?"
+
+msgid "You leave the match and return to the main menu. The other players go on without you."
+msgstr "Вы покинете матч и вернётесь в главное меню. Остальные игроки продолжат без вас."
+
+msgid "LEAVE THE GAME?"
+msgstr "ВЫЙТИ ИЗ ИГРЫ?"
+
+msgid "You return to the main menu: the progress of this game is lost."
+msgstr "Вы вернётесь в главное меню: прогресс этой игры будет потерян."
+
+msgid "YES"
+msgstr "ДА"
+
+msgid "NO"
+msgstr "НЕТ"
+
+msgid "LEAVE THE ROOM?"
+msgstr "ПОКИНУТЬ КОМНАТУ?"
+
+msgid "You are the room owner. If you leave, the game may end for everybody in it."
+msgstr "Вы владелец комнаты. Если вы выйдете, игра может закончиться для всех в ней."
+
+msgid "You leave the room. You can join it again while it is open."
+msgstr "Вы покинете комнату. Войти в неё снова можно, пока она открыта."
+
+msgid "Password"
+msgstr "Пароль"
+
+msgid "optional"
+msgstr "необязательно"
+
+msgid "Loading the map..."
+msgstr "Загрузка карты..."
+
+msgid "A player who is silent for this long (milliseconds) is dropped."
+msgstr "Игрок, молчащий дольше этого времени (миллисекунды), отключается."
+
+msgid "A player who lost the connection can come back during this time (seconds)."
+msgstr "Игрок, потерявший связь, может вернуться в течение этого времени (секунды)."
+
+msgid "AI level chosen when the game starts."
+msgstr "Уровень ИИ, выбранный при запуске игры."
+
+msgid "API used when the preferred one does not work."
+msgstr "API, который берётся, если предпочитаемый не работает."
+
+msgid "Address of the server that lists the public games."
+msgstr "Адрес сервера со списком открытых игр."
+
+msgid "All animations of the game. Click one to play it on the canvas, or to put it into a field after pressing Pick."
+msgstr "Все анимации игры. Клик проигрывает её на холсте или, после нажатия «Выбрать», вносит номер в поле."
+
+msgid "Animation %d: %d frames"
+msgstr "Анимация %d: кадров %d"
+
+msgid "Animations"
+msgstr "Анимации"
+
+msgid "Apply"
+msgstr "Применить"
+
+msgid "Building death"
+msgstr "Гибель здания"
+
+msgid "Burial seconds"
+msgstr "Секунд до исчезновения"
+
+msgid "Choose..."
+msgstr "Выбрать..."
+
+msgid "Click an animation to put it in the chosen field"
+msgstr "Нажмите анимацию, чтобы вставить её в выбранное поле"
+
+msgid "Color of the fog."
+msgstr "Цвет тумана."
+
+msgid "Color of the line (#RRGGBB)."
+msgstr "Цвет линии (#RRGGBB)."
+
+msgid "Colors of all themes"
+msgstr "Цвета для всех тем"
+
+msgid "Composite"
+msgstr "Композит"
+
+msgid "Credits %.0f, +%.0f / s"
+msgstr "Кредиты %.0f, +%.0f / с"
+
+msgid "Credits earned by minute"
+msgstr "Накопленные кредиты по минутам"
+
+msgid "Darkness (0..255) of the places you have already seen but cannot see now."
+msgstr "Затемнение (0..255) мест, которые вы уже видели, но сейчас не видите."
+
+msgid "Darkness (0..255) of the places you have never seen."
+msgstr "Затемнение (0..255) мест, которых вы ещё не видели."
+
+msgid "Default difficulty"
+msgstr "Сложность по умолчанию"
+
+msgid "Delete"
+msgstr "Удалить"
+
+msgid "Edits assets/data/game_environment.json: font, fog, construction, network, order lines."
+msgstr "Правит assets/data/game_environment.json: шрифт, туман, строительство, сеть, линии приказов."
+
+msgid "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). The canvas plays the result."
+msgstr "Правит то, как взрываются здания и машины: анимации, задержки, цепочки взрывов (assets/characters/effects.yaml). Результат проигрывается на холсте."
+
+msgid "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare the levels."
+msgstr "Правит уровни ИИ от лёгкого до хардкора (assets/characters/difficulty.yaml): доход, волны, тактику. Графики сравнивают уровни."
+
+msgid "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the screens."
+msgstr "Правит цвета интерфейса игры по темам (assets/characters/game_ui.yaml) с макетом экранов."
+
+msgid "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time (assets/characters/effects.yaml)."
+msgstr "Правит остовы разрушенных машин и зданий: картинки, стадии и время исчезновения (assets/characters/effects.yaml)."
+
+msgid "Environment"
+msgstr "Окружение"
+
+msgid "Every %.0f s, tier %.0f"
+msgstr "Каждые %.0f с, ступень %.0f"
+
+msgid "Every this many game ticks the players compare their game state to detect a desync."
+msgstr "Раз в столько тиков игры игроки сверяют состояние, чтобы найти рассинхрон."
+
+msgid "Explosions"
+msgstr "Взрывы"
+
+msgid "Families"
+msgstr "Семейства"
+
+msgid "File not found: a system font is used instead."
+msgstr "Файл не найден: вместо него берётся системный шрифт."
+
+msgid "Font files and sizes the game uses (section font of game_environment.json)."
+msgstr "Файлы и размеры шрифтов игры (раздел font файла game_environment.json)."
+
+msgid "Frame time"
+msgstr "Время кадра"
+
+msgid "Game UI"
+msgstr "Интерфейс игры"
+
+msgid "Game font"
+msgstr "Шрифт игры"
+
+msgid "Groups up to %.0f, research %.0f s"
+msgstr "Групп до %.0f, исследование %.0f с"
+
+msgid "Hints and disabled items"
+msgstr "Подсказки и недоступные пункты"
+
+msgid "Hovered"
+msgstr "Под курсором"
+
+msgid "How long (milliseconds) the game tries to connect two players directly."
+msgstr "Сколько миллисекунд игра пытается соединить двух игроков напрямую."
+
+msgid "How long the preview of the whole burial takes (the game uses 'Burial seconds')."
+msgstr "Сколько длится просмотр всего захоронения (в игре действует «Секунд до исчезновения»)."
+
+msgid "How many ports after the first one are searched for games in the local network."
+msgstr "Сколько портов после первого просматривается в поисках игр в локальной сети."
+
+msgid "How many tiles around an enemy structure stay closed for building."
+msgstr "Сколько клеток вокруг вражеской постройки закрыто для строительства."
+
+msgid "How round the edge of the fog is (0 square, 1 smooth)."
+msgstr "Насколько скруглён край тумана (0 — квадраты, 1 — гладко)."
+
+msgid "In the game the burial takes the time of 'Burial seconds' (the right panel)."
+msgstr "В игре захоронение длится столько, сколько указано в «Секунд до исчезновения» (правая панель)."
+
+msgid "Known wreck pictures of the game: a click sets the composite and the number of stages."
+msgstr "Известные картинки остовов игры: клик задаёт композит и число стадий."
+
+msgid "Length of a network turn in milliseconds."
+msgstr "Длина сетевого хода в миллисекундах."
+
+msgid "Line of the wall being built."
+msgstr "Линия строящейся стены."
+
+msgid "Line to the place a unit is moving to."
+msgstr "Линия к месту, куда идёт юнит."
+
+msgid "Line to the target a unit attacks."
+msgstr "Линия к цели, которую атакует юнит."
+
+msgid "Look of the fog of war."
+msgstr "Вид тумана войны."
+
+msgid "Menus"
+msgstr "Меню"
+
+msgid "Moment of the burial to show."
+msgstr "Какой момент захоронения показать."
+
+msgid "Network game settings."
+msgstr "Настройки сетевой игры."
+
+msgid "No power"
+msgstr "Нет энергии"
+
+msgid "Not a list of numbers: "
+msgstr "Это не список чисел: "
+
+msgid "Opacity of the order lines (0..1)."
+msgstr "Непрозрачность линий приказов (0..1)."
+
+msgid "Opens the system dialog to pick a font file."
+msgstr "Открывает системное окно выбора файла шрифта."
+
+msgid "Order lines and bars shown while Alt is held."
+msgstr "Линии приказов и полоски, которые видны при зажатом Alt."
+
+msgid "Pause between waves (seconds)"
+msgstr "Пауза между волнами (секунды)"
+
+msgid "Pick"
+msgstr "Выбрать"
+
+msgid "Pick: click an animation"
+msgstr "Нажмите анимацию"
+
+msgid "Play burial"
+msgstr "Проигрывать захоронение"
+
+msgid "Plays the blast again and again."
+msgstr "Проигрывает взрыв снова и снова."
+
+msgid "Plays the blast again."
+msgstr "Проигрывает взрыв заново."
+
+msgid "Port of that server."
+msgstr "Порт этого сервера."
+
+msgid "Preferred graphics API (vulkan, opengl, opengles2, software)."
+msgstr "Предпочитаемый графический API (vulkan, opengl, opengles2, software)."
+
+msgid "Preview of a big building blowing up."
+msgstr "Взрыв большого здания."
+
+msgid "Preview of a building up to 2x2 tiles blowing up."
+msgstr "Взрыв здания размером до 2x2 клеток."
+
+msgid "Preview of a dying vehicle: the blast and the second blast with the wreck."
+msgstr "Гибель машины: взрыв, второй взрыв и остов."
+
+msgid "Preview of a power plant or tech center blowing up."
+msgstr "Взрыв электростанции или технического центра."
+
+msgid "Preview of the game interface with the colors of the file. Pick a theme on the right panel."
+msgstr "Макет интерфейса игры с цветами из файла. Тему выбирают на правой панели."
+
+msgid "Radar"
+msgstr "Радар"
+
+msgid "Replay"
+msgstr "Повторить"
+
+msgid "Researching"
+msgstr "Исследование"
+
+msgid "Resolution of the fog picture: pixels per map tile."
+msgstr "Разрешение картинки тумана: пикселей на клетку карты."
+
+msgid "Rules of placing buildings."
+msgstr "Правила размещения построек."
+
+msgid "Secondary text"
+msgstr "Второстепенный текст"
+
+msgid "Seconds"
+msgstr "Секунды"
+
+msgid "Settings"
+msgstr "Настройки"
+
+msgid "Size in pixels of headings."
+msgstr "Размер заголовков в пикселях."
+
+msgid "Size in pixels of normal text."
+msgstr "Размер обычного текста в пикселях."
+
+msgid "Size in pixels of screen titles."
+msgstr "Размер названий экранов в пикселях."
+
+msgid "Size in pixels of small text."
+msgstr "Размер мелкого текста в пикселях."
+
+msgid "Size in pixels of the big title on the main menu."
+msgstr "Размер большого заголовка главного меню в пикселях."
+
+msgid "Speed"
+msgstr "Скорость"
+
+msgid "Speed of the preview; the game always plays at normal speed."
+msgstr "Скорость просмотра; в игре всё идёт с обычной скоростью."
+
+msgid "TCP port of the game."
+msgstr "TCP-порт игры."
+
+msgid "TTF/OTF file of headings and titles."
+msgstr "TTF/OTF-файл заголовков и названий."
+
+msgid "TTF/OTF file of the normal text. A path inside the game folder or a full path."
+msgstr "TTF/OTF-файл обычного текста. Путь внутри папки игры или полный путь."
+
+msgid "The biggest map (in kilobytes) a host sends to the players."
+msgstr "Самая большая карта (в килобайтах), которую хозяин отправляет игрокам."
+
+msgid "The difficulty file could not be loaded."
+msgstr "Не удалось загрузить файл сложности."
+
+msgid "The effects file could not be loaded."
+msgstr "Не удалось загрузить файл эффектов."
+
+msgid "The environment file could not be loaded."
+msgstr "Не удалось загрузить файл окружения."
+
+msgid "The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."
+msgstr "Игра берёт файлы и размеры шрифтов отсюда. Путь может вести за пределы папки assets; шрифт, который не открылся, заменяется системным."
+
+msgid "The interface file could not be loaded."
+msgstr "Не удалось загрузить файл интерфейса."
+
+msgid "The largest delay (in turns) between giving an order and carrying it out."
+msgstr "Наибольшая задержка (в ходах) между приказом и его выполнением."
+
+msgid "The look of menus and of the game screen for each faction."
+msgstr "Вид меню и игрового экрана для каждой стороны."
+
+msgid "The smallest delay (in turns) between giving an order and carrying it out."
+msgstr "Наименьшая задержка (в ходах) между приказом и его выполнением."
+
+msgid "The wreck sinks stage by stage; uncheck to pick the moment by hand."
+msgstr "Остов погружается по стадиям; снимите галку, чтобы выбрать момент вручную."
+
+msgid "Theme"
+msgstr "Тема"
+
+msgid "Then click an animation in the list below to put its number into this field (lists get it added)."
+msgstr "Затем нажмите анимацию в списке ниже: её номер попадёт в это поле (в списки добавляется)."
+
+msgid "Thickness of the line in pixels."
+msgstr "Толщина линии в пикселях."
+
+msgid "UDP port of the game."
+msgstr "UDP-порт игры."
+
+msgid "Units in wave N"
+msgstr "Юнитов в волне N"
+
+msgid "Vehicle death"
+msgstr "Гибель машины"
+
+msgid "Waves %.0f..%.0f units"
+msgstr "Волны %.0f..%.0f юнитов"
+
+msgid "Which graphics API the game starts with."
+msgstr "С каким графическим API стартует игра."
+
+msgid "Wreck of each vehicle"
+msgstr "Остов каждой машины"
+
+msgid "Wrecks"
+msgstr "Остовы"
+
+msgid "Writes the file of this tab (Ctrl+S). Comments in the file are kept."
+msgstr "Записывает файл этой вкладки (Ctrl+S). Комментарии в файле сохраняются."
+
+msgid "minutes"
+msgstr "минуты"
+
+msgid "wave number"
+msgstr "номер волны"
+
+msgid "Small building"
+msgstr "Малое здание"
+
+msgid "Power building"
+msgstr "Электростанция"
+
+msgid "Large building"
+msgstr "Большое здание"
+
+msgid "Regular font file"
+msgstr "Файл обычного шрифта"
+
+msgid "Bold font file"
+msgstr "Файл жирного шрифта"
+
+msgid "Small text"
+msgstr "Мелкий текст"
+
+msgid "Body text"
+msgstr "Обычный текст"
+
+msgid "Heading"
+msgstr "Заголовок"
+
+msgid "Title"
+msgstr "Название"
+
+msgid "Big title"
+msgstr "Крупное название"
+
+msgid "Save settings"
+msgstr "Сохранить настройки"
+
+msgid "Pick animation"
+msgstr "Выбрать анимацию"
+
+msgid "Loop effect"
+msgstr "Повтор эффекта"
+
+msgid "Playback speed"
+msgstr "Скорость просмотра"
+
+msgid "Burial preview seconds"
+msgstr "Секунд просмотра захоронения"
+
+msgid "Burial time"
+msgstr "Момент захоронения"
+
+msgid "UI theme"
+msgstr "Тема интерфейса"
+
+msgid "Choose font file"
+msgstr "Выбрать файл шрифта"
+
+msgid "Needs the SDL GPU renderer (shader effects)"
+msgstr "Нужен рендерер SDL GPU (шейдерные эффекты)"
+
+msgid "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
+msgstr "Проверка, как персонаж выглядит в цвете армии игры (персонаж на вкладках Preview, Compare и Wrecks). «Classic» показывает оригинальные листы."

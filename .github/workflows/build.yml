@@ -1,0 +1,205 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# The game opens a window even for --test; the dummy drivers let it run on a headless runner
+env:
+  SDL_VIDEODRIVER: dummy
+  SDL_AUDIODRIVER: dummy
+
+jobs:
+  linux:
+    name: Linux (GCC)
+    runs-on: ubuntu-latest
+    # SDL3 is not packaged for Ubuntu LTS yet; Arch has it (and is what the project is developed on)
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm base-devel cmake ninja git python sdl3 sdl3_ttf yaml-cpp nlohmann-json gettext libarchive zstd pkgconf
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: |
+          set -o pipefail
+          ./build/openaow --test | tee test.log
+          echo "linux $(awk '/^DETERMINISM-HASH/ {print $2}' test.log)" > determinism-linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-linux
+          path: determinism-linux.txt
+      - name: Network tests
+        run: ./build/openaow-net-tests
+      - name: Two-process network match
+        run: python tools/net_selftest.py build/openaow 30
+      - name: Network match through openaow-server
+        run: python tools/net_selftest.py build/openaow 30 brod --server
+      - name: Network match with a dropped connection
+        run: python tools/net_selftest.py build/openaow 40 brod --reconnect
+      - name: Player-hosted match through openaow-server
+        run: python tools/net_selftest.py build/openaow 30 brod --hosted
+      - name: Package
+        run: |
+          mkdir dist
+          cp -a build/openaow build/openaow-server build/openaow-charactereditor build/openaow-mapeditor build/libopenaow.so* build/data.blob dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openaow-linux-x64
+          path: dist
+
+  windows-msvc:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\vcpkg\archives
+          key: vcpkg-msvc-${{ hashFiles('.github/workflows/build.yml') }}
+      - name: Install dependencies
+        run: C:\vcpkg\vcpkg.exe install sdl3 sdl3-ttf yaml-cpp nlohmann-json gettext-libintl "libarchive[zstd]" pkgconf --triplet x64-windows
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        shell: bash
+        run: |
+          set -o pipefail
+          build/openaow.exe --test | tee test.log
+          echo "windows-msvc $(awk '/^DETERMINISM-HASH/ {print $2}' test.log)" > determinism-windows-msvc.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-windows-msvc
+          path: determinism-windows-msvc.txt
+      - name: Network tests
+        run: build\openaow-net-tests.exe
+      - name: Package
+        shell: bash
+        run: |
+          mkdir dist
+          cp build/*.exe build/*.dll build/data.blob dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openaow-windows-msvc-x64
+          path: dist
+
+  windows-mingw:
+    name: Windows (MinGW)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-SDL3
+            mingw-w64-x86_64-SDL3_ttf
+            mingw-w64-x86_64-yaml-cpp
+            mingw-w64-x86_64-nlohmann-json
+            mingw-w64-x86_64-libarchive
+            mingw-w64-x86_64-zstd
+            mingw-w64-x86_64-gettext-runtime
+            mingw-w64-x86_64-gettext-tools
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: |
+          set -o pipefail
+          ./build/openaow.exe --test | tee test.log
+          echo "windows-mingw $(awk '/^DETERMINISM-HASH/ {print $2}' test.log)" > determinism-windows-mingw.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-windows-mingw
+          path: determinism-windows-mingw.txt
+      - name: Network tests
+        run: ./build/openaow-net-tests.exe
+      - name: Package
+        run: |
+          mkdir dist
+          cp build/*.exe build/*.dll build/data.blob dist/
+          # runtime DLLs (SDL3, yaml-cpp, libintl ...) so the folder runs outside MSYS2
+          for exe in dist/*.exe; do
+            ldd "$exe" | awk '/\/mingw64\// {print $3}' | xargs -r -I{} cp -n {} dist/
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openaow-windows-mingw-x64
+          path: dist
+
+  macos:
+    name: macOS (Clang)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: brew install cmake ninja sdl3 sdl3_ttf yaml-cpp nlohmann-json gettext libarchive zstd pkgconf spirv-cross
+      - name: Configure
+        # gettext and libarchive are keg-only on Homebrew
+        env:
+          PKG_CONFIG_PATH: /opt/homebrew/opt/libarchive/lib/pkgconfig:/usr/local/opt/libarchive/lib/pkgconfig
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix gettext)"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: |
+          set -o pipefail
+          ./build/openaow --test | tee test.log
+          echo "macos $(awk '/^DETERMINISM-HASH/ {print $2}' test.log)" > determinism-macos.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-macos
+          path: determinism-macos.txt
+      - name: Network tests
+        run: ./build/openaow-net-tests
+      - name: Package
+        run: |
+          mkdir dist
+          cp -a build/openaow build/openaow-charactereditor build/openaow-mapeditor build/libopenaow*.dylib build/data.blob dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openaow-macos-arm64
+          path: dist
+
+  # Lockstep needs the simulation to give the same bits everywhere: the scripted skirmish of the
+  # self-test must end with the same world checksum on every platform and compiler
+  determinism:
+    name: Cross-platform determinism
+    needs: [linux, windows-msvc, windows-mingw, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: determinism-*
+          merge-multiple: true
+          path: hashes
+      - name: Compare world checksums
+        run: |
+          cat hashes/*.txt
+          test "$(awk '{print $2}' hashes/*.txt | sort -u | wc -l)" -eq 1

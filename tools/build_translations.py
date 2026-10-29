@@ -1,0 +1,657 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+
+PO_ENTRIES = [
+    # Main menu
+    ("MAIN MENU", "Main Menu", "ГЛАВНОЕ МЕНЮ"),
+    ("CAMPAIGN", "Campaign", "КАМПАНИЯ"),
+    ("CUSTOM GAME", "Custom Game", "ПРОСТАЯ ИГРА"),
+    ("TEST MAP", "Test Map", "ТЕСТОВАЯ КАРТА"),
+    ("SETTINGS", "Settings", "НАСТРОЙКИ"),
+    ("MILITARY RANK", "Military Rank", "ЗВАНИЕ"),
+    ("HELP", "Help", "ПОМОЩЬ"),
+    ("ABOUT", "About", "ОБ ИГРЕ"),
+    ("EXIT", "Exit", "ВЫХОД"),
+    ("[ SELECT ]", "[ Select ]", "[ ВЫБРАТЬ ]"),
+    ("[ EXIT ]", "[ Exit ]", "[ ВЫХОД ]"),
+    ("Select", "Select", "Выбор"),
+    ("Exit", "Exit", "Выход"),
+    ("Back", "Back", "Назад"),
+    ("Toggle", "Toggle", "Переключить"),
+
+    # Pause menu
+    ("GAME PAUSED", "Game Paused", "ИГРА ПРИОСТАНОВЛЕНА"),
+    ("CONTINUE", "Continue", "ПРОДОЛЖИТЬ"),
+    ("OBJECTIVES", "Objectives", "ЗАДАНИЕ"),
+    ("CONSTRUCTION", "Construction", "СТРОИТЕЛЬСТВО"),
+    ("SOUND & MUSIC", "Sound & Music", "ЗВУК И МУЗЫКА"),
+    ("RESTART MISSION", "Restart Mission", "НАЧАТЬ ЗАНОВО"),
+    ("1. CONTINUE", "1. Continue", "1. ПРОДОЛЖИТЬ ИГРУ"),
+    ("2. OBJECTIVES", "2. Objectives", "2. ЗАДАНИЕ МИССИИ"),
+    ("3. BASE CONSTRUCTION", "3. Base Construction", "3. СТРОИТЕЛЬСТВО БАЗЫ"),
+    ("4. SOUND & MUSIC", "4. Sound & Music", "4. ЗВУК И МУЗЫКА"),
+    ("5. RESTART MISSION", "5. Restart Mission", "5. НАЧАТЬ ЗАНОВО"),
+    ("6. MAIN MENU", "6. Main Menu", "6. ГЛАВНОЕ МЕНЮ"),
+    ("[ SELECT / ENTER ]", "[ Select / Enter ]", "[ ВЫБРАТЬ / ENTER ]"),
+    ("[ BACK / ESC ]", "[ Back / ESC ]", "[ НАЗАД / ESC ]"),
+
+    # Dialogs & Missions
+    ("MISSION OBJECTIVES", "Mission Objectives", "ЦЕЛИ ЗАДАНИЯ"),
+    (" - OBJECTIVES", " - Objectives", " - ЗАДАНИЕ"),
+    ("PRIMARY OBJECTIVES:", "Primary Objectives:", "ОСНОВНЫЕ ЗАДАЧИ:"),
+    ("OPERATION BRIEFING:", "Operation Briefing:", "ОПИСАНИЕ ОПЕРАЦИИ:"),
+    ("CONTINUE (ESC)", "Continue (ESC)", "ПРОДОЛЖИТЬ (ESC)"),
+    ("Press SPACE, ENTER or Click to return", "Press SPACE, ENTER or Click to return", "Нажмите ПРОБЕЛ, ENTER или ЛКМ для возврата"),
+    ("BASE CONSTRUCTION (RESISTANCE)", "Base Construction (Resistance)", "СТРОИТЕЛЬСТВО БАЗЫ (СОПРОТИВЛЕНИЕ)"),
+    ("BASE CONSTRUCTION", "Base Construction", "СТРОИТЕЛЬСТВО БАЗЫ"),
+    ("[ SELECT & PLACE ]", "[ Select & Place ]", "[ ВЫБРАТЬ И РАЗМЕСТИТЬ ]"),
+    ("[ CANCEL / ESC ]", "[ Cancel / ESC ]", "[ ОТМЕНА / ESC ]"),
+    ("Cost: $", "Cost: $", "Стоимость: $"),
+    ("Power: ", "Power: ", "Энергия: "),
+    (" kW", " kW", " кВт"),
+    ("SELECT CAMPAIGN MISSION", "Select Campaign Mission", "ВЫБОР МИССИИ КАМПАНИИ"),
+    ("OBJECTIVES:", "Objectives:", "ЗАДАЧИ:"),
+    ("BRIEFING:", "Briefing:", "БРИФИНГ:"),
+    ("START MISSION", "Start Mission", "НАЧАТЬ МИССИЮ"),
+    ("BACK", "Back", "НАЗАД"),
+    ("MISSION BRIEFING - FREEDOM FOR LIBERTY", "Mission Briefing - Freedom for Liberty", "БРИФИНГ МИССИИ - ОСВОБОЖДЕНИЕ ПЕРУ"),
+    ("START MISSION [ENTER]", "Start Mission [Enter]", "НАЧАТЬ МИССИЮ [ENTER]"),
+    ("MISSION BRIEFING", "Mission Briefing", "БРИФИНГ ЗАДАНИЯ"),
+    ("RESISTANCE HIGH COMMAND - SECTOR REPORT", "Resistance High Command - Sector Report", "КОМАНДОВАНИЕ СОПРОТИВЛЕНИЯ - ОТЧЕТ ПО СЕКТОРУ"),
+    ("OPERATIONAL OBJECTIVES:", "Operational Objectives:", "ЦЕЛИ ОПЕРАЦИИ:"),
+    ("PRESS [SPACE] OR [ENTER] TO BEGIN MISSION", "Press [Space] or [Enter] to Begin Mission", "НАЖМИТЕ [ПРОБЕЛ] ИЛИ [ENTER] ДЛЯ НАЧАЛА"),
+
+    # Settings, Help, Rank, About
+    ("AUDIO & SYSTEM SETTINGS", "Audio & System Settings", "НАСТРОЙКИ ЗВУКА И СИСТЕМЫ"),
+    ("Sound & Music", "Sound & Music", "Звук и Музыка"),
+    ("Language", "Language", "Язык"),
+    ("English", "English", "English"),
+    ("Russian", "Russian", "Русский"),
+    ("ON", "ON", "ВКЛ"),
+    ("OFF", "OFF", "ВЫКЛ"),
+    ("Synthesizer", "Synthesizer", "Синтезатор"),
+    ("Graphics", "Graphics", "Графика"),
+    ("Pixel-Perfect High-Res", "Pixel-Perfect High-Res", "Высокое разрешение (Pixel-Perfect)"),
+    ("Press [1] to toggle Sound, [2] to toggle Language", "Press [1] to toggle Sound, [2] to toggle Language", "Нажмите [1] для переключения звука, [2] для выбора языка"),
+    ("BACK (ESC / ENTER)", "Back (ESC / ENTER)", "НАЗАД (ESC / ENTER)"),
+
+    # Help
+    ("HELP & CONTROLS", "Help & Controls", "ПОМОЩЬ И УПРАВЛЕНИЕ"),
+    ("- Mouse: LMB - select unit / box selection.", "- Mouse: LMB - select unit / box selection.", "- Управление мышью: ЛКМ - выбор юнита / рамка выделения."),
+    ("- Orders: RMB on ground - move, RMB on enemy - attack.", "- Orders: RMB on ground - move, RMB on enemy - attack.", "- Приказы: ПКМ на карту - перемещение, ПКМ на врага - атака."),
+    ("- Camera: Arrow keys, WASD, or move mouse to screen edges.", "- Camera: Arrow keys, WASD, or move mouse to screen edges.", "- Камера: Стрелки, WASD, или перемещение мыши к краям экрана."),
+    ("- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets.", "- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets.", "- Строительство (B): Штаб, Генератор, Казарма, Завод, Локатор, Турели."),
+    ("- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS.", "- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS.", "- Производство (1..7): Пехотинец, Гренадер, Снайпер, Койот, Броненосец, Носорог, Дикобраз."),
+    ("- Siege mode (G): Deploy Sniper and Rhino heavy tank.", "- Siege mode (G): Deploy Sniper and Rhino heavy tank.", "- Осадный режим (G): Развертывание Снайпера и тяжелого танка Носорог."),
+    ("- Hotkeys: F12 - debug overlay, Space / ESC - pause.", "- Hotkeys: F12 - debug overlay, Space / ESC - pause.", "- Быстрые клавиши: F12 - панель отладки, Пробел / ESC - пауза."),
+
+    # About
+    ("ABOUT OPEN ART OF WAR", "About Open Art Of War", "ОБ ИГРЕ OPEN ART OF WAR"),
+    ("ABOUT GAME", "About Game", "ОБ ИГРЕ"),
+    ("Version", "Version", "Версия"),
+    ("Author", "Author", "Автор"),
+    ("Porting: Modern C++17, SDL3, ImGui", "Porting: Modern C++17, SDL3, ImGui", "Портирование: Modern C++17/20, SDL3, ImGui"),
+    ("Central Peru is occupied by the army of the Confederation.", "Central Peru is occupied by the army of the Confederation.", "Вся центральная часть Перу находится под контролем"),
+    ("The Resistance stands ready to strike for freedom!", "The Resistance stands ready to strike for freedom!", "армии Конфедерации. Сопротивление готово нанести удар!"),
+
+    # Rank
+    ("RANK & SERVICE RECORD", "Rank & Service Record", "ЗВАНИЕ И ДОСТИЖЕНИЯ"),
+    ("Commander of Peru Resistance Forces", "Commander of Peru Resistance Forces", "Командующий силами Сопротивления Перу"),
+    ("Military Rank: Lieutenant-General", "Military Rank: Lieutenant-General", "Воинское звание: Генерал-лейтенант"),
+    ("Faction: Resistance (Red)", "Faction: Resistance (Red)", "Фракция: Сопротивление (Красные)"),
+    ("Campaign Victories: 8 of 8", "Campaign Victories: 8 of 8", "Победы в кампаниях: 8 из 8"),
+    ("Confederation Bases Destroyed: 24", "Confederation Bases Destroyed: 24", "Уничтожено баз Конфедерации: 24"),
+    ("Medals: Liberator Star, Medal of Courage", "Medals: Liberator Star, Medal of Courage", "Награды: Звезда Освободителя, Медаль за Отвагу"),
+    ("Combat Readiness: 100%", "Combat Readiness: 100%", "Боевая готовность: 100%"),
+
+    # HUD Tabs & Buttons
+    ("CONSTRUCTION", "Construction", "СТРОИТЕЛЬСТВО"),
+    ("RESEARCH", "Research", "ИССЛЕДОВАНИЯ"),
+    ("INFANTRY", "Infantry", "ПЕХОТА"),
+    ("VEHICLES", "Vehicles", "ТЕХНИКА"),
+    ("BASE", "Base", "БАЗА"),
+    ("ORDERS", "Orders", "ПРИКАЗЫ"),
+    ("MENU", "Menu", "МЕНЮ"),
+    ("OBJECTIVES", "Objectives", "ЦЕЛИ"),
+    ("READY", "Ready", "ГОТОВО"),
+    ("LOCK", "Lock", "БЛОК"),
+    ("BUILDING PLACEMENT: ", "Building Placement: ", "РАЗМЕЩЕНИЕ: "),
+    (" (LMB - build, RMB - cancel)", " (LMB - build, RMB - cancel)", " (ЛКМ - построить на карте, ПКМ - отмена)"),
+    ("Select building to construct", "Select building to construct", "Выберите здание для постройки"),
+
+    # Research Techs
+    ("BODY ARMOR", "Body Armor", "БРОНЕЖИЛЕТЫ"),
+    ("+30% armor and HP for infantry", "+30% armor and HP for infantry", "+30% броня и здоровье всей пехоты"),
+    ("SPECIAL TRAINING", "Special Training", "СПЕЦПОДГОТОВКА"),
+    ("+25% movement speed for infantry", "+25% movement speed for infantry", "+25% скорость передвижения пехоты"),
+    ("OPTICS", "Optics", "ОПТИКА"),
+    ("+1.5 range and +25% infantry damage", "+1.5 range and +25% infantry damage", "+1.5 дальность и +25% урон пехоты"),
+    ("MEDIC STATION", "Medic Station", "МЕДПУНКТ"),
+    ("+40 max HP and healing for infantry", "+40 max HP and healing for infantry", "+40 макс. HP и лечение всей пехоты"),
+    ("TANK ARMOR", "Tank Armor", "БРОНЯ ТАНКОВ"),
+    ("+25% durability for all vehicles", "+25% durability for all vehicles", "+25% прочность всей бронетехники"),
+    ("AFTERBURNER", "Afterburner", "ФОРСАЖ"),
+    ("+25% vehicle movement speed", "+25% vehicle movement speed", "+25% скорость движения бронетехники"),
+    ("SIEGE CANNONS", "Siege Cannons", "ОСАДНЫЕ ОРУДИЯ"),
+    ("+25% heavy firepower", "+25% heavy firepower", "+25% огневая мощь тяжелой техники"),
+    ("LOGISTICS", "Logistics", "ЛОГИСТИКА"),
+    ("Emergency supply +$600 credits", "Emergency supply +$600 credits", "Экстренная поставка +$600 кредитов"),
+    ("[LAB REQUIRED] Construct Research Lab to unlock", "[Lab Required] Construct Research Lab to unlock", "[ТРЕБУЕТСЯ ЛАБОРАТОРИЯ] Постройте лабораторию для исследований"),
+    ("[RESEARCHED] ", "[Researched] ", "[ИЗУЧЕНО] "),
+    ("Researching: ", "Researching: ", "Исследование: "),
+    ("Select technology to research", "Select technology to research", "Выберите технологию для исследования"),
+    ("LABORATORY REQUIRED FOR RESEARCH!", "Laboratory required for research!", "ТРЕБУЕТСЯ ЛАБОРАТОРИЯ ДЛЯ ИССЛЕДОВАНИЙ!"),
+    ("THIS TECHNOLOGY IS ALREADY RESEARCHED!", "This technology is already researched!", "ЭТА ТЕХНОЛОГИЯ УЖЕ ИЗУЧЕНА!"),
+    ("ANOTHER RESEARCH IS ALREADY IN PROGRESS!", "Another research is already in progress!", "ДРУГОЕ ИССЛЕДОВАНИЕ УЖЕ ВЫПОЛНЯЕТСЯ!"),
+    ("INSUFFICIENT CREDITS FOR RESEARCH!", "Insufficient credits for research!", "НЕДОСТАТОЧНО КРЕДИТОВ ДЛЯ ИССЛЕДОВАНИЯ!"),
+
+    # Infantry Cameos
+    ("RIFLEMAN", "Rifleman", "СТРЕЛОК"),
+    ("Standard Resistance infantry rifleman", "Standard Resistance infantry rifleman", "Базовый боец Сопротивления с автоматом"),
+    ("GRENADIER", "Grenadier", "ГРЕНАДЕР"),
+    ("Heavy rocket soldier vs vehicles and walls", "Heavy rocket soldier vs vehicles and walls", "Ракетчик против бронетехники и стен"),
+    ("SNIPER", "Sniper", "СНАЙПЕР"),
+    ("Long-range sniper (Camouflage mode [G])", "Long-range sniper (Camouflage mode [G])", "Дальнобойный снайпер (Режим маскировки [G])"),
+    ("ASSAULT TROOPER", "Assault Trooper", "ШТУРМОВИК"),
+    ("Heavy assault infantryman", "Heavy assault infantryman", "Штурмовой тяжелый пехотинец Сопротивления"),
+    ("[BARRACKS REQUIRED] Construct Barracks to recruit ", "[Barracks Required] Construct Barracks to recruit ", "[ТРЕБУЕТСЯ КАЗАРМА] Постройте казарму для найма "),
+    ("ACTIVE BARRACKS: #", "Active Barracks: #", "АКТИВНАЯ КАЗАРМА: #"),
+    (" [PRIMARY RALLY POINT]", " [Primary Rally Point]", " [ОСНОВНАЯ ТОЧКА ВЫХОДА]"),
+    ("TRAINING: ", "Training: ", "ПОДГОТОВКА: "),
+    (" (QUEUE: ", " (Queue: ", " (ОЧЕРЕДЬ: "),
+    ("PRODUCTION QUEUE EMPTY. PRESS [1..4] TO RECRUIT", "Production queue empty. Press [1..4] to recruit", "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ НАЙМА"),
+    ("BARRACKS NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE", "Barracks not built. Click in Construction tab to place", "КАЗАРМА НЕ ПОСТРОЕНА. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"),
+    ("BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!", "Barracks required for infantry recruitment!", "ТРЕБУЕТСЯ КАЗАРМА ДЛЯ НАЙМА ПЕХОТЫ!"),
+
+    # Vehicles Cameos
+    ("COYOTE", "Coyote", "КОЙОТ"),
+    ("Fast scout buggy (spawns at Factory)", "Fast scout buggy (spawns at Factory)", "Быстрый разведывательный броневик (спавн у Завода)"),
+    ("ARMADILLO", "Armadillo", "БРОНЕНОСЕЦ"),
+    ("Main battle tank of Resistance", "Main battle tank of Resistance", "Основной боевой танк Сопротивления"),
+    ("RHINO", "Rhino", "НОСОРОГ"),
+    ("Heavy twin-cannon tank (Siege mode [G])", "Heavy twin-cannon tank (Siege mode [G])", "Тяжелый двуствольный танк (Осадный режим [G])"),
+    ("PORCUPINE", "Porcupine", "ДИКОБРАЗ"),
+    ("Multiple Launch Rocket System (MLRS)", "Multiple Launch Rocket System (MLRS)", "Реактивная система залпового огня (РСЗО)"),
+    ("[FACTORY REQUIRED] Construct Factory to build ", "[Factory Required] Construct Factory to build ", "[ТРЕБУЕТСЯ ЗАВОД] Постройте завод техники для производства "),
+    ("ACTIVE FACTORY: #", "Active Factory: #", "АКТИВНЫЙ ЗАВОД: #"),
+    ("PRODUCTION: ", "Production: ", "ПРОИЗВОДСТВО: "),
+    ("PRODUCTION QUEUE EMPTY. PRESS [1..4] TO BUILD VEHICLES", "Production queue empty. Press [1..4] to build vehicles", "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ СБОРКИ ТЕХНИКИ"),
+    ("FACTORY NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE", "Factory not built. Click in Construction tab to place", "ЗАВОД ТЕХНИКИ НЕ ПОСТРОЕН. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"),
+    ("VEHICLE FACTORY REQUIRED FOR PRODUCTION!", "Vehicle Factory required for production!", "ТРЕБУЕТСЯ ЗАВОД ТЕХНИКИ ДЛЯ ПРОИЗВОДСТВА!"),
+
+    # Base tab
+    ("BARRACKS (CLICK: SET PRIMARY)", "Barracks (Click: Set Primary)", "КАЗАРМЫ (КЛИК: ВЫБРАТЬ ОСНОВНУЮ)"),
+    ("NO BARRACKS", "No Barracks", "НЕТ КАЗАРМ"),
+    ("BARRACKS #", "Barracks #", "КАЗАРМА #"),
+    (" [PRIMARY]", " [Primary]", " [ОСНОВНАЯ]"),
+    ("FACTORIES (CLICK: SET PRIMARY)", "Factories (Click: Set Primary)", "ЗАВОДЫ (КЛИК: ВЫБРАТЬ ОСНОВНОЙ)"),
+    ("NO FACTORIES", "No Factories", "НЕТ ЗАВОДОВ"),
+    ("FACTORY #", "Factory #", "ЗАВОД #"),
+    ("Base grouping: Click Barracks or Factory to set primary rally point.", "Base grouping: Click Barracks or Factory to set primary rally point.", "Группировка баз: Клик по казарме или заводу назначает точку появления подкреплений."),
+    ("Assigned primary Barracks #", "Assigned primary Barracks #", "Назначена основная Казарма #"),
+    ("Assigned primary Factory #", "Assigned primary Factory #", "Назначен основной Завод #"),
+
+    # Orders tab
+    ("ATTACK-MOVE", "Attack-Move", "АТАКА-ХОД"),
+    ("Units advance to destination, attacking all encountered enemies", "Units advance to destination, attacking all encountered enemies", "Юниты идут к точке, уничтожая всех встреченных врагов"),
+    ("SIEGE", "Siege", "ОСАДА"),
+    ("Toggle Siege mode for Sniper and Rhino", "Toggle Siege mode for Sniper and Rhino", "Переключить осадный режим Снайпера и Носорога"),
+    ("STOP", "Stop", "СТОП"),
+    ("Immediately halt all orders and movement", "Immediately halt all orders and movement", "Немедленно остановить все приказы и стрельбу"),
+    ("DEFEND", "Defend", "ОБОРОНА"),
+    ("Hold current position and engage enemies in range", "Hold current position and engage enemies in range", "Удерживать текущую позицию и атаковать в радиусе"),
+    ("TACTICAL ORDERS: Select units and issue a command", "Tactical Orders: Select units and issue a command", "ТАКТИЧЕСКИЕ ПРИКАЗЫ: Выберите юнитов и нажмите команду"),
+    ("Attack-Move [A] is the primary offensive tactic for Resistance forces!", "Attack-Move [A] is the primary offensive tactic for Resistance forces!", "Атака на ходу [A] - базовый режим наступления повстанцев!"),
+
+    # In-Game gameplay orders & notifications
+    ("ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)", "ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)", "АТАКА-ДВИЖЕНИЕ [A]: укажите точку (ЛКМ - подтвердить, ПКМ/ESC - отмена)"),
+    ("GAME SAVED (F5)", "Game Saved (F5)", "ИГРА СОХРАНЕНА (F5)"),
+    ("GAME LOADED (F9)", "Game Loaded (F9)", "ИГРА ЗАГРУЖЕНА (F9)"),
+    ("TEST MAP: Test passages, wall destruction and AI!", "Test Map: Test passages, wall destruction and AI!", "ТЕСТОВАЯ КАРТА: Проверьте проходы, разрушение стен и ИИ!"),
+    ("MISSION ACCOMPLISHED!", "Mission Accomplished!", "ЗАДАНИЕ ВЫПОЛНЕНО!"),
+    ("Press SPACE / ENTER to return to menu", "Press SPACE / ENTER to return to menu", "Нажмите ПРОБЕЛ / ENTER для перехода в меню"),
+    ("MISSION FAILED!", "Mission Failed!", "ЗАДАНИЕ ПРОВАЛЕНО!"),
+    ("Press SPACE / ENTER to retry", "Press SPACE / ENTER to retry", "Нажмите ПРОБЕЛ / ENTER для повтора"),
+
+    # Default building names & blueprints
+    ("HEADQUARTERS", "Headquarters", "ШТАБ"),
+    ("Resistance Command Center. Provides radar and logistics.", "Resistance Command Center. Provides radar and logistics.", "Командный центр Сопротивления. Обеспечивает снабжение и радар."),
+    ("POWER PLANT", "Power Plant", "ГЕНЕРАТОР"),
+    ("Power Plant (+100 kW). Supplies energy to factories and defenses.", "Power Plant (+100 kW). Supplies energy to factories and defenses.", "Электростанция (+100 кВт). Снабжает энергией заводы и оборону."),
+    ("BARRACKS", "Barracks", "КАЗАРМА"),
+    ("Infantry Training: Rifleman, Grenadier, Sniper.", "Infantry Training: Rifleman, Grenadier, Sniper.", "Подготовка бойцов: Пехотинец, Гренадер, Снайпер."),
+    ("FACTORY", "Factory", "ЗАВОД"),
+    ("Vehicle Factory: Coyote, Armadillo, Rhino, and Porcupine MLRS.", "Vehicle Factory: Coyote, Armadillo, Rhino, and Porcupine MLRS.", "Военный завод: Койот, Броненосец, Носорог и РСЗО Дикобраз."),
+    ("RESEARCH LAB", "Research Lab", "ЛАБОРАТОРИЯ"),
+    ("Scientific center for combat research upgrades (RESEARCH tab).", "Scientific center for combat research upgrades (RESEARCH tab).", "Научно-технический центр для исследования улучшений (вкладка ИССЛЕД.)."),
+    ("BUNKER", "Bunker", "БУНКЕР"),
+    ("Reinforced machine-gun bunker for perimeter defense.", "Reinforced machine-gun bunker for perimeter defense.", "Бетонный пулеметный ДОТ Сопротивления для обороны периметра."),
+    ("TURRET", "Turret", "ВЫШКА"),
+    ("Watchtower with heavy machine gun and extended vision.", "Watchtower with heavy machine gun and extended vision.", "Сторожевая вышка с крупнокалиберным пулеметом и дальним обзором."),
+    ("WALL", "Wall", "СТЕНА"),
+    ("Reinforced concrete wall (1x1) to block enemy armor.", "Reinforced concrete wall (1x1) to block enemy armor.", "Бетонное заграждение (1x1) для блокирования проходов бронетехнике."),
+
+    # Missions 1..8 & Test
+    ("Mission 1: The Return", "Mission 1: The Return", "Миссия 1: Возвращение"),
+    ("Map: m37 (Southern Jungle)", "Map: m37 (Southern Jungle)", "Карта: m37 (Южные джунгли)"),
+    ("- Establish base.\n- Destroy Confederation base.", "- Establish base.\n- Destroy Confederation base.", "- Построить базу.\n- Уничтожить базу Конфедерации."),
+    ("We can no longer endure this oppression! The Confederation only hides behind noble words while plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost and prepare to strike.",
+     "We can no longer endure this oppression! The Confederation only hides behind noble words while plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost and prepare to strike.",
+     "Мы не должны и дальше терпеть это угнетение! Конфедерация только прикрывается благими намерениями, грабя народ Перу. Пришло время вернуть нашу свободу! Высаживаемся в районе перевала и готовим плацдарм для наступления."),
+
+    ("Mission 2: Jungle", "Mission 2: Jungle", "Миссия 2: Джунгли"),
+    ("Map: m42 (Rainforest)", "Map: m42 (Rainforest)", "Карта: m42 (Тропический лес)"),
+    ("- Capture the pass.\n- Repel counter-attacks and eliminate Confederation forces.", "- Capture the pass.\n- Repel counter-attacks and eliminate Confederation forces.", "- Захватить перевал.\n- Отразить атаки и уничтожить силы Конфедерации."),
+    ("The central region of Peru is occupied by Confederation forces. Over three months they fortified the high ground. Launch a surprise strike through the dense jungle.",
+     "The central region of Peru is occupied by Confederation forces. Over three months they fortified the high ground. Launch a surprise strike through the dense jungle.",
+     "Вся центральная часть Перу находится под контролем армии конфедерации. За три месяца оккупации они укрепили ключевые высоты. Мы должны нанести неожиданный удар через джунгли."),
+
+    ("Mission 3: Sabotage", "Mission 3: Sabotage", "Миссия 3: Диверсия"),
+    ("Map: m43 (River Valley)", "Map: m43 (River Valley)", "Карта: m43 (Речная долина)"),
+    ("- Guide sabotage squad.\n- Eliminate Confederation outposts in the sector.", "- Guide sabotage squad.\n- Eliminate Confederation outposts in the sector.", "- Провести диверсионный отряд.\n- Подавить силы Конфедерации в секторе."),
+    ("Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy ammo and fuel depots.",
+     "Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy ammo and fuel depots.",
+     "Наш план сработал! Разведка докладывает, что конвои снабжения противника движутся по долине реки. Отрежьте врага от боеприпасов и топлива."),
+
+    ("Mission 4: The Gorge", "Mission 4: The Gorge", "Миссия 4: Ущелье"),
+    ("Map: m43 (Mountain Canyon)", "Map: m43 (Mountain Canyon)", "Карта: m43 (Горный каньон)"),
+    ("- Break through mountain canyon.\n- Destroy Confederation defense fortifications.", "- Break through mountain canyon.\n- Destroy Confederation defense fortifications.", "- Прорваться через горный каньон.\n- Уничтожить укрепления Конфедерации."),
+    ("Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. Assault the fortifications!",
+     "Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. Assault the fortifications!",
+     "Подразделение выдвигается к перевалу по запланированному маршруту. Враг заблокировал ущелье тяжелыми турелями. Штурмуйте укрепления!"),
+
+    ("Mission 5: Matter of Seconds", "Mission 5: Matter of Seconds", "Миссия 5: Счет на секунды"),
+    ("Map: m26 (Desert Outpost)", "Map: m26 (Desert Outpost)", "Карта: m26 (Пустынный форпост)"),
+    ("- Defend the base and construct factories.\n- Eliminate enemy armor divisions.", "- Defend the base and construct factories.\n- Eliminate enemy armor divisions.", "- Захватить базу и развернуть заводы.\n- Ликвидировать вражескую бронетехнику."),
+    ("The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy armor to strike back.",
+     "The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy armor to strike back.",
+     "Противник бросает в бой танковые соединения. Счет идет на секунды! Разверните заводы и подготовьте тяжелые танки для контрудара."),
+
+    ("Mission 6: Radio Station", "Mission 6: Radio Station", "Миссия 6: Радиостанция"),
+    ("Map: m35 (Highland Plateau)", "Map: m35 (Highland Plateau)", "Карта: m35 (Холмистое плато)"),
+    ("- Capture the communications relay.\n- Annihilate Confederation plateau garrison.", "- Capture the communications relay.\n- Annihilate Confederation plateau garrison.", "- Захватить передатчик связи.\n- Уничтожить базу Конфедерации на плато."),
+    ("The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces and hold the plateau.",
+     "The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces and hold the plateau.",
+     "Радиоузел на стратегической высоте позволит перехватывать все приказы штаба Конфедерации. Выбейте врага с высоты и удерживайте позицию."),
+
+    ("Mission 7: Lima", "Mission 7: Lima", "Миссия 7: Лима"),
+    ("Map: m44 (Outskirts of Lima)", "Map: m44 (Outskirts of Lima)", "Карта: m44 (Пригород Лимы)"),
+    ("- Assault the capital city of Lima.\n- Total destruction of Confederation Headquarters!", "- Assault the capital city of Lima.\n- Total destruction of Confederation Headquarters!", "- Штурмовать столицу Лиму.\n- Полное уничтожение штаба Конфедерации!"),
+    ("Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike for the liberation of Peru!",
+     "Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike for the liberation of Peru!",
+     "Наконец-то, мы стоим на пороге в наше светлое будущее! Нам остался всего один решительный бой! И сегодня мы обязаны победить ради свободы Перу!"),
+
+    ("Mission 8: Skirmish", "Mission 8: Skirmish", "Миссия 8: Схватка"),
+    ("Map: m0 (Training Ground)", "Map: m0 (Training Ground)", "Карта: m0 (Учебный полигон)"),
+    ("- Construct your base.\n- Destroy enemy forces.", "- Construct your base.\n- Destroy enemy forces.", "- Построить базу.\n- Уничтожить вражескую группировку."),
+    ("Open skirmish for sector control. Test your strategy and tactics against fortified Confederation positions.",
+     "Open skirmish for sector control. Test your strategy and tactics against fortified Confederation positions.",
+     "Свободная схватка за контроль над сектором. Проверьте вашу тактику против укрепленной базы Конфедерации."),
+
+    ("Mission 9: The Ford", "Mission 9: The Ford", "Миссия 9: Брод"),
+    ("Map: brod (The Ford Crossing)", "Map: brod (The Ford Crossing)", "Карта: brod (Брод)"),
+    ("- Defend the river crossing.\n- Destroy Confederation fortress base.", "- Defend the river crossing.\n- Destroy Confederation fortress base.", "- Оборонять речную переправу.\n- Уничтожить базу Конфедерации."),
+    ("The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post.",
+     "The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post.",
+     "Река делит сектор на две части. Единственное место переправы - брод в центре, плотно прикрытый бункерами врага. Прорвите оборону на реке и уничтожьте вражеский командный пункт."),
+
+    ("Mission 10: Canyon", "Mission 10: Canyon", "Миссия 10: Каньон"),
+    ("Map: canyon (Desert Canyon)", "Map: canyon (Desert Canyon)", "Карта: canyon (Пустынный каньон)"),
+    ("- Secure the canyon gorge.\n- Crush enemy armored units in the valley.", "- Secure the canyon gorge.\n- Crush enemy armored units in the valley.", "- Захватить ущелье каньона.\n- Разгромить вражескую бронетехнику в долине."),
+    ("Confederation armor is positioned in the narrow canyon passes. Maneuver through the rocky terrain and capture the sector.",
+     "Confederation armor is positioned in the narrow canyon passes. Maneuver through the rocky terrain and capture the sector.",
+     "Бронетехника Конфедерации заняла узкие проходы в каньоне. Маневрируйте между скал и захватите весь сектор."),
+
+    ("Mission 11: Oasis", "Mission 11: Oasis", "Миссия 11: Оазис"),
+    ("Map: oasis (Desert Oasis)", "Map: oasis (Desert Oasis)", "Карта: oasis (Пустынный оазис)"),
+    ("- Control strategic water oases.\n- Eradicate Confederation desert outpost.", "- Control strategic water oases.\n- Eradicate Confederation desert outpost.", "- Установить контроль над оазисами.\n- Ликвидировать пустынный форпост Конфедерации."),
+    ("Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison.",
+     "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison.",
+     "Древние оазисы в пустыне дают ключевые ресурсы в этих безжизненных песках. Захватите источники воды и штурмуйте базу противника."),
+
+    ("Test Map (Polygon)", "Test Map (Polygon)", "Тестовая карта (Полигон)"),
+    ("Map: AI & Pathfinding Polygon", "Map: AI & Pathfinding Polygon", "Карта: Полигон ИИ и проходимости"),
+    ("- Verify pathfinding in narrow and closed passages.\n- Test wall destruction and AI rebuilding.\n- Test Attack-Move [A].",
+     "- Verify pathfinding in narrow and closed passages.\n- Test wall destruction and AI rebuilding.\n- Test Attack-Move [A].",
+     "- Проверить проходимость узких проходов и закрытых стен.\n- Проверить разрушаемость стен и отстройку базы ИИ.\n- Проверить атаку в движении [A]."),
+    ("Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls.",
+     "Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls.",
+        "Специальный тестовый полигон: 1) Сектор закрытых стен (юнит подходит вплотную к закрытому проходу и ждет открытия пути или пробивает стену), 2) Узкий коридор, перекрытый вражеским юнитом, 3) Лабиринт препятствий, 4) Укрепленная база ИИ с авто-восстановлением зданий и стен."),
+
+    # Character Archetype Editor
+    ("Open Art Of War Character Archetype Editor", "Open Art Of War Character Archetype Editor", "Редактор архетипов Open Art Of War"),
+    ("SDL error: ", "SDL error: ", "Ошибка SDL: "),
+    ("SDL_image error: ", "SDL_image error: ", "Ошибка SDL_image: "),
+    ("SDL window error: ", "SDL window error: ", "Ошибка окна SDL: "),
+    ("SDL renderer error: ", "SDL renderer error: ", "Ошибка рендерера SDL: "),
+    ("Could not find the assets folder with graphics data.", "Could not find the assets folder with graphics data.", "Не найдена папка assets с графическими данными."),
+    ("No YAML files found in assets/characters.", "No YAML files found in assets/characters.", "В assets/characters не найдено файлов YAML."),
+    ("Invalid YAML", "Invalid YAML", "Ошибка YAML"),
+    ("The YAML root must be a map.", "The YAML root must be a map.", "Корневой элемент YAML должен быть словарём."),
+    ("Loaded: ", "Loaded: ", "Загружено: "),
+    ("Could not load YAML: ", "Could not load YAML: ", "Не удалось загрузить YAML: "),
+    ("Could not open file for writing: ", "Could not open file for writing: ", "Не удалось открыть файл для записи: "),
+    ("Failed to write file: ", "Failed to write file: ", "Ошибка записи файла: "),
+    ("Saved: ", "Saved: ", "Сохранено: "),
+    ("YAML save error: ", "YAML save error: ", "Ошибка YAML при сохранении: "),
+    ("Ready", "Ready", "Готово"),
+    ("File", "File", "Файл"),
+    ("Save", "Save", "Сохранить"),
+    ("Load selected", "Load selected", "Загрузить выбранный"),
+    ("Refresh list", "Refresh list", "Обновить список"),
+    ("Archetypes", "Archetypes", "Архетипы"),
+    ("%zu archetypes", "%zu archetypes", "%zu конфигураций"),
+    ("Search by name or ID", "Search by name or ID", "Поиск по имени или ID"),
+    ("Properties", "Properties", "Параметры"),
+    ("Select a YAML configuration from the list.", "Select a YAML configuration from the list.", "Выберите YAML-конфигурацию в списке."),
+    ("Preview", "Preview", "Предпросмотр"),
+    ("Unsaved changes", "Unsaved changes", "Есть несохранённые изменения"),
+    ("General", "General", "Основное"),
+    ("Name", "Name", "Название"),
+    ("Description", "Description", "Описание"),
+    ("Faction", "Faction", "Сторона"),
+    ("Category (unit/building)", "Category (unit/building)", "Категория (unit/building)"),
+    ("Internal type", "Internal type", "Внутренний тип"),
+    ("Class", "Class", "Класс"),
+    ("Archetype ID", "Archetype ID", "ID архетипа"),
+    ("Building index", "Building index", "Индекс здания"),
+    ("Size and stats", "Size and stats", "Размер и характеристики"),
+    ("Width (tiles)", "Width (tiles)", "Ширина в клетках"),
+    ("Height (tiles)", "Height (tiles)", "Высота в клетках"),
+    ("Maximum health", "Maximum health", "Максимум здоровья"),
+    ("Sight radius (tiles)", "Sight radius (tiles)", "Радиус обзора (клетки)"),
+    ("Move speed (pixels per tick)", "Move speed (pixels per tick)", "Скорость (пикселей за тик)"),
+    ("Production", "Production", "Производство"),
+    ("Cost", "Cost", "Стоимость"),
+    ("Credit cost", "Credit cost", "Стоимость в кредитах"),
+    ("Power (+/-)", "Power (+/-)", "Мощность (+/-)"),
+    ("Build time", "Build time", "Время производства"),
+    ("Produced in", "Produced in", "Где производится"),
+    ("Icon composite ID", "Icon composite ID", "ID иконки"),
+    ("Prerequisites (one per line)", "Prerequisites (one per line)", "Предпосылки (по одной на строку)"),
+    ("Combat", "Combat", "Бой"),
+    ("Can attack", "Can attack", "Может атаковать"),
+    ("Damage", "Damage", "Урон"),
+    ("Range (tiles)", "Range (tiles)", "Дальность (клетки)"),
+    ("Cooldown (seconds)", "Cooldown (seconds)", "Перезарядка (сек.)"),
+    ("Shots per burst", "Shots per burst", "Выстрелов в очереди"),
+    ("Burst interval (seconds)", "Burst interval (seconds)", "Интервал очереди (сек.)"),
+    ("Projectile", "Projectile", "Снаряд"),
+    ("Rotating turret", "Rotating turret", "Поворотная башня"),
+    ("Rotating radar", "Rotating radar", "Поворотная антенна"),
+    ("Animation", "Animation", "Анимация"),
+    ("Sprite sheet", "Sprite sheet", "Лист спрайтов"),
+    ("Base sequence", "Base sequence", "Базовая последовательность"),
+    ("Composite ID", "Composite ID", "Составной спрайт"),
+    ("Rubble composite base", "Rubble composite base", "База обломков"),
+    ("Attack offset", "Attack offset", "Смещение атаки"),
+    ("Walk frames", "Walk frames", "Кадров ходьбы"),
+    ("Idle frames", "Idle frames", "Кадров покоя"),
+    ("Death frames", "Death frames", "Кадров гибели"),
+    ("Abilities", "Abilities", "Способности"),
+    ("Siege mode", "Siege mode", "Режим осады"),
+    ("Siege archetype ID", "Siege archetype ID", "ID осадного архетипа"),
+    ("Parent archetype ID", "Parent archetype ID", "ID родительского архетипа"),
+    ("Independent turret", "Independent turret", "Независимая башня"),
+    ("Filename for Save As", "Filename for Save As", "Имя файла для Сохранить как"),
+    ("Save As", "Save As", "Сохранить как"),
+    ("Reload file", "Reload file", "Перезагрузить файл"),
+    ("Idle", "Idle", "Покой"),
+    ("Move", "Move", "Движение"),
+    ("Attack", "Attack", "Атака"),
+    ("Death", "Death", "Гибель"),
+    ("Loop", "Loop", "Цикл"),
+    ("Facing %d/7", "Facing %d/7", "Направление %d/7"),
+    ("Speed %.1fx", "Speed %.1fx", "Скорость %.1fx"),
+    ("Attack range", "Attack range", "Радиус атаки"),
+    ("Construction", "Construction", "Строительство"),
+    ("Health", "Health", "Прочность"),
+    ("Powered", "Powered", "Питание"),
+    ("Preview zoom", "Preview zoom", "Масштаб предпросмотра"),
+    ("Game sprites and animation sequences from assets/data", "Game sprites and animation sequences from assets/data", "Игровые спрайты и последовательности из assets/data"),
+
+    # Map Editor
+    ("Open Art Of War Map Editor - [openaow-mapeditor]", "Open Art Of War Map Editor - [openaow-mapeditor]", "Редактор карт Open Art Of War - [openaow-mapeditor]"),
+    ("Undo action", "Undo action", "Отмена действия (Undo)"),
+    ("Redo action", "Redo action", "Повтор действия (Redo)"),
+    ("Map saved: ", "Map saved: ", "Карта сохранена: "),
+    ("Player start point (HQ): ", "Player start point (HQ): ", "Стартовая точка игрока (HQ): "),
+    ("Enemy start point (HQ): ", "Enemy start point (HQ): ", "Стартовая точка врага (HQ): "),
+    ("Eyedropper: selected tile #", "Eyedropper: selected tile #", "Пипетка: выбран тайл #"),
+    # Character editor: hints shown over the fields (and the Research tab)
+    ("Technology name", "Technology name", "Название технологии"),
+    ("Technology description", "Technology description", "Описание технологии"),
+    ("Research cost (credits)", "Research cost (credits)", "Цена исследования (кредиты)"),
+    ("Icon: %d", "Icon: %d", "Значок: %d"),
+    ("Effect", "Effect", "Эффект"),
+    ("Value", "Value", "Значение"),
+    ("Second value", "Second value", "Второе значение"),
+    ("Unit A", "Unit A", "Юнит A"),
+    ("Unit B", "Unit B", "Юнит B"),
+    ("Requires", "Requires", "Требует"),
+    ("Player only", "Player only", "Только для игрока"),
+    ("Save research", "Save research", "Сохранить исследования"),
+    ("Reload", "Reload", "Перечитать"),
+    ("Technology #%d", "Technology #%d", "Технология №%d"),
+    ("The research file could not be loaded.", "The research file could not be loaded.", "Файл исследований не загрузился."),
+    ("No research list in ", "No research list in ", "Нет списка исследований в "),
+    ("Value / second value: see the effect list in game/Research.hpp", "Value / second value: see the effect list in game/Research.hpp", "Значения: см. список эффектов в game/Research.hpp"),
+    ("Research", "Research", "Исследования"),
+    ("Shows the edited character on a canvas: idle, moving, attacking, dying.", "Shows the edited character on a canvas: idle, moving, attacking, dying.", "Показывает редактируемого персонажа на холсте: стоит, идёт, атакует, погибает."),
+    ("Puts the edited character (A) next to another one (B) and compares their numbers.", "Puts the edited character (A) next to another one (B) and compares their numbers.", "Ставит редактируемого персонажа (A) рядом с другим (B) и сравнивает их показатели."),
+    ("Runs a battle of A against B with the game's combat rules.", "Runs a battle of A against B with the game's combat rules.", "Запускает бой A против B по боевым правилам игры."),
+    ("Edits the technology trees of both factions (assets/characters/research_*.yaml).", "Edits the technology trees of both factions (assets/characters/research_*.yaml).", "Правка деревьев технологий обеих фракций (assets/characters/research_*.yaml)."),
+    ("Standing still animation.", "Standing still animation.", "Анимация покоя."),
+    ("Walking animation: the unit drives right, turns around and returns.", "Walking animation: the unit drives right, turns around and returns.", "Анимация движения: юнит едет вправо, разворачивается и возвращается."),
+    ("Fires the weapons at the target point with the current weapon settings.", "Fires the weapons at the target point with the current weapon settings.", "Стрельба по точке цели с текущими настройками оружия."),
+    ("Death animation of the unit or building.", "Death animation of the unit or building.", "Анимация гибели юнита или здания."),
+    ("Shows the remains left after death, stage by stage.", "Shows the remains left after death, stage by stage.", "Показывает остов, остающийся после гибели, стадию за стадией."),
+    ("Plays the burning death variant of infantry.", "Plays the burning death variant of infantry.", "Показывает вариант гибели пехоты от огня."),
+    ("Back to the mobile form (hotkey G).", "Back to the mobile form (hotkey G).", "Вернуть подвижную форму (клавиша G)."),
+    ("Switches the unit to its stationary siege form (hotkey G).", "Switches the unit to its stationary siege form (hotkey G).", "Переводит юнит в неподвижную осадную форму (клавиша G)."),
+    ("Restart the death animation again and again.", "Restart the death animation again and again.", "Повторять анимацию гибели по кругу."),
+    ("Resets the camera position and zoom.", "Resets the camera position and zoom.", "Сбрасывает положение и масштаб камеры."),
+    ("Direction of the hull, 0-7 in 45 degree steps. Also set with the right mouse button on the canvas.", "Direction of the hull, 0-7 in 45 degree steps. Also set with the right mouse button on the canvas.", "Направление корпуса, 0-7 с шагом 45°. Также задаётся правой кнопкой мыши на холсте."),
+    ("Direction of the turret, 0-7. Also set with the left mouse button on the canvas.", "Direction of the turret, 0-7. Also set with the left mouse button on the canvas.", "Направление башни, 0-7. Также задаётся левой кнопкой мыши на холсте."),
+    ("The turret follows the hull direction.", "The turret follows the hull direction.", "Башня поворачивается вместе с корпусом."),
+    ("Playback speed of the preview animations.", "Playback speed of the preview animations.", "Скорость воспроизведения анимаций."),
+    ("Flight speed of bullets and shells in pixels per second (combat.bullet_speed).", "Flight speed of bullets and shells in pixels per second (combat.bullet_speed).", "Скорость полёта пуль и снарядов в пикселях в секунду (combat.bullet_speed)."),
+    ("Speed multiplier of shot and hit animations (combat.fx_speed).", "Speed multiplier of shot and hit animations (combat.fx_speed).", "Множитель скорости анимации выстрела и попадания (combat.fx_speed)."),
+    ("Magnification of the canvas. The mouse wheel over the canvas does the same.", "Magnification of the canvas. The mouse wheel over the canvas does the same.", "Масштаб холста. То же делает колесо мыши над холстом."),
+    ("Puts the target point back in front of the unit.", "Puts the target point back in front of the unit.", "Возвращает точку цели перед юнитом."),
+    ("Draws the attack range as a red circle (the minimum range is drawn inside it).", "Draws the attack range as a red circle (the minimum range is drawn inside it).", "Рисует дальность атаки красным кругом (минимальная дальность — внутри него)."),
+    ("Draws the sight radius as a green circle.", "Draws the sight radius as a green circle.", "Рисует радиус обзора зелёным кругом."),
+    ("Draws a 5x5 tile grid under the character.", "Draws a 5x5 tile grid under the character.", "Рисует сетку 5x5 клеток под персонажем."),
+    ("Shows damage, DPS, range and burst figures over the canvas.", "Shows damage, DPS, range and burst figures over the canvas.", "Показывает урон, DPS, дальность и очередь поверх холста."),
+    ("Health shown in the preview: damaged units and buildings look different.", "Health shown in the preview: damaged units and buildings look different.", "Здоровье в превью: повреждённые юниты и здания выглядят иначе."),
+    ("Construction progress of the building shown in the preview.", "Construction progress of the building shown in the preview.", "Степень достройки здания в превью."),
+    ("Building with or without power (radars and turrets stop without it).", "Building with or without power (radars and turrets stop without it).", "Здание с питанием или без (без питания радары и башни не работают)."),
+    ("Shows the siege form of the unit with its own stats and weapon.", "Shows the siege form of the unit with its own stats and weapon.", "Показывает осадную форму юнита с её характеристиками и оружием."),
+    ("Filters the list by name, id, number or faction.", "Filters the list by name, id, number or faction.", "Фильтр списка по имени, id, номеру или фракции."),
+    ("Show units and buildings.", "Show units and buildings.", "Показать юнитов и здания."),
+    ("Show units only.", "Show units only.", "Только юниты."),
+    ("Show buildings only.", "Show buildings only.", "Только здания."),
+    ("Width of this panel in pixels. The splitter between the panels works too.", "Width of this panel in pixels. The splitter between the panels works too.", "Ширина этой панели в пикселях. Можно также тянуть разделитель между панелями."),
+    ("Narrow panel.", "Narrow panel.", "Узкая панель."),
+    ("Medium panel.", "Medium panel.", "Средняя панель."),
+    ("Wide panel.", "Wide panel.", "Широкая панель."),
+    ("Identity of the character: id, name and what it is in the game.", "Identity of the character: id, name and what it is in the game.", "Идентификация персонажа: id, имя и что это в игре."),
+    ("Footprint, health, sight and speed.", "Footprint, health, sight and speed.", "Размер, здоровье, обзор и скорость."),
+    ("Price, build time and power of the character.", "Price, build time and power of the character.", "Цена, время производства и мощность."),
+    ("Settings shared by all weapons, and the weapons list.", "Settings shared by all weapons, and the weapons list.", "Общие настройки оружия и список оружия."),
+    ("Which sprite sequences the game uses (derived from the archetype, read only).", "Which sprite sequences the game uses (derived from the archetype, read only).", "Какие спрайтовые последовательности использует игра (следуют из архетипа, только чтение)."),
+    ("Siege mode and upgraded / baseline forms.", "Siege mode and upgraded / baseline forms.", "Осадный режим и улучшенные / базовые формы."),
+    ("Unique text id of the configuration, e.g. rifleman_conf. The description in po/*.po is found by it.", "Unique text id of the configuration, e.g. rifleman_conf. The description in po/*.po is found by it.", "Уникальный текстовый id конфигурации, например rifleman_conf. По нему ищется описание в po/*.po."),
+    ("Name shown in the game.", "Name shown in the game.", "Название, которое видно в игре."),
+    ("Kind of building. The faction, structure type and sprites follow from it.", "Kind of building. The faction, structure type and sprites follow from it.", "Вид здания. Из него следуют фракция, тип постройки и спрайты."),
+    ("Kind of unit. The faction, class, production building and sprites follow from it.", "Kind of unit. The faction, class, production building and sprites follow from it.", "Вид юнита. Из него следуют фракция, класс, здание-производитель и спрайты."),
+    ("Width of the building on the map in tiles.", "Width of the building on the map in tiles.", "Ширина здания на карте в клетках."),
+    ("Height of the building on the map in tiles.", "Height of the building on the map in tiles.", "Высота здания на карте в клетках."),
+    ("Health points of the unit or building.", "Health points of the unit or building.", "Очки здоровья юнита или здания."),
+    ("How far it sees, in tiles.", "How far it sees, in tiles.", "Как далеко он видит, в клетках."),
+    ("Speed of the unit in internal simulation units.", "Speed of the unit in internal simulation units.", "Скорость юнита во внутренних единицах симуляции."),
+    ("Price in credits.", "Price in credits.", "Цена в кредитах."),
+    ("Positive: the building generates power. Negative: it consumes power.", "Positive: the building generates power. Negative: it consumes power.", "Положительное — здание вырабатывает энергию, отрицательное — потребляет."),
+    ("Seconds to train the unit or build the building.", "Seconds to train the unit or build the building.", "Секунд на производство юнита или строительство здания."),
+    ("Icon of the building in the construction menu (cameo composite).", "Icon of the building in the construction menu (cameo composite).", "Значок здания в меню строительства (композит-картинка)."),
+    ("Whether the building shoots. If off, the weapons are ignored.", "Whether the building shoots. If off, the weapons are ignored.", "Стреляет ли здание. Если выключено, оружие игнорируется."),
+    ("Flight speed of projectiles in pixels per second. Used by the preview.", "Flight speed of projectiles in pixels per second. Used by the preview.", "Скорость полёта снарядов в пикселях в секунду. Используется превью."),
+    ("Speed multiplier of the shot and hit animations in the preview.", "Speed multiplier of the shot and hit animations in the preview.", "Множитель скорости анимаций выстрела и попадания в превью."),
+    ("Random deviation of a shot in degrees. 0 = every shot hits the aimed point.", "Random deviation of a shot in degrees. 0 = every shot hits the aimed point.", "Случайный разброс выстрела в градусах. 0 — каждый выстрел точно в цель."),
+    ("The turret turns independently of the hull.", "The turret turns independently of the hull.", "Башня поворачивается независимо от корпуса."),
+    ("The radar dish of the building rotates.", "The radar dish of the building rotates.", "Антенна радара здания вращается."),
+    ("Pivot of the turret relative to the hull centre in pixels (hull faces south).", "Pivot of the turret relative to the hull centre in pixels (hull faces south).", "Центр вращения башни относительно центра корпуса в пикселях (корпус смотрит на юг)."),
+    ("Removes the custom value: the game default for this unit is used.", "Removes the custom value: the game default for this unit is used.", "Убирает своё значение: берётся значение игры по умолчанию для этого юнита."),
+    ("Disabled weapons are neither used nor tested.", "Disabled weapons are neither used nor tested.", "Отключённое оружие не используется и не проверяется."),
+    ("Deletes this weapon from the list.", "Deletes this weapon from the list.", "Удаляет это оружие из списка."),
+    ("Name of the weapon (information only).", "Name of the weapon (information only).", "Название оружия (только для справки)."),
+    ("Kind of projectile: decides the flight, the hit effect and the default spread.", "Kind of projectile: decides the flight, the hit effect and the default spread.", "Тип снаряда: определяет полёт, эффект попадания и разброс по умолчанию."),
+    ("Damage of one shot.", "Damage of one shot.", "Урон одного выстрела."),
+    ("Maximum firing distance in tiles.", "Maximum firing distance in tiles.", "Максимальная дальность стрельбы в клетках."),
+    ("Closer targets cannot be attacked (artillery). 0 = no limit.", "Closer targets cannot be attacked (artillery). 0 = no limit.", "Ближние цели атаковать нельзя (артиллерия). 0 — без ограничения."),
+    ("Fixed: the same pause after every attack. Random: a new pause between min and max each time.", "Fixed: the same pause after every attack. Random: a new pause between min and max each time.", "Фиксированная: одна и та же пауза после каждой атаки. Случайная: новая пауза между минимумом и максимумом."),
+    ("Shortest and longest pause between attack cycles in seconds.", "Shortest and longest pause between attack cycles in seconds.", "Самая короткая и самая длинная пауза между циклами атаки в секундах."),
+    ("Pause between attack cycles in seconds.", "Pause between attack cycles in seconds.", "Пауза между циклами атаки в секундах."),
+    ("Shots in one attack cycle.", "Shots in one attack cycle.", "Выстрелов в одном цикле атаки."),
+    ("Time between shots of one burst.", "Time between shots of one burst.", "Время между выстрелами одной очереди."),
+    ("Share of the damage dealt to targets next to the hit point. 0 = single target.", "Share of the damage dealt to targets next to the hit point. 0 = single target.", "Доля урона по целям рядом с точкой попадания. 0 — только одна цель."),
+    ("Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways.", "Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways.", "Откуда вылетают снаряды, относительно корпуса (или башни): X вперёд, Y вбок."),
+    ("The weapon only works after the matching technology is researched.", "The weapon only works after the matching technology is researched.", "Оружие работает только после изучения нужной технологии."),
+    ("The weapon is used only for targets closer than this.", "The weapon is used only for targets closer than this.", "Оружие применяется только по целям ближе этого расстояния."),
+    ("Adds a second weapon (e.g. a flamethrower for close targets).", "Adds a second weapon (e.g. a flamethrower for close targets).", "Добавляет второе оружие (например огнемёт для ближних целей)."),
+    ("Adds the main weapon.", "Adds the main weapon.", "Добавляет основное оружие."),
+    ("Preview only: pretend the research for the second weapon is done.", "Preview only: pretend the research for the second weapon is done.", "Только превью: считать изученной технологию для второго оружия."),
+    ("Preview only: which weapon fires. Auto picks by distance.", "Preview only: which weapon fires. Auto picks by distance.", "Только превью: какое оружие стреляет. Авто — по расстоянию."),
+    ("Preview the siege form (hotkey G).", "Preview the siege form (hotkey G).", "Показать осадную форму (клавиша G)."),
+    ("The unit can switch to a stationary siege form.", "The unit can switch to a stationary siege form.", "Юнит может переходить в неподвижную осадную форму."),
+    ("Archetype number of the siege form.", "Archetype number of the siege form.", "Номер архетипа осадной формы."),
+    ("For siege / baseline forms: the base unit they belong to.", "For siege / baseline forms: the base unit they belong to.", "Для осадных / базовых форм: к какому юниту они относятся."),
+    ("Stats and weapon of the siege form stored in this file.", "Stats and weapon of the siege form stored in this file.", "Характеристики и оружие осадной формы, хранящиеся в этом файле."),
+    ("Whether the siege form is available.", "Whether the siege form is available.", "Доступна ли осадная форма."),
+    ("Archetype number of the siege form (14-18).", "Archetype number of the siege form (14-18).", "Номер архетипа осадной формы (14-18)."),
+    ("Name of the siege form.", "Name of the siege form.", "Название осадной формы."),
+    ("Sight radius in tiles.", "Sight radius in tiles.", "Радиус обзора в клетках."),
+    ("Speed in the siege form. 0 = cannot move.", "Speed in the siege form. 0 = cannot move.", "Скорость в осадной форме. 0 — не двигается."),
+    ("Creates a siege form with its own stats and weapon.", "Creates a siege form with its own stats and weapon.", "Создаёт осадную форму со своими характеристиками и оружием."),
+    ("Weapon of the unit before the research upgrade.", "Weapon of the unit before the research upgrade.", "Оружие юнита до улучшения исследованием."),
+    ("Writes the character to its file (Ctrl+S).", "Writes the character to its file (Ctrl+S).", "Записывает персонажа в его файл (Ctrl+S)."),
+    ("File name inside assets/characters for a copy.", "File name inside assets/characters for a copy.", "Имя файла в assets/characters для копии."),
+    ("Saves a copy under the typed file name and opens it.", "Saves a copy under the typed file name and opens it.", "Сохраняет копию под введённым именем и открывает её."),
+    ("Discards unsaved edits and reads the file again.", "Discards unsaved edits and reads the file again.", "Отбрасывает несохранённые правки и читает файл заново."),
+    ("Shows the corpse left by the infantry.", "Shows the corpse left by the infantry.", "Показывает труп, остающийся от пехоты."),
+    ("Number of burial stages of the wreck.", "Number of burial stages of the wreck.", "Число стадий погребения остова."),
+    ("Stage shown in the preview. -1 plays all the stages in a loop.", "Stage shown in the preview. -1 plays all the stages in a loop.", "Стадия в превью. -1 — все стадии по кругу."),
+    ("Shows the wreck in the preview.", "Shows the wreck in the preview.", "Показывает остов в превью."),
+    ("Removes the custom wreck: the game default for this unit is used.", "Removes the custom wreck: the game default for this unit is used.", "Убирает свой остов: берётся остов по умолчанию для этого юнита."),
+    ("Character to compare with or to fight against.", "Character to compare with or to fight against.", "Персонаж для сравнения или боя."),
+    ("Swaps the characters. Save A first: both files are reloaded.", "Swaps the characters. Save A first: both files are reloaded.", "Меняет персонажей местами. Сначала сохраните A: оба файла перечитываются."),
+    ("Distance between A and B on the canvas.", "Distance between A and B on the canvas.", "Расстояние между A и B на холсте."),
+    ("Table of numbers: green = better, red = worse.", "Table of numbers: green = better, red = worse.", "Таблица показателей: зелёный — лучше, красный — хуже."),
+    ("How many units of A fight.", "How many units of A fight.", "Сколько юнитов A участвует в бою."),
+    ("How many units of B fight.", "How many units of B fight.", "Сколько юнитов B участвует в бою."),
+    ("Starting distance between the sides in tiles.", "Starting distance between the sides in tiles.", "Начальное расстояние между сторонами в клетках."),
+    ("B walks toward A from the start. Off: B stands and waits.", "B walks toward A from the start. Off: B stands and waits.", "B идёт на A с начала боя. Выключено: B стоит на месте."),
+    ("The battle is a draw when this time runs out.", "The battle is a draw when this time runs out.", "Если время вышло, бой считается ничьей."),
+    ("Starts a battle with the current settings.", "Starts a battle with the current settings.", "Запускает бой с текущими настройками."),
+    ("Starts the battle again.", "Starts the battle again.", "Запускает бой заново."),
+    ("Pauses the battle.", "Pauses the battle.", "Ставит бой на паузу."),
+    ("Continues the battle.", "Continues the battle.", "Продолжает бой."),
+    ("Advances a paused battle by 0.1 s.", "Advances a paused battle by 0.1 s.", "Продвигает бой на паузе на 0,1 с."),
+    ("Ends the battle.", "Ends the battle.", "Заканчивает бой."),
+    ("Frames all the fighters.", "Frames all the fighters.", "Показывает всех бойцов."),
+    ("Speed of the battle.", "Speed of the battle.", "Скорость боя."),
+    ("How many battles the batch runs.", "How many battles the batch runs.", "Сколько боёв проведёт серия."),
+    ("Runs many battles at once without drawing and shows the win statistics.", "Runs many battles at once without drawing and shows the win statistics.", "Проводит много боёв сразу без отрисовки и показывает статистику побед."),
+    ("Technology tree of the Confederation (Tech Center).", "Technology tree of the Confederation (Tech Center).", "Дерево технологий Конфедерации (Технический центр)."),
+    ("Technology tree of the Resistance (Laboratory).", "Technology tree of the Resistance (Laboratory).", "Дерево технологий Сопротивления (Лаборатория)."),
+    ("Writes the tree to assets/characters/research_<faction>.yaml (Ctrl+S).", "Writes the tree to assets/characters/research_<faction>.yaml (Ctrl+S).", "Записывает дерево в assets/characters/research_<фракция>.yaml (Ctrl+S)."),
+    ("Name of the technology (a translation key from po/*.po).", "Name of the technology (a translation key from po/*.po).", "Название технологии (ключ перевода из po/*.po)."),
+    ("Text shown in the game (a translation key from po/*.po).", "Text shown in the game (a translation key from po/*.po).", "Текст в игре (ключ перевода из po/*.po)."),
+    ("Price of the technology in credits.", "Price of the technology in credits.", "Цена технологии в кредитах."),
+    ("Picture of the technology in the research menu.", "Picture of the technology in the research menu.", "Картинка технологии в меню исследований."),
+    ("What the technology does. Value and second value depend on it.", "What the technology does. Value and second value depend on it.", "Что делает технология. От неё зависят значение и второе значение."),
+    ("Main number of the effect: percent, points or tiles (see the effect).", "Main number of the effect: percent, points or tiles (see the effect).", "Основное число эффекта: проценты, очки или клетки (зависит от эффекта)."),
+    ("Extra number of the effect, e.g. the damage bonus of range upgrades.", "Extra number of the effect, e.g. the damage bonus of range upgrades.", "Дополнительное число эффекта, например бонус урона у улучшений дальности."),
+    ("The unit the effect is about. Siege forms count as their base unit.", "The unit the effect is about. Siege forms count as their base unit.", "Юнит, к которому относится эффект. Осадные формы считаются базовым юнитом."),
+    ("A second unit the effect is about (optional).", "A second unit the effect is about (optional).", "Второй юнит, к которому относится эффект (необязательно)."),
+    ("Technology that has to be researched first. The tree is drawn from it.", "Technology that has to be researched first. The tree is drawn from it.", "Технология, которую надо изучить раньше. По ней строится дерево."),
+    ("The effect is meaningless for the AI, so the AI skips it.", "The effect is meaningless for the AI, so the AI skips it.", "Эффект не имеет смысла для ИИ, он его пропускает."),
+]
+
+def format_po_string(s: str) -> str:
+    escaped = s.replace('\\', '\\\\').replace('"', '\\"')
+    if '\n' in escaped:
+        lines = escaped.split('\n')
+        res = '""\n'
+        for i, line in enumerate(lines):
+            suffix = '\\n' if i < len(lines) - 1 else ''
+            res += f'"{line}{suffix}"\n'
+        return res.rstrip('\n')
+    else:
+        return f'"{escaped}"'
+
+def main():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    po_dir = os.path.join(root, 'po')
+    os.makedirs(po_dir, exist_ok=True)
+    os.makedirs(os.path.join(root, 'assets', 'locale', 'en', 'LC_MESSAGES'), exist_ok=True)
+    os.makedirs(os.path.join(root, 'assets', 'locale', 'ru', 'LC_MESSAGES'), exist_ok=True)
+
+    header = (
+        'msgid ""\n'
+        'msgstr ""\n'
+        '"Project-Id-Version: OpenArtOfWar 1.0\\n"\n'
+        '"Report-Msgid-Bugs-To: \\n"\n'
+        '"POT-Creation-Date: 2026-10-24 23:00+0500\\n"\n'
+        '"PO-Revision-Date: 2026-10-24 23:00+0500\\n"\n'
+        '"MIME-Version: 1.0\\n"\n'
+        '"Content-Type: text/plain; charset=UTF-8\\n"\n'
+        '"Content-Transfer-Encoding: 8bit\\n"\n\n'
+    )
+
+    # Write POT
+    pot_path = os.path.join(po_dir, 'openaow.pot')
+    with open(pot_path, 'w', encoding='utf-8') as f:
+        f.write(header)
+        seen = set()
+        for msgid, _, _ in PO_ENTRIES:
+            if msgid in seen: continue
+            seen.add(msgid)
+            f.write(f'msgid {format_po_string(msgid)}\n')
+            f.write('msgstr ""\n\n')
+
+    # Write EN
+    en_path = os.path.join(po_dir, 'en.po')
+    with open(en_path, 'w', encoding='utf-8') as f:
+        f.write(header)
+        seen = set()
+        for msgid, en_str, _ in PO_ENTRIES:
+            if msgid in seen: continue
+            seen.add(msgid)
+            f.write(f'msgid {format_po_string(msgid)}\n')
+            f.write(f'msgstr {format_po_string(en_str)}\n\n')
+
+    # Write RU
+    ru_path = os.path.join(po_dir, 'ru.po')
+    with open(ru_path, 'w', encoding='utf-8') as f:
+        f.write(header)
+        seen = set()
+        for msgid, _, ru_str in PO_ENTRIES:
+            if msgid in seen: continue
+            seen.add(msgid)
+            f.write(f'msgid {format_po_string(msgid)}\n')
+            f.write(f'msgstr {format_po_string(ru_str)}\n\n')
+
+    # Compile with msgfmt
+    en_mo = os.path.join(root, 'assets', 'locale', 'en', 'LC_MESSAGES', 'openaow.mo')
+    ru_mo = os.path.join(root, 'assets', 'locale', 'ru', 'LC_MESSAGES', 'openaow.mo')
+    subprocess.run(['msgfmt', '-o', en_mo, en_path], check=True)
+    subprocess.run(['msgfmt', '-o', ru_mo, ru_path], check=True)
+
+    print(f"Generated {pot_path}")
+    print(f"Generated and compiled {en_path} -> {en_mo}")
+    print(f"Generated and compiled {ru_path} -> {ru_mo}")
+
+if __name__ == '__main__':
+    main()
