@@ -1,21 +1,57 @@
 #include "core/Application.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include <filesystem>
 #include <iostream>
 #include <string>
+
+namespace
+{
+    const char *const kHelp = R"(Usage: openaow [options]
+
+Open Art Of War: Freedom for Liberty. Run it from the folder that holds ./assets.
+
+Single player:
+  --map=<name|path>             start a custom game on this map (a name from assets/maps or a .json path)
+  --from-scratch                start from scratch (only HQ and power plant, no units)
+  --testmap, --test-map, -tm    open the test polygon (assets/maps/testmap.json)
+
+Network game (the same --map picks the match map):
+  --host[=port]                 host a LAN game (default port 38100)
+  --players=N                   with --host / --server-create: start once N players are in (default 2)
+  --join=<address>[:port]       join a LAN game
+  --server=<host>[:port]        play through a dedicated server (openaow-server)
+  --server-create               with --server: create a room
+  --server-code=<code>          with --server: join the room with this code
+  --name=<player>               player name (default "Player")
+
+Graphics:
+  --renderer=<name>             render API for this run: gpu, vulkan, opengl, direct3d12, direct3d11,
+                                direct3d, metal, software (what this system offers)
+
+Debug builds only (cmake -DAOW_DEBUG=ON):
+  --debug, -d                   debug overlay, navigation inspection, full control over the enemy
+  --test, --headless, -t        run the headless self-tests and exit (0 = success)
+
+  --help, -h                    this text
+  --version                     print the version
+)";
+} // namespace
 
 int main(int argc, char *argv[])
 {
     bool testMode = false;
     bool debugMode = false;
     bool testMapMode = false;
+    bool fromScratch = false; // --map without a network game: a custom game, --from-scratch ignores the map's own bases
     std::string rendererOverride;
     // Network game from the command line: --host[=port] --players=N --map=<name> | --join=<address>[:port], --name=<player>
+    // Single player: --map=<name|path> [--from-scratch] starts a custom game on that map
     bool netHost = false;
     std::string netJoin;
     uint16_t netPort = 38100;
     int netPlayers = 2;
-    std::string netMap = "assets/maps/m26.json";
+    std::string netMapName; // resolved through LoaderResources once the assets are found
     std::string netName = "Player";
     std::string netServer;
     bool netServerCreate = false;
@@ -23,9 +59,23 @@ int main(int argc, char *argv[])
     for(int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
+        if(arg == "--help" || arg == "-h")
+        {
+            std::cout << kHelp;
+            return 0;
+        }
+        if(arg == "--version")
+        {
+            std::cout << "openaow " << OAOW_VERSION << std::endl;
+            return 0;
+        }
         if(arg == "--test" || arg == "--headless" || arg == "--headless-test" || arg == "-t")
         {
+#if defined(AOW_DEBUG)
             testMode = true;
+#else
+            std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
+#endif
         }
         if(arg == "--host" || arg.rfind("--host=", 0) == 0)
         {
@@ -53,7 +103,9 @@ int main(int argc, char *argv[])
         if(arg.rfind("--server-code=", 0) == 0)
             netServerCode = arg.substr(14);
         if(arg.rfind("--map=", 0) == 0)
-            netMap = "assets/maps/" + arg.substr(6) + ".json";
+            netMapName = arg.substr(6);
+        if(arg == "--from-scratch")
+            fromScratch = true;
         if(arg.rfind("--name=", 0) == 0)
             netName = arg.substr(7);
         if(arg.rfind("--renderer=", 0) == 0)
@@ -62,12 +114,18 @@ int main(int argc, char *argv[])
         }
         if(arg == "--debug" || arg == "-d")
         {
+#if defined(AOW_DEBUG)
             debugMode = true;
+#else
+            std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
+#endif
         }
         if(arg == "--testmap" || arg == "--test-map" || arg == "-tm")
         {
             testMapMode = true;
-            debugMode = true; // Test map always runs with DEBUG mode active
+#if defined(AOW_DEBUG)
+            debugMode = true; // Test map runs with DEBUG mode active (debug builds only)
+#endif
         }
     }
 
@@ -79,7 +137,7 @@ int main(int argc, char *argv[])
     }
     if(testMapMode)
     {
-        std::cout << "[DIRECT TEST MAP LAUNCH: Mission 8 - Test Polygon]" << std::endl;
+        std::cout << "[DIRECT TEST MAP LAUNCH: Test Polygon]" << std::endl;
     }
     std::cout << "========================================================" << std::endl;
 
@@ -110,9 +168,13 @@ int main(int argc, char *argv[])
         {
             app.launchTestMap();
         }
+        // --map=<name> alone: a single-player custom game on that map (with --host / --server it is the match map)
+        const bool netGame = netHost || !netJoin.empty() || (!netServer.empty() && (netServerCreate || !netServerCode.empty()));
+        if(!restart && !testMapMode && !testMode && !netGame && !netMapName.empty())
+            app.launchMap(netMapName, fromScratch);
         if(!restart && netHost)
         {
-            app.hostNetworkGame(netPort, netPlayers, netMap, netName);
+            app.hostNetworkGame(netPort, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::netDefaultMap() : OpenArtOfWar::LoaderResources::mapPath(netMapName), netName, fromScratch);
             // --server too: the hosted game is listed there and reachable by its code
             if(!netServer.empty())
             {
@@ -139,9 +201,10 @@ int main(int argc, char *argv[])
                 port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
                 host.resize(colon);
             }
-            app.serverNetworkGame(host, port, netServerCreate ? std::string() : netServerCode, netPlayers, netMap, netName);
+            app.serverNetworkGame(host, port, netServerCreate ? std::string() : netServerCode, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::netDefaultMap() : OpenArtOfWar::LoaderResources::mapPath(netMapName), netName, fromScratch);
         }
 
+#if defined(AOW_DEBUG)
         if(testMode)
         {
             bool ok = app.runHeadlessTest(200);
@@ -150,6 +213,7 @@ int main(int argc, char *argv[])
             std::filesystem::remove_all(testUserDir, ec);
             return ok ? 0 : 1;
         }
+#endif
 
         app.run();
         restart = app.restartRequested();

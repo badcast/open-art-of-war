@@ -295,11 +295,27 @@ namespace OpenArtOfWar
         {
             entities.issueMoveOrder(ids, x, y, pathfinder, false);
         }
-        capDetours(sq, entities);
+        capDetours(sq, entities, pathfinder.getMap());
     }
 
-    void AISquadController::capDetours(const AISquad &sq, EntityManager &entities)
+    void AISquadController::capDetours(const AISquad &sq, EntityManager &entities, const TileMap *map)
     {
+        // A hostile wall within a few tiles of the unit: worth breaching instead of the detour
+        auto hostileWallNear = [&](const Unit &u)
+        {
+            if(!map || !sq.attackMove)
+                return false;
+            constexpr int r = 6;
+            for(int y = std::max(0, u.tileY - r); y <= std::min(map->getHeight() - 1, u.tileY + r); ++y)
+            {
+                for(int x = std::max(0, u.tileX - r); x <= std::min(map->getWidth() - 1, u.tileX + r); ++x)
+                {
+                    if(map->getWall(x, y) > 0 && Players::hostile(map->getWallOwner(x, y), u.owner))
+                        return true;
+                }
+            }
+            return false;
+        };
         const Unit *leader = entities.getUnit(sq.leaderId);
         if(!leader)
             return;
@@ -320,7 +336,20 @@ namespace OpenArtOfWar
             // Only units already with the group: a straggler far away must still be allowed to come back
             const float toLeader = distTo(*u, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
             if(pathLen > limit && toLeader <= leash * 2.0f)
+            {
+                if(hostileWallNear(*u))
+                {
+                    // Keep the goal, drop the long route: the unit's own breach check picks a wall next tick
+                    Unit *mu = entities.getUnit(id);
+                    mu->clearPathState();
+                    if(mu->state == ActionState::Move)
+                        mu->state = ActionState::Idle;
+                    mu->waitingForPath = true;
+                    mu->wallCheckCooldown = 0.0f;
+                    continue;
+                }
                 hold.push_back(id);
+            }
         }
         if(!hold.empty())
             holdUnits(hold, entities);
@@ -670,7 +699,7 @@ namespace OpenArtOfWar
         const int localWidth = chokes.openWidth(leader->tileX, leader->tileY);
         const float leash = effectiveLeash(tactics, sq.unitIds.size(), localWidth > 0 && localWidth <= 4);
         sq.leashRadius = leash;
-        capDetours(sq, entities); // also catches re-paths the units made on their own (blocked by the crowd)
+        capDetours(sq, entities, &map); // also catches re-paths the units made on their own (blocked by the crowd)
 
         // Cohesion metrics: centroid of the group core and the farthest unit from it (Dmax).
         // The core is everyone within two leash radii of the leader, so one far straggler

@@ -101,7 +101,8 @@ namespace OpenArtOfWar
             Bunker,
             Wall,
             Lab,
-            PowerPlant
+            PowerPlant,
+            Barracks
         };
         Kind kind {Tower};
         int tileX {0};
@@ -166,7 +167,7 @@ namespace OpenArtOfWar
         }
 
         // Difficulty system
-        bool loadDifficultyConfig(const std::string &path = "assets/characters/difficulty.yaml");
+        bool loadDifficultyConfig(const std::string &path); // LoaderResources::aiDifficulty()
         void setDifficulty(AIDifficulty difficulty);
         AIDifficulty getDifficulty() const
         {
@@ -288,7 +289,7 @@ namespace OpenArtOfWar
         void updateBaseDefense(EntityManager &entities, Pathfinder &pathfinder);
         void updateWaveLaunch(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
         void updateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-        void updateStagingPoint(const TileMap &map);
+        void updateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime);
         bool isReserveUnit(const Unit &u) const;
         bool aiSees(const Entity &e, const EntityManager &entities) const;
         void findAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const;
@@ -331,6 +332,7 @@ namespace OpenArtOfWar
         bool m_hasProduction {true};
         int m_stagingX {0};
         int m_stagingY {0};
+        float m_stagingTimer {0.0f}; // the staging point is placed again every few seconds (the road out may change)
 
         // Research Lab progress
         int m_researchIndex {0};

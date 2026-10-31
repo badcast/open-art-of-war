@@ -21,7 +21,22 @@ namespace OpenArtOfWar
         Bullet = 0,
         Shell = 1,
         Rocket = 2,
-        Flame = 3
+        Flame = 3,
+        Sniper = 4 // a sniper rifle's round: hit-scan like a bullet, its own tracer and hit (see Projectiles)
+    };
+
+    // The visible jet of a flamethrower shot: plays its animation over time, independent of the damage
+    // projectile (which reaches a near target within the tick it is fired, before it could ever be drawn)
+    struct FlameBurst
+    {
+        float startX {0.0f};
+        float startY {0.0f};
+        float targetX {0.0f};
+        float targetY {0.0f};
+        float age {0.0f};
+        float duration {0.35f};
+        Faction faction {Faction::Resistance};
+        PlayerId owner {0};
     };
 
     struct SmokePuff
@@ -49,8 +64,8 @@ namespace OpenArtOfWar
         int targetId {0};
         int shooterId {0}; // who fired (revealed in the fog when it hits the player)
         ProjectileType type {ProjectileType::Bullet};
-        int direction {0}; // 0..15 (for 16-dir rockets 1405+)
-        int dir32 {0};     // 0..31 (for 32-dir bullets 1277+ and shells 1341+)
+        int direction {0}; // 0..15 (16-direction sprites, e.g. rockets)
+        int dir32 {0};     // 0..31 (32-direction sprites, e.g. bullets and shells)
         bool active {false};
         float smokeTimer {0.0f};
     };
@@ -111,6 +126,9 @@ namespace OpenArtOfWar
 
         // Common combat attributes
         int targetEntityId {0};
+        // Who hit this entity last and for how much longer that counts (a unit turns on a far shooter)
+        int lastAttackerId {0};
+        float lastAttackedTimer {0.0f};
         int targetWallTileX {-1};
         int targetWallTileY {-1};
         int attackDamage {0};

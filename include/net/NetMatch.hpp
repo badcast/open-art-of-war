@@ -3,6 +3,7 @@
 #include "game/Match.hpp"
 #include "game/SimCommand.hpp"
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -101,16 +102,21 @@ namespace OpenArtOfWar
         }
         const Net::Roster *roster() const;
         void setChoice(const Net::LobbyChoice &choice);
+        // The own picks as last sent: the room's echo lags behind on a slow link, and editing that stale copy
+        // sent old values back (a faction changed a moment ago came back with the next change of colour)
+        bool localChoice(Net::LobbyChoice &out) const;
         // Host / room owner: add, change or remove a computer player
         void setAi(const Net::OwnerSetAi &change);
+        // Host / room owner: the team of a player (players cannot choose their own)
+        void setTeam(uint8_t slot, uint8_t team);
         void sendChat(const std::string &text);
         std::vector<Net::Chat> takeChat();
         // Host: everybody in the room is ready (two players at least)
         bool canStart() const;
         // Host: the match from the room's picks; random factions and start positions are drawn here with the
         // match seed, so every peer gets the same resolved setup
-        // `prebuilt`: play with the buildings and units the map has (else everybody starts from the usual base)
-        void startFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt = false);
+        // `prebuilt`: prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch (HQ + power only)
+        void startFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt = true);
 
         // Host: every connected player takes part, in the order they joined; the setup goes to all of them
         void startMatch(const MatchSetup &setup, uint32_t nowMs);
@@ -151,6 +157,36 @@ namespace OpenArtOfWar
         {
             m_reconnectWindowMs = ms;
         }
+        // Network statistics overlay: the link to the host / server and, on a host, every player's ping
+        struct Stats
+        {
+            bool valid {false};
+            bool host {false}; // this computer hosts (its own link is memory: 0 ms)
+            uint32_t rttMs {0};
+            uint32_t jitterMs {0};
+            float lossPercent {0.0f};
+            float sendKBps {0.0f}; // over the last second
+            float recvKBps {0.0f};
+            uint32_t packetsSent {0};
+            uint32_t packetsLost {0};
+            int inputDelayMs {0}; // commands take effect this much later (adapts to the slowest ping)
+            int turnMs {0};
+            int turnsBuffered {0};       // turns received but not run yet (>2: behind, catching up)
+            float stalledSeconds {0.0f}; // waiting for the next turn
+            bool reconnecting {false};
+            bool desynced {false};
+            struct Peer
+            {
+                uint8_t slot {0};
+                std::string name;
+                bool connected {false};
+                uint32_t rttMs {0};
+            };
+            std::vector<Peer> peers; // host only
+        };
+        // `tick`: the simulation's current tick (for the turn buffer); call about once per frame
+        Stats stats(uint32_t nowMs, uint32_t tick);
+
         // Tests: the connection drops here and now (the reconnect logic takes over)
         void dropConnection();
 
@@ -192,8 +228,21 @@ namespace OpenArtOfWar
         std::string m_address;
         uint16_t m_port {0};
         std::string m_name;
+        // Joined by code through the server (no address to dial back): a comeback goes the same way
+        std::string m_hostedMaster;
+        uint16_t m_hostedMasterPort {0};
+        std::string m_hostedCode;
+        std::array<uint8_t, 16> m_rejoinToken {}; // Net::SessionToken
         uint32_t m_reconnectWindowMs {60000};
         uint32_t m_lastTickMs {0};
+        uint32_t m_nowMs {0};
+        // Traffic rate: totals one second ago
+        uint64_t m_rateSent {0}, m_rateRecv {0};
+        uint32_t m_rateMs {0};
+        float m_sendKBps {0.0f}, m_recvKBps {0.0f};
+        bool m_hasPendingChoice {false};
+        std::array<uint8_t, 5> m_pendingChoice {}; // faction, team, color, spawn, ready (Net::LobbyChoice)
+        uint32_t m_pendingChoiceMs {0};
     };
 
 } // namespace OpenArtOfWar

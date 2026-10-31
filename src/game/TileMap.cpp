@@ -373,6 +373,16 @@ namespace OpenArtOfWar
         return m_wallRubbleGrid[tileY][tileX];
     }
 
+    void TileMap::destroyWall(int tileX, int tileY)
+    {
+        if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height || m_wallGrid[tileY][tileX] == 0)
+            return;
+        m_wallHp[tileY][tileX] = 0;
+        m_wallRubbleGrid[tileY][tileX] = 1778; // the compact rubble a wall shot down leaves
+        m_wallGrid[tileY][tileX] = 0;
+        m_passable[tileY][tileX] = true;
+    }
+
     void TileMap::damageWall(int tileX, int tileY, int damage)
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
@@ -772,10 +782,12 @@ namespace OpenArtOfWar
                 int damageStep = std::clamp(((wval - 1001) % 100) / 20, 0, 4);
                 int wallBuildingId = wallBase + damageStep;
                 Faction wallFaction = (wval >= 1101) ? Faction::Resistance : Faction::Confederation;
+                renderer.setDrawOwner(owner); // the wall wears its owner's army colour
                 renderer.drawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
                 renderer.drawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
             }
         }
+        renderer.setDrawOwner(kNoPlayer);
     }
 
     uint8_t TileMap::getBaseTile(int x, int y) const

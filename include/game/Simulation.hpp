@@ -67,7 +67,7 @@ namespace OpenArtOfWar
         void startMatch(const MatchSetup &setup);
         // The economy of a player in this tick
         Economy &economyOf(PlayerId player, SimContext &ctx);
-        // Income, power and production of the other players' economies
+        // Income, power and production of every economy (the local one too), in slot order
         void updateEconomies(float dt, SimContext &ctx);
 
         // From the interface: applied on the next tick that runs (the current one when issued before it).

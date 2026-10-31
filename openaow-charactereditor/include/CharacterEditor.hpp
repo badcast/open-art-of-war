@@ -6,12 +6,38 @@
 #include "SpriteCatalog.hpp"
 #include "SpriteExport.hpp"
 #include "graphics/ShaderEffects.hpp"
+#include "game/Projectiles.hpp"
 
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <set>
 
 namespace CharEditor {
+
+struct PreviewSprite {
+    int id{0};
+    int page{0};
+    SDL_Rect src{0, 0, 0, 0};
+    int x{0};
+    int y{0};
+    int w{0};
+    int h{0};
+    int groupId{-1};
+    std::string groupLabel;
+    bool colliding{false};
+    bool selected{false};
+};
+
+enum class SpriteDetailTab {
+    Tree,
+    ExportPreview,
+    LoadedSprites
+};
+
+enum class PreviewSourceMode {
+    Object,
+    SingleSprites
+};
 
 class CharacterEditor {
 public:
@@ -138,6 +164,23 @@ private:
     void drawSpriteImageAt(const ImVec2& pos, int spriteId, float box);
     void drawDepNode(const DepNode& node, int depth);
 
+    // Sprite Tools Export Preview & Layout Editor
+    void initPreviewFromObject(int objectIndex);
+    void initPreviewFromSingleSprites();
+    void updatePreviewCollisions();
+    void layoutPreviewLine(bool horizontal = true, int pad = 2);
+    void layoutPreviewGrid(int cols, int pad = 2, bool compress = true);
+    void layoutPreviewPack(int pad = 1);
+    void layoutPreviewByObject(int pad = 2);
+    void layoutPreviewScatter();
+    void layoutPreviewSeparateOverlaps(int pad = 2);
+    void layoutPreviewAlign(int mode); // 0=left, 1=top, 2=right, 3=bottom, 4=distribH, 5=distribV
+    void fitPreviewView(const ImVec2& canvasSize);
+    void drawSpritePreview();
+    void drawSpritePreviewCanvas(const ImVec2& size);
+    bool exportCurrentPreview(std::string& report);
+    void drawLoadedSprites();
+
     // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
     bool loadYamlFile(CommentedYaml& y, const char* name);
@@ -160,6 +203,18 @@ private:
     void updateEffectsSim(float dt);
     void drawEffectsScene();
 
+    // --- Projectiles tab (assets/characters/projectiles.yaml) ---
+    void ensureProjectiles();
+    void projectilesChanged();             // the game's projectile settings follow the editor at once
+    const OpenArtOfWar::ProjectileSpec& projectileSpec() const; // of the kind on the canvas
+    void fireProjectilePreview();
+    void updateProjectilesSim(float dt);
+    void drawProjectilesScene();
+    void drawProjectileControls();
+    void drawProjectileProperties();
+    SDL_Texture* zoomedThumbnail(int composite, float scale); // a composite magnified around its centre (96x64)
+    std::map<std::pair<int, int>, SDL_Texture*> zoomThumbs;
+
     void drawGameUi();
     void drawGameUiProperties();
     void ensureUi();
@@ -180,7 +235,8 @@ private:
     std::unique_ptr<OpenArtOfWar::TextureManager> textures;
     std::unique_ptr<OpenArtOfWar::Renderer> gameRenderer;
     std::unique_ptr<OpenArtOfWar::ShaderEffects> shaderEffects;   // army colours need the SDL GPU renderer
-    int previewArmyColor{0};                  // 0 classic sheets, 1..8 the army colours of the game
+    int previewArmyColor{0};
+    float previewBackground[3]{0.0f, 0.0f, 0.0f}; // canvas background (black by default)                  // 0 classic sheets, 1..8 the army colours of the game
     void drawArmyColorCombo();
     std::map<int, SDL_Texture*> wreckThumbs;  // wreck family pictures
     int wreckPreviewStage{-1};               // -1: the stages play in a loop
@@ -191,6 +247,7 @@ private:
     fs::path charactersDir;
     fs::path activePath;
     YAML::Node document;
+    YAML::Node documentBase; // `document` as loaded / last saved: saving applies only the edits since (ConfigMerge)
     std::vector<CharacterFile> files;
     std::map<std::string, std::array<char, 1024>> textBuffers;
     std::array<char, 256> searchBuffer{};
@@ -200,6 +257,10 @@ private:
     int selectedIndex{0};
     int facing{2};
     int turretFacingDir{2};
+    int desiredHullFacingDir{2};
+    int desiredTurretFacingDir{2};
+    float previewHullTurnTimer{0.0f};
+    float previewTurretTurnTimer{0.0f};
     bool linkTurretToHull{true};
     PreviewMode previewMode{PreviewMode::Idle};
     float playbackSpeed{1.0f};
@@ -220,7 +281,9 @@ private:
     float targetWorldY{120.0f};
     bool targetCustomized{false};
     bool testSiegeMode{false};
+    float leftPanelWidth{280.0f};
     float rightPanelWidth{460.0f};
+    float spriteListWidth{280.0f};
 
     struct SimProjectile {
         float startX{0.0f};
@@ -275,11 +338,42 @@ private:
     VisualOffsets compareOffsets;
     float compareSpacing{90.0f};
     YAML::Node researchDoc[2]; // 0 Confederation, 1 Resistance
+    YAML::Node researchBase[2];
     fs::path researchPath[2];
     bool researchDirty[2]{false, false};
     int researchFaction{0};
     int researchSelected{0};
-    CommentedYaml effectsYaml, uiYaml, aiYaml;
+    CommentedYaml effectsYaml, uiYaml, aiYaml, projectilesYaml;
+    bool projectilesTried{false};
+    int projKind{0};                           // 0 bullet, 1 sniper, 2 shell, 3 rocket, 4 flame
+    float projDistance{260.0f};
+    float projAngleDeg{0.0f};
+    bool projSweep{false};                     // every shot one direction further: all sprite directions in turn
+    float projSweepAngle{0.0f};
+    bool projLoop{true};
+    float projInterval{0.6f};
+    float projFireTimer{0.0f};
+    float projCraterSpeed{8.0f};               // craters of the canvas go this many times faster than in the game
+    int projShotCount{0};
+    struct ProjShot {
+        float sx{0.0f}, sy{0.0f}, x{0.0f}, y{0.0f}, tx{0.0f}, ty{0.0f};
+        int dir16{0}, dir32{0};
+        bool landed{false}, done{false};
+        int impactAnim{-1}, mark{-1}, frame{0};
+        float frameTimer{0.0f}, smokeTimer{0.0f};
+    };
+    struct ProjSmoke {
+        float x{0.0f}, y{0.0f}, age{0.0f};
+    };
+    struct ProjCrater {
+        float x{0.0f}, y{0.0f};
+        int composite{0};
+        float timeLeft{0.0f};
+    };
+    std::vector<ProjShot> projShots;
+    std::vector<ProjSmoke> projSmoke;
+    std::vector<ProjCrater> projCraters;
+    std::vector<std::string> projectileUsers;  // characters firing the kind on screen (filled when shown)
     bool effectsTried{false}, uiTried{false}, aiTried{false}, envTried{false};
     std::set<std::string> yamlAnimPaths;       // keys of the open file that hold animation ids (get a Pick button)
     std::string animPickPath;                  // the key the gallery click goes to ("" none)
@@ -306,6 +400,7 @@ private:
     int wreckFaction{1};
     int uiTheme{0};                            // 0 neutral, 1 resistance, 2 confederation
     nlohmann::ordered_json envJson;
+    nlohmann::ordered_json envBase;
     fs::path envPath;
     bool envLoaded{false};
     bool envDirty{false};
@@ -331,6 +426,46 @@ private:
     FolderPick importPick;                  // result of the folder dialog of the import
     std::array<char, 512> spriteInDir{};    // folder the import reads
     bool importConfirm{false};              // ask before the import overwrites the assets
+
+    // Sprite Tools Preview State
+    SpriteDetailTab spriteDetailTab{SpriteDetailTab::Tree};
+    PreviewSourceMode previewSourceMode{PreviewSourceMode::Object};
+    int previewForObject{-1};
+    std::vector<PreviewSprite> previewSprites;
+    int previewAtlasW{0};
+    int previewAtlasH{0};
+    int previewCollisionCount{0};
+    int previewCollidingSpritesCount{0};
+    std::string previewCollisionDetail;
+    ImVec2 previewLastCanvasSize{700.0f, 500.0f};
+    float previewPanX{40.0f};
+    float previewPanY{40.0f};
+    float previewZoomLevel{1.0f};
+    bool previewDragging{false};
+    bool previewDragMoved{false};
+    int previewClickedIndex{-1};
+    ImVec2 previewDragStartMouse{0.0f, 0.0f};
+    std::vector<ImVec2> previewOriginalPositions;
+    bool previewMarquee{false};
+    ImVec2 previewMarqueeStart{0.0f, 0.0f};
+    ImVec2 previewMarqueeEnd{0.0f, 0.0f};
+    int previewSnapGrid{1};                 // 1, 2, 4, 8, 16 px
+    int previewGridCols{16};
+    int previewPadding{1};
+    int previewSelectedCount{0};
+    bool previewShowObjectGroups{false};
+    bool previewExportConfirm{false};
+    std::string previewExportReport;
+
+    // Loaded Sprites Provenance Inspector State
+    int loadedSpritesScope{0};              // 0 = All Sprites, 1 = Selected Object(s), 2 = By Sheet Page
+    int loadedSpritesSheetFilter{-1};       // -1 = All pages, 0..41 = specific sheet_XX.png
+    int loadedSpriteSelectedId{0};          // currently inspected sprite ID
+    bool loadedSpritesShowSheetMap{true};   // show visual sheet_XX.png cutout map
+    bool loadedSpritesScrollToSelected{false};
+    std::array<char, 128> loadedSpritesSearch{};
+    std::vector<std::vector<int>> spriteToObjects; // per spriteId -> list of object indices using it
+    std::map<int, std::string> spriteExternalSource; // per spriteId -> external exported/imported file info
     BattleSim battle;
     BattleSim::Setup battleSetup;
     bool battlePaused{false};

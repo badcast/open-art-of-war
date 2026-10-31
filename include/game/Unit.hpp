@@ -65,10 +65,20 @@ namespace OpenArtOfWar
         float turretShiftY {0.0f};
         float turnTimer {0.0f};
         float turnStepDelay {0.0f};
+        float turretTurnTimer {0.0f};
+        float turretTurnStepDelay {0.0f};
         bool waitingForPath {false};
         bool flowMode {false}; // Single-file column (AI chokepoint transit): queue behind allies, no sidesteps
         float pathRetryTimer {0.0f};
         float wallCheckCooldown {0.0f}; // throttles the "is a wall really in the way?" route check
+        // Wall breaching: a unit of a group order may shoot its way through hostile walls, like an attack-move
+        bool groupOrder {false};
+        // Hold position: the unit fires from where it stands and never walks off by itself (not even after an attacker)
+        bool holdPosition {false};
+        // Time spent with a move goal without leaving the current tile (queueing at a gap, stuck behind allies)
+        float blockedTimer {0.0f};
+        int blockedTileX {-1};
+        int blockedTileY {-1};
 
         // Burst fire attributes
         int burstCount {1};
@@ -95,6 +105,15 @@ namespace OpenArtOfWar
         int targetTileY {-1};
         bool isManualWallTarget {false};
         float waitBlockedTimer {0.0f}; // Wait before re-pathing behind friendly moving unit
+
+        // Making way for allies (Unit::requestMakeWay): a blocked unit asks the allies in its way to step
+        // aside, as a chain when the first one has no free tile next to it
+        float allyWaitTimer {0.0f};   // while > 0 a moving ally in the way is waited for (a chain is moving aside)
+        float makeWayCooldown {0.0f}; // throttles the make-way requests of this unit
+        int yieldHomeX {-1};          // where a unit without orders stood before it stepped aside (it walks back)
+        int yieldHomeY {-1};
+        float yieldHomeTimer {0.0f};
+        int yieldHomeTries {0};
         std::vector<PathNode> path;
         size_t pathIndex {0};
 
@@ -154,15 +173,42 @@ namespace OpenArtOfWar
 
         // True when the goal is reachable over terrain, walls and buildings (other units ignored),
         // i.e. a blocked path is only congestion and no wall needs to be breached
-        bool hasOpenRouteTo(int goalX, int goalY, Pathfinder &pathfinder) const;
+        // outRouteLen (optional): the number of steps of that route
+        bool hasOpenRouteTo(int goalX, int goalY, Pathfinder &pathfinder, int *outRouteLen = nullptr) const;
+        // May this unit pick hostile walls as targets on its own (attack-move, group order, computer player)?
+        bool canBreachWalls() const;
+        // True when shooting through a hostile wall beats walking: no open route, a long detour around
+        // the wall line, or the unit has been queueing at a narrow gap for too long
+        bool shouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const;
+        // Where to walk to shoot `target`: the tile on the line target -> unit a little inside firing range
+        // (walking to the target's own tile brought every unit much too close). The target's tile for
+        // buildings, and when that tile is not open.
+        void approachTile(const Entity &target, const TileMap &map, int &outX, int &outY) const;
+        // findPath to approachTile, falling back to the target's tile
+        bool findPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial);
         // Same for reaching firing contact with an entity (next to a building's footprint counts)
         bool hasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) const;
+
+        // Who passes first when two allies are in each other's way: group orders and attack-moves before
+        // plain moves, any order before none; equal ones by the lower id (a total order, so never a deadlock)
+        int movePriority() const;
+        bool passesBefore(const Unit &other) const;
+        // May this (standing) unit step aside for `requester`? Units without orders always do, units with a
+        // goal of their own only for a unit that passes before them
+        bool canMakeWayFor(const Unit &requester) const;
+        // Moves `blocker` (and the allies behind it, as a chain) aside to the nearest free tile; true when they go
+        bool requestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates &delegates);
+        // findPath to the goal; when allies standing in a passage make the route partial or a long detour, the
+        // route through them (they make way once the unit gets there). avoidX/Y: one extra tile to walk around
+        bool findPathThroughAllies(int goalX, int goalY, Pathfinder &pathfinder, std::vector<PathNode> &outPath, bool *outPartial, int avoidX = -1, int avoidY = -1) const;
 
         void update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
         void updateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
         void updateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
         // Rotating turret on a driving vehicle: aim at an enemy in range and fire without stopping
-        void fireOnTheMove(TileMap &map, const UnitDelegates &delegates);
+        void fireOnTheMove(float deltaTime, TileMap &map, const UnitDelegates &delegates);
+        // Steps turretFacing toward targetDir8 by 45 degrees every turretTurnStepDelay seconds; returns true when aligned
+        bool stepTurretToward(int targetDir8, float deltaTime);
         void updateTransformation(float deltaTime, const UnitDelegates &delegates);
         void updateBurst(float deltaTime, TileMap &map, const UnitDelegates &delegates);
 
@@ -170,6 +216,10 @@ namespace OpenArtOfWar
         // Slides toward the reserved tile using up to `budget` pixels; returns the unused budget.
         float advanceStep(float budget);
         void finalizeArrivalIfPathDone();
+        // One step of a make-way chain: walk to (x, y), keep the own goal and plan again from there
+        void makeWayStep(int x, int y);
+        // A unit that stepped aside without orders walks back to where it stood
+        void updateYieldHome(float deltaTime, Pathfinder &pathfinder, const UnitDelegates &delegates);
     };
 
 } // namespace OpenArtOfWar

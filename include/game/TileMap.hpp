@@ -83,6 +83,8 @@ namespace OpenArtOfWar
         PlayerId getWallOwner(int tileX, int tileY) const;
         uint16_t getWall(int tileX, int tileY) const;
         void damageWall(int tileX, int tileY, int damage);
+        // The wall is gone at once (rubble stays), whatever its armour
+        void destroyWall(int tileX, int tileY);
         int getWallHp(int tileX, int tileY) const;
         int getWallMaxHp(int /*tileX*/, int /*tileY*/) const
         {

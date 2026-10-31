@@ -1,5 +1,6 @@
 #include <cmath>
 #include "ui/UiKit.hpp"
+#include "audio/SoundRequests.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
 #include "core/Localization.hpp"
@@ -179,6 +180,8 @@ namespace OpenArtOfWar
 
         void drawButton(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &label, ButtonStyle style, bool hovered, bool enabled)
         {
+            if(hovered && enabled)
+                SoundRequests::markHover();
             SDL_Color fill = color::PanelRaised;
             SDL_Color border = color::Border;
             SDL_Color text = color::Text;
@@ -269,6 +272,8 @@ namespace OpenArtOfWar
 
         void drawComboField(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &value, bool open, bool hovered, bool enabled, SDL_Color valueColor)
         {
+            if(hovered && enabled)
+                SoundRequests::markHover();
             const SDL_Color fill = !enabled ? color::PanelSunken : (open || hovered) ? color::Hover : color::PanelRaised;
             r.fillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
             r.drawRectScreen(rect.x, rect.y, rect.w, rect.h, open ? color::Accent : (hovered && enabled ? color::BorderStrong : color::Border));
@@ -294,7 +299,7 @@ namespace OpenArtOfWar
             return {field.x, y, std::max(field.w, kComboMinListW), h};
         }
 
-        void drawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY)
+        void drawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY, const std::vector<bool> *disabled)
         {
             const int n = static_cast<int>(items.size());
             const UiRect list = comboListRect(field, n, windowH);
@@ -307,12 +312,16 @@ namespace OpenArtOfWar
                 if(i >= n)
                     break;
                 const UiRect item {list.x + 2, list.y + 2 + row * kComboItemH, list.w - (n > visible ? 10 : 4), kComboItemH};
-                const bool hot = item.contains(mouseX, mouseY);
+                const bool off = disabled && static_cast<size_t>(i) < disabled->size() && (*disabled)[static_cast<size_t>(i)] && i != current;
+                const bool hot = item.contains(mouseX, mouseY) && !off;
+                if(hot)
+                    SoundRequests::markHover();
                 if(i == current)
                     r.fillRectScreen(item.x, item.y, item.w, item.h, color::AccentDeep);
                 else if(hot)
                     r.fillRectScreen(item.x, item.y, item.w, item.h, color::Hover);
-                font.drawString(fitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - 20), item.x + 10, item.centerY(), FONT_BODY, i == current ? color::Accent : color::Text, false, Anchor::LEFT | Anchor::VCENTER);
+                const SDL_Color textColor = i == current ? color::Accent : (off ? color::TextMuted : color::Text);
+                font.drawString(fitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - 20), item.x + 10, item.centerY(), FONT_BODY, textColor, false, Anchor::LEFT | Anchor::VCENTER);
             }
             if(n > visible)
             { // a thin scroll bar for a long list

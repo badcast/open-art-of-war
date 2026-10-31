@@ -1,4 +1,5 @@
 #include "MapEditorApp.hpp"
+#include "core/LoaderResources.hpp"
 #include "core/AssetStore.hpp"
 #include <cstring>
 #include "core/Localization.hpp"
@@ -34,7 +35,7 @@ bool MapEditorApp::init(int width, int height, const std::string& initialMap) {
         return false;
     }
 
-    Localization::init("assets/locale", "en");
+    Localization::init(LoaderResources::localeDir(), LoaderResources::defaultLanguage());
 
     m_window = SDL_CreateWindow(
         _("Open Art Of War Map Editor - [openaow-mapeditor]"),
@@ -61,7 +62,7 @@ bool MapEditorApp::init(int width, int height, const std::string& initialMap) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     std::vector<uint8_t> fontData;
-    if (Assets::readBytes("assets/fonts/Roboto-Regular.ttf", fontData) && !fontData.empty()) {
+    if (Assets::readBytes(LoaderResources::fontRegular(), fontData) && !fontData.empty()) {
         // ImGui owns (and frees) the buffer it is given
         void* fontCopy = IM_ALLOC(fontData.size());
         std::memcpy(fontCopy, fontData.data(), fontData.size());
@@ -93,7 +94,7 @@ bool MapEditorApp::init(int width, int height, const std::string& initialMap) {
     m_doc.setTextureManager(m_texManager.get());
     m_renderer = std::make_unique<Renderer>(m_sdlRenderer, m_texManager.get());
 
-    std::string assetRoot = "assets";
+    std::string assetRoot = LoaderResources::kDefaultRoot;
     if (!m_texManager->loadAllAssets(assetRoot)) {
         assetRoot = "../assets";
         if (!m_texManager->loadAllAssets(assetRoot)) {
@@ -108,7 +109,7 @@ bool MapEditorApp::init(int width, int height, const std::string& initialMap) {
             m_doc.newMap(60, 40, 0, 0);
         }
     } else {
-        if (!m_doc.loadMap("assets/maps/m0.json")) {
+        if (!m_doc.loadMap(LoaderResources::mapPath("m0"))) {
             m_doc.newMap(60, 40, 0, 0);
         }
     }
@@ -148,10 +149,12 @@ void MapEditorApp::processEvents() {
 
         if (event.type == SDL_EVENT_QUIT) {
             m_ui.requestClose(m_doc);
-        } else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                m_windowW = event.window.data1;
-                m_windowH = event.window.data2;
+        } else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_RESIZED || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_RESIZED) {
+                int pw = 0, ph = 0;
+                SDL_GetWindowSizeInPixels(m_window, &pw, &ph);
+                m_windowW = (pw > 0) ? pw : event.window.data1;
+                m_windowH = (ph > 0) ? ph : event.window.data2;
                 m_camera.setViewport(m_windowW, m_windowH);
             } else {
                 m_ui.requestClose(m_doc);

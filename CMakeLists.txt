@@ -11,8 +11,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(BUILD_ASSETS_BLOB "Make a data.blob with: assets" OFF)
-option(AOW_DEBUG "Build the game in debug mode (enables cheats)" OFF)
+# Debug build: cheats, the debug overlay, --debug, --test (HeadlessTest) and the OAOW_* environment variables.
+# The macro AOW_DEBUG exists only when this is ON (code checks it with #if defined(AOW_DEBUG)).
+option(AOW_DEBUG "Build the game in debug mode (enables cheats, --debug, --test, OAOW_* variables)" OFF)
+# A string, not an option(): option() is a boolean and turned the name into "OFF"
+if(DEFINED CACHE{MAIN_ASSET_BLOB_NAME} AND (MAIN_ASSET_BLOB_NAME STREQUAL "OFF" OR MAIN_ASSET_BLOB_NAME STREQUAL "ON"))
+    unset(MAIN_ASSET_BLOB_NAME CACHE)
+endif()
+set(MAIN_ASSET_BLOB_NAME "assets.blob" CACHE STRING "The name of the blob file that holds the packed contents of the \"assets\" directory. The blob is a tar stream compressed.")
+option(BUILD_ASSETS_BLOB "Make a ${MAIN_ASSET_BLOB_NAME} with: assets" OFF)
 
 # Optimization and warning flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -47,7 +54,7 @@ if(TARGET yaml-cpp::yaml-cpp)
 else()
     pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
 endif()
-# libarchive: reads data.blob (tar + zstd)
+
 pkg_check_modules(LIBARCHIVE REQUIRED IMPORTED_TARGET libarchive)
 # zstd: maps sent between players in a network game are compressed with it (libarchive needs it anyway)
 find_package(zstd CONFIG QUIET)
@@ -90,6 +97,10 @@ set(ENGINE_SOURCES
     src/core/Application.cpp
     src/core/Localization.cpp
     src/core/AssetStore.cpp
+    src/core/LoaderResources.cpp
+    src/audio/SfxMixer.cpp
+    src/audio/GameSounds.cpp
+    src/audio/VoiceManager.cpp
     src/core/Settings.cpp
     src/core/VideoModes.cpp
     src/core/EnvironmentConfig.cpp
@@ -115,6 +126,7 @@ set(ENGINE_SOURCES
     src/game/AISquadController.cpp
     src/game/Research.cpp
     src/game/Effects.cpp
+    src/game/Projectiles.cpp
     src/game/Sides.cpp
     src/game/Players.cpp
     src/core/Utility.cpp
@@ -133,10 +145,13 @@ set(ENGINE_SOURCES
     src/ui/HUDController.cpp
     src/ui/UiKit.cpp
     src/ui/NetworkMenu.cpp
-    src/test/HeadlessTest.cpp
     src/storage/SaveManager.cpp
     src/debug/DebugOverlay.cpp
 )
+# The automated self-test (--test) exists only in a debug build
+if(AOW_DEBUG)
+    list(APPEND ENGINE_SOURCES src/test/HeadlessTest.cpp)
+endif()
 
 # Translations (gettext MO generation)
 find_program(MSGFMT_EXECUTABLE msgfmt)
@@ -150,16 +165,17 @@ if(MSGFMT_EXECUTABLE)
     )
 endif()
 
-# Network layer: OpenAOWNetworking static library (ENet inside), linked into the engine and the server
 enable_testing()
-add_subdirectory(networking)
+
+# Network layer: OpenAOWNetworking static library (ENet inside), linked into the engine and the server
+add_subdirectory(src/networking)
 
 # Dedicated server: the network library only (no SDL, no game code)
 option(OAOW_BUILD_SERVER "Build openaow-server" ON)
 if(OAOW_BUILD_SERVER)
     add_executable(openaow-server openaow-server/main.cpp)
     target_link_libraries(openaow-server PRIVATE OpenAOWNetworking nlohmann_json::nlohmann_json)
-    target_compile_definitions(openaow-server PRIVATE AOW_DEBUG=${AOW_DEBUG} OAOW_VERSION="${OAOW_VERSION_FULL}")
+    target_compile_definitions(openaow-server PRIVATE $<$<BOOL:${AOW_DEBUG}>:AOW_DEBUG> OAOW_VERSION="${OAOW_VERSION_FULL}")
     set_target_properties(openaow-server PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 endif()
 
@@ -239,32 +255,34 @@ target_link_libraries(openaow-core PUBLIC
 target_link_libraries(openaow-core PRIVATE OpenAOWNetworking ${OAOW_ZSTD})
 target_sources(openaow-core PRIVATE ${OAOW_SHADER_OUT}/OaowShaders.inc)
 target_include_directories(openaow-core PRIVATE ${OAOW_SHADER_OUT})
-target_compile_definitions(openaow-core PUBLIC AOW_DEBUG=${AOW_DEBUG}
-    OAOW_VERSION="${OAOW_VERSION_FULL}"
-    $<$<CONFIG:Debug>:OAOW_DEBUG>
+target_compile_definitions(openaow-core PUBLIC
+            $<$<BOOL:${AOW_DEBUG}>:AOW_DEBUG>
+            MAIN_ASSET_BLOB_NAME="${MAIN_ASSET_BLOB_NAME}"
+            OAOW_VERSION="${OAOW_VERSION_FULL}"
+            $<$<CONFIG:Debug>:OAOW_DEBUG>
 )
 if(TARGET translations)
     add_dependencies(openaow-core translations)
 endif()
 
-# data.blob: the contents of assets/ packed into one tar.zst next to the executables. The game looks
+# The contents of assets/ packed into one tar.zst next to the executables. The game looks
 # for the assets directory first and falls back to this file (see core/AssetStore.hpp).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND AND BUILD_ASSETS_BLOB)
     file(GLOB_RECURSE OAOW_ASSET_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/assets/*)
     add_custom_command(
-        OUTPUT ${CMAKE_BINARY_DIR}/data.blob
+        OUTPUT ${CMAKE_BINARY_DIR}/${MAIN_ASSET_BLOB_NAME}
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/pack_assets.py
-                ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/data.blob
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/${MAIN_ASSET_BLOB_NAME}
         DEPENDS ${OAOW_ASSET_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/tools/pack_assets.py
-        COMMENT "Packing assets into data.blob..."
+        COMMENT "Packing assets into ${MAIN_ASSET_BLOB_NAME}..."
     )
-    add_custom_target(pack-assets ALL DEPENDS ${CMAKE_BINARY_DIR}/data.blob)
+    add_custom_target(pack-assets ALL DEPENDS ${CMAKE_BINARY_DIR}/${MAIN_ASSET_BLOB_NAME})
     if(TARGET translations)
         add_dependencies(pack-assets translations)
     endif()
 else()
-    message(WARNING "Python3 not found: data.blob will not be built (the game still runs from the assets directory)")
+    message(WARNING "Python3 not found: ${MAIN_ASSET_BLOB_NAME} will not be built (the game still runs from the assets directory)")
 endif()
 
 # Helper: thin executable linked against the shared library

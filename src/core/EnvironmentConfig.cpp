@@ -31,7 +31,7 @@ namespace OpenArtOfWar
             m_root = nlohmann::json::object();
 
         // What the game found out on this system (settings.json) wins over the factory defaults
-        nlohmann::json runtime = JsonFile::readObject(Settings::defaultPath()).value(kSettingsKey, nlohmann::json::object());
+        nlohmann::json runtime = JsonFile::readObjectFromFileName(Settings::defaultPath()).value(kSettingsKey, nlohmann::json::object());
         // Earlier builds kept it in a file of its own: take it over once
         const fs::path legacy = fs::path(Assets::userDataDir()) / "game_environment.json";
         std::error_code ec;
@@ -39,7 +39,7 @@ namespace OpenArtOfWar
         {
             if(!runtime.is_object() || runtime.empty())
             {
-                runtime = JsonFile::readObject(legacy.string());
+                runtime = JsonFile::readObjectFromFileName(legacy.string());
                 m_dirty = true;
             }
             fs::remove(legacy, ec);
@@ -80,7 +80,7 @@ namespace OpenArtOfWar
         // The asset file holds the factory defaults (and ends up in data.blob): only the runtime sections
         // are written, into settings.json next to the player's options (which are left as they are)
         const std::string path = Settings::defaultPath();
-        nlohmann::json settings = JsonFile::readObject(path);
+        nlohmann::json settings = JsonFile::readObjectFromFileName(path);
         nlohmann::json runtime = nlohmann::json::object();
         for(const char *name : kRuntimeSections)
         {

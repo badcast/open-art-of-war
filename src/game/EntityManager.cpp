@@ -1,6 +1,8 @@
 #include "game/EntityManager.hpp"
+#include "game/Projectiles.hpp"
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "core/Localization.hpp"
 #include "core/Utility.hpp"
 #include "game/Effects.hpp"
@@ -19,6 +21,7 @@ namespace OpenArtOfWar
 {
 
     std::vector<BuildingBlueprint> EntityManager::s_blueprints;
+    std::vector<BuildingBlueprint> EntityManager::s_factionBlueprints[2];
 
     std::string EntityManager::descriptionKey(const std::string &characterId)
     {
@@ -33,28 +36,12 @@ namespace OpenArtOfWar
 
     static const char *projectileTypeName(ProjectileType type)
     {
-        switch(type)
-        {
-            case ProjectileType::Shell:
-                return "shell";
-            case ProjectileType::Rocket:
-                return "rocket";
-            case ProjectileType::Flame:
-                return "flame";
-            default:
-                return "bullet";
-        }
+        return Projectiles::keyOf(type);
     }
 
-    static ProjectileType stringToProjectileType(const std::string &str)
+    inline ProjectileType stringToProjectileType(const std::string &str)
     {
-        if(str == "rocket")
-            return ProjectileType::Rocket;
-        if(str == "shell")
-            return ProjectileType::Shell;
-        if(str == "flame")
-            return ProjectileType::Flame;
-        return ProjectileType::Bullet;
+        return Projectiles::fromKey(str);
     }
 
     int EntityManager::applyMovingUnitDamage(int baseDamage, const Entity *target)
@@ -132,6 +119,16 @@ namespace OpenArtOfWar
         return 55 + (targetId % 4);
     }
 
+    // Distance in tiles from tile (px, py) to the segment (ax, ay) - (bx, by)
+    static float distanceToSegment(int px, int py, int ax, int ay, int bx, int by)
+    {
+        const float dx = static_cast<float>(bx - ax), dy = static_cast<float>(by - ay);
+        const float len2 = dx * dx + dy * dy;
+        float t = len2 > 0.0f ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0.0f;
+        t = std::clamp(t, 0.0f, 1.0f);
+        return DetMath::hypot(px - (ax + t * dx), py - (ay + t * dy));
+    }
+
     static void handleUnitDeathState(Unit *tu, bool isFlameDamage)
     {
         if(!tu)
@@ -168,22 +165,19 @@ namespace OpenArtOfWar
     EntityManager::EntityManager()
     {
         m_entities.reserve(MAX_UNITS);
-        loadCharacterConfigs("assets");
+        loadCharacterConfigs(LoaderResources::kDefaultRoot);
     }
 
     bool EntityManager::loadCharacterConfigs(const std::string &assetRoot)
     {
         namespace fs = std::filesystem;
-        fs::path charDir = fs::path(assetRoot) / "characters";
-        std::vector<std::string> files = Assets::list(charDir.generic_string(), ".yaml");
-        for(const std::string &f : Assets::list(charDir.generic_string(), ".yml"))
-            files.push_back(f);
+        // The definition files and the ones to skip come from main.json (LoaderResources)
+        std::string charDir = LoaderResources::charactersDir(assetRoot);
+        std::vector<std::string> files = LoaderResources::characterFiles(assetRoot);
         if(files.empty())
         {
-            charDir = fs::path("../") / assetRoot / "characters";
-            files = Assets::list(charDir.generic_string(), ".yaml");
-            for(const std::string &f : Assets::list(charDir.generic_string(), ".yml"))
-                files.push_back(f);
+            charDir = LoaderResources::charactersDir("../" + assetRoot);
+            files = LoaderResources::characterFiles("../" + assetRoot);
         }
 
         if(files.empty())
@@ -198,8 +192,6 @@ namespace OpenArtOfWar
         for(const std::string &file : files)
         {
             const fs::path entryPath(file);
-            if(entryPath.filename() == "difficulty.yaml" || entryPath.filename() == "ai_difficulty.yaml")
-                continue;
             if(entryPath.filename().string().rfind("research_", 0) == 0)
                 continue; // technology trees, see Research.cpp
 
@@ -218,7 +210,7 @@ namespace OpenArtOfWar
 
         rebuildBlueprints();
 
-        std::cout << "[EntityManager] Loaded " << m_unitConfigs.size() << " unit configs and " << m_buildingConfigs.size() << " building configs from YAML in " << charDir.string() << std::endl;
+        std::cout << "[EntityManager] Loaded " << m_unitConfigs.size() << " unit configs and " << m_buildingConfigs.size() << " building configs from YAML in " << charDir << std::endl;
         return true;
     }
 
@@ -509,6 +501,8 @@ namespace OpenArtOfWar
 
             const bool isInf = Utility::isInfantryArchetype(cfg.archetypeId);
             cfg.turnStepDelay = getFloat(root, "turn_step_delay", Utility::defaultTurnStepDelay(cfg.archetypeId));
+            const float defTurretDelay = root["turn_step_delay"].IsDefined() ? cfg.turnStepDelay : Utility::defaultTurretTurnStepDelay(cfg.archetypeId);
+            cfg.turretTurnStepDelay = getFloat(combatNode, "turret_turn_step_delay", getFloat(root, "turret_turn_step_delay", defTurretDelay));
 
             cfg.description = desc;
 
@@ -603,6 +597,7 @@ namespace OpenArtOfWar
                     form.weapons = formWeapons;
                 }
                 form.hasRotatingTurret = getBool(formCombat, "has_rotating_turret", form.hasRotatingTurret);
+                form.turretTurnStepDelay = getFloat(formCombat, "turret_turn_step_delay", form.turretTurnStepDelay);
             };
 
             // Check for embedded siege mode configuration (consolidated)
@@ -718,30 +713,52 @@ namespace OpenArtOfWar
     void EntityManager::rebuildBlueprints()
     {
         // Blueprints of the player's faction in canonical order: HQ, power, barracks, factory, lab, bunker, tower, wall
-        s_blueprints.clear();
-        const std::vector<int> bpOrder = (playerFaction() == Faction::Confederation) ? std::vector<int> {0, 1, 2, 3, 4, 5, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
-        int bpId = 0;
-        for(int bIdx : bpOrder)
+        // Both factions: commands of other players are looked up in their own faction's list
+        for(int side = 0; side < 2; ++side)
         {
-            auto it = m_buildingConfigs.find(bIdx);
-            if(it != m_buildingConfigs.end())
+            std::vector<BuildingBlueprint> &list = s_factionBlueprints[side];
+            list.clear();
+            const std::vector<int> bpOrder = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
+            for(size_t slot = 0; slot < bpOrder.size(); ++slot)
             {
-                const auto &cfg = it->second;
-                BuildingBlueprint bp;
-                bp.blueprintId = bpId++;
-                bp.buildingIndex = cfg.buildingIndex;
-                bp.iconCompId = cfg.iconCompId;
-                bp.isWall = (bIdx == 15 || bIdx == 25);
-                bp.unitType = cfg.type;
-                bp.name = cfg.name;
-                bp.width = cfg.width;
-                bp.height = cfg.height;
-                bp.creditCost = cfg.creditCost;
-                bp.powerCost = cfg.powerCost;
-                bp.desc = cfg.description;
-                s_blueprints.push_back(bp);
+                const int bIdx = bpOrder[slot];
+                auto it = m_buildingConfigs.find(bIdx);
+                if(it != m_buildingConfigs.end())
+                {
+                    const auto &cfg = it->second;
+                    BuildingBlueprint bp;
+                    bp.blueprintId = static_cast<int>(slot);
+                    bp.buildingIndex = cfg.buildingIndex;
+                    bp.iconCompId = cfg.iconCompId;
+                    bp.isWall = (bIdx == 15 || bIdx == 25);
+                    bp.unitType = cfg.type;
+                    bp.name = cfg.name;
+                    bp.width = cfg.width;
+                    bp.height = cfg.height;
+                    bp.creditCost = cfg.creditCost;
+                    bp.powerCost = cfg.powerCost;
+                    bp.desc = cfg.description;
+                    list.push_back(bp);
+                }
             }
         }
+        s_blueprints = s_factionBlueprints[playerFaction() == Faction::Confederation ? 0 : 1];
+    }
+
+    const std::vector<BuildingBlueprint> &EntityManager::getBlueprints(Faction faction)
+    {
+        const std::vector<BuildingBlueprint> &list = s_factionBlueprints[faction == Faction::Confederation ? 0 : 1];
+        return list.empty() ? getBlueprints() : list;
+    }
+
+    const BuildingBlueprint *EntityManager::findBlueprint(Faction faction, int blueprintId)
+    {
+        for(const BuildingBlueprint &bp : getBlueprints(faction))
+        {
+            if(bp.blueprintId == blueprintId)
+                return &bp;
+        }
+        return nullptr;
     }
 
     const UnitConfig *EntityManager::getUnitConfig(int archetypeId) const
@@ -802,8 +819,13 @@ namespace OpenArtOfWar
         m_projectiles.clear();
         m_explosions.clear();
         m_smokePuffs.clear();
+        m_flameBursts.clear();
+        m_groundMarks.clear();
+        m_soundCues.clear();
+        ++m_generation;
         m_nextId = 1;
         m_kills = {};
+        m_stats = {};
         // Research effects belong to the game that is being cleared
         m_buildRadiusExtra = {};
         std::fill(std::begin(m_flamethrowerUnlocked), std::end(m_flamethrowerUnlocked), false);
@@ -979,6 +1001,8 @@ namespace OpenArtOfWar
             u->spreadAngle = cfg->spreadAngle;
             u->turnStepDelay = cfg->turnStepDelay;
             u->turnTimer = 0.0f;
+            u->turretTurnStepDelay = cfg->turretTurnStepDelay;
+            u->turretTurnTimer = 0.0f;
             u->wreckType = cfg->wreckType;
             u->wreckComposite = cfg->wreckComposite;
             u->wreckStages = cfg->wreckStages;
@@ -1148,8 +1172,10 @@ namespace OpenArtOfWar
                     u->maxHp = 100;
                     break;
             }
-            u->turnStepDelay = u->isInfantry() ? 0.0f : 0.10f;
+            u->turnStepDelay = u->isInfantry() ? 0.0f : Utility::defaultTurnStepDelay(archetypeId);
             u->turnTimer = 0.0f;
+            u->turretTurnStepDelay = u->isInfantry() ? 0.0f : Utility::defaultTurretTurnStepDelay(archetypeId);
+            u->turretTurnTimer = 0.0f;
             if(u->isInfantry())
             {
                 u->wreckType = "infantry";
@@ -1964,6 +1990,10 @@ namespace OpenArtOfWar
             u->isDirectEngaged = false;
             u->isSupportAssisting = false;
             u->isAttackMoving = attackMove;
+            // Several units ordered together may breach hostile walls instead of queueing at one gap
+            u->groupOrder = validUnits.size() >= 2;
+            u->holdPosition = false;
+            u->blockedTimer = 0.0f;
 
             if(u->tileX == destX && u->tileY == destY && std::abs(u->subX) <= 0.001f && std::abs(u->subY) <= 0.001f)
             {
@@ -2055,6 +2085,7 @@ namespace OpenArtOfWar
                 continue;
             if(!Players::hostile(u->owner, target->owner))
                 continue;
+            u->holdPosition = false; // an explicit attack order ends a hold
 
             // 1. If already targeting this exact entity, do NOT reset state or animation frame!
             if(u->targetEntityId == targetEntityId && !u->isManualWallTarget)
@@ -2117,7 +2148,7 @@ namespace OpenArtOfWar
             else if(pathfinder)
             {
                 bool isPartial = false;
-                if(pathfinder->findPath(u->tileX, u->tileY, target->tileX, target->tileY, u->path, u->id, &isPartial))
+                if(u->findPathToAttack(*target, *pathfinder, &isPartial))
                 {
                     u->pathIndex = 0;
                     u->state = ActionState::Move;
@@ -2144,6 +2175,7 @@ namespace OpenArtOfWar
             Unit *u = getUnit(uid);
             if(!u || !u->alive || u->state == ActionState::Die || u->state == ActionState::Transform || u->attackDamage <= 0)
                 continue;
+            u->holdPosition = false;
 
             float srcX = u->getUnitCenterPixelX();
             float srcY = u->getUnitCenterPixelY();
@@ -2417,6 +2449,16 @@ namespace OpenArtOfWar
         m_revealPings.push_back({attackerId, victim, 2.5f});
     }
 
+    void EntityManager::noteEntityHit(Entity &victim, int attackerId)
+    {
+        noteHit(victim.owner, attackerId);
+        const Entity *attacker = getEntity(attackerId);
+        if(!attacker || !attacker->alive || attacker->state == ActionState::Die || !Players::hostile(attacker->owner, victim.owner))
+            return;
+        victim.lastAttackerId = attackerId;
+        victim.lastAttackedTimer = 6.0f;
+    }
+
     void EntityManager::updateFogOfWar(TileMap &map)
     {
         if(!map.isFogEnabled())
@@ -2641,7 +2683,14 @@ namespace OpenArtOfWar
             }
             if(!enemyInRange)
             {
-                int scanR = 5;
+                // Walls an ally of the same player already shoots at come first: one tile down opens the way
+                std::vector<std::pair<int, int>> allyWalls;
+                for(const auto &other : m_entities)
+                {
+                    if(other.alive && other.id != u.id && other.owner == u.owner && other.targetWallTileX >= 0)
+                        allyWalls.emplace_back(other.targetWallTileX, other.targetWallTileY);
+                }
+                int scanR = 6;
                 int minWX = std::max(0, u.tileX - scanR);
                 int maxWX = std::min(map.getWidth() - 1, u.tileX + scanR);
                 int minWY = std::max(0, u.tileY - scanR);
@@ -2654,15 +2703,23 @@ namespace OpenArtOfWar
                         uint16_t w = map.getWall(wx, wy);
                         if(w == 0)
                             continue;
-                        Faction wallFac = (w >= 1101) ? Faction::Resistance : Faction::Confederation;
                         // Only walls toward the destination; never turn back to shoot a wall behind
                         if(goalX >= 0 && DetMath::hypot(wx - goalX, wy - goalY) >= DetMath::hypot(u.tileX - goalX, u.tileY - goalY) + 1.0f)
                         {
                             continue;
                         }
-                        if(wallFac != u.faction && wallFac != Faction::Neutral)
+                        // ... and only the ones in the way: near the straight line to the goal (a wall off to
+                        // the side hinders nobody)
+                        if(goalX >= 0 && distanceToSegment(wx, wy, u.tileX, u.tileY, goalX, goalY) > 2.0f)
+                        {
+                            continue;
+                        }
+                        // Hostile by owner (two players of one faction can be enemies)
+                        if(Players::hostile(map.getWallOwner(wx, wy), u.owner))
                         {
                             float wd = DetMath::hypot((wx - u.tileX) * TILE_WIDTH, (wy - u.tileY) * TILE_HEIGHT);
+                            if(std::find(allyWalls.begin(), allyWalls.end(), std::make_pair(wx, wy)) != allyWalls.end())
+                                wd -= 2.0f * TILE_WIDTH;
                             if(wd < bestWDist)
                             {
                                 bestWDist = wd;
@@ -2774,7 +2831,8 @@ namespace OpenArtOfWar
             float dy = proj.targetY - proj.y;
             float dist = std::sqrt(dx * dx + dy * dy);
 
-            if(proj.type == ProjectileType::Rocket)
+            const ProjectileSpec &spec = Projectiles::of(proj.type);
+            if(spec.smokeTrail)
             {
                 proj.smokeTimer += deltaTime;
                 if(proj.smokeTimer >= 0.030f)
@@ -2802,29 +2860,17 @@ namespace OpenArtOfWar
                 bool targetAlive = (target && target->alive && target->state != ActionState::Die);
                 bool isTargetInfantry = (target && target->asUnit() && target->asUnit()->isInfantry());
 
-                int impactAnim = 42;
-                if(proj.type == ProjectileType::Bullet)
+                // Hit animation of the projectile kind, picked by the target
+                const int impactAnim = spec.pickImpact(proj.targetId);
+                if(proj.type == ProjectileType::Shell || proj.type == ProjectileType::Rocket)
+                    cue(SoundCue::ExplodeSmall, proj.targetX, proj.targetY, proj.owner);
+                // A small crater where a shell / rocket lands (on the ground or the unit it hit)
+                if(const int mark = spec.pickGroundMark(proj.shooterId + proj.targetId + static_cast<int>(proj.targetX) + static_cast<int>(proj.targetY)); mark >= 0)
                 {
-                    if(targetAlive)
-                    {
-                        impactAnim = bulletImpactAnim(proj.targetId);
-                    }
-                    else
-                    {
-                        impactAnim = 42;
-                    }
-                }
-                else if(proj.type == ProjectileType::Rocket)
-                {
-                    impactAnim = 18 + (proj.targetId % 3);
-                }
-                else if(proj.type == ProjectileType::Shell)
-                {
-                    impactAnim = 15 + (proj.targetId % 3);
-                }
-                else if(proj.type == ProjectileType::Flame)
-                {
-                    impactAnim = -1;
+                    const float markX = targetAlive && target->asUnit() ? target->getUnitCenterPixelX() : proj.targetX;
+                    const float markY = targetAlive && target->asUnit() ? target->getUnitCenterPixelY() : proj.targetY;
+                    if(!(targetAlive && target->asBuilding()))
+                        addGroundMark(markX, markY, mark, spec.groundMarkSeconds);
                 }
 
                 if(targetAlive)
@@ -2833,7 +2879,7 @@ namespace OpenArtOfWar
                     const bool hitUnit = target->asUnit() != nullptr;
                     float hitCenterX = hitUnit ? target->getUnitCenterPixelX() : proj.targetX;
                     float hitCenterY = hitUnit ? target->getUnitCenterPixelY() : proj.targetY;
-                    noteHit(target->owner, proj.shooterId);
+                    noteEntityHit(*target, proj.shooterId);
                     target->currentHp -= applyMovingUnitDamage(proj.damage, target);
                     if(target->currentHp <= 0)
                     {
@@ -2870,7 +2916,7 @@ namespace OpenArtOfWar
                             spawnExplosion(hitCenterX, hitCenterY, impactAnim);
                         }
 
-                        noteKill(target->owner, proj.owner);
+                        noteKill(*target, proj.owner);
                     }
                     else
                     {
@@ -2887,11 +2933,12 @@ namespace OpenArtOfWar
                         map.damageWall(hitTileX, hitTileY, proj.damage);
                         if(map.getWall(hitTileX, hitTileY) == 0)
                         {
-                            spawnExplosion(hitTileX * TILE_WIDTH + TILE_WIDTH * 0.5f, hitTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f, 42);
+                            spawnExplosion(hitTileX * TILE_WIDTH + TILE_WIDTH * 0.5f, hitTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f, spec.wallDestroyed);
+                            cue(SoundCue::WallDestroyed, proj.targetX, proj.targetY, proj.owner);
                         }
                         else
                         {
-                            spawnExplosion(proj.targetX, proj.targetY, 55);
+                            spawnExplosion(proj.targetX, proj.targetY, spec.impactWall);
                         }
                     }
                     else
@@ -2901,7 +2948,7 @@ namespace OpenArtOfWar
                 }
 
                 // Splash / AoE Damage (2x2 tiles around impact) for Shell, Rocket, Flame
-                if(proj.splashPercent > 0 && (proj.type == ProjectileType::Shell || proj.type == ProjectileType::Rocket || proj.type == ProjectileType::Flame))
+                if(proj.splashPercent > 0 && !spec.hitscan)
                 {
                     float impactX = targetAlive ? target->getUnitCenterPixelX() : proj.targetX;
                     float impactY = targetAlive ? target->getUnitCenterPixelY() : proj.targetY;
@@ -2923,7 +2970,7 @@ namespace OpenArtOfWar
                         float distFromImpact = DetMath::hypot(ox - impactX, oy - impactY);
                         if(distFromImpact <= maxSplashDist)
                         {
-                            noteHit(other.owner, proj.shooterId);
+                            noteEntityHit(other, proj.shooterId);
                             other.currentHp -= applyMovingUnitDamage(splashDmg, &other);
                             if(other.currentHp <= 0)
                             {
@@ -2958,6 +3005,7 @@ namespace OpenArtOfWar
                                     other.deathTimer = EffectsConfig::get().burialSeconds;
                                     spawnDeathExplosions(other);
                                 }
+                                noteStats(other, proj.owner);
                             }
                         }
                     }
@@ -2976,7 +3024,8 @@ namespace OpenArtOfWar
                                 map.damageWall(wx, wy, splashDmg);
                                 if(map.getWall(wx, wy) == 0)
                                 {
-                                    spawnExplosion(wx * TILE_WIDTH + TILE_WIDTH * 0.5f, wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f, 42);
+                                    spawnExplosion(wx * TILE_WIDTH + TILE_WIDTH * 0.5f, wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f, spec.wallDestroyed);
+                                    cue(SoundCue::WallDestroyed, wx * TILE_WIDTH + TILE_WIDTH * 0.5f, wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f, proj.owner);
                                 }
                             }
                         }
@@ -2991,6 +3040,11 @@ namespace OpenArtOfWar
             }
         }
 
+        // Craters fade away after their time
+        for(GroundMark &m : m_groundMarks)
+            m.timeLeft -= deltaTime;
+        m_groundMarks.erase(std::remove_if(m_groundMarks.begin(), m_groundMarks.end(), [](const GroundMark &m) { return m.timeLeft <= 0.0f; }), m_groundMarks.end());
+
         // 3. Update smoke puffs
         for(auto &puff : m_smokePuffs)
         {
@@ -3003,6 +3057,11 @@ namespace OpenArtOfWar
             }
         }
         m_smokePuffs.erase(std::remove_if(m_smokePuffs.begin(), m_smokePuffs.end(), [](const SmokePuff &p) { return !p.active; }), m_smokePuffs.end());
+
+        // 3b. Flamethrower jets (visual only)
+        for(auto &burst : m_flameBursts)
+            burst.age += deltaTime;
+        m_flameBursts.erase(std::remove_if(m_flameBursts.begin(), m_flameBursts.end(), [](const FlameBurst &b) { return b.age >= b.duration; }), m_flameBursts.end());
 
         // 4. Update explosions
         for(auto &exp : m_explosions)
@@ -3069,25 +3128,8 @@ namespace OpenArtOfWar
         }
         else
         {
-            // Unconfigured default (-1.0f): authentic weapon spread per type
-            switch(entity.projectile)
-            {
-                case ProjectileType::Bullet:
-                    maxSpread = 0.065f;
-                    break; // ~3.7 deg
-                case ProjectileType::Shell:
-                    maxSpread = 0.035f;
-                    break; // ~2.0 deg
-                case ProjectileType::Rocket:
-                    maxSpread = 0.080f;
-                    break; // ~4.6 deg
-                case ProjectileType::Flame:
-                    maxSpread = 0.120f;
-                    break; // ~6.9 deg
-                default:
-                    maxSpread = 0.055f;
-                    break;
-            }
+            // Unconfigured default (-1.0f): the spread of the projectile kind (projectiles.yaml)
+            maxSpread = Projectiles::of(entity.projectile).spread;
         }
 
         float spreadDstX = dstX;
@@ -3110,7 +3152,22 @@ namespace OpenArtOfWar
         const int dir16 = Utility::dirFromNorth(spreadDx, spreadDy, 16);
         const int dir32 = Utility::dirFromNorth(spreadDx, spreadDy, 32);
 
-        if(entity.projectile == ProjectileType::Bullet)
+        const ProjectileSpec &spec = Projectiles::of(entity.projectile);
+        {
+            // The sound of the shot by weapon kind
+            const Unit *shooter = entity.asUnit();
+            SoundCue fire = SoundCue::FireMg;
+            switch(entity.projectile)
+            {
+                case ProjectileType::Flame: fire = SoundCue::FireFlame; break;
+                case ProjectileType::Sniper: fire = SoundCue::FireSniper; break;
+                case ProjectileType::Shell: fire = SoundCue::FireCannon; break;
+                case ProjectileType::Rocket: fire = (shooter && shooter->burstCount >= 3) ? SoundCue::FireMlrs : SoundCue::FireRocket; break;
+                default: fire = (shooter && shooter->isInfantry()) ? SoundCue::FireRifle : SoundCue::FireMg; break;
+            }
+            cue(fire, srcX, srcY, entity.owner);
+        }
+        if(spec.hitscan)
         {
             float finalHitX = spreadDstX;
             float finalHitY = spreadDstY;
@@ -3121,9 +3178,10 @@ namespace OpenArtOfWar
                 if(target && target->alive && target->state != ActionState::Die)
                 {
                     bool isTargetInfantry = (target->asUnit() && target->asUnit()->isInfantry());
-                    int impactAnim = bulletImpactAnim(target->id);
+                    int impactAnim = spec.pickImpact(target->id);
+                    cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, finalHitX, finalHitY, entity.owner);
 
-                    noteHit(target->owner, entity.id);
+                    noteEntityHit(*target, entity.id);
                     target->currentHp -= applyMovingUnitDamage(entity.attackDamage, target);
                     if(target->currentHp <= 0)
                     {
@@ -3160,7 +3218,7 @@ namespace OpenArtOfWar
                             spawnExplosion(finalHitX, finalHitY, impactAnim);
                         }
 
-                        noteKill(target->owner, entity.owner);
+                        noteKill(*target, entity.owner);
                     }
                     else
                     {
@@ -3180,11 +3238,13 @@ namespace OpenArtOfWar
                     finalHitY = wy * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
                     if(map.getWall(wx, wy) == 0)
                     {
-                        spawnExplosion(finalHitX, finalHitY, 42);
+                        spawnExplosion(finalHitX, finalHitY, spec.wallDestroyed);
+                        cue(SoundCue::WallDestroyed, finalHitX, finalHitY, entity.owner);
                     }
                     else
                     {
-                        spawnExplosion(finalHitX, finalHitY, 55);
+                        spawnExplosion(finalHitX, finalHitY, spec.impactWall);
+                        cue(SoundCue::HitArmor, finalHitX, finalHitY, entity.owner);
                     }
                 }
             }
@@ -3205,8 +3265,8 @@ namespace OpenArtOfWar
             p.smokeTimer = 0.0f;
             p.direction = dir16;
             p.dir32 = dir32;
-            p.type = ProjectileType::Bullet;
-            p.speed = 36.0f;
+            p.type = entity.projectile; // the tracer of its own kind (a sniper's round looks different)
+            p.speed = spec.speed;
             m_projectiles.push_back(p);
             return;
         }
@@ -3234,20 +3294,22 @@ namespace OpenArtOfWar
         p.direction = dir16;
         p.dir32 = dir32;
         p.type = entity.projectile;
-        switch(p.type)
+        p.speed = spec.speed;
+        if(p.type == ProjectileType::Flame)
         {
-            case ProjectileType::Rocket:
-                p.speed = 11.0f;
-                break;
-            case ProjectileType::Shell:
-                p.speed = 13.5f;
-                break;
-            case ProjectileType::Flame:
-                p.speed = 22.0f;
-                break;
-            default:
-                p.speed = 16.0f;
-                break;
+            // The jet is drawn by its own effect, as long as the projectile would fly (22 px per tick) but never
+            // shorter than the animation needs: a target close by got no visible flame at all before
+            constexpr float kMinFlameSeconds = 0.35f;
+            const float flight = DetMath::hypot(p.targetX - p.startX, p.targetY - p.startY) / p.speed * static_cast<float>(SIMULATION_TIMESTEP);
+            FlameBurst burst;
+            burst.startX = p.startX;
+            burst.startY = p.startY;
+            burst.targetX = p.targetX;
+            burst.targetY = p.targetY;
+            burst.duration = std::max(kMinFlameSeconds, flight);
+            burst.faction = p.faction;
+            burst.owner = p.owner;
+            m_flameBursts.push_back(burst);
         }
         m_projectiles.push_back(p);
     }
@@ -3277,6 +3339,98 @@ namespace OpenArtOfWar
         }
         spawnDeathExplosions(*b);
         return refund;
+    }
+
+    int EntityManager::valueOf(const Entity &e) const
+    {
+        if(const Unit *u = e.asUnit())
+        {
+            const UnitConfig *cfg = getUnitConfig(u->archetypeId);
+            return cfg ? cfg->creditCost : 0;
+        }
+        if(const Building *b = e.asBuilding())
+        {
+            const BuildingConfig *cfg = getBuildingConfig(b->rawBuildingType);
+            return cfg ? cfg->creditCost : 0;
+        }
+        return 0;
+    }
+
+    void EntityManager::noteStats(const Entity &victim, PlayerId killer)
+    {
+        const int value = valueOf(victim);
+        if(victim.owner < kMaxPlayers)
+        {
+            PlayerStats &lost = m_stats[victim.owner];
+            (victim.isBuilding ? lost.buildingsLost : lost.unitsLost) += 1;
+            lost.valueLost += value;
+        }
+        if(killer < kMaxPlayers && Players::hostile(victim.owner, killer))
+        {
+            PlayerStats &won = m_stats[killer];
+            (victim.isBuilding ? won.buildingsDestroyed : won.unitsKilled) += 1;
+            won.valueDestroyed += value;
+        }
+    }
+
+    void EntityManager::noteKill(const Entity &victim, PlayerId killer)
+    {
+        noteKill(victim.owner, killer);
+        noteStats(victim, killer);
+    }
+
+    void EntityManager::killEntity(Entity &e, TileMap &map)
+    {
+        if(!e.alive || e.state == ActionState::Die)
+            return;
+        e.currentHp = 0;
+        e.state = ActionState::Die;
+        e.animFrame = 0;
+        e.animTimer = 0.0f;
+        e.selected = false;
+        e.deathTimer = EffectsConfig::get().burialSeconds;
+        if(Building *b = e.asBuilding())
+        {
+            b->productionQueue.clear();
+            b->isProducing = false;
+            for(int ty = b->tileY; ty < b->tileY + b->buildHeight; ++ty)
+            {
+                for(int tx = b->tileX; tx < b->tileX + b->buildWidth; ++tx)
+                    map.setPassable(tx, ty, true);
+            }
+            spawnDeathExplosions(*b);
+        }
+        else if(Unit *u = e.asUnit())
+        {
+            handleUnitDeathState(u, false);
+            if(u->isInfantry())
+                spawnExplosion(u->getUnitCenterPixelX(), u->getUnitCenterPixelY(), bulletImpactAnim(u->id));
+            else
+                spawnDeathExplosions(*u);
+        }
+    }
+
+    void EntityManager::destroyPlayer(PlayerId player, TileMap &map)
+    {
+        if(player >= kMaxPlayers)
+            return;
+        for(Entity &e : m_entities)
+        {
+            if(e.owner == player)
+                killEntity(e, map);
+        }
+        // The walls of the player's base go too
+        for(int y = 0; y < map.getHeight(); ++y)
+        {
+            for(int x = 0; x < map.getWidth(); ++x)
+            {
+                if(map.getWall(x, y) > 0 && map.getWallOwner(x, y) == player)
+                {
+                    map.destroyWall(x, y);
+                    spawnExplosion(x * TILE_WIDTH + TILE_WIDTH * 0.5f, y * TILE_HEIGHT + TILE_HEIGHT * 0.5f, 42);
+                }
+            }
+        }
     }
 
     void EntityManager::spawnDeathExplosions(const Entity &e)
@@ -3399,8 +3553,25 @@ namespace OpenArtOfWar
         return bestId;
     }
 
+    void EntityManager::addGroundMark(float x, float y, int composite, float seconds)
+    {
+        if(composite <= 0 || seconds <= 0.0f)
+            return;
+        constexpr size_t kMaxMarks = 400; // the oldest go first
+        if(m_groundMarks.size() >= kMaxMarks)
+            m_groundMarks.erase(m_groundMarks.begin());
+        m_groundMarks.push_back({x, y, composite, seconds});
+    }
+
     void EntityManager::renderGroundRemnants(Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled) const
     {
+        // Craters of shells and rockets: under everything else, only where the player can see the ground
+        for(const GroundMark &m : m_groundMarks)
+        {
+            if(fogEnabled && map.getFogState(static_cast<int>(m.x / TILE_WIDTH), static_cast<int>(m.y / TILE_HEIGHT)) == FogState::Hidden)
+                continue;
+            renderer.drawCompositeWorld(m.composite, m.x - 90.0f, m.y - 60.0f, camera, Faction::Resistance);
+        }
         for(const auto &entity : m_entities)
         {
             if(!entity.alive || entity.state != ActionState::Die)
@@ -3667,33 +3838,21 @@ namespace OpenArtOfWar
         {
             if(!proj.active)
                 continue;
-            if(proj.type == ProjectileType::Flame)
-            {
-                float angle = DetMath::atan2(proj.targetY - proj.startY, proj.targetX - proj.startX);
-                float totalDist = DetMath::hypot(proj.targetX - proj.startX, proj.targetY - proj.startY);
-                float curDist = DetMath::hypot(proj.x - proj.startX, proj.y - proj.startY);
-                float prog = (totalDist > 0.001f) ? (curDist / totalDist) : 1.0f;
-                if(prog > 1.0f)
-                    prog = 1.0f;
-                int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
-                renderer.setDrawOwner(proj.owner);
-                renderer.drawAnimSequenceWorldRotated(59, flameFrame, proj.startX, proj.startY, angle, camera, proj.faction);
-            }
-            else if(proj.type == ProjectileType::Rocket)
-            {
-                renderer.setDrawOwner(proj.owner);
-                renderer.drawProjectileWorld(1405, proj.direction, proj.x, proj.y, camera, proj.faction, 16);
-            }
-            else if(proj.type == ProjectileType::Shell)
-            {
-                renderer.setDrawOwner(proj.owner);
-                renderer.drawProjectileWorld(1341, proj.dir32, proj.x, proj.y, camera, proj.faction, 32);
-            }
-            else
-            {
-                renderer.setDrawOwner(proj.owner);
-                renderer.drawProjectileWorld(1309, proj.dir32, proj.x, proj.y, camera, proj.faction, 32);
-            }
+            const ProjectileSpec &spec = Projectiles::of(proj.type);
+            if(proj.type == ProjectileType::Flame || spec.sprite <= 0)
+                continue; // a flame is drawn as a FlameBurst below
+            renderer.setDrawOwner(proj.owner);
+            renderer.drawProjectileWorld(spec.sprite, spec.directions == 16 ? proj.direction : proj.dir32, proj.x, proj.y, camera, proj.faction, spec.directions);
+        }
+
+        // Flamethrower jets: the 12 frames of the flame over the jet's time
+        for(const auto &burst : m_flameBursts)
+        {
+            const float angle = DetMath::atan2(burst.targetY - burst.startY, burst.targetX - burst.startX);
+            const float prog = burst.duration > 0.0f ? std::clamp(burst.age / burst.duration, 0.0f, 1.0f) : 1.0f;
+            const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
+            renderer.setDrawOwner(burst.owner);
+            renderer.drawAnimSequenceWorldRotated(59, flameFrame, burst.startX, burst.startY, angle, camera, burst.faction);
         }
 
         // 6. Render Explosions (with visual centering for bullet hits and impacts)

@@ -152,6 +152,33 @@ namespace OpenArtOfWar::Utility
         }
     }
 
+    float defaultTurretTurnStepDelay(int archetypeId)
+    {
+        if(isInfantryArchetype(archetypeId))
+            return 0.0f;
+        switch(archetypeId)
+        {
+            case 6:
+            case 8:
+            case 10:
+                return 0.08f; // light / medium turrets
+            case 15:
+                return 0.12f; // deployed Rhino turret
+            case 7:
+            case 9:
+            case 11:
+            case 12:
+            case 17:
+            case 18:
+                return 0.16f; // heavy turrets
+            case 13:
+            case 16:
+                return 0.24f;
+            default:
+                return defaultTurnStepDelay(archetypeId);
+        }
+    }
+
     const BuildingKindInfo *buildingKindInfo(int buildingIndex)
     {
         for(const auto &k : kBuildingKinds)

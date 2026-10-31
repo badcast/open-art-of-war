@@ -532,6 +532,129 @@ bool exportSingleSprites(const SpriteCatalog& catalog, const fs::path& assetsRoo
     return true;
 }
 
+bool exportCustomAtlas(const SpriteCatalog& catalog, const fs::path& assetsRoot,
+                       const fs::path& outDir, const std::string& baseName,
+                       const std::string& title, const std::vector<CustomAtlasItem>& items,
+                       int atlasWidth, int atlasHeight,
+                       const nlohmann::json* extraGraphicsData, std::string& report) {
+    if (items.empty()) {
+        report = "No sprites to export";
+        return false;
+    }
+    std::error_code ec;
+    fs::create_directories(outDir, ec);
+    if (ec) {
+        report = "Could not create " + outDir.string() + ": " + ec.message();
+        return false;
+    }
+    Sheets sheets(assetsRoot);
+    std::string error;
+
+    std::vector<Placed> validItems;
+    validItems.reserve(items.size());
+    int minX = 0, minY = 0;
+    for (const auto& item : items) {
+        if (item.id < 0 || item.id >= static_cast<int>(catalog.sprites().size())) continue;
+        const RawSprite& s = catalog.sprites()[static_cast<size_t>(item.id)];
+        Placed p;
+        p.id = item.id;
+        if (!sheets.rect(s, p.src)) continue;
+        p.x = item.x;
+        p.y = item.y;
+        minX = std::min(minX, p.x);
+        minY = std::min(minY, p.y);
+        validItems.push_back(p);
+    }
+
+    if (validItems.empty()) {
+        report = "No valid sprites to export" + skippedNote(sheets);
+        return false;
+    }
+
+    int w = std::max(1, atlasWidth);
+    int h = std::max(1, atlasHeight);
+    for (auto& p : validItems) {
+        p.x -= minX;
+        p.y -= minY;
+        w = std::max(w, p.x + p.src.w);
+        h = std::max(h, p.y + p.src.h);
+    }
+
+    if (w > kMaxImageSide || h > kMaxImageSide) {
+        report = "Atlas too large: " + std::to_string(w) + "x" + std::to_string(h);
+        return false;
+    }
+
+    SDL_Surface* atlas = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+    if (!atlas) {
+        report = std::string("Could not create the atlas: ") + SDL_GetError();
+        return false;
+    }
+    SDL_FillSurfaceRect(atlas, nullptr, 0);
+
+    json sprites = json::array();
+    for (const auto& p : validItems) {
+        const RawSprite& s = catalog.sprites()[static_cast<size_t>(p.id)];
+        SDL_Surface* sheet = sheets.get(s.page);
+        SDL_Rect dst{p.x, p.y, p.src.w, p.src.h};
+        SDL_BlitSurface(sheet, &p.src, atlas, &dst);
+
+        json sItem = spriteJson(s, p.src, sheets.scale(s.page), hashRect(sheet, p.src.x, p.src.y, p.src.w, p.src.h));
+        sItem["atlas_rect"] = {{"x", p.x}, {"y", p.y}, {"w", p.src.w}, {"h", p.src.h}};
+        sItem["cell_rect"] = sItem["atlas_rect"];
+        sprites.push_back(sItem);
+    }
+
+    const std::string pngName = baseName + ".png";
+    const std::string jsonName = baseName + ".json";
+
+    const bool saved = savePng(atlas, outDir / pngName, error);
+    SDL_DestroySurface(atlas);
+    if (!saved) {
+        report = error;
+        return false;
+    }
+
+    json doc = json::object();
+    doc["title"] = title;
+    doc["file"] = pngName;
+    doc["atlas"] = {{"file", pngName}, {"width", w}, {"height", h}, {"padding", 1}};
+    doc["image"] = {{"w", w}, {"h", h}};
+    doc["custom_layout"] = true;
+    doc["sprites"] = sprites;
+    if (extraGraphicsData && extraGraphicsData->is_object()) {
+        for (auto it = extraGraphicsData->begin(); it != extraGraphicsData->end(); ++it) {
+            doc[it.key()] = it.value();
+        }
+    }
+
+    if (!writeJson(outDir / jsonName, doc)) {
+        report = "Could not write " + (outDir / jsonName).string();
+        return false;
+    }
+
+    report = "Exported " + std::to_string(sprites.size()) + " sprites (" + std::to_string(w) + "x" +
+             std::to_string(h) + " px) to " + (outDir / pngName).string() + skippedNote(sheets);
+    return true;
+}
+
+std::vector<CustomAtlasItem> packCustomMaxRects(std::vector<CustomAtlasItem> items, int& width, int& height, int pad) {
+    std::vector<Placed> placedItems;
+    placedItems.reserve(items.size());
+    for (const auto& it : items) {
+        Placed p;
+        p.id = it.id;
+        p.src = SDL_Rect{0, 0, it.w, it.h};
+        placedItems.push_back(p);
+    }
+    placedItems = packMaxRects(std::move(placedItems), width, height, pad);
+    for (size_t i = 0; i < items.size() && i < placedItems.size(); ++i) {
+        items[i].x = placedItems[i].x;
+        items[i].y = placedItems[i].y;
+    }
+    return items;
+}
+
 } // namespace CharEditor
 
 // ---------------------------------------------------------------------------------------------------------

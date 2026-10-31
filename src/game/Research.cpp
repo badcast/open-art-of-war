@@ -3,6 +3,7 @@
 #include "game/Sides.hpp"
 #include "core/Utility.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <array>
@@ -114,7 +115,7 @@ namespace OpenArtOfWar
                         c.defs[i].desc = c.descs[i].c_str();
                     }
                     std::string text;
-                    if(!Assets::readText(std::string("assets/") + researchFile(side), text))
+                    if(!Assets::readText(LoaderResources::research(side == Faction::Confederation ? "confederation" : "resistance"), text))
                         continue;
                     try
                     {

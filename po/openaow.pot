@@ -2820,3 +2820,278 @@ msgstr ""
 
 msgid "Choose an output folder first."
 msgstr ""
+
+msgid "Network statistics"
+msgstr ""
+
+msgid "Network game: ping, jitter, packet loss and traffic in the corner"
+msgstr ""
+
+msgid "NETWORK"
+msgstr ""
+
+msgid "Hosting this game"
+msgstr ""
+
+msgid "Ping"
+msgstr ""
+
+msgid "ms"
+msgstr ""
+
+msgid "Jitter"
+msgstr ""
+
+msgid "Packet loss"
+msgstr ""
+
+msgid "Traffic out / in"
+msgstr ""
+
+msgid "KB/s"
+msgstr ""
+
+msgid "Input delay"
+msgstr ""
+
+msgid "turn"
+msgstr ""
+
+msgid "Turns buffered"
+msgstr ""
+
+msgid "Waiting for the next turn"
+msgstr ""
+
+msgid "disconnected"
+msgstr ""
+
+msgid "Reconnecting..."
+msgstr ""
+
+msgid "DESYNC"
+msgstr ""
+
+#, c-format
+msgid "Player %s has disconnected"
+msgstr ""
+
+#, c-format
+msgid "Player %s is back"
+msgstr ""
+
+#, c-format
+msgid "Player %s did not come back"
+msgstr ""
+
+#, c-format
+msgid "The base of %s is destroyed"
+msgstr ""
+
+msgid "MATCH STATISTICS"
+msgstr ""
+
+msgid "Player"
+msgstr ""
+
+msgid "Efficiency"
+msgstr ""
+
+msgid "Kills"
+msgstr ""
+
+msgid "Losses"
+msgstr ""
+
+msgid "left"
+msgstr ""
+
+msgid "Efficiency: a point for every 10 credits of enemy forces destroyed"
+msgstr ""
+
+msgid "taken"
+msgstr ""
+
+msgid "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
+msgstr ""
+
+msgid "Ordinary bullet of rifles and machine guns (projectile: bullet)."
+msgstr ""
+
+msgid "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."
+msgstr ""
+
+msgid "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."
+msgstr ""
+
+msgid "Rocket with a smoke trail; leaves a crater (projectile: rocket)."
+msgstr ""
+
+msgid "Flamethrower jet (projectile: flame)."
+msgstr ""
+
+msgid "Fires one shot now."
+msgstr ""
+
+msgid "Fires a shot every interval."
+msgstr ""
+
+msgid "Every shot turns one sprite direction further, so all directions of the sprite show in turn."
+msgstr ""
+
+msgid "Distance between the shooter and the target on the canvas."
+msgstr ""
+
+msgid "Direction of the shot on the canvas."
+msgstr ""
+
+msgid "Time between shots of the preview."
+msgstr ""
+
+msgid "Removes the craters from the canvas."
+msgstr ""
+
+msgid "Empties the list of hit animations (then no hit is drawn)."
+msgstr ""
+
+msgid "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
+msgstr ""
+
+msgid "Pixels the projectile flies per simulation tick (20 ticks a second)."
+msgstr ""
+
+msgid "Projectile pictures of the game: a click sets the composite and its number of directions."
+msgstr ""
+
+msgid "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
+msgstr ""
+
+msgid "How much faster the craters disappear on the canvas than in the game."
+msgstr ""
+
+msgid "Background color of the canvas (black by default)."
+msgstr ""
+
+msgid "Projectiles"
+msgstr ""
+
+msgid "Bullet"
+msgstr ""
+
+msgid "Sniper round"
+msgstr ""
+
+msgid "Shell"
+msgstr ""
+
+msgid "Rocket"
+msgstr ""
+
+msgid "Flame"
+msgstr ""
+
+msgid "Bullet tracer"
+msgstr ""
+
+msgid "Heavy tracer"
+msgstr ""
+
+msgid "Rocket with flame"
+msgstr ""
+
+msgid "Fire"
+msgstr ""
+
+msgid "All directions"
+msgstr ""
+
+msgid "Angle"
+msgstr ""
+
+msgid "Distance"
+msgstr ""
+
+msgid "Interval"
+msgstr ""
+
+msgid "Background"
+msgstr ""
+
+msgid "Clear craters"
+msgstr ""
+
+msgid "Clear impacts"
+msgstr ""
+
+msgid "Crater composites"
+msgstr ""
+
+msgid "Craters"
+msgstr ""
+
+msgid "Crater seconds"
+msgstr ""
+
+msgid "Directions"
+msgstr ""
+
+msgid "Flight"
+msgstr ""
+
+msgid "Ground marks"
+msgstr ""
+
+msgid "Hit effects"
+msgstr ""
+
+msgid "Hit-scan"
+msgstr ""
+
+msgid "Impact animations"
+msgstr ""
+
+msgid "Preview fade speed"
+msgstr ""
+
+msgid "Projectile sprites"
+msgstr ""
+
+msgid "Smoke trail"
+msgstr ""
+
+msgid "Speed (px per tick)"
+msgstr ""
+
+msgid "Spread (radians)"
+msgstr ""
+
+msgid "Sprite (composite)"
+msgstr ""
+
+msgid "Used by"
+msgstr ""
+
+msgid "Wall destroyed"
+msgstr ""
+
+msgid "Wall hit"
+msgstr ""
+
+msgid "The projectiles file could not be loaded."
+msgstr ""
+
+msgid "A flame is drawn as its own jet (animation 59), not as a sprite."
+msgstr ""
+
+msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"
+msgstr ""
+
+#, c-format
+msgid "Animation %d"
+msgstr ""
+
+msgid "Voice volume"
+msgstr ""
+
+msgid "Volume of the unit replies and the announcer"
+msgstr ""

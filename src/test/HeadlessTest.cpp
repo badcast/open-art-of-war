@@ -1,4 +1,9 @@
 #include "test/HeadlessTest.hpp"
+#include "audio/VoiceManager.hpp"
+#include "game/Projectiles.hpp"
+#include "core/LoaderResources.hpp"
+#include "core/DetMath.hpp"
+#include "ui/RadarAlert.hpp"
 #include "game/Players.hpp"
 #include "core/Application.hpp"
 #include "core/Localization.hpp"
@@ -187,7 +192,7 @@ namespace OpenArtOfWar
 
         // Team 0: Resistance + Confederation; team 1: Resistance + Confederation (same factions on both sides)
         MatchSetup setup;
-        setup.mapPath = "assets/maps/m26.json";
+        setup.mapPath = LoaderResources::mapPath("m26");
         setup.seed = 12345;
         setup.local = 0;
         const Faction factions[4] = {Faction::Resistance, Faction::Confederation, Faction::Resistance, Faction::Confederation};
@@ -202,7 +207,7 @@ namespace OpenArtOfWar
             std::cerr << "[Test] FAILED: m26 must offer 4 start positions" << std::endl;
             return false;
         }
-        if(MissionController::startPositions("assets/maps/map_skirmish_5.json").size() != 2)
+        if(MissionController::startPositions(LoaderResources::mapPath("map_skirmish_5")).size() != 2)
         {
             std::cerr << "[Test] FAILED: a map without start_positions is a map for two players" << std::endl;
             return false;
@@ -258,18 +263,49 @@ namespace OpenArtOfWar
             SimCommand foreign = order;
             foreign.player = 1;
             sim.issue(foreign);
+            // Player 3 leaves the network match at tick 300: its base, walls and units go (see PlayerLeft)
+            int leaverHqX = 0, leaverHqY = 0;
+            for(const Entity &e : entities.getAllEntities())
+            {
+                if(e.owner == 3 && e.isBuilding && e.type == UnitType::Headquarters)
+                {
+                    leaverHqX = e.tileX;
+                    leaverHqY = e.tileY;
+                }
+            }
+            const int wallX = std::max(0, leaverHqX - 2), wallY = std::max(0, leaverHqY - 2);
+            map.setWall(wallX, wallY, factions[3], 100, 3);
             const float dt = static_cast<float>(SIMULATION_TIMESTEP);
             for(int tick = 0; tick < 1200; ++tick)
             {
+                if(tick == 300)
+                {
+                    SimCommand leave;
+                    leave.type = CommandType::PlayerLeft;
+                    leave.player = 3;
+                    sim.schedule(sim.tick(), leave);
+                }
                 sim.applyCommands(ctx);
                 sim.updateResearch(dt, ctx);
                 entities.update(dt, map, pf);
                 sim.updateSquads(dt, ctx, ai.getChokepoints());
-                economy.update(dt, entities, map, pf);
-                sim.updateEconomies(dt, ctx);
+                sim.updateEconomies(dt, ctx); // the local economy included
                 if(tick % 60 == 0)
                     sums.push_back(sim.checksum(ctx));
                 sim.endTick();
+            }
+            int leftStanding = 0, othersStanding = 0;
+            for(const Entity &e : entities.getAllEntities())
+            {
+                if(!e.alive || e.state == ActionState::Die)
+                    continue;
+                (e.owner == 3 ? leftStanding : othersStanding) += 1;
+            }
+            std::cout << "  - Player 3 left: " << leftStanding << " of its things standing, wall " << (map.getWall(wallX, wallY) > 0 ? "standing" : "gone") << ", others keep " << othersStanding << std::endl;
+            if(leftStanding != 0 || map.getWall(wallX, wallY) > 0 || othersStanding == 0)
+            {
+                std::cerr << "[Test] FAILED: the forces of a player who left must be destroyed (and only those)" << std::endl;
+                return false;
             }
             return true;
         };
@@ -316,7 +352,7 @@ namespace OpenArtOfWar
 
         // A person (Resistance) against two computer players of both factions in one team
         MatchSetup setup;
-        setup.mapPath = "assets/maps/m26.json";
+        setup.mapPath = LoaderResources::mapPath("m26");
         setup.seed = 777;
         setup.local = 0;
         setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
@@ -345,8 +381,7 @@ namespace OpenArtOfWar
                 sim.updateResearch(dt, ctx);
                 entities.update(dt, map, pf);
                 sim.updateSquads(dt, ctx, app.m_aiController->getChokepoints());
-                economy.update(dt, entities, map, pf);
-                sim.updateEconomies(dt, ctx);
+                sim.updateEconomies(dt, ctx); // the local economy included
                 for(auto &ai : gc.m_matchAis)
                     ai->update(dt, map, entities, pf);
                 if(tick % 100 == 0)
@@ -1383,20 +1418,23 @@ namespace OpenArtOfWar
                 group.push_back(entities.spawnUnitByArchetype(1, 4 + i, 25, Faction::Confederation));
             SquadRun half = runSquad(group, 34, 10, 90.0f, front);
             std::cout << "  - Half of the group behind: regrouped " << (half.seen.count(AISquadState::Regrouping) ? "yes" : "no") << ", vanguard at x<=" << half.vanguardMaxXEarly << " in 4 s, reached objective=" << (half.assault ? "yes" : "no") << std::endl;
-            if(half.seen.count(AISquadState::Regrouping) == 0 || half.vanguardMaxXEarly > 12.0f || !half.assault)
+            // (12.5: a started step is always finished, and diagonal steps between allies may cut corners)
+            if(half.seen.count(AISquadState::Regrouping) == 0 || half.vanguardMaxXEarly > 12.5f || !half.assault)
             {
                 return fail("a group that fell apart must wait for the rest, then go on");
             }
         }
 
-        // H) Enemy walls: detour when there is a way around, breach only a sealed line
-        for(bool sealed : {false, true})
+        // H) Enemy walls: detour through a wide gap, cross a narrow one (only units the wall really holds up may
+        //    shoot at it), breach a sealed line. gap = number of open tiles from y=2 (0 = sealed).
+        for(int gap : {5, 2, 0})
         {
+            const bool sealed = gap == 0;
             withDifficulty(1);
             setupArena();
             for(int y = 0; y < 30; ++y)
             {
-                if(sealed || y < 3 || y > 4)
+                if(y < 2 || y >= 2 + gap)
                     map.setWall(20, y, Faction::Resistance, 100);
             }
             std::vector<int> column;
@@ -1420,9 +1458,11 @@ namespace OpenArtOfWar
                 if(const Unit *u = entities.getUnit(id); u && u->alive && u->tileX > 20)
                     ++crossed;
             }
-            std::cout << "  - Wall " << (sealed ? "sealed" : "with gap") << ": wall targeted=" << (shotWall ? "yes" : "no") << ", crossed " << crossed << "/6" << std::endl;
-            if(!sealed && (shotWall || crossed < 5))
-                return fail("units must walk around a wall that has a gap");
+            std::cout << "  - Wall " << (sealed ? std::string("sealed") : "with a gap of " + std::to_string(gap)) << ": wall targeted=" << (shotWall ? "yes" : "no") << ", crossed " << crossed << "/6" << std::endl;
+            if(gap > 2 && (shotWall || crossed < 5))
+                return fail("units must walk around a wall that has a wide gap");
+            if(gap > 0 && gap <= 2 && crossed < 5)
+                return fail("a group must get through a narrow gap in an enemy wall");
             if(sealed && !shotWall)
                 return fail("units must breach a sealed enemy wall");
         }
@@ -1612,6 +1652,328 @@ namespace OpenArtOfWar
         return true;
     }
 
+    bool HeadlessTest::runMakeWayTest(Application &app)
+    {
+        std::cout << "[Test] Validating allies making way in narrow passages..." << std::endl;
+        const float dt = 1.0f / 30.0f;
+        EntityManager &entities = *app.m_entities;
+        TileMap &map = *app.m_map;
+        Pathfinder &pf = *app.m_pathfinder;
+        auto fail_ = [&](const std::string &msg)
+        {
+            std::cerr << "[Test] Error: " << msg << std::endl;
+            entities.clear();
+            return false;
+        };
+        auto fresh = [&]
+        {
+            entities.clear();
+            map.initBlankArena(60, 40, 0);
+            pf.setMap(&map);
+            pf.setEntityManager(&entities);
+        };
+        auto near = [&](int id, int x, int y, int r)
+        {
+            const Unit *u = entities.getUnit(id);
+            return u && u->alive && std::max(std::abs(u->tileX - x), std::abs(u->tileY - y)) <= r;
+        };
+
+        // A. Own wall at x=30 with a one-tile gap at y=20, packed with idle allies in the gap and right behind
+        //    it; a group (infantry and a tank) and a single unit are sent through. Everyone gets across, and the
+        //    idle units walk back to their places afterwards.
+        for(bool vehicle : {false, true})
+        {
+            fresh();
+            for(int y = 0; y < 40; ++y)
+            {
+                if(y != 20)
+                    map.setWall(30, y, Faction::Confederation, 100);
+            }
+            const std::vector<std::pair<int, int>> plugSpots {{30, 20}, {31, 20}, {31, 19}, {31, 21}, {29, 20}};
+            std::vector<int> plugs;
+            for(const auto &[x, y] : plugSpots)
+                plugs.push_back(entities.spawnUnitByArchetype(1, x, y, Faction::Confederation));
+            std::vector<int> group;
+            for(int i = 0; i < 6; ++i)
+                group.push_back(entities.spawnUnitByArchetype((vehicle && i == 0) ? 11 : 1, 18 + i % 3, 19 + i / 3, Faction::Confederation));
+            entities.issueMoveOrder(group, 42, 20, pf);
+            float allAcross = -1.0f;
+            for(float t = 0.0f; t < 45.0f && allAcross < 0.0f; t += dt)
+            {
+                entities.update(dt, map, pf);
+                int across = 0;
+                for(int id : group)
+                    across += near(id, 42, 20, 4) ? 1 : 0;
+                if(across == static_cast<int>(group.size()))
+                    allAcross = t;
+            }
+            for(float t = 0.0f; t < 15.0f; t += dt)
+                entities.update(dt, map, pf);
+            int home = 0;
+            for(size_t i = 0; i < plugs.size(); ++i)
+                home += near(plugs[i], plugSpots[i].first, plugSpots[i].second, 0) ? 1 : 0;
+            int across = 0;
+            for(int id : group)
+                across += near(id, 42, 20, 4) ? 1 : 0;
+            std::cout << "  - Gap packed with 5 idle allies" << (vehicle ? " (group with a tank)" : "") << ": " << across << "/6 across"
+                      << (allAcross >= 0.0f ? " after " + std::to_string(allAcross) + "s" : std::string()) << ", " << home << "/5 back in place" << std::endl;
+            if(across < 6)
+                return fail_("a group must get through a gap packed with idle allies");
+            if(home < 4)
+                return fail_("allies that made way must return to their places");
+        }
+
+        // B. Head-on in a 1-tile corridor (own walls at y=19 and y=21 over x=28..32): both units get through
+        {
+            fresh();
+            for(int x = 28; x <= 32; ++x)
+            {
+                map.setWall(x, 19, Faction::Confederation, 100);
+                map.setWall(x, 21, Faction::Confederation, 100);
+            }
+            // The corridor is the only way: close the sides above and below it
+            for(int y = 0; y < 40; ++y)
+            {
+                if(y < 19 || y > 21)
+                    map.setWall(30, y, Faction::Confederation, 100);
+            }
+            const int a = entities.spawnUnitByArchetype(1, 24, 20, Faction::Confederation);
+            const int b = entities.spawnUnitByArchetype(11, 36, 20, Faction::Confederation);
+            entities.issueMoveOrder({a}, 38, 20, pf);
+            entities.issueMoveOrder({b}, 22, 20, pf);
+            float done = -1.0f;
+            for(float t = 0.0f; t < 30.0f && done < 0.0f; t += dt)
+            {
+                entities.update(dt, map, pf);
+                if(near(a, 38, 20, 1) && near(b, 22, 20, 1))
+                    done = t;
+            }
+            std::cout << "  - Head-on in a 1-tile corridor: " << (done >= 0.0f ? "both through after " + std::to_string(done) + "s" : std::string("stuck")) << std::endl;
+            if(done < 0.0f)
+                return fail_("two allies meeting head-on in a corridor must let each other pass");
+        }
+
+        // C. Diagonal steps may cut corners: a diagonal wall line (tiles touching only at their corners) is
+        //    walked through, by infantry and by a vehicle
+        for(int arch : {1, 11})
+        {
+            fresh();
+            for(int y = 0; y < 40; ++y)
+                map.setWall(10 + y, y, Faction::Confederation, 100);
+            const int u = entities.spawnUnitByArchetype(arch, 22, 18, Faction::Confederation);
+            entities.issueMoveOrder({u}, 34, 18, pf);
+            float done = -1.0f;
+            for(float t = 0.0f; t < 20.0f && done < 0.0f; t += dt)
+            {
+                entities.update(dt, map, pf);
+                if(near(u, 34, 18, 1))
+                    done = t;
+            }
+            std::cout << "  - Diagonal wall line, " << (arch == 1 ? "infantry" : "vehicle") << ": " << (done >= 0.0f ? "crossed after " + std::to_string(done) + "s" : std::string("not crossed")) << std::endl;
+            if(done < 0.0f)
+                return fail_("a diagonal step between two wall tiles touching at the corners must be allowed");
+        }
+
+        entities.clear();
+        std::cout << "  - Making way validated." << std::endl;
+        return true;
+    }
+
+    bool HeadlessTest::runCombatBehaviourTest(Application &app)
+    {
+        std::cout << "[Test] Validating wall breach at a single gap and retaliation against far shooters..." << std::endl;
+        const float dt = 1.0f / 30.0f;
+        auto fresh = [&]
+        {
+            app.m_entities->clear();
+            app.m_map->initBlankArena(60, 40, 0);
+            app.m_pathfinder->setMap(app.m_map.get());
+            app.m_pathfinder->setEntityManager(app.m_entities.get());
+        };
+        auto countWalls = [&]
+        {
+            int n = 0;
+            for(int y = 0; y < app.m_map->getHeight(); ++y)
+                n += app.m_map->getWall(30, y) > 0 ? 1 : 0;
+            return n;
+        };
+
+        // A. Hostile wall across the arena at x=30 with one gap; a group ordered to the far side
+        for(int gapY : {20, 38})
+        {
+            fresh();
+            for(int y = 0; y < app.m_map->getHeight(); ++y)
+            {
+                if(y != gapY)
+                    app.m_map->setWall(30, y, Faction::Confederation, 100);
+            }
+            const int wallsBefore = countWalls();
+            std::vector<int> group;
+            for(int i = 0; i < 8; ++i)
+            {
+                int id = app.m_entities->spawnUnitByArchetype(i % 2 == 0 ? 0 : 6, 22 + (i % 4), 6 + i / 4, Faction::Resistance);
+                if(id > 0)
+                    group.push_back(id);
+            }
+            const Unit *first = app.m_entities->getUnit(group.front());
+            if(!first || Players::hostile(app.m_map->getWallOwner(30, 6), first->owner) == false)
+            {
+                std::cerr << "[Test] Error: test wall is not hostile to the group" << std::endl;
+                return false;
+            }
+            app.m_entities->issueMoveOrder(group, 40, 7, *app.m_pathfinder);
+            float breachAt = -1.0f, maxBlocked = 0.0f, doneAt = -1.0f;
+            int across = 0;
+            for(float t = 0.0f; t < 90.0f; t += dt)
+            {
+                for(int id : group)
+                {
+                    if(const Unit *u = app.m_entities->getUnit(id))
+                        maxBlocked = std::max(maxBlocked, u->blockedTimer);
+                }
+                app.m_entities->update(dt, *app.m_map, *app.m_pathfinder);
+                if(breachAt < 0.0f && countWalls() < wallsBefore)
+                    breachAt = t;
+                across = 0;
+                for(int id : group)
+                {
+                    if(const Unit *u = app.m_entities->getUnit(id); u && u->tileX > 30)
+                        across++;
+                }
+                if(across == static_cast<int>(group.size()))
+                {
+                    doneAt = t;
+                    break;
+                }
+            }
+            std::cout << "  - Gap at y=" << gapY << " (human group: " << (Players::slot(first->owner).human ? "yes" : "no") << "): wall breached " << (breachAt >= 0.0f ? "after " + std::to_string(breachAt) + "s" : std::string("never")) << ", " << across << "/" << group.size() << " across at "
+                      << doneAt << "s, longest queueing " << maxBlocked << "s" << std::endl;
+            // Near gap: an open route of about the straight length, so the group walks through it (units held up
+            // in the queue at the wall may shoot it). Far gap: the detour is much longer, the wall is breached.
+            if(gapY == 38 && breachAt < 0.0f)
+            {
+                std::cerr << "[Test] Error: the group took the long detour instead of breaching the hostile wall!" << std::endl;
+                return false;
+            }
+            if(across < static_cast<int>(group.size()))
+            {
+                std::cerr << "[Test] Error: the group did not get across the hostile wall!" << std::endl;
+                return false;
+            }
+        }
+
+        // B. Retaliation: a unit hit by a far shooter goes after it; a unit holding position does not
+        {
+            fresh();
+            const int shooterId = app.m_entities->spawnUnitByArchetype(0, 45, 20, Faction::Confederation);
+            const int victimId = app.m_entities->spawnUnitByArchetype(0, 15, 20, Faction::Resistance);
+            const int holderId = app.m_entities->spawnUnitByArchetype(0, 15, 25, Faction::Resistance);
+            Unit *shooter = app.m_entities->getUnit(shooterId);
+            Unit *victim = app.m_entities->getUnit(victimId);
+            Unit *holder = app.m_entities->getUnit(holderId);
+            if(!shooter || !victim || !holder)
+                return false;
+            shooter->moveSpeed = 0.0f; // a stationary target dummy that keeps "shooting"
+            shooter->attackDamage = 0;
+            holder->holdPosition = true;
+            const int victimStartX = victim->tileX;
+            for(float t = 0.0f; t < 4.0f; t += dt)
+            {
+                if(static_cast<int>(t / dt) % 30 == 0)
+                {
+                    app.m_entities->noteEntityHit(*victim, shooterId);
+                    app.m_entities->noteEntityHit(*holder, shooterId);
+                }
+                app.m_entities->update(dt, *app.m_map, *app.m_pathfinder);
+            }
+            std::cout << "  - Retaliation: victim moved " << victimStartX << " -> " << victim->tileX << " (target " << victim->targetEntityId << "), holder at " << holder->tileX << "," << holder->tileY << std::endl;
+            if(victim->targetEntityId != shooterId || victim->tileX <= victimStartX + 2)
+            {
+                std::cerr << "[Test] Error: a unit hit from afar did not go after the shooter!" << std::endl;
+                return false;
+            }
+            if(holder->tileX != 15 || holder->tileY != 25)
+            {
+                std::cerr << "[Test] Error: a unit holding position walked off after a shooter!" << std::endl;
+                return false;
+            }
+        }
+        // C. A manual attack order: the units stop at their firing range, they do not walk up to the target
+        for(int arch : {0, 6, 10})
+        {
+            fresh();
+            const int targetId = app.m_entities->spawnUnitByArchetype(1, 45, 20, Faction::Confederation);
+            Unit *target = app.m_entities->getUnit(targetId);
+            target->moveSpeed = 0.0f;
+            target->attackDamage = 0;
+            target->maxHp = target->currentHp = 100000;
+            std::vector<int> group;
+            for(int i = 0; i < 6; ++i)
+                group.push_back(app.m_entities->spawnUnitByArchetype(arch, 10 + i % 3, 18 + i / 3 * 2, Faction::Resistance));
+            app.m_entities->issueAttackOrder(group, targetId, app.m_pathfinder.get());
+            float closest = 1e9f, rangeTiles = 0.0f;
+            for(float t = 0.0f; t < 30.0f; t += dt)
+                app.m_entities->update(dt, *app.m_map, *app.m_pathfinder);
+            float farthest = 0.0f;
+            for(int id : group)
+            {
+                const Unit *u = app.m_entities->getUnit(id);
+                if(!u)
+                    continue;
+                rangeTiles = u->attackRange;
+                const float d = DetMath::hypot(u->getUnitCenterPixelX() - target->getUnitCenterPixelX(), u->getUnitCenterPixelY() - target->getUnitCenterPixelY()) / TILE_WIDTH;
+                closest = std::min(closest, d);
+                farthest = std::max(farthest, d);
+                if(std::getenv("OAOW_TEST_VERBOSE"))
+                    std::cout << "    unit " << id << " at " << u->tileX << "," << u->tileY << " dist " << d << " state " << static_cast<int>(u->state) << std::endl;
+            }
+            std::cout << "  - Manual attack, archetype " << arch << ": range " << rangeTiles << " tiles, closest unit at " << closest << " tiles" << std::endl;
+            if(farthest > rangeTiles + 0.01f || closest < rangeTiles - 1.05f)
+            {
+                std::cerr << "[Test] Error: units on a manual attack order must stand at their firing range (range " << rangeTiles << ", nearest " << closest << ", farthest " << farthest << ")" << std::endl;
+                return false;
+            }
+        }
+        // D. A flamethrower at point-blank range: the flame is seen (the damage projectile arrives within the
+        //    tick it is fired; the jet is an effect of its own that plays over time)
+        for(int gap : {1, 2, 3})
+        {
+            fresh();
+            const int flamerId = app.m_entities->spawnUnitByArchetype(5, 20, 20, Faction::Confederation);
+            const int victimId = app.m_entities->spawnUnitByArchetype(0, 20 + gap, 20, Faction::Resistance);
+            Unit *victim = app.m_entities->getUnit(victimId);
+            Unit *flamer = app.m_entities->getUnit(flamerId);
+            if(!victim || !flamer || flamer->projectile != ProjectileType::Flame)
+            {
+                std::cerr << "[Test] Error: no flamethrower to test" << std::endl;
+                return false;
+            }
+            victim->attackDamage = 0;
+            victim->moveSpeed = 0.0f;
+            victim->maxHp = victim->currentHp = 100000;
+            app.m_entities->issueAttackOrder({flamerId}, victimId, app.m_pathfinder.get());
+            int visibleTicks = 0, firstSeen = -1;
+            for(int tick = 0; tick < 60; ++tick)
+            {
+                app.m_entities->update(0.05f, *app.m_map, *app.m_pathfinder);
+                if(app.m_entities->flameBurstCount() > 0)
+                {
+                    ++visibleTicks;
+                    if(firstSeen < 0)
+                        firstSeen = tick;
+                }
+            }
+            std::cout << "  - Flamethrower at " << gap << " tile(s): flame on screen for " << visibleTicks << " ticks (hp lost " << (100000 - victim->currentHp) << ")" << std::endl;
+            if(firstSeen < 0 || visibleTicks < 6 || victim->currentHp >= 100000)
+            {
+                std::cerr << "[Test] Error: a flamethrower shot at close range shows no flame (or does no damage)!" << std::endl;
+                return false;
+            }
+        }
+        std::cout << "  - Wall breach and retaliation validated." << std::endl;
+        return true;
+    }
+
     bool HeadlessTest::run(Application &app, int numTicks)
     {
         if(const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "group")
@@ -1621,6 +1983,14 @@ namespace OpenArtOfWar
         if(const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "ai")
         {
             return runAIBehaviourTest(app);
+        }
+        if(const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "combat")
+        {
+            return runCombatBehaviourTest(app);
+        }
+        if(const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "makeway")
+        {
+            return runMakeWayTest(app);
         }
         std::cout << "[Test] Starting automated headless simulation test (" << numTicks << " ticks)..." << std::endl;
 
@@ -2372,6 +2742,8 @@ namespace OpenArtOfWar
         int hammerId = app.m_entities->spawnUnitByArchetype(9, 15, 15, Faction::Confederation); // T-21 Hammer
         int dummyId = app.m_entities->spawnUnitByArchetype(8, 17, 15, Faction::Resistance);     // Target dummy
         Unit *hammer = app.m_entities->getUnit(hammerId);
+        hammer->turretTurnStepDelay = 0.0f;
+        hammer->turnStepDelay = 0.0f; // instant aiming (a zero turret delay falls back to the hull one)
         hammer->targetEntityId = dummyId;
         hammer->cooldownTimer = 0.0f;
         app.m_entities->update(0.05f, *app.m_map, *app.m_pathfinder);
@@ -2425,6 +2797,8 @@ namespace OpenArtOfWar
         int targetDummyId = app.m_entities->spawnUnitByArchetype(0, 42, 40, Faction::Resistance); // East of fortress
         Unit *fortress = app.m_entities->getUnit(fortId);
         fortress->facingDirection = 2; // Hull faces South
+        fortress->turretTurnStepDelay = 0.0f;
+        fortress->turnStepDelay = 0.0f;
         fortress->targetEntityId = targetDummyId;
         fortress->cooldownTimer = 0.0f;
         app.m_entities->update(0.05f, *app.m_map, *app.m_pathfinder);
@@ -2738,7 +3112,7 @@ namespace OpenArtOfWar
 
         // 12. Test AI Difficulty Modes & YAML Configuration (Easy, Medium, Hard, Hardcore)
         std::cout << "[Test] Validating AI Difficulty System & assets/characters/difficulty.yaml..." << std::endl;
-        if(!app.m_aiController->loadDifficultyConfig("assets/characters/difficulty.yaml"))
+        if(!app.m_aiController->loadDifficultyConfig(LoaderResources::aiDifficulty()))
         {
             std::cerr << "[Test] Error: Failed to load difficulty configuration from assets/characters/difficulty.yaml!" << std::endl;
             return false;
@@ -2897,8 +3271,9 @@ namespace OpenArtOfWar
         mUnit->muzzleOffsetX = 12.0f;
         mUnit->muzzleOffsetY = 3.0f;
 
-        const float tPivotX = cx - 2.0f;
-        const float tPivotY = cy - 14.0f;
+        // Without a custom offset the pivot is the unit centre moved by the sprite's turret layer shift
+        const float tPivotX = cx + mUnit->turretShiftX;
+        const float tPivotY = cy + mUnit->turretShiftY;
 
         // Facing 0 (East): forward=+X, lateral=+Y
         mUnit->turretFacing = 0;
@@ -3072,6 +3447,24 @@ namespace OpenArtOfWar
             return false;
         }
         std::cout << "  - 2x2 area splash damage validated: primary target damaged, neighbor in 2x2 area took " << (100 - splTarget->currentHp) << " splash damage, far target unharmed." << std::endl;
+        // A shell leaves a small crater on the ground (projectiles.yaml: ground_marks)
+        if(app.m_entities->groundMarkCount() == 0)
+        {
+            std::cerr << "[Test] Error: a shell impact left no crater on the ground!" << std::endl;
+            return false;
+        }
+        std::cout << "  - Shell impact left a crater on the ground." << std::endl;
+        // The sniper fires its own rounds: hit-scan like a bullet, its own tracer and hit
+        {
+            const ProjectileSpec &sniper = Projectiles::of(ProjectileType::Sniper);
+            const ProjectileSpec &bullet = Projectiles::of(ProjectileType::Bullet);
+            if(Projectiles::fromKey("sniper") != ProjectileType::Sniper || !sniper.hitscan || sniper.sprite == bullet.sprite || sniper.impact == bullet.impact)
+            {
+                std::cerr << "[Test] Error: the sniper round must be its own hit-scan projectile with its own tracer and hit!" << std::endl;
+                return false;
+            }
+            std::cout << "  - Sniper round: hit-scan, tracer " << sniper.sprite << ", hit animations " << sniper.impact.front() << ".." << sniper.impact.back() << std::endl;
+        }
 
         // C. Validate Flame burning infantry death (killedByFlame=true)
         int infantryVictimId = app.m_entities->spawnUnitByArchetype(0, 18, 18, Faction::Confederation);
@@ -3109,6 +3502,21 @@ namespace OpenArtOfWar
 
         // 17. Validate Vehicle Movement & Rotation Mechanics (Left-to-Right turns through Down first, then Right)
         std::cout << "[Test] Validating Vehicle Movement & Rotation Mechanics (Left-to-Right turns through Down)..." << std::endl;
+        // The earlier sections leave fights behind: end them, so nobody (chasing its attacker) drives into the test lane
+        for(Entity &e : app.m_entities->getAllEntities())
+        {
+            if(Unit *u = e.asUnit(); u && u->alive && u->state != ActionState::Die)
+            {
+                u->targetEntityId = 0;
+                u->lastAttackerId = 0;
+                u->lastAttackedTimer = 0.0f;
+                u->clearPathState();
+                u->clearMoveTarget();
+                u->isAttackMoving = false;
+                if(u->state == ActionState::Move || u->state == ActionState::Attack)
+                    u->state = ActionState::Idle;
+            }
+        }
         int turnTestTankId = app.m_entities->spawnUnitByArchetype(6, 12, 12, Faction::Confederation); // Hammer tank
         Unit *turnTestTank = app.m_entities->getEntity(turnTestTankId)->asUnit();
         turnTestTank->facingDirection = 4; // Facing West / Left
@@ -3890,6 +4298,63 @@ namespace OpenArtOfWar
         if(!runAIBehaviourTest(app))
             return false;
 
+        // 27a. Radar alarm: goes off on contact, flashes, waves, stays quiet until the radar was clear long enough
+        {
+            std::cout << "[Test] Validating the radar alarm..." << std::endl;
+            RadarAlert alert;
+            nlohmann::json cfg = {{"blink_duration_s", 2.0}, {"blink_hz", 2.0}, {"rearm_delay_s", 5.0}, {"wave_count", 3}, {"wave_duration_s", 1.0}, {"wave_interval_s", 0.5}, {"wave_max_radius_px", 30}, {"dot_radius_px", 2}};
+            alert.config.load(cfg);
+            alert.update(1000, false, 0, 0);
+            bool ok = !alert.active() && alert.armed();
+            alert.update(2000, true, 12.0f, 7.0f); // contact
+            ok = ok && alert.active() && alert.tileX() == 12.0f && alert.blinkOn(2000) && !alert.blinkOn(2300);
+            float r = 0, o = 0;
+            ok = ok && alert.wave(0, 2500, r, o) && r > 2.0f && r < 30.0f && o > 0.0f && !alert.wave(2, 2500, r, o) && alert.wave(2, 3100, r, o);
+            alert.update(3000, true, 20.0f, 20.0f); // still in sight: no new alarm, same contact
+            ok = ok && alert.tileX() == 12.0f;
+            alert.update(4500, true, 20.0f, 20.0f); // over (2 s flashing / 2 s of waves) but the enemy is still there
+            ok = ok && !alert.active() && !alert.armed();
+            alert.update(8000, false, 0, 0); // gone 3.5 s: not long enough
+            ok = ok && !alert.armed();
+            alert.update(9600, false, 0, 0); // gone 5.1 s: armed again
+            ok = ok && alert.armed();
+            alert.update(9700, true, 3.0f, 4.0f);
+            ok = ok && alert.active() && alert.tileX() == 3.0f;
+            std::cout << "  - Radar alarm: " << (ok ? "contact, flashes, waves, quiet until the radar was clear for the rearm delay" : "BROKEN") << std::endl;
+            if(!ok)
+            {
+                std::cerr << "[Test] Error: radar alarm timing is wrong!" << std::endl;
+                return false;
+            }
+        }
+
+        // 27a. Voices: every language has every line; an unknown language speaks English
+        {
+            std::cout << "[Test] Validating the voices of each language..." << std::endl;
+            VoiceManager en, ru, other;
+            en.load("en", LoaderResources::kDefaultRoot);
+            ru.load("ru", LoaderResources::kDefaultRoot);
+            other.load("xx", LoaderResources::kDefaultRoot);
+            static const char *const kLines[] = {"ack_select_infantry", "ack_move_vehicle", "ack_hold", "target_destroyed", "ann_unit_ready", "ann_base_attack", "ann_victory", "ann_defeat"};
+            bool ok = en.lineCount() > 0 && ru.lineCount() == en.lineCount() && other.lineCount() == en.lineCount();
+            for(const char *line : kLines)
+                ok = ok && en.has(line) && ru.has(line) && other.has(line);
+            std::cout << "  - Voice lines: en " << en.lineCount() << ", ru " << ru.lineCount() << ", unknown language (English) " << other.lineCount() << std::endl;
+            if(!ok)
+            {
+                std::cerr << "[Test] Error: a language misses voice lines (assets/audio/voices/<language>)!" << std::endl;
+                return false;
+            }
+        }
+
+        // 27b. Wall breach at a single gap, retaliation against far shooters (see runCombatBehaviourTest)
+        if(!runCombatBehaviourTest(app))
+            return false;
+
+        // 27c. Allies make way for each other in narrow passages (see runMakeWayTest)
+        if(!runMakeWayTest(app))
+            return false;
+
         // 28. Lockstep groundwork: same commands, same world (see runDeterminismTest)
         if(!runDeterminismTest(app))
             return false;
@@ -4016,7 +4481,7 @@ namespace OpenArtOfWar
         // 25. A map with buildings of its own: prebuilt bases or a start from scratch
         std::cout << "[Test] Validating prebuilt bases and the start from scratch..." << std::endl;
         {
-            const std::string path = "assets/maps/testmap.json";
+            const std::string path = LoaderResources::testMap();
             bool listed = false;
             for(const SkirmishMapInfo &m : MissionController::listSkirmishMaps())
             {
@@ -4030,6 +4495,13 @@ namespace OpenArtOfWar
                     n += (e.alive && e.asBuilding()) ? 1 : 0;
                 return n;
             };
+            auto countUnits = [&]()
+            {
+                int n = 0;
+                for(const auto &e : app.m_entities->getAllEntities())
+                    n += (e.alive && !e.isBuilding) ? 1 : 0;
+                return n;
+            };
             auto countWalls = [&]()
             {
                 int n = 0;
@@ -4041,11 +4513,49 @@ namespace OpenArtOfWar
             const bool prebuiltOk = app.m_mission->loadSkirmish(path, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder, true);
             const int prebuiltBuildings = countBuildings(), prebuiltWalls = countWalls();
             const bool scratchOk = app.m_mission->loadSkirmish(path, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder, false);
-            const int scratchBuildings = countBuildings(), scratchWalls = countWalls();
-            if(!listed || !prebuiltOk || !scratchOk || prebuiltBuildings < 40 || prebuiltWalls < 100 || scratchBuildings > 8 || scratchWalls != 0)
+            const int scratchBuildings = countBuildings(), scratchUnits = countUnits(), scratchWalls = countWalls();
+            if(!listed || !prebuiltOk || !scratchOk || prebuiltBuildings < 40 || prebuiltWalls < 100 || scratchBuildings != 4 || scratchUnits != 0 || scratchWalls != 0)
             {
-                std::cerr << "[Test] Error: prebuilt/scratch start: listed=" << listed << " buildings " << prebuiltBuildings << "/" << scratchBuildings << " walls " << prebuiltWalls << "/" << scratchWalls << std::endl;
+                std::cerr << "[Test] Error: prebuilt/scratch start on testmap: listed=" << listed << " buildings " << prebuiltBuildings << "/" << scratchBuildings << " units=" << scratchUnits << " walls " << prebuiltWalls << "/" << scratchWalls << std::endl;
                 return false;
+            }
+            // Normal map without its own buildings: prebuilt = HQ + power + barracks + 4 units each; from scratch = HQ + power only, no units
+            const std::string plainMap = LoaderResources::mapPath("m26");
+            const bool plainPrebuiltOk = app.m_mission->loadSkirmish(plainMap, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder, true);
+            const int plainPrebuiltBuildings = countBuildings(), plainPrebuiltUnits = countUnits();
+            const bool plainScratchOk = app.m_mission->loadSkirmish(plainMap, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder, false);
+            const int plainScratchBuildings = countBuildings(), plainScratchUnits = countUnits();
+            if(!plainPrebuiltOk || !plainScratchOk || plainPrebuiltBuildings != 6 || plainPrebuiltUnits != 8 || plainScratchBuildings != 4 || plainScratchUnits != 0)
+            {
+                std::cerr << "[Test] Error: prebuilt/scratch start on m26: prebuilt=" << plainPrebuiltBuildings << "b/" << plainPrebuiltUnits << "u, scratch=" << plainScratchBuildings << "b/" << plainScratchUnits << "u" << std::endl;
+                return false;
+            }
+            // AI starting from scratch (even on Easy, where defenses are off) builds a barracks and trains units
+            app.m_aiController->setDifficulty(AIDifficulty::Easy);
+            for(int t = 0; t < 60; ++t)
+            {
+                app.m_aiController->update(1.0f, *app.m_map, *app.m_entities, *app.m_pathfinder);
+                app.m_entities->update(1.0f, *app.m_map, *app.m_pathfinder);
+            }
+            if(!app.m_entities->hasBuildingType(UnitType::Barracks, app.m_aiController->player(), true) || countUnits() == 0)
+            {
+                std::cerr << "[Test] Error: AI starting from scratch did not build a barracks and train units!" << std::endl;
+                return false;
+            }
+            // Multiplayer match from scratch: HQ + power plant per slot, no barracks, no units
+            {
+                MatchSetup setup;
+                setup.mapPath = plainMap;
+                setup.prebuilt = false;
+                setup.slots[0] = {true, Faction::Resistance, 0, 1, true};
+                setup.slots[1] = {true, Faction::Confederation, 1, 2, true};
+                setup.startPosition[0] = 0;
+                setup.startPosition[1] = 1;
+                if(!app.m_mission->loadMatch(setup, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder) || countBuildings() != 4 || countUnits() != 0)
+                {
+                    std::cerr << "[Test] Error: multiplayer match from scratch must spawn 4 buildings and 0 units!" << std::endl;
+                    return false;
+                }
             }
             // Effects of destruction come from assets/characters/effects.yaml (defaults = the original numbers)
             {

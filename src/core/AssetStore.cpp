@@ -20,15 +20,15 @@ namespace OpenArtOfWar::Assets
 
     namespace
     {
-
-        constexpr const char *BLOB_NAME = "data.blob";
+        //
+        constexpr const char *MainAssetBlobName = MAIN_ASSET_BLOB_NAME;
 
         struct State
         {
             Mode mode = Mode::None;
             std::string description = "no assets located";
             std::mutex lock;
-            std::map<std::string, std::vector<uint8_t>> blobFiles; // data.blob (tar.zst) unpacked: entry name -> contents
+            std::map<std::string, std::vector<uint8_t>> blobFiles;
             std::string userDir;
         };
 
@@ -178,7 +178,7 @@ namespace OpenArtOfWar::Assets
         // 2. data.blob with the packed contents of that directory
         for(const fs::path &root : roots)
         {
-            const fs::path blob = root / BLOB_NAME;
+            const fs::path blob = root / MainAssetBlobName;
             if(!fs::is_regular_file(blob, ec))
                 continue;
             if(!loadBlob(blob, s.blobFiles))
@@ -191,7 +191,7 @@ namespace OpenArtOfWar::Assets
             return true;
         }
 
-        std::cerr << "[Assets] Neither an \"assets\" directory nor " << BLOB_NAME << " was found" << std::endl;
+        std::cerr << "[Assets] Neither an \"assets\" directory nor " << MainAssetBlobName << " was found" << std::endl;
         return false;
     }
 

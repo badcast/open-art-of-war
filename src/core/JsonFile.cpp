@@ -8,7 +8,14 @@ namespace OpenArtOfWar::JsonFile
 
     namespace fs = std::filesystem;
 
-    nlohmann::json readObject(const std::string &path)
+    nlohmann::json readFromString(const std::string &text)
+    {
+
+        nlohmann::json j = nlohmann::json::parse(text, nullptr, false, true);
+        return j.is_object() ? j : nlohmann::json::object();
+    }
+
+    nlohmann::json readObjectFromFileName(const std::string &path)
     {
         std::ifstream in(path, std::ios::binary);
         if(!in)

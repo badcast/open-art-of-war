@@ -59,6 +59,18 @@ namespace OpenArtOfWar
             return out;
         }
 
+        // Team colours (index 0 = colour 1) other players of the room already have: nobody may pick them again
+        std::vector<bool> takenColors(const Net::LobbyState &lobby, uint8_t slot)
+        {
+            std::vector<bool> taken(Settings::kArmyColors, false);
+            for(const Net::LobbySlot &o : lobby.slots)
+            {
+                if(o.slot != slot && o.choice.color >= 1 && o.choice.color <= Settings::kArmyColors)
+                    taken[o.choice.color - 1] = true;
+            }
+            return taken;
+        }
+
         SDL_Color slotColor(uint8_t color)
         {
             return color == 0 ? col::TextDim : armyColor(color);
@@ -123,10 +135,15 @@ namespace OpenArtOfWar
         l.serverList = {x, l.refreshBtn.bottom() + 6, inner, 4 * 34 + 8};
         l.codeField = {x + 150, l.serverList.bottom() + 10, 130, 34};
         l.codeBtn = {l.codeField.right() + 10, l.codeField.y, 170, 34};
-        l.joinBtn = {l.dialog.right() - 24 - 150, l.dialog.bottom() - 60, 150, 40};
-        l.hostBtn = {l.joinBtn.x - 12 - 170, l.joinBtn.y, 170, 40};
-        l.serverBtn = {l.hostBtn.x - 12 - 200, l.joinBtn.y, 200, 40};
-        l.backBtn = {x, l.joinBtn.y, 120, 40};
+        // Bottom row: Back on the left, the three actions share the rest; a narrow window shrinks them all, so they
+        // never overlap
+        constexpr int kGap = 12;
+        const int backW = std::min(120, inner / 6);
+        const int actionW = std::min(210, (inner - backW - 3 * kGap) / 3);
+        l.joinBtn = {l.dialog.right() - 24 - actionW, l.dialog.bottom() - 60, actionW, 40};
+        l.hostBtn = {l.joinBtn.x - kGap - actionW, l.joinBtn.y, actionW, 40};
+        l.serverBtn = {l.hostBtn.x - kGap - actionW, l.joinBtn.y, actionW, 40};
+        l.backBtn = {x, l.joinBtn.y, backW, 40};
         return l;
     }
 
@@ -142,7 +159,8 @@ namespace OpenArtOfWar
         l.chatLog = {x, l.players.bottom() + 10, 520, l.dialog.bottom() - 70 - (l.players.bottom() + 10) - 44};
         l.chatField = {x, l.chatLog.bottom() + 6, 520, 36};
         l.prebuiltBtn = {l.map.right() - 8 - 190, l.map.bottom() - 8 - 28, 190, 28};
-        l.leaveBtn = {l.map.x, l.dialog.bottom() - 60, 140, 40};
+        // Bottom row: Leave on the left (under the chat), Ready and Start on the right - never on top of each other
+        l.leaveBtn = {x, l.dialog.bottom() - 60, 140, 40};
         l.startBtn = {l.dialog.right() - 20 - 150, l.leaveBtn.y, 150, 40};
         l.readyBtn = {l.startBtn.x - 12 - 150, l.leaveBtn.y, 150, 40};
         return l;
@@ -386,18 +404,6 @@ namespace OpenArtOfWar
             if(!m_maps.empty())
                 net.setLobbyMap(m_maps[std::clamp(m_mapIndex, 0, static_cast<int>(m_maps.size()) - 1)].path);
         }
-        // Does the room's map bring buildings of its own (the host chooses whether they are used)
-        m_mapHasPrebuilt = false;
-        if(lobby && !lobby->map.empty())
-        {
-            if(m_maps.empty())
-                m_maps = MissionController::listSkirmishMaps();
-            for(const SkirmishMapInfo &m : m_maps)
-            {
-                if(m.path == lobby->map)
-                    m_mapHasPrebuilt = m.hasPrebuilt;
-            }
-        }
         // Start positions from the room's map as this computer has it (the own file or the downloaded copy)
         if(net.lobbyMapFile() != m_spotsMap)
         {
@@ -416,6 +422,7 @@ namespace OpenArtOfWar
                 if(lobby->slots[i].slot == net.localSlot())
                 {
                     mine = lobby->slots[i].choice;
+                    net.localChoice(mine); // what was last sent, not the room's lagging echo
                     haveMine = true;
                     myRow = static_cast<int>(i);
                 }
@@ -448,7 +455,7 @@ namespace OpenArtOfWar
         if(m_combo.open >= 0)
         {
             const int id = m_combo.open, row = id / 10, kind = id == kLayoutCombo ? 5 : id % 10;
-            const bool valid = id == kLayoutCombo ? (net.controlsRoom() && m_mapHasPrebuilt) : (lobby && row < static_cast<int>(lobby->slots.size()));
+            const bool valid = id == kLayoutCombo ? net.controlsRoom() : (lobby && row < static_cast<int>(lobby->slots.size()));
             if(!valid)
             {
                 m_combo.open = -1;
@@ -466,6 +473,8 @@ namespace OpenArtOfWar
                     {
                         const Net::LobbySlot &s = lobby->slots[row];
                         Net::LobbyChoice choice = s.choice;
+                        if(!s.ai && s.slot == net.localSlot())
+                            net.localChoice(choice); // edit what was last sent, not the room's lagging echo
                         uint8_t level = s.aiLevel;
                         if(kind == 1)
                         {
@@ -475,10 +484,21 @@ namespace OpenArtOfWar
                         if(kind == 2)
                         {
                             choice.team = static_cast<uint8_t>(picked);
-                            choice.ready = false;
+                            // Teams are the host's decision: a player's team goes through the room directly
+                            if(!s.ai)
+                            {
+                                if(net.controlsRoom())
+                                    net.setTeam(s.slot, choice.team);
+                                return NetworkAction::None;
+                            }
                         }
+                        if(kind == 3 && takenColors(*lobby, s.slot)[static_cast<size_t>(picked)] && picked + 1 != choice.color)
+                            return NetworkAction::None; // somebody else's colour: nothing changes
                         if(kind == 3)
+                        {
                             choice.color = static_cast<uint8_t>(picked + 1);
+                            choice.ready = false; // like faction and team: the owner never starts with an old colour
+                        }
                         if(kind == 4)
                             level = static_cast<uint8_t>(picked);
                         if(s.ai && net.controlsRoom())
@@ -545,7 +565,7 @@ namespace OpenArtOfWar
         }
         if(l.startBtn.contains(mx, my) && net.controlsRoom() && net.canStart())
             return NetworkAction::Start;
-        if(net.controlsRoom() && m_mapHasPrebuilt && l.prebuiltBtn.contains(mx, my))
+        if(net.controlsRoom() && l.prebuiltBtn.contains(mx, my))
             return openCombo(kLayoutCombo);
         if(net.controlsRoom() && !m_maps.empty() && (l.mapPrev.contains(mx, my) || l.mapNext.contains(mx, my)))
         {
@@ -585,6 +605,9 @@ namespace OpenArtOfWar
             for(int i = 0; i < rows; ++i)
             {
                 const Net::LobbySlot &s = lobby->slots[i];
+                // The host / owner sets every player's team
+                if(l.teamCell(i).contains(mx, my))
+                    return openCombo(i * 10 + 2);
                 if(!s.ai)
                     continue;
                 if(l.removeCell(i).contains(mx, my))
@@ -617,7 +640,7 @@ namespace OpenArtOfWar
         {
             if(l.factionCell(myRow).contains(mx, my))
                 return openCombo(myRow * 10 + 1);
-            if(l.teamCell(myRow).contains(mx, my))
+            if(l.teamCell(myRow).contains(mx, my) && net.controlsRoom())
                 return openCombo(myRow * 10 + 2);
             if(l.colorCell(myRow).contains(mx, my))
                 return openCombo(myRow * 10 + 3);
@@ -706,14 +729,21 @@ namespace OpenArtOfWar
                         // Drop-down lists: faction, team, colour
                         auto combo = [&](const UiRect &c, int kind, const std::string &text) { ui::drawComboField(r, font, c, text, m_combo.open == rowIndex * 10 + kind, c.contains(m_mouseX, m_mouseY)); };
                         combo(l.factionCell(rowIndex), 1, factionName(s.choice.faction));
-                        combo(l.teamCell(rowIndex), 2, std::to_string(s.choice.team + 1));
+                        if(net->controlsRoom())
+                            combo(l.teamCell(rowIndex), 2, std::to_string(s.choice.team + 1));
+                        else
+                            cell(l.teamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(s.choice.team + 1));
                         combo(cc, 3, "");
                         r.fillRectScreen(cc.x + 5, cc.y + 6, 14, cc.h - 12, slotColor(s.choice.color));
                     }
                     else
                     {
                         cell(l.factionCell(rowIndex), factionName(s.choice.faction));
-                        cell(l.teamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(s.choice.team + 1));
+                        // The host / owner sets the team of every player
+                        if(net->controlsRoom())
+                            ui::drawComboField(r, font, l.teamCell(rowIndex), std::to_string(s.choice.team + 1), m_combo.open == rowIndex * 10 + 2, l.teamCell(rowIndex).contains(m_mouseX, m_mouseY));
+                        else
+                            cell(l.teamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(s.choice.team + 1));
                         r.fillRectScreen(cc.x + 6, cc.y + 6, cc.w - 12, cc.h - 12, slotColor(s.choice.color));
                     }
                     const std::string spawn = s.choice.spawn == Net::kRandom ? std::string("?") : std::to_string(s.choice.spawn + 1);
@@ -786,7 +816,7 @@ namespace OpenArtOfWar
                     font.drawString(std::to_string(i + 1), sx, sy, ui::FONT_SMALL_BOLD, col::Backdrop, false, Anchor::HCENTER | Anchor::VCENTER);
                 }
             }
-            if(net->controlsRoom() && m_mapHasPrebuilt)
+            if(net->controlsRoom())
             {
                 ui::drawComboField(r, font, l.prebuiltBtn, m_prebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"), m_combo.open == kLayoutCombo, l.prebuiltBtn.contains(m_mouseX, m_mouseY));
             }
@@ -795,7 +825,7 @@ namespace OpenArtOfWar
                 // How many players the map is made for (its start positions)
                 font.drawString(std::string(_("Players on this map: ")) + std::to_string(lobby->spawnCount), l.map.x + 8, l.map.bottom() - 18, ui::FONT_SMALL_BOLD, col::Accent, true);
             }
-            font.drawTextWrapped(_("Click a number on the map to start there, again to leave it to chance. Click your faction, team and colour to change them."), l.map.x, l.map.bottom() + 10, l.map.w, ui::FONT_SMALL, col::TextDim, false);
+            font.drawTextWrapped(_("Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."), l.map.x, l.map.bottom() + 10, l.map.w, ui::FONT_SMALL, col::TextDim, false);
 
             // Chat
             ui::drawPanel(r, l.chatLog, col::PanelSunken, col::Border);
@@ -838,7 +868,18 @@ namespace OpenArtOfWar
                     const Net::LobbySlot &s = lobby->slots[row];
                     const ui::UiRect field = kind == 1 ? l.factionCell(row) : kind == 2 ? l.teamCell(row) : kind == 3 ? l.colorCell(row) : l.nameCell(row);
                     const int current = kind == 1 ? (s.choice.faction == Net::kRandom ? 0 : s.choice.faction + 1) : kind == 2 ? s.choice.team : kind == 3 ? std::max(0, s.choice.color - 1) : s.aiLevel;
-                    ui::drawComboList(r, font, field, comboChoices(kind), current, m_combo, h, m_mouseX, m_mouseY);
+                    std::vector<std::string> items = comboChoices(kind);
+                    std::vector<bool> taken;
+                    if(kind == 3)
+                    {
+                        taken = takenColors(*lobby, s.slot);
+                        for(size_t i = 0; i < items.size() && i < taken.size(); ++i)
+                        {
+                            if(taken[i] && static_cast<int>(i) != current)
+                                items[i] += std::string(" (") + _("taken") + ")";
+                        }
+                    }
+                    ui::drawComboList(r, font, field, items, current, m_combo, h, m_mouseX, m_mouseY, kind == 3 ? &taken : nullptr);
                 }
             }
             ui::drawConfirm(r, font, w, h, m_confirm, m_mouseX, m_mouseY);

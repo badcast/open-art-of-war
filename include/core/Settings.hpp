@@ -33,6 +33,7 @@ namespace OpenArtOfWar
         bool vsync {true};
         int fpsLimit {0}; // 0 = unlimited (frames per second), only used without vsync or below the refresh rate
         bool showFps {false};
+        bool showNetStats {false}; // network game: ping, jitter, loss, traffic, turn buffer in the corner
 
         // Graphics
         int graphicsQuality {2};  // 0 = low (sprites at 1/3 resolution), 1 = medium (1/2), 2 = high (original resolution)
@@ -46,8 +47,9 @@ namespace OpenArtOfWar
         bool sharpPixels {false}; // pixel-art anti-aliased upscaling instead of plain nearest / linear
 
         // Audio
-        int musicVolume {96}; // 0..128
-        int fxVolume {128};   // 0..128
+        int musicVolume {96};  // 0..128
+        int fxVolume {128};    // 0..128
+        int voiceVolume {128}; // 0..128: unit replies and the announcer
         bool muted {false};
 
         // Network game

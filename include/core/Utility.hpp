@@ -136,6 +136,7 @@ namespace OpenArtOfWar::Utility
     const char *unitClassName(int archetypeId);          // "infantry" / "vehicle"
     const char *producedIn(int archetypeId);             // "barracks" / "factory"
     float defaultTurnStepDelay(int archetypeId);         // seconds per 45-degree hull turn (0 for infantry)
+    float defaultTurretTurnStepDelay(int archetypeId);   // seconds per 45-degree turret turn (0 for infantry)
 
     struct BuildingKindInfo
     {

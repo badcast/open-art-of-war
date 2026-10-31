@@ -202,12 +202,16 @@ Targets: `openaow` (game), `openaow-server` (dedicated server, `-DOAOW_BUILD_SER
 
 ```bash
 ./build/openaow                 # the game
-./build/openaow --debug         # with the debug toolbar and the ImGui debugger
+./build/openaow --debug         # with the debug toolbar and the ImGui debugger (debug build)
 ./build/openaow --testmap       # straight into the test map
-./build/openaow --test          # headless self-test (simulation, AI, determinism, matches)
+./build/openaow --test          # headless self-test (debug build)
 ./build/openaow --renderer=opengl   # try one render API once (not stored)
 
 ```
+
+`--debug`, `--test`, the ImGui debugger, cheats and the developer environment variables (`OAOW_NET_BOT`,
+`OAOW_NET_TRACE`, `OAOW_NET_DROP_AT`, `OAOW_NET_FACTION`, `OAOW_NET_FACTION_BY_SLOT`, `OAOW_TEST_*`) exist only in a
+debug build: `cmake -B build -DAOW_DEBUG=ON` (off by default). A normal build ignores them.
 
 The game finds `assets/` (or `data.blob`) next to the executable or one level above, so it can be started from any directory.
 
@@ -378,6 +382,8 @@ Behaviour per difficulty (Easy / Medium / Hard / Hardcore) lives in `assets/char
 Run with `--debug` (or start the test map) and click **IMGUI** on the debug toolbar: fog of war, +1000 credits, unit spawner, entity inspector, AI director, camera and performance.
 
 ## Tests
+
+The tests need a debug build (`-DAOW_DEBUG=ON`), except `openaow-net-tests` and `openaow-charactereditor-tests`.
 
 ```bash
 ./build/openaow --test                                # simulation, AI, determinism, replays, matches

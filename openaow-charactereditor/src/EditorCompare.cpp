@@ -239,13 +239,13 @@ void CharacterEditor::drawSimulationControls() {
     drawOpponentPicker(true);
 
     ImGui::SetNextItemWidth(130.0f);
-    hinted(ImGui::SliderInt("##countA", &battleSetup.countA, 1, 20, _("A units: %d")), "##countA");
+    hinted(ImGui::SliderInt("##countA", &battleSetup.countA, 1, 100, _("A units: %d")), "##countA");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(130.0f);
-    hinted(ImGui::SliderInt("##countB", &battleSetup.countB, 1, 20, _("B units: %d")), "##countB");
+    hinted(ImGui::SliderInt("##countB", &battleSetup.countB, 1, 100, _("B units: %d")), "##countB");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(150.0f);
-    hinted(ImGui::SliderInt("##distance", &battleSetup.distance, 2, 40, _("Distance: %d tiles")), "##distance");
+    hinted(ImGui::SliderInt("##distance", &battleSetup.distance, 2, 50, _("Distance: %d tiles")), "##distance");
     ImGui::SameLine();
     hinted(ImGui::Checkbox(_("B advances"), &battleSetup.bAdvances), "B advances");
     ImGui::SameLine();

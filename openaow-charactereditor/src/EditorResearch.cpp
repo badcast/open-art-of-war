@@ -1,4 +1,5 @@
 #include "CharacterEditor.hpp"
+#include "ConfigMerge.hpp"
 
 #include "game/Research.hpp"
 
@@ -45,6 +46,7 @@ bool CharacterEditor::loadResearch(int faction) {
             status = std::string(_("No research list in ")) + kFactionFiles[faction];
             return false;
         }
+        researchBase[faction] = YAML::Clone(researchDoc[faction]);
         researchDirty[faction] = false;
         return true;
     } catch (const std::exception& error) {
@@ -58,19 +60,16 @@ bool CharacterEditor::saveResearch() {
     const int f = researchFaction;
     if (!researchDoc[f].IsMap()) return false;
     try {
-        YAML::Emitter emitter;
-        emitter.SetIndent(2);
-        emitter << researchDoc[f];
-        std::ofstream output(researchPath[f]);
-        if (!output) {
-            status = std::string(_("Could not open file for writing: ")) + researchPath[f].string();
+        // Only the editor's changes on top of the file as it is now (keys it does not know stay)
+        const YAML::Node disk = readYamlFile(researchPath[f]);
+        YAML::Node merged = disk.IsMap() ? mergeYamlEdits(researchBase[f], researchDoc[f], disk) : YAML::Clone(researchDoc[f]);
+        std::string error;
+        if (!writeFileAtomic(researchPath[f], yamlText(merged), error)) {
+            status = error;
             return false;
         }
-        output << emitter.c_str() << '\n';
-        if (!output) {
-            status = std::string(_("Failed to write file: ")) + researchPath[f].string();
-            return false;
-        }
+        researchDoc[f] = merged;
+        researchBase[f] = YAML::Clone(merged);
         researchDirty[f] = false;
         status = std::string(_("Saved: ")) + kFactionFiles[f];
         return true;

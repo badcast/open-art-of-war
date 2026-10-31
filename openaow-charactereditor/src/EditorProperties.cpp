@@ -1,4 +1,5 @@
 #include "CharacterEditor.hpp"
+#include "game/Projectiles.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,14 +22,17 @@ void CharacterEditor::drawEditor() {
     ImGuiIO& io = ImGui::GetIO();
     const float fullWidth = io.DisplaySize.x;
     const float fullHeight = io.DisplaySize.y;
-    const float leftWidth = std::clamp(fullWidth * 0.22f, 240.0f, 320.0f);
     constexpr float top = 24.0f;
-    const float panelHeight = std::max(200.0f, fullHeight - top);
+    const float panelHeight = std::max(70.0f, fullHeight - top);
 
-    const float minRightWidth = 260.0f;
-    const float maxRightWidth = std::max(minRightWidth, fullWidth - leftWidth - 260.0f);
-    rightPanelWidth = std::clamp(rightPanelWidth, minRightWidth, maxRightWidth);
-    const float rightWidth = rightPanelWidth;
+    constexpr float kMinPanelWidth = 70.0f;
+    leftPanelWidth = std::clamp(leftPanelWidth, kMinPanelWidth, std::max(kMinPanelWidth, fullWidth - rightPanelWidth - kMinPanelWidth));
+    rightPanelWidth = std::clamp(rightPanelWidth, kMinPanelWidth, std::max(kMinPanelWidth, fullWidth - leftPanelWidth - kMinPanelWidth));
+
+    float leftWidth = leftPanelWidth;
+    float rightWidth = rightPanelWidth;
+    const float minRightWidth = kMinPanelWidth;
+    float maxRightWidth = std::max(minRightWidth, fullWidth - leftWidth - kMinPanelWidth);
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu(_("File"))) {
@@ -59,7 +63,7 @@ void CharacterEditor::drawEditor() {
     ImGui::SetNextWindowPos(ImVec2(0.0f, top), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(leftWidth, panelHeight), ImGuiCond_Always);
     ImGui::Begin(_("Archetypes"), nullptr,
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
     ImGui::Text(_("%zu configurations"), files.size());
     ImGui::SetNextItemWidth(-1.0f);
     hinted(ImGui::InputTextWithHint("##search", _("Search by name, ID or faction"), searchBuffer.data(), searchBuffer.size()),
@@ -165,14 +169,55 @@ void CharacterEditor::drawEditor() {
     ImGui::EndChild();
     ImGui::End();
 
+    const float splitterThickness = 8.0f;
+
+    // Draggable vertical splitter to resize Archetypes tab panel (left)
+    const float splitterLeftX = leftWidth - splitterThickness * 0.5f;
+    ImGui::SetNextWindowPos(ImVec2(splitterLeftX, top), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(splitterThickness, panelHeight), ImGuiCond_Always);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("##vsplitter_left", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoSavedSettings);
+    ImGui::InvisibleButton("##split_left_btn", ImVec2(splitterThickness, panelHeight));
+    const bool isLeftSplitHovered = ImGui::IsItemHovered();
+    const bool isLeftSplitActive = ImGui::IsItemActive();
+    if (isLeftSplitHovered || isLeftSplitActive) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+    if (isLeftSplitActive) {
+        leftPanelWidth += io.MouseDelta.x;
+        leftPanelWidth = std::clamp(leftPanelWidth, kMinPanelWidth, std::max(kMinPanelWidth, fullWidth - rightPanelWidth - kMinPanelWidth));
+        leftWidth = leftPanelWidth;
+        maxRightWidth = std::max(minRightWidth, fullWidth - leftWidth - kMinPanelWidth);
+    }
+    if (isLeftSplitHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        leftPanelWidth = std::clamp(fullWidth * 0.22f, kMinPanelWidth, 320.0f);
+        leftWidth = leftPanelWidth;
+        maxRightWidth = std::max(minRightWidth, fullWidth - leftWidth - kMinPanelWidth);
+    }
+    if (isLeftSplitHovered || isLeftSplitActive) {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 pMin = ImGui::GetItemRectMin();
+        ImVec2 pMax = ImGui::GetItemRectMax();
+        dl->AddRectFilled(pMin, pMax, isLeftSplitActive ? IM_COL32(70, 190, 160, 220) : IM_COL32(55, 140, 115, 160));
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+
     ImGui::SetNextWindowPos(ImVec2(fullWidth - rightWidth, top), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(rightWidth, panelHeight), ImGuiCond_Always);
     ImGui::Begin(_("Properties"), nullptr,
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
     if (editorMode == EditorMode::Research) drawResearchProperties();
     else if (editorMode == EditorMode::SpriteTools) drawSpriteProperties();
     else if (editorMode == EditorMode::Explosions) drawExplosionProperties();
     else if (editorMode == EditorMode::Wrecks) drawWreckTabProperties();
+    else if (editorMode == EditorMode::Projectiles) drawProjectileProperties();
     else if (editorMode == EditorMode::GameUi) drawGameUiProperties();
     else if (editorMode == EditorMode::Environment) drawEnvironmentProperties();
     else if (editorMode == EditorMode::AiDifficulty) drawAiProperties();
@@ -180,10 +225,9 @@ void CharacterEditor::drawEditor() {
     else ImGui::TextWrapped(_("Select a YAML configuration from the list."));
     ImGui::End();
 
-    // Draggable vertical splitter to resize Properties tab panel
-    const float splitterThickness = 8.0f;
-    const float splitterX = fullWidth - rightWidth - splitterThickness * 0.5f;
-    ImGui::SetNextWindowPos(ImVec2(splitterX, top), ImGuiCond_Always);
+    // Draggable vertical splitter to resize Properties tab panel (right)
+    const float splitterRightX = fullWidth - rightWidth - splitterThickness * 0.5f;
+    ImGui::SetNextWindowPos(ImVec2(splitterRightX, top), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(splitterThickness, panelHeight), ImGuiCond_Always);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -201,9 +245,11 @@ void CharacterEditor::drawEditor() {
     if (isSplitterActive) {
         rightPanelWidth -= io.MouseDelta.x;
         rightPanelWidth = std::clamp(rightPanelWidth, minRightWidth, maxRightWidth);
+        rightWidth = rightPanelWidth;
     }
     if (isSplitterHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        rightPanelWidth = std::clamp(fullWidth * 0.35f, 380.0f, 520.0f);
+        rightPanelWidth = std::clamp(fullWidth * 0.35f, kMinPanelWidth, 520.0f);
+        rightWidth = rightPanelWidth;
     }
     if (isSplitterHovered || isSplitterActive) {
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -215,11 +261,11 @@ void CharacterEditor::drawEditor() {
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
 
-    const float centerWidth = std::max(200.0f, fullWidth - leftWidth - rightWidth);
+    const float centerWidth = std::max(kMinPanelWidth, fullWidth - leftWidth - rightWidth);
     ImGui::SetNextWindowPos(ImVec2(leftWidth, top), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(centerWidth, panelHeight), ImGuiCond_Always);
     ImGui::Begin(_("Preview"), nullptr,
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
     drawPreviewControls();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools || editorMode == EditorMode::GameUi ||
         editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty) {
@@ -252,7 +298,7 @@ void CharacterEditor::drawEditor() {
         cameraPanY -= delta.y / previewZoom;
     }
 
-    // 2. Right Mouse Button (RMB) -> Turn Unit Hull toward point
+    // 2. Right Mouse Button (RMB) -> Turn Unit Hull toward point (step-by-step)
     else if (editorMode != EditorMode::Simulation && canvasActive && (ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))) {
         const ImVec2 mousePos = io.MousePos;
         float mWorldX = 0.0f, mWorldY = 0.0f;
@@ -260,21 +306,19 @@ void CharacterEditor::drawEditor() {
 
         float dx = mWorldX;
         float dy = mWorldY;
-        float angle = std::atan2(dy, dx);
-        if (angle < 0.0f) angle += 2.0f * static_cast<float>(M_PI);
-        int dir = static_cast<int>(std::round(angle / (static_cast<float>(M_PI) / 4.0f))) % 8;
-        facing = (dir % 8 + 8) % 8;
+        int dir = OpenArtOfWar::Utility::dir8FromVector(dx, dy);
+        desiredHullFacingDir = (dir % 8 + 8) % 8;
 
         const bool hasRotTurret = yamlBool(document["combat"], "has_rotating_turret", false);
         if (!hasRotTurret || linkTurretToHull) {
-            turretFacingDir = facing;
+            desiredTurretFacingDir = desiredHullFacingDir;
             targetWorldX = mWorldX;
             targetWorldY = mWorldY;
             targetCustomized = true;
         }
     }
 
-    // 3. Left Mouse Button (LMB) -> Turn Turret / Aim
+    // 3. Left Mouse Button (LMB) -> Turn Turret / Aim (step-by-step)
     else if (editorMode != EditorMode::Simulation && canvasActive && (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Left))) {
         const ImVec2 mousePos = io.MousePos;
         camera->screenToWorld(mousePos.x, mousePos.y, targetWorldX, targetWorldY);
@@ -285,12 +329,10 @@ void CharacterEditor::drawEditor() {
         float tPivotY = hasRotTurret ? turretOffsetY : 0.0f;
         float dx = targetWorldX - tPivotX;
         float dy = targetWorldY - tPivotY;
-        float angle = std::atan2(dy, dx);
-        if (angle < 0.0f) angle += 2.0f * static_cast<float>(M_PI);
-        int dir = static_cast<int>(std::round(angle / (static_cast<float>(M_PI) / 4.0f))) % 8;
-        turretFacingDir = (dir % 8 + 8) % 8;
+        int dir = OpenArtOfWar::Utility::dir8FromVector(dx, dy);
+        desiredTurretFacingDir = (dir % 8 + 8) % 8;
         if (!hasRotTurret) {
-            facing = turretFacingDir;
+            desiredHullFacingDir = desiredTurretFacingDir;
         }
     }
 
@@ -448,8 +490,12 @@ void CharacterEditor::drawProperties() {
 
     // Panel Width quick controls
     ImGui::SetNextItemWidth(75.0f);
-    if (hinted(ImGui::DragFloat(_("Width##rpanel"), &rightPanelWidth, 2.0f, 260.0f, 900.0f, "%.0f px"), "Width##rpanel")) {
-        rightPanelWidth = std::clamp(rightPanelWidth, 260.0f, 900.0f);
+    if (hinted(ImGui::DragFloat(_("Width##rpanel"), &rightPanelWidth, 2.0f, 70.0f, 900.0f, "%.0f px"), "Width##rpanel")) {
+        rightPanelWidth = std::clamp(rightPanelWidth, 70.0f, 900.0f);
+    }
+    ImGui::SameLine();
+    if (hinted(ImGui::SmallButton(_("Min")), "Min")) {
+        rightPanelWidth = 70.0f;
     }
     ImGui::SameLine();
     if (hinted(ImGui::SmallButton(_("Compact")), "Compact")) {
@@ -544,11 +590,10 @@ void CharacterEditor::drawProperties() {
         float curSpread = yamlFloat(combat, "spread_angle", -1.0f);
         if (curSpread < 0.0f) {
             std::string ptype = yamlString(mainWeapon(combat), "projectile", "bullet");
-            if (ptype == "bullet") curSpread = 3.7f;
-            else if (ptype == "shell") curSpread = 2.0f;
-            else if (ptype == "rocket") curSpread = 4.6f;
-            else if (ptype == "flame") curSpread = 6.9f;
-            else curSpread = 3.0f;
+            // The default of the projectile kind (Projectiles tab)
+            curSpread = ptype == "none" ? 3.0f
+                                        : OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(ptype)).spread * 180.0f /
+                                              static_cast<float>(M_PI);
         }
         if (hinted(ImGui::DragFloat(_("Shot Spread (deg, 0=pinpoint)"), &curSpread, 0.1f, 0.0f, 15.0f, "%.1f deg"), "Shot Spread (deg, 0=pinpoint)")) {
             combat["spread_angle"] = curSpread;
@@ -591,6 +636,13 @@ void CharacterEditor::drawProperties() {
             }
             ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", _("Dome Offset: Turret rotation center relative to hull center [X, Y]."));
             ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.6f, 1.0f), "%s", _("localePosition: Projectile exit point attached to rotating turret: [X=Forward, Y=Lateral]."));
+            if (!isBuilding) {
+                const int arch = yamlInt(document, "archetype_id", 0);
+                const float defTDelay = document["turn_step_delay"].IsDefined()
+                    ? yamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::defaultTurretTurnStepDelay(arch))
+                    : OpenArtOfWar::Utility::defaultTurretTurnStepDelay(arch);
+                changed |= editFloat(combat, "turret_turn_step_delay", "Turret turn delay per 45 deg (s)", defTDelay, 0.01f);
+            }
         } else {
             ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.6f, 1.0f), "%s", _("localePosition: Projectile exit point: [X=Forward along facing, Y=Lateral]."));
         }
@@ -773,8 +825,15 @@ void CharacterEditor::drawProperties() {
                                 textures ? textures->getUnitBaseSeq(arch, static_cast<int>(OpenArtOfWar::ActionState::Idle)) : -1,
                                 textures ? textures->getUnitBaseSeq(arch, static_cast<int>(OpenArtOfWar::ActionState::Move)) : -1);
             if (!OpenArtOfWar::Utility::isInfantryArchetype(arch)) {
-                ImGui::TextDisabled(_("Hull turn: %.2f s per 45 degrees"),
-                                    yamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::defaultTurnStepDelay(arch)));
+                changed |= editFloat(document, "turn_step_delay", "Hull turn delay per 45 deg (s)",
+                                     OpenArtOfWar::Utility::defaultTurnStepDelay(arch), 0.01f);
+                if (yamlBool(document["combat"], "has_rotating_turret", false)) {
+                    YAML::Node combat = section("combat");
+                    const float defTDelay = document["turn_step_delay"].IsDefined()
+                        ? yamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::defaultTurretTurnStepDelay(arch))
+                        : OpenArtOfWar::Utility::defaultTurretTurnStepDelay(arch);
+                    changed |= editFloat(combat, "turret_turn_step_delay", "Turret turn delay per 45 deg (s)", defTDelay, 0.01f);
+                }
             }
         }
     }

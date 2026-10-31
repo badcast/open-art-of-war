@@ -62,10 +62,14 @@ namespace OpenArtOfWar
         {
             return m_tab == Tab::Internet;
         }
-        // The host's choice for a map that has buildings of its own: play with them (true) or start from scratch
+        // The host's choice: prebuilt bases (true) or start from scratch (only HQ + power plant, no units)
         bool prebuilt() const
         {
-            return m_prebuilt && m_mapHasPrebuilt;
+            return m_prebuilt;
+        }
+        void setPrebuilt(bool prebuilt)
+        {
+            m_prebuilt = prebuilt;
         }
         // The room password: set for a game created here, sent when joining a room that asks for it (empty: none)
         const std::string &password() const
@@ -187,8 +191,7 @@ namespace OpenArtOfWar
         std::string m_password;
         ui::ConfirmState m_confirm;    // "leave the room?"
         ui::ComboState m_combo;        // the open drop-down list of the room
-        bool m_prebuilt {true};        // host: use the map's own buildings (when it has some)
-        bool m_mapHasPrebuilt {false}; // the room's map has buildings or units of its own
+        bool m_prebuilt {true}; // host: prebuilt bases (else from scratch: HQ + power plant only)
         int m_mapIndex {0};
         std::string m_spotsMap; // map the start positions below belong to
         std::vector<std::pair<int, int>> m_spots;

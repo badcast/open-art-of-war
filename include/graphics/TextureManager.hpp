@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LoaderResources.hpp"
+
 #include <SDL3/SDL.h>
 #include <string>
 #include <vector>
@@ -82,7 +84,7 @@ namespace OpenArtOfWar
         TextureManager(SDL_Renderer *renderer);
         ~TextureManager();
 
-        bool loadAllAssets(const std::string &assetRoot = "assets");
+        bool loadAllAssets(const std::string &assetRoot = LoaderResources::kDefaultRoot);
         SDL_Texture *loadTexture(const std::string &filePath);
 
         // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).

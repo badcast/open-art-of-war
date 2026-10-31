@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LoaderResources.hpp"
+
 #include <nlohmann/json.hpp>
 #include <string>
 
@@ -13,9 +15,8 @@ namespace OpenArtOfWar
     class EnvironmentConfig
     {
     public:
-        static constexpr const char *kAssetPath = "assets/data/game_environment.json";
-
-        bool load(const std::string &assetPath = kAssetPath);
+        // The path comes from assets/main.json (LoaderResources::environment())
+        bool load(const std::string &assetPath = LoaderResources::environment());
         // Writes the runtime sections into settings.json if anything changed (atomically: temp file + rename)
         bool save();
 
@@ -35,7 +36,7 @@ namespace OpenArtOfWar
 
     private:
         nlohmann::json m_root = nlohmann::json::object();
-        std::string m_assetPath {kAssetPath};
+        std::string m_assetPath;
         bool m_dirty {false};
     };
 

@@ -2405,8 +2405,8 @@ msgstr "ВЫЙТИ"
 msgid "The host starts the game"
 msgstr "Игру начинает хост"
 
-msgid "Click a number on the map to start there, again to leave it to chance. Click your faction, team and colour to change them."
-msgstr "Щёлкните номер на карте, чтобы начать там, ещё раз — чтобы оставить случаю. Фракцию, команду и цвет меняет щелчок по ним."
+msgid "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
+msgstr "Нажмите номер на карте, чтобы начать там, повторно — оставить на волю случая. Нажмите на свою фракцию и цвет, чтобы изменить их; команды задаёт ведущий."
 
 msgid "Enter: chat"
 msgstr "Enter: чат"
@@ -3703,3 +3703,278 @@ msgstr "Нужен рендерер SDL GPU (шейдерные эффекты)"
 
 msgid "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
 msgstr "Проверка, как персонаж выглядит в цвете армии игры (персонаж на вкладках Preview, Compare и Wrecks). «Classic» показывает оригинальные листы."
+
+msgid "Network statistics"
+msgstr "Статистика сети"
+
+msgid "Network game: ping, jitter, packet loss and traffic in the corner"
+msgstr "Сетевая игра: пинг, джиттер, потери пакетов и трафик в углу экрана"
+
+msgid "NETWORK"
+msgstr "СЕТЬ"
+
+msgid "Hosting this game"
+msgstr "Эта игра создана здесь"
+
+msgid "Ping"
+msgstr "Пинг"
+
+msgid "ms"
+msgstr "мс"
+
+msgid "Jitter"
+msgstr "Джиттер"
+
+msgid "Packet loss"
+msgstr "Потери"
+
+msgid "Traffic out / in"
+msgstr "Трафик исх. / вх."
+
+msgid "KB/s"
+msgstr "КБ/с"
+
+msgid "Input delay"
+msgstr "Задержка ввода"
+
+msgid "turn"
+msgstr "ход"
+
+msgid "Turns buffered"
+msgstr "Ходов в запасе"
+
+msgid "Waiting for the next turn"
+msgstr "Ожидание хода"
+
+msgid "disconnected"
+msgstr "отключён"
+
+msgid "Reconnecting..."
+msgstr "Переподключение..."
+
+msgid "DESYNC"
+msgstr "РАССИНХРОН"
+
+#, c-format
+msgid "Player %s has disconnected"
+msgstr "Игрок %s отключился"
+
+#, c-format
+msgid "Player %s is back"
+msgstr "Игрок %s вернулся"
+
+#, c-format
+msgid "Player %s did not come back"
+msgstr "Игрок %s не вернулся"
+
+#, c-format
+msgid "The base of %s is destroyed"
+msgstr "База игрока %s уничтожена"
+
+msgid "MATCH STATISTICS"
+msgstr "СТАТИСТИКА МАТЧА"
+
+msgid "Player"
+msgstr "Игрок"
+
+msgid "Efficiency"
+msgstr "Эффективность"
+
+msgid "Kills"
+msgstr "Уничтожено"
+
+msgid "Losses"
+msgstr "Потери"
+
+msgid "left"
+msgstr "вышел"
+
+msgid "Efficiency: a point for every 10 credits of enemy forces destroyed"
+msgstr "Эффективность: очко за каждые 10 кредитов уничтоженных сил противника"
+
+msgid "taken"
+msgstr "занят"
+
+msgid "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
+msgstr "Как летят и попадают пули, снайперские пули, снаряды, ракеты и огонь и какие воронки они оставляют (assets/characters/projectiles.yaml). Холст стреляет выбранным видом снова и снова."
+
+msgid "Ordinary bullet of rifles and machine guns (projectile: bullet)."
+msgstr "Обычная пуля винтовок и пулемётов (projectile: bullet)."
+
+msgid "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."
+msgstr "Пуля снайпера: попадает сразу, как обычная пуля, но со своим трассером и попаданием (projectile: sniper)."
+
+msgid "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."
+msgstr "Снаряд пушки: летит, бьёт по месту падения, задевает соседей и оставляет воронку (projectile: shell)."
+
+msgid "Rocket with a smoke trail; leaves a crater (projectile: rocket)."
+msgstr "Ракета с дымным следом; оставляет воронку (projectile: rocket)."
+
+msgid "Flamethrower jet (projectile: flame)."
+msgstr "Струя огнемёта (projectile: flame)."
+
+msgid "Fires one shot now."
+msgstr "Сделать один выстрел сейчас."
+
+msgid "Fires a shot every interval."
+msgstr "Стрелять раз в интервал."
+
+msgid "Every shot turns one sprite direction further, so all directions of the sprite show in turn."
+msgstr "Каждый выстрел поворачивается на одно направление спрайта, так видны все направления по очереди."
+
+msgid "Distance between the shooter and the target on the canvas."
+msgstr "Расстояние между стрелком и целью на холсте."
+
+msgid "Direction of the shot on the canvas."
+msgstr "Направление выстрела на холсте."
+
+msgid "Time between shots of the preview."
+msgstr "Время между выстрелами в превью."
+
+msgid "Removes the craters from the canvas."
+msgstr "Убрать воронки с холста."
+
+msgid "Empties the list of hit animations (then no hit is drawn)."
+msgstr "Очистить список анимаций попадания (тогда попадание не рисуется)."
+
+msgid "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
+msgstr "Вкл.: урон наносится в момент выстрела, снаряд летит только для вида (пули). Выкл.: летит, бьёт по месту падения и задевает соседей."
+
+msgid "Pixels the projectile flies per simulation tick (20 ticks a second)."
+msgstr "Сколько пикселей снаряд пролетает за тик симуляции (20 тиков в секунду)."
+
+msgid "Projectile pictures of the game: a click sets the composite and its number of directions."
+msgstr "Картинки снарядов из игры: щелчок задаёт композит и число направлений."
+
+msgid "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
+msgstr "Маленькие воронки из игры. Щелчок добавляет воронку в список или убирает её; на каждое попадание выбирается одна из списка."
+
+msgid "How much faster the craters disappear on the canvas than in the game."
+msgstr "Во сколько раз быстрее воронки исчезают на холсте, чем в игре."
+
+msgid "Background color of the canvas (black by default)."
+msgstr "Цвет фона холста (по умолчанию чёрный)."
+
+msgid "Projectiles"
+msgstr "Снаряды"
+
+msgid "Bullet"
+msgstr "Пуля"
+
+msgid "Sniper round"
+msgstr "Снайперская пуля"
+
+msgid "Shell"
+msgstr "Снаряд"
+
+msgid "Rocket"
+msgstr "Ракета"
+
+msgid "Flame"
+msgstr "Огонь"
+
+msgid "Bullet tracer"
+msgstr "Трассер пули"
+
+msgid "Heavy tracer"
+msgstr "Тяжёлый трассер"
+
+msgid "Rocket with flame"
+msgstr "Ракета с пламенем"
+
+msgid "Fire"
+msgstr "Огонь!"
+
+msgid "All directions"
+msgstr "Все направления"
+
+msgid "Angle"
+msgstr "Угол"
+
+msgid "Distance"
+msgstr "Дистанция"
+
+msgid "Interval"
+msgstr "Интервал"
+
+msgid "Background"
+msgstr "Фон"
+
+msgid "Clear craters"
+msgstr "Убрать воронки"
+
+msgid "Clear impacts"
+msgstr "Очистить попадания"
+
+msgid "Crater composites"
+msgstr "Композиты воронок"
+
+msgid "Craters"
+msgstr "Воронки"
+
+msgid "Crater seconds"
+msgstr "Секунд до исчезновения"
+
+msgid "Directions"
+msgstr "Направления"
+
+msgid "Flight"
+msgstr "Полёт"
+
+msgid "Ground marks"
+msgstr "Следы на земле"
+
+msgid "Hit effects"
+msgstr "Эффекты попадания"
+
+msgid "Hit-scan"
+msgstr "Мгновенное попадание"
+
+msgid "Impact animations"
+msgstr "Анимации попадания"
+
+msgid "Preview fade speed"
+msgstr "Ускорение исчезновения"
+
+msgid "Projectile sprites"
+msgstr "Спрайты снарядов"
+
+msgid "Smoke trail"
+msgstr "Дымный след"
+
+msgid "Speed (px per tick)"
+msgstr "Скорость (px за тик)"
+
+msgid "Spread (radians)"
+msgstr "Разброс (радианы)"
+
+msgid "Sprite (composite)"
+msgstr "Спрайт (композит)"
+
+msgid "Used by"
+msgstr "Используют"
+
+msgid "Wall destroyed"
+msgstr "Стена разрушена"
+
+msgid "Wall hit"
+msgstr "Попадание в стену"
+
+msgid "The projectiles file could not be loaded."
+msgstr "Не удалось загрузить файл снарядов."
+
+msgid "A flame is drawn as its own jet (animation 59), not as a sprite."
+msgstr "Огонь рисуется своей струёй (анимация 59), а не спрайтом."
+
+msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"
+msgstr "СКМ: сдвиг | Колесо: масштаб | 2×СКМ: сброс"
+
+#, c-format
+msgid "Animation %d"
+msgstr "Анимация %d"
+
+msgid "Voice volume"
+msgstr "Громкость голоса"
+
+msgid "Volume of the unit replies and the announcer"
+msgstr "Громкость ответов бойцов и диктора"

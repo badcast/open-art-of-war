@@ -151,6 +151,7 @@ enum class EditorMode {
     Research,  // technology trees of both factions
     Explosions, // how buildings and vehicles blow up (assets/characters/effects.yaml)
     Wrecks,     // the remains they leave (the same file)
+    Projectiles, // how bullets, sniper rounds, shells, rockets and flames fly and hit (assets/characters/projectiles.yaml)
     GameUi,     // colors of the interface (assets/characters/game_ui.yaml)
     Environment, // fog, construction, network, overlay and font (assets/data/game_environment.json)
     AiDifficulty, // AI levels (assets/characters/difficulty.yaml)

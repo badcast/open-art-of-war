@@ -122,6 +122,7 @@ void CharacterEditor::drawPreviewControls() {
         {EditorMode::Preview, "Preview"},         {EditorMode::Compare, "Compare"},
         {EditorMode::Simulation, "Simulation"},   {EditorMode::Research, "Research"},
         {EditorMode::Explosions, "Explosions"},   {EditorMode::Wrecks, "Wrecks"},
+        {EditorMode::Projectiles, "Projectiles"},
         {EditorMode::GameUi, "Game UI"},          {EditorMode::Environment, "Environment"},
         {EditorMode::AiDifficulty, "AI Difficulty"}, {EditorMode::SpriteTools, "Sprite Tools"},
     };
@@ -137,7 +138,10 @@ void CharacterEditor::drawPreviewControls() {
     ImGui::Separator();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools || editorMode == EditorMode::GameUi ||
         editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty) return;
+    // Background of the canvas (black by default)
+    hinted(ImGui::ColorEdit3(_("Background"), previewBackground, ImGuiColorEditFlags_NoInputs), "Canvas background");
     if (editorMode == EditorMode::Preview || editorMode == EditorMode::Compare || editorMode == EditorMode::Wrecks) {
+        ImGui::SameLine();
         drawArmyColorCombo();
     }
     if (editorMode == EditorMode::Explosions) {
@@ -146,6 +150,10 @@ void CharacterEditor::drawPreviewControls() {
     }
     if (editorMode == EditorMode::Wrecks) {
         drawWreckControls();
+        return;
+    }
+    if (editorMode == EditorMode::Projectiles) {
+        drawProjectileControls();
         return;
     }
     if (editorMode == EditorMode::Simulation) {
@@ -202,8 +210,12 @@ void CharacterEditor::drawPreviewControls() {
 
     ImGui::SetNextItemWidth(105.0f);
     if (hinted(ImGui::SliderInt("##facing", &facing, 0, 7, hasRotTurret ? _("Hull %d/7") : _("Facing %d/7")), "##facing")) {
+        desiredHullFacingDir = facing;
+        previewHullTurnTimer = 0.0f;
         if (!hasRotTurret || linkTurretToHull) {
             turretFacingDir = facing;
+            desiredTurretFacingDir = facing;
+            previewTurretTurnTimer = 0.0f;
             float ang = static_cast<float>(facing) * (static_cast<float>(M_PI) / 4.0f);
             float dist = std::max(60.0f, std::hypot(targetWorldX, targetWorldY));
             targetWorldX = std::cos(ang) * dist;
@@ -214,6 +226,8 @@ void CharacterEditor::drawPreviewControls() {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(115.0f);
         if (hinted(ImGui::SliderInt("##turretFacing", &turretFacingDir, 0, 7, _("Turret %d/7")), "##turretFacing")) {
+            desiredTurretFacingDir = turretFacingDir;
+            previewTurretTurnTimer = 0.0f;
             float ang = static_cast<float>(turretFacingDir) * (static_cast<float>(M_PI) / 4.0f);
             float dist = std::max(60.0f, std::hypot(targetWorldX, targetWorldY));
             targetWorldX = std::cos(ang) * dist;
@@ -250,6 +264,10 @@ void CharacterEditor::drawPreviewControls() {
         targetWorldY = std::sin(ang) * 120.0f;
         targetCustomized = false;
         turretFacingDir = facing;
+        desiredHullFacingDir = facing;
+        desiredTurretFacingDir = facing;
+        previewHullTurnTimer = 0.0f;
+        previewTurretTurnTimer = 0.0f;
     }
     ImGui::SameLine();
     ImGui::TextDisabled("Aim: (%.0f, %.0f)", targetWorldX, targetWorldY);
@@ -293,8 +311,15 @@ void CharacterEditor::drawPreviewControls() {
 void CharacterEditor::drawCanvasGuides(const ImVec2& min, const ImVec2& size) {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImVec2 max(min.x + size.x, min.y + size.y);
-    drawList->AddRectFilled(min, max, IM_COL32(24, 31, 31, 255));
+    // The canvas background: black unless picked otherwise (Background, above the canvas)
+    drawList->AddRectFilled(min, max, ImGui::ColorConvertFloat4ToU32(ImVec4(previewBackground[0], previewBackground[1], previewBackground[2], 1.0f)));
 
+    // Effect tabs show no character: no turret / target guides and no combat card of the character
+    if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks || editorMode == EditorMode::Projectiles) {
+        drawList->AddText(ImVec2(min.x + 10.0f, min.y + size.y - 20.0f), IM_COL32(173, 190, 182, 220),
+                          _("MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"));
+        return;
+    }
     if (editorMode == EditorMode::Simulation) {
         drawList->AddText(ImVec2(min.x + 10.0f, min.y + size.y - 20.0f), IM_COL32(173, 190, 182, 220),
                           _("MMB Drag: Pan | Wheel: Zoom | MMB 2x: Fit arena"));
@@ -472,6 +497,9 @@ void CharacterEditor::drawPreviewScene() {
     if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks) {
         drawPreviewGrid();
         drawEffectsScene();
+    } else if (editorMode == EditorMode::Projectiles) {
+        drawPreviewGrid();
+        drawProjectilesScene();
     } else if (editorMode == EditorMode::Simulation) {
         drawPreviewGrid();
         battle.render(*gameRenderer, *camera, static_cast<int>(previewTime * 8.0f));

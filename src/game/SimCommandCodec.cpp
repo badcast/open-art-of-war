@@ -35,6 +35,7 @@ namespace OpenArtOfWar::SimCommandCodec
             Ids,                   // Demolish
             A,                     // DebugCredits
             X | Y | A | B | C | D, // DebugSpawn
+            0,                     // PlayerLeft
         };
 
         constexpr int kTypeBits = 4;

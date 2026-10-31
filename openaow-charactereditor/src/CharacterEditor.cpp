@@ -1,4 +1,5 @@
 #include "CharacterEditor.hpp"
+#include "ConfigMerge.hpp"
 
 #include <algorithm>
 #include <array>
@@ -112,6 +113,7 @@ int CharacterEditor::run() {
         } else {
             updateCombatSim(simDt);
             updateEffectsSim(simDt);
+            updateProjectilesSim(simDt);
         }
 
         SDL_Event event;
@@ -122,7 +124,7 @@ int CharacterEditor::run() {
             } else if (event.type == SDL_EVENT_KEY_DOWN && (event.key.mod & SDL_KMOD_CTRL) &&
                        event.key.key == SDLK_S) {
                 if (editorMode == EditorMode::Research) saveResearch();
-                else if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks ||
+                else if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks || editorMode == EditorMode::Projectiles ||
                          editorMode == EditorMode::GameUi || editorMode == EditorMode::Environment ||
                          editorMode == EditorMode::AiDifficulty) saveActiveSettings();
                 else saveFile();
@@ -189,6 +191,9 @@ CharacterEditor::~CharacterEditor() {
     for (auto& [id, tex] : animThumbs) {
         if (tex) SDL_DestroyTexture(tex);
     }
+    for (auto& [key, tex] : zoomThumbs) {
+        if (tex) SDL_DestroyTexture(tex);
+    }
     for (auto& [key, tex] : fontPreviews) {
         if (tex) SDL_DestroyTexture(tex);
     }
@@ -236,7 +241,9 @@ void CharacterEditor::loadCatalog() {
         if (error || !entry.is_regular_file()) continue;
         const std::string extension = entry.path().extension().string();
         if (extension != ".yaml" && extension != ".yml") continue;
-        if (entry.path().filename() == "difficulty.yaml" || entry.path().filename() == "ai_difficulty.yaml") continue;
+        if (entry.path().filename() == "difficulty.yaml" || entry.path().filename() == "ai_difficulty.yaml" ||
+            entry.path().filename() == "effects.yaml" || entry.path().filename() == "projectiles.yaml" ||
+            entry.path().filename() == "game_ui.yaml") continue;
         if (entry.path().filename().string().rfind("research_", 0) == 0) continue; // edited in the Research tab
         try {
             const YAML::Node root = YAML::LoadFile(entry.path().string());
@@ -268,6 +275,7 @@ bool CharacterEditor::loadFile(const fs::path& path) {
             status = _("The YAML root must be a map.");
             return false;
         }
+        documentBase = YAML::Clone(document);
         activePath = path;
         textBuffers.clear();
         dirty = false;
@@ -302,6 +310,10 @@ bool CharacterEditor::loadFile(const fs::path& path) {
         simBurstDelayTimer2 = 0.0f;
         muzzleFlashTimer = 0.0f;
         turretFacingDir = facing;
+        desiredHullFacingDir = facing;
+        desiredTurretFacingDir = facing;
+        previewHullTurnTimer = 0.0f;
+        previewTurretTurnTimer = 0.0f;
         linkTurretToHull = true;
 
         if (!targetCustomized) {
@@ -319,19 +331,18 @@ bool CharacterEditor::loadFile(const fs::path& path) {
 bool CharacterEditor::saveFile() {
     if (!document || activePath.empty()) return false;
     try {
-        YAML::Emitter emitter;
-        emitter.SetIndent(2);
-        emitter << document;
-        std::ofstream output(activePath);
-        if (!output) {
-            status = std::string(_("Could not open file for writing: ")) + activePath.string();
+        // Only the editor's own changes go into the file as it is now: fields the editor does not know
+        // (a newer game's, or added since the file was loaded) are kept
+        const YAML::Node disk = readYamlFile(activePath);
+        YAML::Node merged = disk.IsMap() ? mergeYamlEdits(documentBase, document, disk) : YAML::Clone(document);
+        std::string error;
+        if (!writeFileAtomic(activePath, yamlText(merged), error)) {
+            status = error;
             return false;
         }
-        output << emitter.c_str() << '\n';
-        if (!output) {
-            status = std::string(_("Failed to write file: ")) + activePath.string();
-            return false;
-        }
+        document = merged;
+        documentBase = YAML::Clone(merged);
+        textBuffers.clear();
         dirty = false;
         status = std::string(_("Saved: ")) + activePath.filename().string();
         reloadCatalogSelection();
@@ -371,8 +382,13 @@ void CharacterEditor::reloadCatalogSelection() {
 }
 
 YAML::Node CharacterEditor::section(const char* name) {
-    if (!document[name] || !document[name].IsMap()) {
+    if (!document[name]) {
         document[name] = YAML::Node(YAML::NodeType::Map);
+    } else if (!document[name].IsMap()) {
+        // Something the editor does not understand (another shape in a newer format): never overwrite it,
+        // edits go to a scratch map that is not saved
+        status = std::string(_("Unknown format, not edited: ")) + name;
+        return YAML::Node(YAML::NodeType::Map);
     }
     return document[name];
 }
@@ -468,9 +484,10 @@ bool CharacterEditor::editWeaponDelay(YAML::Node w) {
 }
 
 bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
-    static const char* s_projectiles[] = {"bullet", "shell", "rocket", "flame", "none"};
+    static const char* s_projectiles[] = {"bullet", "sniper", "shell", "rocket", "flame", "none"};
     static const char* s_labels[] = {
         "bullet (Bullet / Rifle / MG)",
+        "sniper (Sniper round)",
         "shell (Cannon shell / Artillery)",
         "rocket (Rocket / Missile / SAM)",
         "flame (Flamethrower stream)",
@@ -478,7 +495,7 @@ bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
     };
     std::string current = yamlString(parent, "projectile", "bullet");
     int currentIdx = 0;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (current == s_projectiles[i]) {
             currentIdx = i;
             break;
@@ -486,7 +503,7 @@ bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
     }
 
     bool changed = false;
-    if (hinted(ImGui::Combo(_("Projectile"), &currentIdx, s_labels, 5), "Projectile")) {
+    if (hinted(ImGui::Combo(_("Projectile"), &currentIdx, s_labels, 6), "Projectile")) {
         parent["projectile"] = std::string(s_projectiles[currentIdx]);
         changed = true;
     }

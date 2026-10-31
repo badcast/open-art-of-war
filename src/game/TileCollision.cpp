@@ -1,5 +1,6 @@
 #include "game/TileCollision.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include <nlohmann/json.hpp>
 #include <array>
 #include <iostream>
@@ -32,7 +33,7 @@ namespace OpenArtOfWar
         Table loadTable()
         {
             std::string text;
-            if(!Assets::readText("assets/data/tile_collision.json", text))
+            if(!Assets::readText(LoaderResources::tileCollision(), text))
             {
                 std::cerr << "[TileCollision] assets/data/tile_collision.json not found, using the water-tile rule" << std::endl;
                 return fallbackTable();

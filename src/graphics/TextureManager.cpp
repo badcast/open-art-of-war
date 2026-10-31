@@ -1,5 +1,6 @@
 #include "graphics/TextureManager.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -225,7 +226,7 @@ namespace OpenArtOfWar
         std::cout << "[TextureManager] Loading game assets from: " << assetRoot << "..." << std::endl;
 
         // 1. Load sprite frame definitions from sprites.json
-        std::string jsonPath = assetRoot + "/characters/sprites.json";
+        std::string jsonPath = LoaderResources::spriteFrames(assetRoot);
         std::string sprites;
         if(Assets::readText(jsonPath, sprites))
         {
@@ -250,16 +251,14 @@ namespace OpenArtOfWar
             std::cerr << "[TextureManager] Warning: could not open " << jsonPath << std::endl;
         }
 
-        // 2. Load all 42 sprite sheets and compute dynamic HD resolution scaling
-
+        // 2. Load the sprite sheets listed in main.json and compute dynamic HD resolution scaling
+        const int sheetCount = LoaderResources::spriteSheetCount();
         m_assetRoot = assetRoot;
-        m_spriteSheets.resize(42, nullptr);
-        m_sheetScales.assign(42, 1.0f);
-        for(int i = 0; i < 42; ++i)
+        m_spriteSheets.assign(sheetCount, nullptr);
+        m_sheetScales.assign(sheetCount, 1.0f);
+        for(int i = 0; i < sheetCount; ++i)
         {
-            std::ostringstream ss;
-            ss << assetRoot << "/sprites/sheet_" << (i < 10 ? "0" : "") << i << ".png";
-            m_spriteSheets[i] = loadTexture(ss.str());
+            m_spriteSheets[i] = loadTexture(LoaderResources::spriteSheet(i, assetRoot));
             if(m_spriteSheets[i])
             {
                 float tw = 0.0f, th = 0.0f;
@@ -272,12 +271,11 @@ namespace OpenArtOfWar
         }
 
         // 3. Load UI screens
-        m_uiTextures["logo"] = loadTexture(assetRoot + "/ui/logo.png");
-        m_uiTextures["title"] = loadTexture(assetRoot + "/ui/title.png");
-        m_uiTextures["icon"] = loadTexture(assetRoot + "/ui/icon.png");
+        for(const auto &[name, path] : LoaderResources::uiTextures(assetRoot))
+            m_uiTextures[name] = loadTexture(path);
 
         // 4. Load comprehensive graphics data (composites, animations, units, buildings, tilesets)
-        std::string gdataPath = assetRoot + "/data/graphics_data.json";
+        std::string gdataPath = LoaderResources::graphicsData(assetRoot);
         loadGraphicsData(gdataPath);
 
         std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
@@ -487,16 +485,15 @@ namespace OpenArtOfWar
 
     SDL_Surface *TextureManager::sheetSurface(int page)
     {
-        if(page < 0 || page >= 42)
+        const int sheetCount = LoaderResources::spriteSheetCount();
+        if(page < 0 || page >= sheetCount)
             return nullptr;
-        if(m_sheetSurfaces.empty())
-            m_sheetSurfaces.assign(42, nullptr);
+        if(static_cast<int>(m_sheetSurfaces.size()) < sheetCount)
+            m_sheetSurfaces.resize(sheetCount, nullptr);
         if(!m_sheetSurfaces[page])
         {
-            std::ostringstream ss;
-            ss << m_assetRoot << "/sprites/sheet_" << (page < 10 ? "0" : "") << page << ".png";
             std::vector<uint8_t> png;
-            if(!Assets::readBytes(ss.str(), png) || png.empty())
+            if(!Assets::readBytes(LoaderResources::spriteSheet(page, m_assetRoot), png) || png.empty())
                 return nullptr;
             SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
             if(!loaded)

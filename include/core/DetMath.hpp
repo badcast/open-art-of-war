@@ -16,7 +16,7 @@ namespace OpenArtOfWar::DetMath
 
     inline float hypot(float x, float y)
     {
-        return std::sqrt(x * x + y * y);
+        return std::hypot(x, y);
     }
 
     // sin on [-pi/2, pi/2] (Taylor to x^13, error < 1e-7)

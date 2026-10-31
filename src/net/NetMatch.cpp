@@ -1,5 +1,7 @@
 #include "net/NetMatch.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
+#include "core/DebugEnv.hpp"
 #include "game/MissionController.hpp"
 #include "net/MapFiles.hpp"
 #include "game/SimCommandCodec.hpp"
@@ -54,13 +56,11 @@ namespace OpenArtOfWar
             // CRC of every file the simulation reads, names included, in a fixed order; two CRCs side by side
             // make a 64-bit value
             uint32_t a = 0, b = 0x9e3779b9u;
-            std::vector<std::string> files = Assets::list("assets/data", ".json");
-            for(const char *ext : {".yaml", ".yml"})
-            {
-                for(const std::string &f : Assets::list("assets/characters", ext))
-                    files.push_back(f);
-            }
+            // The manifest (main.json) decides which folders matter and is hashed itself
+            std::vector<std::string> files = LoaderResources::netHashFiles();
+            files.push_back(LoaderResources::kManifestPath);
             std::sort(files.begin(), files.end());
+            files.erase(std::unique(files.begin(), files.end()), files.end());
             std::vector<uint8_t> bytes;
             for(const std::string &f : files)
             {
@@ -166,6 +166,10 @@ namespace OpenArtOfWar
             return false;
         }
         m_name = playerName;
+        m_hostedMaster = master;
+        m_hostedMasterPort = masterPort;
+        m_hostedCode = code;
+        m_rejoinToken = {};
         return true;
     }
 
@@ -185,10 +189,24 @@ namespace OpenArtOfWar
         m_dedicated = false;
         m_scheduledTurn = 0;
         m_reconnect = Reconnect {};
+        m_hostedMaster.clear();
+        m_hostedMasterPort = 0;
+        m_hostedCode.clear();
+        m_rejoinToken = {};
     }
 
     void NetMatch::update(uint32_t nowMs)
     {
+        m_nowMs = nowMs;
+        // The room has echoed the own picks: its copy is current again
+        if(m_hasPendingChoice && m_client)
+        {
+            for(const Net::LobbySlot &s : m_client->lobby().slots)
+            {
+                if(s.slot == localSlot() && s.choice.faction == m_pendingChoice[0] && s.choice.team == m_pendingChoice[1] && s.choice.color == m_pendingChoice[2] && s.choice.spawn == m_pendingChoice[3] && s.choice.ready == (m_pendingChoice[4] != 0))
+                    m_hasPendingChoice = false;
+            }
+        }
         // Through the server to a player-hosted game: when the way is open, the session takes the socket
         if(m_hostedJoin)
         {
@@ -199,12 +217,15 @@ namespace OpenArtOfWar
                 cc.identity = identity();
                 cc.playerName = m_name;
                 cc.password = m_password;
+                cc.token = m_rejoinToken; // set when this is a comeback after a lost connection
                 m_client = std::make_unique<Net::SessionClient>(m_hostedJoin->takeTransport(), cc);
                 m_hostedJoin.reset();
             }
             else if(m_hostedJoin->state() == Net::HostedJoin::State::Failed)
             {
-                m_failure = "server: " + m_hostedJoin->error();
+                // A comeback attempt that failed is tried again (below) until the reconnect window ends
+                if(!m_reconnect.active)
+                    m_failure = "server: " + m_hostedJoin->error();
                 m_hostedJoin.reset();
             }
         }
@@ -227,7 +248,18 @@ namespace OpenArtOfWar
             }
             if(nowMs >= m_reconnect.deadlineMs)
                 return; // given up: the game shows it
-            if(nowMs >= m_reconnect.nextAttemptMs)
+            if(nowMs >= m_reconnect.nextAttemptMs && m_reconnect.address.empty() && !m_hostedCode.empty())
+            {
+                // Joined by code: punch through the server again, the session token takes the slot back
+                if(!m_hostedJoin)
+                {
+                    m_rejoinToken = m_client->token();
+                    m_hostedJoin = std::make_unique<Net::HostedJoin>(m_hostedMaster, m_hostedMasterPort, m_hostedCode);
+                }
+                m_reconnect.delayMs = std::min<uint32_t>(m_reconnect.delayMs * 2, 4000);
+                m_reconnect.nextAttemptMs = nowMs + m_reconnect.delayMs;
+            }
+            else if(nowMs >= m_reconnect.nextAttemptMs)
             {
                 std::string error;
                 auto transport = Net::createEnetClient(m_reconnect.address, m_reconnect.port, &error);
@@ -403,8 +435,43 @@ namespace OpenArtOfWar
     }
     void NetMatch::setChoice(const Net::LobbyChoice &choice)
     {
-        if(m_client)
-            m_client->sendLobbyChoice(choice);
+        if(!m_client)
+            return;
+        Net::LobbyChoice c = choice;
+        // Only the classic look (0) and the eight team colours exist (9..15 drew white)
+        if(c.color > 8)
+            c.color = static_cast<uint8_t>(1 + localSlot() % 8);
+        m_client->sendLobbyChoice(c);
+        m_pendingChoice = {c.faction, c.team, c.color, c.spawn, static_cast<uint8_t>(c.ready ? 1 : 0)};
+        m_hasPendingChoice = true;
+        m_pendingChoiceMs = m_nowMs;
+    }
+
+    bool NetMatch::localChoice(Net::LobbyChoice &out) const
+    {
+        if(!m_client)
+            return false;
+        bool found = false;
+        for(const Net::LobbySlot &s : m_client->lobby().slots)
+        {
+            if(s.slot == localSlot())
+            {
+                out = s.choice;
+                found = true;
+            }
+        }
+        if(!found)
+            return false;
+        // Until the room echoes what was sent (or 4 s went by: the room may have refused or changed it)
+        if(m_hasPendingChoice && m_nowMs - m_pendingChoiceMs < 4000)
+        {
+            out.faction = m_pendingChoice[0];
+            out.team = m_pendingChoice[1];
+            out.color = m_pendingChoice[2];
+            out.spawn = m_pendingChoice[3];
+            out.ready = m_pendingChoice[4] != 0;
+        }
+        return true;
     }
 
     void NetMatch::setAi(const Net::OwnerSetAi &change)
@@ -413,6 +480,13 @@ namespace OpenArtOfWar
             m_host->setAiSlot(change);
         else if(isOwner())
             m_client->sendOwnerSetAi(change);
+    }
+    void NetMatch::setTeam(uint8_t slot, uint8_t team)
+    {
+        if(m_host)
+            m_host->setTeam(slot, team);
+        else if(isOwner())
+            m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team});
     }
     void NetMatch::sendChat(const std::string &text)
     {
@@ -467,7 +541,7 @@ namespace OpenArtOfWar
             slot.aiLevel = s.aiLevel;
             slot.faction = s.choice.faction == Net::kRandom ? static_cast<Faction>(rng() % 2) : static_cast<Faction>(s.choice.faction);
             slot.team = s.choice.team;
-            slot.color = s.choice.color;
+            slot.color = s.choice.color <= 8 ? s.choice.color : static_cast<uint8_t>(1 + s.slot % 8);
             int spawn = s.choice.spawn;
             if(spawn == Net::kRandom)
             {
@@ -547,9 +621,19 @@ namespace OpenArtOfWar
                 continue;
             for(SimCommand &c : commands)
             {
+                if(c.type == CommandType::PlayerLeft)
+                    continue;    // only the host's word counts for that (below)
                 c.debug = false; // no debug powers in a network game
                 m_sim->schedule(turn * tpt, std::move(c));
             }
+        }
+        // Players who left the match for good: their forces go on this tick, on every peer alike
+        for(uint8_t slot : bundle->left)
+        {
+            SimCommand c;
+            c.type = CommandType::PlayerLeft;
+            c.player = slot;
+            m_sim->schedule(turn * tpt, std::move(c));
         }
         m_scheduledTurn = turn + 1;
         m_client->dropTurnsBefore(turn);
@@ -565,20 +649,84 @@ namespace OpenArtOfWar
         if((tick + 1) % tpt == 0 && !m_outgoing.empty())
         {
             const uint32_t turn = tick / tpt + m_client->inputDelay();
-            m_client->sendCommands(turn, SimCommandCodec::encode(m_outgoing));
+            // In batches the room accepts: at most kMaxCommandsPerTurn commands and kMaxPlayerCommandBytes bytes
+            // each (a bigger one was refused by the host and the orders were lost). The host keeps every batch.
+            size_t begin = 0;
+            while(begin < m_outgoing.size())
+            {
+                size_t count = std::min(m_outgoing.size() - begin, SimCommandCodec::kMaxCommandsPerTurn);
+                std::vector<SimCommand> part(m_outgoing.begin() + begin, m_outgoing.begin() + begin + count);
+                std::vector<uint8_t> bytes = SimCommandCodec::encode(part);
+                while(bytes.size() > Net::kMaxPlayerCommandBytes && count > 1)
+                {
+                    count = (count + 1) / 2;
+                    part.resize(count);
+                    bytes = SimCommandCodec::encode(part);
+                }
+                if(bytes.size() <= Net::kMaxPlayerCommandBytes)
+                    m_client->sendCommands(turn, bytes);
+                else
+                    std::cerr << "[Net] A command too big for one batch was dropped" << std::endl;
+                begin += count;
+            }
             m_outgoing.clear();
         }
         if(tick % kHashIntervalTicks == 0)
         {
             m_client->sendWorldHash(tick, checksum);
             // OAOW_NET_TRACE=1: the checksums on stdout, to compare two peers by eye or script
-            static const bool trace = std::getenv("OAOW_NET_TRACE") != nullptr;
+            static const bool trace = debugEnv("OAOW_NET_TRACE") != nullptr;
             if(trace && tick % (kHashIntervalTicks * 10) == 0)
             {
                 std::printf("[Net] tick %u checksum %016llx\n", tick, static_cast<unsigned long long>(checksum));
                 std::fflush(stdout);
             }
         }
+    }
+
+    NetMatch::Stats NetMatch::stats(uint32_t nowMs, uint32_t tick)
+    {
+        Stats s;
+        if(!m_client)
+            return s;
+        s.valid = true;
+        s.host = m_host != nullptr;
+        const Net::LinkStats link = m_client->linkStats();
+        s.rttMs = link.rttMs;
+        s.jitterMs = link.jitterMs;
+        s.lossPercent = link.packetLoss * 100.0f;
+        s.packetsSent = link.packetsSent;
+        s.packetsLost = link.packetsLost;
+        // Traffic per second, measured over (at least) one second
+        if(m_rateMs == 0 || link.bytesSent < m_rateSent || link.bytesReceived < m_rateRecv)
+        {
+            m_rateMs = nowMs;
+            m_rateSent = link.bytesSent;
+            m_rateRecv = link.bytesReceived;
+        }
+        else if(nowMs - m_rateMs >= 1000)
+        {
+            const float secs = (nowMs - m_rateMs) / 1000.0f;
+            m_sendKBps = (link.bytesSent - m_rateSent) / 1024.0f / secs;
+            m_recvKBps = (link.bytesReceived - m_rateRecv) / 1024.0f / secs;
+            m_rateMs = nowMs;
+            m_rateSent = link.bytesSent;
+            m_rateRecv = link.bytesReceived;
+        }
+        s.sendKBps = m_sendKBps;
+        s.recvKBps = m_recvKBps;
+        s.turnMs = m_client->turnMs();
+        s.inputDelayMs = static_cast<int>(m_client->inputDelay()) * s.turnMs;
+        s.turnsBuffered = m_sim ? std::max(0, turnsAhead(tick)) : 0;
+        s.stalledSeconds = m_sim ? stalledSeconds(nowMs) : 0.0f;
+        s.reconnecting = m_reconnect.active;
+        s.desynced = desynced();
+        if(m_host)
+        {
+            for(const Net::SessionHost::Player &p : m_host->players())
+                s.peers.push_back({p.slot, p.name, p.connected, p.rttMs});
+        }
+        return s;
     }
 
     int NetMatch::turnsAhead(uint32_t tick) const
@@ -639,13 +787,15 @@ namespace OpenArtOfWar
             s.faction = static_cast<Faction>(faction);
             s.team = static_cast<uint8_t>(r.readBits(3));
             s.color = static_cast<uint8_t>(r.readBits(4));
+            if(s.color > 8)
+                s.color = static_cast<uint8_t>(1 + i % 8); // the same fallback on every computer
             s.human = r.readBool();
             if(!s.human)
                 s.aiLevel = static_cast<uint8_t>(r.readBits(2));
             out.startPosition[i] = static_cast<int8_t>(r.readBits(3));
         }
         // Only maps of the game's own folder (the path comes from another computer)
-        if(out.mapPath.rfind("assets/maps/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
+        if(out.mapPath.rfind(LoaderResources::mapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
             return false;
         return !r.failed();
     }

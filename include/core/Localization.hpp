@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LoaderResources.hpp"
+
 #include <string>
 
 namespace OpenArtOfWar
@@ -8,7 +10,7 @@ namespace OpenArtOfWar
     class Localization
     {
     public:
-        static void init(const std::string &localeDir = "assets/locale", const std::string &defaultLang = "en");
+        static void init(const std::string &localeDir = LoaderResources::localeDir(), const std::string &defaultLang = LoaderResources::defaultLanguage());
         static void setLanguage(const std::string &langCode);
         static const std::string &getLanguage();
         static void toggleLanguage();
