@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LoaderResources.hpp"
+
 #include <unordered_set>
 
 #include "core/Config.hpp"
@@ -358,8 +360,9 @@ namespace OpenArtOfWar
         float turretOffsetX {0.0f}; // turret_offset / dome_offset X
         float turretOffsetY {0.0f}; // turret_offset / dome_offset Y
         bool hasCustomTurretOffset {false};
-        float spreadAngle {-1.0f};  // Spread angle in radians (-1 = unconfigured default, 0 = high precision pinpoint)
-        float turnStepDelay {0.0f}; // Delay per 45-degree rotation step in seconds (0 for infantry)
+        float spreadAngle {-1.0f};        // Spread angle in radians (-1 = unconfigured default, 0 = high precision pinpoint)
+        float turnStepDelay {0.0f};       // Delay per 45-degree rotation step in seconds (0 for infantry)
+        float turretTurnStepDelay {0.0f}; // Delay per 45-degree turret rotation step in seconds (0 for infantry)
         int creditCost {80};
         float buildTime {4.0f};
         std::string producedIn;
@@ -431,7 +434,7 @@ namespace OpenArtOfWar
         int spawnBuilding(UnitType type, int tileX, int tileY, Faction faction);
         int spawnBuildingByIndex(int buildingIdx, int tileX, int tileY, Faction faction, float initialProgress = 1.0f, PlayerId owner = kAutoOwner);
 
-        bool loadCharacterConfigs(const std::string &assetRoot = "assets");
+        bool loadCharacterConfigs(const std::string &assetRoot = LoaderResources::kDefaultRoot);
         // Parses one character YAML document (unit or building) and replaces its config; used by the
         // loader above and by the character editor to apply unsaved edits. Call rebuildBlueprints() after.
         // Taken by value: lookups of missing keys need a mutable node (pass YAML::Clone to keep yours intact).
@@ -467,7 +470,12 @@ namespace OpenArtOfWar
         // Technologies widen the base building radius by a percentage of the mission's own radius (people only:
         // the computer's bases are laid out by the AI)
         void setBuildRadiusPercent(PlayerId player, int percent);
+        // Build menu of the local player's faction
         static const std::vector<BuildingBlueprint> &getBlueprints();
+        // Build menu of any faction; blueprintId is the slot in the canonical order (HQ, power, barracks,
+        // factory, lab, bunker, tower, wall), the same for both factions, so it is what a network command carries
+        static const std::vector<BuildingBlueprint> &getBlueprints(Faction faction);
+        static const BuildingBlueprint *findBlueprint(Faction faction, int blueprintId);
 
         bool hasBuildingType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
         bool hasBuildingType(UnitType type, Faction faction, bool mustBeComplete = true) const
@@ -489,6 +497,8 @@ namespace OpenArtOfWar
         // (only its own spot, so long-range units reveal where they fire from, not their surroundings)
         // `attackerId` hit something of `victim`: its team sees the attacker for a moment
         void noteHit(PlayerId victim, int attackerId);
+        // noteHit plus the victim remembers its attacker (retaliation, see Unit::updateCombat)
+        void noteEntityHit(Entity &victim, int attackerId);
         // Keeps Unit::turretShiftX/Y in line with the turret layer of the unit's current hull sprite
         void updateTurretShift(Unit &u) const;
         // Siege-capable units deploy by themselves when a visible enemy is out of normal range but within
@@ -578,6 +588,67 @@ namespace OpenArtOfWar
         {
             return getKillCount(Players::local());
         }
+        // Match statistics (Tab): what a player destroyed of the enemy and lost itself, in credits of the
+        // things' price; units and buildings counted separately
+        struct PlayerStats
+        {
+            int unitsKilled {0};
+            int buildingsDestroyed {0};
+            int unitsLost {0};
+            int buildingsLost {0};
+            int valueDestroyed {0};
+            int valueLost {0};
+        };
+        const PlayerStats &getPlayerStats(PlayerId player) const
+        {
+            static const PlayerStats kNone {};
+            return player < kMaxPlayers ? m_stats[player] : kNone;
+        }
+        // Efficiency points: a point per 10 credits of enemy forces destroyed
+        int getEfficiencyPoints(PlayerId player) const
+        {
+            return getPlayerStats(player).valueDestroyed / 10;
+        }
+        // Sounds of the world, collected for the game's sound effects (only a picture: never part of the simulation).
+        // Deaths are found by the sound side itself (entities that turned to Die).
+        enum class SoundCue : uint8_t
+        {
+            FireRifle,
+            FireMg,
+            FireSniper,
+            FireCannon,
+            FireRocket,
+            FireMlrs,
+            FireFlame,
+            HitBullet,    // a bullet into a soldier
+            HitArmor,     // a bullet into a vehicle, building or wall
+            ExplodeSmall, // a shell / rocket lands
+            WallDestroyed
+        };
+        struct SoundCueEvent
+        {
+            SoundCue cue {SoundCue::FireRifle};
+            float x {0.0f};
+            float y {0.0f};
+            PlayerId owner {kNoPlayer}; // who fired
+        };
+        // Changes whenever the world is cleared (entity ids start again)
+        uint32_t generation() const
+        {
+            return m_generation;
+        }
+        std::vector<SoundCueEvent> takeSoundCues()
+        {
+            std::vector<SoundCueEvent> out;
+            out.swap(m_soundCues);
+            return out;
+        }
+
+        // The player left a network match: every building, wall and unit of it is destroyed at once
+        // (no kills for anybody)
+        void destroyPlayer(PlayerId player, TileMap &map);
+        // Price of a unit / building in credits (statistics)
+        int valueOf(const Entity &e) const;
         void updateRegeneration(float deltaTime);
 
         static int applyMovingUnitDamage(int baseDamage, const Entity *target);
@@ -597,11 +668,18 @@ namespace OpenArtOfWar
     private:
         int m_nextId {1};
         std::array<int, kMaxPlayers> m_kills {};
+        std::array<PlayerStats, kMaxPlayers> m_stats {};
         void noteKill(PlayerId victim, PlayerId killer)
         {
             if(killer < kMaxPlayers && Players::hostile(victim, killer))
                 ++m_kills[killer];
         }
+        // A kill with the statistics of both sides
+        void noteKill(const Entity &victim, PlayerId killer);
+        // Only the statistics (kills by splash damage, which earn no kill reward)
+        void noteStats(const Entity &victim, PlayerId killer);
+        // Puts a living entity into its death (state, death animation, explosions, frees a building's tiles)
+        void killEntity(Entity &e, TileMap &map);
         int m_baseBuildRadius {16};                         // radius before Base Expansion research
         std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
         bool m_flamethrowerUnlocked[kMaxPlayers] {};
@@ -620,10 +698,43 @@ namespace OpenArtOfWar
         std::vector<Projectile> m_projectiles;
         std::vector<ExplosionParticle> m_explosions;
         std::vector<SmokePuff> m_smokePuffs;
+        std::vector<FlameBurst> m_flameBursts;
+        // Small craters where shells and rockets landed (only a picture: not part of the simulation state)
+        struct GroundMark
+        {
+            float x {0.0f};
+            float y {0.0f};
+            int composite {0};
+            float timeLeft {0.0f};
+        };
+        std::vector<GroundMark> m_groundMarks;
+        std::vector<SoundCueEvent> m_soundCues;
+        uint32_t m_generation {0};
+        void cue(SoundCue c, float x, float y, PlayerId owner)
+        {
+            if(m_soundCues.size() < 256) // nobody takes them (headless, editor): they stop piling up
+                m_soundCues.push_back({c, x, y, owner});
+        }
+        void addGroundMark(float x, float y, int composite, float seconds);
+
+    public:
+        // Flamethrower jets on screen (tests)
+        size_t flameBurstCount() const
+        {
+            return m_flameBursts.size();
+        }
+        // Craters on the ground (tests)
+        size_t groundMarkCount() const
+        {
+            return m_groundMarks.size();
+        }
+
+    private:
         TextureManager *m_texManager {nullptr};
         std::unordered_map<int, UnitConfig> m_unitConfigs;
         std::unordered_map<int, BuildingConfig> m_buildingConfigs;
         static std::vector<BuildingBlueprint> s_blueprints;
+        static std::vector<BuildingBlueprint> s_factionBlueprints[2]; // [0] Confederation, [1] Resistance
     };
 
 } // namespace OpenArtOfWar

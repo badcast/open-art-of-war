@@ -40,7 +40,26 @@ static int exportWithoutWindow(const std::string& mode, const std::string& folde
     return ok ? 0 : 1;
 }
 
+static const char* const kHelp = R"(Usage: openaow-charactereditor [command]
+
+Editor of the units and buildings in assets/characters/*.yaml (and of effects, projectiles, the game UI,
+the environment, AI difficulty and sprites). Without a command it opens the editor window.
+
+Commands without a window:
+  --export-sprites <folder>                      one atlas + JSON per object into <folder>
+  --export-single <folder> [columns [packed]]    every sprite on one grid per group (default 64 columns;
+                                                 "packed": a packed atlas instead of a grid)
+  --import-sprites <folder> [assets]             put exported sprites back (OVERWRITES assets/sprites;
+                                                 [assets]: the assets folder, else it is looked for)
+
+  --help, -h                                     this text
+)";
+
 int main(int argc, char** argv) {
+    if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        std::cout << kHelp;
+        return 0;
+    }
     if (argc >= 3 && (std::string(argv[1]) == "--export-sprites" || std::string(argv[1]) == "--export-single")) {
         return exportWithoutWindow(argv[1], argv[2], argc >= 4 ? std::max(1, std::atoi(argv[3])) : 64, {},
                                    argc >= 5 && std::string(argv[4]) == "packed");

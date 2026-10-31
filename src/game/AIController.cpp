@@ -2,6 +2,7 @@
 #include "game/AIController.hpp"
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "game/EntityManager.hpp"
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
@@ -433,7 +434,7 @@ namespace OpenArtOfWar
     AIController::AIController()
     {
         initDifficultyDefaults();
-        loadDifficultyConfig("assets/characters/difficulty.yaml");
+        loadDifficultyConfig(LoaderResources::aiDifficulty());
     }
 
     bool AIController::isFoe(const Entity &e) const
@@ -497,6 +498,7 @@ namespace OpenArtOfWar
         m_expandTimer = 0.0f;
         m_expansions = 0;
         m_gateX[0] = m_gateX[1] = m_gateY[0] = m_gateY[1] = -1;
+        m_stagingTimer = 0.0f;
         m_lastThreatX = m_lastThreatY = -1;
         m_lastThreatId = 0;
         clearThoughts();
@@ -733,12 +735,12 @@ namespace OpenArtOfWar
             m_chokes.rebuild(map);
         }
 
-        updateStagingPoint(map);
+        updateStagingPoint(map, pathfinder, deltaTime);
         m_squadController.setStagingPoint(m_stagingX, m_stagingY);
 
         // Rebuild starting base structures & walls if destroyed
         updateRebuilding(deltaTime, map, entities);
-        if(m_skirmish && m_currentDifficultyConfig.tactics.buildDefenses)
+        if(m_skirmish && (m_currentDifficultyConfig.tactics.buildDefenses || !entities.hasBuildingType(UnitType::Barracks, m_player, false)))
         {
             updateBaseBuilder(deltaTime, map, entities, pathfinder);
         }
@@ -794,13 +796,13 @@ namespace OpenArtOfWar
                 else if(b->type == UnitType::Barracks)
                 {
                     hasBarracks = true;
-                    if(!b->isProducing && b->productionTimer <= 0.0f && !availableBarracks)
+                    if(b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f && !availableBarracks)
                         availableBarracks = b;
                 }
                 else if(b->type == UnitType::Factory)
                 {
                     hasFactory = true;
-                    if(!b->isProducing && b->productionTimer <= 0.0f && !availableFactory)
+                    if(b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f && !availableFactory)
                         availableFactory = b;
                 }
             }
@@ -995,9 +997,14 @@ namespace OpenArtOfWar
         }
     }
 
-    void AIController::updateStagingPoint(const TileMap &map)
+    void AIController::updateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime)
     {
-        // Rally point 6 tiles from the enemy HQ toward the player
+        m_stagingTimer -= deltaTime;
+        if(m_stagingTimer > 0.0f)
+            return;
+        m_stagingTimer = 5.0f;
+
+        // Fallback: 6 tiles from the enemy HQ straight toward the player
         float dxToPlayer = static_cast<float>(m_playerHqX - m_enemyHqX);
         float dyToPlayer = static_cast<float>(m_playerHqY - m_enemyHqY);
         float len = DetMath::hypot(dxToPlayer, dyToPlayer);
@@ -1005,6 +1012,39 @@ namespace OpenArtOfWar
         int stepY = (len > 0.001f) ? static_cast<int>(std::round((dyToPlayer / len) * 6.0f)) : 0;
         m_stagingX = std::clamp(m_enemyHqX + stepX, 3, std::max(3, map.getWidth() - 4));
         m_stagingY = std::clamp(m_enemyHqY + stepY, 3, std::max(3, map.getHeight() - 4));
+        if(m_playerHqX <= 0 && m_playerHqY <= 0)
+            return;
+
+        // The waves gather on the road the base is actually left by (the straight line may point at the back
+        // wall of the base while the exit is on the other side): a few tiles before the wall exit the road
+        // crosses, or ~9 tiles out along the road when there is no wall
+        constexpr int kBeforeGate = 4;
+        constexpr int kAlongRoad = 9;
+        std::vector<PathNode> road;
+        bool partial = false;
+        pathfinder.setIgnoreUnitsOnce();
+        if(!pathfinder.findPath(m_enemyHqX, m_enemyHqY, m_playerHqX, m_playerHqY, road, 0, &partial) || road.empty())
+            return;
+        int pick = std::min(static_cast<int>(road.size()) - 1, kAlongRoad);
+        for(int i = 0; i < static_cast<int>(road.size()) && i <= 24; ++i)
+        {
+            bool atGate = false;
+            for(int g = 0; g < 2; ++g)
+            {
+                if(m_gateX[g] >= 0 && std::max(std::abs(road[i].x - m_gateX[g]), std::abs(road[i].y - m_gateY[g])) <= 1)
+                    atGate = true;
+            }
+            if(atGate)
+            {
+                pick = std::max(0, i - kBeforeGate);
+                break;
+            }
+        }
+        // Stay where the reserve lives (isReserveUnit: within 18 tiles of the HQ)
+        while(pick > 0 && DetMath::hypot(static_cast<float>(road[pick].x - m_enemyHqX), static_cast<float>(road[pick].y - m_enemyHqY)) > 12.0f)
+            --pick;
+        m_stagingX = std::clamp(road[pick].x, 3, std::max(3, map.getWidth() - 4));
+        m_stagingY = std::clamp(road[pick].y, 3, std::max(3, map.getHeight() - 4));
     }
 
     void AIController::updateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
@@ -1266,6 +1306,8 @@ namespace OpenArtOfWar
                     return conf ? 4 : 12;
                 case AIDefenseSite::PowerPlant:
                     return conf ? 1 : 9;
+                case AIDefenseSite::Barracks:
+                    return conf ? 2 : 10;
                 case AIDefenseSite::Wall:
                     return -1;
             }
@@ -1284,6 +1326,8 @@ namespace OpenArtOfWar
                     return 450;
                 case AIDefenseSite::PowerPlant:
                     return 200;
+                case AIDefenseSite::Barracks:
+                    return 350;
                 case AIDefenseSite::Wall:
                     return 25;
             }
@@ -1406,6 +1450,10 @@ namespace OpenArtOfWar
 
         auto add = [&](AIDefenseSite::Kind kind, int x, int y) { m_defensePlan.push_back({kind, x, y, false}); };
 
+        // 0. Starting from scratch (HQ + power plant only): raise a barracks first so troop training can begin
+        if(!entities.hasBuildingType(UnitType::Barracks, m_player, false))
+            add(AIDefenseSite::Barracks, cx - 1, cy - 1);
+
         // 1. First tower right behind the main exit, then a bunker covering the second one
         const float innerRadius = wallRadius - 3.0f;
         int x = 0, y = 0;
@@ -1485,7 +1533,8 @@ namespace OpenArtOfWar
         const int w = cfg ? cfg->width : 2;
         const int h = cfg ? cfg->height : 2;
         int x = site.tileX, y = site.tileY;
-        if(!findSiteNear(x, y, w, h, 3, map, entities))
+        const int searchRadius = site.kind == AIDefenseSite::Barracks ? 8 : 3;
+        if(!findSiteNear(x, y, w, h, searchRadius, map, entities))
         {
             site.done = true; // no room around the planned spot
             return false;
@@ -1502,7 +1551,7 @@ namespace OpenArtOfWar
             for(int tx = x; tx < x + w && tx < map.getWidth(); ++tx)
                 map.setPassable(tx, ty, false);
         }
-        static const char *const kKindNames[] = {"tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)"};
+        static const char *const kKindNames[] = {"tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks"};
         think("BUILD", std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y) + ") for $" + std::to_string(cost));
         if(const Building *b = entities.getBuilding(id))
         {
@@ -1536,14 +1585,14 @@ namespace OpenArtOfWar
             return;
         m_buildTimer = 0.0f;
 
-        // Troops come first: building only spends what is left above a reserve for the next wave
-        const int reserve = 300;
+        // Troops come first: building only spends what is left above a reserve for the next wave (except a missing barracks)
         int wallsThisTick = 0;
         for(auto &site : m_defensePlan)
         {
             if(site.done)
                 continue;
             const int cost = defenseCost(site.kind);
+            const int reserve = site.kind == AIDefenseSite::Barracks ? 0 : 300;
             if(m_credits - cost < reserve)
             {
                 thinkOnce("build", "BUILD", "Fortification waits: troops come first (keeping $" + std::to_string(reserve) + " in reserve)");

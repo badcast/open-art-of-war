@@ -6,6 +6,7 @@
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
 #include "graphics/RenderBackend.hpp"
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ struct SDL_Texture;
 
 namespace OpenArtOfWar
 {
+    class GameSounds;
 
     class TextureManager;
     class Renderer;
@@ -56,7 +58,9 @@ namespace OpenArtOfWar
 
         bool init(int windowWidth = DEFAULT_WINDOW_WIDTH, int windowHeight = DEFAULT_WINDOW_HEIGHT);
         void run();
-        bool runHeadlessTest(int numTicks = 200);
+#if defined(AOW_DEBUG)
+        bool runHeadlessTest(int numTicks = 200); // debug builds only (HeadlessTest.cpp)
+#endif
         void shutdown();
         void setDebugMode(bool debug);
         bool isDebugMode() const
@@ -64,6 +68,9 @@ namespace OpenArtOfWar
             return m_debugMode;
         }
         void launchTestMap();
+        // Single-player game on a map straight from the command line (--map=<name|path>, --from-scratch):
+        // the same start as a custom game picked in the menu. False when the map is unknown or fails to load.
+        bool launchMap(const std::string &nameOrPath, bool fromScratch);
 
         const Settings &settings() const
         {
@@ -86,13 +93,13 @@ namespace OpenArtOfWar
         }
         // Network game from the command line (until the lobby screen exists): host on `port` and start the
         // match on `mapPath` once `players` have joined, or join address:port
-        void hostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name);
+        void hostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
         void joinNetworkGame(const std::string &address, uint16_t port, const std::string &name);
         // The hosted game is listed on the server (reachable by its code through NAT hole punching)
         void announceNetworkGame(const std::string &server, uint16_t port);
         // Through a dedicated server (host:port): create a room (code empty) or join the room with `code`;
         // `players` / `mapPath` as for hostNetworkGame (the creator owns the room)
-        void serverNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name);
+        void serverNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
         // Applies the options of one area to the running game and stores them in settings.json
         void applySettings(SettingsArea area);
 
@@ -112,12 +119,26 @@ namespace OpenArtOfWar
         void beginVideoConfirm(const Settings &previous);
         void updateVideoConfirm(float deltaTime);
         void renderVideoConfirm();
+        void syncWindowSize(int w = 0, int h = 0);
         void renderFpsCounter();
+        // Settings "Network statistics": ping, jitter, loss, traffic, turn buffer (network lobby and match)
+        void renderNetStats();
         // Network match: services the session, starts the match when its setup arrives
         void updateNetwork(uint32_t nowMs);
         bool inNetworkMatch() const;
         void driveNetworkBot(uint32_t tick);
         void renderNetworkBanner();
+        // Network match: notices who drops out / comes back / leaves (from the room's roster)
+        void trackNetPlayers(uint32_t nowMs);
+        // Short messages over the battlefield ("Player X has disconnected"), they fade after a few seconds
+        void pushNotice(const std::string &text, uint32_t nowMs);
+        void renderNotices();
+        // Tab held in a match: every player with faction, colour, name and efficiency points
+        void renderScoreboard();
+        // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat
+        void updateSounds();
+        std::unique_ptr<GameSounds> m_gameSounds;
+        AppState m_soundState {AppState::SplashLogo}; // the state the last updateSounds saw
         // Draws the loading screen right now (for work that blocks the main loop: start-up, loading a match); the window
         // stays alive. `progress` 0..1, negative for an unknown length. Nothing in headless mode.
         void showLoading(const std::string &status, float progress);
@@ -192,6 +213,22 @@ namespace OpenArtOfWar
         std::string m_netMapPath;
         bool m_netMatchStarted {false};
         bool m_netMatchLoaded {false}; // the match world is set up and playing (or was)
+        // The match's players as the roster last showed them (by slot), to notice changes and to name them on the
+        // scoreboard after they have gone
+        struct NetPlayer
+        {
+            std::string name;
+            bool present {false}; // in the roster
+            bool connected {false};
+            bool left {false}; // was in the match and is gone for good
+        };
+        std::array<NetPlayer, 8> m_netPlayers {};
+        struct Notice
+        {
+            std::string text;
+            uint32_t untilMs {0};
+        };
+        std::vector<Notice> m_notices;
         std::unique_ptr<TextureManager> m_texManager;
         std::unique_ptr<Renderer> m_renderer;
         std::unique_ptr<Camera> m_camera;
@@ -206,7 +243,9 @@ namespace OpenArtOfWar
         std::unique_ptr<AIController> m_aiController;
         std::unique_ptr<MissionController> m_mission;
         std::unique_ptr<SaveManager> m_saveManager;
-        std::unique_ptr<DebugOverlay> m_debug;
+#if defined(AOW_DEBUG)
+        std::unique_ptr<DebugOverlay> m_debug; // Dear ImGui debug overlay: debug builds only
+#endif
 
         // Subsystem Controllers
         std::unique_ptr<MenuController> m_menuController;

@@ -1,4 +1,5 @@
 #include "CommentedYaml.hpp"
+#include "ConfigMerge.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -65,6 +66,7 @@ bool CommentedYaml::load(const std::filesystem::path& path, std::string& error) 
     }
     m_path = path;
     m_lines = std::move(lines);
+    m_edits.clear();
     m_dirty = false;
     m_loaded = true;
     index();
@@ -73,16 +75,20 @@ bool CommentedYaml::load(const std::filesystem::path& path, std::string& error) 
 
 bool CommentedYaml::save(std::string& error) {
     if (!m_loaded) return false;
-    std::ofstream out(m_path);
-    if (!out) {
-        error = "Could not open file for writing: " + m_path.string();
-        return false;
+    // The file as it is now, with the editor's edits applied again: whatever was added there since loading
+    // stays. An edit whose key is gone from the file is dropped: the file's contents are never overwritten
+    // with an older copy.
+    CommentedYaml fresh;
+    std::string loadError;
+    const std::vector<std::pair<std::string, std::string>> edits = m_edits;
+    if (fresh.load(m_path, loadError)) {
+        for (const auto& [path, value] : edits) fresh.set(path, value);
+        m_lines = fresh.m_lines;
+        m_node = fresh.m_node;
+        index();
     }
-    out << text();
-    if (!out) {
-        error = "Failed to write file: " + m_path.string();
-        return false;
-    }
+    if (!writeFileAtomic(m_path, text(), error)) return false;
+    m_edits.clear();
     m_dirty = false;
     return true;
 }
@@ -176,6 +182,7 @@ bool CommentedYaml::set(const std::string& path, const std::string& valueText) {
         m_lines[it->second] = old;
         return false;
     }
+    m_edits.emplace_back(path, valueText);
     m_dirty = true;
     return true;
 }

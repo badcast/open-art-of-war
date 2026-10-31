@@ -4,6 +4,7 @@
 #include "game/Players.hpp"
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "core/Utility.hpp"
 #include "game/Missions.hpp"
 #include "game/Research.hpp"
@@ -199,6 +200,9 @@ namespace OpenArtOfWar
 
     bool MissionController::loadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
+        // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
+        // custom match before left its own slots, colours and local slot behind)
+        setPlayerFaction(playerFaction());
         ++m_loadSerial;
         resetResearch();
         m_customMapPath.clear();
@@ -255,8 +259,8 @@ namespace OpenArtOfWar
         };
 
         // 2. Load corresponding map
-        std::string mapPath = assetRoot + "/maps/" + jmi.mapFile + ".json";
-        if(!map.loadMap(mapPath) && !map.loadMap("maps/" + jmi.mapFile + ".json"))
+        std::string mapPath = LoaderResources::mapPath(jmi.mapFile, assetRoot);
+        if(!map.loadMap(mapPath))
         {
             std::cerr << "[MissionController] Failed to load map: " << mapPath << std::endl;
             return false;
@@ -624,13 +628,16 @@ namespace OpenArtOfWar
 
     bool MissionController::loadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
-        return loadTestMap("assets", map, entities, economy, pathfinder);
+        // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
+        // custom match before left its own slots, colours and local slot behind)
+        setPlayerFaction(playerFaction());
+        return loadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
     }
 
     std::vector<SkirmishMapInfo> MissionController::listSkirmishMaps()
     {
         std::vector<SkirmishMapInfo> maps;
-        for(const std::string &path : Assets::list("assets/maps", ".json"))
+        for(const std::string &path : LoaderResources::listMaps())
         {
             std::string text;
             if(!Assets::readText(path, text))
@@ -929,6 +936,9 @@ namespace OpenArtOfWar
 
     bool MissionController::loadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt)
     {
+        // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
+        // custom match before left its own slots, colours and local slot behind)
+        setPlayerFaction(playerFaction());
         std::string mapText;
         if(!Assets::readText(mapPath, mapText) || !map.loadMap(mapPath))
         {
@@ -1091,14 +1101,20 @@ namespace OpenArtOfWar
         if(!prebuiltHq[0])
         {
             planner.place(9, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
-            planner.place(10, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
-            planner.placeUnits(kResistanceBase.units, pcx, pcy, Faction::Resistance, autoOwner);
+            if(usePrebuilt)
+            {
+                planner.place(10, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
+                planner.placeUnits(kResistanceBase.units, pcx, pcy, Faction::Resistance, autoOwner);
+            }
         }
         if(!prebuiltHq[1])
         {
             planner.place(1, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
-            planner.place(2, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
-            planner.placeUnits(kConfederationBase.units, ecx, ecy, Faction::Confederation, autoOwner);
+            if(usePrebuilt)
+            {
+                planner.place(2, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
+                planner.placeUnits(kConfederationBase.units, ecx, ecy, Faction::Confederation, autoOwner);
+            }
         }
 
         m_playerHqTileX = hqX;
@@ -1273,8 +1289,11 @@ namespace OpenArtOfWar
             if(!planner.place(base.hq, cx, cy, slot.faction, p, hqX, hqY))
                 return false;
             planner.place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
-            planner.place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);
-            planner.placeUnits(base.units, cx, cy, slot.faction, p);
+            if(setup.prebuilt)
+            {
+                planner.place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);
+                planner.placeUnits(base.units, cx, cy, slot.faction, p);
+            }
             if(p == setup.local)
             {
                 m_playerHqTileX = hqX;
@@ -1306,6 +1325,9 @@ namespace OpenArtOfWar
 
     bool MissionController::loadTestMap(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
+        // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
+        // custom match before left its own slots, colours and local slot behind)
+        setPlayerFaction(playerFaction());
         m_currentMissionId = -1; // Standalone test map, not a numbered campaign mission!
         m_customMapPath.clear();
         m_missionTime = 0.0f;
@@ -1317,14 +1339,9 @@ namespace OpenArtOfWar
         m_isVictory = false;
         m_isDefeat = false;
 
-        std::string testMapPath = "maps/testmap.json";
+        const std::string testMapPath = LoaderResources::testMap(assetRoot.empty() ? std::string(LoaderResources::kDefaultRoot) : assetRoot);
         std::string mapText;
         bool haveTestMap = Assets::readText(testMapPath, mapText);
-        if(!haveTestMap && !assetRoot.empty())
-        {
-            testMapPath = assetRoot + "/maps/testmap.json";
-            haveTestMap = Assets::readText(testMapPath, mapText);
-        }
         if(!haveTestMap)
         {
             std::cerr << "[MissionController] Failed to open test map: " << testMapPath << std::endl;

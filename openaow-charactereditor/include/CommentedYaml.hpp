@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace CharEditor {
@@ -35,6 +36,9 @@ private:
     void index();
 
     std::filesystem::path m_path;
+    // Values set since the last load/save, in order: on saving they are applied again to the file as it is
+    // then, so lines and keys added there meanwhile (by hand, a newer game) are not lost
+    std::vector<std::pair<std::string, std::string>> m_edits;
     std::vector<std::string> m_lines;
     std::map<std::string, int> m_lineOf;
     std::map<std::string, std::string> m_comments;

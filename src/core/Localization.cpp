@@ -14,7 +14,7 @@ namespace OpenArtOfWar
 {
 
     std::string Localization::s_currentLanguage = "en";
-    std::string Localization::s_localeDir = "assets/locale";
+    std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
     bool Localization::s_initialized = false;
 
     void Localization::init(const std::string &localeDir, const std::string &defaultLang)

@@ -56,6 +56,10 @@ namespace OpenArtOfWar
         {
             m_entities = entities;
         }
+        const EntityManager *getEntityManager() const
+        {
+            return m_entities;
+        }
         void syncMap(int ignoreEntityId = 0, bool lockUnits = true);
 
         bool findPath(int startX, int startY, int targetX, int targetY, std::vector<PathNode> &outPath, int ignoreEntityId = 0, bool *outIsPartial = nullptr, bool allowDiagonal = true);

@@ -1,6 +1,8 @@
 #include "ui/MenuController.hpp"
+#include "audio/SoundRequests.hpp"
 #include <nlohmann/json.hpp>
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "graphics/ShaderEffects.hpp"
 #include "game/Sides.hpp"
 #include "ui/UiKit.hpp"
@@ -102,7 +104,7 @@ namespace OpenArtOfWar
             UiRect sideBtn[1];    // combo: the side the player commands (Resistance / Confederation)
             UiRect difficultyBtn; // combo: AI difficulty, right of the side combo
             UiRect editorBtn;     // opens the map editor with the selected map, left of Start
-            UiRect layoutBtn;     // maps with buildings of their own: prebuilt bases or from scratch (top right of the details)
+            UiRect layoutBtn;     // custom game: prebuilt bases or from scratch (top right of the details)
             int itemH {40};
             int itemGap {4};
 
@@ -533,6 +535,16 @@ namespace OpenArtOfWar
                         s.showFps = on;
                         notify(SettingsArea::Video);
                     });
+
+                toggle(
+                    _("Network statistics"),
+                    _("Network game: ping, jitter, packet loss and traffic in the corner"),
+                    s.showNetStats,
+                    [&s, notify](bool on)
+                    {
+                        s.showNetStats = on;
+                        notify(SettingsArea::Video);
+                    });
             }
             else if(tab == 1)
             { // GRAPHICS: quality preset and render API
@@ -690,6 +702,19 @@ namespace OpenArtOfWar
                         s.fxVolume = static_cast<int>(v);
                         notify(SettingsArea::Audio);
                     }));
+                rows.push_back(sliderRow(
+                    _("Voice volume"),
+                    _("Volume of the unit replies and the announcer"),
+                    static_cast<float>(s.voiceVolume),
+                    0.0f,
+                    128.0f,
+                    8.0f,
+                    percent,
+                    [&s, notify](float v)
+                    {
+                        s.voiceVolume = static_cast<int>(v);
+                        notify(SettingsArea::Audio);
+                    }));
             }
             else
             { // GAME
@@ -760,6 +785,7 @@ namespace OpenArtOfWar
                 s.vsync = d.vsync;
                 s.fpsLimit = d.fpsLimit;
                 s.showFps = d.showFps;
+                s.showNetStats = d.showNetStats;
             }
             else if(tab == 1)
             {
@@ -773,6 +799,7 @@ namespace OpenArtOfWar
             {
                 s.musicVolume = d.musicVolume;
                 s.fxVolume = d.fxVolume;
+                s.voiceVolume = d.voiceVolume;
                 s.muted = d.muted;
             }
             else
@@ -886,7 +913,7 @@ namespace OpenArtOfWar
                     }
                     break;
                 case 4: // Restart mission
-                    mission.restart("assets", map, entities, economy, pathfinder);
+                    mission.restart(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
                     camera.centerOn(mission.getPlayerHqX() * TILE_WIDTH, mission.getPlayerHqY() * TILE_HEIGHT);
                     m_inGameMenuOpen = false;
                     break;
@@ -980,11 +1007,11 @@ namespace OpenArtOfWar
                 else
                 {
                     const auto &data = Missions::campaign(playerFaction())[m_campaignMissionSelected];
-                    m_beginLoading(_(data.info.name), "assets/maps/" + data.data.mapFile + ".json");
+                    m_beginLoading(_(data.info.name), LoaderResources::mapPath(data.data.mapFile));
                 }
             }
-            const bool started =
-                m_customGame ? mission.loadSkirmish(m_skirmishMaps[m_skirmishSelected].path, map, entities, economy, pathfinder, m_skirmishMaps[m_skirmishSelected].hasPrebuilt && m_skirmishPrebuilt) : mission.loadMission(m_campaignMissionSelected, "assets", map, entities, economy, pathfinder);
+            const bool started = m_customGame ? mission.loadSkirmish(m_skirmishMaps[m_skirmishSelected].path, map, entities, economy, pathfinder, m_skirmishPrebuilt)
+                                              : mission.loadMission(m_campaignMissionSelected, LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
             if(m_endLoading)
                 m_endLoading();
             if(!started)
@@ -1049,7 +1076,7 @@ namespace OpenArtOfWar
 
         if(input.isKeyJustPressed(SDL_SCANCODE_TAB))
             cycleDifficulty();
-        const bool hasLayoutChoice = m_customGame && m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size()) && m_skirmishMaps[m_skirmishSelected].hasPrebuilt;
+        const bool hasLayoutChoice = m_customGame && m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size());
         // The drop-down lists of the footer (side, difficulty) and of the map (prebuilt bases / from scratch)
         auto comboField = [&](int id) { return id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn); };
         if(m_combo.open >= 0 && m_combo.open < kComboSide)
@@ -1089,7 +1116,7 @@ namespace OpenArtOfWar
             // Side the player commands in this mission
             if(l.editorBtn.contains(mx, my))
             {
-                const std::string mapPath = m_customGame ? m_skirmishMaps[m_skirmishSelected].path : "assets/maps/" + Missions::campaign(playerFaction())[m_campaignMissionSelected].data.mapFile + ".json";
+                const std::string mapPath = m_customGame ? m_skirmishMaps[m_skirmishSelected].path : LoaderResources::mapPath(Missions::campaign(playerFaction())[m_campaignMissionSelected].data.mapFile);
                 m_editorNotice = launchMapEditor(mapPath) ? "" : _("Map editor (openaow-mapeditor) not found next to the game");
                 return true;
             }
@@ -1149,7 +1176,7 @@ namespace OpenArtOfWar
                 state = AppState::MenuNetwork;
                 break;
             case 3: // Test map
-                mission.loadTestMap("assets", map, entities, economy, pathfinder);
+                mission.loadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
                 state = AppState::CampaignPlaying;
                 camera.centerOn((mission.getPlayerHqX() + 12) * TILE_WIDTH, mission.getPlayerHqY() * TILE_HEIGHT);
                 break;
@@ -1420,13 +1447,13 @@ namespace OpenArtOfWar
     void MenuController::renderSplashLogo(Renderer &renderer, Camera &camera, TextureManager &texManager, int windowW, int windowH)
     {
         (void) camera;
-        renderer.fillRectScreen(0, 0, windowW, windowH, {0, 16, 60, 255});
+        renderer.fillRectScreen(0, 0, windowW, windowH, {0, 0, 0, 255});
 
         SDL_Texture *logoTex = texManager.getUiTexture("logo");
         if(logoTex)
         {
-            int lw = 296;
-            int lh = 196;
+            int lw = logoTex->w / 2;
+            int lh = logoTex->h / 2;
             int lx = (windowW - lw) / 2;
             int ly = (windowH - lh) / 2 - 25;
             renderer.drawTextureScreen(logoTex, lx, ly, lw, lh);
@@ -1488,6 +1515,8 @@ namespace OpenArtOfWar
         for(int i = 0; i < kMainMenuItems; ++i)
         {
             UiRect r = mainMenuItemRect(i, windowW, windowH);
+            if(r.contains(m_mouseX, m_mouseY))
+                SoundRequests::markHover();
             bool selected = (i == m_selectedMenuItem);
             bool isExit = (i == kMainMenuItems - 1);
             std::string label = _(kMainMenuLabels[i]);
@@ -1600,7 +1629,7 @@ namespace OpenArtOfWar
         {
             std::vector<std::string> out;
             std::string text;
-            if(!Assets::readText("assets/data/tracklist.json", text))
+            if(!Assets::readText(LoaderResources::tracklist(), text))
                 return out;
             const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
             if(!doc.is_object())
@@ -1643,7 +1672,7 @@ namespace OpenArtOfWar
             _("Music:")};
         // The licence texts shipped with the music; the tracklist authors only when the file is missing
         std::string licence;
-        if(Assets::readText("assets/audio/LICENSE", licence))
+        if(Assets::readText(LoaderResources::audioLicense(), licence))
         {
             std::istringstream in(licence);
             std::string line;
@@ -1760,6 +1789,8 @@ namespace OpenArtOfWar
         for(int i = 0; i < kPauseItems; ++i)
         {
             bool hot = (i == m_inGameMenuSelected) || l.items[i].contains(m_mouseX, m_mouseY);
+            if(l.items[i].contains(m_mouseX, m_mouseY))
+                SoundRequests::markHover();
             ui::ButtonStyle style = (i == 0) ? ui::ButtonStyle::Primary : (i == kPauseItems - 1 ? ui::ButtonStyle::Danger : ui::ButtonStyle::Secondary);
             ui::drawButton(renderer, fontRenderer, l.items[i], items[i], style, hot);
         }
@@ -1818,6 +1849,8 @@ namespace OpenArtOfWar
             UiRect r = l.item(row);
             bool isSelected = (i == selected);
             bool hovered = r.contains(m_mouseX, m_mouseY);
+            if(hovered)
+                SoundRequests::markHover();
 
             renderer.fillRectScreen(r.x, r.y, r.w, r.h, isSelected ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
             renderer.drawRectScreen(r.x, r.y, r.w, r.h, isSelected ? col::BorderStrong : col::Border);
@@ -1860,12 +1893,9 @@ namespace OpenArtOfWar
 
             int x = d.x + 20;
             int w = d.w - 40;
-            const int titleW = info.hasPrebuilt ? w - 220 : w;
+            const int titleW = w - 220;
             fontRenderer.drawString(ui::fitText(fontRenderer, info.displayName(), ui::FONT_H2, titleW), x, d.y + 18, ui::FONT_H2, col::Accent, true);
-            if(info.hasPrebuilt)
-            {
-                ui::drawComboField(renderer, fontRenderer, l.layoutBtn, m_skirmishPrebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"), m_combo.open == kComboLayout, l.layoutBtn.contains(m_mouseX, m_mouseY));
-            }
+            ui::drawComboField(renderer, fontRenderer, l.layoutBtn, m_skirmishPrebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"), m_combo.open == kComboLayout, l.layoutBtn.contains(m_mouseX, m_mouseY));
             fontRenderer.drawString(info.name + ".json", x, d.y + 50, ui::FONT_SMALL, col::TextMuted, false);
             renderer.fillRectScreen(x, d.y + 74, w, 1, col::Border);
             const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
@@ -1902,7 +1932,7 @@ namespace OpenArtOfWar
             int pw = 0, ph = 0;
             // Each side has its own campaign: the key keeps their pictures apart
             const std::string previewKey = std::string("mission:") + (playerFaction() == Faction::Confederation ? "c" : "r") + std::to_string(selected);
-            SDL_Texture *tex = m_mapPreview.get(renderer.getSDLRenderer(), texManager, previewKey, "assets/maps/" + data.mapFile + ".json", markers, pw, ph);
+            SDL_Texture *tex = m_mapPreview.get(renderer.getSDLRenderer(), texManager, previewKey, LoaderResources::mapPath(data.mapFile), markers, pw, ph);
             drawMapPreview(renderer, tex, pw, ph, d);
         }
 

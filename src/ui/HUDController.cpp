@@ -1,8 +1,10 @@
 #include "ui/HUDController.hpp"
+#include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Localization.hpp"
 #include "graphics/Renderer.hpp"
+#include "graphics/ShaderEffects.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/TextureManager.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -243,6 +245,32 @@ namespace OpenArtOfWar
             return out;
         }
 
+        // A true circle outline in screen pixels (64 segments)
+        void drawCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+        {
+            constexpr int kSegments = 64;
+            float px = cx + radius, py = cy;
+            for(int i = 1; i <= kSegments; ++i)
+            {
+                const float a = 6.28318530718f * static_cast<float>(i) / kSegments;
+                const float nx = cx + radius * std::cos(a), ny = cy + radius * std::sin(a);
+                renderer.drawLineScreen(static_cast<int>(std::lround(px)), static_cast<int>(std::lround(py)), static_cast<int>(std::lround(nx)), static_cast<int>(std::lround(ny)), color);
+                px = nx;
+                py = ny;
+            }
+        }
+        // A filled disc, one horizontal span per pixel row
+        void fillCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+        {
+            const int r = static_cast<int>(std::ceil(radius));
+            for(int dy = -r; dy <= r; ++dy)
+            {
+                const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(dy * dy)));
+                const int x0 = static_cast<int>(std::lround(cx - span)), x1 = static_cast<int>(std::lround(cx + span));
+                renderer.fillRectScreen(x0, static_cast<int>(std::lround(cy)) + dy, std::max(1, x1 - x0), 1, color);
+            }
+        }
+
         // Zoom buttons in the radar's bottom-right corner
         UiRect radarZoomInBtn(const UiRect &radar)
         {
@@ -251,6 +279,21 @@ namespace OpenArtOfWar
         UiRect radarZoomOutBtn(const UiRect &radar)
         {
             return {radar.right() - 44, radar.bottom() - 22, 20, 20};
+        }
+
+        SDL_Color radarFactionColor(Faction f, bool unit);
+
+        // A player's own army colour on the radar when it has one, else the classic colour of its faction
+        SDL_Color radarOwnerColor(PlayerId owner, Faction f, bool unit)
+        {
+            if(owner < kMaxPlayers && Players::isActive(owner) && Players::slot(owner).color > 0)
+            {
+                SDL_Color c = armyColor(Players::slot(owner).color);
+                if(unit) // units a little lighter than buildings, as with the classic colours
+                    c = {static_cast<Uint8>(c.r + (255 - c.r) / 3), static_cast<Uint8>(c.g + (255 - c.g) / 3), static_cast<Uint8>(c.b + (255 - c.b) / 3), 255};
+                return c;
+            }
+            return radarFactionColor(f, unit);
         }
 
         SDL_Color radarFactionColor(Faction f, bool unit)
@@ -300,7 +343,12 @@ namespace OpenArtOfWar
             {
                 int iconX = cell.x + (cell.w - kCameoW * 2) / 2;
                 int iconY = cell.y + 3;
+                // The icons wear the player's army colour, like its buildings and units
+                r.setDrawOwner(Players::local());
+                r.setStructureFaction(playerFaction());
                 r.drawCompositeScreen(compId, iconX, iconY, 2.0f, playerFaction());
+                r.setStructureFaction(Faction::Neutral);
+                r.setDrawOwner(kNoPlayer);
             }
             if(locked)
             {
@@ -374,6 +422,10 @@ namespace OpenArtOfWar
 
     void HUDController::issue(SimCommand command)
     {
+        if(command.type == CommandType::Produce || command.type == CommandType::StartResearch)
+            SoundRequests::play("production_start");
+        else if(command.type == CommandType::Stop || command.type == CommandType::HoldPosition)
+            SoundRequests::play("@hold");
         if(!m_sim)
             return;
         command.player = Players::local();
@@ -431,6 +483,7 @@ namespace OpenArtOfWar
 
     void HUDController::announceResearch(int upgradeIndex)
     {
+        SoundRequests::announce("ann_research_complete");
         const ResearchDef &r = researchDef(playerFaction(), upgradeIndex);
         if(r.effect == ResearchEffect::FortressFlamethrower)
         {
@@ -473,6 +526,7 @@ namespace OpenArtOfWar
 
     void HUDController::resetForMission()
     {
+        m_radarAlert.reset();
         m_primaryBarracksId = 0;
         m_primaryFactoryId = 0;
         m_buildMode = false;
@@ -520,6 +574,7 @@ namespace OpenArtOfWar
         const int cost = cfg ? cfg->creditCost : 100;
         if(!economy.canAfford(cost))
         {
+            SoundRequests::announce("ann_insufficient_funds");
             setNotification(_("INSUFFICIENT CREDITS!"));
             return false;
         }
@@ -601,6 +656,7 @@ namespace OpenArtOfWar
                 const auto &blueprints = EntityManager::getBlueprints();
                 if(index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6 && !isRadarUnlocked(Players::local()))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"));
                 }
                 else if(index < static_cast<int>(blueprints.size()))
@@ -614,10 +670,12 @@ namespace OpenArtOfWar
             case TabInfantry:
                 if(!isUnitUnlocked(Players::local(), unitCatalog(true).items[index].archetype))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("RESEARCH REQUIRED TO TRAIN THIS UNIT!"));
                 }
-                else if(!entities.hasBuildingType(UnitType::Barracks, playerFaction()))
+                else if(!entities.hasBuildingType(UnitType::Barracks, Players::local()))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"));
                 }
                 else
@@ -628,10 +686,12 @@ namespace OpenArtOfWar
             case TabVehicles:
                 if(!isUnitUnlocked(Players::local(), unitCatalog(false).items[index].archetype))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("RESEARCH REQUIRED TO BUILD THIS UNIT!"));
                 }
-                else if(!entities.hasBuildingType(UnitType::Factory, playerFaction()))
+                else if(!entities.hasBuildingType(UnitType::Factory, Players::local()))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("VEHICLE FACTORY REQUIRED FOR PRODUCTION!"));
                 }
                 else
@@ -644,18 +704,22 @@ namespace OpenArtOfWar
                 const auto &r = researchDef(playerFaction(), index);
                 if(!hasResearchBuilding(Players::local(), entities))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(playerFaction() == Faction::Confederation ? _("TECH CENTER REQUIRED FOR RESEARCH!") : _("LABORATORY REQUIRED FOR RESEARCH!"));
                 }
                 else if(isResearched(Players::local(), index))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("THIS TECHNOLOGY IS ALREADY RESEARCHED!"));
                 }
                 else if(!isResearchAvailable(Players::local(), index))
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(std::string(_("REQUIRES: ")) + _(researchDef(playerFaction(), r.needs).name));
                 }
                 else if(m_sim && m_sim->research(Players::local()).active >= 0)
                 {
+                    SoundRequests::play("ui_error");
                     setNotification(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
                 }
                 else if(economy.canAfford(r.cost))
@@ -667,6 +731,7 @@ namespace OpenArtOfWar
                 }
                 else
                 {
+                    SoundRequests::announce("ann_insufficient_funds");
                     setNotification(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
                 }
                 break;
@@ -913,6 +978,12 @@ namespace OpenArtOfWar
             SDL_Color pCol = deficit ? col::Danger : col::Ok;
             std::string pwr = std::to_string(cons) + " / " + std::to_string(prod) + _(" kW");
             fontRenderer.drawString(pwr, h.right(), h.y + 2, ui::FONT_SMALL_BOLD, pCol, false, Anchor::RIGHT | Anchor::TOP);
+            // The lightning of the game next to the kW figures; it blinks while the power is short
+            if(!deficit || powerIconBlinkOn())
+            {
+                const int textW = fontRenderer.getTextWidth(pwr, ui::FONT_SMALL_BOLD);
+                renderer.drawRawSpriteScreen(kPowerIconSprite, h.right() - textW - 27, h.y, 1.0f);
+            }
             fontRenderer.drawString(_("POWER"), h.right(), h.y + 17, ui::FONT_SMALL, col::TextMuted, false, Anchor::RIGHT | Anchor::TOP);
 
             float ratio = static_cast<float>(cons) / static_cast<float>(std::max(1, prod));
@@ -966,7 +1037,7 @@ namespace OpenArtOfWar
                         }
                         if(map.getWall(tx, ty) > 0)
                         {
-                            renderer.fillRectScreen(px, py, pw, ph, radarFactionColor(map.getWallFaction(tx, ty), false));
+                            renderer.fillRectScreen(px, py, pw, ph, radarOwnerColor(map.getWallOwner(tx, ty), map.getWallFaction(tx, ty), false));
                         }
                         else if(!map.isPassable(tx, ty))
                         {
@@ -975,6 +1046,9 @@ namespace OpenArtOfWar
                     }
                 }
 
+                // First enemy drawn on the radar this frame: the radar alarm's contact point
+                bool enemyOnRadar = false;
+                float contactX = 0.0f, contactY = 0.0f;
                 for(const auto &e : entities.getAllEntities())
                 {
                     if(!e.alive || e.state == ActionState::Die)
@@ -998,14 +1072,47 @@ namespace OpenArtOfWar
                     if(b)
                     {
                         cellRect(static_cast<float>(b->tileX), static_cast<float>(b->tileY), static_cast<float>(b->buildWidth), static_cast<float>(b->buildHeight), px, py, pw, ph);
-                        renderer.fillRectScreen(px, py, std::max(3, pw), std::max(3, ph), radarFactionColor(e.faction, false));
+                        renderer.fillRectScreen(px, py, std::max(3, pw), std::max(3, ph), radarOwnerColor(e.owner, e.faction, false));
                     }
                     else
                     {
                         cellRect(e.getUnitCenterPixelX() / TILE_WIDTH - 0.5f, e.getUnitCenterPixelY() / TILE_HEIGHT - 0.5f, 1.0f, 1.0f, px, py, pw, ph);
                         const int s = std::max(2, std::min(pw, ph));
-                        renderer.fillRectScreen(px + (pw - s) / 2, py + (ph - s) / 2, s, s, radarFactionColor(e.faction, true));
+                        renderer.fillRectScreen(px + (pw - s) / 2, py + (ph - s) / 2, s, s, radarOwnerColor(e.owner, e.faction, true));
                     }
+                    if(!enemyOnRadar && !own && e.faction != Faction::Neutral && Players::hostile(e.owner, Players::local()) && (!b || m_radarAlert.config.includeBuildings))
+                    {
+                        enemyOnRadar = true;
+                        contactX = e.getUnitCenterPixelX() / TILE_WIDTH;
+                        contactY = e.getUnitCenterPixelY() / TILE_HEIGHT;
+                        if(b)
+                        {
+                            contactX = b->tileX + b->buildWidth * 0.5f;
+                            contactY = b->tileY + b->buildHeight * 0.5f;
+                        }
+                    }
+                }
+
+                // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
+                const uint64_t nowMs = SDL_GetTicks();
+                m_radarAlert.update(nowMs, enemyOnRadar, contactX, contactY);
+                if(m_radarAlert.active())
+                {
+                    const RadarAlertConfig &ac = m_radarAlert.config;
+                    const float cx = v.toScreenX(m_radarAlert.tileX());
+                    const float cy = v.toScreenY(m_radarAlert.tileY());
+                    for(int i = 0; i < ac.waveCount; ++i)
+                    {
+                        float radius = 0.0f, opacity = 0.0f;
+                        if(!m_radarAlert.wave(i, nowMs, radius, opacity))
+                            continue;
+                        SDL_Color wc = ac.color;
+                        wc.a = static_cast<Uint8>(ac.color.a * opacity);
+                        for(int k = 0; k < ac.waveThicknessPx; ++k)
+                            drawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
+                    }
+                    if(m_radarAlert.blinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
+                        fillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
                 }
 
                 // Camera frame from rounded edges (truncating position and size separately made it wobble)
@@ -1018,6 +1125,18 @@ namespace OpenArtOfWar
             }
             renderer.drawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
 
+            // Radar alarm: the radar's sides flash red, the band fading inward
+            if(m_radarAlert.blinkOn(SDL_GetTicks()))
+            {
+                const RadarAlertConfig &ac = m_radarAlert.config;
+                for(int k = 0; k < ac.edgeWidthPx; ++k)
+                {
+                    SDL_Color ec = ac.color;
+                    ec.a = static_cast<Uint8>(ac.edgeAlpha * (ac.edgeWidthPx - k) / ac.edgeWidthPx);
+                    renderer.drawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
+                }
+            }
+
             // Zoom buttons
             const UiRect zoomBtns[2] = {radarZoomOutBtn(rd), radarZoomInBtn(rd)};
             for(int k = 0; k < 2; ++k)
@@ -1025,6 +1144,8 @@ namespace OpenArtOfWar
                 const UiRect &b = zoomBtns[k];
                 const bool enabled = (k == 0) ? m_radarZoom > 1 : m_radarZoom < kRadarMaxZoom;
                 const bool hot = enabled && b.contains(mx, my);
+                if(hot)
+                    SoundRequests::markHover();
                 renderer.fillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
                 renderer.drawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
                 const SDL_Color sc = enabled ? col::Text : col::TextMuted;
@@ -1048,6 +1169,8 @@ namespace OpenArtOfWar
             const UiRect &tr = l.tabs[t];
             bool active = (t == m_activeTab);
             bool hovered = tr.contains(mx, my);
+            if(hovered)
+                SoundRequests::markHover();
             renderer.fillRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
             renderer.drawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
             if(active)
@@ -1058,7 +1181,11 @@ namespace OpenArtOfWar
                 renderer.setClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
                 float s = 0.75f;
                 int iw = static_cast<int>(kCameoW * s);
+                renderer.setDrawOwner(Players::local());
+                renderer.setStructureFaction(playerFaction());
                 renderer.drawCompositeScreen(tabIcon(t), tr.centerX() - iw / 2, tr.y + 6, s, playerFaction());
+                renderer.setStructureFaction(Faction::Neutral);
+                renderer.setDrawOwner(kNoPlayer);
                 renderer.resetClipRect();
                 if(!active)
                     renderer.fillRectScreen(tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
@@ -1124,8 +1251,8 @@ namespace OpenArtOfWar
         // --- Cameo grid -----------------------------------------------------------------------------------
         std::string hoverTitle;
         std::string hoverText;
-        bool hasBarracks = entities.hasBuildingType(UnitType::Barracks, playerFaction());
-        bool hasFactory = entities.hasBuildingType(UnitType::Factory, playerFaction());
+        bool hasBarracks = entities.hasBuildingType(UnitType::Barracks, Players::local());
+        bool hasFactory = entities.hasBuildingType(UnitType::Factory, Players::local());
         bool hasLab = hasResearchBuilding(Players::local(), entities);
         // Orders shown on unit cards come from the buildings that would train them
         auto queuedAt = [&](UnitType buildingType)
@@ -1146,6 +1273,8 @@ namespace OpenArtOfWar
             if(c.bottom() < l.grid.y || c.y > l.grid.bottom())
                 continue;
             bool hovered = c.contains(mx, my) && l.grid.contains(mx, my);
+            if(hovered)
+                SoundRequests::markHover();
 
             switch(m_activeTab)
             {
@@ -1399,6 +1528,34 @@ namespace OpenArtOfWar
         const SDL_Color kBuildRadiusColor {160, 80, 230, 90};
     } // namespace
 
+    bool HUDController::powerIconBlinkOn()
+    {
+        return (SDL_GetTicks() / 400) % 2 == 0; // 0.4 s on, 0.4 s off
+    }
+
+    void HUDController::renderPowerAlerts(Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const
+    {
+        if(!economy.hasPowerDeficit() || !powerIconBlinkOn())
+            return;
+        const float zoom = camera.getZoom();
+        const float scale = std::clamp(zoom, 0.75f, 1.5f);
+        for(const auto &e : entities.getAllEntities())
+        {
+            const Building *b = e.asBuilding();
+            if(!b || !b->alive || b->state == ActionState::Die || b->owner != Players::local() || b->buildProgress < 1.0f || b->isPowered)
+                continue;
+            // Only what consumes power (power plants and power-free buildings keep working)
+            const BuildingConfig *cfg = entities.getBuildingConfig(b->rawBuildingType);
+            if(!cfg || cfg->powerCost >= 0)
+                continue;
+            float sx = 0.0f, sy = 0.0f;
+            camera.worldToScreen((b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
+            // Over the roof: the top of the footprint, a little above
+            const int w = static_cast<int>(23 * scale), h = static_cast<int>(19 * scale);
+            renderer.drawRawSpriteScreen(kPowerIconSprite, static_cast<int>(sx) - w / 2, static_cast<int>(sy) - h - static_cast<int>(10 * zoom), scale);
+        }
+    }
+
     void HUDController::renderProductionOverlay(Renderer &renderer, BitmapFontRenderer &fontRenderer, const EntityManager &entities, const TileMap &map, const Camera &camera) const
     {
         const float zoom = camera.getZoom();
@@ -1523,8 +1680,10 @@ namespace OpenArtOfWar
         // Walls are drawn exactly like the placed segment (building 15 / 25, the reinforced 20 after Active Wall Armor),
         // not with a stray composite
         const int drawIndex = (bp.buildingIndex == 15 && isEffectResearched(Players::local(), ResearchEffect::WallStrength)) ? 20 : bp.buildingIndex;
+        renderer.setDrawOwner(Players::local()); // the ghost already wears the player's army colour
         renderer.drawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 0, camera, playerFaction(), 0, 1.0f, false);
         renderer.drawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 1, camera, playerFaction(), 0, 1.0f, false);
+        renderer.setDrawOwner(kNoPlayer);
     }
 
 } // namespace OpenArtOfWar

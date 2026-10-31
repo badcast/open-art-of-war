@@ -225,18 +225,17 @@ namespace OpenArtOfWar
                         {
                             if(std::abs(dx) != r && std::abs(dy) != r)
                                 continue;
-                            int nx = targetX + dx;
-                            int ny = targetY + dy;
-                            if(nx >= 0 && nx < mapW && ny >= 0 && ny < mapH)
+                            brain::the_site site {targetX + dx, targetY + dy};
+                            if(site.x >= 0 && site.x < mapW && site.y >= 0 && site.y < mapH)
                             {
-                                if(!m_brainMap->has_lock(brain::the_site {nx, ny}))
+                                if(!m_brainMap->has_lock(site))
                                 {
-                                    int dsq = (nx - startX) * (nx - startX) + (ny - startY) * (ny - startY);
+                                    int dsq = (site.x - startX) * (site.x - startX) + (site.y - startY) * (site.y - startY);
                                     if(dsq < bestDistSq)
                                     {
                                         bestDistSq = dsq;
-                                        altX = nx;
-                                        altY = ny;
+                                        altX = site.x;
+                                        altY = site.y;
                                     }
                                 }
                             }
@@ -313,14 +312,8 @@ namespace OpenArtOfWar
         // Fortress, which only turns by 90 degrees). Reorder the steps into long straight runs: same tiles
         // count, same length, far fewer turns. A swap is only made when the new corner tile is free.
         auto freeTile = [&](int x, int y) { return x >= 0 && x < mapW && y >= 0 && y < mapH && m_map->isPassable(x, y) && m_map->getWall(x, y) == 0 && !m_brainMap->has_lock(brain::the_site {x, y}); };
-        auto stepOk = [&](int fromX, int fromY, int dx, int dy)
-        {
-            if(!freeTile(fromX + dx, fromY + dy))
-                return false;
-            if(dx != 0 && dy != 0)
-                return freeTile(fromX + dx, fromY) && freeTile(fromX, fromY + dy); // no corner cutting
-            return true;
-        };
+        // (a diagonal step needs only its own tile: corners may be cut, as everywhere else)
+        auto stepOk = [&](int fromX, int fromY, int dx, int dy) { return freeTile(fromX + dx, fromY + dy); };
         auto straighten = [&](std::vector<PathNode> &pathVec) -> bool
         {
             const size_t n = pathVec.size();

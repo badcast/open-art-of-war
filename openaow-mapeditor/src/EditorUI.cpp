@@ -1,4 +1,5 @@
 #include "EditorUI.hpp"
+#include "core/LoaderResources.hpp"
 #include "SmartGenerator.hpp"
 #include "game/TileCollision.hpp"
 #include "core/AssetStore.hpp"
@@ -298,7 +299,7 @@ void EditorUI::requestClose(const MapDocument& doc) {
 
 void EditorUI::scanAvailableMaps() {
     m_availableMaps.clear();
-    const std::string searchDirs[] = {"assets/maps"};
+    const std::string searchDirs[] = {OpenArtOfWar::LoaderResources::mapsDir()};
 
     for (const auto& sdir : searchDirs) {
         for (const std::string& mapPath : OpenArtOfWar::Assets::list(sdir, ".json")) {
@@ -1089,7 +1090,7 @@ void EditorUI::renderSaveAsModal(MapDocument& doc) {
             if (fname.find(".json") == std::string::npos) {
                 fname += ".json";
             }
-            std::string savePath = OpenArtOfWar::Assets::writablePath("assets/maps/" + fname);
+            std::string savePath = OpenArtOfWar::Assets::writablePath(OpenArtOfWar::LoaderResources::mapsDir() + "/" + fname);
             doc.setName(m_saveMapName);
             if (doc.saveMap(savePath)) {
                 showToast("Карта успешно сохранена в " + savePath);

@@ -183,7 +183,9 @@ namespace OpenArtOfWar
         void orderLeg(const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder);
         // A member whose path is far longer than the straight way (e.g. to reach a slot behind the crowd
         // or around a wall) stays where it is instead of running across the map; the next leg moves it on
-        void capDetours(const AISquad &sq, EntityManager &entities);
+        // Units whose route is a long detour: an attack-moving group with a hostile wall at hand breaches it
+        // instead, everyone else waits (`map` may be null: then nobody breaches)
+        void capDetours(const AISquad &sq, EntityManager &entities, const TileMap *map = nullptr);
         void releaseUnit(AISquad &sq, int unitId, EntityManager &entities);
         void setState(AISquad &sq, AISquadState state);
         void rebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);

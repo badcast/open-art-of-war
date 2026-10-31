@@ -37,4 +37,22 @@ bool exportSpriteObjects(const SpriteCatalog& catalog, const fs::path& assetsRoo
 bool exportSingleSprites(const SpriteCatalog& catalog, const fs::path& assetsRoot,
                          const fs::path& outDir, const SingleExportOptions& options, std::string& report);
 
+struct CustomAtlasItem {
+    int id{0};
+    int x{0};
+    int y{0};
+    int w{0};
+    int h{0};
+};
+
+// Exports a custom sprite atlas layout with user-defined positions directly to PNG and JSON.
+bool exportCustomAtlas(const SpriteCatalog& catalog, const fs::path& assetsRoot,
+                       const fs::path& outDir, const std::string& baseName,
+                       const std::string& title, const std::vector<CustomAtlasItem>& items,
+                       int atlasWidth, int atlasHeight,
+                       const nlohmann::json* extraGraphicsData, std::string& report);
+
+// Packs items tightly using MaxRects best-short-side fit
+std::vector<CustomAtlasItem> packCustomMaxRects(std::vector<CustomAtlasItem> items, int& width, int& height, int pad);
+
 } // namespace CharEditor

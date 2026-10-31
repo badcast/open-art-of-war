@@ -2405,8 +2405,8 @@ msgstr "Leave"
 msgid "The host starts the game"
 msgstr "The host starts the game"
 
-msgid "Click a number on the map to start there, again to leave it to chance. Click your faction, team and colour to change them."
-msgstr "Click a number on the map to start there, again to leave it to chance. Click your faction, team and colour to change them."
+msgid "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
+msgstr "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
 
 msgid "Enter: chat"
 msgstr "Enter: chat"
@@ -3703,3 +3703,278 @@ msgstr ""
 
 msgid "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
 msgstr ""
+
+msgid "Network statistics"
+msgstr "Network statistics"
+
+msgid "Network game: ping, jitter, packet loss and traffic in the corner"
+msgstr "Network game: ping, jitter, packet loss and traffic in the corner"
+
+msgid "NETWORK"
+msgstr "NETWORK"
+
+msgid "Hosting this game"
+msgstr "Hosting this game"
+
+msgid "Ping"
+msgstr "Ping"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Jitter"
+msgstr "Jitter"
+
+msgid "Packet loss"
+msgstr "Packet loss"
+
+msgid "Traffic out / in"
+msgstr "Traffic out / in"
+
+msgid "KB/s"
+msgstr "KB/s"
+
+msgid "Input delay"
+msgstr "Input delay"
+
+msgid "turn"
+msgstr "turn"
+
+msgid "Turns buffered"
+msgstr "Turns buffered"
+
+msgid "Waiting for the next turn"
+msgstr "Waiting for the next turn"
+
+msgid "disconnected"
+msgstr "disconnected"
+
+msgid "Reconnecting..."
+msgstr "Reconnecting..."
+
+msgid "DESYNC"
+msgstr "DESYNC"
+
+#, c-format
+msgid "Player %s has disconnected"
+msgstr "Player %s has disconnected"
+
+#, c-format
+msgid "Player %s is back"
+msgstr "Player %s is back"
+
+#, c-format
+msgid "Player %s did not come back"
+msgstr "Player %s did not come back"
+
+#, c-format
+msgid "The base of %s is destroyed"
+msgstr "The base of %s is destroyed"
+
+msgid "MATCH STATISTICS"
+msgstr "MATCH STATISTICS"
+
+msgid "Player"
+msgstr "Player"
+
+msgid "Efficiency"
+msgstr "Efficiency"
+
+msgid "Kills"
+msgstr "Kills"
+
+msgid "Losses"
+msgstr "Losses"
+
+msgid "left"
+msgstr "left"
+
+msgid "Efficiency: a point for every 10 credits of enemy forces destroyed"
+msgstr "Efficiency: a point for every 10 credits of enemy forces destroyed"
+
+msgid "taken"
+msgstr "taken"
+
+msgid "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
+msgstr "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
+
+msgid "Ordinary bullet of rifles and machine guns (projectile: bullet)."
+msgstr "Ordinary bullet of rifles and machine guns (projectile: bullet)."
+
+msgid "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."
+msgstr "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."
+
+msgid "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."
+msgstr "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."
+
+msgid "Rocket with a smoke trail; leaves a crater (projectile: rocket)."
+msgstr "Rocket with a smoke trail; leaves a crater (projectile: rocket)."
+
+msgid "Flamethrower jet (projectile: flame)."
+msgstr "Flamethrower jet (projectile: flame)."
+
+msgid "Fires one shot now."
+msgstr "Fires one shot now."
+
+msgid "Fires a shot every interval."
+msgstr "Fires a shot every interval."
+
+msgid "Every shot turns one sprite direction further, so all directions of the sprite show in turn."
+msgstr "Every shot turns one sprite direction further, so all directions of the sprite show in turn."
+
+msgid "Distance between the shooter and the target on the canvas."
+msgstr "Distance between the shooter and the target on the canvas."
+
+msgid "Direction of the shot on the canvas."
+msgstr "Direction of the shot on the canvas."
+
+msgid "Time between shots of the preview."
+msgstr "Time between shots of the preview."
+
+msgid "Removes the craters from the canvas."
+msgstr "Removes the craters from the canvas."
+
+msgid "Empties the list of hit animations (then no hit is drawn)."
+msgstr "Empties the list of hit animations (then no hit is drawn)."
+
+msgid "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
+msgstr "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
+
+msgid "Pixels the projectile flies per simulation tick (20 ticks a second)."
+msgstr "Pixels the projectile flies per simulation tick (20 ticks a second)."
+
+msgid "Projectile pictures of the game: a click sets the composite and its number of directions."
+msgstr "Projectile pictures of the game: a click sets the composite and its number of directions."
+
+msgid "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
+msgstr "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
+
+msgid "How much faster the craters disappear on the canvas than in the game."
+msgstr "How much faster the craters disappear on the canvas than in the game."
+
+msgid "Background color of the canvas (black by default)."
+msgstr "Background color of the canvas (black by default)."
+
+msgid "Projectiles"
+msgstr "Projectiles"
+
+msgid "Bullet"
+msgstr "Bullet"
+
+msgid "Sniper round"
+msgstr "Sniper round"
+
+msgid "Shell"
+msgstr "Shell"
+
+msgid "Rocket"
+msgstr "Rocket"
+
+msgid "Flame"
+msgstr "Flame"
+
+msgid "Bullet tracer"
+msgstr "Bullet tracer"
+
+msgid "Heavy tracer"
+msgstr "Heavy tracer"
+
+msgid "Rocket with flame"
+msgstr "Rocket with flame"
+
+msgid "Fire"
+msgstr "Fire"
+
+msgid "All directions"
+msgstr "All directions"
+
+msgid "Angle"
+msgstr "Angle"
+
+msgid "Distance"
+msgstr "Distance"
+
+msgid "Interval"
+msgstr "Interval"
+
+msgid "Background"
+msgstr "Background"
+
+msgid "Clear craters"
+msgstr "Clear craters"
+
+msgid "Clear impacts"
+msgstr "Clear impacts"
+
+msgid "Crater composites"
+msgstr "Crater composites"
+
+msgid "Craters"
+msgstr "Craters"
+
+msgid "Crater seconds"
+msgstr "Crater seconds"
+
+msgid "Directions"
+msgstr "Directions"
+
+msgid "Flight"
+msgstr "Flight"
+
+msgid "Ground marks"
+msgstr "Ground marks"
+
+msgid "Hit effects"
+msgstr "Hit effects"
+
+msgid "Hit-scan"
+msgstr "Hit-scan"
+
+msgid "Impact animations"
+msgstr "Impact animations"
+
+msgid "Preview fade speed"
+msgstr "Preview fade speed"
+
+msgid "Projectile sprites"
+msgstr "Projectile sprites"
+
+msgid "Smoke trail"
+msgstr "Smoke trail"
+
+msgid "Speed (px per tick)"
+msgstr "Speed (px per tick)"
+
+msgid "Spread (radians)"
+msgstr "Spread (radians)"
+
+msgid "Sprite (composite)"
+msgstr "Sprite (composite)"
+
+msgid "Used by"
+msgstr "Used by"
+
+msgid "Wall destroyed"
+msgstr "Wall destroyed"
+
+msgid "Wall hit"
+msgstr "Wall hit"
+
+msgid "The projectiles file could not be loaded."
+msgstr "The projectiles file could not be loaded."
+
+msgid "A flame is drawn as its own jet (animation 59), not as a sprite."
+msgstr "A flame is drawn as its own jet (animation 59), not as a sprite."
+
+msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"
+msgstr "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"
+
+#, c-format
+msgid "Animation %d"
+msgstr "Animation %d"
+
+msgid "Voice volume"
+msgstr "Voice volume"
+
+msgid "Volume of the unit replies and the announcer"
+msgstr "Volume of the unit replies and the announcer"

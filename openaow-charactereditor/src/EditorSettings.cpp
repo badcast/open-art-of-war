@@ -116,6 +116,7 @@ void CharacterEditor::drawSettingsBar(CommentedYaml& y, const char* fileName) {
     if (hinted(ImGui::Button(_("Reload")), "Reload")) {
         loadYamlFile(y, fileName);
         if (&y == &effectsYaml) effectsChanged();
+        if (&y == &projectilesYaml) projectilesChanged();
     }
     if (y.dirty()) {
         ImGui::SameLine();
@@ -239,6 +240,7 @@ void CharacterEditor::saveActiveSettings() {
     switch (editorMode) {
         case EditorMode::Explosions:
         case EditorMode::Wrecks: saveYamlFile(effectsYaml); break;
+        case EditorMode::Projectiles: saveYamlFile(projectilesYaml); break;
         case EditorMode::GameUi: saveYamlFile(uiYaml); break;
         case EditorMode::AiDifficulty: saveYamlFile(aiYaml); break;
         case EditorMode::Environment: saveEnvironment(); break;

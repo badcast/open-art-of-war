@@ -40,9 +40,9 @@ void CharacterEditor::ensureEffects() {
     if (effectsTried) return;
     effectsTried = true;
     if (loadYamlFile(effectsYaml, "effects.yaml")) {
-        yamlAnimPaths = {"explosions.vehicle.main", "explosions.vehicle.second", "explosions.building.small",
-                         "explosions.building.power", "explosions.building.large", "explosions.building.extra_anims",
-                         "explosions.building.big_anim"};
+        yamlAnimPaths.insert({"explosions.vehicle.main", "explosions.vehicle.second", "explosions.building.small",
+                              "explosions.building.power", "explosions.building.large", "explosions.building.extra_anims",
+                              "explosions.building.big_anim"});
         effectsChanged();
         startExplosionPreview(0);
     }
@@ -106,19 +106,27 @@ void CharacterEditor::drawAnimGallery(float height) {
         }
         if (clicked) {
             if (!animPickPath.empty()) {
-                const YAML::Node target = effectsYaml.at(animPickPath);
+                // The field belongs to the file of the tab: projectiles.yaml or effects.yaml
+                const bool projectiles = editorMode == EditorMode::Projectiles;
+                CommentedYaml& y = projectiles ? projectilesYaml : effectsYaml;
+                const YAML::Node target = y.at(animPickPath);
                 bool ok = false;
                 if (target.IsSequence()) {
                     std::string list = "[";
                     for (size_t i = 0; i < target.size(); ++i) list += target[i].Scalar() + ", ";
-                    ok = effectsYaml.set(animPickPath, list + std::to_string(id) + "]");
+                    ok = y.set(animPickPath, list + std::to_string(id) + "]");
                 } else {
-                    ok = effectsYaml.set(animPickPath, std::to_string(id));
+                    ok = y.set(animPickPath, std::to_string(id));
                 }
                 if (ok) {
-                    effectsChanged();
                     animPickPath.clear();
-                    startExplosionPreview(fxPreset);
+                    if (projectiles) {
+                        projectilesChanged();
+                        projShots.clear();
+                    } else {
+                        effectsChanged();
+                        startExplosionPreview(fxPreset);
+                    }
                 }
             } else {
                 fxAnim = id;

@@ -100,6 +100,13 @@ namespace OpenArtOfWar
         {
             m_drawOwner = player;
         }
+        // Buildings, walls and their icons keep their team trims on the shared sheets (not only the unit sheets):
+        // while set, a player with an army colour gets the trims of this faction recoloured on any sheet
+        // (Confederation: blue trims, Resistance: red). Faction::Neutral switches it off.
+        void setStructureFaction(Faction faction)
+        {
+            m_structureTeam = faction == Faction::Confederation ? 1 : (faction == Faction::Resistance ? 2 : 0);
+        }
         // Opacity (0..1) of the sprites drawn next (menu effects); every sheet draw applies it, 1 is the normal state
         void setDrawAlpha(float alpha)
         {
@@ -128,6 +135,8 @@ namespace OpenArtOfWar
         SDL_Color m_armyColor[kMaxPlayers] {};
         PlayerId m_drawOwner {kNoPlayer};
         float m_drawAlpha {1.0f};
+        int m_structureTeam {0};    // see setStructureFaction
+        bool m_tintedSheet[64] {};  // sheets whose colour mod carries an army colour right now
 
         SDL_Renderer *m_renderer {nullptr};
         TextureManager *m_texManager {nullptr};

@@ -1,6 +1,7 @@
 #include "graphics/RenderUtility.hpp"
 #include "core/EnvironmentConfig.hpp"
 #include "game/GameplayController.hpp"
+#include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
 #include "core/DetMath.hpp"
 #include "game/Sides.hpp"
@@ -133,8 +134,34 @@ namespace OpenArtOfWar
             entities.getEntity(id)->selected = true;
     }
 
+    void GameplayController::selectOwnUnits(EntityManager &entities, const Camera &camera, bool onScreen, const std::function<bool(const Unit &)> &pick)
+    {
+        const float zoom = std::max(0.01f, camera.getZoom());
+        const float x0 = camera.getX(), y0 = camera.getY();
+        const float x1 = x0 + camera.getViewportWidth() / zoom, y1 = y0 + camera.getViewportHeight() / zoom;
+        m_selectedUnits.clear();
+        for(auto &e : entities.getAllEntities())
+        {
+            e.selected = false;
+            const Unit *u = e.asUnit();
+            if(!u || !isLiveOwnUnit(&e) || !pick(*u))
+                continue;
+            const float cx = e.getUnitCenterPixelX(), cy = e.getUnitCenterPixelY();
+            if(onScreen && (cx < x0 || cx > x1 || cy < y0 || cy > y1))
+                continue;
+            e.selected = true;
+            m_selectedUnits.push_back(e.id);
+        }
+    }
+
     void GameplayController::handleControlGroupKeys(InputManager &input, EntityManager &entities, Camera &camera)
     {
+        // ~ (the key left of 1): every own unit on the map
+        if(input.isKeyJustPressed(SDL_SCANCODE_GRAVE))
+        {
+            selectOwnUnits(entities, camera, false, [](const Unit &) { return true; });
+            return;
+        }
         static const SDL_Scancode kKeys[10] = {SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4, SDL_SCANCODE_5, SDL_SCANCODE_6, SDL_SCANCODE_7, SDL_SCANCODE_8, SDL_SCANCODE_9, SDL_SCANCODE_0};
         const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
         for(int k = 0; k < 10; ++k)
@@ -286,6 +313,7 @@ namespace OpenArtOfWar
         c.a = static_cast<int32_t>(kind);
         c.b = (units.size() >= 2 && groupOfUnits(units) >= 0) ? 1 : 0;
         m_sim.issue(std::move(c));
+        SoundRequests::play(kind == OrderKind::AttackMove ? "@attack" : "@move"); // the units answer
     }
 
     int GameplayController::groupBarHit(int mx, int my, int mapViewW, int windowH) const
@@ -409,7 +437,11 @@ namespace OpenArtOfWar
             {
                 int comp = unitCameoCompId(leader->archetypeId);
                 if(comp >= 0)
+                    renderer.setDrawOwner(leader->owner);
+                    renderer.setStructureFaction(leader->faction);
                     renderer.drawCompositeScreen(comp, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
+                    renderer.setStructureFaction(Faction::Neutral);
+                    renderer.setDrawOwner(kNoPlayer);
             }
 
             // Group health
@@ -717,14 +749,25 @@ namespace OpenArtOfWar
                     {
                         bool canPlace = entities.canPlaceBuilding(curTileX, curTileY, bp.width, bp.height, map, Players::local());
                         bool canAfford = economy.canAfford(bp.creditCost);
+                        if(!canAfford)
+                        {
+                            SoundRequests::announce("ann_insufficient_funds");
+                        }
+                        else if(!canPlace)
+                        {
+                            SoundRequests::announce("ann_cannot_build");
+                        }
                         if(canPlace && canAfford)
                         {
                             // The simulation checks both again when it places it (a network turn later)
                             SimCommand c = command(CommandType::PlaceBuilding);
-                            c.a = selectedBp;
+                            c.a = bp.blueprintId; // canonical slot: the same on every peer
                             c.x = curTileX;
                             c.y = curTileY;
                             m_sim.issue(std::move(c));
+                            SoundRequests::play("build_place");
+                            if(!bp.isWall)
+                                SoundRequests::announce("ann_building");
                             // Walls are laid one after the other; a building ends the placement
                             if(!bp.isWall)
                                 hud.setBuildMode(false);
@@ -838,12 +881,19 @@ namespace OpenArtOfWar
             {
                 int clickedId = entities.getUnitAt(lx, ly);
                 const Building *clickedBuilding = entities.getBuilding(clickedId);
-                const bool ownProducer = clickedBuilding && clickedBuilding->faction == playerFaction() && clickedBuilding->isUnitProducer();
+                const bool ownProducer = clickedBuilding && clickedBuilding->owner == Players::local() && clickedBuilding->isUnitProducer();
                 const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
                 const Uint64 now = SDL_GetTicks();
-                const bool doubleClick = clickedId > 0 && clickedId == m_lastClickId && now - m_lastClickTicks < 350;
+                // Twice on the same unit, or twice on the same spot of empty ground
+                const bool samePlace = std::abs(static_cast<int>(mx) - m_lastClickX) <= 8 && std::abs(static_cast<int>(my) - m_lastClickY) <= 8;
+                const bool doubleClick = clickedId == m_lastClickId && now - m_lastClickTicks < 350 && (clickedId > 0 || samePlace);
                 m_lastClickId = clickedId;
                 m_lastClickTicks = now;
+                m_lastClickX = static_cast<int>(mx);
+                m_lastClickY = static_cast<int>(my);
+                const Entity *clickedEntity = clickedId > 0 ? entities.getEntity(clickedId) : nullptr;
+                const Unit *clickedUnit = clickedEntity ? clickedEntity->asUnit() : nullptr;
+                const bool ownClickedUnit = clickedUnit && isLiveOwnUnit(clickedEntity);
 
                 // Shift+click on a Barracks / Factory adds it to the selected ones of the same type
                 bool sameTypeSelected = ownProducer && shift;
@@ -876,7 +926,18 @@ namespace OpenArtOfWar
                     m_selectedUnits.clear();
                     for(auto &e : entities.getAllEntities())
                         e.selected = false;
-                    if(ownProducer && doubleClick)
+                    if(doubleClick && ownClickedUnit)
+                    {
+                        // Double click on a unit: every own unit of that kind on the screen
+                        const int archetype = clickedUnit->archetypeId;
+                        selectOwnUnits(entities, camera, true, [archetype](const Unit &u) { return u.archetypeId == archetype; });
+                    }
+                    else if(doubleClick && clickedId == 0)
+                    {
+                        // Double click on empty ground: every own unit on the screen
+                        selectOwnUnits(entities, camera, true, [](const Unit &) { return true; });
+                    }
+                    else if(ownProducer && doubleClick)
                     {
                         // Double click: every own building of that type
                         for(auto &e : entities.getAllEntities())
@@ -912,8 +973,10 @@ namespace OpenArtOfWar
                 float maxX = std::max(sbox.startWorldX, sbox.currentWorldX);
                 float minY = std::min(sbox.startWorldY, sbox.currentWorldY);
                 float maxY = std::max(sbox.startWorldY, sbox.currentWorldY);
-                Faction selFac = (m_debugMode && m_controlAllFactions) ? aiFaction() : playerFaction();
-                entities.getUnitsInBox(minX, minY, maxX, maxY, Players::ownerOf(selFac), m_selectedUnits);
+                // The local player's own units: by player, not by faction (two players of one faction would
+                // otherwise select the first one's units, whose orders the simulation then refuses)
+                const PlayerId selOwner = (m_debugMode && m_controlAllFactions) ? Players::ownerOf(aiFaction()) : Players::local();
+                entities.getUnitsInBox(minX, minY, maxX, maxY, selOwner, m_selectedUnits);
                 if(m_debugMode && m_controlAllFactions && m_selectedUnits.empty())
                 {
                     entities.getUnitsInBox(minX, minY, maxX, maxY, Players::local(), m_selectedUnits);
@@ -933,8 +996,7 @@ namespace OpenArtOfWar
         hud.update(deltaTime, entities, economy, m_sim.takeEvents());
         entities.update(deltaTime, map, pathfinder);
         m_sim.updateSquads(deltaTime, ctx, aiController.getChokepoints());
-        economy.update(deltaTime, entities, map, pathfinder);
-        m_sim.updateEconomies(deltaTime, ctx);
+        m_sim.updateEconomies(deltaTime, ctx); // the local economy included, in slot order
         // A match has its own computer players (one per computer slot), the mission's commander stays out
         if(mission.isMatch())
         {

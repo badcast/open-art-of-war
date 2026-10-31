@@ -152,7 +152,7 @@ namespace OpenArtOfWar
         bool m_customGame {false};
         std::vector<SkirmishMapInfo> m_skirmishMaps;
         int m_skirmishSelected {0};
-        bool m_skirmishPrebuilt {true}; // custom game on a map with buildings of its own: use them (else from scratch)
+        bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
         int m_skirmishTop {0};
         AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update            // first visible row of the map list
         int m_settingsSelected {0};

@@ -1,4 +1,6 @@
 #include "CharacterEditor.hpp"
+#include "game/Effects.hpp"
+#include "game/Projectiles.hpp"
 
 #include "graphics/RenderUtility.hpp"
 
@@ -112,7 +114,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
                     }
                 }
             }
-            const int bTurretFacing = (previewMode == PreviewMode::Attack) ? aimDir8 : (hasRotTurret ? turretFacingDir : facing);
+            const int bTurretFacing = hasRotTurret ? turretFacingDir : ((previewMode == PreviewMode::Attack) ? aimDir8 : facing);
             int wreckComp = 0, wreckStages = 0;
             wreckOf(doc, wreckComp, wreckStages);
 
@@ -165,7 +167,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
             unitX += m.offsetX;
             unitFacing = m.facing;
         } else if (!hasRotTurret && previewMode == PreviewMode::Attack) {
-            unitFacing = targetCustomized ? aimDir8 : facing;
+            unitFacing = facing;
         }
 
         unitCenterX = unitX + static_cast<float>(OpenArtOfWar::TILE_WIDTH) * 0.5f;
@@ -191,9 +193,8 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         }
 
         int action = static_cast<int>(OpenArtOfWar::ActionState::Idle);
-        // Driving without a target the turret follows the hull, as in the game
-        const int turretFacing = (previewMode == PreviewMode::Attack) ? (targetCustomized ? aimDir8 : turretFacingDir) :
-                                 (previewMode == PreviewMode::Move || !hasRotTurret) ? unitFacing : turretFacingDir;
+        // Turret rotates step-by-step via turretFacingDir (updated in updateCombatSim)
+        const int turretFacing = hasRotTurret ? turretFacingDir : unitFacing;
         shownHullFacing = unitFacing;
         shownArchetype = archetypeId;
 
@@ -353,13 +354,12 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         if (!building) turretShift(shownArchetype, shownHullFacing, shiftX, shiftY);
         basePivotX += vo.turretX + shiftX;
         basePivotY += vo.turretY + shiftY;
-        activeFacing = (previewMode == PreviewMode::Attack) ? (targetCustomized ? aimDir8 : turretFacingDir)
-                     : (previewMode == PreviewMode::Move ? shownHullFacing : turretFacingDir);
+        activeFacing = turretFacingDir;
     } else {
         if (!building && isInf) {
             basePivotY -= 4.0f; // Infantry weapon height
         }
-        activeFacing = (previewMode == PreviewMode::Attack) ? (targetCustomized ? aimDir8 : facing) : shownHullFacing;
+        activeFacing = shownHullFacing;
     }
     if (primary) {
         simHullFacing = shownHullFacing;
@@ -429,37 +429,25 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
                     const float prog = std::clamp(p.traveledDist / std::max(1.0f, p.totalDist), 0.0f, 1.0f);
                     const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
                     gameRenderer->drawAnimSequenceWorldRotated(59, flameFrame, p.startX, p.startY, angle, *camera, faction);
-                } else if (p.projectileType == "rocket") {
-                    gameRenderer->drawProjectileWorld(1405, p.dir16, p.curX, p.curY, *camera, faction, 16);
-                } else if (p.projectileType == "shell") {
-                    gameRenderer->drawProjectileWorld(1341, p.dir32, p.curX, p.curY, *camera, faction, 32);
                 } else if (p.projectileType != "none") {
-                    gameRenderer->drawProjectileWorld(1309, p.dir32, p.curX, p.curY, *camera, faction, 32);
+                    // The sprite of the projectile kind (projectiles.yaml), as the game draws it
+                    const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(p.projectileType));
+                    if (spec.sprite > 0)
+                        gameRenderer->drawProjectileWorld(spec.sprite, spec.directions == 16 ? p.dir16 : p.dir32, p.curX, p.curY, *camera,
+                                                          faction, spec.directions);
                 }
             } else {
                 float impactProgress = 1.0f - (p.impactTimer / p.maxImpactTime);
                 int impactFrame = std::clamp(static_cast<int>(impactProgress * 4.0f), 0, 3);
-                int impactAnim = 42;
-                float offX = -16.0f;
-                float offY = -8.0f;
-                if (p.projectileType == "rocket") {
-                    impactAnim = 18;
-                    offX = -16.0f;
-                    offY = -2.0f;
-                } else if (p.projectileType == "shell") {
-                    impactAnim = 15;
-                    offX = -16.0f;
-                    offY = 0.0f;
-                } else if (p.projectileType == "flame") {
-                    impactAnim = 59;
-                    offX = 0.0f;
-                    offY = 0.0f;
-                } else { // bullet / other
-                    impactAnim = 55; // the same impact sparks as in the game, whatever was hit
-                    offX = -16.0f;
-                    offY = -6.0f;
-                }
-                if (p.projectileType == "flame") {
+                // The hit animation of the projectile kind, centred like the game does
+                const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(p.projectileType));
+                const int impactAnim = spec.pickImpact(0);
+                float offX = 0.0f, offY = 0.0f;
+                OpenArtOfWar::explosionCentering(impactAnim, offX, offY);
+                const OpenArtOfWar::IndexRange impactRange = textures->getAnimRange(std::max(0, impactAnim));
+                impactFrame = std::clamp(static_cast<int>(impactProgress * static_cast<float>(std::max(1, impactRange.end - impactRange.start + 1))), 0,
+                                         std::max(0, impactRange.end - impactRange.start));
+                if (p.projectileType == "flame" || impactAnim < 0) {
                     // The game draws no impact for flames: the stream itself ends at the target
                 } else {
                     gameRenderer->drawAnimSequenceWorld(impactAnim, impactFrame,
@@ -507,6 +495,72 @@ void CharacterEditor::drawPreviewGrid() {
 }
 
 void CharacterEditor::updateCombatSim(float dt) {
+    if (document.IsDefined()) {
+        const bool building = (yamlString(document, "type") == "building");
+        const int arch = yamlInt(document, "archetype_id", 0);
+        const bool isInf = !building && OpenArtOfWar::Utility::isInfantryArchetype(arch);
+        YAML::Node cNode = document["combat"];
+        if (testSiegeMode && document["abilities"] && document["abilities"]["siege"] &&
+            document["abilities"]["siege"]["combat"].IsMap()) {
+            cNode = document["abilities"]["siege"]["combat"];
+        }
+        const bool hasRotTurret = yamlBool(cNode, "has_rotating_turret", false);
+        const int effArch = (simArchetype >= 0) ? simArchetype : arch;
+        const float hullDelay = (building || isInf) ? 0.0f
+            : std::max(0.0f, yamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::defaultTurnStepDelay(effArch)));
+        const float defTurretDelay = document["turn_step_delay"].IsDefined()
+            ? hullDelay
+            : OpenArtOfWar::Utility::defaultTurretTurnStepDelay(effArch);
+        const float turretDelay = isInf ? 0.0f
+            : (building ? (hasRotTurret ? std::max(0.0f, yamlFloat(cNode, "turret_turn_step_delay", 0.08f)) : 0.0f)
+                        : std::max(0.0f, yamlFloat(cNode, "turret_turn_step_delay",
+                                                   yamlFloat(document, "turret_turn_step_delay", defTurretDelay))));
+
+        const int aimDir8 = OpenArtOfWar::Utility::dir8FromVector(targetWorldX, targetWorldY);
+        int targetHullDir = desiredHullFacingDir;
+        if (!hasRotTurret && previewMode == PreviewMode::Attack && targetCustomized) {
+            targetHullDir = aimDir8;
+        }
+        targetHullDir = (targetHullDir % 8 + 8) % 8;
+        facing = (facing % 8 + 8) % 8;
+        if (facing == targetHullDir || hullDelay <= 0.0f) {
+            facing = targetHullDir;
+            previewHullTurnTimer = 0.0f;
+        } else {
+            previewHullTurnTimer += dt;
+            while (previewHullTurnTimer >= hullDelay && facing != targetHullDir) {
+                previewHullTurnTimer -= hullDelay;
+                facing = (facing + OpenArtOfWar::Utility::turnStep8(facing, targetHullDir) + 8) % 8;
+            }
+            if (facing == targetHullDir) previewHullTurnTimer = 0.0f;
+        }
+
+        int targetTurretDir = desiredTurretFacingDir;
+        if (previewMode == PreviewMode::Attack && targetCustomized) {
+            targetTurretDir = aimDir8;
+        } else if (previewMode == PreviewMode::Move && (!hasRotTurret || (linkTurretToHull && !targetCustomized))) {
+            targetTurretDir = simHullFacing;
+        } else if (!hasRotTurret) {
+            targetTurretDir = facing;
+        }
+        targetTurretDir = (targetTurretDir % 8 + 8) % 8;
+        turretFacingDir = (turretFacingDir % 8 + 8) % 8;
+        if (!hasRotTurret) {
+            turretFacingDir = (previewMode == PreviewMode::Move) ? simHullFacing : facing;
+            previewTurretTurnTimer = 0.0f;
+        } else if (turretFacingDir == targetTurretDir || turretDelay <= 0.0f) {
+            turretFacingDir = targetTurretDir;
+            previewTurretTurnTimer = 0.0f;
+        } else {
+            previewTurretTurnTimer += dt;
+            while (previewTurretTurnTimer >= turretDelay && turretFacingDir != targetTurretDir) {
+                previewTurretTurnTimer -= turretDelay;
+                turretFacingDir = (turretFacingDir + OpenArtOfWar::Utility::turnStep8(turretFacingDir, targetTurretDir) + 8) % 8;
+            }
+            if (turretFacingDir == targetTurretDir) previewTurretTurnTimer = 0.0f;
+        }
+    }
+
     if (!document.IsDefined() || previewMode != PreviewMode::Attack) {
         simProjectiles.clear();
         simShotCooldown = 0.0f;
@@ -558,9 +612,10 @@ void CharacterEditor::updateCombatSim(float dt) {
         }
     }
 
-    const int activeSimFacing = hasRotTurret ? (targetCustomized ? aimDir8 : turretFacingDir) :
-                                               (targetCustomized ? aimDir8 : facing);
+    const int activeSimFacing = hasRotTurret ? turretFacingDir : facing;
     const int tf = (activeSimFacing % 8 + 8) % 8;
+    const int expectedAimDir = targetCustomized ? aimDir8 : (hasRotTurret ? desiredTurretFacingDir : desiredHullFacingDir);
+    const bool aimAligned = (!building && !hasRotTurret && isInf) || (tf == (expectedAimDir % 8 + 8) % 8);
 
     if (muzzleFlashTimer > 0.0f) {
         muzzleFlashTimer -= dt;
@@ -631,6 +686,10 @@ void CharacterEditor::updateCombatSim(float dt) {
             muzzleY = basePivotY + curMuzzleY;
         }
 
+        if (!aimAligned) {
+            continue;
+        }
+
         if (sw.bIdx < burstCount) {
             sw.bDelay -= dt;
             if (sw.bDelay <= 0.0f) {
@@ -653,11 +712,8 @@ void CharacterEditor::updateCombatSim(float dt) {
                     float sDeg = yamlFloat(combatNode, "spread_angle", 0.0f);
                     maxSpread = std::max(0.0f, sDeg * (static_cast<float>(M_PI) / 180.0f));
                 } else {
-                    if (projectile == "bullet") maxSpread = 0.065f;
-                    else if (projectile == "shell") maxSpread = 0.035f;
-                    else if (projectile == "rocket") maxSpread = 0.080f;
-                    else if (projectile == "flame") maxSpread = 0.120f;
-                    else maxSpread = 0.055f;
+                    maxSpread = projectile == "none" ? 0.055f
+                                                     : OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(projectile)).spread;
                 }
 
                 if (maxSpread <= 0.0001f) {

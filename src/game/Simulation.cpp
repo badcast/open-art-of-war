@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 
 namespace OpenArtOfWar
 {
@@ -110,11 +111,22 @@ namespace OpenArtOfWar
 
     void Simulation::updateEconomies(float dt, SimContext &ctx)
     {
+        // Every economy in slot order, the local one (SimContext::economy) at its own slot. Economies create
+        // units: updating the local one first gave the new units other ids on every computer (desync, and the
+        // owner's later commands no longer reached its units)
+        bool localDone = false;
         for(PlayerId p = 0; p < kMaxPlayers; ++p)
         {
             if((m_economyMask >> p) & 1u)
                 m_economies[p].update(dt, ctx.entities, ctx.map, ctx.pathfinder);
+            else if(!localDone && p == ctx.economy.player())
+            {
+                ctx.economy.update(dt, ctx.entities, ctx.map, ctx.pathfinder);
+                localDone = true;
+            }
         }
+        if(!localDone)
+            ctx.economy.update(dt, ctx.entities, ctx.map, ctx.pathfinder);
     }
 
     void Simulation::issue(SimCommand command)
@@ -301,6 +313,8 @@ namespace OpenArtOfWar
                     u->targetWallTileX = -1;
                     u->targetWallTileY = -1;
                     u->isAttackMoving = false;
+                    u->groupOrder = false;
+                    u->holdPosition = false;
                     u->waitingForPath = false;
                     u->state = ActionState::Idle;
                 }
@@ -314,16 +328,21 @@ namespace OpenArtOfWar
                     u->path.clear();
                     u->pathIndex = 0;
                     u->isAttackMoving = false;
+                    u->groupOrder = false;
+                    u->holdPosition = true;
+                    u->clearMoveTarget();
                     u->waitingForPath = false;
                     u->state = ActionState::Idle;
                 }
                 break;
             case CommandType::PlaceBuilding:
             {
-                const auto &blueprints = EntityManager::getBlueprints();
-                if(cmd.a < 0 || cmd.a >= static_cast<int>(blueprints.size()))
+                // cmd.a is the canonical blueprint slot; the building is the one of the ordering player's faction
+                // (looking it up in the local player's menu gave the other side's buildings)
+                const BuildingBlueprint *found = EntityManager::findBlueprint(faction, cmd.a);
+                if(!found)
                     return;
-                const auto &bp = blueprints[cmd.a];
+                const auto &bp = *found;
                 if(!entities.canPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
                     return;
                 if(!economy.canAfford(bp.creditCost))
@@ -419,6 +438,11 @@ namespace OpenArtOfWar
                 }
                 break;
             }
+            case CommandType::PlayerLeft:
+                // Gone from the match: nothing of the player stays to be fought over (or left standing in the way)
+                entities.destroyPlayer(cmd.player, map);
+                std::cout << "[Simulation] Player " << int(cmd.player) << " left the match: its forces are destroyed" << std::endl;
+                break;
             case CommandType::Count:
                 break;
         }
@@ -476,6 +500,9 @@ namespace OpenArtOfWar
             h.f32(e.subY);
             h.i32(e.currentHp);
             h.i32(e.targetEntityId);
+            h.i32(e.targetWallTileX);
+            h.i32(e.targetWallTileY);
+            h.i32(e.lastAttackerId);
         }
         // Credits in player order (the local player's economy is SimContext::economy on every peer, so the
         // order must not depend on it)

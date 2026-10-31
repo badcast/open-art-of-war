@@ -1,5 +1,6 @@
 #include "game/Effects.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "core/Config.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -191,7 +192,7 @@ namespace OpenArtOfWar
         {
             EffectsConfig c;
             std::string text;
-            if(Assets::readText("assets/characters/effects.yaml", text))
+            if(Assets::readText(LoaderResources::effects(), text))
                 c.loadText(text);
             return c;
         }();
@@ -209,7 +210,7 @@ namespace OpenArtOfWar
     {
         EffectsConfig fresh;
         std::string text;
-        if(Assets::readText("assets/characters/effects.yaml", text))
+        if(Assets::readText(LoaderResources::effects(), text))
             fresh.loadText(text);
         get() = fresh;
     }

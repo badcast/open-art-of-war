@@ -73,6 +73,7 @@ namespace OpenArtOfWar
     void Renderer::endWorldPass()
     {
         m_drawOwner = kNoPlayer;
+        m_structureTeam = 0;
         plainState();
     }
 
@@ -97,6 +98,9 @@ namespace OpenArtOfWar
             if(page == 9)
                 page = 8;
             team = (blueSheet || page == 8) ? 1 : (redSheet ? 2 : 0);
+            // Buildings, walls and icons: their trims sit on the shared sheets too
+            if(m_structureTeam != 0)
+                team = m_structureTeam;
         }
         SDL_Texture *sheet = m_texManager->getSpriteSheet(page);
         if(!sheet)
@@ -104,11 +108,14 @@ namespace OpenArtOfWar
         SDL_SetTextureAlphaMod(sheet, static_cast<Uint8>(m_drawAlpha * 255.0f + 0.5f));
         if(m_effects)
             m_effects->useSpriteState(team);
-        if(blueSheet || redSheet || page == 8)
+        const bool tracked = page >= 0 && page < 64;
+        if(team != 0 || blueSheet || redSheet || page == 8 || (tracked && m_tintedSheet[page]))
         {
             // The colour mod carries the army colour to the shader; plain draws of the same sheet stay white
             const SDL_Color c = team ? m_armyColor[owner] : SDL_Color {255, 255, 255, 255};
             SDL_SetTextureColorMod(sheet, c.r, c.g, c.b);
+            if(tracked)
+                m_tintedSheet[page] = team != 0;
         }
         return sheet;
     }
@@ -396,6 +403,18 @@ namespace OpenArtOfWar
             }
             return;
         }
+
+        // Living buildings and walls show the army colour of their owner on every sheet (see setStructureFaction)
+        struct StructureScope
+        {
+            Renderer &r;
+            ~StructureScope()
+            {
+                r.setStructureFaction(Faction::Neutral);
+            }
+        } structureScope {*this};
+        if(buildingType < 30 && !isDestroyed)
+            setStructureFaction(faction);
 
         // 2. Walls (15..29), construction scaffolding (30), and Map Decorations (31..338) (i6 == 0 in f.java:10806)
         if(buildingType >= 15)
@@ -854,9 +873,15 @@ namespace OpenArtOfWar
             page = 9;
         }
 
-        SDL_Texture *sheet = m_texManager->getSpriteSheet(page);
+        // An owner set (HUD icons of the player): the army colour as in the world; otherwise the plain sheet
+        SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? bindSheet(page, faction) : m_texManager->getSpriteSheet(page);
         if(!sheet)
             return;
+        if(m_drawOwner >= kMaxPlayers && page >= 0 && page < 64 && m_tintedSheet[page])
+        {
+            SDL_SetTextureColorMod(sheet, 255, 255, 255);
+            m_tintedSheet[page] = false;
+        }
 
         float sScale = m_texManager->getSheetScale(page);
         SDL_FRect srcRect = {std::round(frame->x * sScale), std::round(frame->y * sScale), std::round(frame->width * sScale), std::round(frame->height * sScale)};

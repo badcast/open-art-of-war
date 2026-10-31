@@ -26,6 +26,7 @@ namespace OpenArtOfWar
         zoomDefault = std::clamp(zoomDefault, zoomMin, zoomMax);
         musicVolume = std::clamp(musicVolume, 0, 128);
         fxVolume = std::clamp(fxVolume, 0, 128);
+        voiceVolume = std::clamp(voiceVolume, 0, 128);
         difficulty = std::clamp(difficulty, 0, 3);
         if(language != "en" && language != "ru")
             language = "en";
@@ -47,7 +48,7 @@ namespace OpenArtOfWar
         try
         {
             // Other parts of the game keep their own keys in this file (e.g. "environment"): leave them alone
-            nlohmann::json j = JsonFile::readObject(path);
+            nlohmann::json j = JsonFile::readObjectFromFileName(path);
             j["windowMode"] = static_cast<int>(windowMode);
             j["windowWidth"] = windowW;
             j["windowHeight"] = windowH;
@@ -56,6 +57,7 @@ namespace OpenArtOfWar
             j["vsync"] = vsync;
             j["fpsLimit"] = fpsLimit;
             j["showFps"] = showFps;
+            j["showNetStats"] = showNetStats;
             j["graphicsQuality"] = graphicsQuality;
             j["smoothing"] = smoothing;
             j["zoomDefault"] = zoomDefault;
@@ -66,6 +68,7 @@ namespace OpenArtOfWar
             j["sharpPixels"] = sharpPixels;
             j["musicVolume"] = musicVolume;
             j["fxVolume"] = fxVolume;
+            j["voiceVolume"] = voiceVolume;
             j["muted"] = muted;
             j["language"] = language;
             j["playerName"] = playerName;
@@ -100,6 +103,7 @@ namespace OpenArtOfWar
             vsync = j.value("vsync", vsync);
             fpsLimit = j.value("fpsLimit", fpsLimit);
             showFps = j.value("showFps", showFps);
+            showNetStats = j.value("showNetStats", showNetStats);
             graphicsQuality = j.value("graphicsQuality", graphicsQuality);
             smoothing = j.value("smoothing", smoothing);
             zoomDefault = j.value("zoomDefault", zoomDefault);
@@ -110,6 +114,7 @@ namespace OpenArtOfWar
             sharpPixels = j.value("sharpPixels", sharpPixels);
             musicVolume = j.value("musicVolume", musicVolume);
             fxVolume = j.value("fxVolume", fxVolume);
+            voiceVolume = j.value("voiceVolume", voiceVolume);
             muted = j.value("muted", muted);
             language = j.value("language", language);
             playerName = j.value("playerName", playerName);

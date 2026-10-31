@@ -54,11 +54,11 @@ namespace OpenArtOfWar
 
         bool loadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
-        // Custom game on any map of assets/maps: both sides get a small starting base next to the open
-        // ground nearest to their corner (or to the map's playerPos / enemyPos), the AI builds the rest
-        // `usePrebuilt`: the buildings, units and walls the map has are used (a base on the map replaces the generated
-        // one of its side); otherwise the map starts from scratch: only the usual starting bases, no walls
-        bool loadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt = false);
+        // Custom game on any map of assets/maps: both sides get a starting base next to the open
+        // ground nearest to their corner (or to the map's playerPos / enemyPos), the AI builds the rest.
+        // `usePrebuilt`: the map's own buildings/units/walls if it has them, or the full starting base (HQ, power
+        // plant, barracks and 4 units); false = from scratch (only HQ and power plant, no units, no walls)
+        bool loadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt = true);
 
         // Match of several players (network game): every active slot gets the starting base of its faction at
         // its start position; Players is set up from the slots. No AI: every slot is a person.
@@ -197,8 +197,8 @@ namespace OpenArtOfWar
         std::string m_briefingText;
         std::string m_objectiveText;
 
-        std::string m_customMapPath;   // map of the running custom game, empty in a campaign mission
-        bool m_customPrebuilt {false}; // ... and whether it was started with the map's own buildings
+        std::string m_customMapPath;  // map of the running custom game, empty in a campaign mission
+        bool m_customPrebuilt {true}; // ... and whether it was started with prebuilt bases (else from scratch)
         MissionLoadedFn m_onLoaded;
         bool m_useBuiltinWaves {false};
     };

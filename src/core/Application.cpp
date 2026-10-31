@@ -1,13 +1,17 @@
 #include "core/Application.hpp"
 #include "core/Localization.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
+#include "core/DebugEnv.hpp"
 #include "ui/MenuController.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/UiKit.hpp"
 #include "game/GameplayController.hpp"
 #include "game/Sides.hpp"
 #include "game/Players.hpp"
+#if defined(AOW_DEBUG)
 #include "test/HeadlessTest.hpp"
+#endif
 #include "graphics/TextureManager.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
@@ -21,6 +25,8 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include "input/InputManager.hpp"
 #include "audio/SoundEngine.hpp"
+#include "audio/GameSounds.hpp"
+#include "audio/SoundRequests.hpp"
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/EntityManager.hpp"
@@ -66,6 +72,8 @@ namespace OpenArtOfWar
             return false;
         }
         std::cout << "[Application] Assets: " << Assets::describe() << std::endl;
+        // Every resource path comes from assets/main.json from here on
+        LoaderResources::init();
 
         // Options and progress live in the per-user directory (Assets::userDataDir)
         m_saveManager = std::make_unique<SaveManager>();
@@ -91,7 +99,7 @@ namespace OpenArtOfWar
             return false;
         }
 
-        m_env.load();
+        m_env.load(LoaderResources::environment());
 
         // Hidden until a renderer is up: trying one API after the other must not flicker on the screen
         m_window = SDL_CreateWindow("Open Art Of War: Freedom for Liberty", m_settings.windowW, m_settings.windowH, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
@@ -121,11 +129,11 @@ namespace OpenArtOfWar
         m_resolutions = VideoModes::availableResolutions(m_window);
 
         // The language and the font first: the loading screen is up before the heavy part of the start-up
-        Localization::init("assets/locale", "en");
+        Localization::init(LoaderResources::localeDir(), LoaderResources::defaultLanguage());
         Localization::setLanguage(m_settings.language);
         {
             std::string uiText;
-            if(Assets::readText("assets/characters/game_ui.yaml", uiText))
+            if(Assets::readText(LoaderResources::uiTheme(), uiText))
                 ui::loadTheme(uiText);
         }
         m_texManager = std::make_unique<TextureManager>(m_sdlRenderer);
@@ -139,13 +147,13 @@ namespace OpenArtOfWar
             sizes.large = f.value("size_large", sizes.large);
             sizes.title = f.value("size_title", sizes.title);
             sizes.hero = f.value("size_hero", sizes.hero);
-            m_fontRenderer = std::make_unique<BitmapFontRenderer>(m_sdlRenderer, f.value("regular", std::string("assets/fonts/Roboto-Regular.ttf")), f.value("bold", std::string("assets/fonts/Roboto-Bold.ttf")), sizes);
+            m_fontRenderer = std::make_unique<BitmapFontRenderer>(m_sdlRenderer, f.value("regular", LoaderResources::fontRegular()), f.value("bold", LoaderResources::fontBold()), sizes);
         }
         showLoading(_("Starting the game..."), 0.05f);
 
         // Initialize core subsystems
         showLoading(_("Loading graphics..."), 0.12f);
-        m_texManager->loadAllAssets("assets");
+        m_texManager->loadAllAssets(LoaderResources::kDefaultRoot);
         showLoading(_("Preparing the renderer..."), 0.55f);
         m_effects = std::make_unique<ShaderEffects>();
         if(!m_headless)
@@ -156,7 +164,7 @@ namespace OpenArtOfWar
         m_input = std::make_unique<InputManager>();
         showLoading(_("Loading sound and music..."), 0.65f);
         m_sound = std::make_unique<SoundEngine>();
-        m_sound->init("assets");
+        m_sound->init(LoaderResources::kDefaultRoot);
         applyAudio();
 
         m_map = std::make_unique<TileMap>();
@@ -164,7 +172,7 @@ namespace OpenArtOfWar
         m_pathfinder = std::make_unique<Pathfinder>(m_map.get());
         showLoading(_("Loading units and buildings..."), 0.8f);
         m_entities = std::make_unique<EntityManager>();
-        m_entities->loadCharacterConfigs("assets");
+        m_entities->loadCharacterConfigs(LoaderResources::kDefaultRoot);
         m_entities->setTextureManager(m_texManager.get());
         m_pathfinder->setEntityManager(m_entities.get());
         m_economy = std::make_unique<Economy>();
@@ -192,6 +200,7 @@ namespace OpenArtOfWar
         m_menuController = std::make_unique<MenuController>();
         m_networkMenu = std::make_unique<NetworkMenu>();
         m_hudController = std::make_unique<HUDController>();
+        m_hudController->setRadarAlertConfig(m_env.section("radar_alert"));
         m_gameplayController = std::make_unique<GameplayController>();
         m_gameplayController->loadOverlayStyle(m_env);
         m_menuController->bindLoading([this](const std::string &title, const std::string &path) { beginMapLoading(title, path); }, [this]() { endMapLoading(); });
@@ -253,6 +262,13 @@ namespace OpenArtOfWar
 
     void Application::shutdown()
     {
+        // Quitting the game in a network match is leaving it for good: the others need not wait out the
+        // reconnect window before this player's base goes
+        if(m_net)
+        {
+            m_net->leave();
+            m_net.reset();
+        }
 #if defined(AOW_DEBUG)
         if(m_debug)
             m_debug.reset();
@@ -286,6 +302,9 @@ namespace OpenArtOfWar
 
     void Application::setDebugMode(bool debug)
     {
+#if !defined(AOW_DEBUG)
+        debug = false; // cheats, the debug toolbar and full enemy control exist only in a debug build
+#endif
         m_debugMode = debug;
         if(m_gameplayController)
         {
@@ -300,11 +319,45 @@ namespace OpenArtOfWar
             return;
         }
         setDebugMode(true);
-        m_mission->loadTestMap("assets", *m_map, *m_entities, *m_economy, *m_pathfinder);
+        m_mission->loadTestMap(LoaderResources::kDefaultRoot, *m_map, *m_entities, *m_economy, *m_pathfinder);
         m_state = AppState::CampaignPlaying;
         m_camera->setZoom(m_settings.zoomDefault);
         m_camera->centerOn((m_mission->getPlayerHqX() + 12) * TILE_WIDTH, m_mission->getPlayerHqY() * TILE_HEIGHT);
         std::cout << "[Application] Standalone Test Map (maps/testmap.json) launched directly via --testmap flag!" << std::endl;
+    }
+
+    bool Application::launchMap(const std::string &nameOrPath, bool fromScratch)
+    {
+        if(!m_mission || !m_map || !m_entities || !m_economy || !m_pathfinder || !m_camera)
+            return false;
+        const std::string path = LoaderResources::mapPath(nameOrPath);
+        const std::vector<SkirmishMapInfo> maps = MissionController::listSkirmishMaps();
+        const SkirmishMapInfo *info = nullptr;
+        for(const SkirmishMapInfo &m : maps)
+        {
+            if(m.path == path || m.name == nameOrPath)
+                info = &m;
+        }
+        if(!info && !std::filesystem::exists(path))
+        {
+            std::cerr << "[Application] --map: no map \"" << nameOrPath << "\". Maps:";
+            for(const SkirmishMapInfo &m : maps)
+                std::cerr << " " << m.name;
+            std::cerr << std::endl;
+            return false;
+        }
+        const std::string mapFile = info ? info->path : path;
+        beginMapLoading(info ? info->displayName() : std::filesystem::path(mapFile).stem().string(), mapFile);
+        const bool started = m_mission->loadSkirmish(mapFile, *m_map, *m_entities, *m_economy, *m_pathfinder, !fromScratch);
+        endMapLoading();
+        if(!started)
+        {
+            std::cerr << "[Application] --map: " << mapFile << " could not be loaded" << std::endl;
+            return false;
+        }
+        m_state = AppState::Briefing; // as from the menu: the briefing, then the game
+        std::cout << "[Application] Custom game on " << mapFile << " launched via --map" << (fromScratch ? " (from scratch)" : "") << std::endl;
+        return true;
     }
 
     void Application::run()
@@ -335,7 +388,9 @@ namespace OpenArtOfWar
             }
 
             handleEvents();
-            updateNetwork(static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(currentTime.time_since_epoch()).count()));
+            // One clock for all network timing: SDL ticks, the same the lobby's Start button uses (epoch
+            // milliseconds here made a host started from the menu close thousands of turns at once)
+            updateNetwork(static_cast<uint32_t>(SDL_GetTicks()));
 
             // Simulation / Menu Update
             if(m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
@@ -373,7 +428,7 @@ namespace OpenArtOfWar
                         m_net->afterTick(tick, checksum);
                         m_net->noteTickRan(nowMs);
                         // Tests (OAOW_NET_DROP_AT=<tick>): the connection drops once at that tick
-                        static const long dropAt = SDL_getenv("OAOW_NET_DROP_AT") ? std::atol(SDL_getenv("OAOW_NET_DROP_AT")) : -1;
+                        static const long dropAt = debugEnv("OAOW_NET_DROP_AT") ? std::atol(debugEnv("OAOW_NET_DROP_AT")) : -1;
                         static bool dropped = false;
                         if(!dropped && dropAt >= 0 && tick == static_cast<uint32_t>(dropAt))
                         {
@@ -427,6 +482,7 @@ namespace OpenArtOfWar
                 accumulator = 0.0;
             }
 
+            updateSounds();
             render();
 
             // Frame rate cap (also with vsync on, when the limit is below the refresh rate)
@@ -451,6 +507,8 @@ namespace OpenArtOfWar
             return;
         m_sound->setMusicVolume(m_settings.musicVolume);
         m_sound->setFxVolume(m_settings.fxVolume);
+        m_sound->setVoiceVolume(m_settings.voiceVolume);
+        m_sound->setVoiceLanguage(m_settings.language); // voices speak the language of the game
         if(m_sound->isMuted() != m_settings.muted)
             m_sound->toggleMute();
     }
@@ -493,7 +551,7 @@ namespace OpenArtOfWar
         auto shade = [&](int i)
         {
             const float t = 1.0f - static_cast<float>(i) / depth;
-            return SDL_Color {15, 18, 24, static_cast<Uint8>(215.0f * t * t)};
+            return SDL_Color {0, 0, 0, static_cast<Uint8>(215.0f * t * t)};
         };
         const int yFrom = std::max(0, top), yTo = std::min(viewH - 1, bottom - 1);
         const int xFrom = std::max(0, left), xTo = std::min(viewW - 1, right - 1);
@@ -521,6 +579,7 @@ namespace OpenArtOfWar
             {
                 const Settings before = m_confirmedVideo;
                 VideoModes::apply(m_window, m_sdlRenderer, m_settings);
+                syncWindowSize();
                 const bool windowChanged = before.windowMode != m_settings.windowMode || before.windowW != m_settings.windowW || before.windowH != m_settings.windowH || before.fullscreenW != m_settings.fullscreenW || before.fullscreenH != m_settings.fullscreenH;
                 if(windowChanged && !m_videoConfirmActive)
                 {
@@ -540,6 +599,8 @@ namespace OpenArtOfWar
                 break;
             case SettingsArea::Game:
                 Localization::setLanguage(m_settings.language);
+                if(m_sound)
+                    m_sound->setVoiceLanguage(m_settings.language);
                 if(m_aiController)
                     m_aiController->setDifficulty(static_cast<AIDifficulty>(m_settings.difficulty));
                 break;
@@ -554,8 +615,50 @@ namespace OpenArtOfWar
             return;
         m_settings.windowMode = m_settings.windowMode == WindowMode::Windowed ? WindowMode::Borderless : WindowMode::Windowed;
         VideoModes::apply(m_window, m_sdlRenderer, m_settings);
+        syncWindowSize();
         m_confirmedVideo = m_settings;
         saveSettings();
+    }
+
+    void Application::syncWindowSize(int w, int h)
+    {
+        if(!m_window)
+            return;
+        int pw = 0, ph = 0;
+        SDL_GetWindowSizeInPixels(m_window, &pw, &ph);
+        if(pw <= 0 || ph <= 0)
+        {
+            pw = w;
+            ph = h;
+        }
+        if(pw <= 0 || ph <= 0)
+        {
+            SDL_GetWindowSize(m_window, &pw, &ph);
+        }
+        if(pw <= 0 || ph <= 0)
+            return;
+
+        if(m_windowW == pw && m_windowH == ph)
+            return;
+
+        m_windowW = pw;
+        m_windowH = ph;
+        if(m_camera)
+        {
+            m_camera->setViewport(m_windowW - HUDController::kSidebarWidth, m_windowH);
+            if(m_map)
+                m_camera->clampToBounds(m_map->getWidth(), m_map->getHeight());
+        }
+        if(!m_videoConfirmActive)
+        {
+            if(m_settings.windowMode == WindowMode::Windowed)
+            {
+                m_settings.windowW = m_windowW;
+                m_settings.windowH = m_windowH;
+                m_confirmedVideo.windowW = m_windowW;
+                m_confirmedVideo.windowH = m_windowH;
+            }
+        }
     }
 
     void Application::beginVideoConfirm(const Settings &previous)
@@ -623,6 +726,7 @@ namespace OpenArtOfWar
             m_settings.fullscreenW = m_confirmedVideo.fullscreenW;
             m_settings.fullscreenH = m_confirmedVideo.fullscreenH;
             VideoModes::apply(m_window, m_sdlRenderer, m_settings);
+            syncWindowSize();
             m_confirmedVideo = m_settings;
             saveSettings();
         }
@@ -644,10 +748,67 @@ namespace OpenArtOfWar
     // headquarters every 5 seconds, so two headless peers have real command traffic and fights to agree on
     void Application::driveNetworkBot(uint32_t tick)
     {
-        static const bool bot = std::getenv("OAOW_NET_BOT") != nullptr;
-        if(!bot || tick % 100 != 10)
+        static const bool bot = debugEnv("OAOW_NET_BOT") != nullptr;
+        if(!bot)
             return;
         const PlayerId me = Players::local();
+        const Faction myFaction = Players::factionOf(me);
+        // Economy traffic too (the commands that broke the other side's faction and unit ids): riflemen from
+        // every barracks, and a building of the own faction next to the headquarters now and then
+        if(tick % 100 == 40)
+        {
+            for(const Entity &e : m_entities->getAllEntities())
+            {
+                const Building *b = e.asBuilding();
+                if(b && b->alive && b->owner == me && b->type == UnitType::Barracks && b->buildProgress >= 1.0f)
+                {
+                    SimCommand produce;
+                    produce.type = CommandType::Produce;
+                    produce.player = me;
+                    produce.a = myFaction == Faction::Confederation ? 1 : 0; // the faction's rifleman
+                    produce.b = b->id;
+                    m_gameplayController->simulation().issue(std::move(produce));
+                }
+            }
+        }
+        if(tick % 200 == 70)
+        {
+            const int slot = (tick / 200) % 2 == 0 ? 1 : 5; // power plant, bunker (canonical blueprint slots)
+            const BuildingBlueprint *bp = EntityManager::findBlueprint(myFaction, slot);
+            const Entity *hq = nullptr;
+            for(const Entity &e : m_entities->getAllEntities())
+            {
+                if(e.alive && e.isBuilding && e.owner == me && e.type == UnitType::Headquarters)
+                    hq = &e;
+            }
+            if(bp && hq)
+            {
+                bool placed = false;
+                for(int r = 4; r < 12 && !placed; ++r)
+                {
+                    for(int dy = -r; dy <= r && !placed; ++dy)
+                    {
+                        for(int dx = -r; dx <= r && !placed; ++dx)
+                        {
+                            const int x = hq->tileX + dx, y = hq->tileY + dy;
+                            if(std::max(std::abs(dx), std::abs(dy)) != r || !m_entities->canPlaceBuilding(x, y, bp->width, bp->height, *m_map, me))
+                                continue;
+                            SimCommand place;
+                            place.type = CommandType::PlaceBuilding;
+                            place.player = me;
+                            place.a = bp->blueprintId;
+                            place.x = x;
+                            place.y = y;
+                            std::cout << "[NetBot] place blueprint " << bp->blueprintId << " (building " << bp->buildingIndex << ") at " << x << "," << y << std::endl;
+                            m_gameplayController->simulation().issue(std::move(place));
+                            placed = true;
+                        }
+                    }
+                }
+            }
+        }
+        if(tick % 100 != 10)
+            return;
         SimCommand order;
         order.type = CommandType::OrderAt;
         order.player = me;
@@ -679,6 +840,8 @@ namespace OpenArtOfWar
         m_net.reset();
         m_netMatchStarted = false;
         m_netMatchLoaded = false;
+        m_netPlayers = {};
+        m_notices.clear();
         m_netMapPath.clear();
         m_netAuto = false;
         m_networkMenu->reset();
@@ -726,8 +889,10 @@ namespace OpenArtOfWar
         m_serverStatus = m_master->serverInfo().name.empty() ? host : m_master->serverInfo().name;
         if(!m_master->serverInfo().motd.empty())
             m_serverStatus += " - " + m_master->serverInfo().motd;
-        // The list every 10 seconds while the tab is open
-        if(m_serverListMs == 0 || now - m_serverListMs > 10000)
+        // The list every 2.5 seconds, only while the internet tab of the network screen is open (no need to press
+        // Refresh to see rooms come and go)
+        constexpr uint32_t kServerListRefreshMs = 2500;
+        if(m_serverListMs == 0 || now - m_serverListMs > kServerListRefreshMs)
         {
             m_serverListMs = now;
             m_master->requestList(OAOW_VERSION);
@@ -951,6 +1116,10 @@ namespace OpenArtOfWar
         for(Uint32 elapsed = SDL_GetTicks() - m_mapLoadStartMs; elapsed < kMinMs; elapsed = SDL_GetTicks() - m_mapLoadStartMs)
         {
             drawLoadingFrame(m_mapLoadTitle, _("Loading the map..."), 0.05f + 0.9f * static_cast<float>(elapsed) / kMinMs, m_mapLoadTexture, m_mapLoadW, m_mapLoadH);
+            // The connection keeps being served behind the loading screen (a silent peer times out on a slow
+            // link); only the transport, this runs inside updateNetwork when a match starts
+            if(m_net)
+                m_net->update(static_cast<uint32_t>(SDL_GetTicks()));
             SDL_Delay(16);
         }
         drawLoadingFrame(m_mapLoadTitle, _("Ready"), 1.0f, m_mapLoadTexture, m_mapLoadW, m_mapLoadH);
@@ -1003,12 +1172,206 @@ namespace OpenArtOfWar
         m_fontRenderer->drawString(text, x + w / 2, y + 17, ui::FONT_BODY_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
     }
 
+    void Application::trackNetPlayers(uint32_t nowMs)
+    {
+        const Net::Roster *roster = m_net ? m_net->roster() : nullptr;
+        // While this computer is the one cut off, the roster is stale: nothing to report about the others
+        if(!roster || !m_net->connected())
+            return;
+        std::array<const Net::RosterEntry *, 8> now {};
+        for(const Net::RosterEntry &e : roster->players)
+        {
+            if(e.slot < now.size())
+                now[e.slot] = &e;
+        }
+        char buf[200];
+        for(size_t slot = 0; slot < m_netPlayers.size(); ++slot)
+        {
+            NetPlayer &p = m_netPlayers[slot];
+            const Net::RosterEntry *e = now[slot];
+            const bool local = slot == m_net->localSlot();
+            if(e)
+            {
+                if(!e->name.empty())
+                    p.name = e->name;
+                if(p.present && !local)
+                {
+                    if(p.connected && !e->connected)
+                    {
+                        std::snprintf(buf, sizeof buf, _("Player %s has disconnected"), p.name.c_str());
+                        pushNotice(buf, nowMs);
+                        std::cout << "[Net] Player " << p.name << " (slot " << slot << ") disconnected" << std::endl;
+                    }
+                    else if(!p.connected && e->connected)
+                    {
+                        std::snprintf(buf, sizeof buf, _("Player %s is back"), p.name.c_str());
+                        pushNotice(buf, nowMs);
+                    }
+                }
+                p.present = true;
+                p.connected = e->connected;
+            }
+            else if(p.present)
+            {
+                // Out of the roster: left the match, or gone longer than the reconnect window. Its base and
+                // units are destroyed by the turn that announces it (see CommandType::PlayerLeft).
+                if(!local)
+                {
+                    std::snprintf(buf, sizeof buf, p.connected ? _("Player %s has disconnected") : _("Player %s did not come back"), p.name.c_str());
+                    pushNotice(buf, nowMs);
+                    std::snprintf(buf, sizeof buf, _("The base of %s is destroyed"), p.name.c_str());
+                    pushNotice(buf, nowMs);
+                }
+                p.present = false;
+                p.connected = false;
+                p.left = true;
+                std::cout << "[Net] Player " << p.name << " (slot " << slot << ") left the match" << std::endl;
+            }
+        }
+    }
+
+    void Application::pushNotice(const std::string &text, uint32_t nowMs)
+    {
+        constexpr uint32_t kShowMs = 7000;
+        constexpr size_t kMaxNotices = 5;
+        m_notices.push_back({text, nowMs + kShowMs});
+        if(m_notices.size() > kMaxNotices)
+            m_notices.erase(m_notices.begin(), m_notices.end() - kMaxNotices);
+    }
+
+    void Application::renderNotices()
+    {
+        const uint32_t nowMs = SDL_GetTicks();
+        m_notices.erase(std::remove_if(m_notices.begin(), m_notices.end(), [&](const Notice &n) { return nowMs >= n.untilMs; }), m_notices.end());
+        if(m_notices.empty() || !(m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat))
+            return;
+        const int viewW = m_camera->getViewportWidth();
+        int y = 86; // under the network banner
+        for(const Notice &n : m_notices)
+        {
+            // The last second fades out
+            const uint32_t left = n.untilMs - nowMs;
+            const float alpha = std::min(1.0f, left / 1000.0f);
+            auto fade = [&](SDL_Color c) { return ui::withAlpha(c, static_cast<uint8_t>(c.a * alpha)); };
+            const int w = m_fontRenderer->getTextWidth(n.text, ui::FONT_BODY_BOLD) + 32;
+            const int x = (viewW - w) / 2;
+            m_renderer->fillRectScreen(x, y, w, 28, fade(ui::color::Panel));
+            m_renderer->fillRectScreen(x, y, 3, 28, fade(ui::color::Danger));
+            m_fontRenderer->drawString(n.text, x + w / 2, y + 14, ui::FONT_BODY_BOLD, fade(ui::color::Text), false, Anchor::HCENTER | Anchor::VCENTER);
+            y += 32;
+        }
+    }
+
+    void Application::renderScoreboard()
+    {
+        if(!m_input || !m_input->isKeyPressed(SDL_SCANCODE_TAB) || !m_entities)
+            return;
+        if(!(m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying || m_state == AppState::Victory || m_state == AppState::Defeat))
+            return;
+        if(m_menuController->isInGameMenuOpen())
+            return;
+        namespace col = ui::color;
+        struct Row
+        {
+            PlayerId id;
+            std::string name;
+            std::string faction;
+            SDL_Color color;
+            std::string colorName;
+            int points;
+            int kills;
+            int losses;
+            bool gone;
+        };
+        std::vector<Row> rows;
+        for(PlayerId id = 0; id < kMaxPlayers; ++id)
+        {
+            if(!Players::isActive(id))
+                continue;
+            const PlayerSlot &slot = Players::slot(id);
+            Row r;
+            r.id = id;
+            r.gone = false;
+            if(!slot.human)
+            {
+                static const char *const kLevels[4] = {"Easy", "Medium", "Hard", "Hardcore"};
+                r.name = std::string(_("AI")) + " (" + _(kLevels[slot.aiLevel & 3]) + ")";
+            }
+            else if(inNetworkMatch() && !m_netPlayers[id].name.empty())
+            {
+                r.name = m_netPlayers[id].name;
+                r.gone = m_netPlayers[id].left;
+            }
+            else if(id == Players::local())
+            {
+                r.name = m_settings.playerName;
+            }
+            else
+            {
+                r.name = std::string(_("Player")) + " " + std::to_string(id + 1);
+            }
+            r.faction = slot.faction == Faction::Confederation ? _("Confederation") : _("Resistance");
+            r.color = slot.color == 0 ? col::TextDim : armyColor(slot.color);
+            r.colorName = _(armyColorName(slot.color));
+            const EntityManager::PlayerStats &st = m_entities->getPlayerStats(id);
+            r.points = m_entities->getEfficiencyPoints(id);
+            r.kills = st.unitsKilled + st.buildingsDestroyed;
+            r.losses = st.unitsLost + st.buildingsLost;
+            rows.push_back(r);
+        }
+        if(rows.empty())
+            return;
+        // Best first; the same points: in slot order
+        std::stable_sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) { return a.points > b.points; });
+
+        const int viewW = m_camera->getViewportWidth();
+        const int rowH = 30, headH = 64;
+        // Columns: colour swatch + name | faction | colour | efficiency | kills | losses
+        const int colName = 16, colFaction = 250, colColor = 410, colPoints = 520, colKills = 620, colLosses = 700;
+        const int w = std::min(viewW - 32, 780);
+        const int h = headH + static_cast<int>(rows.size()) * rowH + 34;
+        const int x = (viewW - w) / 2, y = std::max(60, (m_windowH - h) / 3);
+        m_renderer->fillRectScreen(x, y, w, h, col::Panel);
+        m_renderer->drawRectScreen(x, y, w, h, col::BorderStrong);
+        m_renderer->fillRectScreen(x, y, w, 2, col::Accent);
+        m_fontRenderer->drawString(_("MATCH STATISTICS"), x + colName, y + 12, ui::FONT_H2, col::Accent, false);
+        const int hy = y + 44;
+        m_fontRenderer->drawString(_("Player"), x + colName + 22, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        m_fontRenderer->drawString(_("Faction"), x + colFaction, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        m_fontRenderer->drawString(_("Color"), x + colColor, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        m_fontRenderer->drawString(_("Efficiency"), x + colPoints, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        m_fontRenderer->drawString(_("Kills"), x + colKills, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        m_fontRenderer->drawString(_("Losses"), x + colLosses, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+        int ry = y + headH;
+        for(const Row &r : rows)
+        {
+            const bool me = r.id == Players::local();
+            if(me)
+                m_renderer->fillRectScreen(x + 4, ry, w - 8, rowH - 2, col::Hover);
+            const int cy = ry + rowH / 2 - 1;
+            const SDL_Color text = r.gone ? col::TextMuted : col::Text;
+            m_renderer->fillRectScreen(x + colName, cy - 7, 14, 14, r.color);
+            m_renderer->drawRectScreen(x + colName, cy - 7, 14, 14, col::Border);
+            std::string name = r.name;
+            if(r.gone)
+                name += std::string(" (") + _("left") + ")";
+            m_fontRenderer->drawString(name, x + colName + 22, cy, me ? ui::FONT_BODY_BOLD : ui::FONT_BODY, text, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->drawString(r.faction, x + colFaction, cy, ui::FONT_BODY, text, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->drawString(r.colorName, x + colColor, cy, ui::FONT_BODY, text, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->drawString(std::to_string(r.points), x + colPoints, cy, ui::FONT_BODY_BOLD, r.gone ? col::TextMuted : col::Accent, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->drawString(std::to_string(r.kills), x + colKills, cy, ui::FONT_BODY, text, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->drawString(std::to_string(r.losses), x + colLosses, cy, ui::FONT_BODY, text, false, Anchor::LEFT | Anchor::VCENTER);
+            ry += rowH;
+        }
+        m_fontRenderer->drawString(_("Efficiency: a point for every 10 credits of enemy forces destroyed"), x + colName, ry + 10, ui::FONT_SMALL, col::TextMuted, false);
+    }
+
     bool Application::inNetworkMatch() const
     {
         return m_net && m_netMatchStarted && m_mission && m_mission->isMatch();
     }
 
-    void Application::hostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name)
+    void Application::hostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
     {
         m_net = std::make_unique<NetMatch>();
         std::string error;
@@ -1018,6 +1381,8 @@ namespace OpenArtOfWar
             m_net.reset();
             return;
         }
+        if(m_networkMenu)
+            m_networkMenu->setPrebuilt(!fromScratch);
         m_netWantedPlayers = std::clamp(players, 1, kMaxPlayers);
         m_netMapPath = mapPath;
         m_netAuto = true;
@@ -1046,8 +1411,10 @@ namespace OpenArtOfWar
         m_state = AppState::MenuNetwork;
     }
 
-    void Application::serverNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name)
+    void Application::serverNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
     {
+        if(m_networkMenu && code.empty())
+            m_networkMenu->setPrebuilt(!fromScratch);
         m_serverOverride = server;
         m_serverOverridePort = port;
         m_cliServerAction = code.empty() ? 1 : 2;
@@ -1084,11 +1451,19 @@ namespace OpenArtOfWar
             {
                 for(const Net::LobbySlot &s : lobby->slots)
                 {
-                    if(s.slot == m_net->localSlot() && !s.choice.ready && m_net->mapReady())
+                    Net::LobbyChoice mine = s.choice;
+                    // OAOW_NET_FACTION_BY_SLOT=1 (self-test): even slots Resistance, odd ones Confederation, so
+                    // a match always has both factions
+                    static const bool factionBySlot = debugEnv("OAOW_NET_FACTION_BY_SLOT") != nullptr;
+                    if(s.slot == m_net->localSlot() && m_net->localChoice(mine) && !mine.ready && m_net->mapReady())
                     {
-                        Net::LobbyChoice ready = s.choice;
-                        ready.ready = true;
-                        m_net->setChoice(ready);
+                        if(factionBySlot)
+                            mine.faction = static_cast<uint8_t>(m_net->localSlot() % 2 == 0 ? Faction::Resistance : Faction::Confederation);
+                        // OAOW_NET_FACTION=0|1: this faction for everybody (players of one faction)
+                        if(const char *forced = debugEnv("OAOW_NET_FACTION"); forced && (forced[0] == '0' || forced[0] == '1'))
+                            mine.faction = static_cast<uint8_t>(forced[0] - '0');
+                        mine.ready = true;
+                        m_net->setChoice(mine);
                     }
                 }
             }
@@ -1112,6 +1487,8 @@ namespace OpenArtOfWar
             }
             m_netMatchStarted = true;
             m_netMatchLoaded = true;
+            m_netPlayers = {};
+            m_notices.clear();
             // A fresh simulation now, before the first turn's commands are scheduled into it
             m_gameplayController->resetForMission(*m_mission, *m_hudController, *m_entities, *m_map);
             m_net->attach(m_gameplayController->simulation());
@@ -1121,6 +1498,12 @@ namespace OpenArtOfWar
             m_camera->centerOn(m_mission->getPlayerHqX() * TILE_WIDTH, m_mission->getPlayerHqY() * TILE_HEIGHT);
             endMapLoading(); // not before three seconds of the loading screen are over
             std::cout << "[Net] Match started, local slot " << int(setup.local) << std::endl;
+            // Who plays what, as this computer got it (the self-test compares the peers' lines)
+            for(int i = 0; i < kMaxPlayers; ++i)
+            {
+                if(setup.slots[i].active)
+                    std::cout << "[Net] Slot " << i << ": faction " << static_cast<int>(setup.slots[i].faction) << " team " << int(setup.slots[i].team) << " color " << int(setup.slots[i].color) << std::endl;
+            }
         }
         if(!m_net->failure().empty())
         {
@@ -1143,6 +1526,8 @@ namespace OpenArtOfWar
             leaveNetworkGame();
             return;
         }
+        if(m_netMatchLoaded)
+            trackNetPlayers(nowMs);
         if(m_net->desynced())
         {
             static bool reported = false;
@@ -1194,13 +1579,83 @@ namespace OpenArtOfWar
         m_fontRenderer->drawString("FPS " + std::to_string(static_cast<int>(m_fps + 0.5f)), 10, 8, ui::FONT_SMALL_BOLD, ui::color::Accent, true);
     }
 
+    void Application::renderNetStats()
+    {
+        if(!m_settings.showNetStats || !m_net)
+            return;
+        const uint32_t tick = m_netMatchLoaded ? m_gameplayController->simulation().tick() : 0;
+        const NetMatch::Stats st = m_net->stats(static_cast<uint32_t>(SDL_GetTicks()), tick);
+        if(!st.valid)
+            return;
+        namespace col = ui::color;
+        auto pingColor = [](uint32_t ms) { return ms < 80 ? col::Ok : (ms < 160 ? col::Accent : col::Danger); };
+        struct Line
+        {
+            std::string text;
+            SDL_Color color;
+        };
+        std::vector<Line> lines;
+        char buf[160];
+        lines.push_back({_("NETWORK"), col::Accent});
+        if(st.host)
+        {
+            lines.push_back({_("Hosting this game"), col::TextDim});
+        }
+        else
+        {
+            std::snprintf(buf, sizeof buf, "%s %u %s   %s %u %s", _("Ping"), st.rttMs, _("ms"), _("Jitter"), st.jitterMs, _("ms"));
+            lines.push_back({buf, pingColor(st.rttMs + st.jitterMs)});
+            std::snprintf(buf, sizeof buf, "%s %.1f%%", _("Packet loss"), st.lossPercent);
+            lines.push_back({buf, st.lossPercent < 1.0f ? col::Text : (st.lossPercent < 5.0f ? col::Accent : col::Danger)});
+            // (a host's own client talks to its server through memory: no traffic of its own to show)
+            std::snprintf(buf, sizeof buf, "%s  %.1f / %.1f %s", _("Traffic out / in"), st.sendKBps, st.recvKBps, _("KB/s"));
+            lines.push_back({buf, col::Text});
+        }
+        if(m_netMatchLoaded)
+        {
+            std::snprintf(buf, sizeof buf, "%s %d %s  (%s %d %s)", _("Input delay"), st.inputDelayMs, _("ms"), _("turn"), st.turnMs, _("ms"));
+            lines.push_back({buf, col::Text});
+            std::snprintf(buf, sizeof buf, "%s %d", _("Turns buffered"), st.turnsBuffered);
+            lines.push_back({buf, st.turnsBuffered > 2 ? col::Accent : col::Text});
+            if(st.stalledSeconds > 0.3f)
+            {
+                std::snprintf(buf, sizeof buf, "%s %.1f %s", _("Waiting for the next turn"), st.stalledSeconds, _("s"));
+                lines.push_back({buf, col::Danger});
+            }
+        }
+        for(const NetMatch::Stats::Peer &p : st.peers)
+        {
+            if(p.rttMs == 0 && p.connected)
+                continue; // the host's own client (memory link)
+            std::snprintf(buf, sizeof buf, "%d. %s  %s", p.slot + 1, p.name.c_str(), p.connected ? (std::to_string(p.rttMs) + " " + _("ms")).c_str() : _("disconnected"));
+            lines.push_back({buf, p.connected ? pingColor(p.rttMs) : col::Danger});
+        }
+        if(st.reconnecting)
+            lines.push_back({_("Reconnecting..."), col::Danger});
+        if(st.desynced)
+            lines.push_back({_("DESYNC"), col::Danger});
+
+        int w = 0;
+        for(const Line &l : lines)
+            w = std::max(w, m_fontRenderer->getTextWidth(l.text, ui::FONT_SMALL));
+        const int lineH = 16, x = 8, y = m_settings.showFps ? 28 : 8;
+        const int h = static_cast<int>(lines.size()) * lineH + 8;
+        m_renderer->fillRectScreen(x, y, w + 16, h, {8, 10, 14, 200});
+        m_renderer->drawRectScreen(x, y, w + 16, h, col::Border);
+        for(size_t i = 0; i < lines.size(); ++i)
+            m_fontRenderer->drawString(lines[i].text, x + 8, y + 4 + static_cast<int>(i) * lineH, i == 0 ? ui::FONT_SMALL_BOLD : ui::FONT_SMALL, lines[i].color, false);
+    }
+
+#if defined(AOW_DEBUG)
     bool Application::runHeadlessTest(int numTicks)
     {
         return HeadlessTest::run(*this, numTicks);
     }
+#endif
 
     void Application::handleEvents()
     {
+        syncWindowSize();
         m_input->resetFrameEvents();
         SDL_Event event;
         while(SDL_PollEvent(&event))
@@ -1219,19 +1674,23 @@ namespace OpenArtOfWar
             }
 
             // Only the game window: the throw-away windows that probe the render APIs report their own sizes
-            if(event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED && event.window.windowID == SDL_GetWindowID(m_window))
+            if((event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_RESIZED || event.type == SDL_EVENT_WINDOW_MAXIMIZED || event.type == SDL_EVENT_WINDOW_RESTORED || event.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || event.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) && event.window.windowID == SDL_GetWindowID(m_window))
             {
-                m_windowW = event.window.data1;
-                m_windowH = event.window.data2;
-                m_camera->setViewport(m_windowW - HUDController::kSidebarWidth, m_windowH);
+                syncWindowSize(event.window.data1, event.window.data2);
             }
 
+            // A click on a button, list entry or cameo the last frame drew under the mouse
+            if(event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT && SoundRequests::hoverFlag() && m_sound)
+                m_sound->playSfx("ui_click");
             m_input->processEvent(event, *m_camera);
         }
 
         if(m_gameplayController && m_gameplayController->consumeDebugOverlayToggle())
         {
-            m_debug->toggle();
+#if defined(AOW_DEBUG)
+            if(m_debug)
+                m_debug->toggle();
+#endif
         }
         // Refresh mouse position every frame so menus get hover feedback too
         m_input->update(0.0f, *m_camera);
@@ -1242,7 +1701,7 @@ namespace OpenArtOfWar
         m_globalAnimTimer += deltaTime;
 
         // Enter is consumed only together with Alt; a plain Enter belongs to the menus
-        if(m_input->isKeyJustPressed(SDL_SCANCODE_F11) || ((SDL_GetModState() & SDL_KMOD_ALT) && m_input->isKeyJustPressed(SDL_SCANCODE_RETURN)))
+        if(((SDL_GetModState() & SDL_KMOD_ALT) && m_input->isKeyJustPressed(SDL_SCANCODE_RETURN)))
         {
             toggleFullscreen();
         }
@@ -1252,11 +1711,13 @@ namespace OpenArtOfWar
             return;
         }
 
-        // Standalone Test Map (-1) always runs with DEBUG mode active
+#if defined(AOW_DEBUG)
+        // Standalone Test Map (-1) always runs with DEBUG mode active (debug builds)
         if(m_mission && m_mission->getCurrentMissionId() == -1 && (!m_debugMode || (m_gameplayController && !m_gameplayController->isDebugMode())))
         {
             setDebugMode(true);
         }
+#endif
 
         if(m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
         {
@@ -1331,9 +1792,59 @@ namespace OpenArtOfWar
         m_sound->update(menuMusic, gameplayMusic);
     }
 
+    void Application::updateSounds()
+    {
+        if(!m_sound)
+        {
+            SoundRequests::take();
+            return;
+        }
+        if(!m_gameSounds)
+            m_gameSounds = std::make_unique<GameSounds>();
+        const bool inMatch = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat;
+        for(const SoundRequests::Request &r : SoundRequests::take())
+        {
+            if(!r.event.empty() && r.event[0] == '@')
+            {
+                if(inMatch && m_gameplayController && m_entities)
+                    m_gameSounds->playReply(*m_sound, *m_entities, m_gameplayController->getSelectedUnits(), r.event.c_str() + 1);
+            }
+            else if(r.announcer)
+            {
+                m_sound->announce(r.event);
+            }
+            else
+            {
+                m_sound->playSfx(r.event);
+            }
+        }
+        if(inMatch && m_state != AppState::Paused && m_entities && m_map && m_economy && m_camera && m_hudController && m_gameplayController)
+        {
+            const bool fog = m_map->isFogEnabled() && !m_gameplayController->isRevealFog();
+            m_gameSounds->update(*m_sound, *m_entities, *m_economy, *m_map, *m_camera, fog, m_hudController->radarAlert(), SDL_GetTicks());
+            m_gameSounds->selectionChanged(*m_sound, *m_entities, m_gameplayController->getSelectedUnits());
+        }
+        // The end of a match
+        if(m_state != m_soundState)
+        {
+            if(m_state == AppState::Victory)
+                m_sound->announce("ann_victory");
+            else if(m_state == AppState::Defeat)
+                m_sound->announce("ann_defeat");
+            else if(!inMatch && (m_soundState == AppState::CampaignPlaying || m_soundState == AppState::SkirmishPlaying || m_soundState == AppState::Paused ||
+                                 m_soundState == AppState::Victory || m_soundState == AppState::Defeat))
+            {
+                m_sound->sfx().stopAll(); // back in the menus: the battle falls silent
+                m_gameSounds->reset();
+            }
+            m_soundState = m_state;
+        }
+    }
+
     void Application::render()
     {
-        m_renderer->clear({15, 18, 24, 255});
+        SoundRequests::hoverFlag() = false; // the widgets drawn now mark it again
+        m_renderer->clear({0,0,0,255});
 
         // Game UI wears the player's faction colors; menus stay neutral (the ImGui debug UI has its own style)
         const bool inGame = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat || m_state == AppState::Briefing;
@@ -1395,7 +1906,7 @@ namespace OpenArtOfWar
             if(scene)
             {
                 SDL_SetRenderTarget(m_sdlRenderer, scene);
-                m_renderer->clear({15, 18, 24, 255});
+                m_renderer->clear({0, 0, 0, 255});
             }
             else if(divisor > 1)
             {
@@ -1413,7 +1924,7 @@ namespace OpenArtOfWar
                 {
                     SDL_SetTextureScaleMode(m_lowResTarget, m_settings.smoothing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
                     SDL_SetRenderTarget(m_sdlRenderer, m_lowResTarget);
-                    m_renderer->clear({15, 18, 24, 255});
+                    m_renderer->clear({0, 0, 0, 255});
                 }
             }
             // Everything of the world stays inside the map: tiles, cliffs, trees, buildings and the fog no longer
@@ -1430,7 +1941,12 @@ namespace OpenArtOfWar
             }
 
             // Layer 0: Base Terrain
-            bool disableFog = (m_debug && m_debug->isFogDisabled()) || m_gameplayController->isRevealFog() || !m_map->isFogEnabled();
+#if defined(AOW_DEBUG)
+            const bool overlayNoFog = m_debug && m_debug->isFogDisabled();
+#else
+            const bool overlayNoFog = false;
+#endif
+            bool disableFog = overlayNoFog || m_gameplayController->isRevealFog() || !m_map->isFogEnabled();
             int globalAnimTick = static_cast<int>(m_globalAnimTimer * 8.0f);
             m_map->renderTerrain(*m_renderer, worldCam, !disableFog, globalAnimTick);
 
@@ -1505,6 +2021,8 @@ namespace OpenArtOfWar
 
             // Training progress above Barracks / Factories, rally lines of the selected ones
             m_hudController->renderProductionOverlay(*m_renderer, *m_fontRenderer, *m_entities, *m_map, *m_camera);
+            // Not enough power: blinking lightnings over the buildings that stopped
+            m_hudController->renderPowerAlerts(*m_renderer, *m_entities, *m_economy, *m_camera);
 
             // Render Selection Box
             if(!m_hudController->isBuildMode())
@@ -1586,16 +2104,21 @@ namespace OpenArtOfWar
             }
         }
 
+        renderNotices();
+        renderScoreboard();
         renderFpsCounter();
+        renderNetStats();
         renderNetworkBanner();
         if(m_videoConfirmActive)
             renderVideoConfirm();
 
+#if defined(AOW_DEBUG)
         // Debug Overlay (Dear ImGui)
         if(m_debug)
         {
             m_debug->render(*m_map, *m_entities, *m_economy, *m_mission, *m_sound, *m_camera, *m_aiController, m_fps);
         }
+#endif
 
         m_renderer->present();
         if(m_renderFirstFrame)

@@ -2,6 +2,7 @@
 
 #include "core/Config.hpp"
 #include "game/Simulation.hpp"
+#include "ui/RadarAlert.hpp"
 #include <string>
 #include <vector>
 
@@ -71,6 +72,11 @@ namespace OpenArtOfWar
 
         // Progress bars / queue size above producing buildings, rally lines of the selected ones
         void renderProductionOverlay(Renderer &renderer, BitmapFontRenderer &fontRenderer, const EntityManager &entities, const TileMap &map, const Camera &camera) const;
+        // Not enough power: a blinking lightning over every finished building of the player that needs power
+        void renderPowerAlerts(Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const;
+        // The lightning icon of the game (sprite of the sheets) and its blinking, shared with the power header
+        static constexpr int kPowerIconSprite = 1778;
+        static bool powerIconBlinkOn();
 
         void renderGameHUD(Renderer &renderer, BitmapFontRenderer &fontRenderer, const Economy &economy, const EntityManager &entities, const TileMap &map, const Camera &camera, int mx, int my, int windowW, int windowH, const std::vector<int> &selected);
 
@@ -122,6 +128,15 @@ namespace OpenArtOfWar
         int getRadarZoom() const
         {
             return m_radarZoom;
+        }
+        // Radar alarm settings (section "radar_alert" of game_environment.json)
+        void setRadarAlertConfig(const nlohmann::json &section)
+        {
+            m_radarAlert.config.load(section);
+        }
+        const RadarAlert &radarAlert() const
+        {
+            return m_radarAlert;
         }
         // Every frame, not at the simulation rate: while a drag that began on the radar holds the left button,
         // the camera glides after the point under the mouse (clamped to the radar when the mouse leaves it)
@@ -183,6 +198,7 @@ namespace OpenArtOfWar
 
         float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
         bool m_radarFog {true};
+        mutable RadarAlert m_radarAlert;      // updated while the radar is drawn
         int m_radarZoom {1};                  // 1 = whole map, up to kRadarMaxZoom
         bool m_radarDragging {false};         // camera follows the mouse on the radar: the zoomed view holds still meanwhile
         mutable float m_radarCenterX {-1.0f}; // tile at the middle of a zoomed radar

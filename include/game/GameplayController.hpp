@@ -5,11 +5,13 @@
 #include <array>
 #include <memory>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace OpenArtOfWar
 {
 
+    class Unit;
     class InputManager;
     class Camera;
     class TileMap;
@@ -173,6 +175,10 @@ namespace OpenArtOfWar
         std::uint64_t m_lastGroupTicks {0};
         int m_lastClickId {0};
         std::uint64_t m_lastClickTicks {0};
+        int m_lastClickX {-100}; // screen position of the last click (a double click on empty ground)
+        int m_lastClickY {-100};
+        // Selects the player's own living units for which `pick` is true; `onScreen`: only those inside the view
+        void selectOwnUnits(EntityManager &entities, const Camera &camera, bool onScreen, const std::function<bool(const Unit &)> &pick);
 
         bool m_debugMode {false};
         bool m_showNavLines {true};

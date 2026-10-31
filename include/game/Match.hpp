@@ -21,7 +21,7 @@ namespace OpenArtOfWar
         PlayerId local {0};                               // this computer's slot
         int startingCredits {1500};
         bool fogOfWar {true};
-        bool prebuilt {false}; // use the buildings and units the map itself has (else everybody starts from the usual base)
+        bool prebuilt {true}; // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch (HQ + power only)
     };
 
 } // namespace OpenArtOfWar

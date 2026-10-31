@@ -27,6 +27,8 @@ namespace OpenArtOfWar
         Demolish,      // ids: own buildings
         DebugCredits,  // a: amount (debug toolbar)
         DebugSpawn,    // a: archetype / building index; b: DebugSpawnKind; c, d: footprint; x, y: tile
+        PlayerLeft,    // the player left a network match: its buildings, walls and units are destroyed
+                       // (only the network session issues it, from the host's turn stream)
         Count
     };
 

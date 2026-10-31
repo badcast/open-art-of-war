@@ -1,4 +1,5 @@
 #include "CharacterEditor.hpp"
+#include "ConfigMerge.hpp"
 
 #include <SDL3_ttf/SDL_ttf.h>
 
@@ -97,22 +98,27 @@ void CharacterEditor::ensureEnvironment() {
     }
     envJson = Json::parse(in, nullptr, false, true);
     envLoaded = envJson.is_object();
+    envBase = envJson;
     if (!envLoaded) status = std::string(_("Could not load YAML: ")) + envPath.string();
     envDirty = false;
 }
 
 bool CharacterEditor::saveEnvironment() {
     if (!envLoaded) return false;
-    std::ofstream out(envPath);
-    if (!out) {
-        status = std::string(_("Could not open file for writing: ")) + envPath.string();
+    // Only the editor's changes on top of the file as it is now (sections it does not show stay)
+    Json disk;
+    {
+        std::ifstream in(envPath);
+        if (in) disk = Json::parse(in, nullptr, false, true);
+    }
+    Json merged = disk.is_object() ? mergeJsonEdits(envBase, envJson, disk) : envJson;
+    std::string error;
+    if (!writeFileAtomic(envPath, merged.dump(2) + "\n", error)) {
+        status = error;
         return false;
     }
-    out << envJson.dump(2) << '\n';
-    if (!out) {
-        status = std::string(_("Failed to write file: ")) + envPath.string();
-        return false;
-    }
+    envJson = merged;
+    envBase = merged;
     envDirty = false;
     status = std::string(_("Saved: ")) + envPath.filename().string();
     return true;

@@ -79,7 +79,9 @@ YAML::Node mainWeapon(const YAML::Node& combat) {
 }
 
 YAML::Node ensureMainWeapon(YAML::Node combat) {
-    if (!combat["weapons"] || !combat["weapons"].IsSequence()) combat["weapons"] = YAML::Node(YAML::NodeType::Sequence);
+    if (!combat["weapons"]) combat["weapons"] = YAML::Node(YAML::NodeType::Sequence);
+    // Another shape than the editor knows: leave it alone (edits land in a scratch weapon that is not saved)
+    if (!combat["weapons"].IsSequence()) return YAML::Node(YAML::NodeType::Map);
     if (combat["weapons"].size() == 0) {
         YAML::Node w(YAML::NodeType::Map);
         w["name"] = "Primary";

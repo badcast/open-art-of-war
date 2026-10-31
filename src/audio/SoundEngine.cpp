@@ -1,5 +1,7 @@
 #include "audio/SoundEngine.hpp"
+#include "core/DebugEnv.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -33,7 +35,7 @@ namespace OpenArtOfWar
             return true;
 
         std::string tracklistText;
-        if(Assets::readText(assetRoot + "/data/tracklist.json", tracklistText))
+        if(Assets::readText(LoaderResources::tracklist(assetRoot), tracklistText))
         {
             const nlohmann::json tracklist = nlohmann::json::parse(tracklistText, nullptr, false);
             if(tracklist.is_object())
@@ -45,7 +47,7 @@ namespace OpenArtOfWar
                     const std::string filename = item["filename"].get<std::string>();
                     if(filename.empty())
                         return false;
-                    track.path = assetRoot + "/audio/" + filename;
+                    track.path = LoaderResources::audioFile(filename, assetRoot);
                     track.name = item.contains("name") && item["name"].is_string() ? item["name"].get<std::string>() : filename.substr(0, filename.rfind('.'));
                     if((item.contains("effective_min") && !item["effective_min"].is_number()) || (item.contains("effective_max") && !item["effective_max"].is_number()))
                     {
@@ -104,6 +106,21 @@ namespace OpenArtOfWar
         m_lock = SDL_CreateMutex();
         SDL_ResumeAudioStreamDevice(m_stream);
 
+        m_assetRoot = assetRoot;
+        // Sound effects: their own stream, fed by the mixer (decoded once at start)
+        m_sfx.loadBank(LoaderResources::sfxConfig(assetRoot), LoaderResources::sfxDir(assetRoot));
+        m_sfx.setFxVolume(m_fxVolume);
+        m_sfx.setVoiceVolume(m_voiceVolume);
+        m_sfx.setMuted(m_muted);
+        m_voices.setVolume(m_voiceVolume);
+        m_voices.setMuted(m_muted);
+        SDL_AudioSpec sfxSpec {SDL_AUDIO_S16, 2, SfxMixer::kRate};
+        m_sfxStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &sfxSpec, &SoundEngine::feedSfx, this);
+        if(m_sfxStream)
+            SDL_ResumeAudioStreamDevice(m_sfxStream);
+        else
+            std::cerr << "[SoundEngine] Warning: no stream for sound effects: " << SDL_GetError() << std::endl;
+
         std::cout << "[SoundEngine] SDL3 audio ready, " << m_gameTracks.size() << " game music tracks." << std::endl;
         m_initialized = true;
         applyGain();
@@ -112,6 +129,13 @@ namespace OpenArtOfWar
 
     void SoundEngine::cleanup()
     {
+        if(m_sfxStream)
+        {
+            SDL_DestroyAudioStream(m_sfxStream);
+            m_sfxStream = nullptr;
+        }
+        m_sfx.stopAll();
+        m_voices.stopAll();
         if(m_stream)
         {
             SDL_DestroyAudioStream(m_stream); // stops the callback before the decoder goes away
@@ -140,6 +164,18 @@ namespace OpenArtOfWar
             m_decoder = nullptr;
             m_oggData.clear();
         }
+    }
+
+    void SDLCALL SoundEngine::feedSfx(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
+    {
+        auto *self = static_cast<SoundEngine *>(userdata);
+        const int frames = additionalAmount / 4; // stereo int16
+        if(frames <= 0)
+            return;
+        self->m_sfxBuffer.assign(static_cast<size_t>(frames) * 2, 0);
+        self->m_sfx.mix(self->m_sfxBuffer.data(), frames);
+        self->m_voices.mix(self->m_sfxBuffer.data(), frames); // the voices on top
+        SDL_PutAudioStreamData(stream, self->m_sfxBuffer.data(), frames * 4);
     }
 
     void SDLCALL SoundEngine::feedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
@@ -386,6 +422,7 @@ namespace OpenArtOfWar
     {
         if(!m_initialized)
             return;
+        m_voices.update(SDL_GetTicks()); // the next announcer line once the current one is over
         const int area = inMainMenu ? 1 : (inGame ? 2 : 0);
         if(area != m_lastArea)
         {
@@ -466,11 +503,58 @@ namespace OpenArtOfWar
     void SoundEngine::setFxVolume(int volume)
     {
         m_fxVolume = std::clamp(volume, 0, 128);
+        m_sfx.setFxVolume(m_fxVolume);
+    }
+
+    void SoundEngine::setVoiceVolume(int volume)
+    {
+        m_voiceVolume = std::clamp(volume, 0, 128);
+        m_voices.setVolume(m_voiceVolume);
+    }
+
+    void SoundEngine::playSfx(const std::string &event, float gain, float pan)
+    {
+        if(!m_sfxStream)
+            return;
+        const bool played = m_sfx.play(event, gain, pan, SDL_GetTicks());
+        // OAOW_SFX_TRACE=1 (debug builds): every sound that starts, to check the events without listening
+        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        if(trace && played)
+            std::cout << "[Sfx] " << event << " gain " << gain << " pan " << pan << std::endl;
+    }
+
+    void SoundEngine::announce(const std::string &event)
+    {
+        if(!m_sfxStream)
+            return;
+        const bool queued = m_voices.announce(event, SDL_GetTicks());
+        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        if(trace && queued)
+            std::cout << "[Sfx] announcer (" << m_voices.language() << "): " << event << std::endl;
+    }
+
+    void SoundEngine::playVoice(const std::string &event)
+    {
+        if(!m_sfxStream)
+            return;
+        const bool played = m_voices.play(event, SDL_GetTicks());
+        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        if(trace && played)
+            std::cout << "[Sfx] voice (" << m_voices.language() << "): " << event << std::endl;
+    }
+
+    void SoundEngine::setVoiceLanguage(const std::string &language)
+    {
+        if(!m_initialized || language == m_voices.language())
+            return;
+        m_voices.load(language, m_assetRoot.empty() ? LoaderResources::kDefaultRoot : m_assetRoot);
     }
 
     void SoundEngine::toggleMute()
     {
         m_muted = !m_muted;
+        m_sfx.setMuted(m_muted);
+        m_voices.setMuted(m_muted);
         applyGain();
     }
 

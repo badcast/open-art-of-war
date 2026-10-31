@@ -692,15 +692,8 @@ bool BRAIN_DEFINE::find(navigate_result<list_type> &navigationResult, INeuron *f
                 continue;
             }
 
-            // Prevent diagonal corner-cutting through adjacent locked tiles
-            if(identity.horizontal[s] != 0 && identity.vertical[s] != 0)
-            {
-                if(has_lock({current_site.x + identity.horizontal[s], current_site.y}) ||
-                   has_lock({current_site.x, current_site.y + identity.vertical[s]}))
-                {
-                    continue;
-                }
-            }
+            // Diagonal steps are allowed whatever the two corner tiles are (open Art of War: units walk
+            // diagonally between two locked tiles that only touch at their corners)
 
             int newG = current->g + identity.g_weight[s]; // get weight
             if(self->flags == NEURON_CAPTURE_OPEN_LIST)

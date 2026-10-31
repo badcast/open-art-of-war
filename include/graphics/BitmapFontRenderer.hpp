@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LoaderResources.hpp"
+
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <string>
@@ -54,7 +56,7 @@ namespace OpenArtOfWar
     class BitmapFontRenderer
     {
     public:
-        BitmapFontRenderer(SDL_Renderer *renderer, const std::string &regularFontPath = "assets/fonts/Roboto-Regular.ttf", const std::string &boldFontPath = "assets/fonts/Roboto-Bold.ttf", const FontSizes &sizes = {});
+        BitmapFontRenderer(SDL_Renderer *renderer, const std::string &regularFontPath = LoaderResources::fontRegular(), const std::string &boldFontPath = LoaderResources::fontBold(), const FontSizes &sizes = {});
         ~BitmapFontRenderer();
 
         void drawString(const std::string &text, int x, int y, int scale = 2, SDL_Color color = {255, 255, 255, 255}, bool dropShadow = true, int anchor = Anchor::TOP | Anchor::LEFT);
