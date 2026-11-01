@@ -211,6 +211,8 @@ void NetMatch::Update(uint32_t nowMs)
     // The room has echoed the own picks: its copy is current again
     if (m_hasPendingChoice && m_client)
     {
+        if (m_nowMs - m_pendingChoiceMs >= 1000)
+            m_hasPendingChoice = false;
         for (const Net::LobbySlot &s : m_client->lobby().slots)
         {
             if (s.slot == LocalSlot() && s.choice.faction == m_pendingChoice[0] && s.choice.team == m_pendingChoice[1]
@@ -492,8 +494,8 @@ bool NetMatch::LocalChoice(Net::LobbyChoice &out) const
     }
     if (!found)
         return false;
-    // Until the room echoes what was sent (or 4 s went by: the room may have refused or changed it)
-    if (m_hasPendingChoice && m_nowMs - m_pendingChoiceMs < 4000)
+    // Until the room echoes what was sent (or 1 s went by: the room may have refused or changed it)
+    if (m_hasPendingChoice && m_nowMs - m_pendingChoiceMs < 1000)
     {
         out.faction = m_pendingChoice[0];
         out.team = m_pendingChoice[1];
@@ -513,6 +515,8 @@ void NetMatch::SetAi(const Net::OwnerSetAi &change)
 }
 void NetMatch::SetTeam(uint8_t slot, uint8_t team)
 {
+    if (m_hasPendingChoice && slot == LocalSlot())
+        m_pendingChoice[1] = team;
     if (m_host)
         m_host->setTeam(slot, team);
     else if (IsOwner())

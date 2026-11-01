@@ -380,7 +380,8 @@ void DrawComboList(
     int windowH,
     int mouseX,
     int mouseY,
-    const std::vector<bool> *disabled)
+    const std::vector<bool> *disabled,
+    const std::vector<SDL_Color> *swatches)
 {
     const int n = static_cast<int>(items.size());
     const UiRect list = ComboListRect(field, n, windowH);
@@ -402,10 +403,21 @@ void DrawComboList(
             r.FillRectScreen(item.x, item.y, item.w, item.h, color::AccentDeep);
         else if (hot)
             r.FillRectScreen(item.x, item.y, item.w, item.h, color::Hover);
+        int textOffset = 10;
+        if (swatches && static_cast<size_t>(i) < swatches->size())
+        {
+            SDL_Color sw = (*swatches)[static_cast<size_t>(i)];
+            if (off)
+                sw.a = 110;
+            const UiRect box {item.x + 8, item.CenterY() - 7, 14, 14};
+            r.FillRectScreen(box.x, box.y, box.w, box.h, sw);
+            r.DrawRectScreen(box.x, box.y, box.w, box.h, off ? color::Border : color::BorderStrong);
+            textOffset = 28;
+        }
         const SDL_Color textColor = i == current ? color::Accent : (off ? color::TextMuted : color::Text);
         font.DrawString(
-            FitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - 20),
-            item.x + 10,
+            FitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - textOffset - 10),
+            item.x + textOffset,
             item.CenterY(),
             FONT_BODY,
             textColor,

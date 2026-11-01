@@ -3842,6 +3842,7 @@ void EntityManager::RenderGroundRemnants(
                 u->selectedDeathSeq);
         }
     }
+    renderer.SetDrawOwner(kNoPlayer);
 }
 
 bool EntityManager::IsHostileBuildingShown(const Building &b, const TileMap &map, bool *outInSight) const
@@ -3958,6 +3959,7 @@ void EntityManager::render(
         }
         else if (const MapDecoration *dec = it.decor)
         {
+            renderer.SetDrawOwner(kNoPlayer);
             renderer.DrawDecorWorld(
                 map.GetTilesetId(), dec->type, dec->x * TILE_WIDTH, dec->y * TILE_HEIGHT, camera, globalAnimTick, 1);
         }
@@ -3967,6 +3969,7 @@ void EntityManager::render(
             float wy = u->GetWorldPixelY();
             if (u->selected)
             {
+                renderer.SetDrawOwner(kNoPlayer);
                 int ringComp = u->IsInfantry() ? 1811 : (u->archetypeId == 6 ? 1812 : 1813);
                 renderer.DrawCompositeWorld(ringComp, wx - 90.0f, wy - 60.0f, camera, u->faction);
                 if (u->isSiegeMode || u->state == ActionState::Transform)
@@ -4125,6 +4128,7 @@ void EntityManager::render(
     }
 
     // 4. Render Smoke Puffs
+    renderer.SetDrawOwner(kNoPlayer);
     for (const auto &puff : m_smokePuffs)
     {
         if (!puff.active)
@@ -4169,6 +4173,7 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
     }
 
     // 6. Render Explosions (with visual centering for bullet hits and impacts)
+    renderer.SetDrawOwner(kNoPlayer);
     for (const auto &exp : m_explosions)
     {
         if (!exp.active || exp.delay > 0.0f)

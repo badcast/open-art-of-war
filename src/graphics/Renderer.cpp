@@ -104,7 +104,7 @@ SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
     const PlayerId owner = m_drawOwner;
     const bool blueSheet = page == 5 || page == 7 || page == 8 || page == 10 || page == 11 || page == 14 || page == 15;
     const bool redSheet = page == 6 || page == 12 || page == 13 || page == 16 || page == 17 || page == 29 || page == 31;
-    const bool custom = m_effects && m_effects->Available() && owner < kMaxPlayers && m_armyCustom[owner];
+    const bool custom = owner < kMaxPlayers && m_armyCustom[owner];
     int team = 0;
     if (custom)
     {
@@ -115,20 +115,25 @@ SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
         if (m_structureTeam != 0)
             team = m_structureTeam;
     }
-    SDL_Texture *sheet = m_texManager->GetSpriteSheet(page);
+    const bool gpuEffects = m_effects && m_effects->Available();
+    SDL_Texture *sheet = (team != 0 && !gpuEffects)
+                             ? m_texManager->GetRecoloredSpriteSheet(page, team, m_armyColor[owner])
+                             : m_texManager->GetSpriteSheet(page);
     if (!sheet)
         return nullptr;
     SDL_SetTextureAlphaMod(sheet, static_cast<Uint8>(m_drawAlpha * 255.0f + 0.5f));
-    if (m_effects)
-        m_effects->UseSpriteState(team);
-    const bool tracked = page >= 0 && page < 64;
-    if (team != 0 || blueSheet || redSheet || page == 8 || (tracked && m_tintedSheet[page]))
+    if (gpuEffects)
     {
-        // The colour mod carries the army colour to the shader; plain draws of the same sheet stay white
-        const SDL_Color c = team ? m_armyColor[owner] : SDL_Color {255, 255, 255, 255};
-        SDL_SetTextureColorMod(sheet, c.r, c.g, c.b);
-        if (tracked)
-            m_tintedSheet[page] = team != 0;
+        m_effects->UseSpriteState(team);
+        const bool tracked = page >= 0 && page < 64;
+        if (team != 0 || blueSheet || redSheet || page == 8 || (tracked && m_tintedSheet[page]))
+        {
+            // The colour mod carries the army colour to the shader; plain draws of the same sheet stay white
+            const SDL_Color c = team ? m_armyColor[owner] : SDL_Color {255, 255, 255, 255};
+            SDL_SetTextureColorMod(sheet, c.r, c.g, c.b);
+            if (tracked)
+                m_tintedSheet[page] = team != 0;
+        }
     }
     return sheet;
 }

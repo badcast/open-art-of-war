@@ -1197,6 +1197,7 @@ std::vector<std::pair<int, int>> MissionController::StartPositions(const std::st
 bool MissionController::LoadMatch(
     const MatchSetup &setup, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
+    Players::setup(setup.slots, setup.local);
     std::string mapText;
     if (!Assets::ReadText(setup.mapPath, mapText) || !map.LoadMap(setup.mapPath))
     {
@@ -1206,7 +1207,6 @@ bool MissionController::LoadMatch(
     const nlohmann::json doc = nlohmann::json::parse(mapText, nullptr, false);
     if (!setup.prebuilt)
         map.ClearWalls();
-    Players::setup(setup.slots, setup.local);
 
     ++m_loadSerial;
     ResetResearch();
@@ -1242,35 +1242,42 @@ bool MissionController::LoadMatch(
     std::array<bool, kMaxPlayers> hasPrebuiltHq {};
     if (setup.prebuilt)
     {
-        SpawnPrebuilt(
-            doc,
-            map,
-            entities,
-            [&](Faction f, int x, int y) {
-                PlayerId best = kNoPlayer;
-                long bestDist = 0;
-                for (PlayerId p = 0; p < kMaxPlayers; ++p)
+        auto nearestOwner = [&](Faction f, int x, int y) {
+            PlayerId best = kNoPlayer;
+            long bestDist = 0;
+            for (PlayerId p = 0; p < kMaxPlayers; ++p)
+            {
+                const PlayerSlot &s = setup.slots[p];
+                const int spot = setup.startPosition[p];
+                if (!s.active || s.faction != f || spot < 0 || spot >= static_cast<int>(spots.size()))
+                    continue;
+                const long dx = spots[spot].first - x, dy = spots[spot].second - y;
+                const long d = dx * dx + dy * dy;
+                if (best == kNoPlayer || d < bestDist)
                 {
-                    const PlayerSlot &s = setup.slots[p];
-                    const int spot = setup.startPosition[p];
-                    if (!s.active || s.faction != f || spot < 0 || spot >= static_cast<int>(spots.size()))
-                        continue;
-                    const long dx = spots[spot].first - x, dy = spots[spot].second - y;
-                    const long d = dx * dx + dy * dy;
-                    if (best == kNoPlayer || d < bestDist)
-                    {
-                        best = p;
-                        bestDist = d;
-                    }
+                    best = p;
+                    bestDist = d;
                 }
-                return best;
-            },
-            [&](PlayerId owner, Faction, int x, int y) {
-                if (owner >= kMaxPlayers)
-                    return;
-                hasPrebuiltHq[owner] = true;
-                prebuiltHq[owner] = {x, y};
-            });
+            }
+            return best;
+        };
+        SpawnPrebuilt(doc, map, entities, nearestOwner, [&](PlayerId owner, Faction, int x, int y) {
+            if (owner >= kMaxPlayers)
+                return;
+            hasPrebuiltHq[owner] = true;
+            prebuiltHq[owner] = {x, y};
+        });
+        for (int ty = 0; ty < map.GetHeight(); ++ty)
+        {
+            for (int tx = 0; tx < map.GetWidth(); ++tx)
+            {
+                if (!map.IsWall(tx, ty))
+                    continue;
+                const PlayerId owner = nearestOwner(map.GetWallFaction(tx, ty), tx, ty);
+                if (owner != kNoPlayer)
+                    map.SetWallOwner(tx, ty, owner);
+            }
+        }
     }
     BasePlanner planner(map, entities);
     std::vector<char> connected;
