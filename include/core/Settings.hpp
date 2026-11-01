@@ -53,7 +53,7 @@ struct Settings
     bool muted {false};
 
     // Network game
-    std::string playerName {"Player"};
+    std::string playerName {};
     std::string lastAddress; // "host" or "host:port" of the last direct connection
 
     // Game
@@ -74,6 +74,7 @@ struct Settings
 
     // settings.json in the per-user directory
     static std::string DefaultPath();
+    static std::string DefaultUserName();
 };
 
 } // namespace OpenArtOfWar

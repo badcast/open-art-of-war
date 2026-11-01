@@ -93,6 +93,8 @@ public:
     // at a tile edge would pull in the neighbouring tile as a faint grid line.
     void SetSpriteFiltering(bool linear, bool sharpPixels = false);
     SDL_Texture *GetSpriteSheet(int page) const;
+    // Sprite sheet `page` with team armour (team 1: blue, team 2: red) recoloured to `color` on CPU and cached
+    SDL_Texture *GetRecoloredSpriteSheet(int page, int team, SDL_Color color);
     float GetSheetScale(int page) const;
     // Width of a sprite sheet of the original game (the sheets may be enlarged: scale = width / this); 0 when unknown
     static int BaseSheetWidth(int page);
@@ -142,6 +144,9 @@ private:
     SDL_Renderer *m_renderer {nullptr};
     std::unordered_map<std::string, SDL_Texture *> m_textureCache;
     std::vector<SDL_Texture *> m_spriteSheets;
+    std::unordered_map<uint64_t, SDL_Texture *> m_recoloredSheets;
+    bool m_linearTerrain {false};
+    bool m_linearSprites {false};
     std::vector<float> m_sheetScales;
     std::string m_assetRoot;
     std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only

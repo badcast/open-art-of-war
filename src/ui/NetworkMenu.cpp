@@ -50,7 +50,7 @@ std::vector<std::string> ComboChoices(int kind)
             out.push_back(std::string(_("Team")) + " " + std::to_string(i));
     else if (kind == 3)
         for (int i = 1; i <= Settings::kArmyColors; ++i)
-            out.push_back(std::string(_("Color")) + " " + std::to_string(i));
+            out.push_back(_(ArmyColorName(i)));
     else if (kind == 4)
         for (int i = 0; i < 4; ++i)
             out.push_back(AiLevelName(static_cast<uint8_t>(i)));
@@ -821,6 +821,9 @@ void NetworkMenu::render(
                         false,
                         Anchor::HCENTER | Anchor::VCENTER);
                 };
+                Net::LobbyChoice choice = s.choice;
+                if (me && !s.ai)
+                    net->LocalChoice(choice);
                 const UiRect cc = l.ColorCell(rowIndex);
                 if (editable)
                 {
@@ -829,32 +832,37 @@ void NetworkMenu::render(
                         ui::DrawComboField(
                             r, font, c, text, m_combo.open == rowIndex * 10 + kind, c.Contains(m_mouseX, m_mouseY));
                     };
-                    combo(l.FactionCell(rowIndex), 1, FactionName(s.choice.faction));
+                    combo(l.FactionCell(rowIndex), 1, FactionName(choice.faction));
                     if (net->ControlsRoom())
-                        combo(l.TeamCell(rowIndex), 2, std::to_string(s.choice.team + 1));
+                        combo(l.TeamCell(rowIndex), 2, std::to_string(choice.team + 1));
                     else
-                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(s.choice.team + 1));
+                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(choice.team + 1));
                     combo(cc, 3, "");
-                    r.FillRectScreen(cc.x + 5, cc.y + 6, 14, cc.h - 12, SlotColor(s.choice.color));
+                    const UiRect sw {cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12};
+                    r.FillRectScreen(sw.x, sw.y, sw.w, sw.h, SlotColor(choice.color));
+                    r.DrawRectScreen(sw.x, sw.y, sw.w, sw.h, col::BorderStrong);
                 }
                 else
                 {
-                    cell(l.FactionCell(rowIndex), FactionName(s.choice.faction));
+                    cell(l.FactionCell(rowIndex), FactionName(choice.faction));
                     // The host / owner sets the team of every player
                     if (net->ControlsRoom())
                         ui::DrawComboField(
                             r,
                             font,
                             l.TeamCell(rowIndex),
-                            std::to_string(s.choice.team + 1),
+                            std::to_string(choice.team + 1),
                             m_combo.open == rowIndex * 10 + 2,
                             l.TeamCell(rowIndex).Contains(m_mouseX, m_mouseY));
                     else
-                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(s.choice.team + 1));
-                    r.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 12, cc.h - 12, SlotColor(s.choice.color));
+                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(choice.team + 1));
+                    ui::DrawPanel(r, cc, col::PanelSunken, col::Border);
+                    const UiRect sw {cc.x + 6, cc.y + 6, cc.w - 12, cc.h - 12};
+                    r.FillRectScreen(sw.x, sw.y, sw.w, sw.h, SlotColor(choice.color));
+                    r.DrawRectScreen(sw.x, sw.y, sw.w, sw.h, col::BorderStrong);
                 }
                 const std::string spawn
-                    = s.choice.spawn == Net::kRandom ? std::string("?") : std::to_string(s.choice.spawn + 1);
+                    = choice.spawn == Net::kRandom ? std::string("?") : std::to_string(choice.spawn + 1);
                 font.DrawString(
                     spawn,
                     row.x + 430,
@@ -866,7 +874,7 @@ void NetworkMenu::render(
                 if (!s.ai)
                 {
                     font.DrawString(
-                        s.choice.ready ? _("READY") : "",
+                        choice.ready ? _("READY") : "",
                         row.Right() - 10,
                         row.CenterY(),
                         ui::FONT_SMALL_BOLD,
@@ -947,8 +955,11 @@ void NetworkMenu::render(
                 SDL_Color c = col::TextDim;
                 for (const Net::LobbySlot &s : lobby->slots)
                 {
-                    if (s.choice.spawn == i)
-                        c = SlotColor(s.choice.color);
+                    Net::LobbyChoice sc = s.choice;
+                    if (!s.ai && s.slot == net->LocalSlot())
+                        net->LocalChoice(sc);
+                    if (sc.spawn == i)
+                        c = SlotColor(sc.color);
                 }
                 const bool hot = std::abs(m_mouseX - sx) <= 14 && std::abs(m_mouseY - sy) <= 14;
                 r.FillRectScreen(sx - 12, sy - 12, 24, 24, col::PanelSunken);
@@ -1024,8 +1035,14 @@ void NetworkMenu::render(
         if (lobby)
         {
             for (const Net::LobbySlot &s : lobby->slots)
+            {
                 if (s.slot == net->LocalSlot())
-                    ready = s.choice.ready;
+                {
+                    Net::LobbyChoice sc = s.choice;
+                    net->LocalChoice(sc);
+                    ready = sc.ready;
+                }
+            }
         }
         ui::DrawButton(
             r, font, l.leaveBtn, _("LEAVE"), ui::ButtonStyle::Secondary, l.leaveBtn.Contains(m_mouseX, m_mouseY));
@@ -1071,19 +1088,25 @@ void NetworkMenu::render(
             else if (lobby && row < static_cast<int>(lobby->slots.size()))
             {
                 const Net::LobbySlot &s = lobby->slots[row];
+                Net::LobbyChoice sc = s.choice;
+                if (!s.ai && s.slot == net->LocalSlot())
+                    net->LocalChoice(sc);
                 const ui::UiRect field = kind == 1   ? l.FactionCell(row)
                                          : kind == 2 ? l.TeamCell(row)
                                          : kind == 3 ? l.ColorCell(row)
                                                      : l.NameCell(row);
-                const int current = kind == 1   ? (s.choice.faction == Net::kRandom ? 0 : s.choice.faction + 1)
-                                    : kind == 2 ? s.choice.team
-                                    : kind == 3 ? std::max(0, s.choice.color - 1)
+                const int current = kind == 1   ? (sc.faction == Net::kRandom ? 0 : sc.faction + 1)
+                                    : kind == 2 ? sc.team
+                                    : kind == 3 ? std::max(0, sc.color - 1)
                                                 : s.aiLevel;
                 std::vector<std::string> items = ComboChoices(kind);
                 std::vector<bool> taken;
+                std::vector<SDL_Color> swatches;
                 if (kind == 3)
                 {
                     taken = TakenColors(*lobby, s.slot);
+                    for (int i = 1; i <= Settings::kArmyColors; ++i)
+                        swatches.push_back(ArmyColor(i));
                     for (size_t i = 0; i < items.size() && i < taken.size(); ++i)
                     {
                         if (taken[i] && static_cast<int>(i) != current)
@@ -1091,7 +1114,17 @@ void NetworkMenu::render(
                     }
                 }
                 ui::DrawComboList(
-                    r, font, field, items, current, m_combo, h, m_mouseX, m_mouseY, kind == 3 ? &taken : nullptr);
+                    r,
+                    font,
+                    field,
+                    items,
+                    current,
+                    m_combo,
+                    h,
+                    m_mouseX,
+                    m_mouseY,
+                    kind == 3 ? &taken : nullptr,
+                    kind == 3 ? &swatches : nullptr);
             }
         }
         ui::DrawConfirm(r, font, w, h, m_confirm, m_mouseX, m_mouseY);
@@ -1208,12 +1241,7 @@ void NetworkMenu::render(
             col::TextDim,
             false);
         DrawField(
-            r,
-            font,
-            l.addressField,
-            settings.lastAddress,
-            _("Address or address:port, e.g. 192.168.1.10"),
-            m_focus == Field::Address);
+            r, font, l.addressField, settings.lastAddress, _("IP address or hostname"), m_focus == Field::Address);
         ui::DrawButton(
             r,
             font,

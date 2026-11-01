@@ -2,6 +2,7 @@
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -29,6 +30,14 @@ void TextureManager::Cleanup()
         }
     }
     m_textureCache.clear();
+    for (auto &[key, tex] : m_recoloredSheets)
+    {
+        if (tex)
+        {
+            SDL_DestroyTexture(tex);
+        }
+    }
+    m_recoloredSheets.clear();
     for (SDL_Surface *surface : m_sheetSurfaces)
     {
         if (surface)
@@ -352,18 +361,152 @@ void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
 {
     if (m_terrainPages.size() != m_spriteSheets.size())
         CollectTerrainPages();
-    const SDL_ScaleMode mode = linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
-    const SDL_ScaleMode spriteMode = (linear || sharpPixels) ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+    m_linearTerrain = linear;
+    m_linearSprites = linear || sharpPixels;
+    const SDL_ScaleMode mode = m_linearTerrain ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+    const SDL_ScaleMode spriteMode = m_linearSprites ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
     for (size_t i = 0; i < m_spriteSheets.size(); ++i)
     {
         if (m_spriteSheets[i])
             SDL_SetTextureScaleMode(m_spriteSheets[i], m_terrainPages[i] ? mode : spriteMode);
+    }
+    for (auto &[key, tex] : m_recoloredSheets)
+    {
+        if (!tex)
+            continue;
+        const size_t page = static_cast<size_t>(key >> 32);
+        const bool terrain = page < m_terrainPages.size() && m_terrainPages[page];
+        SDL_SetTextureScaleMode(tex, terrain ? mode : spriteMode);
     }
     for (SDL_Texture *texture : m_tilesets)
     {
         if (texture)
             SDL_SetTextureScaleMode(texture, mode);
     }
+}
+
+namespace
+{
+
+float Smoothstep(float edge0, float edge1, float x)
+{
+    const float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+void RgbToHsv(float r, float g, float b, float &h, float &s, float &v)
+{
+    const float maxC = std::max({r, g, b});
+    const float minC = std::min({r, g, b});
+    const float d = maxC - minC;
+    v = maxC;
+    s = maxC > 1.0e-10f ? d / maxC : 0.0f;
+    if (d <= 1.0e-10f)
+    {
+        h = 0.0f;
+        return;
+    }
+    if (maxC == r)
+        h = (g - b) / (6.0f * d) + (g < b ? 1.0f : 0.0f);
+    else if (maxC == g)
+        h = (b - r) / (6.0f * d) + (1.0f / 3.0f);
+    else
+        h = (r - g) / (6.0f * d) + (2.0f / 3.0f);
+}
+
+void HsvToRgb(float h, float s, float v, float &r, float &g, float &b)
+{
+    auto fract = [](float x) {
+        return x - std::floor(x);
+    };
+    const float px = std::abs(fract(h + 1.0f) * 6.0f - 3.0f);
+    const float py = std::abs(fract(h + 2.0f / 3.0f) * 6.0f - 3.0f);
+    const float pz = std::abs(fract(h + 1.0f / 3.0f) * 6.0f - 3.0f);
+    r = v * (1.0f + s * (std::clamp(px - 1.0f, 0.0f, 1.0f) - 1.0f));
+    g = v * (1.0f + s * (std::clamp(py - 1.0f, 0.0f, 1.0f) - 1.0f));
+    b = v * (1.0f + s * (std::clamp(pz - 1.0f, 0.0f, 1.0f) - 1.0f));
+}
+
+} // namespace
+
+SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Color color)
+{
+    if (team != 1 && team != 2)
+        return GetSpriteSheet(page);
+    if (page < 0 || page >= static_cast<int>(m_spriteSheets.size()))
+        return nullptr;
+
+    const uint64_t key = (static_cast<uint64_t>(static_cast<uint32_t>(page)) << 32)
+                         | (static_cast<uint64_t>(static_cast<uint8_t>(team)) << 24)
+                         | (static_cast<uint64_t>(color.r) << 16) | (static_cast<uint64_t>(color.g) << 8)
+                         | static_cast<uint64_t>(color.b);
+    auto it = m_recoloredSheets.find(key);
+    if (it != m_recoloredSheets.end())
+        return it->second;
+
+    SDL_Surface *base = SheetSurface(page);
+    if (!base)
+        return GetSpriteSheet(page);
+    SDL_Surface *copy = SDL_DuplicateSurface(base);
+    if (!copy)
+        return GetSpriteSheet(page);
+
+    float teamH = 0.0f, teamS = 0.0f, teamV = 0.0f;
+    RgbToHsv(color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, teamH, teamS, teamV);
+    const float gain = team == 2 ? 1.7f : 1.0f;
+    const float satFactor = gain * (0.6f + 0.5f * teamS);
+
+    for (int y = 0; y < copy->h; ++y)
+    {
+        uint8_t *row = static_cast<uint8_t *>(copy->pixels) + y * copy->pitch;
+        for (int x = 0; x < copy->w; ++x)
+        {
+            uint8_t *px = row + x * 4; // RGBA32
+            if (px[3] == 0)
+                continue;
+            const float cr = px[0] / 255.0f;
+            const float cg = px[1] / 255.0f;
+            const float cb = px[2] / 255.0f;
+            float h = 0.0f, s = 0.0f, v = 0.0f;
+            RgbToHsv(cr, cg, cb, h, s, v);
+            const float deg = h * 360.0f;
+            float w = 0.0f;
+            if (team == 1)
+            {
+                w = Smoothstep(160.0f, 185.0f, deg) * (1.0f - Smoothstep(235.0f, 255.0f, deg))
+                    * Smoothstep(0.18f, 0.40f, s);
+            }
+            else
+            {
+                const float hueDist = deg < 180.0f ? deg : 360.0f - deg;
+                const float redness = 1.0f - Smoothstep(22.0f, 36.0f, hueDist);
+                w = redness * Smoothstep(0.10f, 0.24f, s) * Smoothstep(0.005f, 0.02f, v);
+            }
+            if (w <= 0.001f)
+                continue;
+            float rr = 0.0f, rg = 0.0f, rb = 0.0f;
+            HsvToRgb(teamH, std::min(1.0f, s * satFactor), v, rr, rg, rb);
+            const float outR = cr + (rr - cr) * w;
+            const float outG = cg + (rg - cg) * w;
+            const float outB = cb + (rb - cb) * w;
+            px[0] = static_cast<uint8_t>(std::clamp(outR * 255.0f + 0.5f, 0.0f, 255.0f));
+            px[1] = static_cast<uint8_t>(std::clamp(outG * 255.0f + 0.5f, 0.0f, 255.0f));
+            px[2] = static_cast<uint8_t>(std::clamp(outB * 255.0f + 0.5f, 0.0f, 255.0f));
+        }
+    }
+
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(m_renderer, copy);
+    SDL_DestroySurface(copy);
+    if (tex)
+    {
+        if (m_terrainPages.size() != m_spriteSheets.size())
+            CollectTerrainPages();
+        const bool terrain = page < static_cast<int>(m_terrainPages.size()) && m_terrainPages[page];
+        const bool linear = terrain ? m_linearTerrain : m_linearSprites;
+        SDL_SetTextureScaleMode(tex, linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+    }
+    m_recoloredSheets[key] = tex;
+    return tex ? tex : GetSpriteSheet(page);
 }
 
 SDL_Texture *TextureManager::GetSpriteSheet(int page) const

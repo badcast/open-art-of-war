@@ -31,7 +31,7 @@ void Settings::Clamp()
     if (language != "en" && language != "ru")
         language = "en";
     if (playerName.empty())
-        playerName = "Player";
+        playerName = DefaultUserName();
     if (playerName.size() > 24)
         playerName.resize(24);
     if (lastAddress.size() > 120)
@@ -41,6 +41,14 @@ void Settings::Clamp()
 std::string Settings::DefaultPath()
 {
     return (std::filesystem::path(Assets::UserDataDir()) / "settings.json").string();
+}
+
+std::string Settings::DefaultUserName()
+{
+    std::string name = std::getenv("USER") ? std::getenv("USER") : "AOW Player";
+    if (name.size() > 24)
+        name.resize(24);
+    return name;
 }
 
 bool Settings::Save(const std::string &path) const

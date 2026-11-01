@@ -32,7 +32,7 @@ struct State
     std::mutex lock;
     std::map<std::string, std::vector<uint8_t>> blobFiles;
     std::string userDir;
-    fs::path root;        // the folder that holds "assets" or the blob
+    fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
 };
 
@@ -71,23 +71,23 @@ bool AssetKey(const std::string &path, std::string &key)
     return true;
 }
 
-std::string UserDirLocked(State &s)
+std::string UserDirLocked(State &state)
 {
-    if (s.userDir.empty())
+    if (state.userDir.empty())
     {
-        if (char *pref = SDL_GetPrefPath("openaow", "openaow"))
+        if (char *pref = SDL_GetPrefPath("badcast", "openaow"))
         {
-            s.userDir = pref;
+            state.userDir = std::move(std::string(pref));
             SDL_free(pref);
         }
         else
         {
-            s.userDir = "./";
+            state.userDir = "./";
         }
-        while (s.userDir.size() > 1 && (s.userDir.back() == '/' || s.userDir.back() == '\\'))
-            s.userDir.pop_back();
+        while (state.userDir.size() > 1 && (state.userDir.back() == '/' || state.userDir.back() == '\\'))
+            state.userDir.pop_back();
     }
-    return s.userDir;
+    return state.userDir;
 }
 
 bool ReadFile(const fs::path &p, std::vector<uint8_t> &out)
@@ -99,21 +99,21 @@ bool ReadFile(const fs::path &p, std::vector<uint8_t> &out)
     return true;
 }
 
-// Unpacks every regular file of the tar.zst blob into memory (a tar stream has no random access)
-bool LoadBlob(const fs::path &blob, std::map<std::string, std::vector<uint8_t>> &files)
+// Unpacks every regular file of the tar.zst blob into memory (blobArhive tar stream has no random access)
+bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<uint8_t>> &files)
 {
-    archive *a = archive_read_new();
-    archive_read_support_filter_all(a);
-    archive_read_support_format_tar(a);
-    if (archive_read_open_filename(a, blob.string().c_str(), 1 << 20) != ARCHIVE_OK)
+    archive *blobArhive = archive_read_new();
+    archive_read_support_filter_all(blobArhive);
+    archive_read_support_format_tar(blobArhive);
+    if (archive_read_open_filename(blobArhive, filePath.string().c_str(), 1 << 20) != ARCHIVE_OK)
     {
-        std::cerr << "[Assets] Cannot open " << blob << ": " << archive_error_string(a) << std::endl;
-        archive_read_free(a);
+        std::cerr << "[Assets] Cannot open " << filePath << ": " << archive_error_string(blobArhive) << std::endl;
+        archive_read_free(blobArhive);
         return false;
     }
     archive_entry *entry = nullptr;
     int status;
-    while ((status = archive_read_next_header(a, &entry)) == ARCHIVE_OK || status == ARCHIVE_WARN)
+    while ((status = archive_read_next_header(blobArhive, &entry)) == ARCHIVE_OK || status == ARCHIVE_WARN)
     {
         if (archive_entry_filetype(entry) != AE_IFREG)
             continue;
@@ -121,7 +121,7 @@ bool LoadBlob(const fs::path &blob, std::map<std::string, std::vector<uint8_t>> 
         size_t got = 0;
         while (got < data.size())
         {
-            const la_ssize_t n = archive_read_data(a, data.data() + got, data.size() - got);
+            const la_ssize_t n = archive_read_data(blobArhive, data.data() + got, data.size() - got);
             if (n <= 0)
                 break;
             got += static_cast<size_t>(n);
@@ -134,8 +134,8 @@ bool LoadBlob(const fs::path &blob, std::map<std::string, std::vector<uint8_t>> 
     }
     const bool ok = status == ARCHIVE_EOF;
     if (!ok)
-        std::cerr << "[Assets] Cannot read " << blob << ": " << archive_error_string(a) << std::endl;
-    archive_read_free(a);
+        std::cerr << "[Assets] Cannot read " << filePath << ": " << archive_error_string(blobArhive) << std::endl;
+    archive_read_free(blobArhive);
     return ok;
 }
 

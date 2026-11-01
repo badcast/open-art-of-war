@@ -365,6 +365,13 @@ PlayerId TileMap::GetWallOwner(int tileX, int tileY) const
     return m_wallOwner[tileY][tileX];
 }
 
+void TileMap::SetWallOwner(int tileX, int tileY, PlayerId owner)
+{
+    if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height || m_wallGrid[tileY][tileX] == 0)
+        return;
+    m_wallOwner[tileY][tileX] = owner;
+}
+
 Faction TileMap::GetWallFaction(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)

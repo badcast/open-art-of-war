@@ -2970,7 +2970,7 @@ msgstr ""
 msgid "Direct connection (the host forwards UDP port 38100)"
 msgstr ""
 
-msgid "Address or address:port, e.g. 192.168.1.10"
+msgid "IP address or hostname"
 msgstr ""
 
 msgid "6 characters"

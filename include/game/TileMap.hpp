@@ -88,6 +88,7 @@ public:
 
     // `owner`: the player the wall belongs to (kNoPlayer + a faction: the first player of that faction)
     void SetWall(int tileX, int tileY, Faction faction, int hpPercent = 100, PlayerId owner = kNoPlayer);
+    void SetWallOwner(int tileX, int tileY, PlayerId owner);
     PlayerId GetWallOwner(int tileX, int tileY) const;
     uint16_t GetWall(int tileX, int tileY) const;
     void DamageWall(int tileX, int tileY, int damage);

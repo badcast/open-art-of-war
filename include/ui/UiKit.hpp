@@ -154,7 +154,7 @@ struct ComboState
 };
 constexpr int kComboItemH = 28;
 constexpr int kComboMaxVisible = 9;
-constexpr int kComboMinListW = 150; // a narrow field (a table cell) still gets a readable list
+constexpr int kComboMinListW = 170; // a narrow field (a table cell) still gets a readable list
 
 void DrawComboField(
     Renderer &r,
@@ -168,6 +168,7 @@ void DrawComboField(
 // Where the list of `itemCount` choices of the combo at `field` goes (under it, above when there is no room)
 UiRect ComboListRect(const UiRect &field, int itemCount, int windowH);
 // `disabled` (optional, one flag per item): choices shown dimmed that cannot be picked (the owner ignores them)
+// `swatches` (optional, one colour per item): a colour square drawn to the left of each choice's label
 void DrawComboList(
     Renderer &r,
     BitmapFontRenderer &font,
@@ -178,7 +179,8 @@ void DrawComboList(
     int windowH,
     int mouseX,
     int mouseY,
-    const std::vector<bool> *disabled = nullptr);
+    const std::vector<bool> *disabled = nullptr,
+    const std::vector<SDL_Color> *swatches = nullptr);
 // Input for the open combo (call it before anything else reacts to the click): a click on a choice sets `picked`, a
 // click elsewhere closes the list; the mouse wheel scrolls it. Returns true when the input belongs to the combo.
 bool ComboUpdate(
