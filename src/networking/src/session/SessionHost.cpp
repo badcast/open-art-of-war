@@ -1,6 +1,12 @@
 #include "openaow/net/Session.hpp"
 
+#include "openaow/net/ReplayFile.hpp"
+
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <ctime>
+#include <filesystem>
 #include <random>
 
 namespace OpenArtOfWar::Net
@@ -39,7 +45,70 @@ SessionHost::SessionHost(HostConfig config)
     m_inputDelay = std::max<uint8_t>(m_config.inputDelayMin, 1);
 }
 
-SessionHost::~SessionHost() = default;
+SessionHost::~SessionHost()
+{
+    finishReplay("the room was closed");
+}
+
+void SessionHost::logLine(const std::string &line) const
+{
+    if (m_config.log)
+        m_config.log(line);
+}
+
+void SessionHost::finishReplay(const std::string &reason)
+{
+    if (!m_replayOpen)
+        return;
+    m_replayOpen = false;
+    if (m_config.replayDir.empty() || m_turnLog.empty())
+        return;
+    ReplayData data;
+    data.setup = m_setup;
+    data.turns = m_turnLog;
+    data.checksums = m_replayChecksums;
+    nlohmann::json players = nlohmann::json::array();
+    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    {
+        if (m_seen[s].name.empty() && !m_slots[s].ai)
+            continue;
+        players.push_back(
+            {{"slot", s},
+             {"name", m_slots[s].ai ? std::string("AI") : m_seen[s].name},
+             {"human", !m_slots[s].ai},
+             {"ai_level", m_slots[s].aiLevel},
+             {"addresses", m_seen[s].addresses}});
+    }
+    const std::int64_t endedAt = static_cast<std::int64_t>(std::time(nullptr));
+    const std::uint32_t tpt = std::max<std::uint32_t>(1, m_config.ticksPerTurn);
+    nlohmann::json meta = {
+        {"format", 1},
+        {"game_version", m_config.identity.gameVersion},
+        {"protocol", kProtocolVersion},
+        {"source", "server"},
+        {"recorded_at", m_replayStartedAt},
+        {"ended_at", endedAt},
+        {"map", m_lobby.map},
+        {"map_hash", m_lobby.mapHash},
+        {"assets_hash", m_config.identity.assetsHash},
+        {"turn_ms", m_config.turnMs},
+        {"ticks_per_turn", tpt},
+        {"turns", data.turns.size()},
+        {"ticks", data.turns.size() * tpt},
+        {"players", players},
+        {"desynced", m_desynced},
+        {"desync_tick", m_desyncTick},
+        {"end_reason", reason},
+        {"checksum_interval", 20}};
+    data.meta = meta.dump(2);
+    const std::string path
+        = (std::filesystem::path(m_config.replayDir) / replayFileName(m_lobby.map, m_replayStartedAt)).string();
+    std::string error;
+    if (writeReplay(path, data, error))
+        logLine("replay saved: " + path + " (" + std::to_string(data.turns.size()) + " turns, " + reason + ")");
+    else
+        logLine("replay NOT saved: " + path + ": " + error);
+}
 
 void SessionHost::addTransport(std::unique_ptr<Transport> transport)
 {
@@ -287,8 +356,18 @@ void SessionHost::update(uint32_t nowMs)
                 if (e.type != TransportEvent::Type::Connected)
                     continue;
                 m_connections.push_back({t, e.peer, -1});
+                logLine("connection from " + m_transports[t]->peerAddress(e.peer));
             }
             handle(index, e, nowMs);
+        }
+    }
+    // A client that does not finish fetching the host's data files in time is let go
+    for (Connection &c : m_connections)
+    {
+        if (c.syncing && c.slot == -1 && nowMs - c.syncStartMs > kMaxSyncMs)
+        {
+            m_transports[c.transport]->disconnect(c.peer);
+            c.slot = -2;
         }
     }
     // Drop the connections that are gone (their slots stay for a reconnect)
@@ -331,6 +410,7 @@ void SessionHost::update(uint32_t nowMs)
         }
         if (humans == 0)
         {
+            finishReplay("all players left");
             for (SlotState &slot : m_slots)
                 slot = SlotState {};
             m_running = false;
@@ -374,6 +454,9 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
     {
         if (c.slot >= 0)
         {
+            logLine(
+                "player disconnected: slot " + std::to_string(c.slot) + " '" + m_slots[c.slot].name + "' from "
+                + m_transports[c.transport]->peerAddress(c.peer));
             m_slots[c.slot].connected = false;
             m_slots[c.slot].goneMs = nowMs;
             // In the room the slot is free again; in a match it waits for the player to come back (for a while)
@@ -393,13 +476,40 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
     const MsgType type = readType(r);
     if (c.slot < 0)
     {
+        // A client with other data fetches the host's files before it says hello again
+        if (type == MsgType::FilePathRequest && c.syncing)
+        {
+            FilePathRequest m;
+            if (!decode(r, m))
+                return;
+            FilePathData answer;
+            answer.path = m.path;
+            bool listed = false;
+            for (const DataEntry &entry : m_config.dataManifest)
+                listed = listed || entry.path == m.path;
+            if (listed && m_config.dataFile)
+            {
+                std::vector<uint8_t> packed;
+                uint64_t hash = 0;
+                if (m_config.dataFile(m.path, packed, hash) && packed.size() <= kMaxFileBytes)
+                {
+                    answer.hash = hash;
+                    answer.bytes = std::move(packed);
+                }
+            }
+            std::vector<uint8_t> big(answer.bytes.size() + 256);
+            BitWriter w(big.data(), big.size());
+            encode(w, answer);
+            sendTo(connection, Channel::Bulk, big.data(), w.finish());
+            return;
+        }
         Hello hello;
         if (type != MsgType::Hello || !decode(r, hello))
         {
             reject(connection, RejectReason::Malformed, "expected a hello");
             return;
         }
-        handleHello(connection, hello);
+        handleHello(connection, hello, nowMs);
         return;
     }
     const uint8_t slot = static_cast<uint8_t>(c.slot);
@@ -441,6 +551,11 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
                     BitWriter w(m_buffer.data(), m_buffer.size());
                     encode(w, Desync {m.tick});
                     broadcast(Channel::Lockstep, m_buffer.data(), w.finish());
+                    logLine("desync at tick " + std::to_string(m.tick));
+                }
+                else if (m_replayOpen)
+                {
+                    m_replayChecksums.emplace_back(m.tick, byTick.begin()->second);
                 }
                 m_hashes.erase(m_hashes.begin(), m_hashes.upper_bound(m.tick));
             }
@@ -557,7 +672,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
     }
 }
 
-void SessionHost::handleHello(size_t connection, const Hello &hello)
+void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t nowMs)
 {
     if (hello.protocol != kProtocolVersion)
     {
@@ -571,9 +686,28 @@ void SessionHost::handleHello(size_t connection, const Hello &hello)
     }
     if (hello.assetsHash != m_config.identity.assetsHash)
     {
+        // A client that can sync gets the host's list and keeps the connection to fetch the files
+        int syncing = 0;
+        for (const Connection &other : m_connections)
+            syncing += other.syncing ? 1 : 0;
+        if (hello.canSync && !m_config.dataManifest.empty() && m_config.dataFile
+            && (m_connections[connection].syncing || syncing < kMaxSyncing))
+        {
+            Connection &c = m_connections[connection];
+            if (!c.syncing)
+                c.syncStartMs = nowMs;
+            c.syncing = true;
+            DataManifest manifest {m_config.dataManifest};
+            std::vector<uint8_t> big(m_config.dataManifest.size() * (kMaxDataPathLength + 16) + 64);
+            BitWriter w(big.data(), big.size());
+            encode(w, manifest);
+            sendTo(connection, Channel::Control, big.data(), w.finish());
+            return;
+        }
         reject(connection, RejectReason::AssetsMismatch, "");
         return;
     }
+    m_connections[connection].syncing = false;
     // Coming back after a drop: the same slot
     int slot = -1;
     if (!isZero(hello.token))
@@ -640,6 +774,20 @@ void SessionHost::handleHello(size_t connection, const Hello &hello)
     s.connected = true;
     s.name = hello.playerName.empty() ? "Player " + std::to_string(slot + 1) : hello.playerName;
     m_connections[connection].slot = slot;
+    {
+        // Who is who: the address of every player, kept for the log and the replay of the match
+        SeenPlayer &seen = m_seen[slot];
+        if (!resumed)
+            seen = SeenPlayer {};
+        seen.name = s.name;
+        const std::string address
+            = m_transports[m_connections[connection].transport]->peerAddress(m_connections[connection].peer);
+        if (std::find(seen.addresses.begin(), seen.addresses.end(), address) == seen.addresses.end())
+            seen.addresses.push_back(address);
+        logLine(
+            std::string(resumed ? "player back: slot " : "player joined: slot ") + std::to_string(slot) + " '" + s.name
+            + "' from " + address);
+    }
 
     Welcome welcome;
     welcome.slot = static_cast<uint8_t>(slot);
@@ -697,6 +845,10 @@ void SessionHost::startMatch(std::vector<uint8_t> setup, uint32_t nowMs, uint32_
     m_turnLog.clear();
     m_leftPending.clear();
     m_announcedDelay = 0;
+    m_replayChecksums.clear();
+    m_replayStartedAt = static_cast<std::int64_t>(std::time(nullptr));
+    m_replayOpen = !m_config.replayDir.empty();
+    logLine("match started on '" + m_lobby.map + "' with " + std::to_string(connectedCount()) + " players");
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, StartMatch {firstTurnDelayMs, m_setup});
     // On the lockstep channel: it must come before the first turn

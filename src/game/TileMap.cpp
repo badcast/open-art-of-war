@@ -56,7 +56,7 @@ bool TileMap::LoadMap(const std::string &jsonPath)
         }
     }
 
-    // Authentic terrain variation ranges e[0..5] per tileset (f.java:2191, maps_mission_list.json)
+    // Terrain variation ranges by tileset.
     const int eRanges0[5][2] = {{0, 10}, {10, 18}, {18, 19}, {19, 26}, {26, 34}};
     const int eRanges1[5][2] = {{0, 10}, {10, 18}, {18, 26}, {26, 33}, {33, 36}};
     const auto &eRanges = (m_tilesetId == 1) ? eRanges1 : eRanges0;
@@ -119,7 +119,7 @@ bool TileMap::LoadMap(const std::string &jsonPath)
         }
     }
 
-    // 3. Apply passability collision bitmask AFTER decorations (f.java:2222-2231)
+    // 3. Apply passability collision bitmask after decorations.
     // Where bit == 0, tile becomes passable (true); where bit == 1, blocked (false).
     // A tile whose sprite blocks (TileCollision) stays blocked whatever the mask says.
     const auto &collisionMask = j["collisionMask"];
@@ -831,7 +831,7 @@ void TileMap::RenderWallRow(
         endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
     }
 
-    // Defensive walls (1001..1100 Confederation building 15..19, 1101..1200 Resistance building 25..29; f.java:6823).
+    // Defensive walls (1001..1100 Confederation building 15..19, 1101..1200 Resistance building 25..29).
     // Confederation walls of a player who has researched Active Wall Armor are drawn as the reinforced wall
     // (building 20..24, same damage steps): the research upgrades the walls already standing too.
     int reinforced[kMaxPlayers];

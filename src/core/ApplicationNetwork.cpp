@@ -33,6 +33,12 @@
 #include "game/Economy.hpp"
 #include "game/AIController.hpp"
 #include "game/MissionController.hpp"
+#include "core/EnvironmentConfig.hpp"
+#include "game/TileCollision.hpp"
+#include "game/Effects.hpp"
+#include "game/Projectiles.hpp"
+#include "game/WeaponBalance.hpp"
+#include "game/Research.hpp"
 #include "storage/SaveManager.hpp"
 #include "debug/DebugOverlay.hpp"
 
@@ -140,6 +146,69 @@ void Application::DriveNetworkBot(uint32_t tick)
     m_gameplayController->simulation().Issue(std::move(order));
 }
 
+namespace
+{
+// What a refusal says, in the player's language; `detail` is the host's note (its version for another game version)
+std::string RejectText(Net::RejectReason reason, const std::string &detail, bool afterSync)
+{
+    switch (reason)
+    {
+        case Net::RejectReason::ProtocolMismatch:
+            return _("The other side uses another network protocol: both need the same version of the game.");
+        case Net::RejectReason::VersionMismatch:
+            return std::string(_("Different game version"))
+                   + (detail.empty() ? std::string()
+                                     : std::string(": ") + _("the host plays") + " " + detail + ", " + _("you have")
+                                           + " " + OAOW_VERSION);
+        case Net::RejectReason::AssetsMismatch:
+            return afterSync ? std::string(_("Different game data: they still differ after the sync."))
+                             : std::string(
+                                   _("Different game data: the host cannot send its files (ask it to update, or "
+                                     "join a game of the same version)."));
+        case Net::RejectReason::RoomFull:
+            return _("The room is full");
+        case Net::RejectReason::MatchRunning:
+            return _("The match has already started");
+        case Net::RejectReason::Banned:
+            return _("Not allowed to join");
+        case Net::RejectReason::BadPassword:
+            return _("Wrong password");
+        case Net::RejectReason::NotFound:
+            return _("No such room");
+        case Net::RejectReason::ServerFull:
+            return _("The server has no free room");
+        case Net::RejectReason::TryAgain:
+            return _("Not ready yet");
+        default:
+            return Net::rejectReasonText(reason);
+    }
+}
+} // namespace
+
+// The game plays with the data files it has now (the host's, while a network session has them): everything the
+// simulation read at start is read again
+void Application::ReloadGameData()
+{
+    if (!m_entities || !m_map)
+        return;
+    m_entities->LoadCharacterConfigs(LoaderResources::kDefaultRoot);
+    ReloadResearchCatalogs();
+    Projectiles::reload();
+    WeaponBalance::Reload();
+    EffectsConfig::reload();
+    TileCollision::Reload();
+    if (Assets::HasSessionOverlay())
+    {
+        EnvironmentConfig host;
+        host.load(); // the host's construction rules; the player's own settings (m_env) stay as they are
+        m_map->LoadEnvironment(host);
+    }
+    else
+    {
+        m_map->LoadEnvironment(m_env);
+    }
+}
+
 void Application::LeaveNetworkGame()
 {
     if (m_net)
@@ -229,7 +298,7 @@ void Application::UpdateServer()
     Net::RejectReason refusal {};
     if (m_master->takeRefusal(refusal))
     {
-        m_networkMenu->SetNotice(std::string(_("Server: ")) + Net::rejectReasonText(refusal));
+        m_networkMenu->SetNotice(std::string(_("Server: ")) + RejectText(refusal, "", false));
         m_serverJoinPending = false;
     }
     Net::RoomAddress room;
@@ -472,8 +541,18 @@ void Application::ServerNetworkGame(
 void Application::UpdateNetwork(uint32_t nowMs)
 {
     if (!m_net)
+    {
+        // Out of the network game: the player's own data are back
+        if (Assets::HasSessionOverlay())
+        {
+            Assets::ClearSessionOverlay();
+            ReloadGameData();
+        }
         return;
+    }
     m_net->Update(nowMs);
+    if (m_net->TakeDataChanged())
+        ReloadGameData();
     static std::string announcedCode;
     if (m_net->PublicCode() != announcedCode)
     {
@@ -570,7 +649,9 @@ void Application::UpdateNetwork(uint32_t nowMs)
     if (m_net->rejected())
     {
         std::cerr << "[Net] Rejected: " << m_net->StatusText() << std::endl;
-        m_networkMenu->SetNotice(std::string(_("Not admitted: ")) + m_net->StatusText());
+        m_networkMenu->SetNotice(
+            std::string(_("Not admitted: "))
+            + RejectText(m_net->RejectedWhy(), m_net->RejectedDetail(), m_net->Synced()));
         LeaveNetworkGame();
         return;
     }

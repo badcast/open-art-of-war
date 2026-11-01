@@ -6,7 +6,7 @@
 namespace OpenArtOfWar
 {
 
-// Virtual J2ME resolution
+// Virtual screen resolution
 constexpr int VIRTUAL_SCREEN_WIDTH = 240;
 constexpr int VIRTUAL_SCREEN_HEIGHT = 320;
 
@@ -91,6 +91,7 @@ enum class AppState
     MenuAbout,    // Authentic game credits (/0/t0)
     MenuSettings, // Sound & music options
     MenuNetwork,  // Network game: browser and game room
+    MenuReplay,   // Open replay: the list of recorded network games
     Briefing,
     CampaignPlaying,
     SkirmishPlaying,
@@ -99,7 +100,7 @@ enum class AppState
     Defeat
 };
 
-// J2ME Anchor flags
+// Anchor flags
 namespace Anchor
 {
 constexpr int TOP = 0x01;

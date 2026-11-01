@@ -43,6 +43,11 @@ public:
     int rawBuildingType {-1}; // 0..14 if building, 15..29 if wall
     int buildWidth {1};
     int buildHeight {1};
+    int burstCount {1};         // shots of one volley
+    float burstDelay {0.1f};    // seconds between them
+    int burstShotsRemaining {0};
+    float burstTimer {0.0f};
+    int radarRange {0};         // tiles seen beyond sightRadius once finished (Radar Locator)
     float buildProgress {1.0f}; // 0..1
     bool isPowered {true};
     bool isProducing {false}; // Active production animation in Factory / Barracks
@@ -50,6 +55,19 @@ public:
     // animates
     bool isResearching {false};
     float productionTimer {0.0f};
+    // Repair for credits: a full repair from 0 takes kRepairSeconds and costs kRepairCostShare of the price,
+    // paid as it goes; it stops when the hit points are full or the owner runs out of credits
+    static constexpr float kRepairSeconds = 180.0f;
+    static constexpr float kRepairCostShare = 0.30f;
+    bool repairing {false};
+    float repairHpAccum {0.0f};    // fractions of a hit point healed so far
+    float repairCreditDebt {0.0f}; // fractions of a credit owed so far
+    // One repair step: heals, returns the credits it costs (never more than `budget`); stops by itself
+    int RepairStep(float dt, int buildingCost, int budget);
+    bool CanBeRepaired() const noexcept
+    {
+        return alive && state != ActionState::Die && buildProgress >= 1.0f && currentHp < maxHp && maxHp > 0;
+    }
     float muzzleOffsetX {0.0f}; // localePosition X
     float muzzleOffsetY {0.0f}; // localePosition Y
     float turretOffsetX {0.0f}; // turret_offset / dome_offset X

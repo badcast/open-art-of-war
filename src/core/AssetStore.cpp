@@ -31,6 +31,7 @@ struct State
     std::string description = "no assets located";
     std::mutex lock;
     std::map<std::string, std::vector<uint8_t>> blobFiles;
+    std::map<std::string, std::vector<uint8_t>> overlay; // session overlay, see SetSessionOverlay
     std::string userDir;
     fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
@@ -279,9 +280,52 @@ std::string Describe()
     return state().description;
 }
 
+void SetSessionOverlay(std::map<std::string, std::vector<uint8_t>> files)
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    s.overlay = std::move(files);
+}
+
+void ClearSessionOverlay()
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    s.overlay.clear();
+}
+
+bool HasSessionOverlay()
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    return !s.overlay.empty();
+}
+
+namespace
+{
+// The overlay's file for `path`, when there is one
+bool OverlayRead(State &s, const std::string &path, std::vector<uint8_t> *out)
+{
+    std::lock_guard<std::mutex> guard(s.lock);
+    if (s.overlay.empty())
+        return false;
+    std::string key;
+    if (!AssetKey(path, key))
+        return false;
+    const auto it = s.overlay.find(key);
+    if (it == s.overlay.end())
+        return false;
+    if (out)
+        *out = it->second;
+    return true;
+}
+} // namespace
+
 bool Exists(const std::string &path)
 {
     State &s = state();
+    if (OverlayRead(s, path, nullptr))
+        return true;
     std::string key;
     if (s.mode != Mode::Blob || !AssetKey(path, key))
     {
@@ -296,6 +340,8 @@ bool Exists(const std::string &path)
 bool ReadBytes(const std::string &path, std::vector<uint8_t> &out)
 {
     State &s = state();
+    if (OverlayRead(s, path, &out))
+        return true;
     std::string key;
     if (s.mode != Mode::Blob || !AssetKey(path, key))
         return ReadFile(path, out);

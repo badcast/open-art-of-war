@@ -17,6 +17,40 @@ Building::Building()
     sightRadius = 7;
 }
 
+int Building::RepairStep(float dt, int buildingCost, int budget)
+{
+    if (!repairing)
+        return 0;
+    if (!CanBeRepaired())
+    {
+        repairing = false;
+        repairHpAccum = repairCreditDebt = 0.0f;
+        return 0;
+    }
+    repairHpAccum += static_cast<float>(maxHp) / kRepairSeconds * dt;
+    const int heal = std::min(static_cast<int>(repairHpAccum), maxHp - currentHp);
+    if (heal <= 0)
+        return 0;
+    const float debt = repairCreditDebt
+                       + static_cast<float>(heal) * kRepairCostShare * static_cast<float>(std::max(0, buildingCost))
+                             / static_cast<float>(maxHp);
+    const int pay = static_cast<int>(debt);
+    if (pay > budget)
+    {
+        repairing = false; // out of credits
+        return 0;
+    }
+    repairCreditDebt = debt - static_cast<float>(pay);
+    repairHpAccum -= static_cast<float>(heal);
+    currentHp += heal;
+    if (currentHp >= maxHp)
+    {
+        repairing = false;
+        repairHpAccum = repairCreditDebt = 0.0f;
+    }
+    return pay;
+}
+
 int Building::GetPowerOutput() const
 {
     int bMod = (rawBuildingType >= 0) ? (rawBuildingType % 8) : 0;
@@ -139,11 +173,12 @@ void Building::UpdateProduction(float deltaTime)
     }
 }
 
-void Building::UpdateDefenseCombat(float /*deltaTime*/, TileMap &map, const BuildingDelegates &delegates)
+void Building::UpdateDefenseCombat(float deltaTime, TileMap &map, const BuildingDelegates &delegates)
 {
     bool requiresPower = (rawBuildingType != 5 && rawBuildingType != 13);
     if (attackDamage <= 0 || buildProgress < 1.0f || (requiresPower && !isPowered) || state == ActionState::Die)
     {
+        burstShotsRemaining = 0;
         return;
     }
 
@@ -189,7 +224,23 @@ void Building::UpdateDefenseCombat(float /*deltaTime*/, TileMap &map, const Buil
 
             turretFacing = Utility::Dir8FromVector(dx, dy);
 
-            if (cooldownTimer <= 0.0f)
+            // The rest of a volley: one more shot every burstDelay at the same target
+            if (burstShotsRemaining > 0)
+            {
+                burstTimer -= deltaTime;
+                if (burstTimer <= 0.0f)
+                {
+                    --burstShotsRemaining;
+                    burstTimer = burstDelay;
+                    attackAnimTimer = 0.15f;
+                    state = ActionState::Attack;
+                    float mSrcX, mSrcY;
+                    GetMuzzlePoint(mSrcX, mSrcY);
+                    if (delegates.spawnProjectile)
+                        delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+                }
+            }
+            else if (cooldownTimer <= 0.0f)
             {
                 cooldownTimer = NextCooldown();
                 attackAnimTimer = 0.15f;
@@ -200,6 +251,11 @@ void Building::UpdateDefenseCombat(float /*deltaTime*/, TileMap &map, const Buil
                 if (delegates.spawnProjectile)
                 {
                     delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+                }
+                if (burstCount > 1)
+                {
+                    burstShotsRemaining = burstCount - 1;
+                    burstTimer = burstDelay;
                 }
             }
         }

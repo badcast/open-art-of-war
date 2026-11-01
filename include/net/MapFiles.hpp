@@ -21,8 +21,17 @@ std::string Resolve(const std::string &path, uint64_t hash);
 
 // The game's own file, compressed for sending (empty when it cannot be read)
 std::vector<uint8_t> Packed(const std::string &path);
+// A received file, unpacked and checked against `hash` and `maxBytes` (what it claims to be, never more); false when
+// anything is wrong
+bool Unpack(const std::vector<uint8_t> &packed, uint64_t hash, std::vector<uint8_t> &raw, size_t maxBytes);
 // A received file: unpacked, checked against `hash` and against being a map at all, stored.
 // Returns the stored path, empty when anything is wrong.
 std::string Store(const std::string &path, uint64_t hash, const std::vector<uint8_t> &packedBytes);
+
+// The bytes of a map file (the game's own or any path); false when it cannot be read
+bool Read(const std::string &path, std::vector<uint8_t> &bytes);
+// Raw bytes of a map with `hash` (a replay carries its map): checked, then stored like a downloaded one.
+// Returns the stored path, empty when the bytes are not that map.
+std::string StoreRaw(const std::string &path, uint64_t hash, const std::vector<uint8_t> &raw);
 
 } // namespace OpenArtOfWar::MapFiles

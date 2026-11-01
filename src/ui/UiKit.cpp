@@ -264,6 +264,50 @@ void DrawButton(
         Anchor::HCENTER | Anchor::VCENTER);
 }
 
+void DrawCheckbox(
+    Renderer &r,
+    BitmapFontRenderer &font,
+    const UiRect &rect,
+    const std::string &label,
+    bool checked,
+    bool hovered,
+    bool enabled)
+{
+    if (hovered && enabled)
+        SoundRequests::MarkHover();
+
+    const int boxSize = 20;
+    const UiRect box = {rect.x, rect.CenterY() - boxSize / 2, boxSize, boxSize};
+
+    const SDL_Color fill = !enabled ? color::PanelSunken : hovered ? color::Hover : color::PanelSunken;
+    const SDL_Color border = !enabled ? color::Border : hovered ? color::Accent : color::BorderStrong;
+
+    r.FillRectScreen(box.x, box.y, box.w, box.h, fill);
+    r.DrawRectScreen(box.x, box.y, box.w, box.h, border);
+
+    if (checked)
+    {
+        const SDL_Color checkCol = enabled ? color::Accent : color::TextMuted;
+        const int bx = box.x;
+        const int by = box.y;
+        for (int i = 0; i < 4; ++i)
+        {
+            r.FillRectScreen(bx + 4 + i, by + 10 + i, 2, 2, checkCol);
+        }
+        for (int i = 0; i < 8; ++i)
+        {
+            r.FillRectScreen(bx + 7 + i, by + 13 - i, 2, 2, checkCol);
+        }
+    }
+
+    if (!label.empty())
+    {
+        const SDL_Color textCol = !enabled ? color::TextMuted : hovered ? color::Text : color::TextDim;
+        font.DrawString(
+            label, box.Right() + 10, rect.CenterY(), FONT_BODY_BOLD, textCol, false, Anchor::LEFT | Anchor::VCENTER);
+    }
+}
+
 void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor)
 {
     r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, color::PanelSunken);

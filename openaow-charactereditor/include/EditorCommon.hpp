@@ -144,6 +144,21 @@ float WeaponDps(YAML::Node weapon);
 
 CharacterStats ComputeStats(YAML::Node doc, bool siege);
 
+// Timing of the pictures (animations: block of a character file); the same defaults and rules as the game
+struct AnimTiming {
+    float moveFrame{0.09f};    // seconds per walking frame
+    float attackFrame{-1.0f};  // seconds per firing-pose frame (< 0: the archetype's default)
+    float attackPose{-1.0f};   // the firing pose lasts this long after the first shot of a volley (< 0: by projectile)
+    float burstPose{0.15f};    // ... after every later shot of a burst
+    int flashMode{0};          // 0 loops, 1 once, 2 once and holds
+    int flashFrames{0};        // 0 = the whole animation
+};
+AnimTiming ReadAnimTiming(const YAML::Node& doc);
+// Seconds per firing-pose frame with the archetype's default applied
+float AttackFrameTime(const AnimTiming& t, int archetypeId);
+// Default length of the firing pose after the first shot: by projectile (hit-scan 0.12 s, others 0.22 s)
+float DefaultAttackPose(const std::string& projectile);
+
 enum class EditorMode {
     Preview,
     Compare,
@@ -155,6 +170,7 @@ enum class EditorMode {
     GameUi,     // colors of the interface (assets/characters/game_ui.yaml)
     Environment, // fog, construction, network, overlay and font (assets/data/game_environment.json)
     AiDifficulty, // AI levels (assets/characters/difficulty.yaml)
+    Animator,   // timing of the pictures of the selected character: pose, muzzle flash, burst
     SpriteTools // sprite browser and exports for repacking the assets
 };
 

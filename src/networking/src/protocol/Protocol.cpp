@@ -68,6 +68,7 @@ void encode(BitWriter &w, const Hello &m)
     w.writeString(m.playerName, kMaxNameLength);
     writeToken(w, m.token);
     w.writeString(m.password, kMaxPasswordLength);
+    w.writeBool(m.canSync);
 }
 
 bool decode(BitReader &r, Hello &m)
@@ -85,6 +86,7 @@ bool decode(BitReader &r, Hello &m)
     m.playerName = r.readString(kMaxNameLength);
     readToken(r, m.token);
     m.password = r.readString(kMaxPasswordLength);
+    m.canSync = r.readBool();
     return done(r);
 }
 
@@ -462,6 +464,65 @@ bool decode(BitReader &r, FileData &m)
     return done(r);
 }
 
+void encode(BitWriter &w, const DataManifest &m)
+{
+    writeType(w, MsgType::DataManifest);
+    const std::size_t n = std::min(m.files.size(), kMaxDataFiles);
+    w.writeVarUint(n);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        w.writeString(m.files[i].path, kMaxDataPathLength);
+        w.writeU64(m.files[i].hash);
+    }
+}
+
+bool decode(BitReader &r, DataManifest &m)
+{
+    const std::uint64_t n = r.readVarUint();
+    if (n > kMaxDataFiles)
+    {
+        r.fail();
+        return false;
+    }
+    m.files.clear();
+    for (std::uint64_t i = 0; i < n && !r.failed(); ++i)
+    {
+        DataEntry e;
+        e.path = r.readString(kMaxDataPathLength);
+        e.hash = r.readU64();
+        m.files.push_back(std::move(e));
+    }
+    return done(r);
+}
+
+void encode(BitWriter &w, const FilePathRequest &m)
+{
+    writeType(w, MsgType::FilePathRequest);
+    w.writeString(m.path, kMaxDataPathLength);
+}
+
+bool decode(BitReader &r, FilePathRequest &m)
+{
+    m.path = r.readString(kMaxDataPathLength);
+    return done(r);
+}
+
+void encode(BitWriter &w, const FilePathData &m)
+{
+    writeType(w, MsgType::FilePathData);
+    w.writeString(m.path, kMaxDataPathLength);
+    w.writeU64(m.hash);
+    writeBlob(w, m.bytes);
+}
+
+bool decode(BitReader &r, FilePathData &m)
+{
+    m.path = r.readString(kMaxDataPathLength);
+    m.hash = r.readU64();
+    readBlob(r, m.bytes, kMaxFileBytes);
+    return done(r);
+}
+
 void encode(BitWriter &w, const OwnerSetAi &m)
 {
     writeType(w, MsgType::OwnerSetAi);
@@ -758,6 +819,29 @@ const char *rejectReasonText(RejectReason reason)
             return "Not ready yet";
     }
     return "";
+}
+
+std::vector<std::uint8_t> encodeTurn(const TurnBundle &m)
+{
+    std::size_t capacity = 64 + m.left.size() + m.players.size() * 16;
+    for (const PlayerTurn &p : m.players)
+        capacity += p.bytes.size() + 8;
+    std::vector<std::uint8_t> buf(capacity);
+    BitWriter w(buf.data(), buf.size());
+    encode(w, m);
+    if (w.overflowed())
+        return {};
+    buf.resize(w.finish());
+    return buf;
+}
+
+bool decodeTurn(const std::uint8_t *data, std::size_t size, TurnBundle &out)
+{
+    BitReader r(data, size);
+    if (readType(r) != MsgType::TurnBundle || r.failed())
+        return false;
+    out = TurnBundle {};
+    return decode(r, out);
 }
 
 } // namespace OpenArtOfWar::Net

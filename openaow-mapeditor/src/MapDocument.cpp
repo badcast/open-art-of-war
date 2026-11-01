@@ -796,6 +796,65 @@ void MapDocument::RestoreSnapshot(const MapSnapshot& snap) {
     m_modified = true;
 }
 
+std::pair<int, int> MapDocument::GetStartPos(int playerIndex) const {
+    if (playerIndex == 0) return {m_playerStartX, m_playerStartY};
+    if (playerIndex == 1) return {m_enemyStartX, m_enemyStartY};
+    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size()) {
+        return m_extraStarts[static_cast<size_t>(playerIndex - 2)];
+    }
+    return {-1, -1};
+}
+
+bool MapDocument::SetStartPos(int playerIndex, int x, int y) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return false;
+    if (playerIndex == 0) {
+        m_playerStartX = x;
+        m_playerStartY = y;
+        m_modified = true;
+        return true;
+    }
+    if (playerIndex == 1) {
+        m_enemyStartX = x;
+        m_enemyStartY = y;
+        m_modified = true;
+        return true;
+    }
+    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size()) {
+        m_extraStarts[static_cast<size_t>(playerIndex - 2)] = {x, y};
+        m_modified = true;
+        return true;
+    }
+    return false;
+}
+
+int MapDocument::FindStartPosAt(int x, int y) const {
+    if (m_playerStartX == x && m_playerStartY == y) return 0;
+    if (m_enemyStartX == x && m_enemyStartY == y) return 1;
+    for (size_t i = 0; i < m_extraStarts.size(); ++i) {
+        if (m_extraStarts[i].first == x && m_extraStarts[i].second == y) {
+            return static_cast<int>(2 + i);
+        }
+    }
+    return -1;
+}
+
+bool MapDocument::AddStartPos(int x, int y) {
+    if (m_extraStarts.size() >= kMaxExtraStarts) return false;
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return false;
+    m_extraStarts.push_back({x, y});
+    m_modified = true;
+    return true;
+}
+
+bool MapDocument::RemoveStartPos(int playerIndex) {
+    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size()) {
+        m_extraStarts.erase(m_extraStarts.begin() + static_cast<std::ptrdiff_t>(playerIndex - 2));
+        m_modified = true;
+        return true;
+    }
+    return false;
+}
+
 void MapDocument::PushUndoSnapshot() {
     m_undoStack.push_back(CreateSnapshot());
     if (m_undoStack.size() > MAX_UNDO_LEVELS) {

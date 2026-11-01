@@ -1,4 +1,5 @@
 #include "graphics/ShaderEffects.hpp"
+#include "graphics/TextureManager.hpp"
 
 #include "OaowShaders.inc" // generated: kShader_<name>_spv / _msl byte arrays (cmake/EmbedShaders.cmake)
 
@@ -286,7 +287,9 @@ void ShaderEffects::Composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bo
         {m_sharp ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f}};
     SDL_SetGPURenderStateFragmentUniforms(m_postState, 0, &p, sizeof p);
     // Sharp upscaling needs linear samples; without it the reduced picture keeps the chosen smoothing
-    SDL_SetTextureScaleMode(m_scene, (m_sharp || smoothing) ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureScaleMode(
+        m_scene,
+        m_sharp ? SDL_SCALEMODE_LINEAR : (smoothing ? TextureManager::SmoothPixelScaleMode() : SDL_SCALEMODE_NEAREST));
     SDL_SetTextureBlendMode(m_scene, SDL_BLENDMODE_NONE);
     SetState(m_postState);
     SDL_RenderTexture(m_renderer, m_scene, nullptr, &dst);

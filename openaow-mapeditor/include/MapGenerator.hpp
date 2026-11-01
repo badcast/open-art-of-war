@@ -20,6 +20,7 @@ struct GeneratorParams {
     GeneratorSymmetry symmetry{GeneratorSymmetry::Rotational180};
     uint32_t seed{1337};
     bool randomSeed{true};
+    int players{2};                     // 2..8 bases; more than two get no symmetry (bases on a ring around the centre)
 
     // Shares in percent. Defaults: medians of the original jungle maps (tileset 0);
     // MapGenerator::OriginalDefaults() gives the values of either tileset.

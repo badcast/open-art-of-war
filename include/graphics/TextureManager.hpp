@@ -91,7 +91,11 @@ public:
     // `sharpPixels` (pixel-art filter of the shader effects) needs linear samples on the sprite sheets but
     // keeps the terrain sheets as they are: their tiles touch each other in the atlas, and linear samples
     // at a tile edge would pull in the neighbouring tile as a faint grid line.
+    // Smoothing of atlas pages uses the pixel-art mode (SDL 3.4+): plain linear samples bleed the neighbouring
+    // frames and the transparent borders into every sprite and tile, which shows as seams and cut lines.
     void SetSpriteFiltering(bool linear, bool sharpPixels = false);
+    // Scale mode of "smooth" scaling of pixel graphics: pixel-art when SDL has it, linear otherwise
+    static SDL_ScaleMode SmoothPixelScaleMode();
     SDL_Texture *GetSpriteSheet(int page) const;
     // Sprite sheet `page` with team armour (team 1: blue, team 2: red) recoloured to `color` on CPU and cached
     SDL_Texture *GetRecoloredSpriteSheet(int page, int team, SDL_Color color);
@@ -145,8 +149,8 @@ private:
     std::unordered_map<std::string, SDL_Texture *> m_textureCache;
     std::vector<SDL_Texture *> m_spriteSheets;
     std::unordered_map<uint64_t, SDL_Texture *> m_recoloredSheets;
-    bool m_linearTerrain {false};
-    bool m_linearSprites {false};
+    SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
+    SDL_ScaleMode m_spriteScaleMode {SDL_SCALEMODE_NEAREST};
     std::vector<float> m_sheetScales;
     std::string m_assetRoot;
     std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only

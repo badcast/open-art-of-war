@@ -1,5 +1,7 @@
 #pragma once
 
+#include "audio/SoundIds.hpp"
+
 #include "audio/SfxMixer.hpp"
 #include "audio/VoiceManager.hpp"
 #include "core/LoaderResources.hpp"
@@ -33,6 +35,7 @@ public:
     void NextTrack(); // player: mainmenu -> tracks... -> mainmenu
     void PrevTrack();
     void SetMusicVolume(int volume); // 0..128
+    void SetReverb(bool enabled); // reverb of explosions and heavy guns
     void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
 
@@ -42,7 +45,12 @@ public:
         return m_sfx;
     }
     // An event heard as is (interface, announcer-free alerts); `gain` 0..1, `pan` -1..1
-    void PlaySfx(const std::string &event, float gain = 1.0f, float pan = 0.0f);
+    void PlaySfx(const std::string &event, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
+    // The sounds of the game itself, by constant (SoundIds.hpp)
+    void PlaySfx(WorldSfx sound, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
+    const SfxMixer::EventConfig *SfxConfig(WorldSfx sound) const;
+    void Announce(Announcement line);
+    void PlayVoice(UnitReply reply, bool infantry);
     // Voices (VoiceManager, the game's language): an announcer line (queued, one at a time) and a unit reply
     void Announce(const std::string &event);
     void PlayVoice(const std::string &event);

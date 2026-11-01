@@ -48,7 +48,6 @@ int TurnStep8(int from, int to)
                 return -1;
         }
     }
-    // Otherwise the short way round (original J2ME turn table indexed by the raw difference -7..7)
     static constexpr int kTurn[15] = {1, 1, 1, -1, -1, -1, -1, 0, 1, 1, 1, 1, -1, -1, -1};
     return kTurn[7 + (to - from)];
 }

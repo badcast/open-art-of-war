@@ -393,7 +393,7 @@ void Renderer::DrawTileWorld(
     if (!m_texManager)
         return;
 
-    // Authentic J2ME terrain rendering (f.java:6603): all ground, cliff, and water tiles are 100% static!
+    // Ground, cliff, and water tiles are static.
     int compId = m_texManager->GetTileCompositeId(tilesetId, tileIndex);
     DrawCompositeWorld(compId, worldX, worldY, camera, Faction::Resistance);
 }
@@ -404,9 +404,8 @@ void Renderer::DrawDecorWorld(
     if (!m_texManager)
         return;
 
-    // Authentic map decoration rendering (f.java:2212, 6826-6836):
-    // tileset_d[offset + decorType] is a Building ID (31..338: trees, bridges 83..108, cliffs, landmarks 121..132).
-    // Never use m_decorAnims (f1131c = 1741..1810) here because f1131c are post-destruction craters & vehicle wrecks!
+    // Tileset decoration entries map to building IDs (31..338: trees, bridges 83..108, cliffs, landmarks 121..132).
+    // Do not use m_decorAnims here: those are post-destruction craters and vehicle wrecks.
     int buildingId = m_texManager->GetDecorBuildingId(tilesetId, decorType);
     if (buildingId >= 0)
     {
@@ -457,7 +456,9 @@ void Renderer::DrawBuildingWorld(
     if (!bdef || bdef->end < bdef->start)
         return;
 
-    // 1. Destroyed building remnant (f1131c = 1741, 1747, 1753; i.java:3311, 3489)
+    lastDrawnBuilding = {buildingType, animFrame, m_animatedPartsVisible};
+
+    // 1. Destroyed building remnant
     // Static crater/rubble composite that stays for 2 minutes without looping frames!
     if (isDestroyed)
     {
@@ -491,7 +492,7 @@ void Renderer::DrawBuildingWorld(
     if (buildingType < 30 && !isDestroyed)
         SetStructureFaction(faction);
 
-    // 2. Walls (15..29), construction scaffolding (30), and Map Decorations (31..338) (i6 == 0 in f.java:10806)
+    // 2. Walls (15..29), construction scaffolding (30), and map decorations (31..338)
     if (buildingType >= 15)
     {
         for (int p = bdef->start; p <= bdef->end; ++p)
@@ -522,7 +523,7 @@ void Renderer::DrawBuildingWorld(
         return;
     }
 
-    // 3. Active Faction Buildings 0..14 (i6 > 0 in f.java:10806-10917)
+    // 3. Active faction buildings 0..14
     // Under construction: draw scaffolding / base
     bool underConstruction = (buildProgress < 1.0f);
     int iA = 4;
@@ -545,7 +546,7 @@ void Renderer::DrawBuildingWorld(
 
         if (part->layer == 2)
         {
-            // In f.java:10890-10906, part->layer == 2 is drawn during the layer == 1 pass!
+            // Layer 2 parts are drawn during the layer 1 pass.
             if (layer != 1)
                 continue;
 
@@ -625,7 +626,9 @@ void Renderer::DrawUnitWorld(
     bool isFlaming,
     int customWreckComp,
     int customWreckStages,
-    int customDeathSeq)
+    int customDeathSeq,
+    int flashMode,
+    int flashFrames)
 {
     if (!m_texManager)
         return;
@@ -633,12 +636,12 @@ void Renderer::DrawUnitWorld(
     unitTypeId = std::clamp(unitTypeId, 0, 18);
     bool isInfantry = Utility::IsInfantryArchetype(unitTypeId); // archetypes 0..5 and 14 (prone sniper)
 
-    // 1. Dying / Wrecked state (i.java:3286, f.java:6740)
+    // 1. Dying / Wrecked state
     if (actionState == static_cast<int>(ActionState::Die))
     {
         if (!isInfantry)
         {
-            // Destroyed vehicle remnant (f1131c = 1759, 1764, 1769) - static wreck that fades over 2 minutes!
+            // Destroyed vehicle remnant - static wreck that fades over 2 minutes!
             const EffectsConfig::Wreck def = EffectsConfig::Get().WreckOfVehicle(unitTypeId);
             const int baseWreck = (customWreckComp > 0) ? customWreckComp : def.composite;
             const int maxStages = (customWreckStages > 0) ? customWreckStages : def.stages;
@@ -651,7 +654,7 @@ void Renderer::DrawUnitWorld(
         }
         else
         {
-            // Authentic J2ME human death & corpse remains (i.java:969, 3286):
+            // Human death and corpse sequences:
             // Bullet death: sequences 247 or 248 (corpse variants)
             // Flame death: sequences 259 or 260 (burning human -> charred remains)
             int deathSeq = customDeathSeq;
@@ -701,7 +704,7 @@ void Renderer::DrawUnitWorld(
 
     int baseSeq = m_texManager->GetUnitBaseSeq(unitTypeId, actionState);
 
-    // Authentic J2ME infantry shooting pose offset (+8) from f.java:10955:
+    // Infantry shooting pose offset (+8):
     // archetypes 0..3 (riflemen, heavy assault, grenadiers) switch to their firing pose. The flamethrower (5)
     // fires from its standing sequence: its firing layer is the flame; its +8 sequences are a walk cycle.
     int shootOffset = 0;
@@ -710,8 +713,7 @@ void Renderer::DrawUnitWorld(
         shootOffset = 8;
     }
 
-    // Siege mode deployed units (14=Prone Sniper seq 230, 15=Deployed Rhino seq 117, 16=Deployed Grad seq 66)
-    // have a single fixed hull sequence (dir8 = 0 in i.java:2797) while their turret/gun rotates via tdir8!
+    // Deployed siege units use a fixed hull sequence while their turret or gun rotates via tdir8.
     int dir8 = (unitTypeId >= 14 && unitTypeId <= 16) ? 0 : ((facingDir % 8 + 8) % 8);
     int tdir8 = (targetFacing >= 0) ? ((targetFacing % 8 + 8) % 8) : ((facingDir % 8 + 8) % 8);
     int seqIdx = baseSeq;
@@ -741,9 +743,9 @@ void Renderer::DrawUnitWorld(
     if (br.end < br.start)
         return;
 
-    // Authentic J2ME layer visibility bitmask & turret rotation tables (f.java:10962-10996):
-    // block[53] = {1, 0, 2, 0, 1, 2} (turret weapon slot per layer flag 0..5)
-    // block[54] = {1, 0, 2}          (idle layer flag replaced by firing layer flag 3..5)
+    // Layer visibility bitmask and turret rotation tables:
+    // Turret weapon slot per layer flag 0..5.
+    // Idle layer flags map to firing layer flags 3..5.
     static const int s_b53[6] = {1, 0, 2, 0, 1, 2};
     static const int s_b54[3] = {1, 0, 2};
 
@@ -809,7 +811,14 @@ void Renderer::DrawUnitWorld(
                 // Replaces the corresponding idle layer (flag 0..2) while firing!
                 IndexRange ar = m_texManager->GetAnimRange(childId);
                 int animLen = (ar.end >= ar.start) ? (ar.end - ar.start + 1) : 1;
+                const int flashLen = (flashFrames > 0) ? std::min(flashFrames, animLen) : animLen;
                 int fireFrame = std::abs(animStep) % std::max(1, animLen);
+                if (flashMode != 0)
+                {
+                    if (animStep >= flashLen && flashMode == 1)
+                        continue; // played once: the idle layer shows until the next shot
+                    fireFrame = std::clamp(animStep, 0, std::max(0, flashLen - 1));
+                }
                 bMask &= ~(1 << s_b54[flag - 3]);
                 DrawAnimSequenceWorld(childId, fireFrame, lx, ly, camera, faction);
             }

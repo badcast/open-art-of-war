@@ -27,6 +27,8 @@
 #include "audio/SoundEngine.hpp"
 #include "audio/GameSounds.hpp"
 #include "audio/SoundRequests.hpp"
+#include "replay/ReplayPlayer.hpp"
+#include "ui/ReplayMenu.hpp"
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/EntityManager.hpp"
@@ -205,6 +207,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     // The map viewport ends where the command sidebar begins
     m_camera = std::make_unique<Camera>(m_windowW - HUDController::kSidebarWidth, m_windowH);
     m_input = std::make_unique<InputManager>();
+    m_input->SetEdgePanMargin(m_settings.edgePanMargin);
     ShowLoading(_("Loading sound and music..."), 0.65f);
     m_sound = std::make_unique<SoundEngine>();
     m_sound->Init(LoaderResources::kDefaultRoot);
@@ -245,6 +248,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     // Initialize modular controllers
     m_menuController = std::make_unique<MenuController>();
     m_networkMenu = std::make_unique<NetworkMenu>();
+    m_replayMenu = std::make_unique<ReplayMenu>();
     m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
     m_gameplayController = std::make_unique<GameplayController>();
@@ -454,9 +458,16 @@ void Application::run()
         // Simulation / Menu Update
         if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
         {
-            if (m_map)
+            const bool menuOpen
+                = (m_menuController && m_menuController->IsAnyMenuOpen()) || m_state == AppState::Paused;
+            if (m_input)
             {
-                m_input->UpdateCamera(static_cast<float>(frameTime), *m_camera, m_map->GetWidth(), m_map->GetHeight());
+                m_input->SetMenuOpen(menuOpen);
+            }
+            if (m_map && !menuOpen)
+            {
+                m_input->UpdateCamera(
+                    static_cast<float>(frameTime), *m_camera, m_map->GetWidth(), m_map->GetHeight(), menuOpen);
                 m_hudController->UpdateRadarDrag(
                     m_input->GetMouseScreenX(),
                     m_input->GetMouseScreenY(),
@@ -467,6 +478,14 @@ void Application::run()
                     *m_map,
                     *m_camera);
             }
+            if (m_replay)
+            {
+                // A recorded game: the turns of the file drive the world
+                UpdateReplay(frameTime);
+                accumulator = 0.0;
+            }
+            else
+            {
             const bool net = InNetworkMatch();
             Simulation &sim = m_gameplayController->simulation();
             // P / Pause: everybody stops (a few times per player), anybody goes on
@@ -505,6 +524,14 @@ void Application::run()
                                 static_cast<unsigned long long>(sections[3]));
                             std::fflush(stdout);
                         }
+                    }
+                    if (tick % NetMatch::kViewIntervalTicks == 0 && m_camera)
+                    {
+                        const float zoom = std::max(0.01f, m_camera->GetZoom());
+                        m_net->SendView(
+                            m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f,
+                            m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f,
+                            zoom);
                     }
                     m_net->AfterTick(tick, checksum);
                     m_net->NoteTickRan(nowMs);
@@ -556,6 +583,7 @@ void Application::run()
                         break;
                 }
             }
+            }
         }
         else
         {
@@ -604,6 +632,12 @@ void Application::HandleEvents()
             m_running = false;
             return;
         }
+        if (event.type == SDL_EVENT_DROP_FILE && event.drop.data)
+        {
+            const std::string dropped = event.drop.data;
+            if (dropped.size() > 4 && dropped.compare(dropped.size() - 4, 4, ".awr") == 0)
+                m_pendingReplay = dropped;
+        }
 
         // Only the game window: the throw-away windows that probe the render APIs report their own sizes
         if ((event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_RESIZED
@@ -621,13 +655,13 @@ void Application::HandleEvents()
         m_input->ProcessEvent(event, *m_camera);
     }
 
+#if defined(AOW_DEBUG)
     if (m_gameplayController && m_gameplayController->ConsumeDebugOverlayToggle())
     {
-#if defined(AOW_DEBUG)
         if (m_debug)
             m_debug->Toggle();
-#endif
     }
+#endif
     // Refresh mouse position every frame so menus get hover feedback too
     m_input->Update(0.0f, *m_camera);
 }
@@ -648,6 +682,17 @@ void Application::Update(float deltaTime)
     {
         UpdateVideoConfirm(deltaTime);
         return;
+    }
+    if (m_state != AppState::MenuReplay)
+        m_replayMenuFresh = false;
+    // A replay file dropped on the window (or named on the command line): from the menus it is opened at once
+    if (!m_pendingReplay.empty() && !m_replay
+        && (m_state == AppState::MainMenu || m_state == AppState::MenuReplay || m_state == AppState::MenuSettings
+            || m_state == AppState::MenuHelp || m_state == AppState::MenuAbout))
+    {
+        const std::string path = std::move(m_pendingReplay);
+        m_pendingReplay.clear();
+        OpenReplay(path);
     }
 
 #if defined(AOW_DEBUG)
@@ -724,6 +769,19 @@ void Application::Update(float deltaTime)
     {
         UpdateNetworkMenu();
     }
+    else if (m_state == AppState::MenuReplay)
+    {
+        if (!m_replayMenuFresh)
+        {
+            m_replayMenu->Refresh();
+            m_replayMenuFresh = true;
+        }
+        const ReplayMenu::Result r = m_replayMenu->Update(*m_input, m_windowW, m_windowH);
+        if (r.back)
+            m_state = AppState::MainMenu;
+        else if (!r.open.empty())
+            OpenReplay(r.open);
+    }
     else if (m_state == AppState::MenuHelp || m_state == AppState::MenuAbout)
     {
         m_menuController->UpdateInfoScreen(*m_input, m_state);
@@ -753,11 +811,22 @@ void Application::Update(float deltaTime)
     }
     else if (m_state == AppState::Victory || m_state == AppState::Defeat)
     {
+        // Clicks and Enter from the last seconds of the battle must not skip the result screen: input is read
+        // (and so consumed) from the first frame, but acted on only after kEndScreenInputDelay
+        if (m_endScreenTimer <= 0.0f && m_net)
+            m_net->FinishReplay(m_state == AppState::Victory ? "victory" : "defeat"); // the match is saved
+        m_endScreenTimer += deltaTime;
         float lx, ly;
-        if (m_input->IsConfirmJustPressed() || m_input->WasLeftClickIssued(lx, ly))
+        const bool confirm = m_input->IsConfirmJustPressed();
+        const bool click = m_input->WasLeftClickIssued(lx, ly);
+        if (m_endScreenTimer >= kEndScreenInputDelay && (confirm || click))
         {
             m_state = AppState::MainMenu;
         }
+    }
+    else
+    {
+        m_endScreenTimer = 0.0f;
     }
 
     const bool gameplayMusic = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
@@ -766,7 +835,7 @@ void Application::Update(float deltaTime)
     // The menu theme goes on through every screen of the main menu (help, about, settings, network game)
     const bool menuMusic = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                            || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
-                           || m_state == AppState::MenuNetwork;
+                           || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
     m_sound->Update(menuMusic, gameplayMusic);
 }
 
@@ -785,9 +854,9 @@ void Application::UpdateSounds()
     {
         if (!r.event.empty() && r.event[0] == '@')
         {
-            if (inMatch && m_gameplayController && m_entities)
-                m_gameSounds->PlayReply(
-                    *m_sound, *m_entities, m_gameplayController->GetSelectedUnits(), r.event.c_str() + 1);
+            UnitReply reply;
+            if (inMatch && m_gameplayController && m_entities && SoundIds::ReplyFromRequest(r.event.c_str(), reply))
+                m_gameSounds->PlayReply(*m_sound, *m_entities, m_gameplayController->GetSelectedUnits(), reply);
         }
         else if (r.announcer)
         {
@@ -801,14 +870,20 @@ void Application::UpdateSounds()
     if (inMatch && m_state != AppState::Paused && m_entities && m_map && m_economy && m_camera && m_hudController
         && m_gameplayController)
     {
-        const bool fog = m_map->IsFogEnabled() && !m_gameplayController->IsRevealFog();
+        const bool fog = m_map->IsFogEnabled() && !m_gameplayController->IsRevealFog() && !ReplayShowsAll();
         m_gameSounds->Update(
             *m_sound, *m_entities, *m_economy, *m_map, *m_camera, fog, m_hudController->radarAlert(), SDL_GetTicks());
         m_gameSounds->SelectionChanged(*m_sound, *m_entities, m_gameplayController->GetSelectedUnits());
     }
-    // The end of a match
+    // The end of a match or screen transition
     if (m_state != m_soundState)
     {
+        const bool isMenuState
+            = (m_state == AppState::MainMenu || m_state == AppState::MenuSettings || m_state == AppState::MenuNetwork
+               || m_state == AppState::MenuReplay || m_state == AppState::MenuHelp || m_state == AppState::MenuAbout);
+        if (isMenuState && m_soundState != AppState::SplashLogo)
+            m_sound->PlaySfx("ui_show_dialog");
+
         if (m_state == AppState::Victory)
             m_sound->Announce("ann_victory");
         else if (m_state == AppState::Defeat)
@@ -832,7 +907,7 @@ void Application::RenderMenuFade()
 {
     const bool menuScreen = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                             || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
-                            || m_state == AppState::MenuNetwork;
+                            || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
     const uint64_t now = SDL_GetTicks();
     if (menuScreen && !m_menuFadeWasMenu)
         m_menuFadeStartMs = m_state == AppState::MainMenu ? now : 0;
@@ -889,6 +964,11 @@ void Application::render()
     {
         m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
         m_menuController->RenderMenuSettings(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
+    }
+    else if (m_state == AppState::MenuReplay)
+    {
+        m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
+        m_replayMenu->Render(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
     }
     else if (m_state == AppState::MenuNetwork)
     {
@@ -949,7 +1029,8 @@ void Application::render()
             if (m_lowResTarget)
             {
                 SDL_SetTextureScaleMode(
-                    m_lowResTarget, m_settings.smoothing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+                    m_lowResTarget,
+                    m_settings.smoothing ? TextureManager::SmoothPixelScaleMode() : SDL_SCALEMODE_NEAREST);
                 SDL_SetRenderTarget(m_sdlRenderer, m_lowResTarget);
                 m_renderer->Clear({0, 0, 0, 255});
             }
@@ -977,7 +1058,7 @@ void Application::render()
 #else
         const bool overlayNoFog = false;
 #endif
-        bool disableFog = overlayNoFog || m_gameplayController->IsRevealFog() || !m_map->IsFogEnabled();
+        bool disableFog = overlayNoFog || m_gameplayController->IsRevealFog() || !m_map->IsFogEnabled() || ReplayShowsAll();
         int globalAnimTick = static_cast<int>(m_globalAnimTimer * 8.0f);
         m_map->RenderTerrain(*m_renderer, worldCam, !disableFog, globalAnimTick);
 
@@ -1195,14 +1276,17 @@ void Application::render()
                 accent,
                 true,
                 Anchor::HCENTER | Anchor::VCENTER);
-            m_fontRenderer->DrawString(
-                _("Click or press Enter to return to the main menu"),
-                band.CenterX(),
-                band.CenterY() + 38,
-                ui::FONT_BODY,
-                ui::color::TextDim,
-                false,
-                Anchor::HCENTER | Anchor::VCENTER);
+            if (m_endScreenTimer >= kEndScreenInputDelay)
+            {
+                m_fontRenderer->DrawString(
+                    _("Click or press Enter to return to the main menu"),
+                    band.CenterX(),
+                    band.CenterY() + 38,
+                    ui::FONT_BODY,
+                    ui::color::TextDim,
+                    false,
+                    Anchor::HCENTER | Anchor::VCENTER);
+            }
         }
     }
 
@@ -1212,6 +1296,8 @@ void Application::render()
     RenderFpsCounter();
     RenderNetStats();
     RenderNetworkBanner();
+    if (m_replay && m_state == AppState::SkirmishPlaying)
+        RenderReplayBar();
     if (m_videoConfirmActive)
         RenderVideoConfirm();
 

@@ -61,6 +61,7 @@ struct ResearchDef
     int archB;
     int needs;       // index of the technology that has to be researched first, -1 = none
     bool playerOnly; // effect only makes sense for the player (e.g. HQ build radius)
+    float seconds {60.0f}; // how long the technology takes to research (research_seconds in the YAML)
 };
 
 constexpr int kResearchCount = 24; // technologies per faction
@@ -73,6 +74,8 @@ constexpr int kResearchIconFirst = 2064;
 constexpr int kResearchIconLast = 2132;
 // The catalog is read from the faction's research YAML; entries it lacks keep the built-in values
 const ResearchDef &researchDef(Faction faction, int index);
+// The research files are read again on the next use (a network game plays with the host's data)
+void ReloadResearchCatalogs();
 
 // Research is only possible while the player owns a finished Tech Center / Laboratory
 bool HasResearchBuilding(PlayerId player, const EntityManager &entities);
@@ -104,6 +107,9 @@ bool IsUnitUnlocked(PlayerId player, int archetype);
 // Index of the technology that unlocks the unit, -1 when it needs none
 int UnitUnlockResearch(Faction faction, int archetype);
 bool IsRadarUnlocked(PlayerId player);
+// The form a unit is trained in: the T-22 Zeus (11) comes without its rocket turret (17) until "Rocket launcher mount"
+// is researched; a Zeus that exists then gets the turret at once (CompleteResearch). Every other archetype as it is.
+int ProductionForm(PlayerId player, int archetype);
 
 // Armor: damage taken by `target` after the armor of its owner's technologies (at least 1)
 int ReduceDamageByArmor(int damage, const class Entity &target);

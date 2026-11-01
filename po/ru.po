@@ -233,6 +233,30 @@ msgstr "ОБОРОНА"
 msgid "Hold current position and engage enemies in range"
 msgstr "Удерживать текущую позицию и атаковать в радиусе"
 
+msgid "GUARD"
+msgstr "ОХРАНА"
+
+msgid "Stance: engage enemies in sight, chase them a short way, then return"
+msgstr "Стойка: атаковать видимых врагов, преследовать недалеко и вернуться"
+
+msgid "HOLD GROUND"
+msgstr "НА МЕСТЕ"
+
+msgid "Stance: fire only at enemies in range, never leave the position"
+msgstr "Стойка: стрелять только в радиусе атаки, не сходить с места"
+
+msgid "PURSUE"
+msgstr "ПРЕСЛЕДОВАНИЕ"
+
+msgid "Stance: engage enemies in sight and chase them to the end (default)"
+msgstr "Стойка: атаковать видимых врагов и преследовать до конца (по умолчанию)"
+
+msgid "REPAIR [R]"
+msgstr "РЕМОНТ [R]"
+
+msgid "REPAIRING"
+msgstr "РЕМОНТ…"
+
 msgid "MISSION ACCOMPLISHED!"
 msgstr "ЗАДАНИЕ ВЫПОЛНЕНО!"
 
@@ -555,6 +579,9 @@ msgstr "Высота в клетках"
 
 msgid "Maximum health"
 msgstr "Максимум здоровья"
+
+msgid "Build radius (tiles)"
+msgstr "Радиус строительства (клетки)"
 
 msgid "Sight radius (tiles)"
 msgstr "Радиус обзора (клетки)"
@@ -1770,17 +1797,20 @@ msgstr "Вступит в силу после пересоздания окна"
 msgid "Graphics interface that draws the game"
 msgstr "Графический интерфейс, которым рисуется игра"
 
-msgid "Apply render API"
-msgstr "Применить API рендера"
-
 msgid "Applied on the next start of the game"
 msgstr "Применится при следующем запуске игры"
 
-msgid "Recreates the window, then asks to keep it"
-msgstr "Пересоздаёт окно и спрашивает, оставить ли его"
+msgid "SWITCH RENDER API?"
+msgstr "ПЕРЕКЛЮЧИТЬ API РЕНДЕРА?"
 
-msgid "RECREATE WINDOW"
-msgstr "ПЕРЕСОЗДАТЬ ОКНО"
+msgid "The render API changes at the next start of the game: "
+msgstr "API рендера сменится при следующем запуске игры: "
+
+msgid "The window is recreated with this render API: "
+msgstr "Окно будет пересоздано с этим API рендера: "
+
+msgid ". You get 15 seconds to keep it, otherwise the previous one returns."
+msgstr ". На подтверждение даётся 15 секунд, иначе вернётся прежний."
 
 msgid "KEEP THIS RENDER API?"
 msgstr "ОСТАВИТЬ ЭТОТ API РЕНДЕРА?"
@@ -2028,6 +2058,12 @@ msgstr "Название технологии"
 msgid "Technology description"
 msgstr "Описание технологии"
 
+msgid "Research time (seconds)"
+msgstr "Время исследования (секунды)"
+
+msgid "How long the technology takes to research."
+msgstr "Сколько секунд исследуется технология."
+
 msgid "Research cost (credits)"
 msgstr "Цена исследования (кредиты)"
 
@@ -2228,6 +2264,9 @@ msgstr "Высота здания на карте в клетках."
 
 msgid "Health points of the unit or building."
 msgstr "Очки здоровья юнита или здания."
+
+msgid "How far from this finished building new structures may be placed, in tiles."
+msgstr "Как далеко от этого достроенного здания можно строить новые, в клетках."
 
 msgid "How far it sees, in tiles."
 msgstr "Как далеко он видит, в клетках."
@@ -3431,6 +3470,12 @@ msgstr "СКМ: сдвиг | Колесо: масштаб | 2×СКМ: сбро�
 msgid "Animation %d"
 msgstr "Анимация %d"
 
+msgid "Sound reverb"
+msgstr "Реверберация звука"
+
+msgid "Echo of explosions and heavy guns"
+msgstr "Эхо взрывов и тяжёлых орудий"
+
 msgid "Voice volume"
 msgstr "Громкость голоса"
 
@@ -3853,6 +3898,366 @@ msgstr "Подключение к"
 msgid "No answer: check the address, and that the host forwards UDP port 38100"
 msgstr "Нет ответа: проверьте адрес и что хост открыл UDP-порт 38100"
 
-
 msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
 msgstr "Файлы шрифтов задаются в assets/main.json (fonts.regular, fonts.bold); здесь задаются размеры."
+
+msgid "Gage Crossing"
+msgstr "Переправа Гейдж"
+
+msgid "Kings Ridge"
+msgstr "Королевский хребет"
+
+msgid "Dry Runs"
+msgstr "Сухие русла"
+
+msgid "The Ford"
+msgstr "Брод"
+
+msgid "Generated Map 7142"
+msgstr "Сгенерированная карта 7142"
+
+msgid "Skirmish 10"
+msgstr "Схватка 10"
+
+msgid "Skirmish 11"
+msgstr "Схватка 11"
+
+msgid "Skirmish 12"
+msgstr "Схватка 12"
+
+msgid "Skirmish 13"
+msgstr "Схватка 13"
+
+msgid "Skirmish 14"
+msgstr "Схватка 14"
+
+msgid "Skirmish 15"
+msgstr "Схватка 15"
+
+msgid "Skirmish 2"
+msgstr "Схватка 2"
+
+msgid "Skirmish 3"
+msgstr "Схватка 3"
+
+msgid "Skirmish 4"
+msgstr "Схватка 4"
+
+msgid "Skirmish 5"
+msgstr "Схватка 5"
+
+msgid "Skirmish 6"
+msgstr "Схватка 6"
+
+msgid "Skirmish 7"
+msgstr "Схватка 7"
+
+msgid "Skirmish 9"
+msgstr "Схватка 9"
+
+msgid "Test Polygon"
+msgstr "Тестовый полигон"
+
+msgid "YOU"
+msgstr "ВЫ"
+
+msgid "COMPUTER PLAYER"
+msgstr "КОМПЬЮТЕР"
+
+msgid "Everybody is in one team: there is nobody to fight."
+msgstr "Все в одной команде: драться не с кем."
+
+msgid "IP address or hostname"
+msgstr "IP-адрес или имя хоста"
+
+msgid "This map has no start position for everybody in the room."
+msgstr "На этой карте нет стартовой позиции для каждого игрока в комнате."
+
+msgid "Edge scroll margin"
+msgstr "Зона прокрутки мышью"
+
+msgid "Screen border thickness in pixels for scrolling with the mouse"
+msgstr "Толщина границы экрана в пикселях для прокрутки мышью"
+
+msgid "Animator"
+msgstr "Аниматор"
+
+msgid "Firing frame time"
+msgstr "Время кадра стрельбы"
+
+msgid "Pose after the first shot"
+msgstr "Поза после первого выстрела"
+
+msgid "The canvas shows the character; the values below change how the game plays its pictures. Ctrl+S writes them to the file."
+msgstr "На холсте виден персонаж; значения ниже меняют, как игра проигрывает его картинки. Ctrl+S записывает их в файл."
+
+msgid "Buildings flash for a fixed time after a shot; their pictures have no timing in the file yet."
+msgstr "Здания вспыхивают фиксированное время после выстрела; у их картинок пока нет настройки времени в файле."
+
+msgid "(default %.3f s)"
+msgstr "(по умолчанию %.3f с)"
+
+msgid "1. Idle"
+msgstr "1. Покой"
+
+msgid "A still picture: nothing to time."
+msgstr "Неподвижная картинка: настраивать нечего."
+
+msgid "2. Move"
+msgstr "2. Движение"
+
+msgid "Walking frame time"
+msgstr "Время кадра ходьбы"
+
+msgid "Preview##animmove"
+msgstr "Показать##animmove"
+
+msgid "3. Attack"
+msgstr "3. Атака"
+
+msgid "This character does not attack."
+msgstr "Этот персонаж не атакует."
+
+msgid "Pose after each next shot"
+msgstr "Поза после каждого следующего выстрела"
+
+msgid "Loop while firing"
+msgstr "Повтор, пока стреляет"
+
+msgid "Once per shot"
+msgstr "Один раз на выстрел"
+
+msgid "Once, hold the last frame"
+msgstr "Один раз, держать последний кадр"
+
+msgid "Muzzle flash"
+msgstr "Вспышка выстрела"
+
+msgid "Flash frames (0 = all)"
+msgstr "Кадров вспышки (0 = все)"
+
+msgid "Preview##animattack"
+msgstr "Показать##animattack"
+
+msgid "Reset timing"
+msgstr "Сбросить время"
+
+msgid "Volley"
+msgstr "Залп"
+
+msgid "shot"
+msgstr "выстрел"
+
+msgid "pose"
+msgstr "поза"
+
+msgid "flash"
+msgstr "вспышка"
+
+msgid "cooldown"
+msgstr "перезарядка"
+
+msgid "The pose (%.2f s) ends before the next shot (%.2f s): the animation stops between shots."
+msgstr "Поза (%.2f с) кончается раньше следующего выстрела (%.2f с): анимация останавливается между выстрелами."
+
+msgid "The first pose (%.2f s) ends before the second shot (%.2f s)."
+msgstr "Первая поза (%.2f с) кончается раньше второго выстрела (%.2f с)."
+
+msgid "Infantry keeps firing while it has a target: with the looping flash the muzzle burns all the time. Use \"Once per shot\"."
+msgstr "Пехота стреляет, пока есть цель: при повторяющейся вспышке дульное пламя горит всё время. Выберите \"Один раз на выстрел\"."
+
+msgid "One volley: %d shot(s) over %.2f s, then %.2f s of cooldown."
+msgstr "Один залп: выстрелов %d за %.2f с, затем %.2f с перезарядки."
+
+msgid "4. Die"
+msgstr "4. Смерть"
+
+msgid "Death sequences and the wreck are set in the Preview tab (Animation)."
+msgstr "Анимации смерти и остов задаются на вкладке Preview (Animation)."
+
+msgid "Preview##animdie"
+msgstr "Показать##animdie"
+
+msgid "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."
+msgstr "Время картинок выбранного персонажа: кадры ходьбы и стрельбы, как долго держатся боевая поза и вспышка, и шкала одного залпа. Сохраняется в блоке animations: его файла."
+
+msgid "Seconds per frame of the walking animation (default 0.09)."
+msgstr "Секунд на кадр ходьбы (по умолчанию 0.09)."
+
+msgid "Seconds per frame of the firing pose (default 0.07, some units 0.04). Off = the default."
+msgstr "Секунд на кадр боевой позы (по умолчанию 0.07, у некоторых 0.04). Выключено — по умолчанию."
+
+msgid "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others 0.22 s)."
+msgstr "Сколько держится боевая поза после первого выстрела залпа. Выключено — по снаряду (мгновенные 0.12 с, остальные 0.22 с)."
+
+msgid "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as the burst delay, or the animation stops between shots."
+msgstr "Сколько держится боевая поза после каждого следующего выстрела очереди. Для длинной очереди держите не меньше интервала очереди, иначе анимация останавливается между выстрелами."
+
+msgid "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer shows until the next shot. Once, hold: plays once and stays on its last frame."
+msgstr "Повтор: слой вспышки крутится, пока юнит стреляет. Один раз: играет один раз на выстрел, потом до следующего выстрела виден обычный слой. Один раз с удержанием: играет один раз и остаётся на последнем кадре."
+
+msgid "How many frames of the flash animation play (0 = the whole animation)."
+msgstr "Сколько кадров анимации вспышки играет (0 — вся анимация)."
+
+msgid "Shows the walking animation on the canvas."
+msgstr "Показывает анимацию ходьбы на холсте."
+
+msgid "Shows the firing animation on the canvas, volley after volley."
+msgstr "Показывает анимацию стрельбы на холсте, залп за залпом."
+
+msgid "Shows the death animation on the canvas."
+msgstr "Показывает анимацию смерти на холсте."
+
+msgid "Removes the timing values from the animations: block: the game uses its defaults again."
+msgstr "Убирает значения времени из блока animations:, игра снова берёт значения по умолчанию."
+
+msgid "The other side uses another network protocol: both need the same version of the game."
+msgstr "У другой стороны другой сетевой протокол: нужна одна и та же версия игры у обоих."
+
+msgid "Different game version"
+msgstr "Другая версия игры"
+
+msgid "the host plays"
+msgstr "у хоста"
+
+msgid "you have"
+msgstr "у вас"
+
+msgid "Different game data: they still differ after the sync."
+msgstr "Другие игровые данные: после синхронизации они всё равно различаются."
+
+msgid "Different game data: the host cannot send its files (ask it to update, or join a game of the same version)."
+msgstr "Другие игровые данные: хост не может прислать свои файлы (попросите его обновиться или зайдите в игру той же версии)."
+
+msgid "The room is full"
+msgstr "Комната заполнена"
+
+msgid "The match has already started"
+msgstr "Матч уже начался"
+
+msgid "Not allowed to join"
+msgstr "Вход запрещён"
+
+msgid "Wrong password"
+msgstr "Неверный пароль"
+
+msgid "No such room"
+msgstr "Такой комнаты нет"
+
+msgid "The server has no free room"
+msgstr "На сервере нет свободной комнаты"
+
+msgid "Not ready yet"
+msgstr "Ещё не готово"
+
+msgid "Your game data differ from the host's and could not be synced: "
+msgstr "Ваши игровые данные отличаются от данных хоста, и синхронизировать их не удалось: "
+
+msgid "(the game's file lists differ)"
+msgstr "(списки файлов игры отличаются)"
+
+msgid "Downloading game data"
+msgstr "Загрузка игровых данных"
+
+msgid "(the data still differ after the sync)"
+msgstr "(данные всё равно различаются после синхронизации)"
+
+msgid "FOG OF WAR"
+msgstr "ТУМАН ВОЙНЫ"
+
+msgid "OPEN REPLAY"
+msgstr "ОТКРЫТЬ ПОВТОР"
+
+msgid "This replay was made by a newer version of the game"
+msgstr "Этот повтор записан более новой версией игры"
+
+msgid "The replay is damaged"
+msgstr "Повтор повреждён"
+
+msgid "The replay is empty"
+msgstr "Повтор пуст"
+
+msgid "Not a readable replay"
+msgstr "Не удалось прочитать повтор"
+
+msgid "The map of this replay is missing"
+msgstr "Карты этого повтора нет"
+
+msgid "Computer"
+msgstr "Компьютер"
+
+msgid "REPLAYS"
+msgstr "ПОВТОРЫ"
+
+msgid "No replays yet. Every network game you play is saved here."
+msgstr "Повторов пока нет. Здесь сохраняется каждая сетевая игра."
+
+msgid "Victory"
+msgstr "Победа"
+
+msgid "Defeat"
+msgstr "Поражение"
+
+msgid "Recorded by the server"
+msgstr "Записано сервером"
+
+msgid "Recorded by you"
+msgstr "Записано вами"
+
+msgid "Game version"
+msgstr "Версия игры"
+
+msgid "team"
+msgstr "команда"
+
+msgid "computer"
+msgstr "компьютер"
+
+msgid "The map of this replay is not on this computer"
+msgstr "Карты этого повтора нет на этом компьютере"
+
+msgid "WATCH"
+msgstr "СМОТРЕТЬ"
+
+msgid "The map of this replay could not be set up"
+msgstr "Не удалось подготовить карту повтора"
+
+msgid "AGAIN"
+msgstr "СНОВА"
+
+msgid "PLAY"
+msgstr "ИГРАТЬ"
+
+msgid "PAUSE"
+msgstr "ПАУЗА"
+
+msgid "View"
+msgstr "Вид"
+
+msgid "Observer (all)"
+msgstr "Наблюдатель (всё)"
+
+msgid "FOLLOW: ON"
+msgstr "СЛЕДИТЬ: ВКЛ"
+
+msgid "FOLLOW: OFF"
+msgstr "СЛЕДИТЬ: ВЫКЛ"
+
+msgid "This replay does not play back the same here (differs at tick"
+msgstr "Этот повтор здесь проигрывается иначе (расхождение на тике"
+
+msgid "REPLAY FINISHED"
+msgstr "ПОВТОР ЗАКОНЧЕН"
+
+msgid "Radar range (tiles)"
+msgstr "Дальность радара (клетки)"
+
+msgid "How many tiles beyond its sight radius the finished locator sees."
+msgstr "На сколько клеток дальше своего радиуса обзора видит достроенный локатор."
+
+msgid "Radar range (Cyan)"
+msgstr "Дальность радара (голубой)"
+
+msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
+msgstr "Рисует весь обзор локатора (радиус обзора + дальность радара) голубым кругом."
+

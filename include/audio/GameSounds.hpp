@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/SoundIds.hpp"
 #include "game/Players.hpp"
 
 #include <cstdint>
@@ -35,9 +36,9 @@ public:
         bool fogEnabled,
         const RadarAlert &radar,
         uint64_t nowMs);
-    // Unit replies of the '@' requests (see SoundRequests): by the first selected unit
+    // Unit replies of the '@' requests (see SoundRequests, SoundIds::ReplyFromRequest): by the first selected unit
     void PlayReply(
-        SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, const char *what);
+        SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, UnitReply reply);
     // The player picked units: a reply when the selection got someone new of the player's own
     void SelectionChanged(SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected);
 

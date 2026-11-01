@@ -94,6 +94,13 @@ void ApplyYaml(LoadedCatalog &c, const std::string &text)
         d.name = c.names[i].c_str();
         d.desc = c.descs[i].c_str();
         d.compId = num(n, "icon", d.compId);
+        try
+        {
+            if (n["research_seconds"])
+                d.seconds = std::clamp(n["research_seconds"].as<float>(), 1.0f, 3600.0f);
+        }
+        catch (...)
+        {}
         d.cost = num(n, "cost", d.cost);
         d.value = num(n, "value", d.value);
         d.value2 = num(n, "value2", d.value2);
@@ -116,14 +123,15 @@ void ApplyYaml(LoadedCatalog &c, const std::string &text)
     }
 }
 
+bool g_catalogsReady = false; // false: the research files are read (again) on the next use
+
 const LoadedCatalog &loadedCatalog(Faction faction)
 {
     static LoadedCatalog catalogs[2];
-    static bool ready = false;
     const bool conf = faction == Faction::Confederation;
-    if (!ready)
+    if (!g_catalogsReady)
     {
-        ready = true;
+        g_catalogsReady = true;
         for (int f = 0; f < 2; ++f)
         {
             const Faction side = f == 0 ? Faction::Confederation : Faction::Resistance;
@@ -183,6 +191,7 @@ void ApplyEffectToUnit(const ResearchDef &def, Unit &u)
     const bool infantry = u.IsInfantry();
     auto scaleDamage = [&](int percent) {
         u.attackDamage = static_cast<int>(u.attackDamage * (100 + percent) / 100.0f);
+        u.secondaryDamage = static_cast<int>(u.secondaryDamage * (100 + percent) / 100.0f); // the second gun too
     };
     switch (def.effect)
     {
@@ -200,6 +209,7 @@ void ApplyEffectToUnit(const ResearchDef &def, Unit &u)
                 const float f = 100.0f / (100 + def.value);
                 u.attackCooldown *= f;
                 u.attackCooldownMax *= f;
+                u.secondaryCooldown *= f;
             }
             break;
         case ResearchEffect::Reload:
@@ -208,6 +218,7 @@ void ApplyEffectToUnit(const ResearchDef &def, Unit &u)
                 const float f = (100 - def.value) / 100.0f;
                 u.attackCooldown *= f;
                 u.attackCooldownMax *= f;
+                u.secondaryCooldown *= f;
             }
             break;
         case ResearchEffect::Damage:
@@ -230,9 +241,7 @@ void ApplyEffectToUnit(const ResearchDef &def, Unit &u)
             }
             break;
         case ResearchEffect::RocketTurret:
-            // The extra rocket launcher adds firepower to the Zeus
-            if (AboutUnit(def, u))
-                scaleDamage(15);
+            // Nothing to scale: the rocket launcher is a gun of its own (weapons[1] of the Zeus' second form)
             break;
         default:
             break;
@@ -258,6 +267,11 @@ bool ParseResearchEffect(const std::string &name, ResearchEffect &out)
         }
     }
     return false;
+}
+
+void ReloadResearchCatalogs()
+{
+    g_catalogsReady = false;
 }
 
 const ResearchDef &researchDef(Faction faction, int index)
@@ -325,6 +339,19 @@ void CompleteResearch(PlayerId player, int index, EntityManager &entities)
         if (!u || !u->alive || u->owner != player)
             continue;
         ApplyEffectToUnit(def, *u);
+    }
+    if (def.effect == ResearchEffect::RocketTurret)
+    {
+        // The Zeus tanks that exist get the rocket turret now
+        std::vector<int> baseZeus;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (u && u->alive && u->owner == player && u->archetypeId == 17)
+                baseZeus.push_back(u->id);
+        }
+        for (int id : baseZeus)
+            entities.UpgradeUnitForm(id, 11);
     }
     if (def.effect == ResearchEffect::FortressFlamethrower)
     {
@@ -406,6 +433,15 @@ bool IsUnitUnlocked(PlayerId player, int archetype)
 {
     const int index = UnitUnlockResearch(Players::FactionOf(player), archetype);
     return index < 0 || IsResearched(player, index);
+}
+
+int ProductionForm(PlayerId player, int archetype)
+{
+    constexpr int kZeus = 11, kZeusBase = 17;
+    if (archetype == kZeus && Players::FactionOf(player) == Faction::Confederation
+        && !IsEffectResearched(player, ResearchEffect::RocketTurret))
+        return kZeusBase;
+    return archetype;
 }
 
 bool IsRadarUnlocked(PlayerId player)

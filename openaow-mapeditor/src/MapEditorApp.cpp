@@ -162,40 +162,71 @@ void MapEditorApp::ProcessEvents() {
         } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
             if (!io.WantCaptureMouse) {
                 if (event.button.button == SDL_BUTTON_RIGHT) {
-                    int tx, ty;
-                    ScreenToTile(event.button.x, event.button.y, tx, ty);
-                    m_isRightDeleting = true;
-                    m_rightDeleteUndoPushed = false;
+                    m_rightClickStartX = event.button.x;
+                    m_rightClickStartY = event.button.y;
+                    m_rightClickMoved = false;
+                    m_isRightDeleting = false;
                     m_lastDeletedTileX = -1;
                     m_lastDeletedTileY = -1;
-                    EraseAtTile(tx, ty);
                 } else if (event.button.button == SDL_BUTTON_MIDDLE) {
                     m_isPanning = true;
-                    m_lastMouseX = event.button.x;
-                    m_lastMouseY = event.button.y;
+                    m_lastMouseX = static_cast<int>(event.button.x);
+                    m_lastMouseY = static_cast<int>(event.button.y);
                 } else if (event.button.button == SDL_BUTTON_LEFT) {
                     int tx, ty;
                     ScreenToTile(event.button.x, event.button.y, tx, ty);
 
-                    if (m_ui.GetActiveTool() != EditorTool::Select &&
-                        m_ui.GetActiveTool() != EditorTool::Eyedropper) {
-                        m_doc.PushUndoSnapshot();
+                    const int pIdx = m_doc.FindStartPosAt(tx, ty);
+                    if (pIdx >= 0) {
+                        m_isDraggingPlayer = true;
+                        m_draggingPlayerIndex = pIdx;
+                        m_draggedTileX = tx;
+                        m_draggedTileY = ty;
+                        m_selectedPlayerIndex = pIdx;
+                        m_ui.SetSelectedPlayerSlot(pIdx);
+                    } else {
+                        if (m_ui.GetActiveTool() != EditorTool::Select &&
+                            m_ui.GetActiveTool() != EditorTool::Eyedropper) {
+                            m_doc.PushUndoSnapshot();
+                        }
+                        m_isPainting = true;
+                        m_lastPaintedTileX = tx;
+                        m_lastPaintedTileY = ty;
+                        ApplyToolAt(tx, ty, false);
                     }
-                    m_isPainting = true;
-                    m_lastPaintedTileX = tx;
-                    m_lastPaintedTileY = ty;
-                    ApplyToolAt(tx, ty, false);
                 }
             }
         } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
             if (event.button.button == SDL_BUTTON_MIDDLE) {
                 m_isPanning = false;
             } else if (event.button.button == SDL_BUTTON_RIGHT) {
+                if (!m_rightClickMoved && !io.WantCaptureMouse) {
+                    int tx, ty;
+                    ScreenToTile(event.button.x, event.button.y, tx, ty);
+                    if (tx >= 0 && tx < m_doc.GetWidth() && ty >= 0 && ty < m_doc.GetHeight()) {
+                        m_ui.OpenContextMenu(tx, ty);
+                    }
+                }
                 m_isRightDeleting = false;
                 m_rightDeleteUndoPushed = false;
                 m_lastDeletedTileX = -1;
                 m_lastDeletedTileY = -1;
             } else if (event.button.button == SDL_BUTTON_LEFT) {
+                if (m_isDraggingPlayer && m_draggingPlayerIndex >= 0) {
+                    int tx, ty;
+                    ScreenToTile(event.button.x, event.button.y, tx, ty);
+                    const auto [origX, origY] = m_doc.GetStartPos(m_draggingPlayerIndex);
+                    if (tx >= 0 && tx < m_doc.GetWidth() && ty >= 0 && ty < m_doc.GetHeight()) {
+                        if (tx != origX || ty != origY) {
+                            m_doc.PushUndoSnapshot();
+                            m_doc.SetStartPos(m_draggingPlayerIndex, tx, ty);
+                            m_ui.ShowToast(std::string("Moved Player ") + std::to_string(m_draggingPlayerIndex + 1) +
+                                           " start to (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+                        }
+                    }
+                    m_isDraggingPlayer = false;
+                    m_draggingPlayerIndex = -1;
+                }
                 m_isPainting = false;
                 m_lastPaintedTileX = -1;
                 m_lastPaintedTileY = -1;
@@ -205,8 +236,13 @@ void MapEditorApp::ProcessEvents() {
                 float dx = static_cast<float>(event.motion.x - m_lastMouseX);
                 float dy = static_cast<float>(event.motion.y - m_lastMouseY);
                 m_camera.Pan(-dx, -dy);
-                m_lastMouseX = event.motion.x;
-                m_lastMouseY = event.motion.y;
+                m_lastMouseX = static_cast<int>(event.motion.x);
+                m_lastMouseY = static_cast<int>(event.motion.y);
+            } else if (m_isDraggingPlayer && !io.WantCaptureMouse) {
+                int tx, ty;
+                ScreenToTile(event.motion.x, event.motion.y, tx, ty);
+                m_draggedTileX = tx;
+                m_draggedTileY = ty;
             } else if (m_isPainting && !io.WantCaptureMouse) {
                 int tx, ty;
                 ScreenToTile(event.motion.x, event.motion.y, tx, ty);
@@ -216,11 +252,17 @@ void MapEditorApp::ProcessEvents() {
                     m_lastPaintedTileY = ty;
                     ApplyToolAt(tx, ty, true);
                 }
-            } else if (m_isRightDeleting && !io.WantCaptureMouse) {
-                int tx, ty;
-                ScreenToTile(event.motion.x, event.motion.y, tx, ty);
-                if (tx != m_lastDeletedTileX || ty != m_lastDeletedTileY) {
-                    EraseAtTile(tx, ty);
+            } else if (!io.WantCaptureMouse && (event.motion.state & SDL_BUTTON_RMASK)) {
+                float dx = event.motion.x - m_rightClickStartX;
+                float dy = event.motion.y - m_rightClickStartY;
+                if (dx * dx + dy * dy > 36.0f) {
+                    m_rightClickMoved = true;
+                    m_isRightDeleting = true;
+                    int tx, ty;
+                    ScreenToTile(event.motion.x, event.motion.y, tx, ty);
+                    if (tx != m_lastDeletedTileX || ty != m_lastDeletedTileY) {
+                        EraseAtTile(tx, ty);
+                    }
                 }
             }
         } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
@@ -366,9 +408,18 @@ void MapEditorApp::ApplyToolAt(int tx, int ty, bool isDrag) {
             }
             break;
         case EditorTool::SetPlayerStart:
-            m_doc.setPlayerStart(tx, ty);
-            m_ui.ShowToast(std::string(_("Player start point (HQ): ")) +
-                           "(" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+            if (!isDrag) {
+                const int slot = m_ui.GetSelectedPlayerSlot();
+                if (slot < m_doc.GetPlayerCount()) {
+                    m_doc.SetStartPos(slot, tx, ty);
+                    m_ui.ShowToast(std::string(_("Player start point (HQ): ")) +
+                                   "P" + std::to_string(slot + 1) + " (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+                } else if (m_doc.GetPlayerCount() < 8) {
+                    m_doc.AddStartPos(tx, ty);
+                    m_ui.ShowToast(std::string(_("Start position added: ")) +
+                                   "P" + std::to_string(m_doc.GetPlayerCount()) + " (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+                }
+            }
             break;
         case EditorTool::SetEnemyStart:
             m_doc.setEnemyStart(tx, ty);
@@ -480,23 +531,37 @@ void MapEditorApp::render() {
     }
 
     // 6. Starting Base Position Markers (Flags)
-    float px = m_doc.GetPlayerStartX() * TILE_WIDTH;
-    float py = m_doc.GetPlayerStartY() * TILE_HEIGHT;
-    m_renderer->FillRectWorld(px, py, TILE_WIDTH, TILE_HEIGHT, m_camera, {255, 30, 30, 140});
-    m_renderer->DrawRectWorld(px, py, TILE_WIDTH, TILE_HEIGHT, m_camera, {255, 255, 255, 255});
+    static const SDL_Color kPlayerMarkerColors[8] = {
+        {235, 40, 40, 150},   // P1
+        {40, 110, 240, 150},  // P2
+        {40, 200, 80, 150},   // P3
+        {240, 200, 40, 150},  // P4
+        {180, 60, 220, 150},  // P5
+        {40, 210, 220, 150},  // P6
+        {240, 130, 40, 150},  // P7
+        {230, 110, 170, 150}  // P8
+    };
 
-    float ex = m_doc.GetEnemyStartX() * TILE_WIDTH;
-    float ey = m_doc.GetEnemyStartY() * TILE_HEIGHT;
-    m_renderer->FillRectWorld(ex, ey, TILE_WIDTH, TILE_HEIGHT, m_camera, {30, 80, 255, 140});
-    m_renderer->DrawRectWorld(ex, ey, TILE_WIDTH, TILE_HEIGHT, m_camera, {255, 255, 255, 255});
+    const int totalPlayers = m_doc.GetPlayerCount();
+    for (int p = 0; p < totalPlayers; ++p) {
+        const auto [sx, sy] = m_doc.GetStartPos(p);
+        const float wx = sx * TILE_WIDTH;
+        const float wy = sy * TILE_HEIGHT;
+        m_renderer->FillRectWorld(wx, wy, TILE_WIDTH, TILE_HEIGHT, m_camera, kPlayerMarkerColors[p]);
+        const SDL_Color outline = (p == m_selectedPlayerIndex)
+            ? SDL_Color{255, 255, 40, 255}
+            : SDL_Color{255, 255, 255, 220};
+        m_renderer->DrawRectWorld(wx, wy, TILE_WIDTH, TILE_HEIGHT, m_camera, outline);
+    }
 
-    // Extra start positions (players 3..8)
-    static const SDL_Color kExtraColors[MapDocument::kMaxExtraStarts] = {
-        {40, 200, 80, 150}, {240, 200, 40, 150}, {180, 60, 220, 150}, {40, 210, 220, 150}, {240, 130, 40, 150}, {230, 110, 170, 150}};
-    for (size_t i = 0; i < m_doc.GetExtraStarts().size(); ++i) {
-        const float sx = m_doc.GetExtraStarts()[i].first * TILE_WIDTH, sy = m_doc.GetExtraStarts()[i].second * TILE_HEIGHT;
-        m_renderer->FillRectWorld(sx, sy, TILE_WIDTH, TILE_HEIGHT, m_camera, kExtraColors[i]);
-        m_renderer->DrawRectWorld(sx, sy, TILE_WIDTH, TILE_HEIGHT, m_camera, {255, 255, 255, 255});
+    // Ghost preview if dragging a player marker
+    if (m_isDraggingPlayer && m_draggingPlayerIndex >= 0 && m_draggingPlayerIndex < 8) {
+        const float dwx = m_draggedTileX * TILE_WIDTH;
+        const float dwy = m_draggedTileY * TILE_HEIGHT;
+        SDL_Color dragColor = kPlayerMarkerColors[m_draggingPlayerIndex];
+        dragColor.a = 180;
+        m_renderer->FillRectWorld(dwx, dwy, TILE_WIDTH, TILE_HEIGHT, m_camera, dragColor);
+        m_renderer->DrawRectWorld(dwx, dwy, TILE_WIDTH, TILE_HEIGHT, m_camera, {255, 255, 100, 255});
     }
 
     // 7. Collision Passability Overlay (if toggled)
@@ -573,6 +638,28 @@ void MapEditorApp::render() {
     m_ui.render(m_doc, m_camera, *m_texManager, *m_renderer);
     if (m_ui.ShouldClose()) {
         m_running = false;
+    }
+
+    // Draw on-screen badge indicators (P1..P8)
+    ImDrawList* fgDraw = ImGui::GetForegroundDrawList();
+    for (int p = 0; p < totalPlayers; ++p) {
+        const auto [sx, sy] = m_doc.GetStartPos(p);
+        float scX = 0.0f, scY = 0.0f;
+        m_camera.WorldToScreen(sx * TILE_WIDTH + 2, sy * TILE_HEIGHT + 2, scX, scY);
+        if (scX >= -50.0f && scX <= m_windowW + 50.0f && scY >= -50.0f && scY <= m_windowH + 50.0f) {
+            char badge[16];
+            snprintf(badge, sizeof(badge), "P%d", p + 1);
+            fgDraw->AddRectFilled(ImVec2(scX, scY), ImVec2(scX + 20.0f, scY + 15.0f), IM_COL32(10, 10, 15, 210), 2.0f);
+            fgDraw->AddText(ImVec2(scX + 3.0f, scY), IM_COL32(255, 255, 255, 240), badge);
+        }
+    }
+    if (m_isDraggingPlayer && m_draggingPlayerIndex >= 0) {
+        float scX = 0.0f, scY = 0.0f;
+        m_camera.WorldToScreen(m_draggedTileX * TILE_WIDTH + 2, m_draggedTileY * TILE_HEIGHT + 2, scX, scY);
+        char badge[32];
+        snprintf(badge, sizeof(badge), "P%d -> (%d, %d)", m_draggingPlayerIndex + 1, m_draggedTileX, m_draggedTileY);
+        fgDraw->AddRectFilled(ImVec2(scX, scY - 18.0f), ImVec2(scX + 115.0f, scY - 2.0f), IM_COL32(20, 20, 25, 220), 3.0f);
+        fgDraw->AddText(ImVec2(scX + 4.0f, scY - 18.0f), IM_COL32(255, 255, 100, 255), badge);
     }
 
     ImGui::Render();

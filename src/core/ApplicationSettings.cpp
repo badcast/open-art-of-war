@@ -60,6 +60,7 @@ void Application::ApplyAudio()
         return;
     m_sound->SetMusicVolume(m_settings.musicVolume);
     m_sound->SetFxVolume(m_settings.fxVolume);
+    m_sound->SetReverb(m_settings.reverb);
     m_sound->SetVoiceVolume(m_settings.voiceVolume);
     m_sound->SetVoiceLanguage(m_settings.language); // voices speak the language of the game
     if (m_sound->IsMuted() != m_settings.muted)
@@ -126,6 +127,8 @@ void Application::ApplySettings(SettingsArea area)
                 m_sound->SetVoiceLanguage(m_settings.language);
             if (m_aiController)
                 m_aiController->SetDifficulty(static_cast<AIDifficulty>(m_settings.difficulty));
+            if (m_input)
+                m_input->SetEdgePanMargin(m_settings.edgePanMargin);
             break;
     }
     SaveSettings();

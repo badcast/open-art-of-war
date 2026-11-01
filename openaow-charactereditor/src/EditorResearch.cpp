@@ -72,6 +72,7 @@ bool CharacterEditor::SaveResearch() {
         researchBase[f] = YAML::Clone(merged);
         researchDirty[f] = false;
         status = std::string(_("Saved: ")) + kFactionFiles[f];
+        ApplySaved(false);
         return true;
     } catch (const std::exception& error) {
         status = std::string(_("YAML save error: ")) + error.what();
@@ -217,6 +218,7 @@ void CharacterEditor::DrawResearchProperties() {
     changed |= EditString(n, "name", "Technology name", scope);
     changed |= EditString(n, "description", "Technology description", scope, true);
     changed |= EditInt(n, "cost", "Research cost (credits)", 0);
+    changed |= EditFloat(n, "research_seconds", "Research time (seconds)", 60.0f);
 
     // Icon
     const int icon = YamlInt(n, "icon", 0);

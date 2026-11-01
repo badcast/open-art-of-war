@@ -105,9 +105,15 @@ SDL_Texture* CharacterEditor::CompositeThumbnail(int composite, bool centred) {
     return tex;
 }
 
+void CharacterEditor::DrawTileRadius(float centerX, float centerY, float rangeTiles, SDL_Color color, float thickness) {
+    if (rangeTiles <= 0.0f) return;
+    OpenArtOfWar::RenderUtility::DrawTileRadius(*gameRenderer, *camera, centerX, centerY, rangeTiles, color, thickness);
+}
+
 void CharacterEditor::DrawRadiusCircle2px(float centerX, float centerY, float radiusPixels, SDL_Color color) {
     if (radiusPixels <= 1.0f) return;
-    OpenArtOfWar::RenderUtility::DrawRadius(*gameRenderer, *camera, centerX, centerY, radiusPixels, color, 2.0f);
+    const float tiles = radiusPixels / static_cast<float>(OpenArtOfWar::TILE_WIDTH);
+    DrawTileRadius(centerX, centerY, tiles, color, 2.0f);
 }
 
 void CharacterEditor::DrawPreviewControls() {
@@ -124,7 +130,8 @@ void CharacterEditor::DrawPreviewControls() {
         {EditorMode::Explosions, "Explosions"},   {EditorMode::Wrecks, "Wrecks"},
         {EditorMode::Projectiles, "Projectiles"},
         {EditorMode::GameUi, "Game UI"},          {EditorMode::Environment, "Environment"},
-        {EditorMode::AiDifficulty, "AI Difficulty"}, {EditorMode::SpriteTools, "Sprite Tools"},
+        {EditorMode::AiDifficulty, "AI Difficulty"}, {EditorMode::Animator, "Animator"},
+        {EditorMode::SpriteTools, "Sprite Tools"},
     };
     const ImGuiStyle& style = ImGui::GetStyle();
     const float rightEdge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - style.WindowPadding.x;
@@ -140,7 +147,8 @@ void CharacterEditor::DrawPreviewControls() {
         editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty) return;
     // Background of the canvas (black by default)
     Hinted(ImGui::ColorEdit3(_("Background"), previewBackground, ImGuiColorEditFlags_NoInputs), "Canvas background");
-    if (editorMode == EditorMode::Preview || editorMode == EditorMode::Compare || editorMode == EditorMode::Wrecks) {
+    if (editorMode == EditorMode::Preview || editorMode == EditorMode::Compare || editorMode == EditorMode::Wrecks ||
+        editorMode == EditorMode::Animator) {
         ImGui::SameLine();
         DrawArmyColorCombo();
     }
@@ -282,6 +290,10 @@ void CharacterEditor::DrawPreviewControls() {
     Hinted(ImGui::Checkbox(_("Attack range (Red)"), &showAttackRange), "Attack range (Red)");
     ImGui::SameLine();
     Hinted(ImGui::Checkbox(_("Sight range (Green)"), &showSightRange), "Sight range (Green)");
+    ImGui::SameLine();
+    Hinted(ImGui::Checkbox(_("Build range (Purple)"), &showBuildRange), "Build range (Purple)");
+    ImGui::SameLine();
+    Hinted(ImGui::Checkbox(_("Radar range (Cyan)"), &showRadarRange), "Radar range (Cyan)");
     ImGui::SameLine();
     Hinted(ImGui::Checkbox(_("Show ground (5x5)"), &showGround), "Show ground (5x5)");
     ImGui::SameLine();

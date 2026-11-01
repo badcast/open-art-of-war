@@ -139,6 +139,9 @@ public:
     // Delay until the next attack cycle (fixed, or random within [attackCooldown, attackCooldownMax])
     float NextCooldown() const;
     float cooldownTimer {0.0f};
+    // Flight speed of this shooter's rockets and shells in pixels per second (combat.bullet_speed); 0: the speed of the
+    // projectile kind (projectiles.yaml)
+    float bulletSpeed {0.0f};
     float attackAnimTimer {0.0f};
     float deathTimer {0.0f};
     int turretFacing {0};

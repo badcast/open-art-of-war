@@ -221,6 +221,7 @@ void CharacterEditor::DrawEditor() {
     else if (editorMode == EditorMode::GameUi) DrawGameUiProperties();
     else if (editorMode == EditorMode::Environment) DrawEnvironmentProperties();
     else if (editorMode == EditorMode::AiDifficulty) DrawAiProperties();
+    else if (editorMode == EditorMode::Animator) DrawAnimatorProperties();
     else if (document.IsDefined()) DrawProperties();
     else ImGui::TextWrapped(_("Select a YAML configuration from the list."));
     ImGui::End();
@@ -538,6 +539,16 @@ void CharacterEditor::DrawProperties() {
         YAML::Node stats = Section("stats");
         changed |= EditInt(stats, "max_hp", "Maximum health", 100);
         changed |= EditInt(stats, "sight_radius", "Sight radius (tiles)", 5);
+        if (isBuilding) {
+            const std::string buildingId = YamlString(document, "id");
+            if (stats["build_radius"] || buildingId.find("headquarters") != std::string::npos
+                || buildingId.find("command_center") != std::string::npos) {
+                changed |= EditInt(stats, "build_radius", "Build radius (tiles)", 16);
+            }
+            if (stats["radar_range"] || buildingId.find("radar") != std::string::npos) {
+                changed |= EditInt(stats, "radar_range", "Radar range (tiles)", 15);
+            }
+        }
         if (!isBuilding) {
             changed |= EditFloat(stats, "move_speed", "Move speed (pixels per tick)", 1.4f);
         }

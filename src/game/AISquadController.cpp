@@ -8,6 +8,8 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include <algorithm>
 #include <cmath>
+#include <queue>
+#include <tuple>
 
 namespace OpenArtOfWar
 {
@@ -87,6 +89,8 @@ const char *SquadStateName(AISquadState state)
             return "DEPLOY";
         case AISquadState::Engaged:
             return "COMBAT";
+        case AISquadState::FormingUp:
+            return "FORM UP";
         case AISquadState::Assault:
             return "ASSAULT";
         case AISquadState::Retreating:
@@ -375,7 +379,9 @@ void AISquadController::CapDetours(const AISquad &sq, EntityManager &entities, c
         const float limit = std::max(6.0f, straight * 1.8f + leash * 1.5f);
         // Only units already with the group: a straggler far away must still be allowed to come back
         const float toLeader = DistTo(*u, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
-        if (pathLen > limit && toLeader <= leash * 2.0f)
+        // A map-wide detour is never worth it, wherever the leader is
+        const bool mapWide = pathLen > straight * 3.0f + 20.0f;
+        if (pathLen > limit && (toLeader <= leash * 2.0f || mapWide))
         {
             if (hostileWallNear(*u))
             {
@@ -444,6 +450,193 @@ int AISquadController::PickLeader(const AISquad &sq, EntityManager &entities, co
     return best;
 }
 
+bool AISquadController::PlanRoute(
+    const TileMap &map,
+    const EntityManager &entities,
+    PlayerId owner,
+    bool seesAll,
+    int startX,
+    int startY,
+    int goalX,
+    int goalY,
+    std::vector<PathNode> &outPath)
+{
+    outPath.clear();
+    const int w = map.GetWidth(), h = map.GetHeight();
+    if (w <= 0 || h <= 0 || startX < 0 || startY < 0 || startX >= w || startY >= h)
+        return false;
+    goalX = std::clamp(goalX, 0, w - 1);
+    goalY = std::clamp(goalY, 0, h - 1);
+    const size_t n = static_cast<size_t>(w) * static_cast<size_t>(h);
+    auto at = [w](int x, int y) {
+        return static_cast<size_t>(y) * static_cast<size_t>(w) + static_cast<size_t>(x);
+    };
+
+    // Tuning (integer costs, a straight step = 10)
+    constexpr int kStraight = 10, kDiagonal = 14;
+    constexpr int kNextToObstacle = 6; // a tile touching a cliff, wall or building
+    constexpr int kNearObstacle = 2;   // two tiles away from one
+    constexpr int kUnderFire = 25;     // within reach of a known enemy defense
+    constexpr int kHostileWall = 120;  // shooting through a wall segment ~ a twelve-tile detour
+
+    // 0 open, 1 blocked, 2 hostile wall (passable at a price)
+    std::vector<uint8_t> kind(n, 0);
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            if (map.GetWall(x, y) > 0)
+                kind[at(x, y)] = Players::Hostile(map.GetWallOwner(x, y), owner) ? 2 : 1;
+            else if (!map.IsPassable(x, y))
+                kind[at(x, y)] = 1;
+        }
+    }
+    std::vector<int> extra(n, 0);
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            if (kind[at(x, y)] != 0)
+                continue;
+            int near1 = 0, near2 = 0;
+            for (int dy = -2; dy <= 2; ++dy)
+            {
+                for (int dx = -2; dx <= 2; ++dx)
+                {
+                    const int nx = x + dx, ny = y + dy;
+                    const bool blocked = nx < 0 || ny < 0 || nx >= w || ny >= h || kind[at(nx, ny)] != 0;
+                    if (!blocked)
+                        continue;
+                    (std::max(std::abs(dx), std::abs(dy)) == 1 ? near1 : near2) += 1;
+                }
+            }
+            extra[at(x, y)] = near1 > 0 ? kNextToObstacle : (near2 > 0 ? kNearObstacle : 0);
+        }
+    }
+    for (const auto &e : entities.GetAllEntities())
+    {
+        if (!e.alive || e.state == ActionState::Die || !e.isBuilding || e.attackDamage <= 0 || e.owner >= kMaxPlayers
+            || !Players::Hostile(e.owner, owner))
+            continue;
+        if (!seesAll && !entities.IsEntityVisibleToAi(e, owner))
+            continue;
+        const int r = static_cast<int>(std::ceil(e.attackRange)) + 1;
+        const float cx = e.GetUnitCenterPixelX() / TILE_WIDTH, cy = e.GetUnitCenterPixelY() / TILE_HEIGHT;
+        for (int y = std::max(0, static_cast<int>(cy) - r); y <= std::min(h - 1, static_cast<int>(cy) + r); ++y)
+        {
+            for (int x = std::max(0, static_cast<int>(cx) - r); x <= std::min(w - 1, static_cast<int>(cx) + r); ++x)
+            {
+                if (DetMath::Hypot(x + 0.5f - cx, y + 0.5f - cy) <= static_cast<float>(r))
+                    extra[at(x, y)] += kUnderFire;
+            }
+        }
+    }
+
+    // The objective is often a building (blocked): reaching its surroundings is enough
+    const bool goalBlocked = kind[at(goalX, goalY)] == 1;
+    auto isGoal = [&](int x, int y) {
+        const int d = std::max(std::abs(x - goalX), std::abs(y - goalY));
+        return d == 0 || (goalBlocked && d <= 3);
+    };
+    auto heuristic = [&](int x, int y) {
+        const int dx = std::abs(x - goalX), dy = std::abs(y - goalY);
+        return kStraight * std::max(dx, dy) + (kDiagonal - kStraight) * std::min(dx, dy);
+    };
+
+    constexpr int kInf = 1 << 30;
+    std::vector<int> cost(n, kInf);
+    std::vector<int> from(n, -1);
+    // (f, index): equal f values pop by tile index, the same on every computer
+    using Item = std::pair<int, int>;
+    std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
+    cost[at(startX, startY)] = 0;
+    open.push({heuristic(startX, startY), static_cast<int>(at(startX, startY))});
+    int reached = -1;
+    while (!open.empty())
+    {
+        const auto [f, idx] = open.top();
+        open.pop();
+        const int x = idx % w, y = idx / w;
+        if (f - heuristic(x, y) > cost[static_cast<size_t>(idx)])
+            continue; // stale
+        if (isGoal(x, y))
+        {
+            reached = idx;
+            break;
+        }
+        for (int dy = -1; dy <= 1; ++dy)
+        {
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                if (dx == 0 && dy == 0)
+                    continue;
+                const int nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                    continue;
+                const uint8_t k = kind[at(nx, ny)];
+                if (k == 1)
+                    continue;
+                // No cutting corners past cliffs or buildings
+                if (dx != 0 && dy != 0 && (kind[at(x + dx, y)] == 1 || kind[at(x, y + dy)] == 1))
+                    continue;
+                const int step
+                    = (dx != 0 && dy != 0 ? kDiagonal : kStraight) + extra[at(nx, ny)] + (k == 2 ? kHostileWall : 0);
+                const int g = cost[static_cast<size_t>(idx)] + step;
+                const size_t ni = at(nx, ny);
+                if (g < cost[ni])
+                {
+                    cost[ni] = g;
+                    from[ni] = idx;
+                    open.push({g + heuristic(nx, ny), static_cast<int>(ni)});
+                }
+            }
+        }
+    }
+    if (reached < 0)
+        return false;
+    for (int i = reached; i >= 0 && i != static_cast<int>(at(startX, startY)); i = from[static_cast<size_t>(i)])
+        outPath.push_back({i % w, i / w});
+    std::reverse(outPath.begin(), outPath.end());
+    return true;
+}
+
+int AISquadController::FormUpIndex(const AISquad &sq, const EntityManager &entities) const
+{
+    const int last = static_cast<int>(sq.route.size()) - 1;
+    if (last <= 0)
+        return -1;
+    constexpr float kObjectiveRadius = 14.0f; // defenses this close to the objective cover it
+    constexpr float kMargin = 2.0f;           // the line stands this far outside their reach
+    struct Defense
+    {
+        float x, y, reach;
+    };
+    std::vector<Defense> defenses;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        if (!e.alive || e.state == ActionState::Die || !e.isBuilding || e.attackDamage <= 0 || e.owner >= kMaxPlayers
+            || !Players::Hostile(e.owner, sq.owner))
+            continue;
+        if (!m_seesAll && !entities.IsEntityVisibleToAi(e, sq.owner))
+            continue;
+        const float x = e.GetUnitCenterPixelX() / TILE_WIDTH, y = e.GetUnitCenterPixelY() / TILE_HEIGHT;
+        if (DetMath::Hypot(x - sq.targetX, y - sq.targetY) <= kObjectiveRadius)
+            defenses.push_back({x, y, e.attackRange + kMargin});
+    }
+    if (defenses.empty())
+        return -1;
+    for (int i = last; i > sq.progress; --i)
+    {
+        const PathNode &p = sq.route[i];
+        bool safe = true;
+        for (const Defense &d : defenses)
+            safe = safe && DetMath::Hypot(p.x + 0.5f - d.x, p.y + 0.5f - d.y) > d.reach;
+        if (safe)
+            return i;
+    }
+    return -1;
+}
+
 void AISquadController::RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder)
 {
     sq.route.clear();
@@ -463,21 +656,27 @@ void AISquadController::RebuildRoute(AISquad &sq, EntityManager &entities, Pathf
     bool partial = false;
     sq.route.push_back({leader->tileX, leader->tileY});
     int fromX = leader->tileX, fromY = leader->tileY;
+    const TileMap *map = pathfinder.GetMap();
+    // Strategic route over terrain only: the group's own idle units must not wall the leader in
+    auto plan = [&](int tx, int ty) {
+        path.clear();
+        if (map && PlanRoute(*map, entities, sq.owner, m_seesAll, fromX, fromY, tx, ty, path) && !path.empty())
+            return true;
+        pathfinder.SetIgnoreUnitsOnce();
+        pathfinder.FindPath(fromX, fromY, tx, ty, path, leader->id, &partial);
+        return !path.empty(); // a partial route still leads the way
+    };
     if (sq.viaX >= 0)
     {
-        // Strategic route over terrain only: the group's own idle units must not wall the leader in
-        pathfinder.SetIgnoreUnitsOnce();
-        if (pathfinder.FindPath(fromX, fromY, sq.viaX, sq.viaY, path, leader->id, &partial) && !path.empty())
+        if (plan(sq.viaX, sq.viaY))
         {
             sq.route.insert(sq.route.end(), path.begin(), path.end());
             fromX = path.back().x;
             fromY = path.back().y;
         }
-        path.clear();
     }
-    pathfinder.SetIgnoreUnitsOnce();
-    pathfinder.FindPath(fromX, fromY, sq.targetX, sq.targetY, path, leader->id, &partial);
-    sq.route.insert(sq.route.end(), path.begin(), path.end());
+    if (plan(sq.targetX, sq.targetY))
+        sq.route.insert(sq.route.end(), path.begin(), path.end());
 }
 
 void AISquadController::HoldUnits(const std::vector<int> &ids, EntityManager &entities)
@@ -543,23 +742,70 @@ void AISquadController::OrderMarch(
         }
     }
 
-    auto pointAt = [&](float offset) -> PathNode {
-        int x = std::clamp(static_cast<int>(std::lround(p.x + dx * offset)), 0, map.GetWidth() - 1);
-        int y = std::clamp(static_cast<int>(std::lround(p.y + dy * offset)), 0, map.GetHeight() - 1);
-        if (!map.IsPassable(x, y) || map.GetWall(x, y) > 0)
-            return p;
-        return {x, y};
+    // Rows across the way, as wide as the road allows (a tile of room kept from cliffs and walls), front kinds in
+    // the first rows. Each row stands further back along the route, so the column follows its bends instead of
+    // the whole group crowding one point at the edge of the road.
+    auto openTile = [&](int x, int y) {
+        return x >= 0 && y >= 0 && x < map.GetWidth() && y < map.GetHeight() && map.IsPassable(x, y)
+               && map.GetWall(x, y) == 0;
     };
-
-    auto issue = [&](const std::vector<int> &ids, float offset) {
-        if (ids.empty())
-            return;
-        PathNode t = pointAt(offset);
-        OrderLeg(sq, ids, t.x, t.y, entities, pathfinder);
+    const float perpX = -dy, perpY = dx;
+    // Open tiles beside the route node; with `clearance` a tile counts only when the next one out is open too
+    auto roomAcross = [&](const PathNode &c, float sideSign, bool clearance) {
+        int room = 0;
+        for (int k = 1; k <= 3; ++k)
+        {
+            const int x = static_cast<int>(std::lround(c.x + perpX * sideSign * k));
+            const int y = static_cast<int>(std::lround(c.y + perpY * sideSign * k));
+            const int xOut = static_cast<int>(std::lround(c.x + perpX * sideSign * (k + 1)));
+            const int yOut = static_cast<int>(std::lround(c.y + perpY * sideSign * (k + 1)));
+            if (!openTile(x, y) || (clearance && !openTile(xOut, yOut)))
+                break;
+            room = k;
+        }
+        return room;
     };
-    issue(front, 2.0f);
-    issue(middle, 0.0f);
-    issue(back, -2.0f);
+    // The leader walks in the first row (the march is measured by it), then front kinds, middle, rear
+    std::vector<int> ordered;
+    for (const std::vector<int> *part : {&front, &middle, &back})
+    {
+        for (int id : *part)
+        {
+            if (id == sq.leaderId)
+                ordered.insert(ordered.begin(), id);
+            else
+                ordered.push_back(id);
+        }
+    }
+    const int maxWidth = sq.state == AISquadState::FormingUp ? 6 : 4;
+    const int half = (maxWidth - 1) / 2 + 1;
+    int left = std::min(roomAcross(p, -1.0f, true), half);
+    int right = std::min(roomAcross(p, 1.0f, true), half);
+    if (left + right == 0)
+    {
+        // A narrow passage: two abreast where it fits, right along its sides
+        left = std::min(roomAcross(p, -1.0f, false), 1);
+        right = left > 0 ? 0 : std::min(roomAcross(p, 1.0f, false), 1);
+    }
+    const int width = std::clamp(1 + left + right, 1, maxWidth);
+    const int rowStep = width >= 2 ? 1 : 2; // a single file keeps a little more distance
+    for (size_t k = 0; k < ordered.size(); ++k)
+    {
+        const int row = static_cast<int>(k) / width;
+        const int col = static_cast<int>(k) % width;
+        const int inRow = std::min(width, static_cast<int>(ordered.size()) - row * width);
+        // Rows never point back past where the group already is
+        const PathNode &c = sq.route[std::max(std::min(sq.progress, routeIndex), routeIndex - row * rowStep)];
+        // Centred on the route, shifted toward the side with more room
+        int start = -std::min(left, (inRow - 1) / 2);
+        start = std::max(-left, std::min(start, right - (inRow - 1)));
+        const float lateral = static_cast<float>(start + col);
+        PathNode t {
+            static_cast<int>(std::lround(c.x + perpX * lateral)), static_cast<int>(std::lround(c.y + perpY * lateral))};
+        if (!openTile(t.x, t.y))
+            t = c;
+        OrderLeg(sq, {ordered[k]}, t.x, t.y, entities, pathfinder);
+    }
     sq.orderTimer = 0.0f;
 }
 
@@ -572,6 +818,19 @@ void AISquadController::AdvanceMarch(
     const AITacticsConfig &tactics)
 {
     int last = static_cast<int>(sq.route.size()) - 1;
+    // In front of the objective's defenses: line up out of their reach first, then go in together
+    if (!sq.formedUp && sq.attackMove && !sq.playerSquad && last > 0)
+    {
+        const int stand = FormUpIndex(sq, entities);
+        if (stand > sq.progress && stand <= std::min(last, sq.progress + std::max(2, tactics.marchStrideTiles) + 2))
+        {
+            sq.formedUp = true;
+            sq.marchIndex = stand;
+            SetState(sq, AISquadState::FormingUp);
+            OrderMarch(sq, stand, map, entities, pathfinder, tactics);
+            return;
+        }
+    }
     if (last <= 0 || sq.progress >= last)
     {
         OrderLeg(sq, sq.unitIds, sq.targetX, sq.targetY, entities, pathfinder);
@@ -859,7 +1118,8 @@ void AISquadController::Tick(
     // Combat pauses the cohesion logic (except inside a corridor, where the column must keep flowing)
     if (engaged
         && (sq.state == AISquadState::Marching || sq.state == AISquadState::Regrouping
-            || sq.state == AISquadState::ChokeApproach || sq.state == AISquadState::Deploying))
+            || sq.state == AISquadState::ChokeApproach || sq.state == AISquadState::Deploying
+            || sq.state == AISquadState::FormingUp))
     {
         sq.resumeState = sq.state;
         SetState(sq, AISquadState::Engaged);
@@ -1099,13 +1359,33 @@ void AISquadController::Tick(
             break;
         }
 
+        case AISquadState::FormingUp:
+        {
+            // Lined up (or as close as the ground allows): everybody goes in at once
+            const PathNode &stand = sq.route[std::clamp(sq.marchIndex, 0, static_cast<int>(sq.route.size()) - 1)];
+            const bool leaderThere
+                = DistTo(*leader, static_cast<float>(stand.x), static_cast<float>(stand.y)) <= std::max(2.5f, leash);
+            sq.quietTimer = (leaderThere && dmax <= leash * 1.5f) ? sq.quietTimer + dt : 0.0f;
+            if (sq.quietTimer >= 1.0f || sq.stateTimer > 12.0f)
+            {
+                sq.progress = sq.marchIndex;
+                AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+                break;
+            }
+            if (leaderThere)
+                trackStragglers(leash * 1.5f, cx, cy);
+            else if (sq.orderTimer > 4.0f && IsIdleWithoutOrders(*leader))
+                OrderMarch(sq, sq.marchIndex, map, entities, pathfinder, tactics);
+            break;
+        }
+
         case AISquadState::Engaged:
         {
             if (engaged)
             {
                 sq.quietTimer = 0.0f;
-                // Idle members help the ones already fighting
-                if (sq.orderTimer > 3.0f)
+                // The whole wave answers: idle members join the ones already fighting
+                if (sq.orderTimer > 1.0f)
                 {
                     std::vector<int> idle;
                     int fx = leader->tileX, fy = leader->tileY;

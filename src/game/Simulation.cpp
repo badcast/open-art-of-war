@@ -417,6 +417,19 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
                 u->state = ActionState::Idle;
             }
             break;
+        case CommandType::SetStance:
+            if (cmd.a < 0 || cmd.a >= static_cast<int>(UnitStance::Count))
+                break;
+            for (int id : OwnUnits(cmd, ctx))
+            {
+                Unit *u = ctx.entities.GetUnit(id);
+                if (!u || u->stance == static_cast<UnitStance>(cmd.a))
+                    continue;
+                u->stance = static_cast<UnitStance>(cmd.a);
+                u->stanceHomeX = u->stanceHomeY = -1;
+                u->stanceReturning = false;
+            }
+            break;
         case CommandType::PlaceBuilding:
         {
             // cmd.a is the canonical blueprint slot; the building is the one of the ordering player's faction
@@ -425,6 +438,9 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             if (!found)
                 return;
             const auto &bp = *found;
+            // The Radar Locator is built only once its technology is researched (the interface says so too)
+            if (bp.buildingIndex == 6 && !IsRadarUnlocked(cmd.player))
+                return;
             if (!entities.CanPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
                 return;
             if (!economy.CanAfford(bp.creditCost))
@@ -477,6 +493,7 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             economy.SpendCredits(def.cost);
             r.active = cmd.a;
             r.timer = 0.0f;
+            r.duration = def.seconds;
             break;
         }
         case CommandType::Demolish:
@@ -490,6 +507,23 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             }
             if (refund > 0)
                 economy.AddCredits(refund);
+            break;
+        }
+        case CommandType::ToggleRepair:
+        {
+            std::vector<Building *> own;
+            bool anyIdle = false;
+            for (uint32_t id : cmd.ids)
+            {
+                Building *b = entities.GetBuilding(static_cast<int>(id));
+                if (Alive(b) && b->owner == cmd.player && b->rawBuildingType < 15 && b->CanBeRepaired())
+                {
+                    own.push_back(b);
+                    anyIdle = anyIdle || !b->repairing;
+                }
+            }
+            for (Building *b : own)
+                b->repairing = anyIdle;
             break;
         }
         case CommandType::DebugCredits:
@@ -521,6 +555,8 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             }
             break;
         }
+        case CommandType::View:
+            break; // the camera of a player: only for replays
         case CommandType::PlayerLeft:
             // Gone from the match: nothing of the player stays to be fought over (or left standing in the way)
             entities.DestroyPlayer(cmd.player, map);
@@ -596,10 +632,17 @@ uint64_t Simulation::ChecksumSections(const SimContext &ctx, uint64_t (&sections
         h.I32(e.targetWallTileX);
         h.I32(e.targetWallTileY);
         h.I32(e.lastAttackerId);
+        if (const Building *b = e.AsBuilding())
+            h.I32(b->repairing ? 1 : 0);
         if (const Unit *u = e.AsUnit())
         {
             h.I32(u->orderX);
             h.I32(u->orderY);
+            h.I32(static_cast<int32_t>(u->stance));
+            h.I32(u->stanceHomeX);
+            h.I32(u->stanceHomeY);
+            h.I32(u->stanceReturning ? 1 : 0);
+            h.I32(u->orderedTargetId);
             h.I32(static_cast<int32_t>(u->orderQueue.size()));
             for (const Unit::QueuedOrder &q : u->orderQueue)
             {

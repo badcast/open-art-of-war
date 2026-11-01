@@ -1,4 +1,5 @@
 #include "ui/NetworkMenu.hpp"
+#include "audio/SoundRequests.hpp"
 #include "core/Localization.hpp"
 #include "core/Settings.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -129,6 +130,7 @@ void NetworkMenu::Reset()
     m_chatInput.clear();
     m_spotsMap.clear();
     m_preview.Clear();
+    m_wasInLobby = false;
 }
 
 NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int w, int h)
@@ -169,6 +171,7 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     l.map = {x + 540, y + 30, l.dialog.Right() - 20 - (x + 540), 300};
     l.mapPrev = {l.map.x, y - 4, 32, 26};
     l.mapNext = {l.map.Right() - 32, y - 4, 32, 26};
+    l.mapName = {l.mapPrev.Right() + 4, y - 4, l.mapNext.x - 4 - (l.mapPrev.Right() + 4), 26};
     l.chatLog = {x, l.players.Bottom() + 10, 520, l.dialog.Bottom() - 70 - (l.players.Bottom() + 10) - 44};
     l.chatField = {x, l.chatLog.Bottom() + 6, 520 - 52, 36};
     l.chatSend = {l.chatField.Right() + 8, l.chatField.y, 44, 36};
@@ -223,7 +226,12 @@ NetworkAction NetworkMenu::Update(
 {
     m_mouseX = input.GetMouseScreenX();
     m_mouseY = input.GetMouseScreenY();
-    if (net && net->connected())
+    const bool inLobby = net && net->connected();
+    if (inLobby && !m_wasInLobby)
+        SoundRequests::Play("ui_show_dialog");
+    m_wasInLobby = inLobby;
+
+    if (inLobby)
         return UpdateLobby(input, windowW, windowH, *net);
     if (net)
     {
@@ -486,6 +494,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     }
     auto askLeave = [&]() {
         m_confirm.open = true;
+        SoundRequests::Play("ui_show_dialog");
         m_confirm.title = _("LEAVE THE ROOM?");
         m_confirm.text = net.ControlsRoom()
                              ? _("You are the room owner. If you leave, the game may end for everybody in it.")
@@ -495,6 +504,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     auto comboField = [&](int id) -> ui::UiRect {
         if (id == kLayoutCombo)
             return l.prebuiltBtn;
+        if (id == kMapCombo)
+            return l.mapName;
         const int row = id / 10, kind = id % 10;
         return kind == 1   ? l.FactionCell(row)
                : kind == 2 ? l.TeamCell(row)
@@ -504,8 +515,9 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     if (m_combo.open >= 0)
     {
         const int id = m_combo.open, row = id / 10, kind = id == kLayoutCombo ? 5 : id % 10;
-        const bool valid
-            = id == kLayoutCombo ? net.ControlsRoom() : (lobby && row < static_cast<int>(lobby->slots.size()));
+        const bool isMapList = id == kMapCombo;
+        const bool valid = id == kLayoutCombo || isMapList ? net.ControlsRoom()
+                                                           : (lobby && row < static_cast<int>(lobby->slots.size()));
         if (!valid)
         {
             m_combo.open = -1;
@@ -516,7 +528,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             if (ui::ComboUpdate(
                     m_combo,
                     comboField(id),
-                    static_cast<int>(ComboChoices(kind).size()),
+                    isMapList ? static_cast<int>(m_maps.size()) : static_cast<int>(ComboChoices(kind).size()),
                     h,
                     mx,
                     my,
@@ -524,7 +536,24 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     input.ConsumeWheel(),
                     picked))
             {
-                if (picked >= 0 && id == kLayoutCombo)
+                if (picked >= 0 && isMapList)
+                {
+                    // Only a map with a start position for everybody in the room
+                    const size_t inRoom = lobby ? lobby->slots.size() : 1;
+                    if (picked < static_cast<int>(m_maps.size())
+                        && MissionController::StartPositions(m_maps[picked].path).size() >= inRoom)
+                    {
+                        m_mapIndex = picked;
+                        net.SetLobbyMap(m_maps[picked].path);
+                    }
+                    else
+                    {
+                        m_chatLog.push_back(_("This map has no start position for everybody in the room."));
+                        if (m_chatLog.size() > 50)
+                            m_chatLog.erase(m_chatLog.begin());
+                    }
+                }
+                else if (picked >= 0 && id == kLayoutCombo)
                 {
                     m_prebuilt = picked == 0;
                 }
@@ -633,6 +662,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         return NetworkAction::Start;
     if (net.ControlsRoom() && l.prebuiltBtn.Contains(mx, my))
         return openCombo(kLayoutCombo);
+    if (net.ControlsRoom() && !m_maps.empty() && l.mapName.Contains(mx, my))
+        return openCombo(kMapCombo);
     if (net.ControlsRoom() && !m_maps.empty() && (l.mapPrev.Contains(mx, my) || l.mapNext.Contains(mx, my)))
     {
         // The next map in that direction that has a start position for everybody in the room
@@ -905,14 +936,22 @@ void NetworkMenu::render(
             if (mapName.empty() && !lobby->map.empty())
                 mapName = lobby->map.substr(lobby->map.find_last_of('/') + 1);
         }
-        font.DrawString(
-            mapName,
-            l.map.CenterX(),
-            l.mapPrev.CenterY(),
-            ui::FONT_BODY_BOLD,
-            col::Text,
-            false,
-            Anchor::HCENTER | Anchor::VCENTER);
+        if (net->ControlsRoom())
+        {
+            ui::DrawComboField(
+                r, font, l.mapName, mapName, m_combo.open == kMapCombo, l.mapName.Contains(m_mouseX, m_mouseY));
+        }
+        else
+        {
+            font.DrawString(
+                ui::FitText(font, mapName, ui::FONT_BODY_BOLD, l.mapName.w),
+                l.map.CenterX(),
+                l.mapPrev.CenterY(),
+                ui::FONT_BODY_BOLD,
+                col::Text,
+                false,
+                Anchor::HCENTER | Anchor::VCENTER);
+        }
         if (net->ControlsRoom())
         {
             ui::DrawButton(r, font, l.mapPrev, "<", ui::ButtonStyle::Secondary, l.mapPrev.Contains(m_mouseX, m_mouseY));
@@ -1080,7 +1119,22 @@ void NetworkMenu::render(
         if (m_combo.open >= 0)
         {
             const int id = m_combo.open, row = id / 10, kind = id == kLayoutCombo ? 5 : id % 10;
-            if (id == kLayoutCombo)
+            if (id == kMapCombo)
+            {
+                std::vector<std::string> names;
+                std::vector<bool> unfit;
+                int current = 0;
+                const size_t inRoom = lobby ? lobby->slots.size() : 1;
+                for (size_t i = 0; i < m_maps.size(); ++i)
+                {
+                    names.push_back(m_maps[i].DisplayName());
+                    unfit.push_back(MissionController::StartPositions(m_maps[i].path).size() < inRoom);
+                    if (lobby && m_maps[i].path == lobby->map)
+                        current = static_cast<int>(i);
+                }
+                ui::DrawComboList(r, font, l.mapName, names, current, m_combo, h, m_mouseX, m_mouseY, &unfit);
+            }
+            else if (id == kLayoutCombo)
             {
                 ui::DrawComboList(
                     r, font, l.prebuiltBtn, ComboChoices(5), m_prebuilt ? 0 : 1, m_combo, h, m_mouseX, m_mouseY);

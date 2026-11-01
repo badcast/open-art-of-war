@@ -46,7 +46,11 @@ RoomServer::RoomServer(RoomServerConfig config)
     : m_config(std::move(config))
     , m_buffer(16 * 1024)
 {}
-RoomServer::~RoomServer() = default;
+RoomServer::~RoomServer()
+{
+    // The rooms save their replays and log while they go: before the log is gone
+    m_rooms.clear();
+}
 
 bool RoomServer::start(std::string &error)
 {
@@ -121,6 +125,7 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
     if (e.type == TransportEvent::Type::Connected)
     {
         ++m_masterClients;
+        m_log.push_back("client connected from " + m_master->peerAddress(e.peer));
         BitWriter w(m_buffer.data(), m_buffer.size());
         encode(w, ServerInfo {m_config.name, m_config.motd});
         sendMaster(e.peer, w, w.finish());
@@ -168,6 +173,7 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
             hc.inputDelayMin = m_config.inputDelayMin;
             hc.inputDelayMax = m_config.inputDelayMax;
             hc.maxPlayers = m_config.maxPlayersPerRoom;
+            hc.replayDir = m_config.replayDir;
             std::string error;
             auto transport
                 = createEnetServer(port, m_config.maxPlayersPerRoom + 4, &error, nullptr, m_config.bindAddress);
@@ -183,13 +189,15 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
             room->gameVersion = m.gameVersion;
             room->listed = m.listed;
             room->port = port;
+            const std::string codeForLog = room->code;
+            hc.log = [this, codeForLog](const std::string &line) { m_log.push_back("room " + codeForLog + ": " + line); };
             room->host = std::make_unique<SessionHost>(hc);
             room->host->addTransport(std::move(transport));
             room->createdMs = nowMs;
             room->lastOccupiedMs = nowMs;
             m_log.push_back(
                 "room " + room->code + " '" + room->name + "' opened on port " + std::to_string(port) + " (version "
-                + m.gameVersion + ")");
+                + m.gameVersion + ") by " + m_master->peerAddress(e.peer));
             BitWriter w(m_buffer.data(), m_buffer.size());
             encode(w, RoomAddress {room->code, port});
             sendMaster(e.peer, w, w.finish());

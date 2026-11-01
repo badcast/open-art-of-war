@@ -2,9 +2,12 @@
 
 #include "game/Match.hpp"
 #include "game/SimCommand.hpp"
+#include "net/ReplayRecorder.hpp"
+#include "openaow/net/Protocol.hpp"
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -87,6 +90,14 @@ public:
     static Net::GameIdentity gameIdentity();
     bool connected() const;
     bool rejected() const;
+    // Why the host or server refused (valid while rejected()): the reason and its detail (the host's version, ...)
+    Net::RejectReason RejectedWhy() const;
+    const std::string &RejectedDetail() const;
+    // The data were fetched from the host in this session (a mismatch after that is final)
+    bool Synced() const
+    {
+        return m_synced;
+    }
     // Joining (not hosting, not back in a match): no answer from the other side within the join timeout
     bool JoinTimedOut(uint32_t nowMs) const;
     static constexpr uint32_t kJoinTimeoutMs = 15000;
@@ -142,6 +153,9 @@ public:
     // In the match: the local player's commands go to the host from now on
     void Attach(Simulation &sim);
     void Detach();
+    // A closed turn into the simulation: everybody's commands on the turn's first tick, in the bundle's order, and the
+    // players who left for good. The network and a replay schedule turns the same way.
+    static void ScheduleBundle(Simulation &sim, const Net::TurnBundle &bundle, uint32_t ticksPerTurn);
     // Tick `tick` may run: its turn is here (on the first tick of a turn its commands get scheduled)
     bool CanRunTick(uint32_t tick);
     // After the tick ran: closes the local turn (sends its commands), reports checksums
@@ -203,13 +217,39 @@ public:
     // `tick`: the simulation's current tick (for the turn buffer); call about once per frame
     Stats stats(uint32_t nowMs, uint32_t tick);
 
+    // The match is over (or left): the replay of it is saved in the user's directory. `outcome`: "victory", "defeat",
+    // "left", ... One file per match; empty result when nothing was recorded or it was saved already.
+    std::string FinishReplay(const std::string &outcome);
+    // The local camera (world pixel centre, zoom): sent to the others with the turns, once in a while, when it moved.
+    // Only a replay uses it, to follow a player's view.
+    void SendView(float centerX, float centerY, float zoom);
+    static constexpr uint32_t kViewIntervalTicks = 20;
+
     // Tests: the connection drops here and now (the reconnect logic takes over)
     void DropConnection();
 
     static std::vector<uint8_t> EncodeSetup(const MatchSetup &setup);
     static bool DecodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out);
-    // What the simulation reads from the assets (game data, character configs): peers must agree
+    // What the simulation reads from the assets (character configs, balance, projectiles, research, ...): peers must
+    // agree. Pictures, sounds and the UI colours (net_visual in main.json) are not part of it. Computed from the files
+    // as they are now, a session overlay (see below) included.
     static uint64_t AssetsHash();
+    // The same files one by one (path, hash of the bytes); the last entry stands for the manifest's simulation part
+    static std::vector<Net::DataEntry> DataManifest();
+    // Joining a host whose data differ: the host's files are fetched and put into a session overlay (Assets::
+    // SetSessionOverlay), then the join goes on. The game reloads its data when this says so (once per change); when
+    // the overlay is gone (the game left) it reloads again.
+    bool TakeDataChanged()
+    {
+        const bool changed = m_dataChanged;
+        m_dataChanged = false;
+        return changed;
+    }
+    // "Downloading game data (3/12)": what the connecting screen shows while files come in; empty otherwise
+    const std::string &SyncText() const
+    {
+        return m_syncText;
+    }
     static constexpr uint32_t kHashIntervalTicks = 20;
 
 private:
@@ -223,9 +263,27 @@ private:
     std::unique_ptr<struct LoopbackHolder> m_loopback;
     Simulation *m_sim {nullptr};
     std::vector<SimCommand> m_outgoing;
+    ReplayRecorder m_recorder;
+    uint32_t m_lastTick {0};
+    int32_t m_lastViewX {-100000}, m_lastViewY {-100000}, m_lastViewZoom {0};
     uint32_t m_scheduledTurn {0}; // turns below this have their commands scheduled
     uint32_t m_takenStarts {0};   // StartMatch messages turned into a match so far
     void UpdateMapFile();
+    // Data sync (see TakeDataChanged)
+    void UpdateDataSync();
+    void StartDataSync(const std::vector<Net::DataEntry> &theirs);
+    void AcceptDataFile(const Net::FilePathData &file);
+    void FailDataSync(const std::string &files);
+    struct DataSync
+    {
+        bool active {false};
+        std::vector<Net::DataEntry> wanted;              // the files that differ, as the host has them
+        std::map<std::string, std::vector<uint8_t>> got; // asset key -> bytes
+        size_t bytes {0};
+    } m_sync;
+    bool m_dataChanged {false};
+    bool m_synced {false}; // the data were fetched once in this session: a second mismatch is final
+    std::string m_syncText;
     std::string m_lobbyMapFile;
     std::string m_lobbyMapChecked; // path + hash the file above belongs to
     uint64_t m_requestedMap {0};

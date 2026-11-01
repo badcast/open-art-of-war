@@ -240,7 +240,9 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
             }
         } else if (previewMode == PreviewMode::Move) {
             action = static_cast<int>(OpenArtOfWar::ActionState::Move);
-            gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, frame,
+            const AnimTiming timing = ReadAnimTiming(doc);
+            const int moveFrame = static_cast<int>(frameClock / std::max(0.02f, timing.moveFrame));
+            gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, moveFrame,
                                         unitX, unitY, *camera, faction, turretFacing, true);
         } else if (previewMode == PreviewMode::Attack && YamlBool(combatNode, "can_attack", true)) {
             const YAML::Node gun = MainWeapon(combatNode);
@@ -248,23 +250,33 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
             const float burstDelay = std::max(0.04f, YamlFloat(gun, "burst_delay", 0.1f));
             const float cooldown = std::max(0.15f, WeaponCooldown(gun, false, 0.7f));
             const float burstSpan = static_cast<float>(burstCount - 1) * burstDelay;
+            // The game counts the cooldown from the last shot of a burst
             const float period = std::max(0.35f, burstSpan + cooldown);
             const float phase = std::fmod(previewTime, period);
-            // Time since the latest shot: the game restarts the firing animation on every shot
+            const AnimTiming timing = ReadAnimTiming(doc);
+            const float firstPose = timing.attackPose >= 0.0f ? timing.attackPose
+                                                              : DefaultAttackPose(YamlString(gun, "projectile", "bullet"));
+            // Time since the latest shot (the game restarts the firing animation on every shot) and the length of
+            // the pose that shot started
             float sinceShot = phase;
+            float pose = firstPose;
             for (int k = 0; k < burstCount; ++k) {
                 const float fireTime = static_cast<float>(k) * burstDelay;
-                if (phase >= fireTime) sinceShot = phase - fireTime;
+                if (phase >= fireTime) {
+                    sinceShot = phase - fireTime;
+                    pose = (k == 0) ? firstPose : timing.burstPose;
+                }
             }
-            const bool firing = sinceShot < 0.16f;
+            const bool firing = sinceShot < pose;
             // Infantry keeps its crouched firing pose for the whole engagement (no standing up between
             // shots), vehicles show the firing layers only right after a shot - both exactly as in the game
             action = (firing || isInf) ? static_cast<int>(OpenArtOfWar::ActionState::Attack)
                                        : static_cast<int>(OpenArtOfWar::ActionState::Idle);
-            const float stepDelay = (archetypeId == 7 || archetypeId == 18) ? 0.04f : 0.07f;
+            const float stepDelay = AttackFrameTime(timing, archetypeId);
             const int attackFrame = static_cast<int>(sinceShot / stepDelay);
             gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, attackFrame,
-                                        unitX, unitY, *camera, faction, turretFacing, true);
+                                        unitX, unitY, *camera, faction, turretFacing, true,
+                                        -1, -1, -1, timing.flashMode, timing.flashFrames);
         } else {
             action = PreviewAction();
             bool flaming = (action == static_cast<int>(OpenArtOfWar::ActionState::Die)) ? testFlameDeath : true;
@@ -329,18 +341,36 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         }
     } catch (...) {}
 
-    // Green Sight Radius (2px line width)
+    // Green Sight Radius (2px line width, tile isometric ground ellipse via RenderUtility::DrawTileRadius)
     if (showSightRange && sightRangeTiles > 0.0f) {
-        DrawRadiusCircle2px(unitCenterX, unitCenterY,
-                            sightRangeTiles * static_cast<float>(OpenArtOfWar::TILE_WIDTH),
-                            SDL_Color{50, 230, 80, 240});
+        DrawTileRadius(unitCenterX, unitCenterY, sightRangeTiles, SDL_Color{50, 230, 80, 240}, 2.0f);
     }
 
-    // Red Attack Radius (2px line width)
+    // Purple Build Radius of a headquarters / command center (same ground ellipse as in the game's HUD)
+    if (showBuildRange && building) {
+        float buildRangeTiles = 0.0f;
+        try {
+            if (statsNode && statsNode["build_radius"]) buildRangeTiles = statsNode["build_radius"].as<float>(0.0f);
+        } catch (...) {}
+        if (buildRangeTiles > 0.0f) {
+            DrawTileRadius(unitCenterX, unitCenterY, buildRangeTiles, SDL_Color{160, 80, 230, 240}, 2.0f);
+        }
+    }
+
+    // Cyan radar range of a Radar Locator: how far the finished building sees (sight radius + radar range)
+    if (showRadarRange && building) {
+        float radarTiles = 0.0f;
+        try {
+            if (statsNode && statsNode["radar_range"]) radarTiles = statsNode["radar_range"].as<float>(0.0f);
+        } catch (...) {}
+        if (radarTiles > 0.0f) {
+            DrawTileRadius(unitCenterX, unitCenterY, sightRangeTiles + radarTiles, SDL_Color{80, 200, 255, 240}, 2.0f);
+        }
+    }
+
+    // Red Attack Radius (2px line width, tile isometric ground ellipse via RenderUtility::DrawTileRadius)
     if (showAttackRange && attackRangeTiles > 0.0f) {
-        DrawRadiusCircle2px(unitCenterX, unitCenterY,
-                            attackRangeTiles * static_cast<float>(OpenArtOfWar::TILE_WIDTH),
-                            SDL_Color{255, 60, 60, 240});
+        DrawTileRadius(unitCenterX, unitCenterY, attackRangeTiles, SDL_Color{255, 60, 60, 240}, 2.0f);
     }
 
     // Projectile exit point calculation (localePosition active for ALL entities)

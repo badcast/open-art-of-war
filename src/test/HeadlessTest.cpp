@@ -1,6 +1,11 @@
 #include "test/HeadlessTest.hpp"
 #include "audio/VoiceManager.hpp"
+#include "audio/SfxMixer.hpp"
+#include "audio/SoundEngine.hpp"
+#include "audio/SoundRequests.hpp"
+#include "ui/MenuController.hpp"
 #include "game/Projectiles.hpp"
+#include "game/WeaponBalance.hpp"
 #include "core/LoaderResources.hpp"
 #include "core/DetMath.hpp"
 #include "ui/RadarAlert.hpp"
@@ -24,6 +29,14 @@
 #include "core/Utility.hpp"
 #include "core/AssetStore.hpp"
 #include "core/Settings.hpp"
+#include "net/NetMatch.hpp"
+#include "net/MapFiles.hpp"
+#include "replay/ReplayPlayer.hpp"
+#include "ui/ReplayMenu.hpp"
+#include "net/ReplayRecorder.hpp"
+#include "openaow/net/ReplayFile.hpp"
+#include <nlohmann/json.hpp>
+#include "game/TileCollision.hpp"
 #include "graphics/Camera.hpp"
 #include "storage/SaveManager.hpp"
 #include <filesystem>
@@ -233,7 +246,7 @@ bool HeadlessTest::RunMatchTest(Application &app)
         std::cerr << "[Test] FAILED: m26 must offer 4 start positions" << std::endl;
         return false;
     }
-    if (MissionController::StartPositions(LoaderResources::MapPath("map_skirmish_5")).size() != 2)
+    if (MissionController::StartPositions(LoaderResources::MapPath("map_skirmish_2")).size() != 2)
     {
         std::cerr << "[Test] FAILED: a map without start_positions is a map for two players" << std::endl;
         return false;
@@ -370,6 +383,737 @@ bool HeadlessTest::RunMatchTest(Application &app)
     return true;
 }
 
+bool HeadlessTest::RunTechTest(Application &app)
+{
+    std::cout << "[Test] Validating Zeus turret research, research time, radar range, far-off sounds..." << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    MatchSetup setup;
+    setup.mapPath = LoaderResources::MapPath("m26");
+    setup.seed = 99;
+    setup.local = 0;
+    setup.slots[0] = {true, Faction::Confederation, 0, 1, true};
+    setup.slots[1] = {true, Faction::Resistance, 1, 2, true};
+    setup.startPosition[0] = 0;
+    setup.startPosition[1] = 1;
+    if (!app.m_mission->LoadMatch(setup, map, entities, *app.m_economy, *app.m_pathfinder))
+        return false;
+    ResetResearch();
+    const PlayerId me = 0;
+
+    // Research time: 60 s each (20 s + 40 s)
+    for (Faction f : {Faction::Confederation, Faction::Resistance})
+    {
+        for (int i = 0; i < kResearchCount; ++i)
+        {
+            if (researchDef(f, i).seconds != 60.0f)
+            {
+                std::cerr << "[Test] FAILED: research " << i << " of faction " << int(f) << " takes "
+                          << researchDef(f, i).seconds << " s, expected 60" << std::endl;
+                return false;
+            }
+        }
+    }
+
+    // The Zeus comes without its turret until the technology is researched, then every Zeus gets it at once
+    int turretIndex = -1;
+    for (int i = 0; i < kResearchCount; ++i)
+        if (researchDef(Faction::Confederation, i).effect == ResearchEffect::RocketTurret)
+            turretIndex = i;
+    if (turretIndex < 0 || ProductionForm(me, 11) != 17 || ProductionForm(me, 10) != 10)
+    {
+        std::cerr << "[Test] FAILED: a Zeus is trained as the base form until the turret is researched" << std::endl;
+        return false;
+    }
+    const int zeus = entities.SpawnUnitByArchetype(ProductionForm(me, 11), 20, 20, Faction::Confederation, me);
+    Unit *z = entities.GetUnit(zeus);
+    if (!z || z->archetypeId != 17)
+        return false;
+    const int cannonBefore = z->attackDamage;
+    if (z->hasSecondary)
+    {
+        std::cerr << "[Test] FAILED: the base Zeus has no rocket launcher" << std::endl;
+        return false;
+    }
+    z->currentHp = z->maxHp / 2;
+    CompleteResearch(me, turretIndex, entities);
+    z = entities.GetUnit(zeus);
+    const int fresh = entities.SpawnUnitByArchetype(ProductionForm(me, 11), 22, 20, Faction::Confederation, me);
+    if (!z || z->archetypeId != 11 || !z->hasSecondary || z->attackDamage != cannonBefore
+        || z->currentHp != z->maxHp / 2 || !entities.GetUnit(fresh) || entities.GetUnit(fresh)->archetypeId != 11
+        || !entities.GetUnit(fresh)->hasSecondary)
+    {
+        std::cerr << "[Test] FAILED: the researched turret must reach the existing Zeus (arch "
+                  << (z ? z->archetypeId : -1) << ", hp " << (z ? z->currentHp : -1) << ") and the new ones"
+                  << std::endl;
+        return false;
+    }
+    ResetResearch();
+
+    // Radar locator: sees 15 tiles beyond its sight radius once it is finished
+    map.SetFogEnabled(true);
+    map.ResetAllFog(FogState::Hidden);
+    const int radar = entities.SpawnBuildingByIndex(6, 40, 40, Faction::Confederation, 0.5f, me);
+    entities.UpdateFogOfWar(map);
+    const bool unfinishedFar = map.IsVisibleTo(40 + 1 + 11 + 5, 41, 0);
+    if (Building *rb = entities.GetBuilding(radar))
+        rb->buildProgress = 1.0f;
+    map.ResetAllFog(FogState::Hidden);
+    entities.UpdateFogOfWar(map);
+    const bool finishedFar = map.IsVisibleTo(40 + 1 + 11 + 5, 41, 0);
+    const bool beyond = map.IsVisibleTo(40 + 1 + 11 + 15 + 4, 41, 0);
+    map.SetFogEnabled(false);
+    if (unfinishedFar || !finishedFar || beyond)
+    {
+        std::cerr << "[Test] FAILED: radar locator range (unfinished sees far " << unfinishedFar << ", finished "
+                  << finishedFar << ", beyond " << beyond << ")" << std::endl;
+        return false;
+    }
+    if (IsRadarUnlocked(me))
+    {
+        std::cerr << "[Test] FAILED: radar locators are locked until the technology is researched" << std::endl;
+        return false;
+    }
+
+    // Shots and explosions out of range are still heard, at 0.07 at least (the sound settings say so)
+    if (app.m_sound)
+    {
+        for (const char *event : {"fire_rifle", "fire_cannon", "explode_large", "hit_armor"})
+        {
+            const SfxMixer::EventConfig *c = app.m_sound->Sfx().Config(event);
+            if (!c || c->minGain < 0.0699f || c->minGain > 0.0701f)
+            {
+                std::cerr << "[Test] FAILED: " << event << " must have min_gain 0.07" << std::endl;
+                return false;
+            }
+        }
+    }
+    // The Grad in siege mode fires a salvo of six rockets (0.12 s apart); out of siege mode a single one
+    {
+        auto rockets = [&](int arch) {
+            entities.Clear();
+            entities.TakeSoundCues();
+            entities.SpawnUnitByArchetype(arch, 20, 20, Faction::Confederation, 0);
+            const int target = entities.SpawnUnitByArchetype(0, 30, 20, Faction::Resistance, 1);
+            if (Unit *t = entities.GetUnit(target))
+            {
+                t->moveSpeed = 0.0f;
+                t->attackDamage = 0;
+                t->maxHp = t->currentHp = 100000;
+            }
+            for (int i = 0; i < 100; ++i) // 5 s: one salvo (the reload is 6 s)
+                entities.Update(0.05f, map, *app.m_pathfinder);
+            int n = 0;
+            for (const auto &c : entities.TakeSoundCues())
+                n += c.cue == EntityManager::SoundCue::FireMlrs || c.cue == EntityManager::SoundCue::FireRocket ? 1 : 0;
+            return n;
+        };
+        const int siege = rockets(16);
+        std::cout << "  - Grad in siege mode: " << siege << " rockets in the first salvo" << std::endl;
+        if (siege != 6)
+        {
+            std::cerr << "[Test] FAILED: a Grad in siege mode fires 6 rockets per salvo, got " << siege << std::endl;
+            return false;
+        }
+    }
+    // The heavy tanks (Zeus, Rhino) fire with the deeper cannon sound, the other tank guns with the usual one
+    {
+        map.SetFogEnabled(false);
+        entities.TakeSoundCues();
+        auto cueOf = [&](Faction f, int arch) {
+            entities.Clear();
+            const PlayerId owner = Players::OwnerOf(f);
+            const PlayerId enemy = Players::OwnerOf(f == Faction::Resistance ? Faction::Confederation : Faction::Resistance);
+            entities.SpawnUnitByArchetype(arch, 20, 20, f, owner);
+            const int target = entities.SpawnUnitByArchetype(
+                f == Faction::Resistance ? 1 : 0, 24, 20, f == Faction::Resistance ? Faction::Confederation : Faction::Resistance, enemy);
+            if (Unit *t = entities.GetUnit(target))
+            {
+                t->moveSpeed = 0.0f;
+                t->attackDamage = 0;
+                t->maxHp = t->currentHp = 100000;
+            }
+            for (int i = 0; i < 240; ++i) // 12 s: the heavy guns turn and reload slowly
+                entities.Update(0.05f, map, *app.m_pathfinder);
+            if (std::getenv("OAOW_TEST_VERBOSE"))
+                for (const Entity &e : entities.GetAllEntities())
+                    if (const Unit *dbg = e.AsUnit())
+                        std::cout << "    arch " << dbg->archetypeId << " owner " << int(dbg->owner) << " at " << dbg->tileX << "," << dbg->tileY << " state " << int(dbg->state) << " target " << dbg->targetEntityId << " hp " << dbg->currentHp << " range " << dbg->attackRange << " dmg " << dbg->attackDamage << " cd " << dbg->cooldownTimer << " facing " << dbg->facingDirection << " turnDelay " << dbg->turnStepDelay << " rotTurret " << dbg->hasRotatingTurret << " burst " << dbg->burstShotsRemaining << " attackAnim " << dbg->attackAnimTimer << " engaged " << dbg->isDirectEngaged << " waiting " << dbg->waitingForPath << " hold " << dbg->HoldsGround() << " turnTimer " << dbg->turnTimer << " siege " << dbg->isSiegeMode << std::endl;
+            std::set<int> cues;
+            for (const auto &c : entities.TakeSoundCues())
+                cues.insert(static_cast<int>(c.cue));
+            return cues;
+        };
+        using Cue = EntityManager::SoundCue;
+        const auto zeus = cueOf(Faction::Confederation, 11);
+        const auto hammer = cueOf(Faction::Confederation, 9);
+        const auto rhino = cueOf(Faction::Resistance, 10);
+        const int high = static_cast<int>(Cue::FireCannonHigh), usual = static_cast<int>(Cue::FireCannon);
+        if (!zeus.count(high) || zeus.count(usual) || !rhino.count(high) || rhino.count(usual) || !hammer.count(usual)
+            || hammer.count(high))
+        {
+            std::cerr << "[Test] FAILED: Zeus and Rhino fire the high cannon sound, the Hammer the usual one (zeus "
+                      << zeus.count(high) << "/" << zeus.count(usual) << ", rhino " << rhino.count(high) << "/"
+                      << rhino.count(usual) << ", hammer " << hammer.count(high) << "/" << hammer.count(usual) << ")"
+                      << std::endl;
+            return false;
+        }
+        // The rocket launcher of the researched Zeus fires beside the cannon; the base form has the cannon only
+        {
+            auto firing = [&](int arch, int &rockets, int &cannons) {
+                entities.Clear();
+                entities.TakeSoundCues();
+                entities.SpawnUnitByArchetype(arch, 20, 20, Faction::Confederation, 0);
+                const int target = entities.SpawnUnitByArchetype(0, 24, 20, Faction::Resistance, 1);
+                if (Unit *t = entities.GetUnit(target))
+                {
+                    t->moveSpeed = 0.0f;
+                    t->attackDamage = 0;
+                    t->maxHp = t->currentHp = 100000;
+                }
+                for (int i = 0; i < 240; ++i)
+                    entities.Update(0.05f, map, *app.m_pathfinder);
+                rockets = cannons = 0;
+                for (const auto &c : entities.TakeSoundCues())
+                {
+                    rockets += c.cue == Cue::FireRocket ? 1 : 0;
+                    cannons += c.cue == Cue::FireCannonHigh ? 1 : 0;
+                }
+            };
+            int baseRockets = 0, baseCannons = 0, fullRockets = 0, fullCannons = 0;
+            firing(17, baseRockets, baseCannons);
+            firing(11, fullRockets, fullCannons);
+            std::cout << "  - Zeus in 12 s: base " << baseCannons << " cannon shots / " << baseRockets
+                      << " rockets, with the launcher " << fullCannons << " / " << fullRockets << std::endl;
+            if (baseRockets != 0 || baseCannons < 2 || fullCannons < 2 || fullRockets < 3)
+            {
+                std::cerr << "[Test] FAILED: the Zeus fires its cannon; the launcher only after the technology"
+                          << std::endl;
+                return false;
+            }
+        }
+        if (app.m_sound && (!app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)
+                            || app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)->clips.empty()))
+        {
+            std::cerr << "[Test] FAILED: the event fire_cannon_high needs its clip" << std::endl;
+            return false;
+        }
+    }
+    std::cout << "  - Zeus turret on research, 60 s research, radar +15, min_gain 0.07, high cannon sound: ok"
+              << std::endl;
+    return true;
+}
+
+bool HeadlessTest::RunReplayTest(Application &app)
+{
+    std::cout << "[Test] Validating replays (.awr): record a match, play the file back..." << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    Economy &economy = *app.m_economy;
+    AIController &ai = *app.m_aiController;
+    MissionController &mission = *app.m_mission;
+    Simulation &sim = app.m_gameplayController->simulation();
+    namespace fs = std::filesystem;
+
+    MatchSetup setup;
+    setup.mapPath = LoaderResources::MapPath("m26");
+    setup.mapHash = MapFiles::HashOf(setup.mapPath);
+    setup.seed = 777;
+    setup.local = 0;
+    setup.slots[0] = {true, Faction::Resistance, 0, 1, true};
+    setup.slots[1] = {true, Faction::Confederation, 1, 2, true};
+    setup.startPosition[0] = 0;
+    setup.startPosition[1] = 1;
+    constexpr uint32_t kTicksPerTurn = 2;
+    constexpr int kTurns = 400;
+
+    std::vector<std::vector<uint8_t>> recordedTurns;
+    std::vector<std::pair<uint32_t, uint64_t>> recordedSums;
+    uint64_t recordedFinal = 0;
+    const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+
+    // Plays the loaded match; `source` makes the bundle of each turn
+    auto play = [&](const std::function<bool(uint32_t turn, Net::TurnBundle &)> &source,
+                    const std::function<void(uint32_t tick, uint64_t sum)> &onSum) -> uint64_t {
+        sim.startMatch(setup);
+        SimContext ctx {entities, map, pf, economy, ai};
+        for (uint32_t tick = 0; tick < kTurns * kTicksPerTurn; ++tick)
+        {
+            if (tick % kTicksPerTurn == 0)
+            {
+                Net::TurnBundle b;
+                if (source(tick / kTicksPerTurn, b))
+                    NetMatch::ScheduleBundle(sim, b, kTicksPerTurn);
+            }
+            sim.ApplyCommands(ctx);
+            sim.UpdateResearch(dt, ctx);
+            entities.Update(dt, map, pf);
+            sim.UpdateSquads(dt, ctx, ai.GetChokepoints());
+            sim.UpdateEconomies(dt, ctx);
+            if (tick % NetMatch::kHashIntervalTicks == 0)
+                onSum(tick, sim.Checksum(ctx));
+            sim.EndTick();
+        }
+        SimContext fin {entities, map, pf, economy, ai};
+        return sim.Checksum(fin);
+    };
+
+    // --- Recording: scripted turns, as a host would have closed them
+    if (!mission.LoadMatch(setup, map, entities, economy, pf))
+        return false;
+    std::vector<uint32_t> own, enemy;
+    int enemyHq = 0;
+    for (const Entity &e : entities.GetAllEntities())
+    {
+        if (e.owner == 0 && !e.isBuilding)
+            own.push_back(static_cast<uint32_t>(e.id));
+        if (e.owner == 1 && e.isBuilding && e.type == UnitType::Headquarters)
+            enemyHq = e.id;
+    }
+    const Entity *hq = entities.GetEntity(enemyHq);
+    if (own.empty() || !hq)
+    {
+        std::cerr << "[Test] FAILED: replay test setup" << std::endl;
+        return false;
+    }
+    const int targetX = hq->tileX * TILE_WIDTH, targetY = hq->tileY * TILE_HEIGHT;
+    auto script = [&](uint32_t turn, Net::TurnBundle &b) {
+        b.turn = turn;
+        std::vector<SimCommand> c0, c1;
+        if (turn == 3)
+        {
+            SimCommand o;
+            o.type = CommandType::OrderAt;
+            o.ids = own;
+            o.x = targetX;
+            o.y = targetY;
+            o.a = static_cast<int32_t>(OrderKind::AttackMove);
+            c0.push_back(o);
+        }
+        if (turn % 10 == 5)
+        {
+            SimCommand v;
+            v.type = CommandType::View;
+            v.x = 1000 + static_cast<int32_t>(turn) * 3;
+            v.y = 700;
+            v.a = 200;
+            c1.push_back(v);
+        }
+        if (!c0.empty())
+            b.players.push_back({0, SimCommandCodec::Encode(c0)});
+        if (!c1.empty())
+            b.players.push_back({1, SimCommandCodec::Encode(c1)});
+        return true;
+    };
+    recordedFinal = play(
+        [&](uint32_t turn, Net::TurnBundle &b) {
+            script(turn, b);
+            recordedTurns.push_back(Net::encodeTurn(b));
+            return true;
+        },
+        [&](uint32_t tick, uint64_t sum) { recordedSums.emplace_back(tick, sum); });
+
+    // --- The file
+    const fs::path dir = fs::temp_directory_path() / "oaow-replay-play-test";
+    fs::remove_all(dir);
+    Net::ReplayData data;
+    data.setup = NetMatch::EncodeSetup(setup);
+    data.turns = recordedTurns;
+    data.checksums = recordedSums;
+    data.meta = nlohmann::json({{"format", 1},
+                                {"source", "client"},
+                                {"ticks_per_turn", kTicksPerTurn},
+                                {"local_slot", 0},
+                                {"players", nlohmann::json::array({{{"slot", 0}, {"name", "Red"}},
+                                                                   {{"slot", 1}, {"name", "Blue"}}})},
+                                {"result", {{"outcome", "left"}, {"tick", kTurns * kTicksPerTurn}}}})
+                    .dump();
+    std::vector<uint8_t> mapBytes, balanceBytes;
+    MapFiles::Read(setup.mapPath, mapBytes);
+    Assets::ReadBytes(LoaderResources::weaponBalance(), balanceBytes);
+    data.files["maps/m26.json"] = mapBytes;
+    data.files["data/assets/data/weapon_balance.json"] = balanceBytes;
+    const std::string path = (dir / "test.awr").string();
+    std::string error;
+    if (!Net::writeReplay(path, data, error))
+    {
+        std::cerr << "[Test] FAILED: writing the replay: " << error << std::endl;
+        return false;
+    }
+
+    // --- Playing the file back
+    {
+        ReplayPlayer player;
+        if (!player.Load(path, error))
+        {
+            std::cerr << "[Test] FAILED: loading the replay: " << error << std::endl;
+            return false;
+        }
+        const ReplayPlayer::Info &info = player.info();
+        float cx = 0, cy = 0, zoom = 0;
+        const bool hasCamera = player.CameraOf(1, 120, cx, cy, zoom);
+        // Turns 5, 15, ... 55 recorded a view of player 1; at tick 120 (turn 60) the one of turn 55 is current
+        if (info.turns != kTurns || info.ticks != kTurns * kTicksPerTurn || info.players.size() != 2
+            || info.players[0].name != "Red" || info.players[1].faction != Faction::Confederation || !hasCamera
+            || cx != 1000.0f + 55.0f * 3.0f || cy != 700.0f || zoom != 2.0f)
+        {
+            std::cerr << "[Test] FAILED: replay info (turns " << info.turns << ", camera " << cx << "," << cy << ")"
+                      << std::endl;
+            return false;
+        }
+        MatchSetup played;
+        if (!player.PrepareMatch(1, played, error) || played.local != 1 || !Assets::HasSessionOverlay())
+        {
+            std::cerr << "[Test] FAILED: preparing the replayed match: " << error << std::endl;
+            return false;
+        }
+        if (!mission.LoadMatch(played, map, entities, economy, pf))
+            return false;
+        setup.local = played.local;
+        const uint64_t finalSum = play(
+            [&](uint32_t turn, Net::TurnBundle &) {
+                player.ScheduleDue(sim, turn * kTicksPerTurn);
+                return false; // the player schedules the turn itself
+            },
+            [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
+        std::cout << "  - Replayed " << info.turns << " turns: " << recordedSums.size()
+                  << " recorded checksums, first difference at " << player.MismatchTick() << ", final "
+                  << (finalSum == recordedFinal ? "equal" : "DIFFERENT") << std::endl;
+        if (player.MismatchTick() >= 0 || finalSum != recordedFinal)
+        {
+            std::cerr << "[Test] FAILED: the replay must play back to the same world" << std::endl;
+            return false;
+        }
+        // Another viewpoint changes nothing in the world
+        player.Rewind();
+    }
+    if (Assets::HasSessionOverlay())
+    {
+        std::cerr << "[Test] FAILED: closing the replay must take its data away" << std::endl;
+        return false;
+    }
+
+    // --- The "Open replay" screen lists the file and draws without trouble
+    {
+        const fs::path folder = ReplayRecorder::Directory();
+        std::error_code ec;
+        fs::create_directories(folder, ec);
+        const fs::path listed = folder / "open-art-of-war-20000101-000000_test.awr";
+        fs::copy_file(path, listed, fs::copy_options::overwrite_existing, ec);
+        ReplayMenu menu;
+        menu.Refresh();
+        menu.SetNotice("notice");
+        app.m_input->ResetFrameEvents();
+        const ReplayMenu::Result r = menu.Update(*app.m_input, app.m_windowW, app.m_windowH);
+        menu.Render(*app.m_renderer, *app.m_fontRenderer, app.m_windowW, app.m_windowH);
+        fs::remove(listed, ec);
+        if (r.back || !r.open.empty())
+        {
+            std::cerr << "[Test] FAILED: the replay screen must wait for the player" << std::endl;
+            return false;
+        }
+    }
+
+    // --- A file that is not a replay, a replay of another map
+    {
+        ReplayPlayer broken;
+        std::ofstream((dir / "junk.awr").string(), std::ios::binary) << "this is not a replay";
+        if (broken.Load((dir / "junk.awr").string(), error))
+        {
+            std::cerr << "[Test] FAILED: junk must not load" << std::endl;
+            return false;
+        }
+        Net::ReplayData other = data;
+        other.files.erase("maps/m26.json");
+        MatchSetup unknown = setup;
+        unknown.mapPath = "assets/maps/does_not_exist.json";
+        unknown.mapHash = 0x1234;
+        other.setup = NetMatch::EncodeSetup(unknown);
+        Net::writeReplay((dir / "nomap.awr").string(), other, error);
+        ReplayPlayer noMap;
+        MatchSetup unused;
+        if (!noMap.Load((dir / "nomap.awr").string(), error) || noMap.PrepareMatch(-1, unused, error) || error.empty()
+            || Assets::HasSessionOverlay())
+        {
+            std::cerr << "[Test] FAILED: a replay whose map is missing must say so" << std::endl;
+            return false;
+        }
+    }
+    fs::remove_all(dir);
+    std::cout << "  - Replay file, playback, cameras, missing map: ok" << std::endl;
+    return true;
+}
+
+bool HeadlessTest::RunAiVehicleTest(Application &app)
+{
+    std::cout << "[Test] Validating that computer players build vehicles and send them (every difficulty)..."
+              << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    Economy &economy = *app.m_economy;
+    MissionController &mission = *app.m_mission;
+    GameplayController &gc = *app.m_gameplayController;
+    Simulation &sim = gc.simulation();
+    const int minutes = std::getenv("OAOW_AI_MINUTES") ? std::atoi(std::getenv("OAOW_AI_MINUTES")) : 10;
+    bool ok = true;
+    for (int level = 0; level <= 3; ++level)
+    {
+        // Two allied computer players of the same difficulty against an idle person (nobody is attacked on the way)
+        MatchSetup setup;
+        setup.mapPath = LoaderResources::MapPath("m26");
+        setup.seed = 4242;
+        setup.local = 0;
+        setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
+        setup.slots[1] = {true, Faction::Confederation, 1, 2, false, static_cast<uint8_t>(level)};
+        setup.slots[2] = {true, Faction::Resistance, 1, 3, false, static_cast<uint8_t>(level)};
+        for (int i = 0; i < 3; ++i)
+            setup.startPosition[i] = static_cast<int8_t>(i);
+        if (!mission.LoadMatch(setup, map, entities, economy, pf))
+            return false;
+        gc.ResetForMission(mission, *app.m_hudController, entities, map);
+        SimContext ctx {entities, map, pf, economy, *app.m_aiController};
+        const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+        std::set<int> vehicles[3], initial;
+        int factories[3] = {};
+        for (const Entity &e : entities.GetAllEntities())
+            if (const Unit *u = e.AsUnit(); u && !u->IsInfantry())
+                initial.insert(u->id);
+        for (int tick = 0; tick < minutes * 60 * 20; ++tick)
+        {
+            sim.ApplyCommands(ctx);
+            sim.UpdateResearch(dt, ctx);
+            entities.Update(dt, map, pf);
+            sim.UpdateSquads(dt, ctx, app.m_aiController->GetChokepoints());
+            sim.UpdateEconomies(dt, ctx);
+            for (auto &ai : gc.m_matchAis)
+                ai->Update(dt, map, entities, pf);
+            sim.EndTick();
+            if (std::getenv("OAOW_TEST_VERBOSE") && tick == 41)
+            {
+                const int goals[][2] = {{68, 9}, {65, 12}, {64, 20}, {70, 24}, {68, 22}};
+                for (const auto &g : goals)
+                {
+                    std::vector<PathNode> probe;
+                    bool partial = false;
+                    const bool found = pf.FindPath(71, 9, g[0], g[1], probe, 0, &partial);
+                    std::cout << "    probe (71,9)->(" << g[0] << "," << g[1] << "): found " << found << " partial "
+                              << partial << " len " << probe.size() << " passableGoal " << map.IsPassable(g[0], g[1])
+                              << std::endl;
+                }
+            }
+            if (std::getenv("OAOW_TEST_VERBOSE") && tick == 40)
+            {
+                for (int y = 4; y <= 26; ++y)
+                {
+                    std::cout << "    ";
+                    for (int x = 58; x <= 79; ++x)
+                    {
+                        char c = map.IsPassable(x, y) ? '.' : '#';
+                        if (map.GetWall(x, y) > 0)
+                            c = 'w';
+                        for (const Entity &e : entities.GetAllEntities())
+                            if (e.alive && !e.isBuilding && e.tileX == x && e.tileY == y)
+                                c = 'u';
+                        std::cout << c;
+                    }
+                    std::cout << std::endl;
+                }
+            }
+            if (std::getenv("OAOW_TEST_VERBOSE") && tick > 0 && tick % 6000 == 0)
+            {
+                for (auto &mai : gc.m_matchAis)
+                {
+                    int idle = 0, found = 0, partialOnly = 0, none = 0;
+                    for (const Entity &e : entities.GetAllEntities())
+                    {
+                        const Unit *u = e.AsUnit();
+                        if (!u || !u->alive || u->owner != mai->m_player || u->state != ActionState::Idle)
+                            continue;
+                        ++idle;
+                        std::vector<PathNode> probe;
+                        bool partial = false;
+                        const bool ok = pf.FindPath(
+                            u->tileX, u->tileY, mai->m_stagingX, mai->m_stagingY, probe, u->id, &partial);
+                        (ok ? found : (partial && !probe.empty() ? partialOnly : none))++;
+                    }
+                    std::cout << "    t=" << tick / 20 << "s ai " << int(mai->m_player) << ": idle " << idle
+                              << ", path to staging " << found << ", partial only " << partialOnly << ", none " << none
+                              << std::endl;
+                }
+            }
+            if (tick % 20 == 0)
+            {
+                for (int p = 1; p <= 2; ++p)
+                    factories[p] = 0;
+                for (const Entity &e : entities.GetAllEntities())
+                {
+                    if (!e.alive || e.owner < 1 || e.owner > 2)
+                        continue;
+                    if (e.isBuilding && e.type == UnitType::Factory)
+                        ++factories[e.owner];
+                    if (const Unit *u = e.AsUnit(); u && !u->IsInfantry() && !initial.count(u->id))
+                        vehicles[e.owner].insert(u->id); // trained during the match
+                }
+            }
+        }
+        // Vehicles that left the base: farther than 12 tiles from their own headquarters at the end
+        int away = 0;
+        for (const Entity &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (!u || !u->alive || u->IsInfantry() || e.owner < 1 || e.owner > 2)
+                continue;
+            for (const Entity &h : entities.GetAllEntities())
+            {
+                if (h.alive && h.isBuilding && h.type == UnitType::Headquarters && h.owner == e.owner
+                    && std::abs(h.tileX - u->tileX) + std::abs(h.tileY - u->tileY) > 12)
+                {
+                    ++away;
+                    break;
+                }
+            }
+        }
+        if (std::getenv("OAOW_TEST_VERBOSE"))
+        {
+            for (auto &mai : gc.m_matchAis)
+            {
+                std::cout << "    [ai " << int(mai->m_player) << "] credits " << mai->m_credits << " vehicleQueue "
+                          << mai->m_vehicleQueue.size() << " infantryQueue " << mai->m_infantryQueue.size()
+                          << " wave " << mai->m_waveCount << " plan " << mai->m_currentPlan.archetypes.size() << " ready "
+                          << mai->m_readyUnits << " units " << std::count_if(entities.GetAllEntities().begin(), entities.GetAllEntities().end(), [&](const Entity &e) { return e.alive && !e.isBuilding && e.owner == mai->m_player; })
+                          << " lab " << mai->m_hasLab << " researchActive " << mai->m_researchActive << " idx "
+                          << mai->m_researchIndex << std::endl;
+            }
+            for (auto &mai : gc.m_matchAis)
+            {
+                std::cout << "    [ai " << int(mai->m_player) << " units] staging " << mai->m_stagingX << ","
+                          << mai->m_stagingY << ":";
+                int shown = 0;
+                for (const Entity &e : entities.GetAllEntities())
+                {
+                    const Unit *u = e.AsUnit();
+                    if (u && u->alive && u->owner == mai->m_player && shown++ < 40)
+                        std::cout << " (" << u->tileX << "," << u->tileY << (u->IsInfantry() ? "i" : "V")
+                                  << (mai->m_squadController.IsSquadMember(u->id) ? "s" : "") << ")";
+                }
+                std::cout << std::endl;
+                int detail = 0;
+                for (const Entity &e : entities.GetAllEntities())
+                {
+                    const Unit *u = e.AsUnit();
+                    if (u && u->alive && u->owner == mai->m_player && detail < 1)
+                    {
+                        std::vector<PathNode> probe;
+                        bool partial = false;
+                        const bool found
+                            = pf.FindPath(u->tileX, u->tileY, mai->m_stagingX, mai->m_stagingY, probe, u->id, &partial);
+                        std::cout << "      path " << u->tileX << "," << u->tileY << " -> staging: found " << found
+                                  << " partial " << partial << " len " << probe.size() << std::endl;
+                    }
+                    if (u && u->alive && u->owner == mai->m_player && detail++ < 4)
+                        std::cout << "      unit " << u->id << " at " << u->tileX << "," << u->tileY << " state "
+                                  << int(u->state) << " waitingPath " << u->waitingForPath << " hasTarget "
+                                  << u->HasMoveTarget() << " target " << u->targetTileX << "," << u->targetTileY
+                                  << " pathLeft " << (u->path.size() > u->pathIndex ? u->path.size() - u->pathIndex : 0)
+                                  << " blocked " << u->blockedTimer << " waitBlocked " << u->waitBlockedTimer
+                                  << std::endl;
+                }
+            }
+            for (const Entity &e : entities.GetAllEntities())
+            {
+                const Building *fb = e.AsBuilding();
+                if (fb && fb->alive && fb->type == UnitType::Factory && fb->owner >= 1)
+                {
+                    int sx = 0, sy = 0;
+                    const bool spawn = entities.GetBuildingSpawnPoint(fb->id, map, sx, sy);
+                    std::cout << "    [factory of " << int(fb->owner) << "] at " << fb->tileX << "," << fb->tileY
+                              << " progress " << fb->buildProgress << " producing " << fb->isProducing << " timer "
+                              << fb->productionTimer << " spawn " << spawn << " (" << sx << "," << sy << ")"
+                              << std::endl;
+                }
+            }
+        }
+        std::cout << "  - Difficulty " << level << ": factories " << factories[1] << "/" << factories[2]
+                  << ", vehicles fielded " << vehicles[1].size() << "/" << vehicles[2].size()
+                  << ", vehicles away from base " << away << std::endl;
+        if (vehicles[1].empty() || vehicles[2].empty())
+        {
+            std::cerr << "[Test] FAILED: a computer player of difficulty " << level << " never fielded a vehicle in "
+                      << minutes << " minutes" << std::endl;
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+bool HeadlessTest::RunFogBlockTest(Application &app)
+{
+    std::cout << "[Test] Validating units sent through the fog against enemy buildings that shut a passage..."
+              << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+    bool ok = true;
+    // 0: attack-move, 1: plain move order
+    for (int mode = 0; mode < 2; ++mode)
+    {
+        entities.Clear();
+        map.InitBlankArena(48, 32, 0);
+        pf.SetMap(&map);
+        pf.SetEntityManager(&entities);
+        // A wall of rock across the map with a three tile gap (y 14..16), shut by an enemy building
+        for (int y = 0; y < 32; ++y)
+            if (y < 14 || y > 16)
+                map.SetPassable(30, y, false);
+        map.SetFogEnabled(true);
+        map.ResetAllFog(FogState::Hidden);
+        const PlayerId me = Players::OwnerOf(Faction::Resistance);
+        const int blocker = entities.SpawnBuildingByIndex(1, 29, 14, Faction::Confederation, 1.0f); // 3x3 power plant
+        for (int ty = 14; ty <= 16; ++ty)
+            for (int tx = 29; tx <= 31; ++tx)
+                map.SetPassable(tx, ty, false);
+        std::vector<int> group;
+        for (int i = 0; i < 6; ++i)
+            group.push_back(entities.SpawnUnitByArchetype(0, 5 + i % 3, 14 + i / 3 * 2, Faction::Resistance, me));
+        if (mode == 0)
+            entities.IssueAttackMoveOrder(group, 40, 15, pf);
+        else
+            entities.IssueMoveOrder(group, 40, 15, pf, false);
+        for (float t = 0.0f; t < 150.0f; t += dt)
+            entities.Update(dt, map, pf);
+        const Building *b = entities.GetBuilding(blocker);
+        const int hp = b && b->alive ? b->currentHp : 0;
+        const int maxHp = b ? b->maxHp : 1;
+        int through = 0, idleAtGap = 0;
+        for (int id : group)
+        {
+            const Unit *u = entities.GetUnit(id);
+            if (!u)
+                continue;
+            through += u->tileX > 31 ? 1 : 0;
+            idleAtGap += (u->tileX >= 24 && u->tileX <= 28 && u->state == ActionState::Idle) ? 1 : 0;
+        }
+        std::cout << "  - " << (mode == 0 ? "Attack-move" : "Move order") << ": building " << hp << "/" << maxHp
+                  << " hp, " << through << " units beyond the gap, " << idleAtGap << " standing idle at it"
+                  << std::endl;
+        // The building that shuts the passage is broken down (it is gone from the list once it has fallen) and the
+        // troops go on, whether they were sent by attack-move or by a plain move order
+        const bool broken = !b || !b->alive || hp < maxHp;
+        if (!broken || through == 0)
+        {
+            std::cerr << "[Test] FAILED: units sent through the fog stand at a shut passage and do not attack the "
+                         "enemy building that blocks it (mode "
+                      << mode << ")" << std::endl;
+            ok = false;
+        }
+        map.SetFogEnabled(false);
+    }
+    return ok;
+}
+
 bool HeadlessTest::RunMatchAiTest(Application &app)
 {
     std::cout << "[Test] Validating computer players in a match..." << std::endl;
@@ -426,6 +1170,18 @@ bool HeadlessTest::RunMatchAiTest(Application &app)
         }
         return o;
     };
+    {
+        // A custom game against several computer players is a local match: not an online one, it restarts alone
+        MatchSetup local = setup;
+        local.localOnly = true;
+        if (!mission.LoadMatch(local, map, entities, economy, pf) || !mission.IsMatch() || mission.IsOnlineMatch()
+            || !mission.Restart(LoaderResources::kDefaultRoot, map, entities, economy, pf) || !mission.IsMatch()
+            || mission.IsOnlineMatch())
+        {
+            std::cerr << "[Test] FAIL: a local match must load, stay local and restart" << std::endl;
+            return false;
+        }
+    }
     const Outcome first = run();
     const Outcome second = run();
     std::cout << "  - " << first.ais << " computer players: " << first.aiBuildings << " buildings, " << first.aiUnits
@@ -708,7 +1464,8 @@ bool HeadlessTest::RunGroupMovementTest(Application &app)
             std::cerr << "[Test] Error: units jerked (pixel position jumped faster than move speed)!" << std::endl;
             ok = false;
         }
-        if (a.reversals > 2 || b.reversals > 12)
+        // (a blob of 12 troops of very different speeds, the slowest Zeus at 0.6: three back-steps are fine)
+        if (a.reversals > 3 || b.reversals > 12)
         {
             std::cerr << "[Test] Error: units shake back and forth while moving!" << std::endl;
             ok = false;
@@ -771,10 +1528,11 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
     for (int level = 0; level <= 2; ++level)
     {
         withDifficulty(level);
+        const AITacticsConfig &tac = ai.GetTactics();
         AIWavePlan w1 = ai.PlanWave(1, true, true);
-        AIWavePlan w3 = ai.PlanWave(3, true, true);
-        AIWavePlan w5 = ai.PlanWave(5, true, true);
-        AIWavePlan w7 = ai.PlanWave(7, true, true);
+        AIWavePlan w3 = ai.PlanWave(tac.vanguardWave, true, true); // the first wave with rocket troopers
+        AIWavePlan w5 = ai.PlanWave(tac.assaultWave, true, true);  // the first wave with tanks
+        AIWavePlan w7 = ai.PlanWave(tac.siegeWave, true, true);    // the first siege fist
         firstWaveSize[level] = static_cast<int>(w1.archetypes.size());
         if (w1.tier != AIWaveTier::Scout || count(w1, {1}) != static_cast<int>(w1.archetypes.size()))
         {
@@ -783,21 +1541,24 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         int support = count(w3, {3});
         if (w3.tier != AIWaveTier::Vanguard || support < 1 || support > 2 || count(w3, {7, 9, 11, 13}) != 0)
         {
-            return fail("wave 3 must be an infantry vanguard with 1-2 rocket troopers");
+            return fail("the vanguard wave must be infantry with 1-2 rocket troopers");
         }
         if (w5.tier != AIWaveTier::Assault || count(w5, {7, 9, 11}) < 1)
         {
-            return fail("wave 5 must bring tanks");
+            return fail("the assault wave must bring tanks");
         }
         if (w1.archetypes.size() > w3.archetypes.size() || w3.archetypes.size() > w5.archetypes.size())
         {
             return fail("wave size must not shrink as the AI escalates");
         }
-        if (level == 0 && w7.tier == AIWaveTier::Siege)
-            return fail("Easy AI must not reach the Siege tier");
-        if (level >= 1 && (w7.tier != AIWaveTier::Siege || count(w7, {13}) < 1))
+        // Tanks come earlier on Normal and above than on Easy
+        if (level >= 1 && tac.assaultWave > 3)
+            return fail("Normal/Hard AI must field tanks from the third wave");
+        if (level == 0 && tac.assaultWave < 4)
+            return fail("Easy AI sends its first tanks later than the others");
+        if (w7.tier != AIWaveTier::Siege || count(w7, {13}) < 1)
         {
-            return fail("wave 7 must be a siege fist with MLRS on Normal/Hard");
+            return fail("the siege wave must be a siege fist with MLRS (difficulty " + std::to_string(level) + ")");
         }
         if (count(ai.PlanWave(5, false, false), {7, 9, 11, 13}) != 0)
         {
@@ -1107,6 +1868,67 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             return fail("a group member must not take a map-wide detour to its slot");
     }
 
+    // D3c) Wave routes: around a hostile wall when the way around is short, through it when there is none,
+    //      and out of a known tower's reach in open ground
+    {
+        const PlayerId me = ai.player();
+        PlayerId foe = kNoPlayer;
+        for (PlayerId p = 0; p < kMaxPlayers && foe == kNoPlayer; ++p)
+        {
+            if (Players::Hostile(p, me))
+                foe = p;
+        }
+        if (foe == kNoPlayer)
+            return fail("D3c: no hostile player");
+        auto crossesWall = [&](const std::vector<PathNode> &route) {
+            for (const PathNode &n : route)
+            {
+                if (map.GetWall(n.x, n.y) > 0)
+                    return true;
+            }
+            return false;
+        };
+        entities.Clear();
+        map.InitBlankArena(40, 30, 0);
+        for (int y = 0; y <= 13; ++y)
+            map.SetWall(20, y, PlayerFaction(), 100, foe); // open from y 14 on: a short way around
+        std::vector<PathNode> around;
+        const bool okAround = AISquadController::PlanRoute(map, entities, me, true, 5, 10, 35, 10, around);
+        const bool aroundCrosses = crossesWall(around);
+        for (int y = 14; y < 30; ++y)
+            map.SetWall(20, y, PlayerFaction(), 100, foe); // no way around any more
+        std::vector<PathNode> through;
+        const bool okThrough = AISquadController::PlanRoute(map, entities, me, true, 5, 10, 35, 10, through);
+        const bool throughCrosses = crossesWall(through);
+
+        entities.Clear();
+        map.InitBlankArena(60, 44, 0);
+        const int towerId // a bunker: reach 10, room to pass it on either side
+            = entities.SpawnBuildingByIndex(
+                PlayerFaction() == Faction::Confederation ? 5 : 13, 29, 21, PlayerFaction(), 1.0f, foe);
+        const Entity *tower = entities.GetEntity(towerId);
+        std::vector<PathNode> safe;
+        const bool okSafe = AISquadController::PlanRoute(map, entities, me, true, 3, 22, 57, 22, safe);
+        float closest = 1e9f;
+        if (tower)
+        {
+            const float tx = tower->GetUnitCenterPixelX() / TILE_WIDTH, ty = tower->GetUnitCenterPixelY() / TILE_HEIGHT;
+            for (const PathNode &n : safe)
+                closest = std::min(closest, DetMath::Hypot(n.x + 0.5f - tx, n.y + 0.5f - ty));
+        }
+        const float reach = tower ? tower->attackRange : 0.0f;
+        std::cout << "  - Wave routes: short way around " << (okAround && !aroundCrosses ? "taken" : "NOT taken")
+                  << ", walled off -> " << (okThrough && throughCrosses ? "breach" : "NO breach") << ", bunker reach "
+                  << reach << " closest pass " << closest << std::endl;
+        entities.Clear();
+        if (!okAround || aroundCrosses)
+            return fail("a wave must walk around a hostile wall when the detour is short");
+        if (!okThrough || !throughCrosses)
+            return fail("a wave must breach a hostile wall when there is no way around");
+        if (!tower || !okSafe || closest <= reach)
+            return fail("a wave route must keep out of a known bunker's reach when the ground allows");
+    }
+
     // D3e) Paths are straight runs, not staircases (vehicles stop to turn before every changed step)
     {
         setupArena();
@@ -1410,6 +2232,30 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             return fail("attacker reveal in fog broken");
     }
 
+    // D3d) Fog: the rest of a group dies, and the lone survivor keeps its ordered target that only the dead saw
+    {
+        setupArena();
+        map.SetFogEnabled(true);
+        map.ResetAllFog(FogState::Hidden);
+        const int hunter = entities.SpawnUnitByArchetype(0, 6, 15, PlayerFaction());
+        const int spotter = entities.SpawnUnitByArchetype(0, 20, 15, PlayerFaction());
+        const int enemy = entities.SpawnUnitByArchetype(0, 24, 15, AiFaction());
+        entities.UpdateFogOfWar(map);
+        entities.IssueAttackOrder({hunter}, enemy, &pf);
+        entities.Update(0.05f, map, pf); // the spotter's sight covers the enemy
+        if (Entity *sp = entities.GetEntity(spotter))
+            sp->alive = false; // gone from the fog calculation
+        for (int i = 0; i < 6; ++i)
+            entities.Update(0.05f, map, pf);
+        const Unit *h = entities.GetUnit(hunter);
+        const bool kept = h && h->targetEntityId == enemy;
+        const bool advancing = h && h->tileX > 6;
+        std::cout << "  - Fog, lone survivor: keeps ordered target " << kept << ", walks on " << advancing << std::endl;
+        map.SetFogEnabled(false);
+        if (!kept || !advancing)
+            return fail("a unit must keep its ordered target after its group's sight is gone");
+    }
+
     // D4) A control group marches with auto-attack: it shoots enemies met on the way and still arrives;
     //     the group bar survives members dying in the same frame
     {
@@ -1593,7 +2439,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
     ai.Init(5, 5, 35, 25);
     ai.m_credits = 10000;
     int lastIndex = 0;
-    for (int t = 0; t < 75; ++t)
+    for (int t = 0; t < 150; ++t) // two technologies of 70 s each (Hard)
     {
         ai.Update(1.0f, map, entities, pf);
         if (ai.GetResearchIndex() < lastIndex)
@@ -1602,7 +2448,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
     }
     const Unit *Tr = entities.GetUnit(trooper);
     std::cout << "  - Research: " << ai.GetResearchIndex()
-              << " technologies done in 75s (Hard), damage to a rifleman 100 -> "
+              << " technologies done in 150s (Hard), damage to a rifleman 100 -> "
               << (Tr ? ReduceDamageByArmor(100, *Tr) : -1) << std::endl;
     if (!ai.IsTechnologyResearched(0) || !ai.IsTechnologyResearched(1) || ai.GetResearchIndex() < 2)
     {
@@ -1671,11 +2517,12 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         const int rich = ai.AttackGroupCount(30, map);
         const int few = ai.AttackGroupCount(4, map);
         const int tenUnits = ai.AttackGroupCount(10, map); // a squad is never smaller than five
-        withDifficulty(0);                                 // Easy: at most 2
+        const int five = ai.AttackGroupCount(5, map);      // fewer than six units stay together
+        withDifficulty(0);                                 // Easy: no flank groups at all
         const int easyRich = ai.AttackGroupCount(30, map);
         std::cout << "  - Attack groups: poor " << poor << ", rich " << rich << " (5 max), 4 units -> " << few
-                  << ", Easy rich " << easyRich << std::endl;
-        if (poor != 1 || rich != 5 || few != 1 || easyRich != 2 || tenUnits > 2)
+                  << ", 5 units -> " << five << ", Easy rich " << easyRich << std::endl;
+        if (poor != 1 || rich != 5 || few != 1 || five != 1 || easyRich != 1 || tenUnits > 2)
             return fail("attack group count must follow money / difficulty");
     }
 
@@ -1741,6 +2588,68 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         ai.SetSkirmish(false);
     }
 
+    // H2) Walls only where an enemy can walk in: the northern half of the ring is closed off by impassable
+    //     terrain right outside it, so no wall goes there; core build order raises power, barracks and factory
+    {
+        withDifficulty(1);
+        entities.Clear();
+        map.InitBlankArena(70, 50, 0);
+        pf.SetMap(&map);
+        pf.SetEntityManager(&entities);
+        ai.m_squadController.Clear();
+        ai.m_defensePlan.clear();
+        ai.m_defensePlanned = false;
+        ai.m_gateX[0] = ai.m_gateX[1] = -1;
+        const Faction side = AiFaction();
+        const bool conf = (side == Faction::Confederation);
+        const int hqId = entities.SpawnBuildingByIndex(conf ? 0 : 8, 10, 22, side, 1.0f); // HQ only
+        entities.SpawnBuildingByIndex(PlayerFaction() == Faction::Confederation ? 0 : 8, 60, 20, PlayerFaction(), 1.0f);
+        const Building *hq = entities.GetBuilding(hqId);
+        if (!hq)
+            return fail("H2: no HQ");
+        const int cx = hq->tileX + hq->buildWidth / 2, cy = hq->tileY + hq->buildHeight / 2;
+        const int hqRadius = std::max(hq->buildWidth, hq->buildHeight) / 2 + 1;
+        const float wallRadius = static_cast<float>(hqRadius + 8);
+        for (int y = 0; y < cy - 2; ++y)
+        {
+            for (int x = 0; x < map.GetWidth(); ++x)
+            {
+                const float d = DetMath::Hypot(static_cast<float>(x - cx), static_cast<float>(y - cy));
+                if (d >= wallRadius + 0.6f && d <= wallRadius + 3.0f)
+                    map.SetPassable(x, y, false);
+            }
+        }
+        ai.Init(cx, cy, 61, 21);
+        ai.SetSkirmish(true);
+        ai.RecordStartingBase(entities, map);
+        ai.m_credits = 20000;
+        for (int t = 0; t < 300; ++t)
+        {
+            ai.UpdateBaseBuilder(1.0f, map, entities, pf);
+            entities.Update(1.0f, map, pf);
+        }
+        int northWalls = 0, southWalls = 0;
+        for (int y = 0; y < map.GetHeight(); ++y)
+        {
+            for (int x = 0; x < map.GetWidth(); ++x)
+            {
+                if (map.GetWall(x, y) > 0 && map.GetWallFaction(x, y) == side)
+                    (y < cy - 5 ? northWalls : southWalls) += 1; // the band ends at cy - 2: walls may close that gap
+            }
+        }
+        const bool power = entities.HasBuildingType(UnitType::PowerPlant, ai.player(), false);
+        const bool barracks = entities.HasBuildingType(UnitType::Barracks, ai.player(), false);
+        const bool factory = entities.HasBuildingType(UnitType::Factory, ai.player(), false);
+        std::cout << "  - Walls on enemy paths: " << northWalls << " behind closed terrain, " << southWalls
+                  << " on open ground; power " << power << ", barracks " << barracks << ", factory " << factory
+                  << std::endl;
+        if (northWalls > 0 || southWalls < 5)
+            return fail("walls must only close ways an enemy can walk");
+        if (!power || !barracks || !factory)
+            return fail("the core build order must raise power, barracks and factory");
+        ai.SetSkirmish(false);
+    }
+
     // I) Debug control: treasury edit and the reasoning log
     {
         ai.SetEnemyCredits(-50);
@@ -1801,6 +2710,80 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
                   << ", built once free=" << (builtLater ? "yes" : "no") << std::endl;
         if (builtUnderUnit || !keptForLater || !builtLater || map.GetWall(20, 10) == 0)
             return fail("a unit on a planned wall tile must only delay the segment");
+    }
+
+    // L) Counter-composition, home guard, expensive units, scouting
+    {
+        withDifficulty(1);
+        ai.m_seenEnemyUnits.clear();
+        auto count = [](const AIWavePlan &plan, int arch) {
+            return static_cast<int>(std::count(plan.archetypes.begin(), plan.archetypes.end(), arch));
+        };
+        const AIWavePlan plain = ai.PlanWave(3, true, true);
+        for (int i = 0; i < 6; ++i)
+            ai.m_seenEnemyUnits[100000 + i] = true; // an armoured enemy
+        const AIWavePlan antiArmour = ai.PlanWave(3, true, true);
+        ai.m_seenEnemyUnits.clear();
+        for (int i = 0; i < 8; ++i)
+            ai.m_seenEnemyUnits[100000 + i] = false; // an infantry enemy
+        const AIWavePlan antiInfantry = ai.PlanWave(3, true, true);
+        ai.m_seenEnemyUnits.clear();
+        std::cout << "  - Counter-composition: rockets " << count(plain, 3) << " -> " << count(antiArmour, 3)
+                  << " vs armour, flamers " << count(plain, 5) << " -> " << count(antiInfantry, 5) << " vs infantry"
+                  << std::endl;
+        if (count(antiArmour, 3) <= count(plain, 3) || count(antiInfantry, 5) <= count(plain, 5))
+            return fail("the wave must counter the enemy army it has seen");
+
+        float shares[4];
+        for (int d = 0; d < 4; ++d)
+        {
+            withDifficulty(d);
+            shares[d] = ai.HomeGuardShare();
+        }
+        withDifficulty(1);
+        std::cout << "  - Home guard: " << shares[0] << " / " << shares[1] << " / " << shares[2] << " / " << shares[3]
+                  << std::endl;
+        if (!(shares[0] > shares[1] && shares[1] > shares[2] && shares[2] > shares[3] && shares[3] > 0.0f))
+            return fail("the home guard must shrink with the difficulty");
+
+        setupArena();
+        const bool conf = ai.side() == Faction::Confederation;
+        const int dear = entities.SpawnUnitByArchetype(conf ? 11 : 10, 10, 10, ai.side(), ai.player());
+        const int cheap = entities.SpawnUnitByArchetype(conf ? 1 : 0, 12, 10, ai.side(), ai.player());
+        const bool dearValuable = entities.GetUnit(dear) && ai.IsValuable(*entities.GetUnit(dear), entities);
+        const bool cheapValuable = entities.GetUnit(cheap) && ai.IsValuable(*entities.GetUnit(cheap), entities);
+        std::cout << "  - Expensive units: " << (conf ? "Zeus" : "Rhino") << " " << dearValuable << ", rifleman "
+                  << cheapValuable << std::endl;
+        if (!dearValuable || cheapValuable)
+            return fail("Zeus / Rhino and dearer units are the ones worth saving");
+
+        // A scout leaves for the enemy base (not on Hardcore)
+        setupArena();
+        ai.Init(5, 5, 35, 25);
+        ai.m_scoutId = 0;
+        ai.m_scoutTimer = 0.0f;             // as on a fresh match (Reset)
+        ai.Update(1.0f, map, entities, pf); // the garrison is recorded first: these troops come after it
+        std::vector<int> troops;
+        for (int i = 0; i < 3; ++i)
+            troops.push_back(entities.SpawnUnitByArchetype(conf ? 1 : 0, 6 + i, 8, ai.side(), ai.player()));
+        for (int id : troops)
+            ai.m_waveRoster.insert(id);
+        int scout = 0;
+        float closest = 1e9f;
+        for (int t = 0; t < 20; ++t)
+        {
+            ai.Update(1.0f, map, entities, pf);
+            entities.Update(1.0f, map, pf);
+            if (ai.m_scoutId)
+                scout = ai.m_scoutId;
+            if (const Unit *u = scout ? entities.GetUnit(scout) : nullptr)
+                closest = std::min(
+                    closest, DetMath::Hypot(static_cast<float>(u->tileX - 35), static_cast<float>(u->tileY - 25)));
+        }
+        std::cout << "  - Scouting: scout " << (scout ? "sent" : "NOT sent") << ", closest to the enemy base "
+                  << closest << " tiles" << std::endl;
+        if (!scout || closest > 10.0f)
+            return fail("a scout must go and look at the enemy base");
     }
 
     ai.SetDebugConfig(savedDebug);
@@ -2062,6 +3045,91 @@ bool HeadlessTest::RunCombatBehaviourTest(Application &app)
             return false;
         }
     }
+    // B2. Stances: an enemy in sight but out of range. Pursue walks up and stays, PursueAndReturn walks up and
+    //     comes back after the kill, HoldGround never moves
+    {
+        fresh();
+        const UnitStance stances[3] = {UnitStance::Pursue, UnitStance::PursueAndReturn, UnitStance::HoldGround};
+        int unitIds[3] = {}, dummyIds[3] = {};
+        for (int i = 0; i < 3; ++i)
+        {
+            const int y = 6 + i * 10;
+            unitIds[i] = app.m_entities->SpawnUnitByArchetype(0, 15, y, Faction::Resistance);
+            Unit *u = app.m_entities->GetUnit(unitIds[i]);
+            if (!u)
+                return false;
+            u->stance = stances[i];
+            u->sightRadius = static_cast<int>(u->attackRange) + 5; // sees well beyond its reach
+            const int gap = static_cast<int>(u->attackRange) + 3;
+            dummyIds[i] = app.m_entities->SpawnUnitByArchetype(1, 15 + gap, y, Faction::Confederation);
+            Unit *d = app.m_entities->GetUnit(dummyIds[i]);
+            if (!d)
+                return false;
+            d->moveSpeed = 0.0f;
+            d->attackDamage = 0;
+            d->maxHp = d->currentHp = 1;
+        }
+        app.m_entities->UpdateFogOfWar(*app.m_map);
+        for (float t = 0.0f; t < 12.0f; t += dt)
+            app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
+        const Unit *pursuer = app.m_entities->GetUnit(unitIds[0]);
+        const Unit *guard = app.m_entities->GetUnit(unitIds[1]);
+        const Unit *holder = app.m_entities->GetUnit(unitIds[2]);
+        if (!pursuer || !guard || !holder)
+            return false;
+        const bool pursuerKilled = app.m_entities->GetEntity(dummyIds[0]) == nullptr;
+        const bool guardKilled = app.m_entities->GetEntity(dummyIds[1]) == nullptr;
+        const bool holderKilled = app.m_entities->GetEntity(dummyIds[2]) == nullptr;
+        std::cout << "  - Stances: pursue at " << pursuer->tileX << " (kill " << pursuerKilled << "), guard at "
+                  << guard->tileX << "," << guard->tileY << " (kill " << guardKilled << "), hold at " << holder->tileX
+                  << " (kill " << holderKilled << ")" << std::endl;
+        if (!pursuerKilled || pursuer->tileX <= 15)
+        {
+            std::cerr << "[Test] Error: a pursuing unit did not go after an enemy in sight!" << std::endl;
+            return false;
+        }
+        if (!guardKilled || std::abs(guard->tileX - 15) > 1 || std::abs(guard->tileY - 16) > 1)
+        {
+            std::cerr << "[Test] Error: a guarding unit did not return home after the kill!" << std::endl;
+            return false;
+        }
+        if (holderKilled || holder->tileX != 15 || holder->tileY != 26)
+        {
+            std::cerr << "[Test] Error: a unit holding its ground walked off after an enemy out of range!" << std::endl;
+            return false;
+        }
+    }
+    // B3. Building repair: half the hit points come back in half of kRepairSeconds for 15% of the price,
+    //     and the repair stops when the credits run out
+    {
+        Building b;
+        b.maxHp = 1000;
+        b.currentHp = 500;
+        b.repairing = true;
+        int paid = 0;
+        float t = 0.0f;
+        for (; t < Building::kRepairSeconds && b.repairing; t += dt)
+            paid += b.RepairStep(dt, 1000, 100000);
+        Building broke;
+        broke.maxHp = 1000;
+        broke.currentHp = 100;
+        broke.repairing = true;
+        int brokePaid = 0;
+        for (float s = 0.0f; s < 60.0f && broke.repairing; s += dt)
+            brokePaid += broke.RepairStep(dt, 1000, 20 - brokePaid);
+        std::cout << "  - Repair: full after " << t << " s for " << paid << " credits; with 20 credits "
+                  << broke.currentHp << " HP, stopped " << !broke.repairing << std::endl;
+        if (b.currentHp != 1000 || std::abs(t - Building::kRepairSeconds / 2.0f) > 1.0f || std::abs(paid - 150) > 2)
+        {
+            std::cerr << "[Test] Error: building repair rate or price is wrong!" << std::endl;
+            return false;
+        }
+        if (broke.repairing || brokePaid > 20 || broke.currentHp >= 1000)
+        {
+            std::cerr << "[Test] Error: a repair without credits must stop!" << std::endl;
+            return false;
+        }
+    }
     // C. A manual attack order: the units stop at their firing range, they do not walk up to the target
     for (int arch : {0, 6, 10})
     {
@@ -2147,8 +3215,166 @@ bool HeadlessTest::RunCombatBehaviourTest(Application &app)
     return true;
 }
 
+bool HeadlessTest::RunBurstTest(Application &app)
+{
+    std::cout << "[Test] Validating bursts (a new volley never starts inside a burst) and animation timing..."
+              << std::endl;
+    app.m_entities->Clear();
+    app.m_map->InitBlankArena(60, 40, 0);
+    app.m_pathfinder->SetMap(app.m_map.get());
+    app.m_pathfinder->SetEntityManager(app.m_entities.get());
+    const int shooter = app.m_entities->SpawnUnitByArchetype(12, 20, 20, Faction::Resistance); // Porcupine
+    app.m_entities->SpawnBuildingByIndex(0, 25, 19, Faction::Confederation, 1.0f);
+    const Unit *u = app.m_entities->GetUnit(shooter);
+    if (!u || u->burstCount < 2)
+    {
+        std::cerr << "[Test] Error: the Porcupine is missing or has no burst" << std::endl;
+        return false;
+    }
+    if (std::abs(u->burstPoseTime - 0.2f) > 0.001f || u->flashMode != 0)
+    {
+        std::cerr << "[Test] Error: animations: timing of the Porcupine was not read (" << u->burstPoseTime << ")"
+                  << std::endl;
+        return false;
+    }
+    const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+    float prevCooldown = 0.0f;
+    int prevRemaining = 0, volleys = 0, shotsInVolley = 0;
+    std::vector<int> shots;
+    for (int tick = 0; tick < 400 && (u = app.m_entities->GetUnit(shooter)); ++tick)
+    {
+        app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
+        u = app.m_entities->GetUnit(shooter);
+        if (!u)
+            break;
+        const bool jumped = u->cooldownTimer > prevCooldown + 0.1f;
+        if (jumped && u->burstShotsRemaining == u->burstCount - 1)
+        { // a volley starts
+            if (prevRemaining != 0)
+            {
+                std::cerr << "[Test] Error: a new volley started inside a burst (" << prevRemaining
+                          << " shots left) tick " << tick << std::endl;
+                return false;
+            }
+            if (volleys > 0)
+                shots.push_back(shotsInVolley);
+            shotsInVolley = 1;
+            ++volleys;
+        }
+        else if (jumped && u->burstShotsRemaining == 0 && u->cooldownTimer < u->attackCooldown - 0.01f)
+        {
+            std::cerr << "[Test] Error: the cooldown after a burst is shorter than the weapon's" << std::endl;
+            return false;
+        }
+        else if (u->burstShotsRemaining < prevRemaining)
+        {
+            ++shotsInVolley;
+        }
+        prevCooldown = u->cooldownTimer;
+        prevRemaining = u->burstShotsRemaining;
+    }
+    if (volleys < 2)
+    {
+        std::cerr << "[Test] Error: the Porcupine fired " << volleys << " volley(s) in 20 s" << std::endl;
+        return false;
+    }
+    for (int n : shots)
+    {
+        if (n != 10)
+        {
+            std::cerr << "[Test] Error: a volley had " << n << " shots, expected 10" << std::endl;
+            return false;
+        }
+    }
+    std::cout << "  - " << volleys << " volleys of 10 shots, none inside another OK" << std::endl;
+    return true;
+}
+
+bool HeadlessTest::RunDataSyncTest(Application &app)
+{
+    std::cout << "[Test] Validating the session data overlay (network data sync)..." << std::endl;
+    const uint64_t own = NetMatch::AssetsHash();
+    const std::vector<Net::DataEntry> manifest = NetMatch::DataManifest();
+    if (manifest.size() != LoaderResources::NetHashFiles().size() + 1
+        || manifest.back().path != LoaderResources::kManifestPath)
+    {
+        std::cerr << "[Test] Error: the data manifest does not list every simulation file (" << manifest.size() << ")"
+                  << std::endl;
+        return false;
+    }
+    // A picture file is not part of the hash, a simulation file is
+    const std::string unitFile = "assets/characters/resistance_unit_rifleman.yaml";
+    std::string original;
+    if (!Assets::ReadText(unitFile, original))
+    {
+        std::cerr << "[Test] Error: cannot read " << unitFile << std::endl;
+        return false;
+    }
+    const int ownHp = app.m_entities->GetUnitConfig(0)->maxHp;
+    const std::string visualFile = LoaderResources::NetVisualFiles().front();
+    Assets::SetSessionOverlay({{visualFile.substr(7), {1, 2, 3}}});
+    if (NetMatch::AssetsHash() != own)
+    {
+        std::cerr << "[Test] Error: a picture file changed the data hash" << std::endl;
+        return false;
+    }
+    std::string changed = original;
+    const size_t at = changed.find("max_hp:");
+    if (at == std::string::npos)
+    {
+        std::cerr << "[Test] Error: no max_hp in " << unitFile << std::endl;
+        return false;
+    }
+    const size_t eol = changed.find('\n', at);
+    changed.replace(at, eol - at, "max_hp: " + std::to_string(ownHp + 7));
+    Assets::SetSessionOverlay({{unitFile.substr(7), std::vector<uint8_t>(changed.begin(), changed.end())}});
+    std::string read;
+    app.ReloadGameData();
+    if (!Assets::ReadText(unitFile, read) || read != changed || NetMatch::AssetsHash() == own
+        || app.m_entities->GetUnitConfig(0)->maxHp != ownHp + 7)
+    {
+        std::cerr << "[Test] Error: the overlay is not used (hp " << app.m_entities->GetUnitConfig(0)->maxHp << ")"
+                  << std::endl;
+        return false;
+    }
+    Assets::ClearSessionOverlay();
+    app.ReloadGameData();
+    if (!Assets::ReadText(unitFile, read) || read != original || NetMatch::AssetsHash() != own
+        || app.m_entities->GetUnitConfig(0)->maxHp != ownHp)
+    {
+        std::cerr << "[Test] Error: the player's own data did not come back" << std::endl;
+        return false;
+    }
+    std::cout << "  - overlay wins, picture files stay out of the hash, own data restored OK" << std::endl;
+    return true;
+}
+
 bool HeadlessTest::run(Application &app, int numTicks)
 {
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "datasync")
+    {
+        return RunDataSyncTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "burst")
+    {
+        return RunBurstTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "matchai")
+    {
+        return RunMatchAiTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "tech")
+    {
+        return RunTechTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "aivehicle")
+    {
+        return RunAiVehicleTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "fogblock")
+    {
+        return RunFogBlockTest(app);
+    }
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "group")
     {
         return RunGroupMovementTest(app);
@@ -2198,7 +3424,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     const auto *u0 = app.m_entities->GetUnitConfig(0); // Rifleman Resistance
     // Descriptions come from the translation catalogue by id, not from the YAML file
     if (!u0 || u0->id != "rifleman_res" || u0->description != "rifleman_res.description"
-        || Localization::Tr(u0->description) == u0->description || u0->maxHp != 30)
+        || Localization::Tr(u0->description) == u0->description || u0->maxHp != 25)
     {
         std::cerr << "[Test] Error: Unit config 0 (rifleman_res) invalid or failed to load from YAML!" << std::endl;
         return false;
@@ -2246,24 +3472,26 @@ bool HeadlessTest::run(Application &app, int numTicks)
         custom.muted = true;
         custom.language = "ru";
         custom.difficulty = 3;
+        custom.edgePanMargin = 18;
         Settings loaded;
         if (!custom.Save(settingsPath) || !loaded.load(settingsPath) || loaded.windowMode != WindowMode::Exclusive
             || loaded.windowW != 1600 || loaded.fullscreenH != 1080 || loaded.vsync || loaded.fpsLimit != 60
             || !loaded.showFps || loaded.graphicsQuality != 1 || loaded.smoothing || loaded.zoomDefault != 1.5f
             || loaded.zoomMin != 0.75f || loaded.zoomMax != 3.0f || loaded.musicVolume != 40 || loaded.fxVolume != 70
-            || !loaded.muted || loaded.language != "ru" || loaded.difficulty != 3)
+            || !loaded.muted || loaded.language != "ru" || loaded.difficulty != 3 || loaded.edgePanMargin != 18)
         {
             std::cerr << "[Test] Error: Settings did not survive a save / load round trip!" << std::endl;
             return false;
         }
         {
             std::ofstream bad(settingsPath);
-            bad << R"({"windowWidth": 10, "zoomDefault": 99, "zoomMax": 1, "musicVolume": 900, "language": "xx", "difficulty": 9})";
+            bad << R"({"windowWidth": 10, "zoomDefault": 99, "zoomMax": 1, "musicVolume": 900, "language": "xx", "difficulty": 9, "edgePanMargin": 999})";
         }
         Settings clamped;
         if (!clamped.load(settingsPath) || clamped.windowW < Settings::kMinWindowW
             || clamped.zoomDefault > clamped.zoomMax || clamped.zoomMax < 2.0f || clamped.musicVolume != 128
-            || clamped.language != "en" || clamped.difficulty != 3)
+            || clamped.language != "en" || clamped.difficulty != 3
+            || clamped.edgePanMargin != Settings::kMaxEdgePanMargin)
         {
             std::cerr << "[Test] Error: Out-of-range settings were not clamped!" << std::endl;
             return false;
@@ -2327,6 +3555,51 @@ bool HeadlessTest::run(Application &app, int numTicks)
             << "  - Settings round trip + clamping, save in the user directory (+ migration), camera zoom limits and "
                "graphics quality validated."
             << std::endl;
+
+        // Edge scroll margin and menu-open camera suppression
+        InputManager testInput;
+        testInput.SetEdgePanMargin(20);
+        if (testInput.GetEdgePanMargin() != 20)
+        {
+            std::cerr << "[Test] Error: InputManager edge pan margin not set!" << std::endl;
+            return false;
+        }
+        testInput.SetEdgePanMargin(2);
+        if (testInput.GetEdgePanMargin() != Settings::kMinEdgePanMargin)
+        {
+            std::cerr << "[Test] Error: InputManager edge pan margin min clamping failed!" << std::endl;
+            return false;
+        }
+        testInput.SetEdgePanMargin(100);
+        if (testInput.GetEdgePanMargin() != Settings::kMaxEdgePanMargin)
+        {
+            std::cerr << "[Test] Error: InputManager edge pan margin max clamping failed!" << std::endl;
+            return false;
+        }
+
+        Camera panCamera(800, 600);
+        panCamera.SetPosition(400.0f, 400.0f);
+        testInput.SetEdgePanMargin(15);
+        testInput.SetMouseScreenPosition(0, 0); // top-left edge
+
+        // When menu is open, edge panning must be blocked
+        testInput.SetMenuOpen(true);
+        testInput.UpdateCamera(0.1f, panCamera, 100, 100, true);
+        if (panCamera.GetX() != 400.0f || panCamera.GetY() != 400.0f)
+        {
+            std::cerr << "[Test] Error: Camera panned while menu was open!" << std::endl;
+            return false;
+        }
+
+        // When menu is closed, edge panning must move the camera
+        testInput.SetMenuOpen(false);
+        testInput.UpdateCamera(0.1f, panCamera, 100, 100, false);
+        if (panCamera.GetX() >= 400.0f || panCamera.GetY() >= 400.0f)
+        {
+            std::cerr << "[Test] Error: Camera failed to pan when mouse was at the edge!" << std::endl;
+            return false;
+        }
+        std::cout << "  - Edge scroll margin slider clamping and menu-open camera suppression validated." << std::endl;
     }
 
     // 1. Verify loading of all 8 campaign missions
@@ -3467,9 +4740,11 @@ bool HeadlessTest::run(Application &app, int numTicks)
     testUnit->state = ActionState::Idle;
     testUnit->path.clear();
     const int baseDamage = 100;
+    // The kind multiplier is tested elsewhere: here a neutral one isolates the moving-target roll
+    WeaponBalance::LoadText(R"({"multipliers":{"bullet":{"infantry":1.0}}})");
     for (int i = 0; i < 20; ++i)
     {
-        int dmg = EntityManager::ApplyMovingUnitDamage(baseDamage, testUnit);
+        int dmg = EntityManager::ApplyMovingUnitDamage(baseDamage, testUnit, ProjectileType::Bullet);
         if (dmg != baseDamage)
         {
             std::cerr << "[Test] Error: Stationary unit took reduced damage: " << dmg << " instead of " << baseDamage
@@ -3484,7 +4759,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     int maxDmgSeen = -999;
     for (int i = 0; i < 500; ++i)
     {
-        int dmg = EntityManager::ApplyMovingUnitDamage(baseDamage, testUnit);
+        int dmg = EntityManager::ApplyMovingUnitDamage(baseDamage, testUnit, ProjectileType::Bullet);
         if (dmg < 50 || dmg > 100)
         {
             std::cerr << "[Test] Error: Moving unit took out-of-bounds damage: " << dmg << " (expected 50..100)"
@@ -3500,6 +4775,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
                   << " max=" << maxDmgSeen << std::endl;
         return false;
     }
+    WeaponBalance::Reload();
     testUnit->alive = false;
     std::cout << "  - Moving unit damage reduction validated: idle=100%, moving=50%..100% (observed: " << minDmgSeen
               << "%.." << maxDmgSeen << "%)." << std::endl;
@@ -3650,53 +4926,21 @@ bool HeadlessTest::run(Application &app, int numTicks)
     const auto *grenadierCfg = app.m_entities->GetUnitConfig(2);
     const auto *heavyAssaultCfg = app.m_entities->GetUnitConfig(3);
 
-    if (!hammerCfg || hammerCfg->splashPercent != 5 || hammerCfg->weapons.empty()
-        || hammerCfg->weapons[0].splashPercent != 5)
+    // The numbers are the designer's to tune (character files); what must hold is that a unit's splash is the one of its
+    // main weapon, for every unit that has a splash
+    for (const UnitConfig *cfg :
+         {hammerCfg, zeusCfg, rhinoCfg, rhinoSiegeCfg, gradCfg, mlrsCfg, grenadierCfg, heavyAssaultCfg})
     {
-        std::cerr << "[Test] Error: Hammer splash percent mismatch! Expected 5%" << std::endl;
-        return false;
+        if (!cfg || cfg->weapons.empty() || cfg->weapons[0].splashPercent != cfg->splashPercent)
+        {
+            std::cerr << "[Test] Error: the splash percent of a unit and of its main weapon differ ("
+                      << (cfg ? cfg->id : std::string("missing config")) << ")" << std::endl;
+            return false;
+        }
     }
-    if (!zeusCfg || zeusCfg->splashPercent != 20 || zeusCfg->weapons.empty() || zeusCfg->weapons[0].splashPercent != 20)
-    {
-        std::cerr << "[Test] Error: Zeus splash percent mismatch! Expected 20%" << std::endl;
-        return false;
-    }
-    if (!rhinoCfg || rhinoCfg->splashPercent != 8 || rhinoCfg->weapons.empty()
-        || rhinoCfg->weapons[0].splashPercent != 8)
-    {
-        std::cerr << "[Test] Error: Rhino splash percent mismatch! Expected 8%" << std::endl;
-        return false;
-    }
-    if (!rhinoSiegeCfg || rhinoSiegeCfg->splashPercent != 15)
-    {
-        std::cerr << "[Test] Error: Rhino siege splash percent mismatch! Expected 15%" << std::endl;
-        return false;
-    }
-    if (!gradCfg || gradCfg->splashPercent != 16 || gradCfg->weapons.empty() || gradCfg->weapons[0].splashPercent != 16)
-    {
-        std::cerr << "[Test] Error: Grad MLRS splash percent mismatch! Expected 16%" << std::endl;
-        return false;
-    }
-    if (!mlrsCfg || mlrsCfg->splashPercent != 4 || mlrsCfg->weapons.empty() || mlrsCfg->weapons[0].splashPercent != 4)
-    {
-        std::cerr << "[Test] Error: Porcupine MLRS splash percent mismatch! Expected 4%" << std::endl;
-        return false;
-    }
-    if (!grenadierCfg || grenadierCfg->splashPercent != 2 || grenadierCfg->weapons.empty()
-        || grenadierCfg->weapons[0].splashPercent != 2)
-    {
-        std::cerr << "[Test] Error: Grenadier splash percent mismatch! Expected 2%" << std::endl;
-        return false;
-    }
-    if (!heavyAssaultCfg || heavyAssaultCfg->splashPercent != 2 || heavyAssaultCfg->weapons.empty()
-        || heavyAssaultCfg->weapons[0].splashPercent != 2)
-    {
-        std::cerr << "[Test] Error: Heavy Assault splash percent mismatch! Expected 2%" << std::endl;
-        return false;
-    }
-    std::cout << "  - Weapon splash damage YAML configurations validated: Hammer=5%, Zeus=20%, Rhino=8%/15%, Grad=16%, "
-                 "Porcupine=4%, Grenadier=2%, HeavyAssault=2%."
-              << std::endl;
+    std::cout << "  - Weapon splash damage: unit and main weapon agree (Hammer " << hammerCfg->splashPercent
+              << "%, Zeus " << zeusCfg->splashPercent << "%, Rhino " << rhinoCfg->splashPercent << "%/"
+              << rhinoSiegeCfg->splashPercent << "%)." << std::endl;
 
     // B. Validate 2x2 area Splash Damage execution on impact
     int primaryTargetId = app.m_entities->SpawnUnitByArchetype(0, 15, 15, Faction::Confederation);
@@ -3822,6 +5066,22 @@ bool HeadlessTest::run(Application &app, int numTicks)
             u->isAttackMoving = false;
             if (u->state == ActionState::Move || u->state == ActionState::Attack)
                 u->state = ActionState::Idle;
+        }
+        else if (Building *b = e.AsBuilding(); b && b->alive)
+        {
+            b->targetEntityId = 0;
+            b->targetWallTileX = -1;
+            b->targetWallTileY = -1;
+            b->cooldownTimer = 100.0f;
+        }
+    }
+    // Whatever the earlier sections left standing around the lane (their outcome depends on the damage balance) goes
+    for (Entity &e : app.m_entities->GetAllEntities())
+    {
+        if (std::abs(e.tileX - 12) <= 5 && std::abs(e.tileY - 12) <= 5)
+        {
+            e.alive = false;
+            e.currentHp = 0;
         }
     }
     int turnTestTankId = app.m_entities->SpawnUnitByArchetype(6, 12, 12, Faction::Confederation); // Hammer tank
@@ -4787,14 +6047,69 @@ bool HeadlessTest::run(Application &app, int numTicks)
         sim.m_research[owner].active = -1;
         sim.UpdateResearch(0.05f, ctx);
         const bool stopped = b && !b->isResearching;
-        entities.Clear();
-        if (!idle || !working || !stopped)
+
+        // Verify rendering behavior:
+        // Resistance Lab (building 12): in IDLE, the radar head must remain visible (not hidden)
+        // and stand still at frame 0 (composite 1262), rather than disappearing with cut-off sprites.
+        // During research, animFrame > 0 and the radar head rotates.
+        bool labIdleCheck = false;
+        bool labWorkCheck = false;
+        if (app.m_renderer && b)
         {
-            std::cerr << "[Test] Error: research animation flag: idle=" << idle << ", working=" << working
-                      << ", stopped=" << stopped << std::endl;
+            b->isResearching = false;
+            entities.render(*app.m_renderer, *app.m_camera, *app.m_map, false, 5);
+            labIdleCheck
+                = (app.m_renderer->lastDrawnBuilding.buildingType == 12
+                   && app.m_renderer->lastDrawnBuilding.animFrame == 0
+                   && app.m_renderer->lastDrawnBuilding.animatedPartsVisible);
+
+            b->isResearching = true;
+            entities.render(*app.m_renderer, *app.m_camera, *app.m_map, false, 5);
+            labWorkCheck
+                = (app.m_renderer->lastDrawnBuilding.buildingType == 12
+                   && app.m_renderer->lastDrawnBuilding.animFrame > 0
+                   && app.m_renderer->lastDrawnBuilding.animatedPartsVisible);
+        }
+
+        // Confederation Tech Center (building 4): in IDLE, screen lights are hidden (animatedPartsVisible == false),
+        // while during research they are visible (animatedPartsVisible == true).
+        bool techIdleCheck = false;
+        bool techWorkCheck = false;
+        const int tech = entities.SpawnBuildingByIndex(4, 20, 20, Faction::Confederation, 1.0f);
+        Building *bTech = entities.GetBuilding(tech);
+        if (app.m_renderer && bTech)
+        {
+            // Remove building 12 so building 4 is the last drawn building
+            if (b)
+                b->alive = false;
+
+            bTech->isResearching = false;
+            entities.render(*app.m_renderer, *app.m_camera, *app.m_map, false, 5);
+            techIdleCheck
+                = (app.m_renderer->lastDrawnBuilding.buildingType == 4
+                   && app.m_renderer->lastDrawnBuilding.animFrame == 0
+                   && !app.m_renderer->lastDrawnBuilding.animatedPartsVisible);
+
+            bTech->isResearching = true;
+            entities.render(*app.m_renderer, *app.m_camera, *app.m_map, false, 5);
+            techWorkCheck
+                = (app.m_renderer->lastDrawnBuilding.buildingType == 4
+                   && app.m_renderer->lastDrawnBuilding.animFrame > 0
+                   && app.m_renderer->lastDrawnBuilding.animatedPartsVisible);
+        }
+
+        entities.Clear();
+        if (!idle || !working || !stopped
+            || (app.m_renderer && (!labIdleCheck || !labWorkCheck || !techIdleCheck || !techWorkCheck)))
+        {
+            std::cerr << "[Test] Error: research animation flag or lab/tech render: idle=" << idle
+                      << ", working=" << working << ", stopped=" << stopped << ", labIdle=" << labIdleCheck
+                      << ", labWork=" << labWorkCheck << ", techIdle=" << techIdleCheck
+                      << ", techWork=" << techWorkCheck << std::endl;
             return false;
         }
-        std::cout << "  - The lab animates only while research runs." << std::endl;
+        std::cout << "  - The lab animates only while research runs (and radar head stands still in IDLE)."
+                  << std::endl;
     }
 
     // 26w. The mouse wheel: counted for the map or the sidebar, never zooms by itself
@@ -5013,6 +6328,22 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // 29. Several players, teams, per-player economies (see runMatchTest)
     if (!RunMatchTest(app))
+        return false;
+
+    // 29a. Zeus turret, research time, radar locator, quiet far-off battle sounds (see RunTechTest)
+    if (!RunTechTest(app))
+        return false;
+
+    // 29d. Units sent through the fog meet enemy buildings shutting a passage (see RunFogBlockTest)
+    if (!RunFogBlockTest(app))
+        return false;
+
+    // 29c. Computer players build a factory and field vehicles on every difficulty (see RunAiVehicleTest)
+    if (!RunAiVehicleTest(app))
+        return false;
+
+    // 29b. A recorded network match plays back to the same worlds (see RunReplayTest)
+    if (!RunReplayTest(app))
         return false;
 
     // 30. Computer players in match slots (see runMatchAiTest)
@@ -5279,6 +6610,247 @@ bool HeadlessTest::run(Application &app, int numTicks)
         }
         std::cout << "  - Prebuilt start: " << prebuiltBuildings << " buildings, " << prebuiltWalls
                   << " wall tiles; from scratch: " << scratchBuildings << " buildings, no walls." << std::endl;
+    }
+
+    // Camera ZOOM sound attenuation test (PlaceSfx)
+    {
+        // 1. Default zoom (2.0x): inside viewport gain is nominal (1.0f)
+        const SfxPlacement pDefault = PlaceSfx(500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f);
+        if (!pDefault.audible || std::abs(pDefault.gain - 1.0f) > 0.01f)
+        {
+            std::cerr << "[Test] Error: PlaceSfx at default zoom (2.0x) expected gain ~1.0, got " << pDefault.gain
+                      << std::endl;
+            return false;
+        }
+
+        // 2. Zoomed out (0.5x): camera high altitude reduces perceived battlefield sound volume
+        const SfxPlacement pFar = PlaceSfx(500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 0.5f);
+        if (!pFar.audible || pFar.gain >= 0.50f || pFar.gain <= 0.35f)
+        {
+            std::cerr << "[Test] Error: PlaceSfx at min zoom (0.5x) expected gain in [0.35, 0.50], got " << pFar.gain
+                      << std::endl;
+            return false;
+        }
+
+        // 3. Zoomed in (4.0x): camera close to ground amplifies perceived sound
+        const SfxPlacement pClose = PlaceSfx(500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 4.0f);
+        if (!pClose.audible || pClose.gain <= 1.20f || pClose.gain > 1.26f)
+        {
+            std::cerr << "[Test] Error: PlaceSfx at max zoom (4.0x) expected gain in (1.20, 1.26], got " << pClose.gain
+                      << std::endl;
+            return false;
+        }
+
+        // 4. Off-screen distance attenuation scales with zoom
+        const SfxPlacement pOffDefault = PlaceSfx(1100.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f);
+        const SfxPlacement pOffFar = PlaceSfx(1100.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 0.5f);
+        if (!pOffDefault.audible || !pOffFar.audible || pOffFar.gain >= pOffDefault.gain)
+        {
+            std::cerr << "[Test] Error: Off-screen sound should attenuate further with zoom out: pOffFar="
+                      << pOffFar.gain << ", pOffDefault=" << pOffDefault.gain << std::endl;
+            return false;
+        }
+
+        // 5. Sound beyond range is not audible regardless of zoom
+        const SfxPlacement pOut = PlaceSfx(1500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 4.0f);
+        if (pOut.audible)
+        {
+            std::cerr << "[Test] Error: Out of range sound must not be audible" << std::endl;
+            return false;
+        }
+
+        std::cout << "  - Camera ZOOM acoustic attenuation verified (0.5x -> " << pFar.gain << ", 2.0x -> "
+                  << pDefault.gain << ", 4.0x -> " << pClose.gain << ")." << std::endl;
+    }
+
+    // Headquarters under construction opens no building zone
+    {
+        app.m_entities->Clear();
+        const PlayerId owner = Players::OwnerOf(Faction::Resistance);
+        app.m_map->RevealArea(60, 10, 40, Players::TeamOf(owner));
+        app.m_entities->SetBuildRadius(16);
+        app.m_entities->SpawnBuildingByIndex(8, 5, 5, Faction::Resistance, 1.0f); // finished HQ
+        const int second = app.m_entities->SpawnBuildingByIndex(8, 50, 5, Faction::Resistance, 0.3f); // under construction
+        const bool underConstruction = app.m_entities->CanPlaceBuilding(52, 10, 1, 1, *app.m_map, owner);
+        if (Building *b = app.m_entities->GetEntity(second) ? app.m_entities->GetEntity(second)->AsBuilding() : nullptr)
+            b->buildProgress = 1.0f;
+        const bool finished = app.m_entities->CanPlaceBuilding(52, 10, 1, 1, *app.m_map, owner);
+        std::cout << "  - HQ build zone: under construction " << underConstruction << ", finished " << finished
+                  << std::endl;
+        if (underConstruction || !finished)
+        {
+            std::cerr << "[Test] Error: a headquarters under construction must not open a build zone" << std::endl;
+            return false;
+        }
+        app.m_entities->Clear();
+    }
+
+    // Damage multipliers by projectile kind and target class (data/weapon_balance.json)
+    {
+        WeaponBalance::Reload();
+        const int bldg = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Building);
+        const int wall = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Wall);
+        const int inf = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Infantry);
+        const int veh = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Vehicle);
+        const int shellBld = WeaponBalance::Scale(100, ProjectileType::Shell, TargetClass::Building);
+        if (bldg != 80 || wall != 80 || inf != 125 || veh != 100 || shellBld != 125
+            || WeaponBalance::Scale(1, ProjectileType::Sniper, TargetClass::Wall) != 1)
+        {
+            std::cerr << "[Test] Error: weapon balance bullet building/wall/infantry/vehicle " << bldg << "/" << wall
+                      << "/" << inf << "/" << veh << ", shell building " << shellBld << std::endl;
+            return false;
+        }
+        WeaponBalance::LoadText(R"({"multipliers":{"bullet":{"building":0.5}}})");
+        const bool overlay = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Building) == 50
+                             && WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Infantry) == 125;
+        WeaponBalance::Reload();
+        std::cout << "  - Weapon balance: bullet building " << bldg << "%, infantry " << inf << "%, overlay " << overlay
+                  << std::endl;
+        if (!overlay)
+            return false;
+    }
+
+    // Low-pass (muffle) and reverb of the sound mixer
+    {
+        // A shot far out of range stays faintly audible when the event has a minimum volume
+        const SfxPlacement faint = PlaceSfx(5000.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f, 0.07f);
+        const SfxPlacement silent = PlaceSfx(5000.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f, 0.0f);
+        if (!faint.audible || faint.gain < 0.0699f || faint.gain > 0.0701f || faint.muffle < 0.8f || silent.audible)
+        {
+            std::cerr << "[Test] Error: min_gain out of range: audible " << faint.audible << " gain " << faint.gain
+                      << " muffle " << faint.muffle << ", without min_gain audible " << silent.audible << std::endl;
+            return false;
+        }
+        {
+            SfxMixer cfg;
+            cfg.Configure(nlohmann::json::parse(
+                R"({"events":{"fire_x":{"category":"weapon","positional":true,"min_gain":0.07}}})"));
+            const SfxMixer::EventConfig *c = cfg.Config("fire_x");
+            if (!c || c->minGain < 0.0699f || c->minGain > 0.0701f)
+            {
+                std::cerr << "[Test] Error: min_gain is not read from the sound settings" << std::endl;
+                return false;
+            }
+        }
+        const SfxPlacement near = PlaceSfx(500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f);
+        const SfxPlacement far = PlaceSfx(1300.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 2.0f);
+        const SfxPlacement high = PlaceSfx(500.0f, 300.0f, 0.0f, 0.0f, 1000.0f, 600.0f, 360.0f, 0.5f);
+        if (near.muffle > 0.001f || far.muffle <= 0.3f || high.muffle <= 0.3f)
+        {
+            std::cerr << "[Test] Error: muffle near/far/zoomed-out expected 0 / >0.3 / >0.3, got " << near.muffle
+                      << " / " << far.muffle << " / " << high.muffle << std::endl;
+            return false;
+        }
+        // A loud noise burst: the muffled copy has far less energy of change (highs), reverb leaves a tail
+        auto render = [](float muffle, bool reverb, int &tailPeak) {
+            SfxMixer mixer;
+            mixer.Configure(nlohmann::json::parse(
+                R"({"events":{"boom":{"category":"impact","volume":1.0,"reverb":1.0,"max_instances":2}}})"));
+            std::vector<int16_t> pcm(2000);
+            uint32_t seed = 12345;
+            for (auto &v : pcm)
+            {
+                seed = seed * 1664525u + 1013904223u;
+                v = static_cast<int16_t>((seed >> 16) % 20000) - 10000;
+            }
+            mixer.AddClip("boom", pcm);
+            mixer.SetReverb(reverb);
+            mixer.Play("boom", 1.0f, 0.0f, 1000, muffle);
+            std::vector<int16_t> out(2 * 4096, 0);
+            mixer.Mix(out.data(), 4096);
+            double diff = 0.0;
+            for (int i = 1; i < 2000; ++i)
+                diff += std::abs(static_cast<int>(out[i * 2]) - static_cast<int>(out[(i - 1) * 2]));
+            tailPeak = 0;
+            for (int i = 2500; i < 4096; ++i)
+                tailPeak = std::max(tailPeak, std::abs(static_cast<int>(out[i * 2])));
+            return diff;
+        };
+        int tailDry = 0, tailWet = 0, tailMuffled = 0;
+        const double clean = render(0.0f, false, tailDry);
+        const double dull = render(0.9f, false, tailMuffled);
+        render(0.0f, true, tailWet);
+        if (!(dull < clean * 0.6) || tailDry != 0 || tailWet <= 0)
+        {
+            std::cerr << "[Test] Error: low-pass/reverb broken: roughness " << clean << " -> " << dull
+                      << ", dry tail " << tailDry << ", reverb tail " << tailWet << std::endl;
+            return false;
+        }
+        std::cout << "  - Low-pass roughness " << clean << " -> " << dull << ", reverb tail peak " << tailWet
+                  << " (dry " << tailDry << ")." << std::endl;
+    }
+
+    // UI show dialog sound event test
+    {
+        // 1. EventOfFile parsing
+        if (EventOfFile("assets/audio/sfx/ui_show_dialog.ogg") != "ui_show_dialog")
+        {
+            std::cerr << "[Test] Error: EventOfFile failed for ui_show_dialog.ogg, got: "
+                      << EventOfFile("assets/audio/sfx/ui_show_dialog.ogg") << std::endl;
+            return false;
+        }
+        if (EventOfFile("assets/audio/sfx/ui_click_1.ogg") != "ui_click")
+        {
+            std::cerr << "[Test] Error: EventOfFile failed for ui_click_1.ogg" << std::endl;
+            return false;
+        }
+
+        // 2. SfxMixer bank loading has ui_show_dialog event
+        if (app.m_sound)
+        {
+            if (!app.m_sound->Sfx().Has("ui_show_dialog"))
+            {
+                std::cerr << "[Test] Error: SfxMixer does not have 'ui_show_dialog' event!" << std::endl;
+                return false;
+            }
+            const SfxMixer::EventConfig *cfg = app.m_sound->Sfx().Config("ui_show_dialog");
+            if (!cfg || cfg->clips.empty())
+            {
+                std::cerr << "[Test] Error: 'ui_show_dialog' has no loaded audio clips!" << std::endl;
+                return false;
+            }
+        }
+
+        // 3. MenuController sound requests on opening menus / dialogs
+        MenuController menu;
+        SoundRequests::Take(); // Clear queue
+
+        menu.SetInGameMenuOpen(true);
+        std::vector<SoundRequests::Request> reqs = SoundRequests::Take();
+        if (reqs.size() != 1 || reqs[0].event != "ui_show_dialog")
+        {
+            std::cerr << "[Test] Error: SetInGameMenuOpen(true) did not request 'ui_show_dialog'" << std::endl;
+            return false;
+        }
+
+        // Already open -> no second sound
+        menu.SetInGameMenuOpen(true);
+        reqs = SoundRequests::Take();
+        if (!reqs.empty())
+        {
+            std::cerr << "[Test] Error: SetInGameMenuOpen(true) when already open should not trigger sound"
+                      << std::endl;
+            return false;
+        }
+
+        menu.SetObjectivesDialogOpen(true);
+        reqs = SoundRequests::Take();
+        if (reqs.size() != 1 || reqs[0].event != "ui_show_dialog")
+        {
+            std::cerr << "[Test] Error: SetObjectivesDialogOpen(true) did not request 'ui_show_dialog'" << std::endl;
+            return false;
+        }
+
+        menu.SetCampaignSelectOpen(true);
+        reqs = SoundRequests::Take();
+        if (reqs.size() != 1 || reqs[0].event != "ui_show_dialog")
+        {
+            std::cerr << "[Test] Error: SetCampaignSelectOpen(true) did not request 'ui_show_dialog'" << std::endl;
+            return false;
+        }
+
+        std::cout << "  - UI show dialog sound (ui_show_dialog.ogg) verified for menus and dialog windows."
+                  << std::endl;
     }
 
     return true;

@@ -39,7 +39,10 @@ Passability follows the tile sprite, as in the original maps: bare earth and jun
 | Action | Control |
 | --- | --- |
 | Paint or use the active tool | Left mouse button |
-| Pan the camera | Right or middle mouse button and drag |
+| Move player start marker | Left mouse button drag on start marker (P1–P8) |
+| Context menu (set/add player starts) | Right mouse button click on tile |
+| Quick erase brush | Right mouse button drag |
+| Pan the camera | Middle mouse button and drag |
 | Zoom | Mouse wheel |
 | Move the camera | `W`, `A`, `S`, `D` or arrow keys |
 | Center the camera on the map | `F` |

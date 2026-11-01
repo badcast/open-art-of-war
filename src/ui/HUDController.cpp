@@ -97,7 +97,12 @@ const OrderDef kOrders[] = {
     {"G", "SIEGE", "Toggle Siege mode for Sniper and Rhino"},
     {"", "STOP", "Immediately halt all orders and movement"},
     {"", "DEFEND", "Hold current position and engage enemies in range"},
+    // Stances (UnitStance order): what the units do about enemies when they have no orders
+    {"Z", "GUARD", "Stance: engage enemies in sight, chase them a short way, then return"},
+    {"X", "HOLD GROUND", "Stance: fire only at enemies in range, never leave the position"},
+    {"C", "PURSUE", "Stance: engage enemies in sight and chase them to the end (default)"},
 };
+constexpr int kFirstStanceOrder = 4;
 
 const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "TECH", "ORDERS"};
 // Tab icons per faction: HQ, rifleman, main tank, a research cameo; Orders draws a crosshair
@@ -232,6 +237,11 @@ RadarView radarView(const UiRect &radar, int mapW, int mapH, int zoom = 1, float
 UiRect DestroyBtn(const UiRect &info)
 {
     return {info.Right() - 92, info.Bottom() - 26, 84, 20};
+}
+
+UiRect RepairBtn(const UiRect &info)
+{
+    return {info.Right() - 184, info.Bottom() - 26, 84, 20};
 }
 
 std::vector<const Building *> OwnSelectedBuildings(const EntityManager &entities, const std::vector<int> &selected)
@@ -469,7 +479,9 @@ void HUDController::Issue(SimCommand command)
 {
     if (command.type == CommandType::Produce || command.type == CommandType::StartResearch)
         SoundRequests::Play("production_start");
-    else if (command.type == CommandType::Stop || command.type == CommandType::HoldPosition)
+    else if (
+        command.type == CommandType::Stop || command.type == CommandType::HoldPosition
+        || command.type == CommandType::SetStance)
         SoundRequests::Play("@hold");
     if (!m_sim)
         return;
@@ -833,6 +845,17 @@ void HUDController::ActivateCell(
                     Issue(std::move(c));
                     break;
                 }
+                case 4: // Stances
+                case 5:
+                case 6:
+                {
+                    SimCommand c;
+                    c.type = CommandType::SetStance;
+                    c.a = index - kFirstStanceOrder;
+                    c.ids.assign(selectedUnits.begin(), selectedUnits.end());
+                    Issue(std::move(c));
+                    break;
+                }
             }
             break;
     }
@@ -971,6 +994,20 @@ bool HUDController::HandleHudClick(
     }
     if (!leftClicked)
         return true;
+
+    // Repair on / off for the selected own structures (paid as it goes)
+    if (RepairBtn(l.info).Contains(mx, my))
+    {
+        const auto own = OwnSelectedBuildings(entities, selectedUnits);
+        if (own.empty())
+            return true;
+        SimCommand c;
+        c.type = CommandType::ToggleRepair;
+        for (const Building *b : own)
+            c.ids.push_back(static_cast<uint32_t>(b->id));
+        Issue(std::move(c));
+        return true;
+    }
 
     // Destroy the selected own structures: the first click arms the button, the second one confirms
     if (DestroyBtn(l.info).Contains(mx, my))
@@ -1118,7 +1155,7 @@ void HUDController::RenderGameHud(
         {
             renderer.SetClipRect({v.ox, v.oy, v.w, v.h});
             renderer.FillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
-            const bool fog = m_radarFog && map.IsFogEnabled();
+            const bool fog = m_radarFog && map.IsFogEnabled() && !m_showAll;
             const int tx0 = std::max(0, static_cast<int>(v.viewX));
             const int ty0 = std::max(0, static_cast<int>(v.viewY));
             const int tx1 = std::min(mapW, static_cast<int>(std::ceil(v.viewX + v.w / v.scale)) + 1);
@@ -1609,6 +1646,21 @@ void HUDController::RenderGameHud(
             {
                 const auto &o = kOrders[i];
                 bool active = (i == 0 && m_attackMoveMode);
+                if (i >= kFirstStanceOrder)
+                {
+                    // Lit when every selected own unit has this stance
+                    const auto wanted = static_cast<UnitStance>(i - kFirstStanceOrder);
+                    bool any = false, all = true;
+                    for (const auto &e : entities.GetAllEntities())
+                    {
+                        const Unit *u = e.AsUnit();
+                        if (!u || !u->alive || !u->selected || u->owner != Players::Local())
+                            continue;
+                        any = true;
+                        all = all && u->stance == wanted;
+                    }
+                    active = any && all;
+                }
                 renderer.FillRectScreen(
                     c.x,
                     c.y,
@@ -1769,6 +1821,35 @@ void HUDController::RenderGameHud(
                 _(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
         }
 
+        if (const auto ownSel = OwnSelectedBuildings(entities, selected); !ownSel.empty())
+        {
+            bool anyDamaged = false, allRepairing = true;
+            for (const Building *b : ownSel)
+            {
+                if (b->CanBeRepaired())
+                {
+                    anyDamaged = true;
+                    allRepairing = allRepairing && b->repairing;
+                }
+            }
+            if (anyDamaged)
+            {
+                const UiRect rb = RepairBtn(ib);
+                const bool on = allRepairing;
+                const bool hotR = rb.Contains(mx, my);
+                renderer.FillRectScreen(
+                    rb.x, rb.y, rb.w, rb.h, on ? SDL_Color {60, 44, 20, 255} : (hotR ? col::Hover : col::PanelRaised));
+                renderer.DrawRectScreen(rb.x, rb.y, rb.w, rb.h, on ? col::Accent : col::BorderStrong);
+                fontRenderer.DrawString(
+                    on ? _("REPAIRING") : _("REPAIR [R]"),
+                    rb.CenterX(),
+                    rb.CenterY(),
+                    ui::FONT_SMALL_BOLD,
+                    on ? col::Accent : col::Text,
+                    false,
+                    Anchor::HCENTER | Anchor::VCENTER);
+            }
+        }
         if (!OwnSelectedBuildings(entities, selected).empty())
         {
             const UiRect db = DestroyBtn(ib);
@@ -1851,7 +1932,7 @@ void HUDController::RenderProductionOverlay(
     {
         const Building *b = e.AsBuilding();
         if (!b || !b->selected || !b->alive || b->state == ActionState::Die || b->owner != Players::Local()
-            || b->type != UnitType::Headquarters)
+            || b->type != UnitType::Headquarters || b->buildProgress < 1.0f)
         {
             continue;
         }

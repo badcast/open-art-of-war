@@ -115,6 +115,10 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     i("wave_max_size", t.waveMaxSize);
     f("wave_interval_seconds", t.waveIntervalSeconds);
     i("max_wave_tier", t.maxWaveTier);
+    i("tier_vanguard_wave", t.vanguardWave);
+    i("tier_assault_wave", t.assaultWave);
+    i("tier_siege_wave", t.siegeWave);
+    f("vehicle_wait_seconds", t.vehicleWaitSeconds);
     f("research_seconds", t.researchSeconds);
     f("straggler_timeout_seconds", t.stragglerTimeoutSeconds);
     i("march_stride_tiles", t.marchStrideTiles);
@@ -179,8 +183,12 @@ void AIController::InitDifficultyDefaults()
     easy.tactics.waveGrowth = 1;
     easy.tactics.waveMaxSize = 14;
     easy.tactics.waveIntervalSeconds = 75.0f;
-    easy.tactics.maxWaveTier = 3;
-    easy.tactics.researchSeconds = 60.0f;
+    easy.tactics.maxWaveTier = 4; // the siege fist comes late (wave 8) but does come
+    easy.tactics.researchSeconds = 100.0f;
+    easy.tactics.vanguardWave = 3;
+    easy.tactics.assaultWave = 5;
+    easy.tactics.siegeWave = 8;
+    easy.tactics.vehicleWaitSeconds = 90.0f;
     easy.tactics.stragglerTimeoutSeconds = 4.0f;
     easy.tactics.marchStrideTiles = 7;
     easy.tactics.maxAttackGroups = 2;
@@ -198,7 +206,11 @@ void AIController::InitDifficultyDefaults()
     med.resourceMultiplier = 0.80f;
     med.productionSpeedMultiplier = 1.00f;
     med.tactics.waveIntervalSeconds = 45.0f;
-    med.tactics.researchSeconds = 45.0f;
+    med.tactics.researchSeconds = 85.0f;
+    med.tactics.vanguardWave = 2;
+    med.tactics.assaultWave = 3;
+    med.tactics.siegeWave = 5;
+    med.tactics.vehicleWaitSeconds = 60.0f;
     med.tactics.maxAttackGroups = 3;
     m_difficultyConfigs[AIDifficulty::Medium] = med;
 
@@ -217,7 +229,11 @@ void AIController::InitDifficultyDefaults()
     hard.tactics.waveBaseSize = 14;
     hard.tactics.waveMaxSize = 22;
     hard.tactics.waveIntervalSeconds = 30.0f;
-    hard.tactics.researchSeconds = 30.0f;
+    hard.tactics.researchSeconds = 70.0f;
+    hard.tactics.vanguardWave = 2;
+    hard.tactics.assaultWave = 3;
+    hard.tactics.siegeWave = 5;
+    hard.tactics.vehicleWaitSeconds = 45.0f;
     hard.tactics.stragglerTimeoutSeconds = 8.0f;
     hard.tactics.marchStrideTiles = 4;
     hard.tactics.maxAttackGroups = 4;
@@ -236,7 +252,11 @@ void AIController::InitDifficultyDefaults()
     hardcore.tactics.waveGrowth = 3;
     hardcore.tactics.waveMaxSize = 26;
     hardcore.tactics.waveIntervalSeconds = 25.0f;
-    hardcore.tactics.researchSeconds = 25.0f;
+    hardcore.tactics.researchSeconds = 65.0f;
+    hardcore.tactics.vanguardWave = 2;
+    hardcore.tactics.assaultWave = 3;
+    hardcore.tactics.siegeWave = 5;
+    hardcore.tactics.vehicleWaitSeconds = 40.0f;
     hardcore.tactics.maxAttackGroups = 5;
     hardcore.tactics.creditsPerExtraGroup = 500;
     m_difficultyConfigs[AIDifficulty::Hardcore] = hardcore;
@@ -481,6 +501,8 @@ void AIController::Reset()
     m_vehicleQueue.clear();
     m_waveCooldown = m_currentDifficultyConfig.tactics.waveIntervalSeconds * 0.5f;
     m_waveAssemblyTimer = 0.0f;
+    m_factoryReady = false;
+    m_vehicleHoldSeconds = 0.0f;
     m_readyUnits = 0;
     m_hasProduction = true;
 
@@ -507,6 +529,18 @@ void AIController::Reset()
     m_stagingTimer = 0.0f;
     m_lastThreatX = m_lastThreatY = -1;
     m_lastThreatId = 0;
+    m_knownBuildings.clear();
+    m_seenEnemyUnits.clear();
+    m_intelTimer = 0.0f;
+    m_scoutId = 0;
+    m_scoutX = m_scoutY = -1;
+    m_scoutTimer = 0.0f;
+    m_scoutIdleTimer = 0.0f;
+    m_scoutTrips = 0;
+    m_repairing.clear();
+    m_retreatTimer = 0.0f;
+    m_firstRaidDone = false;
+    m_trainedUnits = 0;
     ClearThoughts();
 }
 
@@ -524,7 +558,8 @@ AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFacto
     size = std::clamp(static_cast<int>(std::lround(size * m_debugConfig.waveSpawnMultiplier)), 1, 30);
     size = std::max(size, kMinAttackWave); // the AI never sends a handful: at least ten troops march
 
-    int tier = (plan.waveNumber <= 2) ? 1 : (plan.waveNumber <= 4) ? 2 : (plan.waveNumber <= 6) ? 3 : 4;
+    const int n = plan.waveNumber;
+    int tier = n >= t.siegeWave ? 4 : n >= t.assaultWave ? 3 : n >= t.vanguardWave ? 2 : 1;
     tier = std::clamp(tier, 1, std::clamp(t.maxWaveTier, 1, 4));
     plan.tier = static_cast<AIWaveTier>(tier);
 
@@ -600,6 +635,45 @@ AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFacto
         }
         if (i > 64)
             break;
+    }
+    // Counter-composition from what the computer has seen of the enemy army (Hardcore: all of it)
+    int seenVehicles = 0, seenInfantry = 0;
+    for (const auto &seenUnit : m_seenEnemyUnits)
+        (seenUnit.second ? seenVehicles : seenInfantry) += 1;
+    const int seen = seenVehicles + seenInfantry;
+    if (seen >= 4)
+    {
+        int riflemenLeft = 0;
+        for (int arch : plan.archetypes)
+            riflemenLeft += arch == kRifleman ? 1 : 0;
+        if (seenVehicles * 10 >= seen * 6)
+        {
+            // Armour: rocket troopers in place of half of the riflemen
+            int swaps = riflemenLeft / 2;
+            for (int &arch : plan.archetypes)
+            {
+                if (swaps > 0 && arch == kRifleman)
+                {
+                    arch = kHeavyAssault;
+                    --swaps;
+                }
+            }
+        }
+        else if (seenInfantry * 10 >= seen * 7 && plan.tier != AIWaveTier::Scout)
+        {
+            // Infantry: flamethrowers in place of a third of the riflemen, and an MLRS when there is a factory
+            int swaps = riflemenLeft / 3;
+            for (int &arch : plan.archetypes)
+            {
+                if (swaps > 0 && arch == kRifleman)
+                {
+                    arch = kFlamethrower;
+                    --swaps;
+                }
+            }
+            if ((hasFactory || hasFactoryPlan) && plan.tier != AIWaveTier::Vanguard)
+                plan.archetypes.push_back(kGrad);
+        }
     }
     plan.archetypes.insert(plan.archetypes.end(), core.begin(), core.end());
     return plan;
@@ -685,6 +759,38 @@ void AIController::UpdateWaveRoster(EntityManager &entities)
     }
 }
 
+void AIController::UpdateUnitStances(EntityManager &entities)
+{
+    std::vector<int> own;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        if (e.alive && !e.isBuilding && e.owner == m_player && e.state != ActionState::Die)
+            own.push_back(e.id);
+    }
+    for (int id : own)
+    {
+        Unit *u = entities.GetUnit(id);
+        if (!u)
+            continue;
+        // Artillery and units with a siege form: Porcupine / Grad MLRS, Sniper, Rhino
+        const int a = u->archetypeId;
+        const bool artillery = a == 4 || a == 10 || a == 12 || a == 13 || a == 14 || a == 15 || a == 16;
+        UnitStance wanted = UnitStance::PursueAndReturn;
+        if (id == m_scoutId || m_repairing.count(id))
+            wanted = UnitStance::HoldGround; // looks / pulls back, does not chase
+        else if (artillery)
+            wanted = UnitStance::HoldGround;
+        else if (m_squadController.IsSquadMember(id))
+            wanted = UnitStance::Pursue;
+        if (u->stance != wanted)
+        {
+            u->stance = wanted;
+            u->stanceHomeX = u->stanceHomeY = -1;
+            u->stanceReturning = false;
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Main update
 // ---------------------------------------------------------------------------
@@ -696,6 +802,9 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     if (m_researchActive)
         SetResearchAnimation(m_player, true, entities);
     m_waveAssemblyTimer += deltaTime;
+    UpdateUnitStances(entities);
+    m_squadController.SetSeesAll(GetEffectiveDifficulty() == AIDifficulty::Hardcore);
+    UpdateRepairs(deltaTime, entities);
 
     // Auto-synchronize Enemy & Player base coordinates from living entities if uninitialized or destroyed
     if (m_enemyHqX <= 0 || m_enemyHqY <= 0 || m_playerHqX <= 0 || m_playerHqY <= 0)
@@ -781,9 +890,11 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
 
     // Rebuild starting base structures & walls if destroyed
     UpdateRebuilding(deltaTime, map, entities);
+    // The builder also runs while the base lacks a barracks or a factory: without a factory there are no vehicles
     if (m_skirmish
         && (m_currentDifficultyConfig.tactics.buildDefenses
-            || !entities.HasBuildingType(UnitType::Barracks, m_player, false)))
+            || !entities.HasBuildingType(UnitType::Barracks, m_player, false)
+            || !entities.HasBuildingType(UnitType::Factory, m_player, false)))
     {
         UpdateBaseBuilder(deltaTime, map, entities, pathfinder);
     }
@@ -803,6 +914,14 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
         UpdateBaseDefense(entities, pathfinder);
     }
 
+    UpdateIntel(entities);
+    UpdateScouting(deltaTime, map, entities, pathfinder);
+    m_retreatTimer += deltaTime;
+    if (m_retreatTimer >= 1.0f)
+    {
+        m_retreatTimer = 0.0f;
+        UpdateValuableRetreat(entities, pathfinder);
+    }
     UpdateStaging(map, entities, pathfinder);
     UpdateWaveLaunch(deltaTime, map, entities, pathfinder);
     UpdateWaveRoster(entities);
@@ -816,7 +935,8 @@ void AIController::RecallReleasedUnits(EntityManager &entities)
     for (int id : m_squadController.TakeReleasedUnits())
     {
         const Unit *u = entities.GetUnit(id);
-        if (u && u->alive && u->owner == m_player && !m_garrison.count(id) && !m_squadController.IsSquadMember(id))
+        if (u && u->alive && u->owner == m_player && !m_garrison.count(id) && !m_squadController.IsSquadMember(id)
+            && !m_repairing.count(id) && id != m_scoutId)
         {
             m_recalled.insert(id);
             m_waveRoster.insert(id); // released by its squad: back on the computer's list for the next wave
@@ -885,6 +1005,24 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     }
     m_hasProduction = hasBarracks || hasFactory;
 
+    // The first finished factory: a wave planned without it has no vehicles, make the plan again with them
+    bool factoryDone = false;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *fb = e.AsBuilding();
+        if (fb && fb->alive && fb->owner == m_player && fb->type == UnitType::Factory && fb->buildProgress >= 1.0f)
+            factoryDone = true;
+    }
+    if (factoryDone && !m_factoryReady)
+    {
+        m_factoryReady = true;
+        bool planHasVehicles = false;
+        for (int arch : m_currentPlan.archetypes)
+            planHasVehicles = planHasVehicles || IsVehicleArchetype(arch);
+        if (!planHasVehicles && !m_currentPlan.archetypes.empty())
+            PreparePlan(m_waveCount + 1, true, true);
+    }
+
     if (m_currentPlan.archetypes.empty())
     {
         PreparePlan(m_waveCount + 1, hasFactory, hasFactoryPlan);
@@ -900,9 +1038,11 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     // Units lost while assembling are replaced so the wave can still reach 100% strength
     int planned = static_cast<int>(m_currentPlan.archetypes.size());
     int queued = static_cast<int>(m_infantryQueue.size() + m_vehicleQueue.size());
-    if (queued == 0 && reserveCount < planned)
+    // ... and so is the home guard that stays when the wave leaves
+    const int withGuard = planned + HomeGuardCount();
+    if (queued == 0 && reserveCount < withGuard)
     {
-        for (int i = reserveCount; i < planned; ++i)
+        for (int i = reserveCount; i < withGuard; ++i)
             m_infantryQueue.push_back(kRifleman);
     }
 
@@ -927,12 +1067,12 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
                               ? researchDef(side(), m_researchIndex).cost
                               : 0;
 
-    auto produce = [&](Building *building, std::vector<int> &queue, float buildTime) {
+    auto produce = [&](Building *building, std::vector<int> &queue, float buildTime, int savingFor = 0) {
         if (!building || queue.empty())
             return;
         int arch = queue.front();
         int cost = costOf(arch);
-        if (m_credits - cost < researchReserve)
+        if (m_credits - cost < researchReserve + savingFor)
         {
             ThinkOnce(
                 "economy",
@@ -948,21 +1088,40 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             return;
         m_credits -= cost;
         queue.erase(queue.begin());
-        int id = entities.SpawnUnitByArchetype(SideArchetype(arch, side()), sx, sy, side(), m_player);
+        int id = entities.SpawnUnitByArchetype(
+            ProductionForm(m_player, SideArchetype(arch, side())), sx, sy, side(), m_player);
         // New troops get every technology the AI has already researched, and join the list of the next wave
         if (Unit *u = entities.GetUnit(id))
         {
             ApplyCompletedResearch(*u);
             m_waveRoster.insert(id);
+            ++m_trainedUnits;
         }
         building->isProducing = true;
         building->productionTimer = buildTime;
     };
 
+    // A free factory with a vehicle waiting comes first: the barracks leave enough credits for it, or cheap infantry
+    // would eat every credit before a tank (220-420) could ever be paid. Not for ever: if the vehicle cannot be
+    // trained (its exit is blocked), the barracks go on after a while.
+    constexpr float kVehicleHoldMax = 25.0f;
+    const bool vehicleWaits = availableFactory && !m_vehicleQueue.empty();
+    int savingFor = 0;
+    if (vehicleWaits && m_vehicleHoldSeconds < kVehicleHoldMax)
+        savingFor = costOf(m_vehicleQueue.front());
+    if (vehicleWaits)
+        m_vehicleHoldSeconds += 1.0f;
+    else
+        m_vehicleHoldSeconds = 0.0f;
     if (hasBarracks)
-        produce(availableBarracks, m_infantryQueue, barracksBuildTime);
+        produce(availableBarracks, m_infantryQueue, barracksBuildTime, savingFor);
     if (hasFactory)
+    {
+        const size_t before = m_vehicleQueue.size();
         produce(availableFactory, m_vehicleQueue, factoryBuildTime);
+        if (m_vehicleQueue.size() != before)
+            m_vehicleHoldSeconds = 0.0f; // a vehicle went out
+    }
 }
 
 void AIController::UpdateResearch(float deltaTime, EntityManager &entities)
@@ -1133,8 +1292,46 @@ void AIController::UpdateStagingPoint(const TileMap &map, Pathfinder &pathfinder
         && DetMath::Hypot(static_cast<float>(road[pick].x - m_enemyHqX), static_cast<float>(road[pick].y - m_enemyHqY))
                > 12.0f)
         --pick;
-    m_stagingX = std::clamp(road[pick].x, 3, std::max(3, map.GetWidth() - 4));
-    m_stagingY = std::clamp(road[pick].y, 3, std::max(3, map.GetHeight() - 4));
+    // The waves gather on open ground near that road tile, not against a cliff or in a corner of the base:
+    // the tile around which most of a 7x7 square is free (ties: the nearest, in scan order)
+    auto openAround = [&](int x, int y) {
+        int free = 0;
+        for (int dy = -3; dy <= 3; ++dy)
+        {
+            for (int dx = -3; dx <= 3; ++dx)
+            {
+                const int nx = x + dx, ny = y + dy;
+                free += (nx >= 0 && ny >= 0 && nx < map.GetWidth() && ny < map.GetHeight() && map.IsPassable(nx, ny)
+                         && map.GetWall(nx, ny) == 0)
+                            ? 1
+                            : 0;
+            }
+        }
+        return free;
+    };
+    int bestX = road[pick].x, bestY = road[pick].y;
+    int bestFree = openAround(bestX, bestY), bestDist = 0;
+    for (int dy = -3; dy <= 3; ++dy)
+    {
+        for (int dx = -3; dx <= 3; ++dx)
+        {
+            const int x = road[pick].x + dx, y = road[pick].y + dy;
+            if (x < 0 || y < 0 || x >= map.GetWidth() || y >= map.GetHeight() || !map.IsPassable(x, y)
+                || map.GetWall(x, y) > 0)
+                continue;
+            const int free = openAround(x, y);
+            const int dist = std::max(std::abs(dx), std::abs(dy));
+            if (free > bestFree || (free == bestFree && dist < bestDist))
+            {
+                bestFree = free;
+                bestDist = dist;
+                bestX = x;
+                bestY = y;
+            }
+        }
+    }
+    m_stagingX = std::clamp(bestX, 3, std::max(3, map.GetWidth() - 4));
+    m_stagingY = std::clamp(bestY, 3, std::max(3, map.GetHeight() - 4));
 }
 
 void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
@@ -1174,7 +1371,15 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
         if (std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1)
         {
             bool isPartial = false;
-            if (pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial))
+            bool found = pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial);
+            if (!found)
+            {
+                // Boxed in by its own crowd (troops standing about in a crowded base block each other): plan the
+                // road through them, the units make way for each other when they walk
+                pathfinder.SetIgnoreUnitsOnce();
+                found = pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial);
+            }
+            if (found)
             {
                 u->pathIndex = 0;
                 u->targetTileX = slotX;
@@ -1192,22 +1397,11 @@ void AIController::FindAttackObjective(const EntityManager &entities, const Tile
     outY = -1;
     float bestBldgDist = 1e9f;
 
-    // Player HQ first, otherwise the closest player structure, otherwise the closest player unit
-    for (const auto &e : entities.GetAllEntities())
+    // The closest enemy structure the computer knows of (walls on the way get breached), otherwise the closest
+    // enemy unit it sees, otherwise the enemy's starting position
+    for (const auto &known : m_knownBuildings)
     {
-        if (!e.alive || e.state == ActionState::Die || !IsFoe(e) || !e.isBuilding)
-            continue;
-        const Building *b = e.AsBuilding();
-        if (!b)
-            continue;
-        int cx = b->tileX + b->buildWidth / 2;
-        int cy = b->tileY + b->buildHeight / 2;
-        if (b->type == UnitType::Headquarters)
-        {
-            outX = cx;
-            outY = cy;
-            break;
-        }
+        const int cx = known.second.first, cy = known.second.second;
         float d = DetMath::Hypot(static_cast<float>(cx - m_enemyHqX), static_cast<float>(cy - m_enemyHqY));
         if (d < bestBldgDist)
         {
@@ -1220,9 +1414,10 @@ void AIController::FindAttackObjective(const EntityManager &entities, const Tile
     if (outX < 0)
     {
         float bestDist = 1e9f;
+        const bool seesAll = GetEffectiveDifficulty() == AIDifficulty::Hardcore;
         for (const auto &e : entities.GetAllEntities())
         {
-            if (!e.alive || e.state == ActionState::Die || !IsFoe(e))
+            if (!e.alive || e.state == ActionState::Die || !IsFoe(e) || (!seesAll && !AiSees(e, entities)))
                 continue;
             float d
                 = DetMath::Hypot(static_cast<float>(e.tileX - m_enemyHqX), static_cast<float>(e.tileY - m_enemyHqY));
@@ -1266,18 +1461,66 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         }
     }
     m_readyUnits = static_cast<int>(ready.size());
+    // Troops that stand about idle in the base but never made it to the staging area (a crowded or walled-in base):
+    // after a long wait the wave marches from where they are instead of waiting for ever
+    std::vector<int> idleReserve;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Unit *u = e.AsUnit();
+        if (u && IsReserveUnit(*u) && u->targetEntityId == 0 && !u->isAttackMoving && u->state == ActionState::Idle)
+            idleReserve.push_back(u->id);
+    }
+
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    // Hard / Hardcore: the first raid leaves as soon as the first troops are ready
+    if (!m_firstRaidDone && m_trainedUnits > 0
+        && (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore) && !ready.empty())
+    {
+        int targetX, targetY;
+        FindAttackObjective(entities, map, targetX, targetY);
+        if (targetX >= 0)
+        {
+            m_firstRaidDone = true;
+            const int squadId = m_squadController.CreateSquad(
+                ready, targetX, targetY, 0, entities, pathfinder, m_currentDifficultyConfig.tactics);
+            std::ostringstream msg;
+            msg << "Early raid G" << squadId << " with " << ready.size() << " unit(s) toward (" << targetX << ", "
+                << targetY << ")";
+            Think("ATTACK", msg.str());
+            return;
+        }
+    }
 
     int required = static_cast<int>(m_currentPlan.archetypes.size());
     if (required == 0 || m_waveCooldown > 0.0f)
         return;
 
-    // March only with 100% of the planned wave; without production left, send whatever is assembled
-    bool full = static_cast<int>(ready.size()) >= required;
+    // March only with 100% of the planned wave plus the home guard that stays; without production left, send
+    // whatever is assembled
+    const int guard = HomeGuardCount();
+    bool full = static_cast<int>(ready.size()) >= required + guard;
+    // A wave does not wait for its vehicles for ever: after the difficulty's wait it marches with what is there
+    // (the vehicles still being built join the next wave)
+    int plannedVehicles = 0, readyVehicles = 0;
+    for (int arch : m_currentPlan.archetypes)
+        plannedVehicles += IsVehicleArchetype(arch) ? 1 : 0;
+    for (int id : ready)
+        if (const Unit *ru = entities.GetUnit(id); ru && !ru->IsInfantry())
+            ++readyVehicles;
+    const int missingVehicles = std::max(0, plannedVehicles - readyVehicles);
+    const bool vehicleTimeout
+        = !full && missingVehicles > 0 && m_waveAssemblyTimer > m_currentDifficultyConfig.tactics.vehicleWaitSeconds
+          && static_cast<int>(ready.size()) >= std::max(kMinAttackWave, required - missingVehicles + guard);
     // Without production left the AI sends what is assembled, but still not a handful: ten troops, or after a long wait
     bool stranded = !m_hasProduction && !ready.empty()
                     && ((static_cast<int>(ready.size()) >= kMinAttackWave && m_waveAssemblyTimer > 20.0f)
                         || m_waveAssemblyTimer > 90.0f);
-    if (!full && !stranded)
+    constexpr float kStagingGiveUpSeconds = 120.0f;
+    const bool lagging = !full && m_waveAssemblyTimer > kStagingGiveUpSeconds
+                         && static_cast<int>(idleReserve.size()) >= std::max(kMinAttackWave, required * 3 / 4);
+    if (lagging)
+        ready = idleReserve;
+    if (!full && !stranded && !vehicleTimeout && !lagging)
         return;
 
     int targetX, targetY;
@@ -1370,6 +1613,10 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 int AIController::AttackGroupCount(int readyUnits, const TileMap &map) const
 {
     const AITacticsConfig &t = m_currentDifficultyConfig.tactics;
+    // Flank groups only on Hard / Hardcore and with six units or more; a smaller wave stays together
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    if ((difficulty != AIDifficulty::Hard && difficulty != AIDifficulty::Hardcore) || readyUnits < 6)
+        return 1;
     int groups = 1 + m_credits / std::max(1, t.creditsPerExtraGroup); // richer AI fields more groups
     if (std::sqrt(static_cast<float>(map.GetWidth() * map.GetHeight())) >= 80.0f)
         ++groups; // room to flank
@@ -1446,6 +1693,8 @@ int FactionBuildingIndex(AIDefenseSite::Kind kind, Faction side)
             return conf ? 1 : 9;
         case AIDefenseSite::Barracks:
             return conf ? 2 : 10;
+        case AIDefenseSite::Factory:
+            return conf ? 3 : 11;
         case AIDefenseSite::Wall:
             return -1;
     }
@@ -1466,6 +1715,8 @@ int DefenseCost(AIDefenseSite::Kind kind)
             return 200;
         case AIDefenseSite::Barracks:
             return 350;
+        case AIDefenseSite::Factory:
+            return 500;
         case AIDefenseSite::Wall:
             return 25;
     }
@@ -1605,9 +1856,7 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         m_defensePlan.push_back({kind, x, y, false});
     };
 
-    // 0. Starting from scratch (HQ + power plant only): raise a barracks first so troop training can begin
-    if (!entities.HasBuildingType(UnitType::Barracks, m_player, false))
-        add(AIDefenseSite::Barracks, cx - 1, cy - 1);
+    // Power plants, the barracks and the factory come from the core build order (UpdateCoreBuildOrder)
 
     // 1. First tower right behind the main exit, then a bunker covering the second one
     const float innerRadius = wallRadius - 3.0f;
@@ -1639,9 +1888,6 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             continue;
         wallTiles.emplace_back(wx, wy);
     }
-    for (const auto &[wx, wy] : wallTiles)
-        add(AIDefenseSite::Wall, wx, wy);
-
     // 3. More firepower along the inside of the wall
     ringTile(innerRadius, 40.0f, x, y);
     add(AIDefenseSite::Tower, x - 1, y - 1);
@@ -1652,14 +1898,106 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         ringTile(static_cast<float>(hqRadius + 4), 180.0f, x, y);
         add(AIDefenseSite::Lab, x - 1, y - 1);
     }
-    ringTile(static_cast<float>(hqRadius + 4), 140.0f, x, y);
-    add(AIDefenseSite::PowerPlant, x - 1, y - 1);
-
     // 5. Flanks of the arc
     ringTile(innerRadius, -75.0f, x, y);
     add(AIDefenseSite::Bunker, x - 1, y - 1);
     ringTile(innerRadius, 75.0f, x, y);
     add(AIDefenseSite::Tower, x - 1, y - 1);
+
+    // 6. Walls last, and only where an enemy can walk in: a ring tile that links the inside of the ring with
+    //    the outside one reachable from a hostile base. Segments in front of trees, cliffs or a closed pocket
+    //    stop nobody and are left out.
+    {
+        const int mw = map.GetWidth(), mh = map.GetHeight();
+        auto idx = [mw](int px, int py) {
+            return py * mw + px;
+        };
+        auto open = [&](int px, int py) {
+            return px >= 0 && py >= 0 && px < mw && py < mh && map.IsPassable(px, py) && map.GetWall(px, py) == 0;
+        };
+        std::vector<uint8_t> ring(static_cast<size_t>(mw) * mh, 0), inside(ring.size(), 0), outside(ring.size(), 0);
+        for (const auto &[wx, wy] : wallTiles)
+            ring[idx(wx, wy)] = 1;
+        auto distOf = [&](int px, int py) {
+            return DetMath::Hypot(static_cast<float>(px - cx), static_cast<float>(py - cy));
+        };
+        auto flood = [&](std::vector<uint8_t> &mark, std::vector<std::pair<int, int>> frontier, bool in) {
+            for (size_t i = 0; i < frontier.size(); ++i)
+            {
+                const auto [fx, fy] = frontier[i];
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        const int nx = fx + dx, ny = fy + dy;
+                        if ((dx == 0 && dy == 0) || !open(nx, ny) || ring[idx(nx, ny)] || mark[idx(nx, ny)])
+                            continue;
+                        if (in != (distOf(nx, ny) < wallRadius))
+                            continue;
+                        mark[idx(nx, ny)] = 1;
+                        frontier.emplace_back(nx, ny);
+                    }
+                }
+            }
+        };
+        std::vector<std::pair<int, int>> seedsIn, seedsOut;
+        for (int py = std::max(0, cy - hqRadius - 2); py <= std::min(mh - 1, cy + hqRadius + 2); ++py)
+        {
+            for (int px = std::max(0, cx - hqRadius - 2); px <= std::min(mw - 1, cx + hqRadius + 2); ++px)
+            {
+                if (open(px, py) && !ring[idx(px, py)] && distOf(px, py) < wallRadius)
+                {
+                    inside[idx(px, py)] = 1;
+                    seedsIn.emplace_back(px, py);
+                }
+            }
+        }
+        for (const auto &e : entities.GetAllEntities())
+        {
+            if (!e.alive || e.state == ActionState::Die || !Players::Hostile(e.owner, m_player)
+                || e.faction == Faction::Neutral)
+                continue;
+            for (int dy = -2; dy <= 2; ++dy)
+            {
+                for (int dx = -2; dx <= 2; ++dx)
+                {
+                    const int px = e.tileX + dx, py = e.tileY + dy;
+                    if (open(px, py) && !ring[idx(px, py)] && !outside[idx(px, py)] && distOf(px, py) >= wallRadius)
+                    {
+                        outside[idx(px, py)] = 1;
+                        seedsOut.emplace_back(px, py);
+                    }
+                }
+            }
+        }
+        flood(inside, std::move(seedsIn), true);
+        const bool knowsEnemy = !seedsOut.empty();
+        flood(outside, std::move(seedsOut), false);
+        int skipped = 0;
+        for (const auto &[wx, wy] : wallTiles)
+        {
+            bool linksIn = false, linksOut = false;
+            for (int dy = -1; dy <= 1; ++dy)
+            {
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    const int nx = wx + dx, ny = wy + dy;
+                    if (nx < 0 || ny < 0 || nx >= mw || ny >= mh)
+                        continue;
+                    linksIn = linksIn || inside[idx(nx, ny)];
+                    linksOut = linksOut || outside[idx(nx, ny)];
+                }
+            }
+            if (knowsEnemy && !(linksIn && linksOut))
+            {
+                ++skipped;
+                continue;
+            }
+            add(AIDefenseSite::Wall, wx, wy);
+        }
+        if (skipped > 0)
+            Think("BUILD", "Leaving out " + std::to_string(skipped) + " wall tiles nobody can walk through");
+    }
 
     std::ostringstream plan;
     plan << "Base plan: " << m_defensePlan.size() << " items, " << wallTiles.size()
@@ -1699,7 +2037,9 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     const int w = cfg ? cfg->width : 2;
     const int h = cfg ? cfg->height : 2;
     int x = site.tileX, y = site.tileY;
-    const int searchRadius = site.kind == AIDefenseSite::Barracks ? 8 : 3;
+    const bool core = site.kind == AIDefenseSite::Barracks || site.kind == AIDefenseSite::Factory
+                      || site.kind == AIDefenseSite::PowerPlant;
+    const int searchRadius = core ? 8 : 3;
     bool unitBlocked = false;
     if (!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked))
     {
@@ -1719,8 +2059,8 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
         for (int tx = x; tx < x + w && tx < map.GetWidth(); ++tx)
             map.SetPassable(tx, ty, false);
     }
-    static const char *const kKindNames[]
-        = {"tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks"};
+    static const char *const kKindNames[] = {
+        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory"};
     Think(
         "BUILD",
         std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y)
@@ -1743,6 +2083,341 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     return true;
 }
 
+void AIController::UpdateIntel(EntityManager &entities)
+{
+    m_intelTimer -= SIMULATION_TIMESTEP;
+    if (m_intelTimer > 0.0f)
+        return;
+    m_intelTimer = 1.0f;
+    const bool seesAll = GetEffectiveDifficulty() == AIDifficulty::Hardcore;
+    std::set<int> alive;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        if (!e.alive || e.state == ActionState::Die || !IsFoe(e))
+            continue;
+        alive.insert(e.id);
+        if (!seesAll && !AiSees(e, entities))
+            continue;
+        if (const Building *b = e.AsBuilding())
+        {
+            if (b->rawBuildingType < 15)
+                m_knownBuildings[e.id] = {b->tileX + b->buildWidth / 2, b->tileY + b->buildHeight / 2};
+        }
+        else if (const Unit *u = e.AsUnit())
+        {
+            m_seenEnemyUnits[e.id] = !Utility::IsInfantryArchetype(u->archetypeId);
+        }
+    }
+    // Destroyed things are forgotten
+    for (auto it = m_knownBuildings.begin(); it != m_knownBuildings.end();)
+        it = alive.count(it->first) ? std::next(it) : m_knownBuildings.erase(it);
+    for (auto it = m_seenEnemyUnits.begin(); it != m_seenEnemyUnits.end();)
+        it = alive.count(it->first) ? std::next(it) : m_seenEnemyUnits.erase(it);
+}
+
+void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+{
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    if (difficulty == AIDifficulty::Hardcore || (m_playerHqX <= 0 && m_playerHqY <= 0))
+        return;
+    m_scoutTimer -= deltaTime;
+    Unit *scout = m_scoutId ? entities.GetUnit(m_scoutId) : nullptr;
+    if (m_scoutId && (!scout || !scout->alive || scout->state == ActionState::Die))
+    {
+        Think("SCOUT", "The scout was lost");
+        m_scoutId = 0;
+        scout = nullptr;
+    }
+    if (scout)
+    {
+        // Back to the reserve once it got there, or when it stands without orders for a while
+        const bool there = std::max(std::abs(scout->tileX - m_scoutX), std::abs(scout->tileY - m_scoutY)) <= 3;
+        const bool idle = scout->state == ActionState::Idle && !scout->HasMoveTarget() && !scout->waitingForPath;
+        m_scoutIdleTimer = idle ? m_scoutIdleTimer + deltaTime : 0.0f;
+        if (there || m_scoutIdleTimer > 3.0f)
+        {
+            std::ostringstream msg;
+            msg << "Scouting trip " << m_scoutTrips << " over: " << m_knownBuildings.size() << " enemy structures and "
+                << m_seenEnemyUnits.size() << " units known";
+            Think("SCOUT", msg.str());
+            entities.IssueMoveOrder({scout->id}, m_stagingX, m_stagingY, pathfinder, false);
+            m_waveRoster.insert(scout->id);
+            m_recalled.insert(scout->id);
+            m_scoutId = 0;
+        }
+        return;
+    }
+    if (m_scoutTimer > 0.0f)
+        return;
+    // The cheapest reserve unit goes
+    int bestId = 0, bestCost = 1 << 30;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Unit *u = e.AsUnit();
+        if (!u || !IsReserveUnit(*u) || m_repairing.count(u->id) || u->targetEntityId != 0)
+            continue;
+        const UnitConfig *cfg = entities.GetUnitConfig(u->archetypeId);
+        const int cost = cfg ? cfg->creditCost : 1000;
+        if (cost < bestCost)
+        {
+            bestCost = cost;
+            bestId = u->id;
+        }
+    }
+    if (!bestId)
+        return;
+    // First the enemy's base, then its flanks and where it last came from, in turn
+    int tx = m_playerHqX, ty = m_playerHqY;
+    if (m_scoutTrips % 3 == 1)
+        FlankPoint(2, m_playerHqX, m_playerHqY, map, tx, ty);
+    else if (m_scoutTrips % 3 == 2)
+        FlankPoint(3, m_playerHqX, m_playerHqY, map, tx, ty);
+    if (tx < 0)
+    {
+        tx = m_playerHqX;
+        ty = m_playerHqY;
+    }
+    m_waveRoster.erase(bestId);
+    m_scoutId = bestId;
+    m_scoutIdleTimer = 0.0f;
+    ++m_scoutTrips;
+    entities.IssueMoveOrder({bestId}, tx, ty, pathfinder, false);
+    m_scoutX = tx;
+    m_scoutY = ty;
+    const float interval = difficulty == AIDifficulty::Easy     ? 180.0f
+                           : difficulty == AIDifficulty::Medium ? 120.0f
+                                                                : 90.0f;
+    m_scoutTimer = interval;
+    std::ostringstream msg;
+    msg << "Sending a scout (trip " << m_scoutTrips << ") toward (" << tx << ", " << ty << ")";
+    Think("SCOUT", msg.str());
+}
+
+bool AIController::IsValuable(const Unit &u, const EntityManager &entities) const
+{
+    // Siege forms count as their mobile form: Sniper 14 -> 4, Rhino 15 -> 10, Grad 16 -> 13
+    auto baseOf = [](int arch) {
+        return arch == 14 ? 4 : arch == 15 ? 10 : arch == 16 ? 13 : arch;
+    };
+    const int reference = side() == Faction::Confederation ? kZeus : 10; // Zeus / Rhino
+    const UnitConfig *ref = entities.GetUnitConfig(reference);
+    const UnitConfig *own = entities.GetUnitConfig(baseOf(u.archetypeId));
+    return ref && own && own->creditCost >= ref->creditCost;
+}
+
+void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder)
+{
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    const float threshold = difficulty == AIDifficulty::Easy     ? 0.0f
+                            : difficulty == AIDifficulty::Medium ? 0.25f
+                            : difficulty == AIDifficulty::Hard   ? 0.30f
+                                                                 : 0.35f;
+    // Where vehicles get repaired: next to an own Factory; otherwise (and for infantry) the staging area
+    int factoryX = -1, factoryY = -1;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (b && b->alive && b->owner == m_player && b->type == UnitType::Factory && b->buildProgress >= 1.0f)
+        {
+            factoryX = b->tileX + b->buildWidth / 2;
+            factoryY = b->tileY + b->buildHeight + 1;
+            break;
+        }
+    }
+    // Healed (or dead): back to the reserve
+    for (auto it = m_repairing.begin(); it != m_repairing.end();)
+    {
+        Unit *u = entities.GetUnit(*it);
+        if (!u || !u->alive || u->state == ActionState::Die)
+        {
+            it = m_repairing.erase(it);
+            continue;
+        }
+        if (u->currentHp * 10 >= u->maxHp * 9)
+        {
+            m_waveRoster.insert(u->id);
+            Think("RETREAT", "A repaired unit rejoins the reserve");
+            it = m_repairing.erase(it);
+            continue;
+        }
+        const bool vehicle = !Utility::IsInfantryArchetype(u->archetypeId);
+        const int rx = vehicle && factoryX >= 0 ? factoryX : m_stagingX;
+        const int ry = vehicle && factoryX >= 0 ? factoryY : m_stagingY;
+        if (u->state == ActionState::Idle && !u->HasMoveTarget()
+            && std::max(std::abs(u->tileX - rx), std::abs(u->tileY - ry)) > 3)
+            entities.IssueMoveOrder({u->id}, rx, ry, pathfinder, false);
+        ++it;
+    }
+    if (threshold <= 0.0f)
+        return;
+    for (const AISquad &sq : m_squadController.GetSquads())
+    {
+        if (sq.playerSquad || sq.unitIds.size() <= 3)
+            continue; // a few units left: they fight to the end
+        std::vector<int> leaving;
+        for (int id : sq.unitIds)
+        {
+            const Unit *u = entities.GetUnit(id);
+            if (u && u->maxHp > 0 && static_cast<float>(u->currentHp) < threshold * static_cast<float>(u->maxHp)
+                && IsValuable(*u, entities) && sq.unitIds.size() - leaving.size() > 4)
+                leaving.push_back(id);
+        }
+        if (leaving.empty())
+            continue;
+        m_squadController.ReleaseUnits(leaving, entities);
+        for (int id : leaving)
+        {
+            m_waveRoster.erase(id);
+            m_repairing.insert(id);
+            if (Unit *u = entities.GetUnit(id))
+            {
+                u->targetEntityId = 0;
+                u->isAttackMoving = false;
+                const bool vehicle = !Utility::IsInfantryArchetype(u->archetypeId);
+                const int rx = vehicle && factoryX >= 0 ? factoryX : m_stagingX;
+                const int ry = vehicle && factoryX >= 0 ? factoryY : m_stagingY;
+                entities.IssueMoveOrder({id}, rx, ry, pathfinder, false);
+            }
+        }
+        Think("RETREAT", std::to_string(leaving.size()) + " badly hurt expensive unit(s) pull back for repairs");
+        break; // squads changed: the rest next time
+    }
+}
+
+float AIController::HomeGuardShare() const
+{
+    switch (GetEffectiveDifficulty())
+    {
+        case AIDifficulty::Easy:
+            return 0.40f;
+        case AIDifficulty::Medium:
+            return 0.30f;
+        case AIDifficulty::Hard:
+            return 0.20f;
+        case AIDifficulty::Hardcore:
+            return 0.10f;
+    }
+    return 0.30f;
+}
+
+int AIController::HomeGuardCount() const
+{
+    const int wave = static_cast<int>(m_currentPlan.archetypes.size());
+    return static_cast<int>(std::lround(static_cast<float>(wave) * HomeGuardShare()));
+}
+
+void AIController::UpdateRepairs(float deltaTime, EntityManager &entities)
+{
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    if (difficulty != AIDifficulty::Hard && difficulty != AIDifficulty::Hardcore)
+        return;
+    constexpr int kKeepForTroops = 150;
+    std::vector<int> damaged;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (b && b->owner == m_player && b->rawBuildingType < 15 && b->CanBeRepaired())
+            damaged.push_back(b->id);
+    }
+    for (int id : damaged)
+    {
+        Building *b = entities.GetBuilding(id);
+        if (!b)
+            continue;
+        // Under fire repairs are wasted: wait until the attack is over
+        b->repairing = b->lastAttackedTimer <= 0.0f && m_credits > kKeepForTroops;
+        if (!b->repairing)
+            continue;
+        const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
+        m_credits -= b->RepairStep(deltaTime, cfg ? cfg->creditCost : 0, m_credits - kKeepForTroops);
+    }
+}
+
+bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
+{
+    // Power as planned: buildings under construction count already, so one shortage starts one plant
+    int produced = 0, consumed = 0;
+    bool hasBarracks = false, hasFactory = false;
+    const Building *hq = nullptr;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player)
+            continue;
+        const int pwr = b->GetPowerOutput();
+        (pwr > 0 ? produced : consumed) += std::abs(pwr);
+        hasBarracks = hasBarracks || b->type == UnitType::Barracks;
+        hasFactory = hasFactory || b->type == UnitType::Factory;
+        if (b->type == UnitType::Headquarters && !hq)
+            hq = b;
+    }
+    if (!hq)
+        return false;
+    constexpr int kSparePower = 40; // what the next consumer (a factory) needs
+    constexpr int kTroopReserve = 300;
+
+    AIDefenseSite::Kind kind;
+    int reserve = 0;
+    const char *why = "";
+    if (produced < consumed)
+    {
+        kind = AIDefenseSite::PowerPlant;
+        why = "Power is short: a power plant comes first";
+    }
+    else if (!hasBarracks)
+    {
+        kind = AIDefenseSite::Barracks;
+        why = "No barracks: raising one to start training troops";
+    }
+    else if (produced - consumed < kSparePower && m_credits >= DefenseCost(AIDefenseSite::PowerPlant) + kTroopReserve)
+    {
+        kind = AIDefenseSite::PowerPlant;
+        reserve = kTroopReserve;
+        why = "Credits to spare: an extra power plant for the next buildings";
+    }
+    else if (!hasFactory)
+    {
+        kind = AIDefenseSite::Factory;
+        reserve = kTroopReserve / 2;
+        why = "No factory: building one for vehicles";
+    }
+    else
+        return false;
+
+    const int cost = DefenseCost(kind);
+    if (m_credits - cost < reserve)
+    {
+        ThinkOnce("core", "BUILD", std::string(why) + " (waiting for credits)");
+        return false;
+    }
+    // Power plants behind the HQ, away from the enemy; barracks and factory to its sides
+    const int cx = hq->tileX + hq->buildWidth / 2, cy = hq->tileY + hq->buildHeight / 2;
+    float tdx = static_cast<float>(m_playerHqX - cx), tdy = static_cast<float>(m_playerHqY - cy);
+    const float tlen = std::max(1.0f, DetMath::Hypot(tdx, tdy));
+    tdx /= tlen;
+    tdy /= tlen;
+    const float radius = static_cast<float>(std::max(hq->buildWidth, hq->buildHeight) / 2 + 4);
+    float ox = -tdx, oy = -tdy; // behind
+    if (kind == AIDefenseSite::Barracks)
+    {
+        ox = -tdy;
+        oy = tdx;
+    }
+    else if (kind == AIDefenseSite::Factory)
+    {
+        ox = tdy;
+        oy = -tdx;
+    }
+    AIDefenseSite site;
+    site.kind = kind;
+    site.tileX = static_cast<int>(std::lround(cx + ox * radius)) - 1;
+    site.tileY = static_cast<int>(std::lround(cy + oy * radius)) - 1;
+    if (!BuildDefenseSite(site, map, entities))
+        return false;
+    Think("BUILD", why);
+    return true;
+}
+
 void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
 {
     if (!m_startingBaseRecorded)
@@ -1757,8 +2432,10 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
         return;
     m_buildTimer = 0.0f;
 
-    // Troops come first: building only spends what is left above a reserve for the next wave (except a missing
-    // barracks)
+    if (UpdateCoreBuildOrder(map, entities))
+        return; // one structure per step
+
+    // Troops come first: building only spends what is left above a reserve for the next wave
     int wallsThisTick = 0;
     for (auto &site : m_defensePlan)
     {
@@ -1822,8 +2499,9 @@ void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfind
         Unit *u = e.AsUnit();
         if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player)
             continue;
-        // A squad's members take orders from their squad only (a held member waits for its group)
-        if (m_squadController.IsSquadMember(u->id))
+        // A squad's members take orders from their squad only (a held member waits for its group); the scout
+        // and units on their way to repairs do not pick fights either
+        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id))
             continue;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->waitingForPath && !u->isAttackMoving)
         {

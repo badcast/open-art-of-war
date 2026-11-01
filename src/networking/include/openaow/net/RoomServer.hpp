@@ -35,6 +35,8 @@ struct RoomServerConfig
     uint32_t unusedRoomTimeoutMs {120000}; // ... and one nobody ever entered after this
     std::string name {"OpenAOW server"};
     std::string motd;
+    // The replay of every match of every room is saved here (the server's fairness record); empty: not saved
+    std::string replayDir; // the openaow-server program defaults it to "replay"
 };
 
 class RoomServer

@@ -35,6 +35,10 @@ struct AITacticsConfig
     int waveMaxSize {18};
     float waveIntervalSeconds {45.0f};    // minimum pause between two waves
     int maxWaveTier {4};                  // strongest composition tier the AI may field (1..4)
+    int vanguardWave {3};                 // first wave with rocket troopers (tier 2)
+    int assaultWave {5};                  // first wave with tanks (tier 3)
+    int siegeWave {7};                    // first wave with the siege fist: MLRS, heavy tanks (tier 4)
+    float vehicleWaitSeconds {60.0f};     // a wave waits this long for its vehicles, then leaves without them
     float researchSeconds {30.0f};        // time per Research Lab technology
     float stragglerTimeoutSeconds {6.0f}; // a straggler that cannot close in for this long leaves the group
     int marchStrideTiles {5};             // distance between consecutive march waypoints
@@ -95,6 +99,7 @@ enum class AISquadState
     ChokeTransit,  // single-file column through the passage (leash rule suspended)
     Deploying,     // waiting past the passage until the whole group is out
     Engaged,       // fighting; cohesion paused until the area is quiet again
+    FormingUp,     // in front of the enemy defenses: lining up (armour ahead, artillery behind) to go in together
     Assault,       // objective reached: free attack on player structures
     Retreating     // Hard: wave lost without effect, survivors fall back to staging
 };
@@ -139,6 +144,7 @@ struct AISquad
     PlayerId owner {kNoPlayer}; // whose units (the owner of the first one); its enemies are the targets
     bool attackMove {true};     // legs are attack-move orders (false: plain moves that ignore enemies)
     bool playerSquad {false};   // player control group: dissolves once the destination is reached
+    bool formedUp {false};      // lined up in front of the objective's defenses already (once per march)
 };
 
 /**
@@ -168,6 +174,25 @@ public:
         Pathfinder &pathfinder,
         const ChokepointMap &chokes,
         const AITacticsConfig &tactics);
+
+    // Hardcore: routes avoid every enemy defense, seen or not (otherwise only the ones the owner sees now)
+    void SetSeesAll(bool seesAll)
+    {
+        m_seesAll = seesAll;
+    }
+    // Strategic route over terrain (units ignored), excluding the start tile: tiles next to cliffs, walls and
+    // buildings cost more (the column keeps off them), tiles under fire of known enemy defenses much more,
+    // and a hostile wall is crossed (breached) only when every way around is clearly longer
+    static bool PlanRoute(
+        const TileMap &map,
+        const EntityManager &entities,
+        PlayerId owner,
+        bool seesAll,
+        int startX,
+        int startY,
+        int goalX,
+        int goalY,
+        std::vector<PathNode> &outPath);
 
     void SetStagingPoint(int x, int y)
     {
@@ -223,6 +248,9 @@ private:
         Pathfinder &pathfinder,
         const AITacticsConfig &tactics);
     void PaceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active);
+    // Index of the route node where the group lines up out of reach of the objective's known defenses;
+    // -1 when there is nothing to line up for (no defenses, or the group is past that point)
+    int FormUpIndex(const AISquad &sq, const EntityManager &entities) const;
     void HoldUnits(const std::vector<int> &ids, EntityManager &entities);
     void OrderLeg(
         const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder);
@@ -242,6 +270,7 @@ private:
     int m_nextSquadId {1};
     int m_stagingX {0};
     int m_stagingY {0};
+    bool m_seesAll {false};
     float m_tickAccumulator {0.0f};
 };
 

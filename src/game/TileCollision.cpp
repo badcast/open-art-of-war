@@ -67,12 +67,25 @@ Table LoadTable()
 
 } // namespace
 
+namespace
+{
+Table &CurrentTable()
+{
+    static Table table = LoadTable();
+    return table;
+}
+} // namespace
+
 bool TileCollision::IsBlocked(int tilesetId, int tile)
 {
-    static const Table table = LoadTable();
     if (tile < 0 || tile >= kTiles)
         return false;
-    return table[tilesetId == 1 ? 1 : 0][tile];
+    return CurrentTable()[tilesetId == 1 ? 1 : 0][tile];
+}
+
+void TileCollision::Reload()
+{
+    CurrentTable() = LoadTable();
 }
 
 } // namespace OpenArtOfWar

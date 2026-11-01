@@ -21,8 +21,14 @@ public:
     static bool RunDeterminismTest(Application &app);
     // A match of four players in two mixed teams: bases, owners, teams, sight, economies, determinism
     static bool RunMatchTest(Application &app);
+    static bool RunReplayTest(Application &app);
+    static bool RunTechTest(Application &app);
+    static bool RunAiVehicleTest(Application &app);
+    static bool RunFogBlockTest(Application &app);
     // A match with computer players in slots: they build and train, and do it alike every time
     static bool RunMatchAiTest(Application &app);
+    static bool RunBurstTest(Application &app);
+    static bool RunDataSyncTest(Application &app);
 };
 
 } // namespace OpenArtOfWar

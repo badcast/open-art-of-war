@@ -88,6 +88,11 @@ public:
     {
         return m_debugMode;
     }
+    // A replay holds the world still (paused) while the interface stays alive
+    void SetSimulationHold(bool hold)
+    {
+        m_simHold = hold;
+    }
     bool IsRevealFog() const
     {
         return m_debugMode && m_revealFog;
@@ -215,6 +220,7 @@ private:
     bool m_controlAllFactions {false};
     bool m_pauseAI {false};
     bool m_revealFog {false};
+    bool m_simHold {false};
     bool m_spawnMode {false};
     bool m_spawnDropdownOpen {false};
     int m_selectedSpawnIndex {8}; // Default: Rhino (Res)

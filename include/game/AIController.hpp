@@ -103,7 +103,8 @@ struct AIDefenseSite
         Wall,
         Lab,
         PowerPlant,
-        Barracks
+        Barracks,
+        Factory
     };
     Kind kind {Tower};
     int tileX {0};
@@ -295,6 +296,24 @@ private:
     void UpdateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime);
     bool IsReserveUnit(const Unit &u) const;
     void UpdateWaveRoster(EntityManager &entities);
+    // Stances by role: wave squads pursue, artillery holds its ground, the rest guards the base and returns
+    void UpdateUnitStances(EntityManager &entities);
+    // Core build order, ahead of the defense plan: a power plant when power runs short, the barracks, a
+    // spare power plant when credits allow, the factory. True when something was started this step
+    bool UpdateCoreBuildOrder(TileMap &map, EntityManager &entities);
+    // Hard / Hardcore: repairs buildings that are not under fire, paid from the AI treasury
+    void UpdateRepairs(float deltaTime, EntityManager &entities);
+    // What the computer knows of the enemy: structures and units it has seen (Hardcore: everything)
+    void UpdateIntel(EntityManager &entities);
+    // A cheap unit looks for the enemy at the start and again every while (not on Hardcore: it sees all)
+    void UpdateScouting(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+    // Badly hurt expensive units (as dear as a Zeus / Rhino or dearer) leave their squad for repairs,
+    // unless the squad is down to a few units; the HP share depends on the difficulty
+    void UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder);
+    bool IsValuable(const Unit &u, const EntityManager &entities) const;
+    // Share of the reserve that stays home when a wave leaves (Easy 40% ... Hardcore 10%)
+    float HomeGuardShare() const;
+    int HomeGuardCount() const;
     bool AiSees(const Entity &e, const EntityManager &entities) const;
     void FindAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const;
     void UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder);
@@ -344,6 +363,8 @@ private:
     std::vector<int> m_vehicleQueue;
     float m_waveCooldown {0.0f};
     float m_waveAssemblyTimer {0.0f};
+    bool m_factoryReady {false};     // a finished factory was seen (the wave plan is made again once, with vehicles)
+    float m_vehicleHoldSeconds {0.0f}; // how long the barracks have been saving credits for the next vehicle
     int m_readyUnits {0};
     bool m_hasProduction {true};
     int m_stagingX {0};
@@ -392,6 +413,23 @@ private:
     std::deque<AIThought> m_thoughts;
     size_t m_thoughtSerial {0};
     std::map<std::string, std::string> m_lastThoughtByKey;
+
+    // Intel (ordered containers: the same iteration on every peer)
+    std::map<int, std::pair<int, int>> m_knownBuildings; // enemy structure id -> centre tile
+    std::map<int, bool> m_seenEnemyUnits;                // enemy unit id -> vehicle
+    float m_intelTimer {0.0f};
+    // Scouting
+    int m_scoutId {0};
+    int m_scoutX {-1};
+    int m_scoutY {-1};
+    float m_scoutTimer {0.0f};
+    float m_scoutIdleTimer {0.0f};
+    int m_scoutTrips {0};
+    // Expensive units on their way to repairs (out of the waves until healed)
+    std::set<int> m_repairing;
+    float m_retreatTimer {0.0f};
+    bool m_firstRaidDone {false};
+    int m_trainedUnits {0}; // troops trained since the start (the early raid waits for the first one)
 
     void InitDifficultyDefaults();
     AIDifficulty m_difficulty {AIDifficulty::Medium};

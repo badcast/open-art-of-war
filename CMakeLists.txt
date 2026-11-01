@@ -7,6 +7,10 @@ string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" OAOW_VERSION_NUMERIC "${OAOW_VERS
 
 project(OpenArtOfWar VERSION ${OAOW_VERSION_NUMERIC} LANGUAGES CXX C)
 
+if(WIN32)
+    enable_language(RC)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -104,6 +108,7 @@ set(ENGINE_SOURCES
     src/core/LoaderResources.cpp
     src/audio/SfxMixer.cpp
     src/audio/GameSounds.cpp
+    src/audio/SoundIds.cpp
     src/audio/VoiceManager.cpp
     src/core/Settings.cpp
     src/core/VideoModes.cpp
@@ -131,6 +136,7 @@ set(ENGINE_SOURCES
     src/game/Research.cpp
     src/game/Effects.cpp
     src/game/Projectiles.cpp
+    src/game/WeaponBalance.cpp
     src/game/Sides.cpp
     src/game/Players.cpp
     src/core/Utility.cpp
@@ -146,6 +152,10 @@ set(ENGINE_SOURCES
     src/game/SimCommandCodec.cpp
     src/net/NetMatch.cpp
     src/net/MapFiles.cpp
+    src/net/ReplayRecorder.cpp
+    src/replay/ReplayPlayer.cpp
+    src/ui/ReplayMenu.cpp
+    src/core/ApplicationReplay.cpp
     src/ui/MenuController.cpp
     src/ui/HUDController.cpp
     src/ui/UiKit.cpp
@@ -304,11 +314,61 @@ function(openaow_executable target output)
         INSTALL_RPATH "${OAOW_RPATH}/../lib"
     )
     target_link_libraries(${target} PRIVATE openaow-core)
-    # Windows has no rpath: put the DLLs of the dependencies next to the executable
-    if(WIN32 AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.21)
-        add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
-            COMMAND_EXPAND_LISTS)
+
+    if(WIN32)
+        # Windows Desktop manifest, icon and version resource
+        if(target STREQUAL "openaow-game")
+            set(OAOW_MANIFEST_NAME "OpenArtOfWar.Game")
+            set(OAOW_MANIFEST_IN "manifest-game.in")
+            set(OAOW_RC_IN "manifest-game.rc.in")
+            set(OAOW_ICON_PATH "${PROJECT_SOURCE_DIR}/docs/app-game-icon.ico")
+            set(OAOW_DESCRIPTION "Open Art Of War: Freedom for Liberty")
+        elseif(target STREQUAL "openaow-charactereditor")
+            set(OAOW_MANIFEST_NAME "OpenArtOfWar.CharacterEditor")
+            set(OAOW_MANIFEST_IN "manifest-charactereditor.in")
+            set(OAOW_RC_IN "manifest-charactereditor.rc.in")
+            set(OAOW_ICON_PATH "${PROJECT_SOURCE_DIR}/docs/app-chareditor-icon.ico")
+            set(OAOW_DESCRIPTION "Open Art Of War Character Archetype Editor")
+        elseif(target STREQUAL "openaow-mapeditor")
+            set(OAOW_MANIFEST_NAME "OpenArtOfWar.MapEditor")
+            set(OAOW_MANIFEST_IN "manifest-mapeditor.in")
+            set(OAOW_RC_IN "manifest-mapeditor.rc.in")
+            set(OAOW_ICON_PATH "${PROJECT_SOURCE_DIR}/docs/app-mapeditor-icon.ico")
+            set(OAOW_DESCRIPTION "Open Art Of War Map Editor")
+        endif()
+
+        if(OAOW_MANIFEST_IN)
+            set(OAOW_TARGET_NAME "${output}")
+            set(OAOW_ORIGINAL_FILENAME "${output}.exe")
+            set(OAOW_MANIFEST_FILE "${CMAKE_CURRENT_BINARY_DIR}/${output}.manifest")
+            set(OAOW_RC_FILE "${CMAKE_CURRENT_BINARY_DIR}/${output}.rc")
+
+            configure_file(
+                "${PROJECT_SOURCE_DIR}/config/${OAOW_MANIFEST_IN}"
+                "${OAOW_MANIFEST_FILE}"
+                @ONLY
+            )
+            configure_file(
+                "${PROJECT_SOURCE_DIR}/config/${OAOW_RC_IN}"
+                "${OAOW_RC_FILE}"
+                @ONLY
+            )
+            target_sources(${target} PRIVATE "${OAOW_RC_FILE}")
+        endif()
+
+        # In Release mode, hide console window for desktop GUI applications
+        set_property(TARGET ${target} PROPERTY WIN32_EXECUTABLE $<CONFIG:Release>)
+        if(MSVC)
+            # Link standard main(int, char**) as the entry point for GUI subsystem
+            target_link_options(${target} PRIVATE $<$<BOOL:$<TARGET_PROPERTY:WIN32_EXECUTABLE>>:/ENTRY:mainCRTStartup>)
+        endif()
+
+        # Windows has no rpath: put the DLLs of the dependencies next to the executable
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.21)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
+                COMMAND_EXPAND_LISTS)
+        endif()
     endif()
 endfunction()
 

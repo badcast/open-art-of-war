@@ -14,6 +14,9 @@
 #include "openaow/net/Rendezvous.hpp"
 #include "openaow/net/Session.hpp"
 
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+
 #include <algorithm>
 #include <iostream>
 #include <random>
@@ -53,36 +56,75 @@ NetMatch::~NetMatch()
 
 uint64_t NetMatch::AssetsHash()
 {
-    static const uint64_t hash = [] {
-        // CRC of every file the simulation reads, names included, in a fixed order; two CRCs side by side
-        // make a 64-bit value
-        uint32_t a = 0, b = 0x9e3779b9u;
-        // The manifest (main.json) decides which folders matter and is hashed itself
-        std::vector<std::string> files = LoaderResources::NetHashFiles();
-        files.push_back(LoaderResources::kManifestPath);
-        std::sort(files.begin(), files.end());
-        files.erase(std::unique(files.begin(), files.end()), files.end());
-        std::vector<uint8_t> bytes;
-        for (const std::string &f : files)
-        {
-            if (!Assets::ReadBytes(f, bytes))
-                continue;
-            a = Net::crc32(f.data(), f.size(), a);
-            a = Net::crc32(bytes.data(), bytes.size(), a);
-            b = Net::crc32(bytes.data(), bytes.size(), b ^ static_cast<uint32_t>(bytes.size()));
-        }
-        return (static_cast<uint64_t>(a) << 32) | b;
-    }();
-    return hash;
+    // CRC of the manifest's simulation part and of every file the simulation reads, names included, in a fixed order;
+    // two CRCs side by side make a 64-bit value. Read from the assets as they are now: a session overlay counts.
+    uint32_t a = 0, b = 0x9e3779b9u;
+    const std::string manifest = LoaderResources::NetManifestText();
+    a = Net::crc32(manifest.data(), manifest.size(), a);
+    b = Net::crc32(manifest.data(), manifest.size(), b ^ static_cast<uint32_t>(manifest.size()));
+    std::vector<std::string> files = LoaderResources::NetHashFiles();
+    std::sort(files.begin(), files.end());
+    files.erase(std::unique(files.begin(), files.end()), files.end());
+    std::vector<uint8_t> bytes;
+    for (const std::string &f : files)
+    {
+        if (!Assets::ReadBytes(f, bytes))
+            continue;
+        a = Net::crc32(f.data(), f.size(), a);
+        a = Net::crc32(bytes.data(), bytes.size(), a);
+        b = Net::crc32(bytes.data(), bytes.size(), b ^ static_cast<uint32_t>(bytes.size()));
+    }
+    return (static_cast<uint64_t>(a) << 32) | b;
 }
+
+std::vector<Net::DataEntry> NetMatch::DataManifest()
+{
+    std::vector<std::string> files = LoaderResources::NetHashFiles();
+    std::sort(files.begin(), files.end());
+    files.erase(std::unique(files.begin(), files.end()), files.end());
+    std::vector<Net::DataEntry> out;
+    std::vector<uint8_t> bytes;
+    for (const std::string &f : files)
+    {
+        // A file that cannot be read is listed with hash 0: it differs from any file of the other side
+        out.push_back({f, Assets::ReadBytes(f, bytes) ? MapFiles::HashOfBytes(bytes) : 0});
+    }
+    const std::string manifest = LoaderResources::NetManifestText();
+    out.push_back({LoaderResources::kManifestPath, MapFiles::HashOfBytes({manifest.begin(), manifest.end()})});
+    return out;
+}
+
+namespace
+{
+// A new session starts with the player's own data (a leftover overlay of an earlier host is dropped)
+void DropOldOverlay(bool &changed)
+{
+    if (Assets::HasSessionOverlay())
+    {
+        Assets::ClearSessionOverlay();
+        changed = true;
+    }
+}
+} // namespace
 
 bool NetMatch::host(uint16_t port, const std::string &playerName, std::string &error)
 {
     leave();
+    DropOldOverlay(m_dataChanged);
     Net::HostConfig hc;
     hc.identity = Identity();
     hc.roomName = playerName;
     hc.password = m_password;
+    // A player whose game data differ can fetch these files from this host (see DataSync)
+    hc.dataManifest = DataManifest();
+    hc.dataFile = [](const std::string &path, std::vector<uint8_t> &packed, uint64_t &hash) {
+        const std::vector<std::string> allowed = LoaderResources::NetHashFiles();
+        if (std::find(allowed.begin(), allowed.end(), path) == allowed.end())
+            return false;
+        packed = MapFiles::Packed(path);
+        hash = MapFiles::HashOf(path);
+        return !packed.empty() && hash != 0;
+    };
     // Another game hosted on this computer holds the port: the next ones of the span (browsers probe them)
     std::unique_ptr<Net::Transport> server;
     for (uint16_t p = 0; p < Net::kDiscoveryPortSpan && !server; ++p)
@@ -129,6 +171,7 @@ bool NetMatch::join(
     const std::string &address, uint16_t port, const std::string &playerName, std::string &error, bool dedicated)
 {
     leave();
+    DropOldOverlay(m_dataChanged);
     m_dedicated = dedicated;
     m_address = address;
     m_port = port;
@@ -141,6 +184,7 @@ bool NetMatch::join(
     cc.identity = Identity();
     cc.playerName = playerName;
     cc.password = m_password;
+    cc.canSync = !m_synced;
     m_client = std::make_unique<Net::SessionClient>(std::move(transport), cc);
     return true;
 }
@@ -167,6 +211,7 @@ bool NetMatch::joinHosted(
     std::string &error)
 {
     leave();
+    DropOldOverlay(m_dataChanged);
     m_joinStartMs = SDL_GetTicks();
     m_hostedJoin = std::make_unique<Net::HostedJoin>(master, masterPort, code);
     if (m_hostedJoin->state() == Net::HostedJoin::State::Failed)
@@ -185,6 +230,7 @@ bool NetMatch::joinHosted(
 
 void NetMatch::leave()
 {
+    FinishReplay("left");
     // Leaving for good: the host frees the slot at once instead of waiting for a comeback
     if (m_client)
         m_client->sendLeave();
@@ -197,6 +243,9 @@ void NetMatch::leave()
     m_loopback.reset();
     m_takenStarts = 0;
     m_dedicated = false;
+    m_sync = DataSync {};
+    m_synced = false;
+    m_syncText.clear();
     m_scheduledTurn = 0;
     m_reconnect = Reconnect {};
     m_hostedMaster.clear();
@@ -231,6 +280,7 @@ void NetMatch::Update(uint32_t nowMs)
             cc.identity = Identity();
             cc.playerName = m_name;
             cc.password = m_password;
+            cc.canSync = !m_synced;
             cc.token = m_rejoinToken; // set when this is a comeback after a lost connection
             m_client = std::make_unique<Net::SessionClient>(m_hostedJoin->takeTransport(), cc);
             m_hostedJoin.reset();
@@ -251,6 +301,7 @@ void NetMatch::Update(uint32_t nowMs)
         m_host->update(nowMs);
     if (m_client)
         m_client->update(nowMs);
+    UpdateDataSync();
 
     // Lost in the middle of a match: back in with the session token, backing off between the tries
     if (!m_host && m_client && m_takenStarts > 0 && m_client->state() == Net::SessionClient::State::Disconnected)
@@ -283,6 +334,7 @@ void NetMatch::Update(uint32_t nowMs)
                 cc.identity = Identity();
                 cc.playerName = m_reconnect.name;
                 cc.password = m_password;
+                cc.canSync = !m_synced;
                 cc.token = m_client->token();
                 m_client = std::make_unique<Net::SessionClient>(std::move(transport), cc);
             }
@@ -295,6 +347,132 @@ void NetMatch::Update(uint32_t nowMs)
     {
         m_reconnect.active = false;
         std::cerr << "[Net] Reconnected" << std::endl;
+    }
+}
+
+// ---- Joining a host with other simulation data: fetch its files, play with them for this session ----
+
+void NetMatch::FailDataSync(const std::string &files)
+{
+    m_failure = std::string(_("Your game data differ from the host's and could not be synced: ")) + files;
+    std::cerr << "[Net] Data sync failed: " << files << std::endl;
+    m_sync = DataSync {};
+    m_syncText.clear();
+    if (m_client)
+        m_client->disconnect();
+}
+
+void NetMatch::StartDataSync(const std::vector<Net::DataEntry> &theirs)
+{
+    std::map<std::string, uint64_t> own;
+    for (const Net::DataEntry &e : DataManifest())
+        own[e.path] = e.hash;
+    const std::vector<std::string> allowed = LoaderResources::NetHashFiles();
+    m_sync = DataSync {};
+    std::string unfixable;
+    auto note = [&](const std::string &path) {
+        unfixable += (unfixable.empty() ? "" : ", ") + path.substr(path.find_last_of('/') + 1);
+    };
+    for (const Net::DataEntry &e : theirs)
+    {
+        const auto it = own.find(e.path);
+        if (it != own.end() && it->second == e.hash)
+            continue;
+        // Only files this game itself lists as simulation data are taken, nothing else a host may name
+        const bool listed = std::find(allowed.begin(), allowed.end(), e.path) != allowed.end();
+        if (!listed || e.hash == 0)
+            note(e.path);
+        else
+            m_sync.wanted.push_back(e);
+    }
+    for (const auto &entry : own)
+    {
+        const bool known
+            = std::any_of(theirs.begin(), theirs.end(), [&](const Net::DataEntry &e) { return e.path == entry.first; });
+        if (!known)
+            note(entry.first);
+    }
+    if (!unfixable.empty() || m_sync.wanted.empty())
+    {
+        FailDataSync(unfixable.empty() ? std::string(_("(the game's file lists differ)")) : unfixable);
+        return;
+    }
+    m_sync.active = true;
+    for (const Net::DataEntry &e : m_sync.wanted)
+        m_client->requestDataFile(e.path);
+    m_syncText = std::string(_("Downloading game data")) + " (0/" + std::to_string(m_sync.wanted.size()) + ")";
+    std::cout << "[Net] Game data differ from the host's: fetching " << m_sync.wanted.size() << " file(s)" << std::endl;
+}
+
+void NetMatch::AcceptDataFile(const Net::FilePathData &file)
+{
+    const auto want = std::find_if(
+        m_sync.wanted.begin(), m_sync.wanted.end(), [&](const Net::DataEntry &e) { return e.path == file.path; });
+    // Anything not asked for, or twice, is ignored
+    const std::string prefix = "assets/";
+    if (want == m_sync.wanted.end() || file.path.compare(0, prefix.size(), prefix) != 0)
+        return;
+    const std::string key = file.path.substr(prefix.size());
+    if (m_sync.got.count(key))
+        return;
+    std::vector<uint8_t> raw;
+    // The hash it is announced with must be the one of the host's list, and the bytes must have it
+    if (file.hash != want->hash || !MapFiles::Unpack(file.bytes, file.hash, raw, Net::kMaxFileBytes * 8))
+    {
+        FailDataSync(file.path.substr(file.path.find_last_of('/') + 1));
+        return;
+    }
+    m_sync.bytes += raw.size();
+    // It must read as what its name says: a hostile host gets no further than the parser
+    bool readable = m_sync.bytes <= 4u * 1024 * 1024;
+    if (readable && file.path.size() > 5 && file.path.compare(file.path.size() - 5, 5, ".json") == 0)
+        readable = !nlohmann::json::parse(raw.begin(), raw.end(), nullptr, false).is_discarded();
+    else if (readable && file.path.size() > 5 && file.path.compare(file.path.size() - 5, 5, ".yaml") == 0)
+    {
+        try
+        {
+            YAML::Load(std::string(raw.begin(), raw.end()));
+        }
+        catch (...)
+        {
+            readable = false;
+        }
+    }
+    if (!readable)
+    {
+        FailDataSync(file.path.substr(file.path.find_last_of('/') + 1));
+        return;
+    }
+    m_sync.got[key] = std::move(raw);
+    m_syncText = std::string(_("Downloading game data")) + " (" + std::to_string(m_sync.got.size()) + "/"
+                 + std::to_string(m_sync.wanted.size()) + ")";
+}
+
+void NetMatch::UpdateDataSync()
+{
+    if (!m_client || m_host)
+        return;
+    std::vector<Net::DataEntry> theirs;
+    if (m_client->takeDataManifest(theirs))
+    {
+        if (m_synced)
+            FailDataSync(_("(the data still differ after the sync)"));
+        else
+            StartDataSync(theirs);
+    }
+    Net::FilePathData file;
+    while (m_sync.active && m_client->takeDataFile(file))
+        AcceptDataFile(file);
+    if (m_sync.active && m_sync.got.size() == m_sync.wanted.size())
+    {
+        // All here: play with the host's files from now on, and say hello again with the data we have now
+        Assets::SetSessionOverlay(std::move(m_sync.got));
+        m_sync = DataSync {};
+        m_synced = true;
+        m_dataChanged = true;
+        m_syncText.clear();
+        m_client->sayHelloAgain(AssetsHash());
+        std::cout << "[Net] Playing with the host's game data" << std::endl;
     }
 }
 
@@ -384,6 +562,16 @@ bool NetMatch::rejected() const
     return m_client && m_client->state() == Net::SessionClient::State::Rejected;
 }
 
+Net::RejectReason NetMatch::RejectedWhy() const
+{
+    return m_client ? m_client->rejectReason() : Net::RejectReason::None;
+}
+const std::string &NetMatch::RejectedDetail() const
+{
+    static const std::string kNone;
+    return m_client ? m_client->rejectDetail() : kNone;
+}
+
 bool NetMatch::JoinTimedOut(uint32_t nowMs) const
 {
     if (m_host || m_reconnect.active || m_takenStarts > 0 || connected() || m_joinStartMs == 0)
@@ -397,6 +585,8 @@ std::string NetMatch::ConnectingText(uint32_t nowMs) const
     const std::string target = m_hostedJoin || m_address.empty() ? std::string(_("the game through the server"))
                                                                  : m_address + ":" + std::to_string(m_port);
     const uint32_t seconds = m_joinStartMs ? (nowMs - m_joinStartMs) / 1000 : 0;
+    if (!m_syncText.empty())
+        return m_syncText;
     return std::string(_("Connecting to")) + " " + target + "...  " + std::to_string(seconds) + " / "
            + std::to_string(kJoinTimeoutMs / 1000) + " " + _("s");
 }
@@ -616,6 +806,22 @@ bool NetMatch::TakeStartedMatch(MatchSetup &out)
         m_takenStarts = m_client->matchStarts();
         return false;
     }
+    // The replay of this match (the setup as the room sent it, the map still under the room's name)
+    {
+        ReplayRecorder::Info info;
+        info.setupBytes = m_client->matchSetup();
+        info.setup = out;
+        info.names.assign(kMaxPlayers, std::string());
+        for (const Net::RosterEntry &e : m_client->roster().players)
+        {
+            if (e.slot < kMaxPlayers)
+                info.names[e.slot] = e.name;
+        }
+        info.ticksPerTurn = std::max<uint32_t>(1, m_client->ticksPerTurn());
+        info.turnMs = m_client->turnMs();
+        info.assetsHash = AssetsHash();
+        m_recorder.Begin(std::move(info));
+    }
     out.mapPath = file;
     m_takenStarts = m_client->matchStarts();
     m_scheduledTurn = 0;
@@ -648,8 +854,17 @@ bool NetMatch::CanRunTick(uint32_t tick)
     const Net::TurnBundle *bundle = m_client->turn(turn);
     if (!bundle)
         return false;
-    // Everybody's commands of this turn on its first tick, in the bundle's order
-    for (const Net::PlayerTurn &p : bundle->players)
+    m_recorder.OnBundle(*bundle);
+    ScheduleBundle(*m_sim, *bundle, tpt);
+    m_scheduledTurn = turn + 1;
+    m_client->dropTurnsBefore(turn);
+    return true;
+}
+
+void NetMatch::ScheduleBundle(Simulation &sim, const Net::TurnBundle &bundle, uint32_t ticksPerTurn)
+{
+    const uint32_t first = bundle.turn * ticksPerTurn;
+    for (const Net::PlayerTurn &p : bundle.players)
     {
         std::vector<SimCommand> commands;
         if (!SimCommandCodec::Decode(p.bytes.data(), p.bytes.size(), p.slot, commands))
@@ -659,26 +874,26 @@ bool NetMatch::CanRunTick(uint32_t tick)
             if (c.type == CommandType::PlayerLeft)
                 continue;    // only the host's word counts for that (below)
             c.debug = false; // no debug powers in a network game
-            m_sim->Schedule(turn * tpt, std::move(c));
+            sim.Schedule(first, std::move(c));
         }
     }
     // Players who left the match for good: their forces go on this tick, on every peer alike
-    for (uint8_t slot : bundle->left)
+    for (uint8_t slot : bundle.left)
     {
         SimCommand c;
         c.type = CommandType::PlayerLeft;
         c.player = slot;
-        m_sim->Schedule(turn * tpt, std::move(c));
+        sim.Schedule(first, std::move(c));
     }
-    m_scheduledTurn = turn + 1;
-    m_client->dropTurnsBefore(turn);
-    return true;
 }
 
 void NetMatch::AfterTick(uint32_t tick, uint64_t checksum)
 {
     if (!m_client || !m_sim)
         return;
+    m_lastTick = tick;
+    if (tick % kHashIntervalTicks == 0)
+        m_recorder.OnChecksum(tick, checksum);
     const uint32_t tpt = std::max<uint32_t>(1, m_client->ticksPerTurn());
     // `tick` ran; the last tick of a turn ends it: what the player did meanwhile goes out
     if ((tick + 1) % tpt == 0 && !m_outgoing.empty())
@@ -762,6 +977,32 @@ NetMatch::Stats NetMatch::stats(uint32_t nowMs, uint32_t tick)
             s.peers.push_back({p.slot, p.name, p.connected, p.rttMs});
     }
     return s;
+}
+
+std::string NetMatch::FinishReplay(const std::string &outcome)
+{
+    return m_recorder.Finish(outcome, m_lastTick);
+}
+
+void NetMatch::SendView(float centerX, float centerY, float zoom)
+{
+    if (!m_client || !m_sim)
+        return;
+    const int32_t x = static_cast<int32_t>(centerX), y = static_cast<int32_t>(centerY);
+    const int32_t z = static_cast<int32_t>(zoom * 100.0f + 0.5f);
+    // Only a camera that moved (a tile or so) or zoomed is worth the bytes
+    if (std::abs(x - m_lastViewX) < TILE_WIDTH && std::abs(y - m_lastViewY) < TILE_HEIGHT && z == m_lastViewZoom)
+        return;
+    m_lastViewX = x;
+    m_lastViewY = y;
+    m_lastViewZoom = z;
+    SimCommand c;
+    c.type = CommandType::View;
+    c.player = m_client->slot();
+    c.x = x;
+    c.y = y;
+    c.a = z;
+    m_outgoing.push_back(std::move(c));
 }
 
 int NetMatch::TurnsAhead(uint32_t tick) const

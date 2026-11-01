@@ -58,6 +58,8 @@ public:
     static std::string Effects(const std::string &root = kDefaultRoot);
     // How projectiles fly and hit (characters/projectiles.yaml)
     static std::string projectiles(const std::string &root = kDefaultRoot);
+    // Damage multipliers by projectile kind and target class (data/weapon_balance.json)
+    static std::string weaponBalance(const std::string &root = kDefaultRoot);
     // `faction` is "confederation" or "resistance"
     static std::string research(const std::string &faction, const std::string &root = kDefaultRoot);
     static std::string tileCollision(const std::string &root = kDefaultRoot);
@@ -79,6 +81,10 @@ public:
     // ---- Network ----
     // Files whose contents must match between the players (net_hash), in manifest order
     static std::vector<std::string> NetHashFiles(const std::string &root = kDefaultRoot);
+    // The simulation's part of the manifest (see net_hash): what must be the same for two players to agree
+    static std::string NetManifestText();
+    // Pictures, palettes, the music list and the UI colours (net_visual): never compared between players
+    static std::vector<std::string> NetVisualFiles(const std::string &root = kDefaultRoot);
 
 private:
     static const nlohmann::json &Manifest();
@@ -86,6 +92,7 @@ private:
     static std::string Str(const char *section, const char *key);
     // A string array of the manifest (empty when missing)
     static std::vector<std::string> List(const char *section, const char *key);
+    static std::vector<std::string> SheetsByPage(); // the sprite sheets by page number (gaps stay empty)
     static std::vector<std::string> Joined(const std::string &root, std::vector<std::string> files);
 };
 
