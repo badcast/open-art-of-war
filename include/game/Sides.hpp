@@ -11,11 +11,11 @@ namespace OpenArtOfWar
      * Chosen before a mission starts; every "player" / "enemy" decision in the game goes through
      * these helpers instead of assuming Resistance = player and Confederation = AI.
      */
-    Faction playerFaction();
-    Faction aiFaction();
-    void setPlayerFaction(Faction faction);
+    Faction PlayerFaction();
+    Faction AiFaction();
+    void SetPlayerFaction(Faction faction);
 
-    inline Faction opposingFaction(Faction faction)
+    inline Faction OpposingFaction(Faction faction)
     {
         return faction == Faction::Resistance ? Faction::Confederation : Faction::Resistance;
     }

@@ -1,81 +1,95 @@
 #include "SmartGenerator.hpp"
 #include "MapNoise.hpp"
+#include "TileCorners.hpp"
 #include "core/Utility.hpp"
 #include "game/TileCollision.hpp"
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <random>
+#include <string>
 #include <vector>
 
 namespace OpenArtOfWar {
 
+// How the original maps are built (measured on map_mission_* / map_skirmish_*):
+// - The ground is a corner tile set: every corner of a tile is light grass (G), dark grass (D), earth (E),
+//   water (W) or, in tileset 1, sand (S), and neighbours share their corners (TileCorners.hpp). Materials
+//   nest: water lies inside dark grass, dark grass, earth and sand inside light grass.
+// - Everything impassable is an island of overlapping decorations: rock massifs and groves in the middle,
+//   trees, groves and small stones on the rim. The collision mask is the union of their footprints; the
+//   open ground carries no decorations at all. 5..60 islands cover 40..65 % of a map, a few of them large,
+//   most touch the map edge. Under an island lies dark grass, water and jungle, hidden by the decorations.
+// - A map keeps one look: forest-only islands, or islands that are 40..70 % rock.
+
 namespace {
 
-using MapNoise::octaveNoise2D;
+using MapNoise::OctaveNoise2D;
 using Rng = Utility::Random;
 
 constexpr float kPi = 3.14159265f;
 constexpr int kBaseSize = 10;      // a base occupies 10x10 tiles
 constexpr int kBaseMargin = 3;     // kept clear around a base
 
-// ---- Ground tiles --------------------------------------------------------------------------------------------
-// Passability follows the tile sprite (TileCollision): bare earth is impassable plateau, jungle tiles are
-// impassable undergrowth, grass, transition and rubble tiles are open. A tile holds four quadrants (NW, NE, SW,
-// SE) that are either grass or earth; the transition pools below are indexed by those quadrants as bits
-// (bit0 = NW, bit1 = NE, bit2 = SW, bit3 = SE, set = earth). They were read from the tile pictures of both tilesets.
-struct TileSet {
-    int grass[2];                       // inclusive tile range of the plain grass variants
-    int meadow[2];
-    int altGrass[2];
-    int earth[2];                       // bare earth, impassable
-    std::vector<int> jungle;            // impassable undergrowth
-    std::vector<int> rubble;            // rough ground, open
-    std::array<std::vector<int>, 16> transition;
-};
+// ---- Ground ----------------------------------------------------------------------------------------------------
+enum Material : char { G = 'G', D = 'D', E = 'E', W = 'W', S = 'S' };
 
-std::vector<int> tilesIn(int tilesetId, int first, int last, bool blocked) {
-    std::vector<int> tiles;
-    for (int tile = first; tile <= last; ++tile) {
-        if (TileCollision::isBlocked(tilesetId, tile) == blocked) tiles.push_back(tile);
-    }
-    return tiles;
+int Rank(char m) { return m == W ? 2 : (m == G ? 0 : 1); }
+char Parent(char m) { return m == W ? D : G; }
+
+bool PairAllowed(char a, char b) {
+    if (a == b) return true;
+    if (a > b) std::swap(a, b);
+    // sorted pairs: D-G, D-W, E-G, G-S
+    return (a == D && b == G) || (a == D && b == W) || (a == E && b == G) || (a == G && b == S);
 }
 
-TileSet makeTileSet(int tilesetId) {
+struct TileSet {
+    std::map<std::string, std::vector<int>> plain;     // corner code -> tiles of the basic ranges
+    std::map<std::string, std::vector<int>> variants;  // speckled variants of the uniform codes
+    std::vector<int> jungle;                           // impassable undergrowth (under islands)
+    std::vector<int> rubble;                           // open rough ground on grass
+};
+
+TileSet MakeTileSet(int tilesetId) {
     TileSet set;
-    std::array<std::vector<int>, 16> transition;
-    if (tilesetId == 1) {
-        set = {{0, 9}, {10, 17}, {18, 25}, {33, 35}, tilesIn(1, 238, 243, true), tilesIn(1, 191, 227, false), {}};
-        transition = {{{}, {64, 86, 109}, {65, 85, 108}, {57, 58, 59, 80, 81, 82, 103, 104, 105},
-                       {67, 84, 87, 107, 110}, {51, 52, 53, 74, 76, 97, 99}, {}, {60},
-                       {66, 83, 106}, {}, {49, 50, 71, 72, 73, 94, 95, 96}, {61, 88, 111},
-                       {54, 55, 56, 77, 78, 79, 100, 101, 102}, {63, 90, 113}, {62, 89, 112}, {}}};
-    } else {
-        set = {{0, 9}, {10, 17}, {19, 25}, {26, 33}, tilesIn(0, 235, 240, true), tilesIn(0, 211, 234, false), {}};
-        transition = {{{}, {67, 88, 150, 199, 208}, {68, 87, 151, 203, 204}, {60, 61, 62, 82, 83, 84, 144, 145, 195},
-                       {70, 86, 89, 153, 200}, {54, 55, 56, 77, 78, 139, 140, 141, 197}, {}, {63, 146},
-                       {69, 85, 152, 207}, {}, {52, 53, 74, 75, 76, 137, 138, 198}, {64, 90, 147},
-                       {57, 58, 59, 79, 80, 81, 142, 143, 196}, {66, 92, 149}, {65, 91, 148}, {}}};
-    }
-    // Edge tiles stay open: only the pure earth tiles are plateau
-    for (size_t bits = 0; bits < transition.size(); ++bits) {
-        for (int tile : transition[bits]) {
-            if (!TileCollision::isBlocked(tilesetId, tile)) set.transition[bits].push_back(tile);
+    const char* const* codes = tilesetId == 1 ? TileCorners::kTileset1 : TileCorners::kTileset0;
+    // Basic ranges the game varies itself (TileMap::loadMap): plain material tiles
+    const int basic[2][5][2] = {{{0, 9}, {10, 17}, {19, 25}, {26, 33}, {0, -1}},
+                                {{0, 9}, {10, 17}, {18, 25}, {26, 32}, {33, 35}}};
+    const auto isBasic = [&](int tile) {
+        for (const auto& range : basic[tilesetId]) {
+            if (tile >= range[0] && tile <= range[1]) return true;
         }
-        if (set.transition[bits].empty() && !transition[bits].empty()) set.transition[bits] = transition[bits];
+        return false;
+    };
+    for (int tile = 0; tile < TileCorners::kGroundTiles; ++tile) {
+        if (tilesetId == 0 && tile == 18) continue;  // a lone orange earth tile, out of place
+        const std::string code = codes[tile];
+        // Away from water every ground tile must stay open
+        if (code.find(W) == std::string::npos && TileCollision::IsBlocked(tilesetId, tile)) continue;
+        const bool uniform = code[0] == code[1] && code[1] == code[2] && code[2] == code[3];
+        (uniform && !isBasic(tile) ? set.variants : set.plain)[code].push_back(tile);
+    }
+    const int jungle[2] = {tilesetId == 1 ? 238 : 235, tilesetId == 1 ? 243 : 240};
+    for (int tile = jungle[0]; tile <= jungle[1]; ++tile) set.jungle.push_back(tile);
+    const int rubble[2] = {tilesetId == 1 ? 191 : 211, tilesetId == 1 ? 206 : 226};  // rubble on grass
+    for (int tile = rubble[0]; tile <= rubble[1]; ++tile) {
+        // Tileset 1 rubble lies inside the ground range: only the ones on plain grass fit anywhere on grass
+        const bool onGrass = tile >= TileCorners::kGroundTiles || std::string(codes[tile]) == "GGGG";
+        if (onGrass && !TileCollision::IsBlocked(tilesetId, tile)) set.rubble.push_back(tile);
     }
     return set;
 }
 
 const TileSet& tileSet(int tilesetId) {
-    static const TileSet sets[2] = {makeTileSet(0), makeTileSet(1)};
+    static const TileSet sets[2] = {MakeTileSet(0), MakeTileSet(1)};
     return sets[tilesetId == 1 ? 1 : 0];
 }
 
-// ---- Decorations ---------------------------------------------------------------------------------------------
-// Footprints (width, height) of the decoration types 0..94; the same in both tilesets.
+// ---- Decorations -----------------------------------------------------------------------------------------------
+// Footprints (width, height) of the decoration types 0..94; the same in both tilesets (buildings 31..132).
 constexpr int kDecorTypes = 95;
 constexpr int kDecorSize[kDecorTypes][2] = {
     {2, 2}, {2, 2}, {1, 2}, {1, 3}, {2, 2}, {2, 3}, {2, 3}, {1, 3},
@@ -83,7 +97,7 @@ constexpr int kDecorSize[kDecorTypes][2] = {
     {2, 3}, {2, 3}, {3, 2}, {3, 2}, {3, 2}, {3, 2}, {3, 3}, {2, 3},
     {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 1}, {2, 1}, {2, 2}, {3, 2},
     {2, 1}, {2, 2}, {3, 2}, {3, 2}, {4, 2}, {3, 3}, {2, 2}, {2, 2},
-    {2, 2}, {2, 2}, {1, 2}, {2, 1}, {2, 1}, {2, 1}, {2, 1}, {2, 1},
+    {2, 2}, {2, 1}, {1, 2}, {2, 1}, {2, 1}, {2, 1}, {2, 1}, {2, 1},
     {2, 1}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 2},
     {2, 2}, {2, 2}, {2, 2}, {2, 2}, {2, 2}, {3, 3}, {3, 3}, {2, 2},
     {2, 2}, {2, 2}, {2, 2}, {1, 1}, {1, 1}, {1, 1}, {1, 1}, {1, 1},
@@ -93,34 +107,23 @@ constexpr int kDecorSize[kDecorTypes][2] = {
 };
 
 struct TypeRange { int first; int last; };
-constexpr TypeRange kBoulders = {0, 11};     // tall rock outcrops
-constexpr TypeRange kCliffs = {12, 25};      // big cliff clusters
-constexpr TypeRange kRubble = {26, 37};      // low stones on bare earth
-constexpr TypeRange kFerns = {38, 49};       // undergrowth
-constexpr TypeRange kTrees = {50, 66};
-constexpr TypeRange kSmall = {67, 94};       // 1x1 bushes and stones
+constexpr TypeRange kRocks = {0, 25};        // rock outcrops and cliff clusters
+constexpr TypeRange kLowRocks = {26, 33};    // low rocks and rock ridges
+constexpr TypeRange kRockPiles = {34, 37};   // big rock piles
+constexpr TypeRange kStones = {38, 49};      // scattered stones
+constexpr TypeRange kGroves = {50, 66};      // groups of trees and bushes
+constexpr TypeRange kTrees = {67, 87};       // single trees (1x1)
+constexpr TypeRange kDeadTrees = {88, 94};   // dead trees (1x1)
 
-enum class Context { Grass, Dirt, Blocked };
-
-struct Weighted { TypeRange range; int weight; };
-
-// What the original maps put on each kind of ground
-const std::vector<Weighted>& typePool(Context ctx) {
-    static const std::vector<Weighted> grass = {{kTrees, 45}, {kFerns, 15}, {kSmall, 40}};
-    static const std::vector<Weighted> dirt = {{kBoulders, 15}, {kCliffs, 25}, {kRubble, 30}, {kSmall, 30}};
-    static const std::vector<Weighted> blocked = {{kTrees, 50}, {kFerns, 30}, {kCliffs, 20}};
-    return ctx == Context::Grass ? grass : (ctx == Context::Dirt ? dirt : blocked);
-}
-
-// ---- Symmetry ------------------------------------------------------------------------------------------------
+// ---- Symmetry --------------------------------------------------------------------------------------------------
 struct Symmetry {
     GeneratorSymmetry kind{GeneratorSymmetry::None};
     int w{0};
     int h{0};
 
-    bool active() const { return kind != GeneratorSymmetry::None; }
+    bool Active() const { return kind != GeneratorSymmetry::None; }
     // Objects keep their orientation under flips only, so a transposed map gets no mirrored decorations
-    bool mirrorsObjects() const { return active() && kind != GeneratorSymmetry::Diagonal; }
+    bool MirrorsObjects() const { return Active() && kind != GeneratorSymmetry::Diagonal; }
 
     void point(float x, float y, float& ox, float& oy) const {
         switch (kind) {
@@ -151,58 +154,64 @@ public:
         m_sym.h = h;
         const int tiles = w * h;
         m_reserved.assign(tiles, 0);
-        m_obstacle.assign(tiles, 0);
-        m_blocked.assign(tiles, 0);
-        m_decorCover.assign(tiles, 0);
-        m_dirt.assign(tiles * 4, 0);
+        m_island.assign(tiles, 0);
+        m_depth.assign(tiles, 0);
+        m_cover.assign(tiles, 0);
+        m_corner.assign((w + 1) * (h + 1), G);
     }
 
     void run() {
-        layoutBases();
-        carveRoads();
-        buildDirt();
-        buildObstacles();
-        resolveTiles();
-        setStartPositions();
-        placeDecorations();
-        finalize();
+        LayoutBases();
+        CarveRoads();
+        BuildIslands();
+        BuildGround();
+        ResolveTiles();
+        SetStartPositions();
+        FillIslands();
+        Finalize();
     }
 
 private:
+    struct Point { int x; int y; };
+    struct FPoint { float x; float y; };
+
     // ---- helpers ---------------------------------------------------------------------------------------------
-    int idx(int x, int y) const { return y * m_w + x; }
-    bool inside(int x, int y) const { return x >= 0 && y >= 0 && x < m_w && y < m_h; }
-    int edgeDistance(int x, int y) const { return std::min(std::min(x, y), std::min(m_w - 1 - x, m_h - 1 - y)); }
-    int pick(int lo, int hi) { return m_rng.range(lo, hi); }
-    int pick(const int (&range)[2]) { return m_rng.range(range[0], range[1]); }
-    bool chance(float p) { return m_rng.unit() < p; }
+    int Idx(int x, int y) const { return y * m_w + x; }
+    int CIdx(int x, int y) const { return y * (m_w + 1) + x; }
+    bool Inside(int x, int y) const { return x >= 0 && y >= 0 && x < m_w && y < m_h; }
+    int EdgeDistance(int x, int y) const { return std::min(std::min(x, y), std::min(m_w - 1 - x, m_h - 1 - y)); }
+    int Pick(int lo, int hi) { return m_rng.Range(lo, hi); }
+    bool Chance(float p) { return m_rng.unit() < p; }
+    template <typename T> const T& PickFrom(const std::vector<T>& items) {
+        return items[Pick(0, static_cast<int>(items.size()) - 1)];
+    }
 
     // Noise symmetric under the chosen symmetry (the original point and its mirror image are averaged)
     float field(float x, float y, float frequency, int octaves, uint32_t salt) const {
-        float value = octaveNoise2D(x * frequency, y * frequency, octaves, 0.5f, m_seed + salt);
-        if (m_sym.active()) {
+        float value = OctaveNoise2D(x * frequency, y * frequency, octaves, 0.5f, m_seed + salt);
+        if (m_sym.Active()) {
             float mx, my;
             m_sym.point(x, y, mx, my);
-            value = (value + octaveNoise2D(mx * frequency, my * frequency, octaves, 0.5f, m_seed + salt)) * 0.5f;
+            value = (value + OctaveNoise2D(mx * frequency, my * frequency, octaves, 0.5f, m_seed + salt)) * 0.5f;
         }
         return value;
     }
 
     // Value above which `fraction` of the samples lie
-    static float quantile(std::vector<float> values, float fraction) {
+    static float Quantile(std::vector<float> values, float fraction) {
         if (values.empty()) return 2.0f;
         const size_t pos = static_cast<size_t>(std::clamp(1.0f - fraction, 0.0f, 1.0f) * (values.size() - 1));
         std::nth_element(values.begin(), values.begin() + pos, values.end());
         return values[pos];
     }
 
-    void reserveRect(int x0, int y0, int x1, int y1) {
+    void ReserveRect(int x0, int y0, int x1, int y1) {
         for (int y = std::max(0, y0); y <= std::min(m_h - 1, y1); ++y) {
-            for (int x = std::max(0, x0); x <= std::min(m_w - 1, x1); ++x) m_reserved[idx(x, y)] = 1;
+            for (int x = std::max(0, x0); x <= std::min(m_w - 1, x1); ++x) m_reserved[Idx(x, y)] = 1;
         }
     }
 
-    bool inBaseZone(int x, int y) const {
+    bool InBaseZone(int x, int y) const {
         for (const auto& b : m_bases) {
             if (x >= b.x - kBaseMargin && x < b.x + kBaseSize + kBaseMargin &&
                 y >= b.y - kBaseMargin && y < b.y + kBaseSize + kBaseMargin) {
@@ -212,10 +221,34 @@ private:
         return false;
     }
 
-    // ---- 1. bases --------------------------------------------------------------------------------------------
-    struct Point { int x; int y; };
+    // Labels the 4-connected components of the tiles where `inside` holds; returns the component count
+    template <typename Pred> int Components(Pred inside, std::vector<int>& label) const {
+        label.assign(m_w * m_h, -1);
+        int count = 0;
+        std::vector<Point> queue;
+        for (int sy = 0; sy < m_h; ++sy) {
+            for (int sx = 0; sx < m_w; ++sx) {
+                if (!inside(sx, sy) || label[Idx(sx, sy)] >= 0) continue;
+                queue.assign(1, {sx, sy});
+                label[Idx(sx, sy)] = count;
+                for (size_t head = 0; head < queue.size(); ++head) {
+                    const Point cur = queue[head];
+                    static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                    for (const auto& s : kStep) {
+                        const int nx = cur.x + s[0], ny = cur.y + s[1];
+                        if (!Inside(nx, ny) || !inside(nx, ny) || label[Idx(nx, ny)] >= 0) continue;
+                        label[Idx(nx, ny)] = count;
+                        queue.push_back({nx, ny});
+                    }
+                }
+                ++count;
+            }
+        }
+        return count;
+    }
 
-    void layoutBases() {
+    // ---- 1. bases --------------------------------------------------------------------------------------------
+    void LayoutBases() {
         const int maxX = m_w - kBaseSize - kBaseMargin - 1;
         const int maxY = m_h - kBaseSize - kBaseMargin - 1;
         int px = 6, py = m_h - 14;
@@ -234,382 +267,579 @@ private:
         if (m_params.symmetry == GeneratorSymmetry::Vertical) ex = px;
         m_bases = {{px, py}, {std::clamp(ex, kBaseMargin + 1, maxX), std::clamp(ey, kBaseMargin + 1, maxY)}};
         for (const auto& b : m_bases) {
-            reserveRect(b.x - kBaseMargin, b.y - kBaseMargin, b.x + kBaseSize + kBaseMargin - 1,
+            ReserveRect(b.x - kBaseMargin, b.y - kBaseMargin, b.x + kBaseSize + kBaseMargin - 1,
                         b.y + kBaseSize + kBaseMargin - 1);
         }
     }
 
-    // ---- 2. roads and clearings ------------------------------------------------------------------------------
-    // Keeps a corridor free of obstacles, plateau and decorations
-    void stampOne(float x, float y, float clearRadius) {
+    // ---- 2. roads and clearings: kept free of islands --------------------------------------------------------
+    void StampOne(float x, float y, float clearRadius) {
         for (int ty = static_cast<int>(y - clearRadius) - 1; ty <= static_cast<int>(y + clearRadius) + 1; ++ty) {
             for (int tx = static_cast<int>(x - clearRadius) - 1; tx <= static_cast<int>(x + clearRadius) + 1; ++tx) {
-                if (!inside(tx, ty)) continue;
+                if (!Inside(tx, ty)) continue;
                 const float dx = tx + 0.5f - x, dy = ty + 0.5f - y;
-                if (dx * dx + dy * dy <= clearRadius * clearRadius) m_reserved[idx(tx, ty)] = 1;
+                if (dx * dx + dy * dy <= clearRadius * clearRadius) m_reserved[Idx(tx, ty)] = 1;
             }
         }
     }
 
-    void stamp(float x, float y, float clearRadius) {
-        stampOne(x, y, clearRadius);
+    void Stamp(float x, float y, float clearRadius) {
+        StampOne(x, y, clearRadius);
         m_roadPoints.push_back({x, y});
-        if (m_sym.active()) {
+        if (m_sym.Active()) {
             float mx, my;
             m_sym.point(x, y, mx, my);
-            stampOne(mx, my, clearRadius);
+            StampOne(mx, my, clearRadius);
             m_roadPoints.push_back({mx, my});
         }
     }
 
     // A winding strip between two points
-    void walk(float ax, float ay, float bx, float by, float clearRadius) {
+    void Walk(float ax, float ay, float bx, float by, float clearRadius) {
         const float length = std::hypot(bx - ax, by - ay);
         if (length < 1.0f) return;
         const float nx = -(by - ay) / length, ny = (bx - ax) / length;
-        const float phase = m_rng.range(0.0f, 2.0f * kPi);
-        const float amplitude = m_rng.range(1.0f, 3.5f) * std::min(1.0f, length / 25.0f);
-        const float waves = m_rng.range(1.0f, 2.5f);
+        const float phase = m_rng.Range(0.0f, 2.0f * kPi);
+        const float amplitude = m_rng.Range(1.0f, 3.5f) * std::min(1.0f, length / 25.0f);
+        const float waves = m_rng.Range(1.0f, 2.5f);
         const int steps = std::max(2, static_cast<int>(length / 0.6f));
         for (int i = 0; i <= steps; ++i) {
             const float t = static_cast<float>(i) / steps;
             const float wobble = std::sin(phase + t * waves * kPi) * amplitude * std::sin(t * kPi);
-            stamp(ax + (bx - ax) * t + nx * wobble, ay + (by - ay) * t + ny * wobble, clearRadius);
+            Stamp(ax + (bx - ax) * t + nx * wobble, ay + (by - ay) * t + ny * wobble, clearRadius);
         }
     }
 
-    void carveRoads() {
+    void CarveRoads() {
         const float p0x = m_bases[0].x + kBaseSize * 0.5f, p0y = m_bases[0].y + kBaseSize * 0.5f;
         const float p1x = m_bases[1].x + kBaseSize * 0.5f, p1y = m_bases[1].y + kBaseSize * 0.5f;
         const float cx = m_w * 0.5f, cy = m_h * 0.5f;
-        const float wx = std::clamp(cx + m_rng.signedUnit() * m_w * 0.22f, 8.0f, m_w - 8.0f);
-        const float wy = std::clamp(cy + m_rng.signedUnit() * m_h * 0.22f, 8.0f, m_h - 8.0f);
-        walk(p0x, p0y, wx, wy, 2.3f);
-        walk(wx, wy, cx, cy, 2.3f);
-        if (!m_sym.active()) {
-            const float w2x = std::clamp(cx + m_rng.signedUnit() * m_w * 0.22f, 8.0f, m_w - 8.0f);
-            const float w2y = std::clamp(cy + m_rng.signedUnit() * m_h * 0.22f, 8.0f, m_h - 8.0f);
-            walk(cx, cy, w2x, w2y, 2.3f);
-            walk(w2x, w2y, p1x, p1y, 2.3f);
+        const float wx = std::clamp(cx + m_rng.SignedUnit() * m_w * 0.22f, 8.0f, m_w - 8.0f);
+        const float wy = std::clamp(cy + m_rng.SignedUnit() * m_h * 0.22f, 8.0f, m_h - 8.0f);
+        Walk(p0x, p0y, wx, wy, 2.0f);
+        Walk(wx, wy, cx, cy, 2.0f);
+        if (!m_sym.Active()) {
+            const float w2x = std::clamp(cx + m_rng.SignedUnit() * m_w * 0.22f, 8.0f, m_w - 8.0f);
+            const float w2y = std::clamp(cy + m_rng.SignedUnit() * m_h * 0.22f, 8.0f, m_h - 8.0f);
+            Walk(cx, cy, w2x, w2y, 2.0f);
+            Walk(w2x, w2y, p1x, p1y, 2.0f);
         }
 
-        // Open clearings (room for expansions and flanking) joined to the road
-        const int clearings = std::clamp(m_w * m_h / 1100, 2, 8);
+        // A few open clearings (room for expansions and flanking) joined to the road
+        const int clearings = std::clamp(m_w * m_h / 1500, 1, 6);
         std::vector<Point> placed;
         for (int attempt = 0; attempt < clearings * 12 && static_cast<int>(placed.size()) < clearings; ++attempt) {
-            const int x = pick(8, m_w - 9), y = pick(8, m_h - 9);
+            const int x = Pick(8, m_w - 9), y = Pick(8, m_h - 9);
             bool ok = true;
             for (const auto& b : m_bases) {
                 if (std::hypot(x - (b.x + kBaseSize * 0.5f), y - (b.y + kBaseSize * 0.5f)) < 15.0f) ok = false;
             }
             for (const auto& c : placed) {
-                if (std::hypot(float(x - c.x), float(y - c.y)) < 12.0f) ok = false;
+                if (std::hypot(float(x - c.x), float(y - c.y)) < 14.0f) ok = false;
             }
             if (!ok) continue;
             placed.push_back({x, y});
-            const float radius = m_rng.range(3.0f, 5.0f);
             float nearestX = cx, nearestY = cy, best = 1e9f;
             for (const auto& pt : m_roadPoints) {
                 const float d = std::hypot(pt.x - x, pt.y - y);
                 if (d < best) { best = d; nearestX = pt.x; nearestY = pt.y; }
             }
-            walk(x, y, nearestX, nearestY, 1.7f);
-            stamp(static_cast<float>(x), static_cast<float>(y), radius);
+            Walk(x, y, nearestX, nearestY, 1.5f);
+            Stamp(static_cast<float>(x), static_cast<float>(y), m_rng.Range(2.5f, 4.0f));
         }
     }
 
-    // ---- 3. ground (grass / dirt on a half-tile grid) --------------------------------------------------------
-    void buildDirt() {
-        const int sw = m_w * 2, sh = m_h * 2;
-        std::vector<float> value(sw * sh);
-        for (int sy = 0; sy < sh; ++sy) {
-            for (int sx = 0; sx < sw; ++sx) {
-                value[sy * sw + sx] = field((sx + 0.5f) * 0.5f, (sy + 0.5f) * 0.5f, 0.06f, 3, 101);
-            }
-        }
-        static constexpr float kDirtShare[3] = {0.08f, 0.16f, 0.26f};
-        const float threshold = quantile(value, kDirtShare[std::clamp(m_params.dirtLevel, 0, 2)]);
-        for (int i = 0; i < sw * sh; ++i) m_dirt[i] = value[i] > threshold ? 1 : 0;
+    // ---- 3. islands ------------------------------------------------------------------------------------------
+    static float Percent(int value) { return std::clamp(value, 0, 100) / 100.0f; }
 
-        // Majority filter: drops specks so patches read like the hand-made ones
-        std::vector<uint8_t> smoothed(m_dirt.size());
-        for (int sy = 0; sy < sh; ++sy) {
-            for (int sx = 0; sx < sw; ++sx) {
+    void MakeIslandMask(const std::vector<float>& value, float fraction) {
+        std::vector<float> eligible;
+        for (int i = 0; i < m_w * m_h; ++i) if (!m_reserved[i]) eligible.push_back(value[i]);
+        const float wanted = fraction * m_w * m_h;
+        const float threshold = Quantile(eligible, std::min(0.98f, wanted / std::max<size_t>(1, eligible.size())));
+        for (int i = 0; i < m_w * m_h; ++i) m_island[i] = !m_reserved[i] && value[i] > threshold ? 1 : 0;
+
+        // Majority filter: smooth outlines
+        std::vector<uint8_t> smoothed(m_island.size());
+        for (int y = 0; y < m_h; ++y) {
+            for (int x = 0; x < m_w; ++x) {
                 int count = 0;
                 for (int dy = -1; dy <= 1; ++dy) {
                     for (int dx = -1; dx <= 1; ++dx) {
-                        const int nx = std::clamp(sx + dx, 0, sw - 1), ny = std::clamp(sy + dy, 0, sh - 1);
-                        count += m_dirt[ny * sw + nx];
+                        const int nx = std::clamp(x + dx, 0, m_w - 1), ny = std::clamp(y + dy, 0, m_h - 1);
+                        count += m_island[Idx(nx, ny)];
                     }
                 }
-                smoothed[sy * sw + sx] = count >= 5 ? 1 : 0;
+                smoothed[Idx(x, y)] = !m_reserved[Idx(x, y)] && count >= 5 ? 1 : 0;
             }
         }
-        m_dirt = smoothed;
+        m_island = smoothed;
 
-        for (int sy = 0; sy < sh; ++sy) {
-            for (int sx = 0; sx < sw; ++sx) {
-                if (m_reserved[idx(sx / 2, sy / 2)]) m_dirt[sy * sw + sx] = 0;
+        // Specks of one or two tiles go
+        std::vector<int> label;
+        const int islands = Components([&](int x, int y) { return m_island[Idx(x, y)] != 0; }, label);
+        std::vector<int> size(islands, 0);
+        for (int l : label) if (l >= 0) ++size[l];
+        for (int i = 0; i < m_w * m_h; ++i) if (label[i] >= 0 && size[label[i]] < 3) m_island[i] = 0;
+
+        ConnectPockets();
+    }
+
+    // Open ground cut off from both bases: small pockets join the islands, larger ones get a passage
+    // (two tiles wide) cut through the islands to the open ground of the bases
+    void ConnectPockets() {
+        std::vector<int> label;
+        for (int pass = 0; pass < 64; ++pass) {
+            const int open = Components([&](int x, int y) { return m_island[Idx(x, y)] == 0; }, label);
+            std::vector<char> keep(open, 0);
+            std::vector<int> size(open, 0);
+            for (int y = 0; y < m_h; ++y) {
+                for (int x = 0; x < m_w; ++x) {
+                    const int l = label[Idx(x, y)];
+                    if (l < 0) continue;
+                    ++size[l];
+                    if (InBaseZone(x, y)) keep[l] = 1;
+                }
             }
-        }
+            int pocket = -1;
+            for (int l = 0; l < open && pocket < 0; ++l) {
+                if (!keep[l] && size[l] >= 12) pocket = l;
+            }
+            for (int i = 0; i < m_w * m_h; ++i) {
+                if (label[i] >= 0 && !keep[label[i]] && size[label[i]] < 12) m_island[i] = 1;
+            }
+            if (pocket < 0) return;
 
-        // No tile shows a grass/dirt checkerboard: those two quadrant patterns have no picture, merge them into dirt
-        for (int y = 0; y < m_h; ++y) {
-            for (int x = 0; x < m_w; ++x) {
-                const int bits = quadrants(x, y);
-                if (bits == 6 || bits == 9) {
-                    for (int q = 0; q < 4; ++q) m_dirt[(y * 2 + q / 2) * sw + x * 2 + q % 2] = 1;
+            // Shortest way from the pocket to kept open ground
+            std::vector<int> from(m_w * m_h, -2);
+            std::vector<int> queue;
+            for (int i = 0; i < m_w * m_h; ++i) {
+                if (label[i] == pocket) { from[i] = -1; queue.push_back(i); }
+            }
+            int reached = -1;
+            for (size_t head = 0; head < queue.size() && reached < 0; ++head) {
+                const int cur = queue[head];
+                static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                for (const auto& st : kStep) {
+                    const int nx = cur % m_w + st[0], ny = cur / m_w + st[1];
+                    if (!Inside(nx, ny) || from[Idx(nx, ny)] != -2) continue;
+                    from[Idx(nx, ny)] = cur;
+                    if (label[Idx(nx, ny)] >= 0 && keep[label[Idx(nx, ny)]]) { reached = Idx(nx, ny); break; }
+                    queue.push_back(Idx(nx, ny));
+                }
+            }
+            if (reached < 0) {  // nothing to join: the pocket becomes island
+                for (int i = 0; i < m_w * m_h; ++i) if (label[i] == pocket) m_island[i] = 1;
+                continue;
+            }
+            for (int cur = from[reached]; cur >= 0; cur = from[cur]) {
+                const int x = cur % m_w, y = cur / m_w;
+                for (int dy = 0; dy <= 1; ++dy) {
+                    for (int dx = 0; dx <= 1; ++dx) {
+                        if (Inside(x + dx, y + dy)) m_island[Idx(x + dx, y + dy)] = 0;
+                    }
                 }
             }
         }
     }
 
-    int quadrants(int x, int y) const {
-        const int sw = m_w * 2;
-        return m_dirt[(y * 2) * sw + x * 2] | (m_dirt[(y * 2) * sw + x * 2 + 1] << 1) |
-               (m_dirt[(y * 2 + 1) * sw + x * 2] << 2) | (m_dirt[(y * 2 + 1) * sw + x * 2 + 1] << 3);
-    }
-
-    // ---- 4. blocked terrain ----------------------------------------------------------------------------------
-    void buildObstacles() {
-        std::vector<float> value(m_w * m_h);
-        std::vector<float> eligible;
-        eligible.reserve(value.size());
+    void BuildIslands() {
+        // Blobs plus ridges (bands along the noise's mid line): round massifs and long winding walls
+        std::vector<float> shape(m_w * m_h), edgeField(m_w * m_h), edgeNoise;
         for (int y = 0; y < m_h; ++y) {
             for (int x = 0; x < m_w; ++x) {
                 const float px = x + 0.5f, py = y + 0.5f;
-                value[idx(x, y)] = field(px, py, 0.07f, 3, 303) * 0.7f + field(px, py, 0.18f, 2, 404) * 0.3f;
-                if (!m_reserved[idx(x, y)]) eligible.push_back(value[idx(x, y)]);
+                const float blob = field(px, py, 0.045f, 3, 303) * 0.65f + field(px, py, 0.13f, 2, 404) * 0.35f;
+                const float ridge = 1.0f - std::fabs(field(px, py, 0.035f, 3, 606) - 0.5f) * 2.0f;
+                shape[Idx(x, y)] = std::max(blob, ridge * 0.62f + field(px, py, 0.15f, 2, 707) * 0.18f);
+                edgeField[Idx(x, y)] = field(px, py, 0.07f, 2, 1212);
+                if (EdgeDistance(x, y) == 0) edgeNoise.push_back(edgeField[Idx(x, y)]);
             }
         }
-        static constexpr float kShare[3] = {0.05f, 0.10f, 0.16f};
-        const float threshold = quantile(eligible, kShare[std::clamp(m_params.obstacleLevel, 0, 2)]);
+
+        // The edge is closed in long stretches with gaps: a share of the edge gets pulled into the islands, the
+        // rest pushed out. Smoothing, the pocket fill and islands reaching the edge on their own shift both
+        // shares, so the two thresholds are corrected until the measured shares match.
+        const float target = Percent(m_params.islandPercent);
+        const float edgeTarget = Percent(m_params.edgePercent);
+        float fraction = target, edgeFraction = edgeTarget;
+        float bestError = 1e9f, bestFraction = fraction, bestEdgeFraction = edgeFraction;
+        std::vector<float> value(m_w * m_h);
+        const auto buildValue = [&](float edgeShareWanted) {
+            const float edgeThreshold = Quantile(edgeNoise, edgeShareWanted);
+            for (int y = 0; y < m_h; ++y) {
+                for (int x = 0; x < m_w; ++x) {
+                    const float nearEdge = std::max(0.0f, 1.0f - EdgeDistance(x, y) / 3.0f);
+                    const float pull = edgeField[Idx(x, y)] > edgeThreshold ? 0.4f : -0.3f;
+                    value[Idx(x, y)] = shape[Idx(x, y)] + pull * nearEdge;
+                }
+            }
+        };
+        for (int round = 0; round < 8; ++round) {
+            buildValue(edgeFraction);
+            MakeIslandMask(value, fraction);
+            int count = 0, edgeCount = 0, edgeTiles = 0;
+            for (int y = 0; y < m_h; ++y) {
+                for (int x = 0; x < m_w; ++x) {
+                    count += m_island[Idx(x, y)];
+                    if (EdgeDistance(x, y) == 0) {
+                        ++edgeTiles;
+                        edgeCount += m_island[Idx(x, y)];
+                    }
+                }
+            }
+            const float share = static_cast<float>(count) / (m_w * m_h);
+            const float edgeShare = static_cast<float>(edgeCount) / std::max(1, edgeTiles);
+            const float error = std::fabs(share - target) + 0.3f * std::fabs(edgeShare - edgeTarget);
+            if (error < bestError) {
+                bestError = error;
+                bestFraction = fraction;
+                bestEdgeFraction = edgeFraction;
+            }
+            if (std::fabs(share - target) < 0.01f && std::fabs(edgeShare - edgeTarget) < 0.03f) break;
+            fraction = std::clamp(fraction + (target - share) * 0.8f, 0.0f, 0.98f);
+            edgeFraction = std::clamp(edgeFraction + (edgeTarget - edgeShare) * 0.8f, 0.0f, 1.0f);
+        }
+        if (bestFraction != fraction || bestEdgeFraction != edgeFraction) {
+            buildValue(bestEdgeFraction);
+            MakeIslandMask(value, bestFraction);
+        }
+
+        // Depth: distance (4-steps) from the open ground; 1 = rim
+        std::vector<Point> queue;
         for (int y = 0; y < m_h; ++y) {
             for (int x = 0; x < m_w; ++x) {
-                const bool wall = m_params.borderForest && edgeDistance(x, y) < 2;
-                if (!m_reserved[idx(x, y)] && (wall || value[idx(x, y)] > threshold)) m_obstacle[idx(x, y)] = 1;
+                m_depth[Idx(x, y)] = m_island[Idx(x, y)] ? 1000 : 0;
+                if (!m_island[Idx(x, y)]) queue.push_back({x, y});
             }
+        }
+        // The map edge does not count as open ground: islands touching it keep a deep core there
+        for (size_t head = 0; head < queue.size(); ++head) {
+            const Point cur = queue[head];
+            static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (const auto& s : kStep) {
+                const int nx = cur.x + s[0], ny = cur.y + s[1];
+                if (!Inside(nx, ny) || m_depth[Idx(nx, ny)] <= m_depth[Idx(cur.x, cur.y)] + 1) continue;
+                m_depth[Idx(nx, ny)] = m_depth[Idx(cur.x, cur.y)] + 1;
+                queue.push_back({nx, ny});
+            }
+        }
+        for (auto& d : m_depth) if (d == 1000) d = 8;  // an island without open ground (all-blocked map)
+    }
+
+    // ---- 4. ground materials on the corner grid --------------------------------------------------------------
+    // Depth of the shallowest tile touching a corner (0 = the corner touches open ground)
+    int CornerDepth(int cx, int cy) const {
+        int depth = 1000;
+        for (int dy = -1; dy <= 0; ++dy) {
+            for (int dx = -1; dx <= 0; ++dx) {
+                const int x = cx + dx, y = cy + dy;
+                if (Inside(x, y)) depth = std::min(depth, m_depth[Idx(x, y)]);
+            }
+        }
+        return depth == 1000 ? 0 : depth;
+    }
+
+    void BuildGround() {
+        const int cw = m_w + 1, ch = m_h + 1;
+        std::vector<int> depth(cw * ch);
+        std::vector<float> earthOpen;
+        for (int y = 0; y < ch; ++y) {
+            for (int x = 0; x < cw; ++x) {
+                depth[CIdx(x, y)] = CornerDepth(x, y);
+                if (depth[CIdx(x, y)] == 0) earthOpen.push_back(field(x, y, 0.07f, 3, 505));
+            }
+        }
+        const float openCorners = static_cast<float>(std::max<size_t>(1, earthOpen.size()));
+        std::fill(m_corner.begin(), m_corner.end(), G);
+
+        // Earth (on tileset 1 also sand) patches on the open ground; a ring of light grass keeps them off the dark grass
+        const float earthThreshold = Quantile(earthOpen, Percent(m_params.earthPercent));
+        const float sandThreshold = m_tilesetId == 1 ? Quantile(earthOpen, 0.5f) : 2.0f;
+        std::vector<uint8_t> grassRing(cw * ch, 0);
+        for (int y = 0; y < ch; ++y) {
+            for (int x = 0; x < cw; ++x) {
+                if (depth[CIdx(x, y)] != 0 || field(x, y, 0.07f, 3, 505) <= earthThreshold) continue;
+                m_corner[CIdx(x, y)] = field(x, y, 0.04f, 2, 808) > sandThreshold ? S : E;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (x + dx >= 0 && y + dy >= 0 && x + dx < cw && y + dy < ch) grassRing[CIdx(x + dx, y + dy)] = 1;
+                    }
+                }
+            }
+        }
+
+        // Dark grass: the chosen share of the open ground, and the ground under the islands
+        std::vector<float> darkOpen;
+        for (int y = 0; y < ch; ++y) {
+            for (int x = 0; x < cw; ++x) {
+                if (depth[CIdx(x, y)] == 0 && !grassRing[CIdx(x, y)]) darkOpen.push_back(field(x, y, 0.05f, 3, 101));
+            }
+        }
+        const float darkFraction = Percent(m_params.darkGrassPercent) * openCorners / std::max<size_t>(1, darkOpen.size());
+        const float darkThreshold = Quantile(darkOpen, std::min(1.0f, darkFraction));
+        for (int y = 0; y < ch; ++y) {
+            for (int x = 0; x < cw; ++x) {
+                const int i = CIdx(x, y);
+                if (grassRing[i]) continue;
+                if (depth[i] > 0 || field(x, y, 0.05f, 3, 101) > darkThreshold) m_corner[i] = D;
+            }
+        }
+
+        // Water hides under the island cores, always rimmed with dark grass
+        std::vector<float> waterCore;
+        for (int i = 0; i < cw * ch; ++i) {
+            if (depth[i] >= 3) waterCore.push_back(field(static_cast<float>(i % cw), static_cast<float>(i / cw), 0.09f, 2, 202));
+        }
+        const float waterThreshold = Quantile(waterCore, Percent(m_params.coreWaterPercent));
+        for (int y = 0; y < ch; ++y) {
+            for (int x = 0; x < cw; ++x) {
+                if (depth[CIdx(x, y)] < 3 || field(x, y, 0.09f, 2, 202) <= waterThreshold) continue;
+                m_corner[CIdx(x, y)] = W;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        const int nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && ny >= 0 && nx < cw && ny < ch && m_corner[CIdx(nx, ny)] != W) m_corner[CIdx(nx, ny)] = D;
+                    }
+                }
+            }
+        }
+        FixCorners();
+    }
+
+    // Every tile must show a combination that has a picture: at most two materials that may touch, and no
+    // diagonal pattern. Offending corners fall back to their parent material until the grid settles.
+    std::string Code(int x, int y) const {
+        return {m_corner[CIdx(x, y)], m_corner[CIdx(x + 1, y)], m_corner[CIdx(x, y + 1)], m_corner[CIdx(x + 1, y + 1)]};
+    }
+
+    bool HasPicture(const std::string& code) const {
+        return m_tileset.plain.count(code) != 0 || m_tileset.variants.count(code) != 0;
+    }
+
+    void FixCorners() {
+        for (int pass = 0; pass < 64; ++pass) {
+            bool changed = false;
+            for (int y = 0; y < m_h; ++y) {
+                for (int x = 0; x < m_w; ++x) {
+                    const std::string code = Code(x, y);
+                    bool legal = HasPicture(code);
+                    for (int a = 0; a < 4 && legal; ++a) {
+                        for (int b = a + 1; b < 4; ++b) legal = legal && PairAllowed(code[a], code[b]);
+                    }
+                    if (legal) continue;
+                    // Shrink the highest-ranked material; between ranks the dark grass stays (it holds water)
+                    int top = 0;
+                    for (char m : code) top = std::max(top, Rank(m));
+                    char victim = 0;
+                    for (char m : code) {
+                        if (Rank(m) == top && (victim == 0 || victim == D)) victim = m;
+                    }
+                    const int cx[4] = {x, x + 1, x, x + 1}, cy[4] = {y, y, y + 1, y + 1};
+                    for (int q = 0; q < 4; ++q) {
+                        if (code[q] == victim) m_corner[CIdx(cx[q], cy[q])] = Parent(victim);
+                    }
+                    changed = true;
+                }
+            }
+            if (!changed) break;
         }
     }
 
     // ---- 5. tiles --------------------------------------------------------------------------------------------
-    int dirtQuadrants(int x, int y) const {
-        const int bits = quadrants(x, y);
-        return (bits & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1) + ((bits >> 3) & 1);
-    }
-
-    int groundTile(int x, int y) {
-        const int bits = quadrants(x, y);
-        if (bits == 15) return pick(m_tileset.earth);
-        if (bits != 0) {
-            const auto& pool = m_tileset.transition[bits];
-            return pool.empty() ? pick(m_tileset.earth) : pool[pick(0, static_cast<int>(pool.size()) - 1)];
-        }
-        if (inBaseZone(x, y)) return pick(m_tileset.meadow);
-        // Rough ground (open) in patches
-        if (!m_tileset.rubble.empty() && field(x + 0.5f, y + 0.5f, 0.09f, 2, 505) > m_roughThreshold) {
-            return m_tileset.rubble[pick(0, static_cast<int>(m_tileset.rubble.size()) - 1)];
-        }
-        const float meadow = field(x + 0.5f, y + 0.5f, 0.05f, 2, 202);
-        if (meadow > 0.60f) return pick(m_tileset.meadow);
-        if (meadow < 0.32f) return pick(m_tileset.altGrass);
-        return pick(m_tileset.grass);
-    }
-
-    int jungleTile() { return m_tileset.jungle[pick(0, static_cast<int>(m_tileset.jungle.size()) - 1)]; }
-
-    void resolveTiles() {
-        // About a tenth of the open ground is rough
-        std::vector<float> rough;
-        for (int y = 0; y < m_h; ++y) {
-            for (int x = 0; x < m_w; ++x) rough.push_back(field(x + 0.5f, y + 0.5f, 0.09f, 2, 505));
-        }
-        m_roughThreshold = quantile(rough, 0.10f);
-
+    void ResolveTiles() {
+        // Speckled variants and rubble come in patches; their thresholds give the chosen shares
+        // (counted over the open tiles they may go on, as on the original maps)
+        std::vector<float> speckle, rough;
         for (int y = 0; y < m_h; ++y) {
             for (int x = 0; x < m_w; ++x) {
-                const int tile = m_obstacle[idx(x, y)] ? jungleTile() : groundTile(x, y);
-                const bool blocked = TileCollision::isBlocked(m_tilesetId, tile);
-                m_doc.setTile(x, y, static_cast<uint8_t>(tile));
-                m_doc.setPassable(x, y, !blocked);
-                m_blocked[idx(x, y)] = blocked ? 1 : 0;
+                if (m_island[Idx(x, y)]) continue;
+                const std::string code = Code(x, y);
+                if (code == "GGGG") rough.push_back(field(x + 0.5f, y + 0.5f, 0.11f, 2, 909));
+                if (code[0] == code[1] && code[1] == code[2] && code[2] == code[3] && m_tileset.variants.count(code)) {
+                    speckle.push_back(field(x + 0.5f, y + 0.5f, 0.08f, 2, 1001));
+                }
+            }
+        }
+        const float speckleThreshold = Quantile(speckle, Percent(m_params.variantPercent));
+        const float roughThreshold = Quantile(rough, Percent(m_params.rubblePercent));
+        // Jungle share of the core tiles, water tiles included (as measured on the original maps)
+        const float water = Percent(m_params.coreWaterPercent);
+        const float jungle = std::min(1.0f, Percent(m_params.coreJunglePercent) / std::max(0.2f, 1.0f - water));
+        for (int y = 0; y < m_h; ++y) {
+            for (int x = 0; x < m_w; ++x) {
+                const std::string code = Code(x, y);
+                const bool uniform = code[0] == code[1] && code[1] == code[2] && code[2] == code[3];
+                const float fx = x + 0.5f, fy = y + 0.5f;
+                int tile = 0;
+                const auto plain = m_tileset.plain.find(code);
+                const auto variant = m_tileset.variants.find(code);
+                if (m_island[Idx(x, y)] && m_depth[Idx(x, y)] >= 2 && code[0] != W && uniform && Chance(jungle)) {
+                    tile = PickFrom(m_tileset.jungle);  // undergrowth inside the islands
+                } else if (!m_island[Idx(x, y)] && code == "GGGG" && !m_tileset.rubble.empty() &&
+                           field(fx, fy, 0.11f, 2, 909) > roughThreshold) {
+                    tile = PickFrom(m_tileset.rubble);
+                } else if (uniform && variant != m_tileset.variants.end() && field(fx, fy, 0.08f, 2, 1001) > speckleThreshold) {
+                    tile = PickFrom(variant->second);  // speckled patches
+                } else if (plain != m_tileset.plain.end()) {
+                    tile = PickFrom(plain->second);
+                } else if (variant != m_tileset.variants.end()) {
+                    tile = PickFrom(variant->second);
+                }
+                m_doc.SetTile(x, y, static_cast<uint8_t>(tile));
             }
         }
     }
 
-    void setStartPositions() {
-        const Point& p = m_bases[0];
-        const Point& e = m_bases[1];
-        m_doc.setPlayerStart(p.x + 1, p.y + 2);
-        m_doc.setEnemyStart(e.x + 1, e.y + 2);
+    void SetStartPositions() {
+        m_doc.setPlayerStart(m_bases[0].x + 1, m_bases[0].y + 2);
+        m_doc.setEnemyStart(m_bases[1].x + 1, m_bases[1].y + 2);
     }
 
-    // ---- 6. decorations --------------------------------------------------------------------------------------
-    bool fits(int type, int x, int y, bool onBlocked, bool onReserved = false) const {
+    // ---- 6. decorations: every island tile ends up under a footprint -----------------------------------------
+    bool InsideIsland(int type, int x, int y) const {
         const int dw = kDecorSize[type][0], dh = kDecorSize[type][1];
         if (x < 0 || y < 0 || x + dw > m_w || y + dh > m_h) return false;
         for (int ty = y; ty < y + dh; ++ty) {
             for (int tx = x; tx < x + dw; ++tx) {
-                const int i = idx(tx, ty);
-                if (m_decorCover[i] || (!onReserved && m_reserved[i])) return false;
-                if (!onBlocked && m_blocked[i]) return false;
+                if (!m_island[Idx(tx, ty)]) return false;
             }
         }
         return true;
     }
 
-    void put(int type, int x, int y) {
-        const int dw = kDecorSize[type][0], dh = kDecorSize[type][1];
-        m_doc.addDecoration(type, x, y);
-        for (int ty = y; ty < y + dh; ++ty) {
-            for (int tx = x; tx < x + dw; ++tx) m_decorCover[idx(tx, ty)] = 1;
+    int NewlyCovered(int type, int x, int y) const {
+        int count = 0;
+        for (int ty = y; ty < y + kDecorSize[type][1]; ++ty) {
+            for (int tx = x; tx < x + kDecorSize[type][0]; ++tx) count += m_cover[Idx(tx, ty)] ? 0 : 1;
         }
-        m_decorCells += dw * dh;
+        return count;
     }
 
-    // Places a decoration and, on a symmetric map, its mirror image
-    bool place(int type, int x, int y, bool onBlocked) {
-        if (!fits(type, x, y, onBlocked)) return false;
-        const int dw = kDecorSize[type][0], dh = kDecorSize[type][1];
-        if (!m_sym.mirrorsObjects()) {
-            put(type, x, y);
-            return true;
+    void Put(int type, int x, int y) {
+        m_doc.AddDecoration(type, x, y);
+        m_decorArea += kDecorSize[type][0] * kDecorSize[type][1];
+        ++m_decorCount;
+        m_rockCount += type <= kStones.last ? 1 : 0;
+        for (int ty = y; ty < y + kDecorSize[type][1]; ++ty) {
+            for (int tx = x; tx < x + kDecorSize[type][0]; ++tx) m_cover[Idx(tx, ty)] = 1;
         }
+    }
+
+    // Places a decoration and, on a symmetric map, its mirror image when that fits the island as well
+    void Place(int type, int x, int y) {
+        Put(type, x, y);
+        if (!m_sym.MirrorsObjects()) return;
         int mx, my;
-        m_sym.rect(x, y, dw, dh, mx, my);
-        const bool overlaps = mx < x + dw && x < mx + dw && my < y + dh && y < my + dh;
-        if (overlaps || !fits(type, mx, my, onBlocked)) return false;
-        put(type, x, y);
-        put(type, mx, my);
-        return true;
+        m_sym.rect(x, y, kDecorSize[type][0], kDecorSize[type][1], mx, my);
+        if ((mx != x || my != y) && InsideIsland(type, mx, my)) Put(type, mx, my);
     }
 
-    // Smaller footprints are more common, as in the original maps
-    int pickType(const std::vector<Weighted>& pool) {
-        float total = 0.0f;
-        std::vector<float> weights;
-        for (const auto& entry : pool) {
-            for (int t = entry.range.first; t <= entry.range.last; ++t) {
-                const float area = static_cast<float>(kDecorSize[t][0] * kDecorSize[t][1]);
-                weights.push_back(entry.weight / std::pow(area, 0.7f) / (entry.range.last - entry.range.first + 1));
-                total += weights.back();
-            }
-        }
-        float roll = m_rng.range(0.0f, total);
-        size_t i = 0;
-        for (const auto& entry : pool) {
-            for (int t = entry.range.first; t <= entry.range.last; ++t, ++i) {
-                roll -= weights[i];
-                if (roll <= 0.0f) return t;
-            }
-        }
-        return kSmall.first;
+    int PickType(TypeRange range) { return Pick(range.first, range.last); }
+
+    // Rocks lean to the island middle; the running count is steered toward the chosen share of rocks
+    float RockChance(float islandRock, float depthWeight) const {
+        const float share = m_decorCount ? static_cast<float>(m_rockCount) / m_decorCount : islandRock;
+        return std::clamp(islandRock * depthWeight + 4.0f * (Percent(m_params.rockPercent) - share), 0.0f, 1.0f);
     }
 
-    int pickType(TypeRange range) { return pickType(std::vector<Weighted>{{range, 1}}); }
-
-    Context contextAt(int x, int y) const {
-        if (dirtQuadrants(x, y) >= 2) return Context::Dirt;          // plateau: rocks
-        return m_blocked[idx(x, y)] ? Context::Blocked : Context::Grass;
+    // What stands at a given depth of an island whose rock share is `rock`
+    int ChooseType(int depth, float rock) {
+        const float roll = m_rng.unit();
+        if (depth >= 3) {
+            if (roll < RockChance(rock, 1.3f)) return PickType(Chance(0.75f) ? kRocks : kRockPiles);
+            return PickType(kGroves);
+        }
+        if (depth == 2) {
+            if (roll < RockChance(rock, 1.0f)) return PickType(Chance(0.7f) ? kRocks : kLowRocks);
+            return PickType(Chance(0.65f) ? kGroves : kTrees);
+        }
+        if (roll < RockChance(rock, 0.6f)) return PickType(Chance(0.5f) ? kStones : (Chance(0.5f) ? kLowRocks : kRocks));
+        const float kind = m_rng.unit();
+        if (kind < 0.45f) return PickType(kTrees);
+        if (kind < 0.9f) return PickType(kGroves);
+        return PickType(kDeadTrees);
     }
 
-    void placeDecorations() {
-        static constexpr float kCoverage[3] = {0.16f, 0.27f, 0.38f};
-        const int budget = static_cast<int>(kCoverage[std::clamp(m_params.decorDensity, 0, 2)] * m_w * m_h);
-
-        // Cliff ridges with gaps: natural chokepoints; the reserved roads never get closed
-        const int ridges = m_w * m_h / 1500 + 1;
-        for (int r = 0; r < ridges; ++r) {
-            float x = static_cast<float>(pick(6, m_w - 7)), y = static_cast<float>(pick(6, m_h - 7));
-            const float angle = m_rng.range(0.0f, 2.0f * kPi);
-            const int length = pick(4, 9);
-            for (int i = 0; i < length; ++i) {
-                if (!chance(0.75f)) { x += std::cos(angle) * 3.0f; y += std::sin(angle) * 3.0f; continue; }
-                place(pickType(kCliffs), static_cast<int>(x), static_cast<int>(y), false);
-                x += std::cos(angle) * 3.0f + m_rng.signedUnit();
-                y += std::sin(angle) * 3.0f + m_rng.signedUnit();
-            }
-        }
-
-        // Dense belt of trees and rocks along the edge
-        if (m_params.borderForest) {
-            for (int y = 0; y < m_h; ++y) {
-                for (int x = 0; x < m_w; ++x) {
-                    if (edgeDistance(x, y) > 2 || !chance(0.8f)) continue;
-                    const Context ctx = contextAt(x, y);
-                    place(pickType(ctx == Context::Dirt ? kCliffs : kTrees), x, y, true);
-                }
-            }
-        }
-
-        // Undergrowth over blocked terrain
+    // Rock share of every island: one look per map, mirrored islands look alike
+    std::vector<float> IslandRockShares(std::vector<int>& label) {
+        const int count = Components([&](int x, int y) { return m_island[Idx(x, y)] != 0; }, label);
+        std::vector<float> sumX(count, 0.0f), sumY(count, 0.0f), size(count, 0.0f), rock(count, 0.0f);
         for (int y = 0; y < m_h; ++y) {
             for (int x = 0; x < m_w; ++x) {
-                if (m_blocked[idx(x, y)] && !m_decorCover[idx(x, y)] && chance(0.14f)) {
-                    place(pickType(typePool(contextAt(x, y))), x, y, true);
-                }
+                const int l = label[Idx(x, y)];
+                if (l < 0) continue;
+                sumX[l] += x + 0.5f;
+                sumY[l] += y + 0.5f;
+                size[l] += 1.0f;
             }
         }
+        for (int l = 0; l < count; ++l) {
+            const float spread = field(sumX[l] / size[l], sumY[l] / size[l], 0.03f, 1, 1111) - 0.5f;
+            // Islands differ around the chosen share, mirrored islands alike
+            const float base = Percent(m_params.rockPercent);
+            rock[l] = std::clamp(base + spread * 1.2f * std::min(base, 1.0f - base), 0.0f, 1.0f);
+        }
+        return rock;
+    }
 
-        // Groups of trees, bushes and stones on open ground, until the budget is spent
-        for (int attempt = 0; attempt < m_w * m_h && m_decorCells < budget; ++attempt) {
-            const int cx = pick(1, m_w - 2), cy = pick(1, m_h - 2);
-            if (m_reserved[idx(cx, cy)] || m_blocked[idx(cx, cy)]) continue;
-            const int members = pick(2, 6);
-            for (int i = 0; i < members; ++i) {
-                const int x = cx + pick(-3, 3), y = cy + pick(-2, 2);
-                if (!inside(x, y) || m_blocked[idx(x, y)]) continue;
-                place(pickType(typePool(contextAt(x, y))), x, y, false);
+    void FillIslands() {
+        std::vector<int> label;
+        const std::vector<float> rock = IslandRockShares(label);
+
+        // Deep tiles first, so the big rocks and groves take the middle and the rim gets the small things
+        std::vector<int> order;
+        for (int i = 0; i < m_w * m_h; ++i) if (m_island[i]) order.push_back(i);
+        for (size_t i = order.size(); i > 1; --i) std::swap(order[i - 1], order[Pick(0, static_cast<int>(i) - 1)]);
+        std::stable_sort(order.begin(), order.end(),
+                         [&](int a, int b) { return std::min(m_depth[a], 3) > std::min(m_depth[b], 3); });
+
+        for (int i : order) {
+            if (m_cover[i]) continue;
+            const int tx = i % m_w, ty = i / m_w;
+            const int depth = m_depth[i];
+            bool placed = false;
+            for (int attempt = 0; attempt < 10 && !placed; ++attempt) {
+                const int type = ChooseType(depth, rock[label[i]]);
+                const int dw = kDecorSize[type][0], dh = kDecorSize[type][1];
+                int bestX = 0, bestY = 0, best = 0, bestScore = -1000;
+                for (int y = ty - dh + 1; y <= ty; ++y) {
+                    for (int x = tx - dw + 1; x <= tx; ++x) {
+                        if (!InsideIsland(type, x, y)) continue;
+                        const int gain = NewlyCovered(type, x, y);
+                        const int score = 2 * gain - (dw * dh - gain);  // prefer little overlap
+                        if (gain > 0 && score > bestScore) { best = gain; bestScore = score; bestX = x; bestY = y; }
+                    }
+                }
+                // The first tries only take a spot with at most one tile of overlap
+                const int overlap = dw * dh - best;
+                if (best > 0 && (attempt >= 6 || overlap <= 1)) {
+                    Place(type, bestX, bestY);
+                    placed = true;
+                }
             }
+            // A single (1x1) tree always fits
+            if (!placed) Place(PickType(Chance(0.85f) ? kTrees : kDeadTrees), tx, ty);
+        }
+
+        // Extra layer: the original islands are piled up; footprints add up to the chosen share of the island area
+        const int wanted = static_cast<int>(std::clamp(m_params.coverPercent, 0, 300) / 100.0f * order.size());
+        for (int attempts = 0; m_decorArea < wanted && attempts < static_cast<int>(order.size()) * 4; ++attempts) {
+            const int i = PickFrom(order);
+            const int type = ChooseType(m_depth[i], rock[label[i]]);
+            if (InsideIsland(type, i % m_w, i / m_w)) Place(type, i % m_w, i / m_w);
         }
     }
 
     // ---- 7. passability --------------------------------------------------------------------------------------
-    void finalize() {
-        for (int i = 0; i < m_w * m_h; ++i) {
-            if (m_decorCover[i]) m_blocked[i] = 1;
-        }
-        sealPockets();
-        for (int y = 0; y < m_h; ++y) {
-            for (int x = 0; x < m_w; ++x) m_doc.setPassable(x, y, !m_blocked[idx(x, y)]);
-        }
-        m_doc.setModified(true);
-    }
-
-    // Open ground cut off from both bases (by decorations or ridges) turns into undergrowth
-    void sealPockets() {
-        std::vector<int> component(m_w * m_h, -1);
-        std::vector<char> keep;
-        int count = 0;
-        for (int sy = 0; sy < m_h; ++sy) {
-            for (int sx = 0; sx < m_w; ++sx) {
-                if (m_blocked[idx(sx, sy)] || component[idx(sx, sy)] >= 0) continue;
-                bool hasBase = false;
-                std::vector<Point> queue{{sx, sy}};
-                component[idx(sx, sy)] = count;
-                for (size_t head = 0; head < queue.size(); ++head) {
-                    const Point cur = queue[head];
-                    hasBase = hasBase || inBaseZone(cur.x, cur.y);
-                    static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-                    for (const auto& s : kStep) {
-                        const int nx = cur.x + s[0], ny = cur.y + s[1];
-                        if (!inside(nx, ny) || m_blocked[idx(nx, ny)] || component[idx(nx, ny)] >= 0) continue;
-                        component[idx(nx, ny)] = count;
-                        queue.push_back({nx, ny});
-                    }
-                }
-                keep.push_back(hasBase ? 1 : 0);
-                ++count;
-            }
-        }
+    void Finalize() {
         for (int y = 0; y < m_h; ++y) {
             for (int x = 0; x < m_w; ++x) {
-                const int c = component[idx(x, y)];
-                if (c < 0 || keep[c]) continue;
-                m_doc.setTile(x, y, static_cast<uint8_t>(jungleTile()));
-                m_blocked[idx(x, y)] = 1;
+                const bool blockedTile = TileCollision::IsBlocked(m_tilesetId, m_doc.GetTileMap().GetBaseTile(x, y));
+                m_doc.SetPassable(x, y, !(blockedTile || m_cover[Idx(x, y)] || m_island[Idx(x, y)]));
             }
         }
+        m_doc.SetModified(true);
     }
 
     MapDocument& m_doc;
@@ -618,25 +848,25 @@ private:
     int m_h;
     int m_tilesetId;
     const TileSet& m_tileset;
-    float m_roughThreshold{2.0f};
     Rng m_rng;
     uint32_t m_seed;
     Symmetry m_sym;
 
     std::vector<Point> m_bases;
-    struct FPoint { float x; float y; };
     std::vector<FPoint> m_roadPoints;
-    std::vector<uint8_t> m_reserved;     // kept free: bases, roads, clearings
-    std::vector<uint8_t> m_obstacle;     // blocked terrain tile
-    std::vector<uint8_t> m_blocked;      // impassable for any reason
-    std::vector<uint8_t> m_decorCover;   // covered by a decoration footprint
-    std::vector<uint8_t> m_dirt;         // quadrants (2x2 per tile): 1 = bare earth (impassable plateau)
-    int m_decorCells{0};
+    std::vector<uint8_t> m_reserved;   // kept free: bases, roads, clearings
+    std::vector<uint8_t> m_island;     // impassable island
+    std::vector<int> m_depth;          // distance of an island tile from the open ground (0 = open)
+    std::vector<uint8_t> m_cover;      // covered by a decoration footprint
+    int m_decorArea{0};                // sum of the footprint areas
+    int m_decorCount{0};
+    int m_rockCount{0};                // rocks and stones among the decorations
+    std::vector<char> m_corner;        // ground material of the (w+1) x (h+1) tile corners
 };
 
 } // namespace
 
-void SmartGenerator::generate(MapDocument& doc, GeneratorParams params) {
+void SmartGenerator::Generate(MapDocument& doc, GeneratorParams params) {
     if (params.randomSeed) {
         std::random_device rd;
         params.seed = rd();
@@ -645,13 +875,71 @@ void SmartGenerator::generate(MapDocument& doc, GeneratorParams params) {
     const int h = std::clamp(params.height, 40, MAX_MAP_SIZE);
     const int tilesetId = std::clamp(params.tilesetId, 0, 1);
 
-    doc.newMap(w, h, tilesetId, 0);
-    doc.setName("smart_map_" + std::to_string(params.seed % 10000));
+    doc.NewMap(w, h, tilesetId, 0);
+    doc.SetName("smart_map_" + std::to_string(params.seed % 10000));
 
     Builder(doc, params, w, h, tilesetId).run();
 
-    std::cout << "[SmartGenerator] Generated map '" << doc.getName() << "' (" << w << "x" << h
+    std::cout << "[SmartGenerator] Generated map '" << doc.GetName() << "' (" << w << "x" << h
               << ", seed: " << params.seed << ")" << std::endl;
+}
+
+// Medians over map_mission_* and map_skirmish_* of each tileset (tools/derive_tile_corners.py gives the table
+// the ground shares are counted with)
+void SmartGenerator::OriginalDefaults(GeneratorParams& params, int tilesetId) {
+    if (tilesetId == 1) {
+        params.islandPercent = 48;
+        params.edgePercent = 64;
+        params.rockPercent = 55;
+        params.coverPercent = 115;
+        params.darkGrassPercent = 14;
+        params.earthPercent = 40;
+        params.variantPercent = 30;
+        params.rubblePercent = 2;
+        params.coreWaterPercent = 13;
+        params.coreJunglePercent = 16;
+    } else {
+        params.islandPercent = 41;
+        params.edgePercent = 74;
+        params.rockPercent = 9;
+        params.coverPercent = 105;
+        params.darkGrassPercent = 53;
+        params.earthPercent = 8;
+        params.variantPercent = 46;
+        params.rubblePercent = 2;
+        params.coreWaterPercent = 30;
+        params.coreJunglePercent = 27;
+    }
+}
+
+const SmartGenerator::Setting* SmartGenerator::Settings(int& count) {
+    static const Setting settings[] = {
+        {"Islands, % of the map", &GeneratorParams::islandPercent, 10, 70,
+         "Impassable rock and forest islands. Original maps: 17..67 %, median 46 %."},
+        {"Closed map edge, %", &GeneratorParams::edgePercent, 0, 100,
+         "Share of the map edge taken by islands. Original maps: 23..100 %, median 69 %."},
+        {"Rocks in islands, %", &GeneratorParams::rockPercent, 0, 100,
+         "Rocks among the island decorations, the rest are trees and groves.\n"
+         "Original maps: 0..82 %; jungle maps median 9 %, tileset 1 median 55 %."},
+        {"Decoration cover, %", &GeneratorParams::coverPercent, 60, 200,
+         "Footprints of the decorations added up, against the island area: over 100 % they overlap.\n"
+         "Original maps: 68..152 %, median 113 %."},
+        {"Dark grass, % of open ground", &GeneratorParams::darkGrassPercent, 0, 80,
+         "Original maps: jungle 20..72 % (median 53 %), tileset 1 8..25 % (median 14 %)."},
+        {"Earth / sand, % of open ground", &GeneratorParams::earthPercent, 0, 50,
+         "Original maps: jungle 2..19 % (median 8 %), tileset 1 23..45 % (median 40 %)."},
+        {"Speckled ground tiles, %", &GeneratorParams::variantPercent, 0, 90,
+         "Speckled variants among the plain ground tiles. Original maps: 5..82 %, median 43 %."},
+        {"Rubble, % of open ground", &GeneratorParams::rubblePercent, 0, 15,
+         "Open rough ground on the grass. Original maps: 0..9 %, median 2 %."},
+        {"Water under islands, %", &GeneratorParams::coreWaterPercent, 0, 100,
+         "Water under the middle of the islands, mostly hidden by the decorations.\n"
+         "Original maps: 0..96 %; jungle median 30 %, tileset 1 median 13 %."},
+        {"Jungle under islands, %", &GeneratorParams::coreJunglePercent, 0, 60,
+         "Jungle tiles under the middle of the islands. Original maps: 1..35 %, median 17 %."},
+    };
+    count = static_cast<int>(sizeof(settings) / sizeof(settings[0]));
+    return settings;
 }
 
 } // namespace OpenArtOfWar

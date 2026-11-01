@@ -17,7 +17,7 @@ namespace OpenArtOfWar
 
         // Finds a font file: first the bundled one (relative to the working directory and to the
         // executable, so the game starts from any directory), then platform system fonts.
-        std::string resolveFontPath(const std::string &bundled, bool bold)
+        std::string ResolveFontPath(const std::string &bundled, bool bold)
         {
             std::vector<fs::path> candidates;
             const fs::path rel(bundled);
@@ -74,12 +74,12 @@ namespace OpenArtOfWar
             }
         }
 
-        std::string regPath = resolveFontPath(regularFontPath, false);
-        std::string bldPath = resolveFontPath(boldFontPath, true);
+        std::string regPath = ResolveFontPath(regularFontPath, false);
+        std::string bldPath = ResolveFontPath(boldFontPath, true);
 
         // Fonts packed in data.blob are opened from memory (the buffers stay alive with the fonts)
-        const bool packedRegular = Assets::isBlob() && Assets::readBytes(regularFontPath, m_fontDataRegular);
-        const bool packedBold = Assets::isBlob() && Assets::readBytes(boldFontPath, m_fontDataBold);
+        const bool packedRegular = Assets::IsBlob() && Assets::ReadBytes(regularFontPath, m_fontDataRegular);
+        const bool packedBold = Assets::IsBlob() && Assets::ReadBytes(boldFontPath, m_fontDataBold);
         auto openFont = [&](bool packed, bool bold, const std::string &path, float size)
         {
             if(!packed)
@@ -109,7 +109,7 @@ namespace OpenArtOfWar
 
     BitmapFontRenderer::~BitmapFontRenderer()
     {
-        clearCache();
+        ClearCache();
 
         if(m_fontSmall)
         {
@@ -148,7 +148,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void BitmapFontRenderer::clearCache()
+    void BitmapFontRenderer::ClearCache()
     {
         for(auto &pair : m_cache)
         {
@@ -160,7 +160,7 @@ namespace OpenArtOfWar
         m_cache.clear();
     }
 
-    TTF_Font *BitmapFontRenderer::getFontForScale(int scale) const
+    TTF_Font *BitmapFontRenderer::GetFontForScale(int scale) const
     {
         if(scale == 5)
             return m_fontSmallBold ? m_fontSmallBold : m_fontSmall;
@@ -177,7 +177,7 @@ namespace OpenArtOfWar
         return m_fontTitle ? m_fontTitle : (m_fontLarge ? m_fontLarge : m_fontMedium);
     }
 
-    CachedText BitmapFontRenderer::getOrCreateTexture(const std::string &text, int scale, SDL_Color color)
+    CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int scale, SDL_Color color)
     {
         if(text.empty() || !m_renderer)
         {
@@ -194,7 +194,7 @@ namespace OpenArtOfWar
             return it->second;
         }
 
-        TTF_Font *font = getFontForScale(scale);
+        TTF_Font *font = GetFontForScale(scale);
         if(!font)
         {
             return {nullptr, 0, 0, 0};
@@ -243,11 +243,11 @@ namespace OpenArtOfWar
         return cached;
     }
 
-    int BitmapFontRenderer::getTextWidth(const std::string &text, int scale) const
+    int BitmapFontRenderer::GetTextWidth(const std::string &text, int scale) const
     {
         if(text.empty())
             return 0;
-        TTF_Font *font = getFontForScale(scale);
+        TTF_Font *font = GetFontForScale(scale);
         if(!font)
             return static_cast<int>(text.size()) * (scale <= 1 ? 8 : (scale * 8));
 
@@ -256,23 +256,23 @@ namespace OpenArtOfWar
         return w;
     }
 
-    int BitmapFontRenderer::getTextHeight(int scale) const
+    int BitmapFontRenderer::GetTextHeight(int scale) const
     {
-        TTF_Font *font = getFontForScale(scale);
+        TTF_Font *font = GetFontForScale(scale);
         if(!font)
             return (scale <= 1 ? 12 : (scale * 8));
         return TTF_GetFontHeight(font);
     }
 
-    void BitmapFontRenderer::drawString(const std::string &text, int x, int y, int scale, SDL_Color color, bool dropShadow, int anchor)
+    void BitmapFontRenderer::DrawString(const std::string &text, int x, int y, int scale, SDL_Color color, bool dropShadow, int anchor)
     {
         if(text.empty() || !m_renderer)
             return;
 
         m_currentFrame++;
 
-        int totalW = getTextWidth(text, scale);
-        int totalH = getTextHeight(scale);
+        int totalW = GetTextWidth(text, scale);
+        int totalH = GetTextHeight(scale);
 
         if(anchor & Anchor::HCENTER)
         {
@@ -296,7 +296,7 @@ namespace OpenArtOfWar
         if(dropShadow)
         {
             SDL_Color shadowCol = {0, 0, 0, 210};
-            CachedText shadow = getOrCreateTexture(text, scale, shadowCol);
+            CachedText shadow = GetOrCreateTexture(text, scale, shadowCol);
             if(shadow.texture)
             {
                 int shadowOffset = (scale == 3 || scale == 4 || scale >= 7) ? 2 : 1;
@@ -306,7 +306,7 @@ namespace OpenArtOfWar
         }
 
         // Main text pass
-        CachedText mainText = getOrCreateTexture(text, scale, color);
+        CachedText mainText = GetOrCreateTexture(text, scale, color);
         if(mainText.texture)
         {
             SDL_FRect dstRect = {static_cast<float>(x), static_cast<float>(y), static_cast<float>(mainText.width), static_cast<float>(mainText.height)};
@@ -314,12 +314,12 @@ namespace OpenArtOfWar
         }
     }
 
-    int BitmapFontRenderer::drawTextWrapped(const std::string &text, int x, int y, int maxLineWidth, int scale, SDL_Color color, bool dropShadow)
+    int BitmapFontRenderer::DrawTextWrapped(const std::string &text, int x, int y, int maxLineWidth, int scale, SDL_Color color, bool dropShadow)
     {
         if(text.empty() || !m_renderer)
             return 0;
 
-        int lineHeight = getTextHeight(scale) + 3;
+        int lineHeight = GetTextHeight(scale) + 3;
         int curY = y;
 
         std::istringstream stream(text);
@@ -341,11 +341,11 @@ namespace OpenArtOfWar
             while(lineStream >> word)
             {
                 std::string testLine = currentLine.empty() ? word : (currentLine + " " + word);
-                int testW = getTextWidth(testLine, scale);
+                int testW = GetTextWidth(testLine, scale);
 
                 if(testW > maxLineWidth && !currentLine.empty())
                 {
-                    drawString(currentLine, x, curY, scale, color, dropShadow);
+                    DrawString(currentLine, x, curY, scale, color, dropShadow);
                     curY += lineHeight;
                     currentLine = word;
                 }
@@ -357,7 +357,7 @@ namespace OpenArtOfWar
 
             if(!currentLine.empty())
             {
-                drawString(currentLine, x, curY, scale, color, dropShadow);
+                DrawString(currentLine, x, curY, scale, color, dropShadow);
                 curY += lineHeight;
             }
         }

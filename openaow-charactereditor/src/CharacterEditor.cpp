@@ -18,18 +18,18 @@
 
 namespace CharEditor {
 
-bool CharacterEditor::init() {
+bool CharacterEditor::Init() {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         status = std::string(_("SDL error: ")) + SDL_GetError();
         return false;
     }
 
-    assetsRoot = findAssetRoot();
+    assetsRoot = FindAssetRoot();
     if (assetsRoot.empty()) {
         status = _("Could not find the assets folder with graphics data.");
         return false;
     }
-    OpenArtOfWar::Localization::init((assetsRoot / "locale").string(), "en");
+    OpenArtOfWar::Localization::Init((assetsRoot / "locale").string(), "en");
     charactersDir = assetsRoot / "characters";
 
     window = SDL_CreateWindow(_("Open Art Of War Character Archetype Editor"), 1500, 900, SDL_WINDOW_RESIZABLE);
@@ -76,17 +76,17 @@ bool CharacterEditor::init() {
     ImGui_ImplSDLRenderer3_Init(renderer);
 
     textures = std::make_unique<OpenArtOfWar::TextureManager>(renderer);
-    textures->loadAllAssets(assetsRoot.string());
+    textures->LoadAllAssets(assetsRoot.string());
     gameRenderer = std::make_unique<OpenArtOfWar::Renderer>(renderer, textures.get());
     shaderEffects = std::make_unique<OpenArtOfWar::ShaderEffects>();
-    if (shaderEffects->init(renderer)) gameRenderer->setEffects(shaderEffects.get());
+    if (shaderEffects->Init(renderer)) gameRenderer->SetEffects(shaderEffects.get());
 
     camera = std::make_unique<OpenArtOfWar::Camera>(1500, 900);
     previewZoom = 2.0f;
     cameraPanX = 0.0f;
     cameraPanY = 0.0f;
-    camera->setZoom(previewZoom);
-    loadCatalog();
+    camera->SetZoom(previewZoom);
+    LoadCatalog();
     if (files.empty()) {
         status = _("No YAML files found in assets/characters.");
     } else {
@@ -109,11 +109,11 @@ int CharacterEditor::run() {
             previewTime = 0.0f;
         }
         if (editorMode == EditorMode::Simulation) {
-            if (!battlePaused) battle.update(simDt);
+            if (!battlePaused) battle.Update(simDt);
         } else {
-            updateCombatSim(simDt);
-            updateEffectsSim(simDt);
-            updateProjectilesSim(simDt);
+            UpdateCombatSim(simDt);
+            UpdateEffectsSim(simDt);
+            UpdateProjectilesSim(simDt);
         }
 
         SDL_Event event;
@@ -123,11 +123,11 @@ int CharacterEditor::run() {
                 running = false;
             } else if (event.type == SDL_EVENT_KEY_DOWN && (event.key.mod & SDL_KMOD_CTRL) &&
                        event.key.key == SDLK_S) {
-                if (editorMode == EditorMode::Research) saveResearch();
+                if (editorMode == EditorMode::Research) SaveResearch();
                 else if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks || editorMode == EditorMode::Projectiles ||
                          editorMode == EditorMode::GameUi || editorMode == EditorMode::Environment ||
-                         editorMode == EditorMode::AiDifficulty) saveActiveSettings();
-                else saveFile();
+                         editorMode == EditorMode::AiDifficulty) SaveActiveSettings();
+                else SaveFile();
             } else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_G &&
                        !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive()) {
                 testSiegeMode = !testSiegeMode;
@@ -146,7 +146,7 @@ int CharacterEditor::run() {
                                              0.5f, 4.0f);
                     if (std::abs(previewZoom - oldZoom) > 0.0001f) {
                         float mouseWorldX = 0.0f, mouseWorldY = 0.0f;
-                        camera->screenToWorld(static_cast<float>(mouseX), static_cast<float>(mouseY), mouseWorldX, mouseWorldY);
+                        camera->ScreenToWorld(static_cast<float>(mouseX), static_cast<float>(mouseY), mouseWorldX, mouseWorldY);
                         const float centerScreenX = static_cast<float>(previewRect.x) + static_cast<float>(previewRect.w) * 0.5f;
                         const float centerScreenY = static_cast<float>(previewRect.y) + static_cast<float>(previewRect.h) * 0.5f;
                         cameraPanX = mouseWorldX - (static_cast<float>(mouseX) - centerScreenX) / previewZoom;
@@ -159,26 +159,26 @@ int CharacterEditor::run() {
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-        drawEditor();
+        DrawEditor();
         ImGui::Render();
 
         int width = 0;
         int height = 0;
         SDL_GetRenderOutputSize(renderer, &width, &height);
-        camera->setViewport(width, height);
+        camera->SetViewport(width, height);
 
         if (previewRect.w > 0 && previewRect.h > 0) {
             const float centerScreenX = static_cast<float>(previewRect.x) + static_cast<float>(previewRect.w) * 0.5f;
             const float centerScreenY = static_cast<float>(previewRect.y) + static_cast<float>(previewRect.h) * 0.5f;
-            camera->setZoom(previewZoom);
-            camera->setPosition(-centerScreenX / previewZoom + cameraPanX,
+            camera->SetZoom(previewZoom);
+            camera->SetPosition(-centerScreenX / previewZoom + cameraPanX,
                                 -centerScreenY / previewZoom + cameraPanY);
         }
 
         SDL_SetRenderDrawColor(renderer, 18, 22, 23, 255);
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
-        drawPreviewScene();
+        DrawPreviewScene();
         SDL_RenderPresent(renderer);
     }
     return 0;
@@ -210,9 +210,9 @@ CharacterEditor::~CharacterEditor() {
     SDL_Quit();
 }
 
-void CharacterEditor::sortCatalogFiles() {
+void CharacterEditor::SortCatalogFiles() {
     auto factionRank = [](const std::string& f) -> int {
-        switch (OpenArtOfWar::Utility::parseFaction(f, OpenArtOfWar::Faction::Neutral)) {
+        switch (OpenArtOfWar::Utility::ParseFaction(f, OpenArtOfWar::Faction::Neutral)) {
             case OpenArtOfWar::Faction::Confederation: return 0;
             case OpenArtOfWar::Faction::Resistance: return 1;
             default: return 2;
@@ -234,7 +234,7 @@ void CharacterEditor::sortCatalogFiles() {
     });
 }
 
-void CharacterEditor::loadCatalog() {
+void CharacterEditor::LoadCatalog() {
     files.clear();
     std::error_code error;
     for (const auto& entry : fs::directory_iterator(charactersDir, error)) {
@@ -248,24 +248,24 @@ void CharacterEditor::loadCatalog() {
         try {
             const YAML::Node root = YAML::LoadFile(entry.path().string());
             if (root["default_difficulty"].IsDefined()) continue;
-            std::string fType = yamlString(root, "type", "?");
+            std::string fType = YamlString(root, "type", "?");
             int numId = -1;
             if (fType == "building" || root["building_index"].IsDefined()) {
-                numId = yamlInt(root, "building_index", -1);
+                numId = YamlInt(root, "building_index", -1);
             } else {
-                numId = yamlInt(root, "archetype_id", -1);
+                numId = YamlInt(root, "archetype_id", -1);
             }
             files.push_back({entry.path(),
-                             yamlString(root, "name", entry.path().stem().string()),
-                             OpenArtOfWar::Utility::factionName(docFaction(root)),
+                             YamlString(root, "name", entry.path().stem().string()),
+                             OpenArtOfWar::Utility::FactionName(DocFaction(root)),
                              fType,
                              numId,
-                             yamlString(root, "id", entry.path().stem().string())});
+                             YamlString(root, "id", entry.path().stem().string())});
         } catch (const std::exception&) {
             files.push_back({entry.path(), entry.path().stem().string(), _("Invalid YAML"), "?", -1, entry.path().stem().string()});
         }
     }
-    sortCatalogFiles();
+    SortCatalogFiles();
 }
 
 bool CharacterEditor::loadFile(const fs::path& path) {
@@ -285,16 +285,16 @@ bool CharacterEditor::loadFile(const fs::path& path) {
         status = std::string(_("Loaded: ")) + path.filename().string();
 
         YAML::Node combat = document["combat"];
-        float cfgBulletSpeed = yamlFloat(combat, "bullet_speed", yamlFloat(combat, "projectile_speed", 0.0f));
-        std::string proj = yamlString(mainWeapon(combat), "projectile", "bullet");
+        float cfgBulletSpeed = YamlFloat(combat, "bullet_speed", YamlFloat(combat, "projectile_speed", 0.0f));
+        std::string proj = YamlString(MainWeapon(combat), "projectile", "bullet");
         if (cfgBulletSpeed > 10.0f) {
             previewBulletSpeed = cfgBulletSpeed;
         } else {
             previewBulletSpeed = (proj == "rocket") ? 420.0f : ((proj == "flame") ? 240.0f : 620.0f);
         }
-        previewFxSpeed = yamlFloat(combat, "fx_speed", 1.0f);
+        previewFxSpeed = YamlFloat(combat, "fx_speed", 1.0f);
 
-        const VisualOffsets offsets = readVisualOffsets(document);
+        const VisualOffsets offsets = ReadVisualOffsets(document);
         muzzleOffsetX = offsets.muzzleX;
         muzzleOffsetY = offsets.muzzleY;
         turretOffsetX = offsets.turretX;
@@ -328,15 +328,15 @@ bool CharacterEditor::loadFile(const fs::path& path) {
     }
 }
 
-bool CharacterEditor::saveFile() {
+bool CharacterEditor::SaveFile() {
     if (!document || activePath.empty()) return false;
     try {
         // Only the editor's own changes go into the file as it is now: fields the editor does not know
         // (a newer game's, or added since the file was loaded) are kept
-        const YAML::Node disk = readYamlFile(activePath);
-        YAML::Node merged = disk.IsMap() ? mergeYamlEdits(documentBase, document, disk) : YAML::Clone(document);
+        const YAML::Node disk = ReadYamlFile(activePath);
+        YAML::Node merged = disk.IsMap() ? MergeYamlEdits(documentBase, document, disk) : YAML::Clone(document);
         std::string error;
-        if (!writeFileAtomic(activePath, yamlText(merged), error)) {
+        if (!WriteFileAtomic(activePath, YamlText(merged), error)) {
             status = error;
             return false;
         }
@@ -345,7 +345,7 @@ bool CharacterEditor::saveFile() {
         textBuffers.clear();
         dirty = false;
         status = std::string(_("Saved: ")) + activePath.filename().string();
-        reloadCatalogSelection();
+        ReloadCatalogSelection();
         return true;
     } catch (const std::exception& error) {
         status = std::string(_("YAML save error: ")) + error.what();
@@ -353,35 +353,35 @@ bool CharacterEditor::saveFile() {
     }
 }
 
-bool CharacterEditor::saveFileAs() {
+bool CharacterEditor::SaveFileAs() {
     if (!document || savePath[0] == '\0') return false;
     fs::path target(savePath.data());
     if (target.is_relative()) target = charactersDir / target;
     if (target.extension().empty()) target.replace_extension(".yaml");
     activePath = target.lexically_normal();
-    if (!saveFile()) return false;
-    loadCatalog();
+    if (!SaveFile()) return false;
+    LoadCatalog();
     return loadFile(activePath);
 }
 
-void CharacterEditor::reloadCatalogSelection() {
+void CharacterEditor::ReloadCatalogSelection() {
     for (auto& file : files) {
         if (file.path == activePath) {
-            file.name = yamlString(document, "name", activePath.stem().string());
-            file.faction = OpenArtOfWar::Utility::factionName(docFaction(document));
-            file.type = yamlString(document, "type", "?");
-            file.stringId = yamlString(document, "id", activePath.stem().string());
+            file.name = YamlString(document, "name", activePath.stem().string());
+            file.faction = OpenArtOfWar::Utility::FactionName(DocFaction(document));
+            file.type = YamlString(document, "type", "?");
+            file.stringId = YamlString(document, "id", activePath.stem().string());
             if (file.type == "building" || document["building_index"].IsDefined()) {
-                file.numericId = yamlInt(document, "building_index", -1);
+                file.numericId = YamlInt(document, "building_index", -1);
             } else {
-                file.numericId = yamlInt(document, "archetype_id", -1);
+                file.numericId = YamlInt(document, "archetype_id", -1);
             }
         }
     }
-    sortCatalogFiles();
+    SortCatalogFiles();
 }
 
-YAML::Node CharacterEditor::section(const char* name) {
+YAML::Node CharacterEditor::Section(const char* name) {
     if (!document[name]) {
         document[name] = YAML::Node(YAML::NodeType::Map);
     } else if (!document[name].IsMap()) {
@@ -393,7 +393,7 @@ YAML::Node CharacterEditor::section(const char* name) {
     return document[name];
 }
 
-bool CharacterEditor::editString(YAML::Node parent, const char* key, const char* label, const std::string& scope,
+bool CharacterEditor::EditString(YAML::Node parent, const char* key, const char* label, const std::string& scope,
                     bool multiline) {
     const std::string bufferKey = scope + "/" + key;
     auto found = textBuffers.find(bufferKey);
@@ -413,55 +413,55 @@ bool CharacterEditor::editString(YAML::Node parent, const char* key, const char*
     } else {
         changed = ImGui::InputText(_(label), found->second.data(), found->second.size());
     }
-    fieldHint(label);
+    FieldHint(label);
     ImGui::PopID();
     if (changed) parent[key] = std::string(found->second.data());
     return changed;
 }
 
-bool CharacterEditor::editInt(YAML::Node parent, const char* key, const char* label, int fallback) {
-    int value = yamlInt(parent, key, fallback);
+bool CharacterEditor::EditInt(YAML::Node parent, const char* key, const char* label, int fallback) {
+    int value = YamlInt(parent, key, fallback);
     const bool edited = ImGui::InputInt(_(label), &value);
-    fieldHint(label);
+    FieldHint(label);
     if (!edited) return false;
     parent[key] = value;
     return true;
 }
 
-bool CharacterEditor::editFloat(YAML::Node parent, const char* key, const char* label, float fallback,
+bool CharacterEditor::EditFloat(YAML::Node parent, const char* key, const char* label, float fallback,
                    float step) {
     float value = 0.0f;
     try { value = parent[key].as<float>(fallback); } catch (...) { value = fallback; }
     const bool edited = ImGui::DragFloat(_(label), &value, step, 0.0f, 0.0f, "%.2f");
-    fieldHint(label);
+    FieldHint(label);
     if (!edited) return false;
     parent[key] = value;
     return true;
 }
 
-bool CharacterEditor::editBool(YAML::Node parent, const char* key, const char* label, bool fallback) {
-    bool value = yamlBool(parent, key, fallback);
+bool CharacterEditor::EditBool(YAML::Node parent, const char* key, const char* label, bool fallback) {
+    bool value = YamlBool(parent, key, fallback);
     const bool edited = ImGui::Checkbox(_(label), &value);
-    fieldHint(label);
+    FieldHint(label);
     if (!edited) return false;
     parent[key] = value;
     return true;
 }
 
-bool CharacterEditor::editWeaponDelay(YAML::Node w) {
+bool CharacterEditor::EditWeaponDelay(YAML::Node w) {
     bool changed = false;
-    int mode = weaponRandomDelay(w) ? 1 : 0;
+    int mode = WeaponRandomDelay(w) ? 1 : 0;
     const char* modes[] = {_("Fixed"), _("Random (min - max)")};
     ImGui::SetNextItemWidth(170.0f);
-    if (hinted(ImGui::Combo(_("Firing delay"), &mode, modes, 2), "Firing delay")) {
+    if (Hinted(ImGui::Combo(_("Firing delay"), &mode, modes, 2), "Firing delay")) {
         if (mode == 1) {
-            const float base = yamlFloat(w, "cooldown", 1.0f);
+            const float base = YamlFloat(w, "cooldown", 1.0f);
             w["cooldown_mode"] = "random";
-            w["cooldown_min"] = yamlFloat(w, "cooldown_min", base);
-            w["cooldown_max"] = yamlFloat(w, "cooldown_max", base * 1.5f);
+            w["cooldown_min"] = YamlFloat(w, "cooldown_min", base);
+            w["cooldown_max"] = YamlFloat(w, "cooldown_max", base * 1.5f);
             w.remove("cooldown");
         } else {
-            w["cooldown"] = yamlFloat(w, "cooldown_min", yamlFloat(w, "cooldown", 1.0f));
+            w["cooldown"] = YamlFloat(w, "cooldown_min", YamlFloat(w, "cooldown", 1.0f));
             w.remove("cooldown_mode");
             w.remove("cooldown_min");
             w.remove("cooldown_max");
@@ -469,8 +469,8 @@ bool CharacterEditor::editWeaponDelay(YAML::Node w) {
         changed = true;
     }
     if (mode == 1) {
-        float range[2] = {yamlFloat(w, "cooldown_min", 1.0f), yamlFloat(w, "cooldown_max", 1.5f)};
-        if (hinted(ImGui::DragFloat2(_("Delay min / max (s)"), range, 0.01f, 0.0f, 30.0f, "%.2f"), "Delay min / max (s)")) {
+        float range[2] = {YamlFloat(w, "cooldown_min", 1.0f), YamlFloat(w, "cooldown_max", 1.5f)};
+        if (Hinted(ImGui::DragFloat2(_("Delay min / max (s)"), range, 0.01f, 0.0f, 30.0f, "%.2f"), "Delay min / max (s)")) {
             range[0] = std::max(0.0f, range[0]);
             range[1] = std::max(range[0], range[1]);
             w["cooldown_min"] = range[0];
@@ -478,12 +478,12 @@ bool CharacterEditor::editWeaponDelay(YAML::Node w) {
             changed = true;
         }
     } else {
-        changed |= editFloat(w, "cooldown", "Cooldown (seconds)", 1.0f);
+        changed |= EditFloat(w, "cooldown", "Cooldown (seconds)", 1.0f);
     }
     return changed;
 }
 
-bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
+bool CharacterEditor::EditProjectileCombo(YAML::Node parent) {
     static const char* s_projectiles[] = {"bullet", "sniper", "shell", "rocket", "flame", "none"};
     static const char* s_labels[] = {
         "bullet (Bullet / Rifle / MG)",
@@ -493,7 +493,7 @@ bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
         "flame (Flamethrower stream)",
         "none (No projectile / Unarmed)"
     };
-    std::string current = yamlString(parent, "projectile", "bullet");
+    std::string current = YamlString(parent, "projectile", "bullet");
     int currentIdx = 0;
     for (int i = 0; i < 6; ++i) {
         if (current == s_projectiles[i]) {
@@ -503,14 +503,14 @@ bool CharacterEditor::editProjectileCombo(YAML::Node parent) {
     }
 
     bool changed = false;
-    if (hinted(ImGui::Combo(_("Projectile"), &currentIdx, s_labels, 6), "Projectile")) {
+    if (Hinted(ImGui::Combo(_("Projectile"), &currentIdx, s_labels, 6), "Projectile")) {
         parent["projectile"] = std::string(s_projectiles[currentIdx]);
         changed = true;
     }
     return changed;
 }
 
-void CharacterEditor::setMode(PreviewMode mode) {
+void CharacterEditor::SetMode(PreviewMode mode) {
     previewMode = mode;
     previewTime = 0.0f;
     simProjectiles.clear();

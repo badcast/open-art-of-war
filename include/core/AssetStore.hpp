@@ -26,34 +26,34 @@ namespace OpenArtOfWar::Assets
     // Locates the assets (working directory, then next to the executable, one level up and in
     // ../share/openaow). Switches the working directory to the folder that holds "assets" when found.
     // Safe to call more than once.
-    bool init();
+    bool Init();
 
     Mode mode();
-    inline bool isBlob()
+    inline bool IsBlob()
     {
         return mode() == Mode::Blob;
     }
-    std::string describe();
+    std::string Describe();
 
-    bool exists(const std::string &path);
-    bool readBytes(const std::string &path, std::vector<uint8_t> &out);
-    bool readText(const std::string &path, std::string &out);
+    bool Exists(const std::string &path);
+    bool ReadBytes(const std::string &path, std::vector<uint8_t> &out);
+    bool ReadText(const std::string &path, std::string &out);
 
     // Regular files directly inside `dir`, sorted, as "<dir>/<name>"; `extension` is e.g. ".json" (empty = all)
-    std::vector<std::string> list(const std::string &dir, const std::string &extension = "");
+    std::vector<std::string> List(const std::string &dir, const std::string &extension = "");
 
     // Where to write `path`: unchanged in directory mode, below the per-user directory in blob mode.
     // Parent directories are created.
-    std::string writablePath(const std::string &path);
+    std::string WritablePath(const std::string &path);
 
     // A directory on disk with the contents of `dir` (for libraries that need real files, like gettext):
     // `dir` itself in directory mode, an extracted copy in the per-user cache in blob mode.
-    std::string realDirectory(const std::string &dir);
+    std::string RealDirectory(const std::string &dir);
 
     // Per-user directory for settings, saves and caches: SDL_GetPrefPath("openaow", "openaow"), i.e. below
     // ~/.local/share (Linux), %APPDATA% (Windows) or ~/Library/Application Support (macOS)
-    std::string userDataDir();
+    std::string UserDataDir();
     // Replaces that directory (tests use a temporary one); call before anything reads or writes there
-    void setUserDataDir(const std::string &dir);
+    void SetUserDataDir(const std::string &dir);
 
 } // namespace OpenArtOfWar::Assets

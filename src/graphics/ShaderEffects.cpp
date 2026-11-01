@@ -46,10 +46,10 @@ namespace OpenArtOfWar
 
     ShaderEffects::~ShaderEffects()
     {
-        shutdown();
+        Shutdown();
     }
 
-    SDL_GPUShader *ShaderEffects::createShader(const unsigned char *spv, size_t spvSize, const unsigned char *msl, size_t mslSize, int uniformBuffers)
+    SDL_GPUShader *ShaderEffects::CreateShader(const unsigned char *spv, size_t spvSize, const unsigned char *msl, size_t mslSize, int uniformBuffers)
     {
         const SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(m_device);
         SDL_GPUShaderCreateInfo info;
@@ -81,7 +81,7 @@ namespace OpenArtOfWar
         return shader;
     }
 
-    SDL_GPURenderState *ShaderEffects::createState(SDL_GPUShader *shader)
+    SDL_GPURenderState *ShaderEffects::CreateState(SDL_GPUShader *shader)
     {
         SDL_GPURenderStateCreateInfo info;
         SDL_zero(info);
@@ -92,43 +92,43 @@ namespace OpenArtOfWar
         return state;
     }
 
-    bool ShaderEffects::init(SDL_Renderer *renderer)
+    bool ShaderEffects::Init(SDL_Renderer *renderer)
     {
-        shutdown();
+        Shutdown();
         m_renderer = renderer;
         m_device = renderer ? SDL_GetGPURendererDevice(renderer) : nullptr;
         if(!m_device)
             return false; // not the SDL GPU renderer: no custom shaders
 
-        m_spriteShader = createShader(kShader_sprite_spv, kShader_sprite_spv_size, kShader_sprite_msl, kShader_sprite_msl_size, 1);
-        m_postShader = createShader(kShader_post_spv, kShader_post_spv_size, kShader_post_msl, kShader_post_msl_size, 1);
-        m_glowShader = createShader(kShader_glow_spv, kShader_glow_spv_size, kShader_glow_msl, kShader_glow_msl_size, 0);
-        m_blurShader = createShader(kShader_blur_spv, kShader_blur_spv_size, kShader_blur_msl, kShader_blur_msl_size, 1);
+        m_spriteShader = CreateShader(kShader_sprite_spv, kShader_sprite_spv_size, kShader_sprite_msl, kShader_sprite_msl_size, 1);
+        m_postShader = CreateShader(kShader_post_spv, kShader_post_spv_size, kShader_post_msl, kShader_post_msl_size, 1);
+        m_glowShader = CreateShader(kShader_glow_spv, kShader_glow_spv_size, kShader_glow_msl, kShader_glow_msl_size, 0);
+        m_blurShader = CreateShader(kShader_blur_spv, kShader_blur_spv_size, kShader_blur_msl, kShader_blur_msl_size, 1);
         if(!m_spriteShader || !m_postShader || !m_glowShader || !m_blurShader)
         {
             std::cerr << "[Effects] The GPU takes none of the built shader formats: effects off" << std::endl;
-            shutdown();
+            Shutdown();
             return false;
         }
-        m_spriteState = createState(m_spriteShader);
-        m_teamState = createState(m_spriteShader);
-        m_teamRedState = createState(m_spriteShader);
-        m_postState = createState(m_postShader);
-        m_glowState = createState(m_glowShader);
-        m_blurH = createState(m_blurShader);
-        m_blurV = createState(m_blurShader);
+        m_spriteState = CreateState(m_spriteShader);
+        m_teamState = CreateState(m_spriteShader);
+        m_teamRedState = CreateState(m_spriteShader);
+        m_postState = CreateState(m_postShader);
+        m_glowState = CreateState(m_glowShader);
+        m_blurH = CreateState(m_blurShader);
+        m_blurV = CreateState(m_blurShader);
         if(!m_spriteState || !m_teamState || !m_teamRedState || !m_postState || !m_glowState || !m_blurH || !m_blurV)
         {
-            shutdown();
+            Shutdown();
             return false;
         }
         m_available = true;
-        updateSpriteUniforms();
+        UpdateSpriteUniforms();
         std::cout << "[Effects] Shader effects ready" << std::endl;
         return true;
     }
 
-    void ShaderEffects::shutdown()
+    void ShaderEffects::Shutdown()
     {
         if(m_renderer && m_current)
             SDL_SetGPURenderState(m_renderer, nullptr);
@@ -157,18 +157,18 @@ namespace OpenArtOfWar
         m_device = nullptr;
     }
 
-    void ShaderEffects::configure(ColorGrade grade, bool glow, bool sharp)
+    void ShaderEffects::Configure(ColorGrade grade, bool glow, bool sharp)
     {
         m_grade = grade;
         m_glow = glow;
         if(m_sharp != sharp)
         {
             m_sharp = sharp;
-            updateSpriteUniforms();
+            UpdateSpriteUniforms();
         }
     }
 
-    void ShaderEffects::updateSpriteUniforms()
+    void ShaderEffects::UpdateSpriteUniforms()
     {
         if(!m_available)
             return;
@@ -180,7 +180,7 @@ namespace OpenArtOfWar
         SDL_SetGPURenderStateFragmentUniforms(m_teamRedState, 0, &p, sizeof p);
     }
 
-    void ShaderEffects::setState(SDL_GPURenderState *state)
+    void ShaderEffects::SetState(SDL_GPURenderState *state)
     {
         if(state == m_current)
             return;
@@ -188,26 +188,26 @@ namespace OpenArtOfWar
         m_current = state;
     }
 
-    void ShaderEffects::useSpriteState(int team)
+    void ShaderEffects::UseSpriteState(int team)
     {
         if(!m_available || m_locked)
             return;
         if(team == 1)
-            setState(m_teamState);
+            SetState(m_teamState);
         else if(team == 2)
-            setState(m_teamRedState);
+            SetState(m_teamRedState);
         else
-            setState(m_sharp ? m_spriteState : nullptr);
+            SetState(m_sharp ? m_spriteState : nullptr);
     }
 
-    void ShaderEffects::useDefaultState()
+    void ShaderEffects::UseDefaultState()
     {
         if(!m_available || m_locked)
             return;
-        setState(nullptr);
+        SetState(nullptr);
     }
 
-    SDL_Texture *ShaderEffects::ensureTarget(SDL_Texture *&tex, int &curW, int &curH, int w, int h, SDL_ScaleMode mode)
+    SDL_Texture *ShaderEffects::EnsureTarget(SDL_Texture *&tex, int &curW, int &curH, int w, int h, SDL_ScaleMode mode)
     {
         w = w > 1 ? w : 1;
         h = h > 1 ? h : 1;
@@ -224,19 +224,19 @@ namespace OpenArtOfWar
         return tex;
     }
 
-    SDL_Texture *ShaderEffects::sceneTarget(int w, int h)
+    SDL_Texture *ShaderEffects::SceneTarget(int w, int h)
     {
         if(!m_available)
             return nullptr;
-        return ensureTarget(m_scene, m_sceneW, m_sceneH, w, h, SDL_SCALEMODE_LINEAR);
+        return EnsureTarget(m_scene, m_sceneW, m_sceneH, w, h, SDL_SCALEMODE_LINEAR);
     }
 
-    void ShaderEffects::beginGlow(int w, int h)
+    void ShaderEffects::BeginGlow(int w, int h)
     {
-        if(!glow())
+        if(!Glow())
             return;
         const bool resized = w != m_glowW || h != m_glowH;
-        if(!ensureTarget(m_glowA, m_glowW, m_glowH, w, h, SDL_SCALEMODE_LINEAR) || !ensureTarget(m_glowB, m_glowBW, m_glowBH, w, h, SDL_SCALEMODE_LINEAR))
+        if(!EnsureTarget(m_glowA, m_glowW, m_glowH, w, h, SDL_SCALEMODE_LINEAR) || !EnsureTarget(m_glowB, m_glowBW, m_glowBH, w, h, SDL_SCALEMODE_LINEAR))
         {
             return;
         }
@@ -250,11 +250,11 @@ namespace OpenArtOfWar
         SDL_SetRenderTarget(m_renderer, m_glowA);
         SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 0);
         SDL_RenderClear(m_renderer);
-        setState(m_glowState);
+        SetState(m_glowState);
         m_locked = true;
     }
 
-    void ShaderEffects::endGlow()
+    void ShaderEffects::EndGlow()
     {
         if(!m_locked)
             return;
@@ -263,15 +263,15 @@ namespace OpenArtOfWar
         SDL_SetTextureBlendMode(m_glowA, SDL_BLENDMODE_NONE);
         SDL_SetTextureBlendMode(m_glowB, SDL_BLENDMODE_NONE);
         SDL_SetRenderTarget(m_renderer, m_glowB);
-        setState(m_blurH);
+        SetState(m_blurH);
         SDL_RenderTexture(m_renderer, m_glowA, nullptr, nullptr);
         SDL_SetRenderTarget(m_renderer, m_glowA);
-        setState(m_blurV);
+        SetState(m_blurV);
         SDL_RenderTexture(m_renderer, m_glowB, nullptr, nullptr);
-        setState(nullptr);
+        SetState(nullptr);
     }
 
-    void ShaderEffects::composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bool smoothing)
+    void ShaderEffects::Composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bool smoothing)
     {
         if(!m_available || !m_scene)
             return;
@@ -281,11 +281,11 @@ namespace OpenArtOfWar
         // Sharp upscaling needs linear samples; without it the reduced picture keeps the chosen smoothing
         SDL_SetTextureScaleMode(m_scene, (m_sharp || smoothing) ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
         SDL_SetTextureBlendMode(m_scene, SDL_BLENDMODE_NONE);
-        setState(m_postState);
+        SetState(m_postState);
         SDL_RenderTexture(m_renderer, m_scene, nullptr, &dst);
-        setState(nullptr);
+        SetState(nullptr);
 
-        if(glow() && m_glowA)
+        if(Glow() && m_glowA)
         {
             const Uint8 strength = static_cast<Uint8>(g.glow >= 1.0f ? 255 : g.glow * 255.0f);
             SDL_SetTextureBlendMode(m_glowA, SDL_BLENDMODE_ADD);

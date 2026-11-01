@@ -14,13 +14,13 @@ namespace OpenArtOfWar::DetMath
     constexpr float kHalfPi = 1.57079632679489661923f;
     constexpr float kTwoPi = 6.28318530717958647692f;
 
-    inline float hypot(float x, float y)
+    inline float Hypot(float x, float y)
     {
         return std::hypot(x, y);
     }
 
     // sin on [-pi/2, pi/2] (Taylor to x^13, error < 1e-7)
-    inline float sinReduced(float r)
+    inline float SinReduced(float r)
     {
         const float r2 = r * r;
         float p = -1.0f / 6227020800.0f;
@@ -32,7 +32,7 @@ namespace OpenArtOfWar::DetMath
         return r - r * r2 * p;
     }
 
-    inline float sin(float x)
+    inline float Sin(float x)
     {
         // To [-pi, pi]: x - k * 2pi with k = round(x / 2pi) (the 2pi split in two parts keeps it exact)
         const float k = std::floor(x * (1.0f / kTwoPi) + 0.5f);
@@ -41,16 +41,16 @@ namespace OpenArtOfWar::DetMath
             r = kPi - r;
         else if(r < -kHalfPi)
             r = -kPi - r;
-        return sinReduced(r);
+        return SinReduced(r);
     }
 
-    inline float cos(float x)
+    inline float Cos(float x)
     {
-        return sin(x + kHalfPi);
+        return Sin(x + kHalfPi);
     }
 
     // atan on [-1, 1] (minimax, error < 1e-5 rad)
-    inline float atanUnit(float z)
+    inline float AtanUnit(float z)
     {
         const float z2 = z * z;
         float p = -0.0117212f;
@@ -62,14 +62,14 @@ namespace OpenArtOfWar::DetMath
         return z * p;
     }
 
-    inline float atan2(float y, float x)
+    inline float Atan2(float y, float x)
     {
         if(x == 0.0f && y == 0.0f)
             return 0.0f;
         const float ax = x < 0.0f ? -x : x;
         const float ay = y < 0.0f ? -y : y;
         // Angle of the first octant, then mirrored into place
-        float a = ax >= ay ? atanUnit(ay / ax) : kHalfPi - atanUnit(ax / ay);
+        float a = ax >= ay ? AtanUnit(ay / ax) : kHalfPi - AtanUnit(ax / ay);
         if(x < 0.0f)
             a = kPi - a;
         return y < 0.0f ? -a : a;

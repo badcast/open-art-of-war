@@ -13,7 +13,7 @@ namespace OpenArtOfWar
 
     // Where new units of a Barracks / Factory gather: the rally point set by the player, otherwise
     // a couple of tiles in front of the exit so the doorway stays clear
-    void rallyPointOf(const Building &b, const TileMap &map, int &outTileX, int &outTileY);
+    void RallyPointOf(const Building &b, const TileMap &map, int &outTileX, int &outTileY);
 
     /**
      * @brief Player economy: credits, power balance and per-building unit production.
@@ -24,8 +24,8 @@ namespace OpenArtOfWar
         Economy();
 
         // `player`: whose economy it is (single player: the local one)
-        void reset(int startingCredits = 1000);
-        void setPlayer(PlayerId player)
+        void Reset(int startingCredits = 1000);
+        void SetPlayer(PlayerId player)
         {
             m_player = player;
         }
@@ -33,40 +33,40 @@ namespace OpenArtOfWar
         {
             return m_player;
         }
-        void update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder);
+        void Update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder);
 
-        bool canAfford(int cost) const
+        bool CanAfford(int cost) const
         {
             return m_credits >= cost;
         }
-        void addCredits(int amount)
+        void AddCredits(int amount)
         {
             m_credits += amount;
         }
-        void setCredits(int credits)
+        void SetCredits(int credits)
         {
             m_credits = credits;
         }
-        bool spendCredits(int amount);
+        bool SpendCredits(int amount);
 
         // Pays and appends a unit (by archetype) to the queue of that Barracks / Factory
-        bool queueUnit(int archetype, int cost, float buildTime, int buildingId, EntityManager &entities);
+        bool QueueUnit(int archetype, int cost, float buildTime, int buildingId, EntityManager &entities);
         // Removes the last queued unit of that archetype from the building and refunds it
-        bool cancelUnit(int archetype, int buildingId, EntityManager &entities);
+        bool CancelUnit(int archetype, int buildingId, EntityManager &entities);
 
-        int getCredits() const
+        int GetCredits() const
         {
             return m_credits;
         }
-        int getPowerProduced() const
+        int GetPowerProduced() const
         {
             return m_powerProduced;
         }
-        int getPowerConsumed() const
+        int GetPowerConsumed() const
         {
             return m_powerConsumed;
         }
-        bool hasPowerDeficit() const
+        bool HasPowerDeficit() const
         {
             return m_powerConsumed > m_powerProduced;
         }

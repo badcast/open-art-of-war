@@ -36,27 +36,27 @@ namespace OpenArtOfWar
             int w {0};
             int h {0};
 
-            bool contains(int px, int py) const
+            bool Contains(int px, int py) const
             {
                 return px >= x && px < x + w && py >= y && py < y + h;
             }
-            int right() const
+            int Right() const
             {
                 return x + w;
             }
-            int bottom() const
+            int Bottom() const
             {
                 return y + h;
             }
-            int centerX() const
+            int CenterX() const
             {
                 return x + w / 2;
             }
-            int centerY() const
+            int CenterY() const
             {
                 return y + h / 2;
             }
-            UiRect inset(int d) const
+            UiRect Inset(int d) const
             {
                 return {x + d, y + d, w - 2 * d, h - 2 * d};
             }
@@ -88,22 +88,22 @@ namespace OpenArtOfWar
 
         // Game UI colors: Faction::Resistance (rust red), Faction::Confederation (steel blue), Faction::Neutral (menus)
         // `army`: the player's own army color (the game screen wears it as its accent); nullptr keeps the faction look
-        void applyTheme(Faction faction, const SDL_Color *army = nullptr);
+        void ApplyTheme(Faction faction, const SDL_Color *army = nullptr);
         // Reads assets/characters/game_ui.yaml (themes per faction + the fixed colors) over the built-in look; false if it
         // cannot be parsed. Call before applyTheme.
-        bool loadTheme(const std::string &yamlText);
+        bool LoadTheme(const std::string &yamlText);
 
-        SDL_Color withAlpha(SDL_Color c, Uint8 a);
-        SDL_Color mix(SDL_Color a, SDL_Color b, float t);
+        SDL_Color WithAlpha(SDL_Color c, Uint8 a);
+        SDL_Color Mix(SDL_Color a, SDL_Color b, float t);
 
-        void fillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Color bottom);
-        void fillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right);
+        void FillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Color bottom);
+        void FillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right);
 
         // Flat plate with a hairline border and a soft top highlight
-        void drawPanel(Renderer &r, const UiRect &rect, SDL_Color fill = color::Panel, SDL_Color border = color::Border);
+        void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill = color::Panel, SDL_Color border = color::Border);
 
         // Full-screen dimmer + framed dialog with a title bar; returns the content area below the title
-        UiRect drawDialog(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, const std::string &title);
+        UiRect DrawDialog(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, const std::string &title);
 
         enum class ButtonStyle
         {
@@ -112,9 +112,9 @@ namespace OpenArtOfWar
             Danger,
             Ghost
         };
-        void drawButton(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &label, ButtonStyle style, bool hovered, bool enabled = true);
+        void DrawButton(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &label, ButtonStyle style, bool hovered, bool enabled = true);
 
-        void drawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor);
+        void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor);
 
         // A yes / no question over a dimmed screen (leaving a room or a game). Enter / click Yes confirms, Esc / click No cancels.
         struct ConfirmState
@@ -124,8 +124,8 @@ namespace OpenArtOfWar
             int action {0}; // what the owner asked about (his own numbering)
         };
         // Returns 1 for Yes, 0 for No, -1 while the question stays open
-        int confirmUpdate(const ConfirmState &state, int windowW, int windowH, int mx, int my, bool clicked, bool enterPressed, bool escPressed);
-        void drawConfirm(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my);
+        int ConfirmUpdate(const ConfirmState &state, int windowW, int windowH, int mx, int my, bool clicked, bool enterPressed, bool escPressed);
+        void DrawConfirm(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my);
 
         // Combo box: a field with the current value and an arrow; opened, a list of the choices drops under it (over
         // everything else, so draw it last). One combo of a screen is open at a time: ComboState says which.
@@ -138,28 +138,28 @@ namespace OpenArtOfWar
         constexpr int kComboMaxVisible = 9;
         constexpr int kComboMinListW = 150; // a narrow field (a table cell) still gets a readable list
 
-        void drawComboField(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &value, bool open, bool hovered, bool enabled = true, SDL_Color valueColor = color::Text);
+        void DrawComboField(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &value, bool open, bool hovered, bool enabled = true, SDL_Color valueColor = color::Text);
         // Where the list of `itemCount` choices of the combo at `field` goes (under it, above when there is no room)
-        UiRect comboListRect(const UiRect &field, int itemCount, int windowH);
+        UiRect ComboListRect(const UiRect &field, int itemCount, int windowH);
         // `disabled` (optional, one flag per item): choices shown dimmed that cannot be picked (the owner ignores them)
-        void drawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY, const std::vector<bool> *disabled = nullptr);
+        void DrawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY, const std::vector<bool> *disabled = nullptr);
         // Input for the open combo (call it before anything else reacts to the click): a click on a choice sets `picked`, a click
         // elsewhere closes the list; the mouse wheel scrolls it. Returns true when the input belongs to the combo.
-        bool comboUpdate(ComboState &state, const UiRect &field, int itemCount, int windowH, int mx, int my, bool clicked, int wheel, int &picked);
+        bool ComboUpdate(ComboState &state, const UiRect &field, int itemCount, int windowH, int mx, int my, bool clicked, int wheel, int &picked);
 
         // Full-screen loading screen: the game name, what is being done (`status`), a progress bar (`progress` 0..1; a negative
         // value shows a sliding bar for something of unknown length) and a turning indicator. `ticks` is SDL_GetTicks().
         // With `preview` (a map's picture, previewW x previewH) the picture takes the middle of the screen.
-        void drawLoadingScreen(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const std::string &title, const std::string &status, float progress, Uint32 ticks, SDL_Texture *preview = nullptr, int previewW = 0, int previewH = 0);
+        void DrawLoadingScreen(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const std::string &title, const std::string &status, float progress, Uint32 ticks, SDL_Texture *preview = nullptr, int previewW = 0, int previewH = 0);
 
         // Small all-caps section caption with an accent tick on the left
-        void drawCaption(BitmapFontRenderer &font, Renderer &r, int x, int y, const std::string &text, SDL_Color tick = color::Accent);
+        void DrawCaption(BitmapFontRenderer &font, Renderer &r, int x, int y, const std::string &text, SDL_Color tick = color::Accent);
 
         // Shortens text with an ellipsis so it fits maxWidth pixels
-        std::string fitText(const BitmapFontRenderer &font, const std::string &text, int scale, int maxWidth);
+        std::string FitText(const BitmapFontRenderer &font, const std::string &text, int scale, int maxWidth);
 
         // Centered dialog rectangle clamped to the window with a margin
-        UiRect centeredRect(int windowW, int windowH, int w, int h, int margin = 24);
+        UiRect CenteredRect(int windowW, int windowH, int w, int h, int margin = 24);
 
     } // namespace ui
 } // namespace OpenArtOfWar

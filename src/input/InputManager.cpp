@@ -12,13 +12,13 @@ namespace OpenArtOfWar
         std::memset(m_keysJustPressed, 0, sizeof(m_keysJustPressed));
     }
 
-    void InputManager::resetFrameEvents()
+    void InputManager::ResetFrameEvents()
     {
         // Note: Do not clear click/action events here, as simulation updates run on fixed timesteps
         // and events must persist until consumed by the update logic.
     }
 
-    void InputManager::updateKeystates()
+    void InputManager::UpdateKeystates()
     {
         if(m_keystates)
         {
@@ -26,11 +26,11 @@ namespace OpenArtOfWar
         }
     }
 
-    void InputManager::updateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles)
+    void InputManager::UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles)
     {
         float panSpeed = 650.0f * frameDeltaTime; // pixels/sec in world space
-        float curX = camera.getX();
-        float curY = camera.getY();
+        float curX = camera.GetX();
+        float curY = camera.GetY();
         if(m_keystates[SDL_SCANCODE_W] || m_keystates[SDL_SCANCODE_UP])
         {
             curY -= panSpeed;
@@ -47,18 +47,18 @@ namespace OpenArtOfWar
         {
             curX += panSpeed;
         }
-        camera.setPosition(curX, curY);
-        camera.clampToBounds(mapWidthTiles, mapHeightTiles);
+        camera.SetPosition(curX, curY);
+        camera.ClampToBounds(mapWidthTiles, mapHeightTiles);
     }
 
-    void InputManager::update(float /*deltaTime*/, Camera &camera)
+    void InputManager::Update(float /*deltaTime*/, Camera &camera)
     {
         // Update mouse world position
         float mouseX = 0.0f, mouseY = 0.0f;
         SDL_GetMouseState(&mouseX, &mouseY);
         m_mouseScreenX = static_cast<int>(mouseX);
         m_mouseScreenY = static_cast<int>(mouseY);
-        camera.screenToWorld(static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY), m_mouseWorldX, m_mouseWorldY);
+        camera.ScreenToWorld(static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY), m_mouseWorldX, m_mouseWorldY);
 
         if(m_selectionBox.active)
         {
@@ -68,10 +68,10 @@ namespace OpenArtOfWar
             m_selectionBox.currentWorldY = m_mouseWorldY;
         }
 
-        updateKeystates();
+        UpdateKeystates();
     }
 
-    bool InputManager::processEvent(const SDL_Event &event, Camera &camera)
+    bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
     {
         switch(event.type)
         {
@@ -115,10 +115,10 @@ namespace OpenArtOfWar
                     m_leftPressY = static_cast<int>(event.button.y);
                     m_leftClickScreenX = static_cast<int>(event.button.x);
                     m_leftClickScreenY = static_cast<int>(event.button.y);
-                    camera.screenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
+                    camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
 
                     // Immediate click dispatch for the UI sidebar (right of the map viewport) and the top debug bar
-                    if(static_cast<int>(event.button.x) >= camera.getViewportWidth() || static_cast<int>(event.button.y) <= 40)
+                    if(static_cast<int>(event.button.x) >= camera.GetViewportWidth() || static_cast<int>(event.button.y) <= 40)
                     {
                         m_leftClickIssued = true;
                         m_selectionBox.active = false;
@@ -141,7 +141,7 @@ namespace OpenArtOfWar
                     m_rightClickIssued = true;
                     m_rightClickScreenX = static_cast<int>(event.button.x);
                     m_rightClickScreenY = static_cast<int>(event.button.y);
-                    camera.screenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_rightClickWorldX, m_rightClickWorldY);
+                    camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_rightClickWorldX, m_rightClickWorldY);
                     m_selectionBox.active = false;
                 }
                 else if(event.button.button == SDL_BUTTON_MIDDLE)
@@ -160,12 +160,12 @@ namespace OpenArtOfWar
                     m_leftMouseDown = false;
                     if(m_selectionBox.active)
                     {
-                        if(!m_selectionBox.hasSignificantArea())
+                        if(!m_selectionBox.HasSignificantArea())
                         {
                             m_leftClickIssued = true;
                             m_leftClickScreenX = static_cast<int>(event.button.x);
                             m_leftClickScreenY = static_cast<int>(event.button.y);
-                            camera.screenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
+                            camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
                         }
                         m_selectionBox.active = false;
                     }
@@ -183,7 +183,7 @@ namespace OpenArtOfWar
                 {
                     float dx = static_cast<float>(m_lastMouseX - static_cast<int>(event.motion.x));
                     float dy = static_cast<float>(m_lastMouseY - static_cast<int>(event.motion.y));
-                    camera.pan(dx, dy);
+                    camera.Pan(dx, dy);
                     m_lastMouseX = static_cast<int>(event.motion.x);
                     m_lastMouseY = static_cast<int>(event.motion.y);
                 }
@@ -193,7 +193,7 @@ namespace OpenArtOfWar
             case SDL_EVENT_MOUSE_WHEEL:
             {
                 m_wheel += (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
-                if(m_mouseScreenX >= camera.getViewportWidth())
+                if(m_mouseScreenX >= camera.GetViewportWidth())
                 {
                     m_uiWheel += (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
                     break;
@@ -201,14 +201,14 @@ namespace OpenArtOfWar
                 if(event.wheel.y == 0.0f)
                     break;
                 float zoomDelta = (event.wheel.y > 0.0f) ? 1.15f : (1.0f / 1.15f);
-                camera.setZoom(camera.getZoom() * zoomDelta, static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY));
+                camera.SetZoom(camera.GetZoom() * zoomDelta, static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY));
                 break;
             }
         }
         return true;
     }
 
-    bool InputManager::wasRightClickIssued(float &worldX, float &worldY)
+    bool InputManager::WasRightClickIssued(float &worldX, float &worldY)
     {
         if(m_rightClickIssued)
         {
@@ -220,7 +220,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    bool InputManager::wasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
+    bool InputManager::WasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
     {
         if(m_rightClickIssued)
         {
@@ -234,7 +234,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    bool InputManager::wasLeftClickIssued(float &worldX, float &worldY)
+    bool InputManager::WasLeftClickIssued(float &worldX, float &worldY)
     {
         if(m_leftClickIssued)
         {
@@ -246,7 +246,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    bool InputManager::wasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
+    bool InputManager::WasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
     {
         if(m_leftClickIssued)
         {
@@ -267,7 +267,7 @@ namespace OpenArtOfWar
         return m_keystates[scancode] != 0;
     }
 
-    bool InputManager::isKeyJustPressed(SDL_Scancode scancode)
+    bool InputManager::IsKeyJustPressed(SDL_Scancode scancode)
     {
         if(scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
             return false;
@@ -279,10 +279,10 @@ namespace OpenArtOfWar
         return false;
     }
 
-    bool InputManager::isConfirmJustPressed()
+    bool InputManager::IsConfirmJustPressed()
     {
-        bool returnPressed = isKeyJustPressed(SDL_SCANCODE_RETURN);
-        bool spacePressed = isKeyJustPressed(SDL_SCANCODE_SPACE);
+        bool returnPressed = IsKeyJustPressed(SDL_SCANCODE_RETURN);
+        bool spacePressed = IsKeyJustPressed(SDL_SCANCODE_SPACE);
         return returnPressed || spacePressed;
     }
 

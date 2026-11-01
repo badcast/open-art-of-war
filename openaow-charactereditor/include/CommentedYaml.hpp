@@ -16,24 +16,24 @@ namespace CharEditor {
 class CommentedYaml {
 public:
     bool load(const std::filesystem::path& path, std::string& error);
-    bool save(std::string& error);
+    bool Save(std::string& error);
 
-    bool loaded() const { return m_loaded; }
-    bool dirty() const { return m_dirty; }
-    const std::filesystem::path& path() const { return m_path; }
-    const YAML::Node& root() const { return m_node; }
+    bool Loaded() const { return m_loaded; }
+    bool Dirty() const { return m_dirty; }
+    const std::filesystem::path& Path() const { return m_path; }
+    const YAML::Node& Root() const { return m_node; }
     std::string text() const;
 
     // Node at the path; an undefined node when there is none
-    YAML::Node at(const std::string& path) const;
+    YAML::Node At(const std::string& path) const;
     // The comment lines right above the key
-    std::string comment(const std::string& path) const;
+    std::string Comment(const std::string& path) const;
     // Replaces the value of a "key: value" line; valueText is YAML ("12", "true", "\"name\"", "[1, 2]").
     // False (nothing changed) when the key has no value line or the result would not parse.
-    bool set(const std::string& path, const std::string& valueText);
+    bool Set(const std::string& path, const std::string& valueText);
 
 private:
-    void index();
+    void Index();
 
     std::filesystem::path m_path;
     // Values set since the last load/save, in order: on saving they are applied again to the file as it is

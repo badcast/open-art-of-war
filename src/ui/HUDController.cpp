@@ -75,7 +75,7 @@ namespace OpenArtOfWar
         // Units the player's faction trains at Barracks (infantry) or Factory (vehicles)
         UnitCatalog unitCatalog(bool infantry)
         {
-            const bool resistance = playerFaction() == Faction::Resistance;
+            const bool resistance = PlayerFaction() == Faction::Resistance;
             if(infantry)
             {
                 return resistance ? UnitCatalog {kResistanceInfantry, static_cast<int>(std::size(kResistanceInfantry))} : UnitCatalog {kConfederationInfantry, static_cast<int>(std::size(kConfederationInfantry))};
@@ -102,9 +102,9 @@ namespace OpenArtOfWar
         const int kResistanceTabIcons[HUDController::TabCount] = {2074, 2057, 2061, 2115, -1};
         const int kConfederationTabIcons[HUDController::TabCount] = {2064, 2049, 2053, 2087, -1};
 
-        int tabIcon(int tab)
+        int TabIcon(int tab)
         {
-            return (playerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
+            return (PlayerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
         }
 
         constexpr int kCameoW = 60; // native cameo composite size
@@ -134,13 +134,13 @@ namespace OpenArtOfWar
             static constexpr int kCellH = 84;
             static constexpr int kGap = 8;
 
-            UiRect cell(int index, int scrollRow) const
+            UiRect Cell(int index, int scrollRow) const
             {
                 int col = index % kCols;
                 int row = index / kCols - scrollRow;
                 return {grid.x + col * (kCellW + kGap), grid.y + row * (kCellH + kGap), kCellW, kCellH};
             }
-            int visibleRows() const
+            int VisibleRows() const
             {
                 return std::max(1, (grid.h + kGap) / (kCellH + kGap));
             }
@@ -158,7 +158,7 @@ namespace OpenArtOfWar
             l.header = {x + pad, top + 8, innerW, 40};
             l.radar = {x + pad, top + 54, innerW, 150};
             l.menuBtn = {x + pad, top + 212, (innerW - 8) / 2, 30};
-            l.objectivesBtn = {l.menuBtn.right() + 8, top + 212, innerW - l.menuBtn.w - 8, 30};
+            l.objectivesBtn = {l.menuBtn.Right() + 8, top + 212, innerW - l.menuBtn.w - 8, 30};
 
             const int tabGap = 5;
             const int tabW = (innerW - (HUDController::TabCount - 1) * tabGap) / HUDController::TabCount;
@@ -168,7 +168,7 @@ namespace OpenArtOfWar
             }
 
             l.strip = {x + pad, top + 302, innerW, 24};
-            l.scrollDown = {l.strip.right() - 24, l.strip.y, 24, l.strip.h};
+            l.scrollDown = {l.strip.Right() - 24, l.strip.y, 24, l.strip.h};
             l.scrollUp = {l.scrollDown.x - 26, l.strip.y, 24, l.strip.h};
             l.primaryBtn = {l.strip.x + innerW / 2 - 10, l.strip.y, innerW / 2 - 44, l.strip.h};
 
@@ -188,11 +188,11 @@ namespace OpenArtOfWar
             float viewX {0.0f}; // first tile shown (zoomed radar)
             float viewY {0.0f};
 
-            float toScreenX(float tileX) const
+            float ToScreenX(float tileX) const
             {
                 return ox + (tileX - viewX) * scale;
             }
-            float toScreenY(float tileY) const
+            float ToScreenY(float tileY) const
             {
                 return oy + (tileY - viewY) * scale;
             }
@@ -228,25 +228,25 @@ namespace OpenArtOfWar
         }
 
         // "Destroy" for the player's selected structures, bottom-right in the info box
-        UiRect destroyBtn(const UiRect &info)
+        UiRect DestroyBtn(const UiRect &info)
         {
-            return {info.right() - 92, info.bottom() - 26, 84, 20};
+            return {info.Right() - 92, info.Bottom() - 26, 84, 20};
         }
 
-        std::vector<const Building *> ownSelectedBuildings(const EntityManager &entities, const std::vector<int> &selected)
+        std::vector<const Building *> OwnSelectedBuildings(const EntityManager &entities, const std::vector<int> &selected)
         {
             std::vector<const Building *> out;
             for(int id : selected)
             {
-                const Building *b = entities.getBuilding(id);
-                if(b && b->alive && b->state != ActionState::Die && b->owner == Players::local())
+                const Building *b = entities.GetBuilding(id);
+                if(b && b->alive && b->state != ActionState::Die && b->owner == Players::Local())
                     out.push_back(b);
             }
             return out;
         }
 
         // A true circle outline in screen pixels (64 segments)
-        void drawCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+        void DrawCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
         {
             constexpr int kSegments = 64;
             float px = cx + radius, py = cy;
@@ -254,49 +254,49 @@ namespace OpenArtOfWar
             {
                 const float a = 6.28318530718f * static_cast<float>(i) / kSegments;
                 const float nx = cx + radius * std::cos(a), ny = cy + radius * std::sin(a);
-                renderer.drawLineScreen(static_cast<int>(std::lround(px)), static_cast<int>(std::lround(py)), static_cast<int>(std::lround(nx)), static_cast<int>(std::lround(ny)), color);
+                renderer.DrawLineScreen(static_cast<int>(std::lround(px)), static_cast<int>(std::lround(py)), static_cast<int>(std::lround(nx)), static_cast<int>(std::lround(ny)), color);
                 px = nx;
                 py = ny;
             }
         }
         // A filled disc, one horizontal span per pixel row
-        void fillCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+        void FillCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
         {
             const int r = static_cast<int>(std::ceil(radius));
             for(int dy = -r; dy <= r; ++dy)
             {
                 const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(dy * dy)));
                 const int x0 = static_cast<int>(std::lround(cx - span)), x1 = static_cast<int>(std::lround(cx + span));
-                renderer.fillRectScreen(x0, static_cast<int>(std::lround(cy)) + dy, std::max(1, x1 - x0), 1, color);
+                renderer.FillRectScreen(x0, static_cast<int>(std::lround(cy)) + dy, std::max(1, x1 - x0), 1, color);
             }
         }
 
         // Zoom buttons in the radar's bottom-right corner
-        UiRect radarZoomInBtn(const UiRect &radar)
+        UiRect RadarZoomInBtn(const UiRect &radar)
         {
-            return {radar.right() - 22, radar.bottom() - 22, 20, 20};
+            return {radar.Right() - 22, radar.Bottom() - 22, 20, 20};
         }
-        UiRect radarZoomOutBtn(const UiRect &radar)
+        UiRect RadarZoomOutBtn(const UiRect &radar)
         {
-            return {radar.right() - 44, radar.bottom() - 22, 20, 20};
+            return {radar.Right() - 44, radar.Bottom() - 22, 20, 20};
         }
 
-        SDL_Color radarFactionColor(Faction f, bool unit);
+        SDL_Color RadarFactionColor(Faction f, bool unit);
 
         // A player's own army colour on the radar when it has one, else the classic colour of its faction
-        SDL_Color radarOwnerColor(PlayerId owner, Faction f, bool unit)
+        SDL_Color RadarOwnerColor(PlayerId owner, Faction f, bool unit)
         {
-            if(owner < kMaxPlayers && Players::isActive(owner) && Players::slot(owner).color > 0)
+            if(owner < kMaxPlayers && Players::IsActive(owner) && Players::Slot(owner).color > 0)
             {
-                SDL_Color c = armyColor(Players::slot(owner).color);
+                SDL_Color c = ArmyColor(Players::Slot(owner).color);
                 if(unit) // units a little lighter than buildings, as with the classic colours
                     c = {static_cast<Uint8>(c.r + (255 - c.r) / 3), static_cast<Uint8>(c.g + (255 - c.g) / 3), static_cast<Uint8>(c.b + (255 - c.b) / 3), 255};
                 return c;
             }
-            return radarFactionColor(f, unit);
+            return RadarFactionColor(f, unit);
         }
 
-        SDL_Color radarFactionColor(Faction f, bool unit)
+        SDL_Color RadarFactionColor(Faction f, bool unit)
         {
             switch(f)
             {
@@ -309,89 +309,89 @@ namespace OpenArtOfWar
             }
         }
 
-        std::string unitName(const UnitCameoDef &def, const EntityManager &entities)
+        std::string UnitName(const UnitCameoDef &def, const EntityManager &entities)
         {
-            const auto *cfg = entities.getUnitConfig(def.archetype);
+            const auto *cfg = entities.GetUnitConfig(def.archetype);
             return (cfg && !cfg->name.empty()) ? cfg->name : std::string(def.name);
         }
 
-        int unitCost(const UnitCameoDef &def, const EntityManager &entities)
+        int UnitCost(const UnitCameoDef &def, const EntityManager &entities)
         {
-            const auto *cfg = entities.getUnitConfig(def.archetype);
+            const auto *cfg = entities.GetUnitConfig(def.archetype);
             return cfg ? cfg->creditCost : def.cost;
         }
 
-        std::string unitDesc(const UnitCameoDef &def, const EntityManager &entities)
+        std::string UnitDesc(const UnitCameoDef &def, const EntityManager &entities)
         {
-            const auto *cfg = entities.getUnitConfig(def.archetype);
+            const auto *cfg = entities.GetUnitConfig(def.archetype);
             return (cfg && !cfg->description.empty()) ? cfg->description : std::string(def.desc);
         }
 
-        void drawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color)
+        void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color)
         {
-            int tw = font.getTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
-            UiRect tag {cell.right() - tw - 3, cell.y + 3, tw, 18};
-            r.fillRectScreen(tag.x, tag.y, tag.w, tag.h, {6, 8, 12, 215});
-            font.drawString(text, tag.centerX(), tag.centerY(), ui::FONT_SMALL_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
+            int tw = font.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
+            UiRect tag {cell.Right() - tw - 3, cell.y + 3, tw, 18};
+            r.FillRectScreen(tag.x, tag.y, tag.w, tag.h, {6, 8, 12, 215});
+            font.DrawString(text, tag.CenterX(), tag.CenterY(), ui::FONT_SMALL_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
         }
 
         // Common cameo frame: icon, bottom name band, hover/selection border
-        void drawCameo(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, int compId, const std::string &name, bool hovered, bool selected, bool locked)
+        void DrawCameo(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, int compId, const std::string &name, bool hovered, bool selected, bool locked)
         {
-            r.fillRectScreen(cell.x, cell.y, cell.w, cell.h, col::PanelSunken);
+            r.FillRectScreen(cell.x, cell.y, cell.w, cell.h, col::PanelSunken);
             if(compId >= 0)
             {
                 int iconX = cell.x + (cell.w - kCameoW * 2) / 2;
                 int iconY = cell.y + 3;
                 // The icons wear the player's army colour, like its buildings and units
-                r.setDrawOwner(Players::local());
-                r.setStructureFaction(playerFaction());
-                r.drawCompositeScreen(compId, iconX, iconY, 2.0f, playerFaction());
-                r.setStructureFaction(Faction::Neutral);
-                r.setDrawOwner(kNoPlayer);
+                r.SetDrawOwner(Players::Local());
+                r.SetStructureFaction(PlayerFaction());
+                r.DrawCompositeScreen(compId, iconX, iconY, 2.0f, PlayerFaction());
+                r.SetStructureFaction(Faction::Neutral);
+                r.SetDrawOwner(kNoPlayer);
             }
             if(locked)
             {
-                r.fillRectScreen(cell.x, cell.y, cell.w, cell.h, {10, 12, 16, 170});
+                r.FillRectScreen(cell.x, cell.y, cell.w, cell.h, {10, 12, 16, 170});
             }
-            UiRect band {cell.x, cell.bottom() - 20, cell.w, 20};
-            r.fillRectScreen(band.x, band.y, band.w, band.h, {6, 8, 12, 225});
-            font.drawString(ui::fitText(font, name, ui::FONT_SMALL_BOLD, band.w - 10), band.centerX(), band.centerY(), ui::FONT_SMALL_BOLD, locked ? col::TextMuted : (selected ? col::Accent : col::Text), false, Anchor::HCENTER | Anchor::VCENTER);
+            UiRect band {cell.x, cell.Bottom() - 20, cell.w, 20};
+            r.FillRectScreen(band.x, band.y, band.w, band.h, {6, 8, 12, 225});
+            font.DrawString(ui::FitText(font, name, ui::FONT_SMALL_BOLD, band.w - 10), band.CenterX(), band.CenterY(), ui::FONT_SMALL_BOLD, locked ? col::TextMuted : (selected ? col::Accent : col::Text), false, Anchor::HCENTER | Anchor::VCENTER);
 
             SDL_Color border = selected ? col::Accent : (hovered ? col::BorderStrong : col::Border);
-            r.drawRectScreen(cell.x, cell.y, cell.w, cell.h, border);
+            r.DrawRectScreen(cell.x, cell.y, cell.w, cell.h, border);
             if(selected)
-                r.drawRectScreen(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2, ui::withAlpha(col::Accent, 120));
+                r.DrawRectScreen(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2, ui::WithAlpha(col::Accent, 120));
         }
 
         // Progress "shutter" that uncovers the cameo from the top while an item is being produced
-        void drawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, float progress, SDL_Color tint)
+        void DrawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, float progress, SDL_Color tint)
         {
             int coverH = static_cast<int>((cell.h - 20) * (1.0f - std::clamp(progress, 0.0f, 1.0f)));
             if(coverH > 0)
-                r.fillRectScreen(cell.x + 1, cell.bottom() - 20 - coverH, cell.w - 2, coverH, {6, 8, 12, 160});
-            r.fillRectScreen(cell.x + 1, cell.bottom() - 22, static_cast<int>((cell.w - 2) * progress), 2, tint);
+                r.FillRectScreen(cell.x + 1, cell.Bottom() - 20 - coverH, cell.w - 2, coverH, {6, 8, 12, 160});
+            r.FillRectScreen(cell.x + 1, cell.Bottom() - 22, static_cast<int>((cell.w - 2) * progress), 2, tint);
             std::string pct = std::to_string(static_cast<int>(progress * 100.0f)) + "%";
-            font.drawString(pct, cell.centerX(), cell.y + (cell.h - 20) / 2, ui::FONT_H2, ui::color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
+            font.DrawString(pct, cell.CenterX(), cell.y + (cell.h - 20) / 2, ui::FONT_H2, ui::color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
         }
 
-        void drawLockBadge(Renderer &r, BitmapFontRenderer &font, const UiRect &cell)
+        void DrawLockBadge(Renderer &r, BitmapFontRenderer &font, const UiRect &cell)
         {
-            font.drawString(_("LOCK"), cell.centerX(), cell.y + (cell.h - 20) / 2, ui::FONT_SMALL_BOLD, col::Danger, true, Anchor::HCENTER | Anchor::VCENTER);
+            font.DrawString(_("LOCK"), cell.CenterX(), cell.y + (cell.h - 20) / 2, ui::FONT_SMALL_BOLD, col::Danger, true, Anchor::HCENTER | Anchor::VCENTER);
             (void) r;
         }
 
         // Crosshair glyph used as the Orders tab icon
-        void drawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
+        void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
         {
-            r.drawRectScreen(cx - size / 2, cy - size / 2, size, size, c);
-            r.fillRectScreen(cx - size / 2 - 4, cy, size + 9, 1, c);
-            r.fillRectScreen(cx, cy - size / 2 - 4, 1, size + 9, c);
+            r.DrawRectScreen(cx - size / 2, cy - size / 2, size, size, c);
+            r.FillRectScreen(cx - size / 2 - 4, cy, size + 9, 1, c);
+            r.FillRectScreen(cx, cy - size / 2 - 4, 1, size + 9, c);
         }
 
     } // namespace
 
-    int unitCameoCompId(int archetype)
+    int UnitCameoCompId(int archetype)
     {
         for(bool infantry : {true, false})
         {
@@ -414,40 +414,40 @@ namespace OpenArtOfWar
     // Simulation-side state
     // ---------------------------------------------------------------------------
 
-    void HUDController::setActiveTab(int tab)
+    void HUDController::SetActiveTab(int tab)
     {
         if(tab >= 0 && tab < TabCount)
             m_activeTab = tab;
     }
 
-    void HUDController::issue(SimCommand command)
+    void HUDController::Issue(SimCommand command)
     {
         if(command.type == CommandType::Produce || command.type == CommandType::StartResearch)
-            SoundRequests::play("production_start");
+            SoundRequests::Play("production_start");
         else if(command.type == CommandType::Stop || command.type == CommandType::HoldPosition)
-            SoundRequests::play("@hold");
+            SoundRequests::Play("@hold");
         if(!m_sim)
             return;
-        command.player = Players::local();
-        m_sim->issue(std::move(command));
+        command.player = Players::Local();
+        m_sim->Issue(std::move(command));
     }
 
-    void HUDController::update(float deltaTime, EntityManager &entities, Economy &economy, const std::vector<SimEvent> &events)
+    void HUDController::Update(float deltaTime, EntityManager &entities, Economy &economy, const std::vector<SimEvent> &events)
     {
         (void) economy;
         m_destroyArmed = std::max(0.0f, m_destroyArmed - deltaTime);
         for(const SimEvent &e : events)
         {
-            if(e.type == SimEvent::Type::ResearchCompleted && e.player == Players::local())
-                announceResearch(e.value);
+            if(e.type == SimEvent::Type::ResearchCompleted && e.player == Players::Local())
+                AnnounceResearch(e.value);
         }
 
         // Validate & auto-assign primary barracks and factory if needed
-        auto barracksList = entities.getBuildingsByType(UnitType::Barracks, Players::local());
+        auto barracksList = entities.GetBuildingsByType(UnitType::Barracks, Players::Local());
         if(m_primaryBarracksId != 0)
         {
-            const Entity *b = entities.getEntity(m_primaryBarracksId);
-            if(!b || !b->alive || b->owner != Players::local() || b->type != UnitType::Barracks)
+            const Entity *b = entities.GetEntity(m_primaryBarracksId);
+            if(!b || !b->alive || b->owner != Players::Local() || b->type != UnitType::Barracks)
             {
                 m_primaryBarracksId = 0;
             }
@@ -457,11 +457,11 @@ namespace OpenArtOfWar
             m_primaryBarracksId = barracksList[0];
         }
 
-        auto factoryList = entities.getBuildingsByType(UnitType::Factory, Players::local());
+        auto factoryList = entities.GetBuildingsByType(UnitType::Factory, Players::Local());
         if(m_primaryFactoryId != 0)
         {
-            const Entity *f = entities.getEntity(m_primaryFactoryId);
-            if(!f || !f->alive || f->owner != Players::local() || f->type != UnitType::Factory)
+            const Entity *f = entities.GetEntity(m_primaryFactoryId);
+            if(!f || !f->alive || f->owner != Players::Local() || f->type != UnitType::Factory)
             {
                 m_primaryFactoryId = 0;
             }
@@ -481,52 +481,52 @@ namespace OpenArtOfWar
         }
     }
 
-    void HUDController::announceResearch(int upgradeIndex)
+    void HUDController::AnnounceResearch(int upgradeIndex)
     {
-        SoundRequests::announce("ann_research_complete");
-        const ResearchDef &r = researchDef(playerFaction(), upgradeIndex);
+        SoundRequests::Announce("ann_research_complete");
+        const ResearchDef &r = researchDef(PlayerFaction(), upgradeIndex);
         if(r.effect == ResearchEffect::FortressFlamethrower)
         {
-            setNotification(_("FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"), 3.0f);
+            SetNotification(_("FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"), 3.0f);
         }
         else if(r.effect == ResearchEffect::BuildRadius)
         {
-            setNotification(_("HQ BUILD RADIUS INCREASED (+25%)!"), 3.0f);
+            SetNotification(_("HQ BUILD RADIUS INCREASED (+25%)!"), 3.0f);
         }
         else
         {
-            setNotification(std::string(_("RESEARCH COMPLETE: ")) + _(r.name), 3.0f);
+            SetNotification(std::string(_("RESEARCH COMPLETE: ")) + _(r.name), 3.0f);
         }
     }
 
-    void HUDController::focusBuilding(int buildingId, const EntityManager &entities)
+    void HUDController::FocusBuilding(int buildingId, const EntityManager &entities)
     {
-        const Building *b = entities.getBuilding(buildingId);
-        if(!b || b->owner != Players::local())
+        const Building *b = entities.GetBuilding(buildingId);
+        if(!b || b->owner != Players::Local())
             return;
         switch(b->type)
         {
             case UnitType::Barracks:
                 m_primaryBarracksId = b->id;
-                setActiveTab(TabInfantry);
+                SetActiveTab(TabInfantry);
                 break;
             case UnitType::Factory:
                 m_primaryFactoryId = b->id;
-                setActiveTab(TabVehicles);
+                SetActiveTab(TabVehicles);
                 break;
             case UnitType::ResearchLab:
-                setActiveTab(TabResearch);
+                SetActiveTab(TabResearch);
                 break;
             default:
-                setActiveTab(TabBuild);
+                SetActiveTab(TabBuild);
                 break;
         }
         m_buildMode = false;
     }
 
-    void HUDController::resetForMission()
+    void HUDController::ResetForMission()
     {
-        m_radarAlert.reset();
+        m_radarAlert.Reset();
         m_primaryBarracksId = 0;
         m_primaryFactoryId = 0;
         m_buildMode = false;
@@ -535,12 +535,12 @@ namespace OpenArtOfWar
         m_hudNotificationTimer = 0.0f;
     }
 
-    std::vector<int> HUDController::productionTargets(UnitType buildingType, const EntityManager &entities, const std::vector<int> &selected) const
+    std::vector<int> HUDController::ProductionTargets(UnitType buildingType, const EntityManager &entities, const std::vector<int> &selected) const
     {
         auto usable = [&](int id)
         {
-            const Building *b = entities.getBuilding(id);
-            return b && b->alive && b->state != ActionState::Die && b->owner == Players::local() && b->type == buildingType && b->buildProgress >= 1.0f;
+            const Building *b = entities.GetBuilding(id);
+            return b && b->alive && b->state != ActionState::Die && b->owner == Players::Local() && b->type == buildingType && b->buildProgress >= 1.0f;
         };
         std::vector<int> targets;
         for(int id : selected)
@@ -557,9 +557,9 @@ namespace OpenArtOfWar
         return targets;
     }
 
-    bool HUDController::orderUnit(int archetype, UnitType buildingType, EntityManager &entities, Economy &economy, const std::vector<int> &selected)
+    bool HUDController::OrderUnit(int archetype, UnitType buildingType, EntityManager &entities, Economy &economy, const std::vector<int> &selected)
     {
-        const std::vector<int> targets = productionTargets(buildingType, entities, selected);
+        const std::vector<int> targets = ProductionTargets(buildingType, entities, selected);
         if(targets.empty())
             return false;
 
@@ -567,33 +567,33 @@ namespace OpenArtOfWar
         int best = targets.front();
         for(int id : targets)
         {
-            if(entities.getBuilding(id)->productionQueue.size() < entities.getBuilding(best)->productionQueue.size())
+            if(entities.GetBuilding(id)->productionQueue.size() < entities.GetBuilding(best)->productionQueue.size())
                 best = id;
         }
-        const auto *cfg = entities.getUnitConfig(archetype);
+        const auto *cfg = entities.GetUnitConfig(archetype);
         const int cost = cfg ? cfg->creditCost : 100;
-        if(!economy.canAfford(cost))
+        if(!economy.CanAfford(cost))
         {
-            SoundRequests::announce("ann_insufficient_funds");
-            setNotification(_("INSUFFICIENT CREDITS!"));
+            SoundRequests::Announce("ann_insufficient_funds");
+            SetNotification(_("INSUFFICIENT CREDITS!"));
             return false;
         }
         SimCommand c;
         c.type = CommandType::Produce;
         c.a = archetype;
         c.b = best;
-        issue(std::move(c));
+        Issue(std::move(c));
         return true;
     }
 
-    bool HUDController::cancelUnitOrder(int archetype, UnitType buildingType, EntityManager &entities, Economy &economy, const std::vector<int> &selected)
+    bool HUDController::CancelUnitOrder(int archetype, UnitType buildingType, EntityManager &entities, Economy &economy, const std::vector<int> &selected)
     {
         // Take the order back from the building that has most of that unit queued
         int best = 0;
         int bestCount = 0;
-        for(int id : productionTargets(buildingType, entities, selected))
+        for(int id : ProductionTargets(buildingType, entities, selected))
         {
-            const Building *b = entities.getBuilding(id);
+            const Building *b = entities.GetBuilding(id);
             int n = static_cast<int>(std::count_if(b->productionQueue.begin(), b->productionQueue.end(), [&](const ProductionItem &it) { return it.archetype == archetype; }));
             if(n >= bestCount && n > 0)
             {
@@ -608,16 +608,16 @@ namespace OpenArtOfWar
         c.type = CommandType::CancelProduce;
         c.a = archetype;
         c.b = best;
-        issue(std::move(c));
+        Issue(std::move(c));
         return true;
     }
 
-    int HUDController::itemCountForTab(int tab) const
+    int HUDController::ItemCountForTab(int tab) const
     {
         switch(tab)
         {
             case TabBuild:
-                return std::min(8, static_cast<int>(EntityManager::getBlueprints().size()));
+                return std::min(8, static_cast<int>(EntityManager::GetBlueprints().size()));
             case TabInfantry:
                 return unitCatalog(true).count;
             case TabVehicles:
@@ -630,14 +630,14 @@ namespace OpenArtOfWar
         return 0;
     }
 
-    int HUDController::maxScrollRows(int tab, int gridHeight) const
+    int HUDController::MaxScrollRows(int tab, int gridHeight) const
     {
-        int rows = (itemCountForTab(tab) + SidebarLayout::kCols - 1) / SidebarLayout::kCols;
+        int rows = (ItemCountForTab(tab) + SidebarLayout::kCols - 1) / SidebarLayout::kCols;
         int visible = std::max(1, (gridHeight + SidebarLayout::kGap) / (SidebarLayout::kCellH + SidebarLayout::kGap));
         return std::max(0, rows - visible);
     }
 
-    void HUDController::activateCell(int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits)
+    void HUDController::ActivateCell(int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits)
     {
         if(cancel)
         {
@@ -645,7 +645,7 @@ namespace OpenArtOfWar
             if(tab == TabInfantry || tab == TabVehicles)
             {
                 const bool inf = (tab == TabInfantry);
-                cancelUnitOrder(unitCatalog(inf).items[index].archetype, inf ? UnitType::Barracks : UnitType::Factory, entities, economy, selectedUnits);
+                CancelUnitOrder(unitCatalog(inf).items[index].archetype, inf ? UnitType::Barracks : UnitType::Factory, entities, economy, selectedUnits);
             }
             return;
         }
@@ -653,11 +653,11 @@ namespace OpenArtOfWar
         {
             case TabBuild:
             {
-                const auto &blueprints = EntityManager::getBlueprints();
-                if(index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6 && !isRadarUnlocked(Players::local()))
+                const auto &blueprints = EntityManager::GetBlueprints();
+                if(index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6 && !IsRadarUnlocked(Players::Local()))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"));
                 }
                 else if(index < static_cast<int>(blueprints.size()))
                 {
@@ -668,71 +668,71 @@ namespace OpenArtOfWar
                 break;
             }
             case TabInfantry:
-                if(!isUnitUnlocked(Players::local(), unitCatalog(true).items[index].archetype))
+                if(!IsUnitUnlocked(Players::Local(), unitCatalog(true).items[index].archetype))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("RESEARCH REQUIRED TO TRAIN THIS UNIT!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("RESEARCH REQUIRED TO TRAIN THIS UNIT!"));
                 }
-                else if(!entities.hasBuildingType(UnitType::Barracks, Players::local()))
+                else if(!entities.HasBuildingType(UnitType::Barracks, Players::Local()))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"));
                 }
                 else
                 {
-                    orderUnit(unitCatalog(true).items[index].archetype, UnitType::Barracks, entities, economy, selectedUnits);
+                    OrderUnit(unitCatalog(true).items[index].archetype, UnitType::Barracks, entities, economy, selectedUnits);
                 }
                 break;
             case TabVehicles:
-                if(!isUnitUnlocked(Players::local(), unitCatalog(false).items[index].archetype))
+                if(!IsUnitUnlocked(Players::Local(), unitCatalog(false).items[index].archetype))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("RESEARCH REQUIRED TO BUILD THIS UNIT!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("RESEARCH REQUIRED TO BUILD THIS UNIT!"));
                 }
-                else if(!entities.hasBuildingType(UnitType::Factory, Players::local()))
+                else if(!entities.HasBuildingType(UnitType::Factory, Players::Local()))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("VEHICLE FACTORY REQUIRED FOR PRODUCTION!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("VEHICLE FACTORY REQUIRED FOR PRODUCTION!"));
                 }
                 else
                 {
-                    orderUnit(unitCatalog(false).items[index].archetype, UnitType::Factory, entities, economy, selectedUnits);
+                    OrderUnit(unitCatalog(false).items[index].archetype, UnitType::Factory, entities, economy, selectedUnits);
                 }
                 break;
             case TabResearch:
             {
-                const auto &r = researchDef(playerFaction(), index);
-                if(!hasResearchBuilding(Players::local(), entities))
+                const auto &r = researchDef(PlayerFaction(), index);
+                if(!HasResearchBuilding(Players::Local(), entities))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(playerFaction() == Faction::Confederation ? _("TECH CENTER REQUIRED FOR RESEARCH!") : _("LABORATORY REQUIRED FOR RESEARCH!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(PlayerFaction() == Faction::Confederation ? _("TECH CENTER REQUIRED FOR RESEARCH!") : _("LABORATORY REQUIRED FOR RESEARCH!"));
                 }
-                else if(isResearched(Players::local(), index))
+                else if(IsResearched(Players::Local(), index))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("THIS TECHNOLOGY IS ALREADY RESEARCHED!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("THIS TECHNOLOGY IS ALREADY RESEARCHED!"));
                 }
-                else if(!isResearchAvailable(Players::local(), index))
+                else if(!IsResearchAvailable(Players::Local(), index))
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(std::string(_("REQUIRES: ")) + _(researchDef(playerFaction(), r.needs).name));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(std::string(_("REQUIRES: ")) + _(researchDef(PlayerFaction(), r.needs).name));
                 }
-                else if(m_sim && m_sim->research(Players::local()).active >= 0)
+                else if(m_sim && m_sim->research(Players::Local()).active >= 0)
                 {
-                    SoundRequests::play("ui_error");
-                    setNotification(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
+                    SoundRequests::Play("ui_error");
+                    SetNotification(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
                 }
-                else if(economy.canAfford(r.cost))
+                else if(economy.CanAfford(r.cost))
                 {
                     SimCommand c;
                     c.type = CommandType::StartResearch;
                     c.a = index;
-                    issue(std::move(c));
+                    Issue(std::move(c));
                 }
                 else
                 {
-                    SoundRequests::announce("ann_insufficient_funds");
-                    setNotification(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
+                    SoundRequests::Announce("ann_insufficient_funds");
+                    SetNotification(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
                 }
                 break;
             }
@@ -744,7 +744,7 @@ namespace OpenArtOfWar
                         bool hasCombat = false;
                         for(int uid : selectedUnits)
                         {
-                            const Entity *e = entities.getEntity(uid);
+                            const Entity *e = entities.GetEntity(uid);
                             if(e && e->alive && !e->isBuilding)
                             {
                                 hasCombat = true;
@@ -766,7 +766,7 @@ namespace OpenArtOfWar
                         SimCommand c;
                         c.type = kTypes[index - 1];
                         c.ids.assign(selectedUnits.begin(), selectedUnits.end());
-                        issue(std::move(c));
+                        Issue(std::move(c));
                         break;
                     }
                 }
@@ -774,29 +774,29 @@ namespace OpenArtOfWar
         }
     }
 
-    void HUDController::cyclePrimaryBuilding(int tab, EntityManager &entities, Camera &camera)
+    void HUDController::CyclePrimaryBuilding(int tab, EntityManager &entities, Camera &camera)
     {
         bool infantry = (tab == TabInfantry);
-        auto list = entities.getBuildingsByType(infantry ? UnitType::Barracks : UnitType::Factory, Players::local());
+        auto list = entities.GetBuildingsByType(infantry ? UnitType::Barracks : UnitType::Factory, Players::Local());
         if(list.empty())
             return;
         int &primary = infantry ? m_primaryBarracksId : m_primaryFactoryId;
         auto it = std::find(list.begin(), list.end(), primary);
         primary = (it == list.end() || std::next(it) == list.end()) ? list.front() : *std::next(it);
-        if(const Entity *ent = entities.getEntity(primary))
+        if(const Entity *ent = entities.GetEntity(primary))
         {
-            camera.centerOn(ent->tileX * TILE_WIDTH, ent->tileY * TILE_HEIGHT);
+            camera.CenterOn(ent->tileX * TILE_WIDTH, ent->tileY * TILE_HEIGHT);
         }
     }
 
-    void HUDController::updateRadarDrag(int mx, int my, bool leftMouseDown, float frameDeltaTime, int windowW, int windowH, const TileMap &map, Camera &camera)
+    void HUDController::UpdateRadarDrag(int mx, int my, bool leftMouseDown, float frameDeltaTime, int windowW, int windowH, const TileMap &map, Camera &camera)
     {
         if(!leftMouseDown)
             m_radarDragging = false;
         if(!m_radarDragging)
             return;
         const SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset);
-        const RadarView v = radarView(l.radar, map.getWidth(), map.getHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
+        const RadarView v = radarView(l.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
         if(v.w <= 0 || v.h <= 0)
             return;
         // Outside the radar the point sticks to its edge
@@ -806,14 +806,14 @@ namespace OpenArtOfWar
         const float targetY = (v.viewY + (py - v.oy) / v.scale) * TILE_HEIGHT;
         // One radar pixel is more than a tile: easing instead of following the pixel steps keeps it fluid,
         // and the exponential form gives the same feel at any frame rate
-        const float halfW = camera.getViewportWidth() * 0.5f / camera.getZoom();
-        const float halfH = camera.getViewportHeight() * 0.5f / camera.getZoom();
-        const float curX = camera.getX() + halfW, curY = camera.getY() + halfH;
+        const float halfW = camera.GetViewportWidth() * 0.5f / camera.GetZoom();
+        const float halfH = camera.GetViewportHeight() * 0.5f / camera.GetZoom();
+        const float curX = camera.GetX() + halfW, curY = camera.GetY() + halfH;
         const float k = 1.0f - std::exp(-frameDeltaTime * kRadarFollowRate);
-        camera.centerOn(curX + (targetX - curX) * k, curY + (targetY - curY) * k);
+        camera.CenterOn(curX + (targetX - curX) * k, curY + (targetY - curY) * k);
     }
 
-    bool HUDController::handleHUDClick(
+    bool HUDController::HandleHudClick(
         int mx, int my, bool leftClicked, bool rightClicked, bool leftMouseDown, int wheelSteps, int windowW, int windowH, Economy &economy, EntityManager &entities, TileMap &map, Camera &camera, bool &outOpenMenu, bool &outOpenObjectives, std::vector<int> &selectedUnits)
     {
         if(!leftMouseDown)
@@ -821,13 +821,13 @@ namespace OpenArtOfWar
         // A radar drag owns the mouse until the button is released, also over the map (no box selection)
         if(m_radarDragging)
             return true;
-        if(!isOverSidebar(mx, windowW))
+        if(!IsOverSidebar(mx, windowW))
             return false;
 
         SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset);
 
         // Radar: wheel and the +/- buttons zoom, click or drag moves the camera
-        if(l.radar.contains(mx, my))
+        if(l.radar.Contains(mx, my))
         {
             if(wheelSteps != 0)
             {
@@ -835,45 +835,45 @@ namespace OpenArtOfWar
             }
             if(leftClicked && !m_radarDragging)
             {
-                if(radarZoomInBtn(l.radar).contains(mx, my))
+                if(RadarZoomInBtn(l.radar).Contains(mx, my))
                 {
                     m_radarZoom = std::min(kRadarMaxZoom, m_radarZoom + 1);
                     return true;
                 }
-                if(radarZoomOutBtn(l.radar).contains(mx, my))
+                if(RadarZoomOutBtn(l.radar).Contains(mx, my))
                 {
                     m_radarZoom = std::max(1, m_radarZoom - 1);
                     return true;
                 }
             }
-            const bool onButtons = radarZoomInBtn(l.radar).contains(mx, my) || radarZoomOutBtn(l.radar).contains(mx, my);
+            const bool onButtons = RadarZoomInBtn(l.radar).Contains(mx, my) || RadarZoomOutBtn(l.radar).Contains(mx, my);
             if((leftMouseDown || leftClicked) && !onButtons)
             {
                 // The click jumps there at once; holding the button goes on in updateRadarDrag, every frame
-                RadarView v = radarView(l.radar, map.getWidth(), map.getHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
+                RadarView v = radarView(l.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
                 if(v.w > 0 && v.h > 0)
                 {
                     m_radarDragging = leftMouseDown;
-                    float tx = std::clamp(v.viewX + static_cast<float>(mx - v.ox) / v.scale, 0.0f, static_cast<float>(map.getWidth()));
-                    float ty = std::clamp(v.viewY + static_cast<float>(my - v.oy) / v.scale, 0.0f, static_cast<float>(map.getHeight()));
-                    camera.centerOn(tx * TILE_WIDTH, ty * TILE_HEIGHT);
+                    float tx = std::clamp(v.viewX + static_cast<float>(mx - v.ox) / v.scale, 0.0f, static_cast<float>(map.GetWidth()));
+                    float ty = std::clamp(v.viewY + static_cast<float>(my - v.oy) / v.scale, 0.0f, static_cast<float>(map.GetHeight()));
+                    camera.CenterOn(tx * TILE_WIDTH, ty * TILE_HEIGHT);
                 }
             }
             return true;
         }
 
-        int maxScroll = maxScrollRows(m_activeTab, l.grid.h);
+        int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
         m_scrollRow[m_activeTab] = std::clamp(m_scrollRow[m_activeTab] - wheelSteps, 0, maxScroll);
 
-        if(rightClicked && l.grid.contains(mx, my))
+        if(rightClicked && l.grid.Contains(mx, my))
         {
-            int count = itemCountForTab(m_activeTab);
+            int count = ItemCountForTab(m_activeTab);
             for(int i = 0; i < count; ++i)
             {
-                UiRect c = l.cell(i, m_scrollRow[m_activeTab]);
-                if(c.contains(mx, my))
+                UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
+                if(c.Contains(mx, my))
                 {
-                    activateCell(m_activeTab, i, true, economy, entities, selectedUnits);
+                    ActivateCell(m_activeTab, i, true, economy, entities, selectedUnits);
                     break;
                 }
             }
@@ -883,9 +883,9 @@ namespace OpenArtOfWar
             return true;
 
         // Destroy the selected own structures: the first click arms the button, the second one confirms
-        if(destroyBtn(l.info).contains(mx, my))
+        if(DestroyBtn(l.info).Contains(mx, my))
         {
-            const auto own = ownSelectedBuildings(entities, selectedUnits);
+            const auto own = OwnSelectedBuildings(entities, selectedUnits);
             if(own.empty())
                 return true;
             if(m_destroyArmed <= 0.0f)
@@ -900,52 +900,52 @@ namespace OpenArtOfWar
                 c.ids.push_back(static_cast<uint32_t>(b->id));
             // They are gone on the tick the command runs: out of the selection already
             selectedUnits.erase(std::remove_if(selectedUnits.begin(), selectedUnits.end(), [&](int id) { return std::find(c.ids.begin(), c.ids.end(), static_cast<uint32_t>(id)) != c.ids.end(); }), selectedUnits.end());
-            issue(std::move(c));
+            Issue(std::move(c));
             return true;
         }
 
-        if(l.menuBtn.contains(mx, my))
+        if(l.menuBtn.Contains(mx, my))
         {
             outOpenMenu = true;
             return true;
         }
-        if(l.objectivesBtn.contains(mx, my))
+        if(l.objectivesBtn.Contains(mx, my))
         {
             outOpenObjectives = true;
             return true;
         }
         for(int t = 0; t < TabCount; ++t)
         {
-            if(l.tabs[t].contains(mx, my))
+            if(l.tabs[t].Contains(mx, my))
             {
                 m_activeTab = t;
                 return true;
             }
         }
-        if(maxScroll > 0 && l.scrollUp.contains(mx, my))
+        if(maxScroll > 0 && l.scrollUp.Contains(mx, my))
         {
             m_scrollRow[m_activeTab] = std::max(0, m_scrollRow[m_activeTab] - 1);
             return true;
         }
-        if(maxScroll > 0 && l.scrollDown.contains(mx, my))
+        if(maxScroll > 0 && l.scrollDown.Contains(mx, my))
         {
             m_scrollRow[m_activeTab] = std::min(maxScroll, m_scrollRow[m_activeTab] + 1);
             return true;
         }
-        if((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && l.primaryBtn.contains(mx, my))
+        if((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && l.primaryBtn.Contains(mx, my))
         {
-            cyclePrimaryBuilding(m_activeTab, entities, camera);
+            CyclePrimaryBuilding(m_activeTab, entities, camera);
             return true;
         }
-        if(l.grid.contains(mx, my))
+        if(l.grid.Contains(mx, my))
         {
-            int count = itemCountForTab(m_activeTab);
+            int count = ItemCountForTab(m_activeTab);
             for(int i = 0; i < count; ++i)
             {
-                UiRect c = l.cell(i, m_scrollRow[m_activeTab]);
-                if(c.contains(mx, my) && c.y >= l.grid.y && c.bottom() <= l.grid.bottom() + SidebarLayout::kGap)
+                UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
+                if(c.Contains(mx, my) && c.y >= l.grid.y && c.Bottom() <= l.grid.Bottom() + SidebarLayout::kGap)
                 {
-                    activateCell(m_activeTab, i, false, economy, entities, selectedUnits);
+                    ActivateCell(m_activeTab, i, false, economy, entities, selectedUnits);
                     break;
                 }
             }
@@ -957,48 +957,48 @@ namespace OpenArtOfWar
     // Rendering
     // ---------------------------------------------------------------------------
 
-    void HUDController::renderGameHUD(Renderer &renderer, BitmapFontRenderer &fontRenderer, const Economy &economy, const EntityManager &entities, const TileMap &map, const Camera &camera, int mx, int my, int windowW, int windowH, const std::vector<int> &selected)
+    void HUDController::RenderGameHud(Renderer &renderer, BitmapFontRenderer &fontRenderer, const Economy &economy, const EntityManager &entities, const TileMap &map, const Camera &camera, int mx, int my, int windowW, int windowH, const std::vector<int> &selected)
     {
         SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset);
 
         // Frame
-        ui::fillVerticalGradient(renderer, l.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
-        renderer.fillRectScreen(l.panel.x, 0, 1, windowH, col::BorderStrong);
-        renderer.fillRectScreen(l.panel.x + 1, 0, 1, windowH, {0, 0, 0, 120});
+        ui::FillVerticalGradient(renderer, l.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
+        renderer.FillRectScreen(l.panel.x, 0, 1, windowH, col::BorderStrong);
+        renderer.FillRectScreen(l.panel.x + 1, 0, 1, windowH, {0, 0, 0, 120});
 
         // --- Header: credits & power ---------------------------------------------------------
         {
             const UiRect &h = l.header;
-            std::string credits = "$ " + std::to_string(economy.getCredits());
-            fontRenderer.drawString(credits, h.x, h.y - 2, ui::FONT_H2, col::Accent, true);
+            std::string credits = "$ " + std::to_string(economy.GetCredits());
+            fontRenderer.DrawString(credits, h.x, h.y - 2, ui::FONT_H2, col::Accent, true);
 
-            int prod = economy.getPowerProduced();
-            int cons = economy.getPowerConsumed();
-            bool deficit = economy.hasPowerDeficit();
+            int prod = economy.GetPowerProduced();
+            int cons = economy.GetPowerConsumed();
+            bool deficit = economy.HasPowerDeficit();
             SDL_Color pCol = deficit ? col::Danger : col::Ok;
             std::string pwr = std::to_string(cons) + " / " + std::to_string(prod) + _(" kW");
-            fontRenderer.drawString(pwr, h.right(), h.y + 2, ui::FONT_SMALL_BOLD, pCol, false, Anchor::RIGHT | Anchor::TOP);
+            fontRenderer.DrawString(pwr, h.Right(), h.y + 2, ui::FONT_SMALL_BOLD, pCol, false, Anchor::RIGHT | Anchor::TOP);
             // The lightning of the game next to the kW figures; it blinks while the power is short
-            if(!deficit || powerIconBlinkOn())
+            if(!deficit || PowerIconBlinkOn())
             {
-                const int textW = fontRenderer.getTextWidth(pwr, ui::FONT_SMALL_BOLD);
-                renderer.drawRawSpriteScreen(kPowerIconSprite, h.right() - textW - 27, h.y, 1.0f);
+                const int textW = fontRenderer.GetTextWidth(pwr, ui::FONT_SMALL_BOLD);
+                renderer.DrawRawSpriteScreen(kPowerIconSprite, h.Right() - textW - 27, h.y, 1.0f);
             }
-            fontRenderer.drawString(_("POWER"), h.right(), h.y + 17, ui::FONT_SMALL, col::TextMuted, false, Anchor::RIGHT | Anchor::TOP);
+            fontRenderer.DrawString(_("POWER"), h.Right(), h.y + 17, ui::FONT_SMALL, col::TextMuted, false, Anchor::RIGHT | Anchor::TOP);
 
             float ratio = static_cast<float>(cons) / static_cast<float>(std::max(1, prod));
-            ui::drawProgressBar(renderer, {h.x, h.bottom() - 6, h.w, 6}, ratio, pCol);
+            ui::DrawProgressBar(renderer, {h.x, h.Bottom() - 6, h.w, 6}, ratio, pCol);
         }
 
         // --- Radar -----------------------------------------------------------------------------
         {
             const UiRect &rd = l.radar;
-            renderer.fillRectScreen(rd.x, rd.y, rd.w, rd.h, {6, 12, 10, 255});
-            const int mapW = map.getWidth();
-            const int mapH = map.getHeight();
+            renderer.FillRectScreen(rd.x, rd.y, rd.w, rd.h, {6, 12, 10, 255});
+            const int mapW = map.GetWidth();
+            const int mapH = map.GetHeight();
             // A zoomed radar follows the camera, except while the player drags on it (that moves the camera)
-            const float camCenterX = (camera.getX() + camera.getViewportWidth() * 0.5f / camera.getZoom()) / TILE_WIDTH;
-            const float camCenterY = (camera.getY() + camera.getViewportHeight() * 0.5f / camera.getZoom()) / TILE_HEIGHT;
+            const float camCenterX = (camera.GetX() + camera.GetViewportWidth() * 0.5f / camera.GetZoom()) / TILE_WIDTH;
+            const float camCenterY = (camera.GetY() + camera.GetViewportHeight() * 0.5f / camera.GetZoom()) / TILE_HEIGHT;
             if(!m_radarDragging || m_radarCenterX < 0.0f)
             {
                 m_radarCenterX = camCenterX;
@@ -1007,9 +1007,9 @@ namespace OpenArtOfWar
             RadarView v = radarView(rd, mapW, mapH, m_radarZoom, m_radarCenterX, m_radarCenterY);
             if(v.w > 0 && v.h > 0)
             {
-                renderer.setClipRect({v.ox, v.oy, v.w, v.h});
-                renderer.fillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
-                const bool fog = m_radarFog && map.isFogEnabled();
+                renderer.SetClipRect({v.ox, v.oy, v.w, v.h});
+                renderer.FillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
+                const bool fog = m_radarFog && map.IsFogEnabled();
                 const int tx0 = std::max(0, static_cast<int>(v.viewX));
                 const int ty0 = std::max(0, static_cast<int>(v.viewY));
                 const int tx1 = std::min(mapW, static_cast<int>(std::ceil(v.viewX + v.w / v.scale)) + 1);
@@ -1017,10 +1017,10 @@ namespace OpenArtOfWar
                 // Cells from rounded edges: neighbours meet exactly, nothing shimmers as the view moves
                 auto cellRect = [&](float x, float y, float w, float h, int &px, int &py, int &pw, int &ph)
                 {
-                    px = static_cast<int>(std::lround(v.toScreenX(x)));
-                    py = static_cast<int>(std::lround(v.toScreenY(y)));
-                    pw = std::max(1, static_cast<int>(std::lround(v.toScreenX(x + w))) - px);
-                    ph = std::max(1, static_cast<int>(std::lround(v.toScreenY(y + h))) - py);
+                    px = static_cast<int>(std::lround(v.ToScreenX(x)));
+                    py = static_cast<int>(std::lround(v.ToScreenY(y)));
+                    pw = std::max(1, static_cast<int>(std::lround(v.ToScreenX(x + w))) - px);
+                    ph = std::max(1, static_cast<int>(std::lround(v.ToScreenY(y + h))) - py);
                 };
                 const SDL_Color hiddenCol {4, 6, 8, 255};
                 for(int ty = ty0; ty < ty1; ++ty)
@@ -1029,19 +1029,19 @@ namespace OpenArtOfWar
                     {
                         int px, py, pw, ph;
                         cellRect(static_cast<float>(tx), static_cast<float>(ty), 1.0f, 1.0f, px, py, pw, ph);
-                        const FogState fs = fog ? map.getFogState(tx, ty) : FogState::Visible;
+                        const FogState fs = fog ? map.GetFogState(tx, ty) : FogState::Visible;
                         if(fs == FogState::Hidden)
                         {
-                            renderer.fillRectScreen(px, py, pw, ph, hiddenCol);
+                            renderer.FillRectScreen(px, py, pw, ph, hiddenCol);
                             continue;
                         }
-                        if(map.getWall(tx, ty) > 0)
+                        if(map.GetWall(tx, ty) > 0)
                         {
-                            renderer.fillRectScreen(px, py, pw, ph, radarOwnerColor(map.getWallOwner(tx, ty), map.getWallFaction(tx, ty), false));
+                            renderer.FillRectScreen(px, py, pw, ph, RadarOwnerColor(map.GetWallOwner(tx, ty), map.GetWallFaction(tx, ty), false));
                         }
-                        else if(!map.isPassable(tx, ty))
+                        else if(!map.IsPassable(tx, ty))
                         {
-                            renderer.fillRectScreen(px, py, pw, ph, {30, 54, 40, 255});
+                            renderer.FillRectScreen(px, py, pw, ph, {30, 54, 40, 255});
                         }
                     }
                 }
@@ -1049,21 +1049,21 @@ namespace OpenArtOfWar
                 // First enemy drawn on the radar this frame: the radar alarm's contact point
                 bool enemyOnRadar = false;
                 float contactX = 0.0f, contactY = 0.0f;
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
                     if(!e.alive || e.state == ActionState::Die)
                         continue;
-                    const bool own = (e.owner == Players::local());
-                    const Building *b = e.asBuilding();
+                    const bool own = (e.owner == Players::Local());
+                    const Building *b = e.AsBuilding();
                     if(fog && !own)
                     {
                         if(b)
                         {
                             // Enemy structures appear once they have been seen (never while they are being built out of sight)
-                            if(!entities.isHostileBuildingShown(*b, map))
+                            if(!entities.IsHostileBuildingShown(*b, map))
                                 continue;
                         }
-                        else if(!entities.isEntityVisibleToPlayer(e, Players::local(), map))
+                        else if(!entities.IsEntityVisibleToPlayer(e, Players::Local(), map))
                         {
                             continue; // units only while in sight
                         }
@@ -1072,19 +1072,19 @@ namespace OpenArtOfWar
                     if(b)
                     {
                         cellRect(static_cast<float>(b->tileX), static_cast<float>(b->tileY), static_cast<float>(b->buildWidth), static_cast<float>(b->buildHeight), px, py, pw, ph);
-                        renderer.fillRectScreen(px, py, std::max(3, pw), std::max(3, ph), radarOwnerColor(e.owner, e.faction, false));
+                        renderer.FillRectScreen(px, py, std::max(3, pw), std::max(3, ph), RadarOwnerColor(e.owner, e.faction, false));
                     }
                     else
                     {
-                        cellRect(e.getUnitCenterPixelX() / TILE_WIDTH - 0.5f, e.getUnitCenterPixelY() / TILE_HEIGHT - 0.5f, 1.0f, 1.0f, px, py, pw, ph);
+                        cellRect(e.GetUnitCenterPixelX() / TILE_WIDTH - 0.5f, e.GetUnitCenterPixelY() / TILE_HEIGHT - 0.5f, 1.0f, 1.0f, px, py, pw, ph);
                         const int s = std::max(2, std::min(pw, ph));
-                        renderer.fillRectScreen(px + (pw - s) / 2, py + (ph - s) / 2, s, s, radarOwnerColor(e.owner, e.faction, true));
+                        renderer.FillRectScreen(px + (pw - s) / 2, py + (ph - s) / 2, s, s, RadarOwnerColor(e.owner, e.faction, true));
                     }
-                    if(!enemyOnRadar && !own && e.faction != Faction::Neutral && Players::hostile(e.owner, Players::local()) && (!b || m_radarAlert.config.includeBuildings))
+                    if(!enemyOnRadar && !own && e.faction != Faction::Neutral && Players::Hostile(e.owner, Players::Local()) && (!b || m_radarAlert.config.includeBuildings))
                     {
                         enemyOnRadar = true;
-                        contactX = e.getUnitCenterPixelX() / TILE_WIDTH;
-                        contactY = e.getUnitCenterPixelY() / TILE_HEIGHT;
+                        contactX = e.GetUnitCenterPixelX() / TILE_WIDTH;
+                        contactY = e.GetUnitCenterPixelY() / TILE_HEIGHT;
                         if(b)
                         {
                             contactX = b->tileX + b->buildWidth * 0.5f;
@@ -1095,152 +1095,152 @@ namespace OpenArtOfWar
 
                 // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
                 const uint64_t nowMs = SDL_GetTicks();
-                m_radarAlert.update(nowMs, enemyOnRadar, contactX, contactY);
-                if(m_radarAlert.active())
+                m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
+                if(m_radarAlert.Active())
                 {
                     const RadarAlertConfig &ac = m_radarAlert.config;
-                    const float cx = v.toScreenX(m_radarAlert.tileX());
-                    const float cy = v.toScreenY(m_radarAlert.tileY());
+                    const float cx = v.ToScreenX(m_radarAlert.TileX());
+                    const float cy = v.ToScreenY(m_radarAlert.TileY());
                     for(int i = 0; i < ac.waveCount; ++i)
                     {
                         float radius = 0.0f, opacity = 0.0f;
-                        if(!m_radarAlert.wave(i, nowMs, radius, opacity))
+                        if(!m_radarAlert.Wave(i, nowMs, radius, opacity))
                             continue;
                         SDL_Color wc = ac.color;
                         wc.a = static_cast<Uint8>(ac.color.a * opacity);
                         for(int k = 0; k < ac.waveThicknessPx; ++k)
-                            drawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
+                            DrawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
                     }
-                    if(m_radarAlert.blinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
-                        fillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
+                    if(m_radarAlert.BlinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
+                        FillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
                 }
 
                 // Camera frame from rounded edges (truncating position and size separately made it wobble)
-                const float camWorldW = camera.getViewportWidth() / camera.getZoom();
-                const float camWorldH = camera.getViewportHeight() / camera.getZoom();
+                const float camWorldW = camera.GetViewportWidth() / camera.GetZoom();
+                const float camWorldH = camera.GetViewportHeight() / camera.GetZoom();
                 int fx, fy, fw, fh;
-                cellRect(camera.getX() / TILE_WIDTH, camera.getY() / TILE_HEIGHT, camWorldW / TILE_WIDTH, camWorldH / TILE_HEIGHT, fx, fy, fw, fh);
-                renderer.drawRectScreen(fx, fy, std::max(6, fw), std::max(4, fh), {255, 255, 255, 220});
-                renderer.resetClipRect();
+                cellRect(camera.GetX() / TILE_WIDTH, camera.GetY() / TILE_HEIGHT, camWorldW / TILE_WIDTH, camWorldH / TILE_HEIGHT, fx, fy, fw, fh);
+                renderer.DrawRectScreen(fx, fy, std::max(6, fw), std::max(4, fh), {255, 255, 255, 220});
+                renderer.ResetClipRect();
             }
-            renderer.drawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
+            renderer.DrawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
 
             // Radar alarm: the radar's sides flash red, the band fading inward
-            if(m_radarAlert.blinkOn(SDL_GetTicks()))
+            if(m_radarAlert.BlinkOn(SDL_GetTicks()))
             {
                 const RadarAlertConfig &ac = m_radarAlert.config;
                 for(int k = 0; k < ac.edgeWidthPx; ++k)
                 {
                     SDL_Color ec = ac.color;
                     ec.a = static_cast<Uint8>(ac.edgeAlpha * (ac.edgeWidthPx - k) / ac.edgeWidthPx);
-                    renderer.drawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
+                    renderer.DrawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
                 }
             }
 
             // Zoom buttons
-            const UiRect zoomBtns[2] = {radarZoomOutBtn(rd), radarZoomInBtn(rd)};
+            const UiRect zoomBtns[2] = {RadarZoomOutBtn(rd), RadarZoomInBtn(rd)};
             for(int k = 0; k < 2; ++k)
             {
                 const UiRect &b = zoomBtns[k];
                 const bool enabled = (k == 0) ? m_radarZoom > 1 : m_radarZoom < kRadarMaxZoom;
-                const bool hot = enabled && b.contains(mx, my);
+                const bool hot = enabled && b.Contains(mx, my);
                 if(hot)
-                    SoundRequests::markHover();
-                renderer.fillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
-                renderer.drawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
+                    SoundRequests::MarkHover();
+                renderer.FillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
+                renderer.DrawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
                 const SDL_Color sc = enabled ? col::Text : col::TextMuted;
-                renderer.fillRectScreen(b.x + 5, b.centerY() - 1, b.w - 10, 2, sc);
+                renderer.FillRectScreen(b.x + 5, b.CenterY() - 1, b.w - 10, 2, sc);
                 if(k == 1)
-                    renderer.fillRectScreen(b.centerX() - 1, b.y + 5, 2, b.h - 10, sc);
+                    renderer.FillRectScreen(b.CenterX() - 1, b.y + 5, 2, b.h - 10, sc);
             }
             if(m_radarZoom > 1)
             {
-                fontRenderer.drawString("x" + std::to_string(m_radarZoom), rd.x + 6, rd.bottom() - 12, ui::FONT_SMALL_BOLD, col::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
+                fontRenderer.DrawString("x" + std::to_string(m_radarZoom), rd.x + 6, rd.Bottom() - 12, ui::FONT_SMALL_BOLD, col::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
             }
         }
 
         // --- Menu / objectives -------------------------------------------------------------------
-        ui::drawButton(renderer, fontRenderer, l.menuBtn, _("MENU"), ui::ButtonStyle::Secondary, l.menuBtn.contains(mx, my));
-        ui::drawButton(renderer, fontRenderer, l.objectivesBtn, _("OBJECTIVES"), ui::ButtonStyle::Secondary, l.objectivesBtn.contains(mx, my));
+        ui::DrawButton(renderer, fontRenderer, l.menuBtn, _("MENU"), ui::ButtonStyle::Secondary, l.menuBtn.Contains(mx, my));
+        ui::DrawButton(renderer, fontRenderer, l.objectivesBtn, _("OBJECTIVES"), ui::ButtonStyle::Secondary, l.objectivesBtn.Contains(mx, my));
 
         // --- Tabs ----------------------------------------------------------------------------------
         for(int t = 0; t < TabCount; ++t)
         {
             const UiRect &tr = l.tabs[t];
             bool active = (t == m_activeTab);
-            bool hovered = tr.contains(mx, my);
+            bool hovered = tr.Contains(mx, my);
             if(hovered)
-                SoundRequests::markHover();
-            renderer.fillRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-            renderer.drawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
+                SoundRequests::MarkHover();
+            renderer.FillRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
+            renderer.DrawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
             if(active)
-                renderer.fillRectScreen(tr.x, tr.bottom() - 3, tr.w, 3, col::Accent);
+                renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
 
-            if(tabIcon(t) >= 0)
+            if(TabIcon(t) >= 0)
             {
-                renderer.setClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
+                renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
                 float s = 0.75f;
                 int iw = static_cast<int>(kCameoW * s);
-                renderer.setDrawOwner(Players::local());
-                renderer.setStructureFaction(playerFaction());
-                renderer.drawCompositeScreen(tabIcon(t), tr.centerX() - iw / 2, tr.y + 6, s, playerFaction());
-                renderer.setStructureFaction(Faction::Neutral);
-                renderer.setDrawOwner(kNoPlayer);
-                renderer.resetClipRect();
+                renderer.SetDrawOwner(Players::Local());
+                renderer.SetStructureFaction(PlayerFaction());
+                renderer.DrawCompositeScreen(TabIcon(t), tr.CenterX() - iw / 2, tr.y + 6, s, PlayerFaction());
+                renderer.SetStructureFaction(Faction::Neutral);
+                renderer.SetDrawOwner(kNoPlayer);
+                renderer.ResetClipRect();
                 if(!active)
-                    renderer.fillRectScreen(tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
+                    renderer.FillRectScreen(tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
             }
             else
             {
-                drawCrosshair(renderer, tr.centerX(), tr.centerY() - 1, 16, active ? col::Accent : col::TextDim);
+                DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
             }
         }
 
         // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
-        int maxScroll = maxScrollRows(m_activeTab, l.grid.h);
+        int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
         int &scroll = m_scrollRow[m_activeTab];
         scroll = std::clamp(scroll, 0, maxScroll);
         {
-            ui::drawCaption(fontRenderer, renderer, l.strip.x, l.strip.y + 4, _(kTabNames[m_activeTab]));
+            ui::DrawCaption(fontRenderer, renderer, l.strip.x, l.strip.y + 4, _(kTabNames[m_activeTab]));
 
             if(m_activeTab == TabInfantry || m_activeTab == TabVehicles)
             {
                 bool inf = (m_activeTab == TabInfantry);
                 int primary = inf ? m_primaryBarracksId : m_primaryFactoryId;
-                auto list = entities.getBuildingsByType(inf ? UnitType::Barracks : UnitType::Factory, Players::local());
+                auto list = entities.GetBuildingsByType(inf ? UnitType::Barracks : UnitType::Factory, Players::Local());
                 if(!list.empty())
                 {
                     std::string label = std::string(inf ? _("Barracks") : _("Factory")) + " #" + std::to_string(primary);
                     if(list.size() > 1)
                         label += "  \xE2\x80\xBA";
-                    bool hot = list.size() > 1 && l.primaryBtn.contains(mx, my);
-                    fontRenderer.drawString(ui::fitText(fontRenderer, label, ui::FONT_SMALL, l.primaryBtn.w), l.primaryBtn.right(), l.primaryBtn.centerY(), ui::FONT_SMALL, hot ? col::Accent : col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
+                    bool hot = list.size() > 1 && l.primaryBtn.Contains(mx, my);
+                    fontRenderer.DrawString(ui::FitText(fontRenderer, label, ui::FONT_SMALL, l.primaryBtn.w), l.primaryBtn.Right(), l.primaryBtn.CenterY(), ui::FONT_SMALL, hot ? col::Accent : col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
                 }
             }
             else if(m_activeTab == TabOrders)
             {
                 int selected = 0;
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
                     if(e.alive && e.selected && !e.isBuilding)
                         ++selected;
                 }
                 std::string label = std::string(_("Selected")) + ": " + std::to_string(selected);
-                fontRenderer.drawString(label, l.primaryBtn.right(), l.primaryBtn.centerY(), ui::FONT_SMALL, col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
+                fontRenderer.DrawString(label, l.primaryBtn.Right(), l.primaryBtn.CenterY(), ui::FONT_SMALL, col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
             }
 
             if(maxScroll > 0)
             {
                 auto arrow = [&](const UiRect &r, bool up, bool enabled)
                 {
-                    bool hot = enabled && r.contains(mx, my);
-                    renderer.fillRectScreen(r.x, r.y, r.w, r.h, hot ? col::Hover : col::PanelRaised);
-                    renderer.drawRectScreen(r.x, r.y, r.w, r.h, hot ? col::BorderStrong : col::Border);
+                    bool hot = enabled && r.Contains(mx, my);
+                    renderer.FillRectScreen(r.x, r.y, r.w, r.h, hot ? col::Hover : col::PanelRaised);
+                    renderer.DrawRectScreen(r.x, r.y, r.w, r.h, hot ? col::BorderStrong : col::Border);
                     SDL_Color c = enabled ? (hot ? col::Accent : col::Text) : col::TextMuted;
                     for(int i = 0; i < 5; ++i)
                     {
-                        int yy = up ? (r.centerY() - 2 + i) : (r.centerY() + 2 - i);
-                        renderer.fillRectScreen(r.centerX() - i, yy, 2 * i + 1, 1, c);
+                        int yy = up ? (r.CenterY() - 2 + i) : (r.CenterY() + 2 - i);
+                        renderer.FillRectScreen(r.CenterX() - i, yy, 2 * i + 1, 1, c);
                     }
                 };
                 arrow(l.scrollUp, true, scroll > 0);
@@ -1251,43 +1251,43 @@ namespace OpenArtOfWar
         // --- Cameo grid -----------------------------------------------------------------------------------
         std::string hoverTitle;
         std::string hoverText;
-        bool hasBarracks = entities.hasBuildingType(UnitType::Barracks, Players::local());
-        bool hasFactory = entities.hasBuildingType(UnitType::Factory, Players::local());
-        bool hasLab = hasResearchBuilding(Players::local(), entities);
+        bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
+        bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
+        bool hasLab = HasResearchBuilding(Players::Local(), entities);
         // Orders shown on unit cards come from the buildings that would train them
         auto queuedAt = [&](UnitType buildingType)
         {
             std::vector<const Building *> out;
-            for(int id : productionTargets(buildingType, entities, selected))
-                out.push_back(entities.getBuilding(id));
+            for(int id : ProductionTargets(buildingType, entities, selected))
+                out.push_back(entities.GetBuilding(id));
             return out;
         };
         const std::vector<const Building *> barracksTargets = queuedAt(UnitType::Barracks);
         const std::vector<const Building *> factoryTargets = queuedAt(UnitType::Factory);
 
-        renderer.setClipRect({l.grid.x, l.grid.y, l.grid.w, l.grid.h});
-        int count = itemCountForTab(m_activeTab);
+        renderer.SetClipRect({l.grid.x, l.grid.y, l.grid.w, l.grid.h});
+        int count = ItemCountForTab(m_activeTab);
         for(int i = 0; i < count; ++i)
         {
-            UiRect c = l.cell(i, scroll);
-            if(c.bottom() < l.grid.y || c.y > l.grid.bottom())
+            UiRect c = l.Cell(i, scroll);
+            if(c.Bottom() < l.grid.y || c.y > l.grid.Bottom())
                 continue;
-            bool hovered = c.contains(mx, my) && l.grid.contains(mx, my);
+            bool hovered = c.Contains(mx, my) && l.grid.Contains(mx, my);
             if(hovered)
-                SoundRequests::markHover();
+                SoundRequests::MarkHover();
 
             switch(m_activeTab)
             {
                 case TabBuild:
                 {
-                    const auto &bp = EntityManager::getBlueprints()[i];
+                    const auto &bp = EntityManager::GetBlueprints()[i];
                     bool selected = (m_buildMode && m_selectedBlueprint == i);
-                    bool canAfford = economy.canAfford(bp.creditCost);
-                    const bool radarLocked = bp.buildingIndex == 6 && !isRadarUnlocked(Players::local());
-                    drawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected, radarLocked);
-                    drawCostTag(renderer, fontRenderer, c, "$" + std::to_string(bp.creditCost), canAfford ? col::Accent : col::Danger);
+                    bool canAfford = economy.CanAfford(bp.creditCost);
+                    const bool radarLocked = bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local());
+                    DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected, radarLocked);
+                    DrawCostTag(renderer, fontRenderer, c, "$" + std::to_string(bp.creditCost), canAfford ? col::Accent : col::Danger);
                     std::string pw = (bp.powerCost >= 0 ? "+" : "") + std::to_string(bp.powerCost);
-                    fontRenderer.drawString(pw, c.x + 6, c.y + 5, ui::FONT_SMALL_BOLD, bp.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255}, true);
+                    fontRenderer.DrawString(pw, c.x + 6, c.y + 5, ui::FONT_SMALL_BOLD, bp.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255}, true);
                     if(hovered)
                     {
                         hoverTitle = std::string(_(bp.name)) + "  $" + std::to_string(bp.creditCost) + ", " + pw + _(" kW");
@@ -1301,11 +1301,11 @@ namespace OpenArtOfWar
                     bool inf = (m_activeTab == TabInfantry);
                     const UnitCameoDef &def = unitCatalog(inf).items[i];
                     const auto &producers = inf ? barracksTargets : factoryTargets;
-                    const bool unlocked = isUnitUnlocked(Players::local(), def.archetype);
+                    const bool unlocked = IsUnitUnlocked(Players::Local(), def.archetype);
                     bool available = (inf ? hasBarracks : hasFactory) && unlocked;
-                    int cost = unitCost(def, entities);
-                    std::string name = _(unitName(def, entities));
-                    drawCameo(renderer, fontRenderer, c, def.compId, name, hovered, false, !available);
+                    int cost = UnitCost(def, entities);
+                    std::string name = _(UnitName(def, entities));
+                    DrawCameo(renderer, fontRenderer, c, def.compId, name, hovered, false, !available);
 
                     int queued = 0;
                     float progress = -1.0f; // most advanced order of this unit currently in training
@@ -1318,25 +1318,25 @@ namespace OpenArtOfWar
                         }
                         if(!b->productionQueue.empty() && b->productionQueue.front().archetype == def.archetype)
                         {
-                            progress = std::max(progress, b->currentProductionProgress());
+                            progress = std::max(progress, b->CurrentProductionProgress());
                         }
                     }
                     if(!available)
                     {
-                        drawLockBadge(renderer, fontRenderer, c);
+                        DrawLockBadge(renderer, fontRenderer, c);
                     }
                     else
                     {
-                        drawCostTag(renderer, fontRenderer, c, "$" + std::to_string(cost), economy.canAfford(cost) ? col::Accent : col::Danger);
+                        DrawCostTag(renderer, fontRenderer, c, "$" + std::to_string(cost), economy.CanAfford(cost) ? col::Accent : col::Danger);
                         if(progress >= 0.0f)
                         {
-                            drawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
+                            DrawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
                         }
                         if(queued > 0)
                         {
                             std::string badge = "\xC3\x97" + std::to_string(queued);
-                            renderer.fillRectScreen(c.x + 3, c.y + 3, fontRenderer.getTextWidth(badge, ui::FONT_SMALL_BOLD) + 10, 18, col::Accent);
-                            fontRenderer.drawString(badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
+                            renderer.FillRectScreen(c.x + 3, c.y + 3, fontRenderer.GetTextWidth(badge, ui::FONT_SMALL_BOLD) + 10, 18, col::Accent);
+                            fontRenderer.DrawString(badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
                         }
                     }
                     if(hovered)
@@ -1344,7 +1344,7 @@ namespace OpenArtOfWar
                         hoverTitle = name + "  $" + std::to_string(cost);
                         if(!unlocked)
                         {
-                            hoverText = std::string(_("[RESEARCH REQUIRED] ")) + _(researchDef(playerFaction(), unitUnlockResearch(playerFaction(), def.archetype)).name);
+                            hoverText = std::string(_("[RESEARCH REQUIRED] ")) + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), def.archetype)).name);
                         }
                         else if(!available)
                         {
@@ -1352,7 +1352,7 @@ namespace OpenArtOfWar
                         }
                         else
                         {
-                            hoverText = _(unitDesc(def, entities));
+                            hoverText = _(UnitDesc(def, entities));
                             if(queued > 0)
                                 hoverText += std::string("  ") + _("(RMB - cancel one)");
                         }
@@ -1361,37 +1361,37 @@ namespace OpenArtOfWar
                 }
                 case TabResearch:
                 {
-                    const auto &r = researchDef(playerFaction(), i);
-                    bool done = isResearched(Players::local(), i);
-                    const ResearchProgress *progress = m_sim ? &m_sim->research(Players::local()) : nullptr;
+                    const auto &r = researchDef(PlayerFaction(), i);
+                    bool done = IsResearched(Players::Local(), i);
+                    const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
                     bool active = progress && progress->active == i;
-                    const bool reqMet = isResearchAvailable(Players::local(), i);
-                    drawCameo(renderer, fontRenderer, c, r.compId, _(r.name), hovered, done, !hasLab || !reqMet);
+                    const bool reqMet = IsResearchAvailable(Players::Local(), i);
+                    DrawCameo(renderer, fontRenderer, c, r.compId, _(r.name), hovered, done, !hasLab || !reqMet);
                     if(!hasLab)
                     {
-                        drawLockBadge(renderer, fontRenderer, c);
+                        DrawLockBadge(renderer, fontRenderer, c);
                     }
                     else if(!reqMet)
                     {
-                        drawLockBadge(renderer, fontRenderer, c);
+                        DrawLockBadge(renderer, fontRenderer, c);
                     }
                     else if(done)
                     {
-                        drawCostTag(renderer, fontRenderer, c, _("READY"), col::Ok);
+                        DrawCostTag(renderer, fontRenderer, c, _("READY"), col::Ok);
                     }
                     else if(active)
                     {
-                        drawProgressShutter(renderer, fontRenderer, c, progress->timer / std::max(0.1f, progress->duration), col::Info);
+                        DrawProgressShutter(renderer, fontRenderer, c, progress->timer / std::max(0.1f, progress->duration), col::Info);
                     }
                     else
                     {
-                        drawCostTag(renderer, fontRenderer, c, "$" + std::to_string(r.cost), economy.canAfford(r.cost) ? col::Accent : col::Danger);
+                        DrawCostTag(renderer, fontRenderer, c, "$" + std::to_string(r.cost), economy.CanAfford(r.cost) ? col::Accent : col::Danger);
                     }
                     if(hovered)
                     {
                         hoverTitle = std::string(_(r.name)) + (done ? "" : "  $" + std::to_string(r.cost));
-                        hoverText = !hasLab ? std::string(playerFaction() == Faction::Confederation ? _("[TECH CENTER REQUIRED] Research is paused until a Tech Center is built") : _("[LAB REQUIRED] Research is paused until a Laboratory is built"))
-                                            : (done ? std::string(_("[RESEARCHED] ")) + _(r.desc) : (reqMet ? std::string(_(r.desc)) : std::string(_("[REQUIRES] ")) + _(researchDef(playerFaction(), r.needs).name)));
+                        hoverText = !hasLab ? std::string(PlayerFaction() == Faction::Confederation ? _("[TECH CENTER REQUIRED] Research is paused until a Tech Center is built") : _("[LAB REQUIRED] Research is paused until a Laboratory is built"))
+                                            : (done ? std::string(_("[RESEARCHED] ")) + _(r.desc) : (reqMet ? std::string(_(r.desc)) : std::string(_("[REQUIRES] ")) + _(researchDef(PlayerFaction(), r.needs).name)));
                     }
                     break;
                 }
@@ -1399,15 +1399,15 @@ namespace OpenArtOfWar
                 {
                     const auto &o = kOrders[i];
                     bool active = (i == 0 && m_attackMoveMode);
-                    renderer.fillRectScreen(c.x, c.y, c.w, c.h, active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
-                    renderer.drawRectScreen(c.x, c.y, c.w, c.h, active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
-                    fontRenderer.drawString(ui::fitText(fontRenderer, _(o.name), ui::FONT_BODY_BOLD, c.w - 16), c.centerX(), c.centerY() + 6, ui::FONT_BODY_BOLD, active ? col::Accent : col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
+                    renderer.FillRectScreen(c.x, c.y, c.w, c.h, active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
+                    renderer.DrawRectScreen(c.x, c.y, c.w, c.h, active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+                    fontRenderer.DrawString(ui::FitText(fontRenderer, _(o.name), ui::FONT_BODY_BOLD, c.w - 16), c.CenterX(), c.CenterY() + 6, ui::FONT_BODY_BOLD, active ? col::Accent : col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
                     if(o.key[0] != '\0')
                     {
                         UiRect chip {c.x + 6, c.y + 6, 22, 22};
-                        renderer.fillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelSunken);
-                        renderer.drawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
-                        fontRenderer.drawString(o.key, chip.centerX(), chip.centerY(), ui::FONT_SMALL_BOLD, col::Accent, false, Anchor::HCENTER | Anchor::VCENTER);
+                        renderer.FillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelSunken);
+                        renderer.DrawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
+                        fontRenderer.DrawString(o.key, chip.CenterX(), chip.CenterY(), ui::FONT_SMALL_BOLD, col::Accent, false, Anchor::HCENTER | Anchor::VCENTER);
                     }
                     if(hovered)
                     {
@@ -1420,39 +1420,39 @@ namespace OpenArtOfWar
                 }
             }
         }
-        renderer.resetClipRect();
+        renderer.ResetClipRect();
 
         // Scroll position hint on the right edge of the grid
         if(maxScroll > 0)
         {
-            int trackX = l.panel.right() - 5;
-            renderer.fillRectScreen(trackX, l.grid.y, 2, l.grid.h, col::PanelRaised);
-            int rows = maxScroll + l.visibleRows();
-            int thumbH = std::max(16, l.grid.h * l.visibleRows() / rows);
+            int trackX = l.panel.Right() - 5;
+            renderer.FillRectScreen(trackX, l.grid.y, 2, l.grid.h, col::PanelRaised);
+            int rows = maxScroll + l.VisibleRows();
+            int thumbH = std::max(16, l.grid.h * l.VisibleRows() / rows);
             int thumbY = l.grid.y + (l.grid.h - thumbH) * scroll / maxScroll;
-            renderer.fillRectScreen(trackX, thumbY, 2, thumbH, col::Accent);
+            renderer.FillRectScreen(trackX, thumbY, 2, thumbH, col::Accent);
         }
 
         // --- Info box -------------------------------------------------------------------------------------
         {
             const UiRect &ib = l.info;
-            ui::drawPanel(renderer, ib, col::PanelSunken, col::Border);
+            ui::DrawPanel(renderer, ib, col::PanelSunken, col::Border);
             int textW = ib.w - 20;
 
             if(!m_hudNotification.empty())
             {
-                renderer.fillRectScreen(ib.x, ib.y, 3, ib.h, col::Accent);
-                fontRenderer.drawTextWrapped(m_hudNotification, ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL_BOLD, col::Accent, false);
+                renderer.FillRectScreen(ib.x, ib.y, 3, ib.h, col::Accent);
+                fontRenderer.DrawTextWrapped(m_hudNotification, ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL_BOLD, col::Accent, false);
             }
             else if(!hoverTitle.empty())
             {
-                fontRenderer.drawString(ui::fitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
-                fontRenderer.drawTextWrapped(hoverText, ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
+                fontRenderer.DrawString(ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
+                fontRenderer.DrawTextWrapped(hoverText, ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
             }
-            else if(m_buildMode && m_selectedBlueprint >= 0 && m_selectedBlueprint < static_cast<int>(EntityManager::getBlueprints().size()))
+            else if(m_buildMode && m_selectedBlueprint >= 0 && m_selectedBlueprint < static_cast<int>(EntityManager::GetBlueprints().size()))
             {
-                fontRenderer.drawString(_(EntityManager::getBlueprints()[m_selectedBlueprint].name), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Accent, false);
-                fontRenderer.drawTextWrapped(_("LMB - build, RMB / Esc - cancel"), ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
+                fontRenderer.DrawString(_(EntityManager::GetBlueprints()[m_selectedBlueprint].name), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Accent, false);
+                fontRenderer.DrawTextWrapped(_("LMB - build, RMB / Esc - cancel"), ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
             }
             else if(
                 const Building *busy = [&]() -> const Building *
@@ -1469,29 +1469,29 @@ namespace OpenArtOfWar
             {
                 const auto &item = busy->productionQueue.front();
                 std::string what = _("Production");
-                if(const auto *cfg = entities.getUnitConfig(item.archetype))
+                if(const auto *cfg = entities.GetUnitConfig(item.archetype))
                     what = _(cfg->name);
-                float prog = busy->currentProductionProgress();
+                float prog = busy->CurrentProductionProgress();
                 std::string line = what + "  " + std::to_string(static_cast<int>(prog * 100.0f)) + "%";
                 if(busy->productionQueue.size() > 1)
                 {
                     line += "   " + std::string(_("queue")) + ": " + std::to_string(busy->productionQueue.size() - 1);
                 }
-                fontRenderer.drawString(ui::fitText(fontRenderer, line, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
-                ui::drawProgressBar(renderer, {ib.x + 10, ib.y + 30, textW, 8}, prog, col::Accent);
+                fontRenderer.DrawString(ui::FitText(fontRenderer, line, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
+                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 30, textW, 8}, prog, col::Accent);
             }
-            else if(const auto own = ownSelectedBuildings(entities, selected); !own.empty())
+            else if(const auto own = OwnSelectedBuildings(entities, selected); !own.empty())
             {
                 const Building *b = own.front();
                 std::string title = _("Structure");
-                if(const BuildingConfig *cfg = entities.getBuildingConfig(b->rawBuildingType))
+                if(const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType))
                     title = _(cfg->name);
                 if(own.size() > 1)
                     title += "  x" + std::to_string(own.size());
-                fontRenderer.drawString(ui::fitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
+                fontRenderer.DrawString(ui::FitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textW), ib.x + 10, ib.y + 7, ui::FONT_SMALL_BOLD, col::Text, false);
                 const float hp = b->maxHp > 0 ? static_cast<float>(b->currentHp) / b->maxHp : 1.0f;
-                ui::drawProgressBar(renderer, {ib.x + 10, ib.y + 28, textW, 6}, hp, hp > 0.35f ? col::Ok : col::Danger);
-                fontRenderer.drawString(std::to_string(b->currentHp) + " / " + std::to_string(b->maxHp), ib.x + 10, ib.y + 40, ui::FONT_SMALL, col::TextDim, false);
+                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 28, textW, 6}, hp, hp > 0.35f ? col::Ok : col::Danger);
+                fontRenderer.DrawString(std::to_string(b->currentHp) + " / " + std::to_string(b->maxHp), ib.x + 10, ib.y + 40, ui::FONT_SMALL, col::TextDim, false);
             }
             else
             {
@@ -1502,17 +1502,17 @@ namespace OpenArtOfWar
                     "Select technology to research",
                     "Select units and issue a command",
                 };
-                fontRenderer.drawTextWrapped(_(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
+                fontRenderer.DrawTextWrapped(_(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
             }
 
-            if(!ownSelectedBuildings(entities, selected).empty())
+            if(!OwnSelectedBuildings(entities, selected).empty())
             {
-                const UiRect db = destroyBtn(ib);
+                const UiRect db = DestroyBtn(ib);
                 const bool armed = m_destroyArmed > 0.0f;
-                const bool hot = db.contains(mx, my);
-                renderer.fillRectScreen(db.x, db.y, db.w, db.h, armed ? col::Danger : (hot ? ui::mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
-                renderer.drawRectScreen(db.x, db.y, db.w, db.h, col::Danger);
-                fontRenderer.drawString(armed ? _("CONFIRM?") : _("DESTROY"), db.centerX(), db.centerY(), ui::FONT_SMALL_BOLD, armed ? col::Text : col::Danger, false, Anchor::HCENTER | Anchor::VCENTER);
+                const bool hot = db.Contains(mx, my);
+                renderer.FillRectScreen(db.x, db.y, db.w, db.h, armed ? col::Danger : (hot ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
+                renderer.DrawRectScreen(db.x, db.y, db.w, db.h, col::Danger);
+                fontRenderer.DrawString(armed ? _("CONFIRM?") : _("DESTROY"), db.CenterX(), db.CenterY(), ui::FONT_SMALL_BOLD, armed ? col::Text : col::Danger, false, Anchor::HCENTER | Anchor::VCENTER);
             }
         }
     }
@@ -1528,76 +1528,76 @@ namespace OpenArtOfWar
         const SDL_Color kBuildRadiusColor {160, 80, 230, 90};
     } // namespace
 
-    bool HUDController::powerIconBlinkOn()
+    bool HUDController::PowerIconBlinkOn()
     {
         return (SDL_GetTicks() / 400) % 2 == 0; // 0.4 s on, 0.4 s off
     }
 
-    void HUDController::renderPowerAlerts(Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const
+    void HUDController::RenderPowerAlerts(Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const
     {
-        if(!economy.hasPowerDeficit() || !powerIconBlinkOn())
+        if(!economy.HasPowerDeficit() || !PowerIconBlinkOn())
             return;
-        const float zoom = camera.getZoom();
+        const float zoom = camera.GetZoom();
         const float scale = std::clamp(zoom, 0.75f, 1.5f);
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
-            if(!b || !b->alive || b->state == ActionState::Die || b->owner != Players::local() || b->buildProgress < 1.0f || b->isPowered)
+            const Building *b = e.AsBuilding();
+            if(!b || !b->alive || b->state == ActionState::Die || b->owner != Players::Local() || b->buildProgress < 1.0f || b->isPowered)
                 continue;
             // Only what consumes power (power plants and power-free buildings keep working)
-            const BuildingConfig *cfg = entities.getBuildingConfig(b->rawBuildingType);
+            const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
             if(!cfg || cfg->powerCost >= 0)
                 continue;
             float sx = 0.0f, sy = 0.0f;
-            camera.worldToScreen((b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
+            camera.WorldToScreen((b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
             // Over the roof: the top of the footprint, a little above
             const int w = static_cast<int>(23 * scale), h = static_cast<int>(19 * scale);
-            renderer.drawRawSpriteScreen(kPowerIconSprite, static_cast<int>(sx) - w / 2, static_cast<int>(sy) - h - static_cast<int>(10 * zoom), scale);
+            renderer.DrawRawSpriteScreen(kPowerIconSprite, static_cast<int>(sx) - w / 2, static_cast<int>(sy) - h - static_cast<int>(10 * zoom), scale);
         }
     }
 
-    void HUDController::renderProductionOverlay(Renderer &renderer, BitmapFontRenderer &fontRenderer, const EntityManager &entities, const TileMap &map, const Camera &camera) const
+    void HUDController::RenderProductionOverlay(Renderer &renderer, BitmapFontRenderer &fontRenderer, const EntityManager &entities, const TileMap &map, const Camera &camera) const
     {
-        const float zoom = camera.getZoom();
+        const float zoom = camera.GetZoom();
 
         // Selected headquarters: the zone where buildings and walls may be placed (purple, 70% transparent, 2 px).
         // The radius is measured in tiles and tiles are wider than tall, so on screen it is an ellipse.
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
-            if(!b || !b->selected || !b->alive || b->state == ActionState::Die || b->owner != Players::local() || b->type != UnitType::Headquarters)
+            const Building *b = e.AsBuilding();
+            if(!b || !b->selected || !b->alive || b->state == ActionState::Die || b->owner != Players::Local() || b->type != UnitType::Headquarters)
             {
                 continue;
             }
             const float cx = (b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH;
             const float cy = (b->tileY + b->buildHeight * 0.5f) * TILE_HEIGHT;
-            const float r = static_cast<float>(entities.getBuildRadius());
+            const float r = static_cast<float>(entities.GetBuildRadius());
             // Counted in tiles (the placement check is a distance in tile units), so it is an ellipse on screen
             RenderUtility::DrawTileRadius(renderer, camera, cx, cy, r, kBuildRadiusColor, 2.0f);
         }
 
         // Selected defensive structures: their firing range (own green, enemy red)
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(!b || !b->selected || !b->alive || b->state == ActionState::Die || b->attackRange <= 0.0f || b->attackDamage <= 0)
             {
                 continue;
             }
             // The same look as the build radius: a ground ellipse, 2 px, 70% transparent
-            const SDL_Color c = (b->owner == Players::local()) ? SDL_Color {90, 230, 120, 77} : SDL_Color {240, 80, 70, 77};
-            RenderUtility::DrawTileRadius(renderer, camera, b->getUnitCenterPixelX(), b->getUnitCenterPixelY(), b->attackRange, c, 2.0f);
+            const SDL_Color c = (b->owner == Players::Local()) ? SDL_Color {90, 230, 120, 77} : SDL_Color {240, 80, 70, 77};
+            RenderUtility::DrawTileRadius(renderer, camera, b->GetUnitCenterPixelX(), b->GetUnitCenterPixelY(), b->attackRange, c, 2.0f);
         }
 
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
-            if(!b || !b->alive || b->state == ActionState::Die || b->owner != Players::local() || !b->isUnitProducer())
+            const Building *b = e.AsBuilding();
+            if(!b || !b->alive || b->state == ActionState::Die || b->owner != Players::Local() || !b->IsUnitProducer())
             {
                 continue;
             }
             float sx = 0.0f, sy = 0.0f;
-            camera.worldToScreen(b->tileX * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
+            camera.WorldToScreen(b->tileX * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
             const int w = static_cast<int>(b->buildWidth * TILE_WIDTH * zoom);
 
             // Training progress above the building, with the number of orders waiting behind it
@@ -1606,52 +1606,52 @@ namespace OpenArtOfWar
                 const int barW = std::max(36, w - 16);
                 const int bx = static_cast<int>(sx) + (w - barW) / 2;
                 const int by = static_cast<int>(sy) - 22;
-                renderer.fillRectScreen(bx - 1, by - 1, barW + 2, 8, {10, 12, 16, 220});
-                renderer.fillRectScreen(bx, by, static_cast<int>(barW * b->currentProductionProgress()), 6, col::Accent);
+                renderer.FillRectScreen(bx - 1, by - 1, barW + 2, 8, {10, 12, 16, 220});
+                renderer.FillRectScreen(bx, by, static_cast<int>(barW * b->CurrentProductionProgress()), 6, col::Accent);
                 const int count = static_cast<int>(b->productionQueue.size());
                 std::string label = std::to_string(count);
-                const int lw = fontRenderer.getTextWidth(label, ui::FONT_SMALL_BOLD) + 8;
-                renderer.fillRectScreen(bx + barW + 3, by - 5, lw, 16, col::Accent);
-                fontRenderer.drawString(label, bx + barW + 3 + lw / 2, by + 3, ui::FONT_SMALL_BOLD, col::AccentText, false, Anchor::HCENTER | Anchor::VCENTER);
+                const int lw = fontRenderer.GetTextWidth(label, ui::FONT_SMALL_BOLD) + 8;
+                renderer.FillRectScreen(bx + barW + 3, by - 5, lw, 16, col::Accent);
+                fontRenderer.DrawString(label, bx + barW + 3 + lw / 2, by + 3, ui::FONT_SMALL_BOLD, col::AccentText, false, Anchor::HCENTER | Anchor::VCENTER);
             }
 
             // Rally line from the exit to the rally point, only while the building is selected
             if(!b->selected)
                 continue;
             int rx = 0, ry = 0;
-            rallyPointOf(*b, map, rx, ry);
+            RallyPointOf(*b, map, rx, ry);
             const float x1 = (b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH;
             const float y1 = (b->tileY + b->buildHeight) * TILE_HEIGHT;
             const float x2 = (rx + 0.5f) * TILE_WIDTH;
             const float y2 = (ry + 0.5f) * TILE_HEIGHT;
             const SDL_Color yellow {255, 220, 40, 150};
             float ax = 0, ay = 0, bx2 = 0, by2 = 0;
-            camera.worldToScreen(x1, y1, ax, ay);
-            camera.worldToScreen(x2, y2, bx2, by2);
+            camera.WorldToScreen(x1, y1, ax, ay);
+            camera.WorldToScreen(x2, y2, bx2, by2);
             // 2 px wide: two parallel 1 px lines offset across the line's main direction
             const bool steep = std::abs(by2 - ay) > std::abs(bx2 - ax);
             for(int k = 0; k < 2; ++k)
             {
                 const int ox = steep ? k : 0;
                 const int oy = steep ? 0 : k;
-                renderer.drawLineScreen(static_cast<int>(ax) + ox, static_cast<int>(ay) + oy, static_cast<int>(bx2) + ox, static_cast<int>(by2) + oy, yellow);
+                renderer.DrawLineScreen(static_cast<int>(ax) + ox, static_cast<int>(ay) + oy, static_cast<int>(bx2) + ox, static_cast<int>(by2) + oy, yellow);
             }
             const int m = std::max(4, static_cast<int>(5 * zoom));
-            renderer.fillRectScreen(static_cast<int>(bx2) - m / 2, static_cast<int>(by2) - m / 2, m, m, yellow);
-            renderer.drawRectScreen(static_cast<int>(bx2) - m, static_cast<int>(by2) - m, 2 * m, 2 * m, yellow);
+            renderer.FillRectScreen(static_cast<int>(bx2) - m / 2, static_cast<int>(by2) - m / 2, m, m, yellow);
+            renderer.DrawRectScreen(static_cast<int>(bx2) - m, static_cast<int>(by2) - m, 2 * m, 2 * m, yellow);
         }
     }
 
-    void HUDController::renderBuildGhost(Renderer &renderer, const TileMap &map, const Camera &camera, int mouseTileX, int mouseTileY, const Economy &economy, const EntityManager &entities)
+    void HUDController::RenderBuildGhost(Renderer &renderer, const TileMap &map, const Camera &camera, int mouseTileX, int mouseTileY, const Economy &economy, const EntityManager &entities)
     {
-        const auto &blueprints = EntityManager::getBlueprints();
+        const auto &blueprints = EntityManager::GetBlueprints();
         if(m_selectedBlueprint < 0 || m_selectedBlueprint >= static_cast<int>(blueprints.size()))
             return;
 
         const auto &bp = blueprints[m_selectedBlueprint];
 
-        bool canPlace = entities.canPlaceBuilding(mouseTileX, mouseTileY, bp.width, bp.height, map, Players::local());
-        bool canAfford = economy.canAfford(bp.creditCost);
+        bool canPlace = entities.CanPlaceBuilding(mouseTileX, mouseTileY, bp.width, bp.height, map, Players::Local());
+        bool canAfford = economy.CanAfford(bp.creditCost);
 
         SDL_Color boxColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 80} : SDL_Color {255, 0, 0, 80};
         SDL_Color borderColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 220} : SDL_Color {255, 0, 0, 220};
@@ -1663,13 +1663,13 @@ namespace OpenArtOfWar
             {
                 const float wx = static_cast<float>(tx * TILE_WIDTH);
                 const float wy = static_cast<float>(ty * TILE_HEIGHT);
-                renderer.fillRectWorld(wx, wy, static_cast<float>(TILE_WIDTH), static_cast<float>(TILE_HEIGHT), camera, boxColor);
-                renderer.drawRectWorld(wx, wy, static_cast<float>(TILE_WIDTH), static_cast<float>(TILE_HEIGHT), camera, borderColor);
+                renderer.FillRectWorld(wx, wy, static_cast<float>(TILE_WIDTH), static_cast<float>(TILE_HEIGHT), camera, boxColor);
+                renderer.DrawRectWorld(wx, wy, static_cast<float>(TILE_WIDTH), static_cast<float>(TILE_HEIGHT), camera, borderColor);
             }
         }
 
         // A tower / bunker shows where it will reach from this spot
-        if(const BuildingConfig *cfg = entities.getBuildingConfig(bp.buildingIndex))
+        if(const BuildingConfig *cfg = entities.GetBuildingConfig(bp.buildingIndex))
         {
             if(cfg->canAttack && cfg->attackRange > 0.0f)
             {
@@ -1679,11 +1679,11 @@ namespace OpenArtOfWar
 
         // Walls are drawn exactly like the placed segment (building 15 / 25, the reinforced 20 after Active Wall Armor),
         // not with a stray composite
-        const int drawIndex = (bp.buildingIndex == 15 && isEffectResearched(Players::local(), ResearchEffect::WallStrength)) ? 20 : bp.buildingIndex;
-        renderer.setDrawOwner(Players::local()); // the ghost already wears the player's army colour
-        renderer.drawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 0, camera, playerFaction(), 0, 1.0f, false);
-        renderer.drawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 1, camera, playerFaction(), 0, 1.0f, false);
-        renderer.setDrawOwner(kNoPlayer);
+        const int drawIndex = (bp.buildingIndex == 15 && IsEffectResearched(Players::Local(), ResearchEffect::WallStrength)) ? 20 : bp.buildingIndex;
+        renderer.SetDrawOwner(Players::Local()); // the ghost already wears the player's army colour
+        renderer.DrawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 0, camera, PlayerFaction(), 0, 1.0f, false);
+        renderer.DrawBuildingWorld(drawIndex, mouseTileX * TILE_WIDTH, mouseTileY * TILE_HEIGHT, 1, camera, PlayerFaction(), 0, 1.0f, false);
+        renderer.SetDrawOwner(kNoPlayer);
     }
 
 } // namespace OpenArtOfWar

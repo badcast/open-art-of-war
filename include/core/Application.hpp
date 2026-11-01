@@ -56,102 +56,102 @@ namespace OpenArtOfWar
         Application();
         ~Application();
 
-        bool init(int windowWidth = DEFAULT_WINDOW_WIDTH, int windowHeight = DEFAULT_WINDOW_HEIGHT);
+        bool Init(int windowWidth = DEFAULT_WINDOW_WIDTH, int windowHeight = DEFAULT_WINDOW_HEIGHT);
         void run();
 #if defined(AOW_DEBUG)
-        bool runHeadlessTest(int numTicks = 200); // debug builds only (HeadlessTest.cpp)
+        bool RunHeadlessTest(int numTicks = 200); // debug builds only (HeadlessTest.cpp)
 #endif
-        void shutdown();
-        void setDebugMode(bool debug);
-        bool isDebugMode() const
+        void Shutdown();
+        void SetDebugMode(bool debug);
+        bool IsDebugMode() const
         {
             return m_debugMode;
         }
-        void launchTestMap();
+        void LaunchTestMap();
         // Single-player game on a map straight from the command line (--map=<name|path>, --from-scratch):
         // the same start as a custom game picked in the menu. False when the map is unknown or fails to load.
-        bool launchMap(const std::string &nameOrPath, bool fromScratch);
+        bool LaunchMap(const std::string &nameOrPath, bool fromScratch);
 
         const Settings &settings() const
         {
             return m_settings;
         }
         // Before init: render API from the command line (one-off, not stored)
-        void setRendererOverride(const std::string &name)
+        void SetRendererOverride(const std::string &name)
         {
             m_rendererOverride = name;
         }
         // Before init: self-test run, the renderer is whatever SDL picks (no probing, no config changes)
-        void setHeadless(bool headless)
+        void SetHeadless(bool headless)
         {
             m_headless = headless;
         }
         // run() returned because the window has to be built anew (another render API): start a new Application
-        bool restartRequested() const
+        bool RestartRequested() const
         {
             return m_restartRequested;
         }
         // Network game from the command line (until the lobby screen exists): host on `port` and start the
         // match on `mapPath` once `players` have joined, or join address:port
-        void hostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
-        void joinNetworkGame(const std::string &address, uint16_t port, const std::string &name);
+        void HostNetworkGame(uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
+        void JoinNetworkGame(const std::string &address, uint16_t port, const std::string &name);
         // The hosted game is listed on the server (reachable by its code through NAT hole punching)
-        void announceNetworkGame(const std::string &server, uint16_t port);
+        void AnnounceNetworkGame(const std::string &server, uint16_t port);
         // Through a dedicated server (host:port): create a room (code empty) or join the room with `code`;
         // `players` / `mapPath` as for hostNetworkGame (the creator owns the room)
-        void serverNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
+        void ServerNetworkGame(const std::string &server, uint16_t port, const std::string &code, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
         // Applies the options of one area to the running game and stores them in settings.json
-        void applySettings(SettingsArea area);
+        void ApplySettings(SettingsArea area);
 
     private:
-        void handleEvents();
-        void update(float deltaTime);
+        void HandleEvents();
+        void Update(float deltaTime);
         void render();
 
-        void applyGraphics();
+        void ApplyGraphics();
         // Graphics quality: the game world is drawn at 1/3 (low), 1/2 (medium) or the full (high) resolution
-        int renderDivisor() const;
-        void renderMapEdgeFade(const Camera &camera);
-        void applyAudio();
-        void saveSettings();
-        void toggleFullscreen();
+        int RenderDivisor() const;
+        void RenderMapEdgeFade(const Camera &camera);
+        void ApplyAudio();
+        void SaveSettings();
+        void ToggleFullscreen();
         // Window mode / size changed: keep it only when confirmed in time, else go back to the previous one
-        void beginVideoConfirm(const Settings &previous);
-        void updateVideoConfirm(float deltaTime);
-        void renderVideoConfirm();
-        void syncWindowSize(int w = 0, int h = 0);
-        void renderFpsCounter();
+        void BeginVideoConfirm(const Settings &previous);
+        void UpdateVideoConfirm(float deltaTime);
+        void RenderVideoConfirm();
+        void SyncWindowSize(int w = 0, int h = 0);
+        void RenderFpsCounter();
         // Settings "Network statistics": ping, jitter, loss, traffic, turn buffer (network lobby and match)
-        void renderNetStats();
+        void RenderNetStats();
         // Network match: services the session, starts the match when its setup arrives
-        void updateNetwork(uint32_t nowMs);
-        bool inNetworkMatch() const;
-        void driveNetworkBot(uint32_t tick);
-        void renderNetworkBanner();
+        void UpdateNetwork(uint32_t nowMs);
+        bool InNetworkMatch() const;
+        void DriveNetworkBot(uint32_t tick);
+        void RenderNetworkBanner();
         // Network match: notices who drops out / comes back / leaves (from the room's roster)
-        void trackNetPlayers(uint32_t nowMs);
+        void TrackNetPlayers(uint32_t nowMs);
         // Short messages over the battlefield ("Player X has disconnected"), they fade after a few seconds
-        void pushNotice(const std::string &text, uint32_t nowMs);
-        void renderNotices();
+        void PushNotice(const std::string &text, uint32_t nowMs);
+        void RenderNotices();
         // Tab held in a match: every player with faction, colour, name and efficiency points
-        void renderScoreboard();
+        void RenderScoreboard();
         // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat
-        void updateSounds();
+        void UpdateSounds();
         std::unique_ptr<GameSounds> m_gameSounds;
         AppState m_soundState {AppState::SplashLogo}; // the state the last updateSounds saw
         // Draws the loading screen right now (for work that blocks the main loop: start-up, loading a match); the window
         // stays alive. `progress` 0..1, negative for an unknown length. Nothing in headless mode.
-        void showLoading(const std::string &status, float progress);
+        void ShowLoading(const std::string &status, float progress);
         // A map is being loaded: the loading screen with the map's picture stays up for at least three seconds, so it can
         // be read (begin before the work, end after it)
-        void beginMapLoading(const std::string &title, const std::string &mapPath);
-        void endMapLoading();
-        void drawLoadingFrame(const std::string &title, const std::string &status, float progress, SDL_Texture *preview, int pw, int ph);
+        void BeginMapLoading(const std::string &title, const std::string &mapPath);
+        void EndMapLoading();
+        void DrawLoadingFrame(const std::string &title, const std::string &status, float progress, SDL_Texture *preview, int pw, int ph);
         // Render API chosen in the settings: rebuild the window now, confirm or go back after the restart
-        void switchRenderApi();
-        void requestRestart();
-        void keepRenderApi();
-        void revertRenderApi();
+        void SwitchRenderApi();
+        void RequestRestart();
+        void KeepRenderApi();
+        void RevertRenderApi();
 
         bool m_running {false};
         MapPreview m_loadingPreview; // the picture of the map on the loading screen
@@ -205,10 +205,10 @@ namespace OpenArtOfWar
         std::string m_cliServerCode;
         bool m_netAuto {false}; // command-line game: ready by itself, the room starts by itself
         uint32_t m_netAutoMs {0};
-        void updateServer();
+        void UpdateServer();
         bool m_textInput {false};
-        void updateNetworkMenu();
-        void leaveNetworkGame();
+        void UpdateNetworkMenu();
+        void LeaveNetworkGame();
         int m_netWantedPlayers {2};
         std::string m_netMapPath;
         bool m_netMatchStarted {false};

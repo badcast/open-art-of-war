@@ -80,8 +80,8 @@ namespace OpenArtOfWar
 
         const std::vector<MissionDef> &resistance();    // Liberation of Peru, ids 0..6 are the campaign
         const std::vector<MissionDef> &confederation(); // Global Confederation, ids 0..6
-        const std::vector<MissionDef> &campaign(Faction faction);
-        const MissionDef *find(Faction faction, int missionId);
+        const std::vector<MissionDef> &Campaign(Faction faction);
+        const MissionDef *Find(Faction faction, int missionId);
 
     } // namespace Missions
 

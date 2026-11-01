@@ -39,13 +39,13 @@ const SpriteFamily kSpriteFamilies[] = {
 constexpr int kCraterFirst = 1784;
 constexpr int kCraterLast = 1800;
 
-std::string listText(const std::vector<int>& v) {
+std::string ListText(const std::vector<int>& v) {
     std::string s = "[";
     for (size_t i = 0; i < v.size(); ++i) s += (i ? ", " : "") + std::to_string(v[i]);
     return s + "]";
 }
 
-std::vector<int> listOf(const YAML::Node& n) {
+std::vector<int> ListOf(const YAML::Node& n) {
     std::vector<int> v;
     if (n.IsSequence()) {
         for (const auto& item : n) {
@@ -60,7 +60,7 @@ std::vector<int> listOf(const YAML::Node& n) {
 
 } // namespace
 
-SDL_Texture* CharacterEditor::zoomedThumbnail(int composite, float scale) {
+SDL_Texture* CharacterEditor::ZoomedThumbnail(int composite, float scale) {
     const auto key = std::make_pair(composite, static_cast<int>(scale * 100.0f));
     auto it = zoomThumbs.find(key);
     if (it != zoomThumbs.end()) return it->second;
@@ -74,7 +74,7 @@ SDL_Texture* CharacterEditor::zoomedThumbnail(int composite, float scale) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         // Composites are 180x120 canvases centred on the object: magnified around that centre
-        gameRenderer->drawCompositeScreen(composite, static_cast<int>(kW * 0.5f - 90.0f * scale), static_cast<int>(kH * 0.5f - 60.0f * scale),
+        gameRenderer->DrawCompositeScreen(composite, static_cast<int>(kW * 0.5f - 90.0f * scale), static_cast<int>(kH * 0.5f - 60.0f * scale),
                                           scale);
         SDL_SetRenderTarget(renderer, previous);
     }
@@ -82,29 +82,29 @@ SDL_Texture* CharacterEditor::zoomedThumbnail(int composite, float scale) {
     return tex;
 }
 
-void CharacterEditor::ensureProjectiles() {
+void CharacterEditor::EnsureProjectiles() {
     if (projectilesTried) return;
     projectilesTried = true;
-    if (!loadYamlFile(projectilesYaml, "projectiles.yaml")) return;
+    if (!LoadYamlFile(projectilesYaml, "projectiles.yaml")) return;
     for (const ProjectileKind& k : kKinds) {
         const std::string base = std::string("projectiles.") + k.key;
         yamlAnimPaths.insert(base + ".impact");
         yamlAnimPaths.insert(base + ".impact_wall");
         yamlAnimPaths.insert(base + ".wall_destroyed");
     }
-    projectilesChanged();
+    ProjectilesChanged();
 }
 
-void CharacterEditor::projectilesChanged() {
-    if (projectilesYaml.loaded()) Projectiles::apply(projectilesYaml.text());
+void CharacterEditor::ProjectilesChanged() {
+    if (projectilesYaml.Loaded()) Projectiles::Apply(projectilesYaml.text());
     projectileUsers.clear(); // recomputed when shown
 }
 
 const ProjectileSpec& CharacterEditor::projectileSpec() const {
-    return Projectiles::of(Projectiles::fromKey(kKinds[std::clamp(projKind, 0, 4)].key));
+    return Projectiles::of(Projectiles::FromKey(kKinds[std::clamp(projKind, 0, 4)].key));
 }
 
-void CharacterEditor::fireProjectilePreview() {
+void CharacterEditor::FireProjectilePreview() {
     const ProjectileSpec& spec = projectileSpec();
     ProjShot shot;
     // The shooter stands left of the centre, the target at the chosen distance and angle
@@ -113,20 +113,20 @@ void CharacterEditor::fireProjectilePreview() {
     shot.y = shot.sy = -projDistance * 0.5f * std::sin(angle);
     shot.tx = projDistance * 0.5f * std::cos(angle);
     shot.ty = projDistance * 0.5f * std::sin(angle);
-    shot.dir16 = OpenArtOfWar::Utility::dirFromNorth(shot.tx - shot.x, shot.ty - shot.y, 16);
-    shot.dir32 = OpenArtOfWar::Utility::dirFromNorth(shot.tx - shot.x, shot.ty - shot.y, 32);
-    shot.impactAnim = spec.pickImpact(projShotCount);
-    shot.mark = spec.pickGroundMark(projShotCount);
+    shot.dir16 = OpenArtOfWar::Utility::DirFromNorth(shot.tx - shot.x, shot.ty - shot.y, 16);
+    shot.dir32 = OpenArtOfWar::Utility::DirFromNorth(shot.tx - shot.x, shot.ty - shot.y, 32);
+    shot.impactAnim = spec.PickImpact(projShotCount);
+    shot.mark = spec.PickGroundMark(projShotCount);
     ++projShotCount;
     projShots.push_back(shot);
     if (projSweep) projSweepAngle += 2.0f * static_cast<float>(M_PI) / static_cast<float>(std::max(1, spec.directions));
 }
 
-void CharacterEditor::updateProjectilesSim(float dt) {
+void CharacterEditor::UpdateProjectilesSim(float dt) {
     if (editorMode != EditorMode::Projectiles) return;
-    ensureProjectiles();
+    EnsureProjectiles();
     const ProjectileSpec& spec = projectileSpec();
-    const float frameTime = OpenArtOfWar::EffectsConfig::get().frameTime;
+    const float frameTime = OpenArtOfWar::EffectsConfig::Get().frameTime;
     // The game moves a projectile `speed` pixels every simulation tick
     const float pixelsPerSecond = spec.speed / static_cast<float>(OpenArtOfWar::SIMULATION_TIMESTEP);
     for (ProjShot& s : projShots) {
@@ -154,7 +154,7 @@ void CharacterEditor::updateProjectilesSim(float dt) {
             s.frameTimer += dt;
             if (s.frameTimer >= frameTime) {
                 s.frameTimer = 0.0f;
-                const OpenArtOfWar::IndexRange r = textures->getAnimRange(s.impactAnim);
+                const OpenArtOfWar::IndexRange r = textures->GetAnimRange(s.impactAnim);
                 if (++s.frame >= std::max(1, r.end - r.start + 1)) s.done = true;
             }
         } else {
@@ -172,25 +172,25 @@ void CharacterEditor::updateProjectilesSim(float dt) {
         projFireTimer -= dt;
         if (projFireTimer <= 0.0f) {
             projFireTimer = projInterval;
-            fireProjectilePreview();
+            FireProjectilePreview();
         }
     }
 }
 
-void CharacterEditor::drawProjectilesScene() {
+void CharacterEditor::DrawProjectilesScene() {
     const ProjectileSpec& spec = projectileSpec();
     const auto faction = OpenArtOfWar::Faction::Resistance;
-    for (const ProjCrater& c : projCraters) gameRenderer->drawCompositeWorld(c.composite, c.x - 90.0f, c.y - 60.0f, *camera, faction);
+    for (const ProjCrater& c : projCraters) gameRenderer->DrawCompositeWorld(c.composite, c.x - 90.0f, c.y - 60.0f, *camera, faction);
     // Shooter and target
     const float angle = projSweep ? projSweepAngle : projAngleDeg * static_cast<float>(M_PI) / 180.0f;
     const float sx = -projDistance * 0.5f * std::cos(angle), sy = -projDistance * 0.5f * std::sin(angle);
     const float tx = -sx, ty = -sy;
-    gameRenderer->fillRectWorld(sx - 4.0f, sy - 4.0f, 8.0f, 8.0f, *camera, SDL_Color{110, 200, 140, 220});
-    gameRenderer->drawRectWorld(tx - OpenArtOfWar::TILE_WIDTH * 0.5f, ty - OpenArtOfWar::TILE_HEIGHT * 0.5f,
+    gameRenderer->FillRectWorld(sx - 4.0f, sy - 4.0f, 8.0f, 8.0f, *camera, SDL_Color{110, 200, 140, 220});
+    gameRenderer->DrawRectWorld(tx - OpenArtOfWar::TILE_WIDTH * 0.5f, ty - OpenArtOfWar::TILE_HEIGHT * 0.5f,
                                 static_cast<float>(OpenArtOfWar::TILE_WIDTH), static_cast<float>(OpenArtOfWar::TILE_HEIGHT), *camera,
                                 SDL_Color{236, 111, 77, 200});
     for (const ProjSmoke& p : projSmoke) {
-        gameRenderer->drawSmokePuffWorld(static_cast<int>(p.age / 0.35f * 13.0f), p.x, p.y, *camera);
+        gameRenderer->DrawSmokePuffWorld(static_cast<int>(p.age / 0.35f * 13.0f), p.x, p.y, *camera);
     }
     for (const ProjShot& s : projShots) {
         if (!s.landed) {
@@ -198,27 +198,27 @@ void CharacterEditor::drawProjectilesScene() {
                 // The flame is a jet from the nozzle, playing its 12 frames over the flight
                 const float total = std::max(1.0f, std::hypot(s.tx - s.sx, s.ty - s.sy));
                 const float prog = std::clamp(std::hypot(s.x - s.sx, s.y - s.sy) / total, 0.0f, 1.0f);
-                gameRenderer->drawAnimSequenceWorldRotated(59, std::clamp(static_cast<int>(prog * 11.0f), 0, 11), s.sx, s.sy,
+                gameRenderer->DrawAnimSequenceWorldRotated(59, std::clamp(static_cast<int>(prog * 11.0f), 0, 11), s.sx, s.sy,
                                                            std::atan2(s.ty - s.sy, s.tx - s.sx), *camera, faction);
             } else if (spec.sprite > 0) {
-                gameRenderer->drawProjectileWorld(spec.sprite, spec.directions == 16 ? s.dir16 : s.dir32, s.x, s.y, *camera, faction,
+                gameRenderer->DrawProjectileWorld(spec.sprite, spec.directions == 16 ? s.dir16 : s.dir32, s.x, s.y, *camera, faction,
                                                   spec.directions);
             }
         } else if (s.impactAnim >= 0) {
             float ox = 0.0f, oy = 0.0f;
-            OpenArtOfWar::explosionCentering(s.impactAnim, ox, oy);
-            gameRenderer->drawAnimSequenceWorld(s.impactAnim, s.frame, s.x + ox, s.y + oy, *camera, faction);
+            OpenArtOfWar::ExplosionCentering(s.impactAnim, ox, oy);
+            gameRenderer->DrawAnimSequenceWorld(s.impactAnim, s.frame, s.x + ox, s.y + oy, *camera, faction);
         }
     }
 }
 
-void CharacterEditor::drawProjectileControls() {
-    ensureProjectiles();
+void CharacterEditor::DrawProjectileControls() {
+    EnsureProjectiles();
     for (int i = 0; i < 5; ++i) {
         if (i) ImGui::SameLine();
         const bool active = projKind == i;
         if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
-        if (hinted(ImGui::Button(_(kKinds[i].label)), kKinds[i].label)) {
+        if (Hinted(ImGui::Button(_(kKinds[i].label)), kKinds[i].label)) {
             projKind = i;
             projectileUsers.clear();
             projShots.clear();
@@ -229,35 +229,35 @@ void CharacterEditor::drawProjectileControls() {
         if (active) ImGui::PopStyleColor();
     }
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Fire")), "Fire")) fireProjectilePreview();
+    if (Hinted(ImGui::Button(_("Fire")), "Fire")) FireProjectilePreview();
     ImGui::SameLine();
-    hinted(ImGui::Checkbox(_("Loop"), &projLoop), "Fire again and again");
+    Hinted(ImGui::Checkbox(_("Loop"), &projLoop), "Fire again and again");
     ImGui::SameLine();
-    hinted(ImGui::Checkbox(_("All directions"), &projSweep), "All directions");
+    Hinted(ImGui::Checkbox(_("All directions"), &projSweep), "All directions");
     ImGui::SetNextItemWidth(150.0f);
-    hinted(ImGui::SliderFloat(_("Distance"), &projDistance, 40.0f, 600.0f, "%.0f px"), "Shot distance");
+    Hinted(ImGui::SliderFloat(_("Distance"), &projDistance, 40.0f, 600.0f, "%.0f px"), "Shot distance");
     ImGui::SameLine();
     if (!projSweep) {
         ImGui::SetNextItemWidth(150.0f);
-        hinted(ImGui::SliderFloat(_("Angle"), &projAngleDeg, -180.0f, 180.0f, "%.0f deg"), "Shot angle");
+        Hinted(ImGui::SliderFloat(_("Angle"), &projAngleDeg, -180.0f, 180.0f, "%.0f deg"), "Shot angle");
         ImGui::SameLine();
     }
     ImGui::SetNextItemWidth(120.0f);
-    hinted(ImGui::SliderFloat(_("Interval"), &projInterval, 0.1f, 3.0f, "%.1f s"), "Shot interval");
+    Hinted(ImGui::SliderFloat(_("Interval"), &projInterval, 0.1f, 3.0f, "%.1f s"), "Shot interval");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0f);
-    hinted(ImGui::SliderFloat(_("Speed"), &playbackSpeed, 0.1f, 2.0f, "%.2fx"), "Playback speed");
+    Hinted(ImGui::SliderFloat(_("Speed"), &playbackSpeed, 0.1f, 2.0f, "%.2fx"), "Playback speed");
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Clear craters")), "Clear craters")) projCraters.clear();
+    if (Hinted(ImGui::Button(_("Clear craters")), "Clear craters")) projCraters.clear();
 }
 
-void CharacterEditor::drawProjectileProperties() {
-    ensureProjectiles();
-    if (!projectilesYaml.loaded()) {
+void CharacterEditor::DrawProjectileProperties() {
+    EnsureProjectiles();
+    if (!projectilesYaml.Loaded()) {
         ImGui::TextWrapped("%s", _("The projectiles file could not be loaded."));
         return;
     }
-    drawSettingsBar(projectilesYaml, "projectiles.yaml");
+    DrawSettingsBar(projectilesYaml, "projectiles.yaml");
     ImGui::Separator();
     const ProjectileKind& kind = kKinds[std::clamp(projKind, 0, 4)];
     const std::string base = std::string("projectiles.") + kind.key;
@@ -266,20 +266,20 @@ void CharacterEditor::drawProjectileProperties() {
     bool changed = false;
 
     if (ImGui::CollapsingHeader(_("Flight"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        changed |= editYamlScalar(projectilesYaml, base + ".hitscan", _("Hit-scan"));
-        fieldHint("Hit-scan");
-        changed |= editYamlScalar(projectilesYaml, base + ".speed", _("Speed (px per tick)"));
-        fieldHint("Speed (px per tick)");
-        changed |= editYamlScalar(projectilesYaml, base + ".spread", _("Spread (radians)"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".hitscan", _("Hit-scan"));
+        FieldHint("Hit-scan");
+        changed |= EditYamlScalar(projectilesYaml, base + ".speed", _("Speed (px per tick)"));
+        FieldHint("Speed (px per tick)");
+        changed |= EditYamlScalar(projectilesYaml, base + ".spread", _("Spread (radians)"));
         ImGui::SameLine();
         ImGui::TextDisabled("%.1f deg", projectileSpec().spread * 180.0f / static_cast<float>(M_PI));
-        changed |= editYamlScalar(projectilesYaml, base + ".smoke_trail", _("Smoke trail"));
-        changed |= editYamlScalar(projectilesYaml, base + ".sprite", _("Sprite (composite)"));
-        changed |= editYamlScalar(projectilesYaml, base + ".directions", _("Directions"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".smoke_trail", _("Smoke trail"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".sprite", _("Sprite (composite)"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".directions", _("Directions"));
         // The projectile pictures of the game: a click sets the composite and its directions
         ImGui::TextUnformatted(_("Projectile sprites"));
-        fieldHint("Projectile sprites");
-        const int cur = projectilesYaml.at(base + ".sprite").as<int>(0);
+        FieldHint("Projectile sprites");
+        const int cur = projectilesYaml.At(base + ".sprite").as<int>(0);
         for (size_t f = 0; f < std::size(kSpriteFamilies); ++f) {
             if (f) ImGui::SameLine();
             ImGui::PushID(static_cast<int>(f));
@@ -287,14 +287,14 @@ void CharacterEditor::drawProjectileProperties() {
             const bool selected = fam.composite == cur;
             if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
             // East-facing frame: a quarter of the directions after north
-            SDL_Texture* thumb = zoomedThumbnail(fam.composite + fam.directions / 4, 2.5f);
+            SDL_Texture* thumb = ZoomedThumbnail(fam.composite + fam.directions / 4, 2.5f);
             const bool clicked = thumb ? ImGui::ImageButton("spr", reinterpret_cast<ImTextureID>(thumb), ImVec2(48, 32))
                                        : ImGui::Button(std::to_string(fam.composite).c_str());
             if (selected) ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s (%d, %d)", _(fam.label), fam.composite, fam.directions);
             if (clicked) {
-                changed |= projectilesYaml.set(base + ".sprite", std::to_string(fam.composite));
-                changed |= projectilesYaml.set(base + ".directions", std::to_string(fam.directions));
+                changed |= projectilesYaml.Set(base + ".sprite", std::to_string(fam.composite));
+                changed |= projectilesYaml.Set(base + ".directions", std::to_string(fam.directions));
             }
             ImGui::PopID();
         }
@@ -302,29 +302,29 @@ void CharacterEditor::drawProjectileProperties() {
     }
 
     if (ImGui::CollapsingHeader(_("Hit effects"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        changed |= editYamlScalar(projectilesYaml, base + ".impact", _("Impact animations"));
-        changed |= editYamlScalar(projectilesYaml, base + ".impact_wall", _("Wall hit"));
-        changed |= editYamlScalar(projectilesYaml, base + ".wall_destroyed", _("Wall destroyed"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".impact", _("Impact animations"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".impact_wall", _("Wall hit"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".wall_destroyed", _("Wall destroyed"));
         // The chosen impacts as pictures
-        const std::vector<int> impacts = listOf(projectilesYaml.at(base + ".impact"));
+        const std::vector<int> impacts = ListOf(projectilesYaml.At(base + ".impact"));
         for (size_t i = 0; i < impacts.size(); ++i) {
             if (i) ImGui::SameLine();
-            if (SDL_Texture* t = animThumbnail(impacts[i])) {
+            if (SDL_Texture* t = AnimThumbnail(impacts[i])) {
                 ImGui::Image(reinterpret_cast<ImTextureID>(t), ImVec2(40, 40));
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip(_("Animation %d"), impacts[i]);
             }
         }
-        if (!impacts.empty() && hinted(ImGui::SmallButton(_("Clear impacts")), "Clear impacts"))
-            changed |= projectilesYaml.set(base + ".impact", "[]");
+        if (!impacts.empty() && Hinted(ImGui::SmallButton(_("Clear impacts")), "Clear impacts"))
+            changed |= projectilesYaml.Set(base + ".impact", "[]");
     }
 
     if (ImGui::CollapsingHeader(_("Ground marks"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        changed |= editYamlScalar(projectilesYaml, base + ".ground_marks", _("Crater composites"));
-        changed |= editYamlScalar(projectilesYaml, base + ".ground_mark_seconds", _("Crater seconds"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".ground_marks", _("Crater composites"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".ground_mark_seconds", _("Crater seconds"));
         ImGui::TextUnformatted(_("Craters"));
-        fieldHint("Craters");
+        FieldHint("Craters");
         // Every crater of the game: a click adds it to the list or takes it out
-        std::vector<int> marks = listOf(projectilesYaml.at(base + ".ground_marks"));
+        std::vector<int> marks = ListOf(projectilesYaml.At(base + ".ground_marks"));
         const float avail = ImGui::GetContentRegionAvail().x;
         const int perRow = std::max(1, static_cast<int>(avail / 62.0f));
         int k = 0;
@@ -333,7 +333,7 @@ void CharacterEditor::drawProjectileProperties() {
             ImGui::PushID(c);
             const bool on = std::find(marks.begin(), marks.end(), c) != marks.end();
             if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
-            SDL_Texture* thumb = zoomedThumbnail(c, 1.2f);
+            SDL_Texture* thumb = ZoomedThumbnail(c, 1.2f);
             const bool clicked = thumb ? ImGui::ImageButton("crater", reinterpret_cast<ImTextureID>(thumb), ImVec2(48, 32))
                                        : ImGui::Button(std::to_string(c).c_str());
             if (on) ImGui::PopStyleColor();
@@ -342,12 +342,12 @@ void CharacterEditor::drawProjectileProperties() {
                 if (on) marks.erase(std::remove(marks.begin(), marks.end(), c), marks.end());
                 else marks.push_back(c);
                 std::sort(marks.begin(), marks.end());
-                changed |= projectilesYaml.set(base + ".ground_marks", listText(marks));
+                changed |= projectilesYaml.Set(base + ".ground_marks", ListText(marks));
             }
             ImGui::PopID();
         }
         ImGui::SetNextItemWidth(160.0f);
-        hinted(ImGui::SliderFloat(_("Preview fade speed"), &projCraterSpeed, 1.0f, 30.0f, "%.0fx"), "Preview fade speed");
+        Hinted(ImGui::SliderFloat(_("Preview fade speed"), &projCraterSpeed, 1.0f, 30.0f, "%.0fx"), "Preview fade speed");
     }
 
     if (ImGui::CollapsingHeader(_("Used by"), ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -360,7 +360,7 @@ void CharacterEditor::drawProjectileProperties() {
                     auto scan = [&](const YAML::Node& combat) {
                         if (!combat || !combat["weapons"] || !combat["weapons"].IsSequence()) return;
                         for (const auto& w : combat["weapons"])
-                            if (yamlString(w, "projectile", "bullet") == kind.key) uses = true;
+                            if (YamlString(w, "projectile", "bullet") == kind.key) uses = true;
                     };
                     scan(doc["combat"]);
                     if (doc["abilities"] && doc["abilities"]["siege"]) scan(doc["abilities"]["siege"]["combat"]);
@@ -374,11 +374,11 @@ void CharacterEditor::drawProjectileProperties() {
     }
 
     if (changed) {
-        projectilesChanged();
+        ProjectilesChanged();
         projShots.clear();
     }
     ImGui::Separator();
-    drawAnimGallery(std::max(160.0f, ImGui::GetContentRegionAvail().y));
+    DrawAnimGallery(std::max(160.0f, ImGui::GetContentRegionAvail().y));
 }
 
 } // namespace CharEditor

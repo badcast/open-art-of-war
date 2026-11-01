@@ -24,7 +24,7 @@ const ThemeField kFixedFields[] = {
     {"text_muted", "Hints"},  {"danger", "Danger"}, {"danger_deep", "Danger fill"}, {"ok", "OK"}, {"info", "Info"},
 };
 
-ImU32 parseColor(const YAML::Node& n, ImU32 fallback) {
+ImU32 ParseColor(const YAML::Node& n, ImU32 fallback) {
     if (!n.IsDefined() || !n.IsScalar()) return fallback;
     const std::string& s = n.Scalar();
     unsigned r = 0, g = 0, b = 0, a = 255;
@@ -35,19 +35,19 @@ ImU32 parseColor(const YAML::Node& n, ImU32 fallback) {
 
 } // namespace
 
-void CharacterEditor::ensureUi() {
+void CharacterEditor::EnsureUi() {
     if (uiTried) return;
     uiTried = true;
-    loadYamlFile(uiYaml, "game_ui.yaml");
+    LoadYamlFile(uiYaml, "game_ui.yaml");
 }
 
-void CharacterEditor::drawGameUi() {
-    ensureUi();
+void CharacterEditor::DrawGameUi() {
+    EnsureUi();
     ImGui::TextWrapped("%s", _("Preview of the game interface with the colors of the file. Pick a theme on the right panel."));
-    if (!uiYaml.loaded()) return;
+    if (!uiYaml.Loaded()) return;
     const std::string tp = std::string("themes.") + kThemeKeys[uiTheme];
-    auto themeColor = [&](const char* key, ImU32 fb) { return parseColor(uiYaml.at(tp + "." + key), fb); };
-    auto fixedColor = [&](const char* key, ImU32 fb) { return parseColor(uiYaml.at(std::string("colors.") + key), fb); };
+    auto themeColor = [&](const char* key, ImU32 fb) { return ParseColor(uiYaml.At(tp + "." + key), fb); };
+    auto fixedColor = [&](const char* key, ImU32 fb) { return ParseColor(uiYaml.At(std::string("colors.") + key), fb); };
 
     const ImU32 backdrop = fixedColor("backdrop", IM_COL32(8, 10, 14, 255));
     const ImU32 text = fixedColor("text", IM_COL32(226, 231, 238, 255));
@@ -142,25 +142,25 @@ void CharacterEditor::drawGameUi() {
     dl->PopClipRect();
 }
 
-void CharacterEditor::drawGameUiProperties() {
-    ensureUi();
-    if (!uiYaml.loaded()) {
+void CharacterEditor::DrawGameUiProperties() {
+    EnsureUi();
+    if (!uiYaml.Loaded()) {
         ImGui::TextWrapped("%s", _("The interface file could not be loaded."));
         return;
     }
-    drawSettingsBar(uiYaml, "game_ui.yaml");
+    DrawSettingsBar(uiYaml, "game_ui.yaml");
     ImGui::Separator();
     ImGui::TextUnformatted(_("Theme"));
-    fieldHint("UI theme");
+    FieldHint("UI theme");
     for (int i = 0; i < 3; ++i) {
         if (i) ImGui::SameLine();
-        if (hinted(ImGui::RadioButton(_(kThemeLabels[i]), uiTheme == i), kThemeLabels[i])) uiTheme = i;
+        if (Hinted(ImGui::RadioButton(_(kThemeLabels[i]), uiTheme == i), kThemeLabels[i])) uiTheme = i;
     }
     ImGui::Spacing();
     const std::string tp = std::string("themes.") + kThemeKeys[uiTheme];
-    for (const ThemeField& f : kThemeFields) editYamlScalar(uiYaml, tp + "." + f.key, _(f.label));
+    for (const ThemeField& f : kThemeFields) EditYamlScalar(uiYaml, tp + "." + f.key, _(f.label));
     if (ImGui::CollapsingHeader(_("Colors of all themes"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        for (const ThemeField& f : kFixedFields) editYamlScalar(uiYaml, std::string("colors.") + f.key, _(f.label));
+        for (const ThemeField& f : kFixedFields) EditYamlScalar(uiYaml, std::string("colors.") + f.key, _(f.label));
     }
 }
 

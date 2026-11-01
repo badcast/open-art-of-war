@@ -29,7 +29,7 @@ namespace OpenArtOfWar
     namespace
     {
 
-        Net::GameIdentity identity()
+        Net::GameIdentity Identity()
         {
             Net::GameIdentity id;
             id.gameVersion = OAOW_VERSION;
@@ -37,7 +37,7 @@ namespace OpenArtOfWar
             // across platforms, see DetMath / -ffp-contract=off)
             const std::string v = std::string(OAOW_VERSION) + "|sim1";
             id.simBuildId = Net::crc32(v.data(), v.size());
-            id.assetsHash = NetMatch::assetsHash();
+            id.assetsHash = NetMatch::AssetsHash();
             return id;
         }
 
@@ -49,7 +49,7 @@ namespace OpenArtOfWar
         leave();
     }
 
-    uint64_t NetMatch::assetsHash()
+    uint64_t NetMatch::AssetsHash()
     {
         static const uint64_t hash = []
         {
@@ -57,14 +57,14 @@ namespace OpenArtOfWar
             // make a 64-bit value
             uint32_t a = 0, b = 0x9e3779b9u;
             // The manifest (main.json) decides which folders matter and is hashed itself
-            std::vector<std::string> files = LoaderResources::netHashFiles();
+            std::vector<std::string> files = LoaderResources::NetHashFiles();
             files.push_back(LoaderResources::kManifestPath);
             std::sort(files.begin(), files.end());
             files.erase(std::unique(files.begin(), files.end()), files.end());
             std::vector<uint8_t> bytes;
             for(const std::string &f : files)
             {
-                if(!Assets::readBytes(f, bytes))
+                if(!Assets::ReadBytes(f, bytes))
                     continue;
                 a = Net::crc32(f.data(), f.size(), a);
                 a = Net::crc32(bytes.data(), bytes.size(), a);
@@ -79,7 +79,7 @@ namespace OpenArtOfWar
     {
         leave();
         Net::HostConfig hc;
-        hc.identity = identity();
+        hc.identity = Identity();
         hc.roomName = playerName;
         hc.password = m_password;
         // Another game hosted on this computer holds the port: the next ones of the span (browsers probe them)
@@ -108,10 +108,10 @@ namespace OpenArtOfWar
 
     Net::GameIdentity NetMatch::gameIdentity()
     {
-        return identity();
+        return Identity();
     }
 
-    bool NetMatch::isOwner() const
+    bool NetMatch::IsOwner() const
     {
         if(!m_dedicated || !connected())
             return false;
@@ -135,21 +135,21 @@ namespace OpenArtOfWar
         if(!transport)
             return false;
         Net::ClientConfig cc;
-        cc.identity = identity();
+        cc.identity = Identity();
         cc.playerName = playerName;
         cc.password = m_password;
         m_client = std::make_unique<Net::SessionClient>(std::move(transport), cc);
         return true;
     }
 
-    void NetMatch::announce(const std::string &master, uint16_t masterPort)
+    void NetMatch::Announce(const std::string &master, uint16_t masterPort)
     {
         if(!m_host || !m_gameSocket || m_announcer)
             return;
         m_announcer = std::make_unique<Net::HostAnnouncer>(master, masterPort, *m_gameSocket, m_gamePort, Net::localLanIp());
     }
 
-    const std::string &NetMatch::publicCode() const
+    const std::string &NetMatch::PublicCode() const
     {
         static const std::string kNone;
         return m_announcer ? m_announcer->code() : kNone;
@@ -178,7 +178,7 @@ namespace OpenArtOfWar
         // Leaving for good: the host frees the slot at once instead of waiting for a comeback
         if(m_client)
             m_client->sendLeave();
-        detach();
+        Detach();
         m_announcer.reset();
         m_hostedJoin.reset();
         m_gameSocket = nullptr;
@@ -195,7 +195,7 @@ namespace OpenArtOfWar
         m_rejoinToken = {};
     }
 
-    void NetMatch::update(uint32_t nowMs)
+    void NetMatch::Update(uint32_t nowMs)
     {
         m_nowMs = nowMs;
         // The room has echoed the own picks: its copy is current again
@@ -203,7 +203,7 @@ namespace OpenArtOfWar
         {
             for(const Net::LobbySlot &s : m_client->lobby().slots)
             {
-                if(s.slot == localSlot() && s.choice.faction == m_pendingChoice[0] && s.choice.team == m_pendingChoice[1] && s.choice.color == m_pendingChoice[2] && s.choice.spawn == m_pendingChoice[3] && s.choice.ready == (m_pendingChoice[4] != 0))
+                if(s.slot == LocalSlot() && s.choice.faction == m_pendingChoice[0] && s.choice.team == m_pendingChoice[1] && s.choice.color == m_pendingChoice[2] && s.choice.spawn == m_pendingChoice[3] && s.choice.ready == (m_pendingChoice[4] != 0))
                     m_hasPendingChoice = false;
             }
         }
@@ -214,7 +214,7 @@ namespace OpenArtOfWar
             if(m_hostedJoin->state() == Net::HostedJoin::State::Ready)
             {
                 Net::ClientConfig cc;
-                cc.identity = identity();
+                cc.identity = Identity();
                 cc.playerName = m_name;
                 cc.password = m_password;
                 cc.token = m_rejoinToken; // set when this is a comeback after a lost connection
@@ -266,7 +266,7 @@ namespace OpenArtOfWar
                 if(transport)
                 {
                     Net::ClientConfig cc;
-                    cc.identity = identity();
+                    cc.identity = Identity();
                     cc.playerName = m_reconnect.name;
                     cc.password = m_password;
                     cc.token = m_client->token();
@@ -276,7 +276,7 @@ namespace OpenArtOfWar
                 m_reconnect.nextAttemptMs = nowMs + m_reconnect.delayMs;
             }
         }
-        updateMapFile();
+        UpdateMapFile();
         if(m_reconnect.active && m_client && m_client->state() == Net::SessionClient::State::Joined)
         {
             m_reconnect.active = false;
@@ -284,7 +284,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void NetMatch::togglePause()
+    void NetMatch::TogglePause()
     {
         if(m_client)
             m_client->requestPause(!m_client->pauseState().paused);
@@ -293,16 +293,16 @@ namespace OpenArtOfWar
     {
         return m_client && m_client->pauseState().paused;
     }
-    uint8_t NetMatch::pausedBy() const
+    uint8_t NetMatch::PausedBy() const
     {
         return m_client ? m_client->pauseState().bySlot : 0;
     }
-    uint8_t NetMatch::pausesLeft() const
+    uint8_t NetMatch::PausesLeft() const
     {
         return m_client ? m_client->pauseState().pausesLeft : 0;
     }
 
-    void NetMatch::dropConnection()
+    void NetMatch::DropConnection()
     {
         if(m_client && !m_host)
             m_client->disconnect();
@@ -310,7 +310,7 @@ namespace OpenArtOfWar
 
     // The room's map on this computer: the own file when it is the room's version, else a downloaded copy,
     // else ask the room for it
-    void NetMatch::updateMapFile()
+    void NetMatch::UpdateMapFile()
     {
         if(!m_client)
             return;
@@ -319,7 +319,7 @@ namespace OpenArtOfWar
         while(m_client->takeFile(hash, bytes))
         {
             const Net::LobbyState &lobby = m_client->lobby();
-            if(hash == lobby.mapHash && !MapFiles::store(lobby.map, hash, bytes).empty())
+            if(hash == lobby.mapHash && !MapFiles::Store(lobby.map, hash, bytes).empty())
                 m_lobbyMapChecked.clear();
         }
         const Net::LobbyState &lobby = m_client->lobby();
@@ -331,7 +331,7 @@ namespace OpenArtOfWar
             m_lobbyMapFile.clear();
             return;
         }
-        m_lobbyMapFile = MapFiles::resolve(lobby.map, lobby.mapHash);
+        m_lobbyMapFile = MapFiles::Resolve(lobby.map, lobby.mapHash);
         if(!m_lobbyMapFile.empty())
         {
             m_lobbyMapChecked = key;
@@ -344,17 +344,17 @@ namespace OpenArtOfWar
         }
     }
 
-    uint32_t NetMatch::desyncTick() const
+    uint32_t NetMatch::DesyncTick() const
     {
         return m_client ? m_client->desyncTick() : 0;
     }
 
-    uint32_t NetMatch::ticksReceived() const
+    uint32_t NetMatch::TicksReceived() const
     {
         return m_client ? m_client->turnsReceived() * std::max<uint32_t>(1, m_client->ticksPerTurn()) : 0;
     }
 
-    float NetMatch::stalledSeconds(uint32_t nowMs) const
+    float NetMatch::StalledSeconds(uint32_t nowMs) const
     {
         if(!m_client || m_lastTickMs == 0 || nowMs < m_lastTickMs)
             return 0.0f;
@@ -369,23 +369,23 @@ namespace OpenArtOfWar
     {
         return m_client && m_client->state() == Net::SessionClient::State::Rejected;
     }
-    uint8_t NetMatch::localSlot() const
+    uint8_t NetMatch::LocalSlot() const
     {
         return m_client ? m_client->slot() : 0;
     }
-    bool NetMatch::desynced() const
+    bool NetMatch::Desynced() const
     {
         return m_client && m_client->desynced();
     }
 
-    int NetMatch::playerCount() const
+    int NetMatch::PlayerCount() const
     {
         if(m_host)
             return m_host->playerCount();
         return m_client ? static_cast<int>(m_client->roster().players.size()) : 0;
     }
 
-    std::string NetMatch::statusText() const
+    std::string NetMatch::StatusText() const
     {
         if(m_hostedJoin)
             return "through the server";
@@ -405,14 +405,14 @@ namespace OpenArtOfWar
         return "";
     }
 
-    void NetMatch::setLobbyMap(const std::string &mapPath)
+    void NetMatch::SetLobbyMap(const std::string &mapPath)
     {
-        if(!controlsRoom())
+        if(!ControlsRoom())
             return;
-        const uint8_t spots = static_cast<uint8_t>(std::min<size_t>(MissionController::startPositions(mapPath).size(), kMaxPlayers));
-        const uint64_t hash = MapFiles::hashOf(mapPath);
+        const uint8_t spots = static_cast<uint8_t>(std::min<size_t>(MissionController::StartPositions(mapPath).size(), kMaxPlayers));
+        const uint64_t hash = MapFiles::HashOf(mapPath);
         // The room hands the map out to whoever does not have this very file (~20 KB compressed)
-        const std::vector<uint8_t> packed = MapFiles::packed(mapPath);
+        const std::vector<uint8_t> packed = MapFiles::Packed(mapPath);
         if(m_host)
         {
             m_host->offerFile(hash, packed);
@@ -425,7 +425,7 @@ namespace OpenArtOfWar
         }
     }
 
-    const Net::LobbyState *NetMatch::lobby() const
+    const Net::LobbyState *NetMatch::Lobby() const
     {
         return m_client ? &m_client->lobby() : nullptr;
     }
@@ -433,28 +433,28 @@ namespace OpenArtOfWar
     {
         return m_client ? &m_client->roster() : nullptr;
     }
-    void NetMatch::setChoice(const Net::LobbyChoice &choice)
+    void NetMatch::SetChoice(const Net::LobbyChoice &choice)
     {
         if(!m_client)
             return;
         Net::LobbyChoice c = choice;
         // Only the classic look (0) and the eight team colours exist (9..15 drew white)
         if(c.color > 8)
-            c.color = static_cast<uint8_t>(1 + localSlot() % 8);
+            c.color = static_cast<uint8_t>(1 + LocalSlot() % 8);
         m_client->sendLobbyChoice(c);
         m_pendingChoice = {c.faction, c.team, c.color, c.spawn, static_cast<uint8_t>(c.ready ? 1 : 0)};
         m_hasPendingChoice = true;
         m_pendingChoiceMs = m_nowMs;
     }
 
-    bool NetMatch::localChoice(Net::LobbyChoice &out) const
+    bool NetMatch::LocalChoice(Net::LobbyChoice &out) const
     {
         if(!m_client)
             return false;
         bool found = false;
         for(const Net::LobbySlot &s : m_client->lobby().slots)
         {
-            if(s.slot == localSlot())
+            if(s.slot == LocalSlot())
             {
                 out = s.choice;
                 found = true;
@@ -474,34 +474,34 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void NetMatch::setAi(const Net::OwnerSetAi &change)
+    void NetMatch::SetAi(const Net::OwnerSetAi &change)
     {
         if(m_host)
             m_host->setAiSlot(change);
-        else if(isOwner())
+        else if(IsOwner())
             m_client->sendOwnerSetAi(change);
     }
-    void NetMatch::setTeam(uint8_t slot, uint8_t team)
+    void NetMatch::SetTeam(uint8_t slot, uint8_t team)
     {
         if(m_host)
             m_host->setTeam(slot, team);
-        else if(isOwner())
+        else if(IsOwner())
             m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team});
     }
-    void NetMatch::sendChat(const std::string &text)
+    void NetMatch::SendChat(const std::string &text)
     {
         if(m_client && !text.empty())
             m_client->sendChat(text, false);
     }
-    std::vector<Net::Chat> NetMatch::takeChat()
+    std::vector<Net::Chat> NetMatch::TakeChat()
     {
         return m_client ? m_client->takeChat() : std::vector<Net::Chat> {};
     }
-    bool NetMatch::canStart() const
+    bool NetMatch::CanStart() const
     {
         if(m_host)
             return !m_host->lobby().map.empty() && m_host->everyoneReady(2);
-        if(!isOwner())
+        if(!IsOwner())
             return false;
         // The room's view of the owner: everybody listed in the room is ready
         const Net::LobbyState &lobby = m_client->lobby();
@@ -510,9 +510,9 @@ namespace OpenArtOfWar
         return std::all_of(lobby.slots.begin(), lobby.slots.end(), [](const Net::LobbySlot &s) { return s.choice.ready; });
     }
 
-    void NetMatch::startFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt)
+    void NetMatch::StartFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt)
     {
-        if(!controlsRoom())
+        if(!ControlsRoom())
             return;
         const Net::LobbyState &lobby = m_host ? m_host->lobby() : m_client->lobby();
         MatchSetup setup;
@@ -555,26 +555,26 @@ namespace OpenArtOfWar
         if(m_host)
             startMatch(setup, nowMs);
         else
-            m_client->sendOwnerStart(encodeSetup(setup));
+            m_client->sendOwnerStart(EncodeSetup(setup));
     }
 
     void NetMatch::startMatch(const MatchSetup &setup, uint32_t nowMs)
     {
         if(m_host)
-            m_host->startMatch(encodeSetup(setup), nowMs);
+            m_host->startMatch(EncodeSetup(setup), nowMs);
     }
 
-    bool NetMatch::takeStartedMatch(MatchSetup &out)
+    bool NetMatch::TakeStartedMatch(MatchSetup &out)
     {
         // A new StartMatch: the match itself, or the same one again after a reconnect (played through from
         // its first turn)
         if(!m_client || !m_client->matchStarted() || m_client->matchStarts() == m_takenStarts)
             return false;
-        if(!decodeSetup(m_client->matchSetup(), out))
+        if(!DecodeSetup(m_client->matchSetup(), out))
             return false;
         out.local = m_client->slot();
         // Exactly the room's map: the own file or the downloaded copy
-        const std::string file = MapFiles::resolve(out.mapPath, out.mapHash);
+        const std::string file = MapFiles::Resolve(out.mapPath, out.mapHash);
         if(file.empty())
         {
             m_failure = "the map " + out.mapPath + " of this match is missing or differs";
@@ -588,21 +588,21 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void NetMatch::attach(Simulation &sim)
+    void NetMatch::Attach(Simulation &sim)
     {
         m_sim = &sim;
         m_outgoing.clear();
-        sim.setCommandSink([this](SimCommand c) { m_outgoing.push_back(std::move(c)); });
+        sim.SetCommandSink([this](SimCommand c) { m_outgoing.push_back(std::move(c)); });
     }
 
-    void NetMatch::detach()
+    void NetMatch::Detach()
     {
         if(m_sim)
-            m_sim->setCommandSink(nullptr);
+            m_sim->SetCommandSink(nullptr);
         m_sim = nullptr;
     }
 
-    bool NetMatch::canRunTick(uint32_t tick)
+    bool NetMatch::CanRunTick(uint32_t tick)
     {
         if(!m_client || !m_sim)
             return true;
@@ -617,14 +617,14 @@ namespace OpenArtOfWar
         for(const Net::PlayerTurn &p : bundle->players)
         {
             std::vector<SimCommand> commands;
-            if(!SimCommandCodec::decode(p.bytes.data(), p.bytes.size(), p.slot, commands))
+            if(!SimCommandCodec::Decode(p.bytes.data(), p.bytes.size(), p.slot, commands))
                 continue;
             for(SimCommand &c : commands)
             {
                 if(c.type == CommandType::PlayerLeft)
                     continue;    // only the host's word counts for that (below)
                 c.debug = false; // no debug powers in a network game
-                m_sim->schedule(turn * tpt, std::move(c));
+                m_sim->Schedule(turn * tpt, std::move(c));
             }
         }
         // Players who left the match for good: their forces go on this tick, on every peer alike
@@ -633,14 +633,14 @@ namespace OpenArtOfWar
             SimCommand c;
             c.type = CommandType::PlayerLeft;
             c.player = slot;
-            m_sim->schedule(turn * tpt, std::move(c));
+            m_sim->Schedule(turn * tpt, std::move(c));
         }
         m_scheduledTurn = turn + 1;
         m_client->dropTurnsBefore(turn);
         return true;
     }
 
-    void NetMatch::afterTick(uint32_t tick, uint64_t checksum)
+    void NetMatch::AfterTick(uint32_t tick, uint64_t checksum)
     {
         if(!m_client || !m_sim)
             return;
@@ -656,12 +656,12 @@ namespace OpenArtOfWar
             {
                 size_t count = std::min(m_outgoing.size() - begin, SimCommandCodec::kMaxCommandsPerTurn);
                 std::vector<SimCommand> part(m_outgoing.begin() + begin, m_outgoing.begin() + begin + count);
-                std::vector<uint8_t> bytes = SimCommandCodec::encode(part);
+                std::vector<uint8_t> bytes = SimCommandCodec::Encode(part);
                 while(bytes.size() > Net::kMaxPlayerCommandBytes && count > 1)
                 {
                     count = (count + 1) / 2;
                     part.resize(count);
-                    bytes = SimCommandCodec::encode(part);
+                    bytes = SimCommandCodec::Encode(part);
                 }
                 if(bytes.size() <= Net::kMaxPlayerCommandBytes)
                     m_client->sendCommands(turn, bytes);
@@ -675,7 +675,7 @@ namespace OpenArtOfWar
         {
             m_client->sendWorldHash(tick, checksum);
             // OAOW_NET_TRACE=1: the checksums on stdout, to compare two peers by eye or script
-            static const bool trace = debugEnv("OAOW_NET_TRACE") != nullptr;
+            static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
             if(trace && tick % (kHashIntervalTicks * 10) == 0)
             {
                 std::printf("[Net] tick %u checksum %016llx\n", tick, static_cast<unsigned long long>(checksum));
@@ -717,10 +717,10 @@ namespace OpenArtOfWar
         s.recvKBps = m_recvKBps;
         s.turnMs = m_client->turnMs();
         s.inputDelayMs = static_cast<int>(m_client->inputDelay()) * s.turnMs;
-        s.turnsBuffered = m_sim ? std::max(0, turnsAhead(tick)) : 0;
-        s.stalledSeconds = m_sim ? stalledSeconds(nowMs) : 0.0f;
+        s.turnsBuffered = m_sim ? std::max(0, TurnsAhead(tick)) : 0;
+        s.stalledSeconds = m_sim ? StalledSeconds(nowMs) : 0.0f;
         s.reconnecting = m_reconnect.active;
-        s.desynced = desynced();
+        s.desynced = Desynced();
         if(m_host)
         {
             for(const Net::SessionHost::Player &p : m_host->players())
@@ -729,7 +729,7 @@ namespace OpenArtOfWar
         return s;
     }
 
-    int NetMatch::turnsAhead(uint32_t tick) const
+    int NetMatch::TurnsAhead(uint32_t tick) const
     {
         if(!m_client)
             return 0;
@@ -737,7 +737,7 @@ namespace OpenArtOfWar
         return static_cast<int>(m_client->turnsReceived()) - static_cast<int>(tick / tpt) - 1;
     }
 
-    std::vector<uint8_t> NetMatch::encodeSetup(const MatchSetup &setup)
+    std::vector<uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
     {
         std::vector<uint8_t> buf(Net::kMaxMatchSetupBytes);
         Net::BitWriter w(buf.data(), buf.size());
@@ -765,7 +765,7 @@ namespace OpenArtOfWar
         return buf;
     }
 
-    bool NetMatch::decodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out)
+    bool NetMatch::DecodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out)
     {
         Net::BitReader r(bytes.data(), bytes.size());
         out = MatchSetup {};
@@ -795,7 +795,7 @@ namespace OpenArtOfWar
             out.startPosition[i] = static_cast<int8_t>(r.readBits(3));
         }
         // Only maps of the game's own folder (the path comes from another computer)
-        if(out.mapPath.rfind(LoaderResources::mapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
+        if(out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
             return false;
         return !r.failed();
     }

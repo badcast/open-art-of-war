@@ -21,24 +21,24 @@
 
 namespace CharEditor {
 
-void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, bool primary) {
-    gameRenderer->setDrawOwner(primary ? 0 : 1);   // owner 0 wears the army color of the combo box, the opponent stays classic
+void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets& vo, bool primary) {
+    gameRenderer->SetDrawOwner(primary ? 0 : 1);   // owner 0 wears the army color of the combo box, the opponent stays classic
     if (showGround) {
         // 5x5 ground tiles centered at world origin (0, 0)
         for (int row = -2; row <= 2; ++row) {
             for (int col = -2; col <= 2; ++col) {
                 float tileX = static_cast<float>(col * OpenArtOfWar::TILE_WIDTH) - static_cast<float>(OpenArtOfWar::TILE_WIDTH) * 0.5f;
                 float tileY = static_cast<float>(row * OpenArtOfWar::TILE_HEIGHT) - static_cast<float>(OpenArtOfWar::TILE_HEIGHT) * 0.5f;
-                gameRenderer->drawTileWorld(0, 0, tileX, tileY, *camera);
+                gameRenderer->DrawTileWorld(0, 0, tileX, tileY, *camera);
             }
         }
         // 2px border around 5x5 ground
-        gameRenderer->drawRectWorld(-75.0f, -50.0f, 150.0f, 100.0f, *camera, SDL_Color{85, 140, 105, 200});
-        gameRenderer->drawRectWorld(-76.0f, -51.0f, 152.0f, 102.0f, *camera, SDL_Color{85, 140, 105, 120});
+        gameRenderer->DrawRectWorld(-75.0f, -50.0f, 150.0f, 100.0f, *camera, SDL_Color{85, 140, 105, 200});
+        gameRenderer->DrawRectWorld(-76.0f, -51.0f, 152.0f, 102.0f, *camera, SDL_Color{85, 140, 105, 120});
     }
 
-    const bool building = yamlString(doc, "type") == "building";
-    const OpenArtOfWar::Faction faction = docFaction(doc);
+    const bool building = YamlString(doc, "type") == "building";
+    const OpenArtOfWar::Faction faction = DocFaction(doc);
     const bool destroyed = previewHealthPercent == 0;
     const bool deathAnimation = destroyed || previewMode == PreviewMode::Die;
     const float frameClock = (loopPreview || deathAnimation) ? previewTime : 0.0f;
@@ -47,7 +47,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
     float unitCenterX = 0.0f;
     float unitCenterY = 0.0f;
     int shownHullFacing = facing;                       // hull direction drawn this frame
-    int shownArchetype = yamlInt(doc, "archetype_id", 0); // sprite set drawn (siege form included)
+    int shownArchetype = YamlInt(doc, "archetype_id", 0); // sprite set drawn (siege form included)
 
     const float* s_dirDx = OpenArtOfWar::Utility::kDir8X;
     const float* s_dirDy = OpenArtOfWar::Utility::kDir8Y;
@@ -55,7 +55,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
     // Direction towards target from world origin
     float toMouseX = targetWorldX;
     float toMouseY = targetWorldY;
-    const int aimDir8 = OpenArtOfWar::Utility::dir8FromVector(toMouseX, toMouseY);
+    const int aimDir8 = OpenArtOfWar::Utility::Dir8FromVector(toMouseX, toMouseY);
 
     YAML::Node combatNode = doc["combat"];
     YAML::Node statsNode = doc["stats"];
@@ -68,28 +68,28 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         }
     }
 
-    const bool hasRotTurret = yamlBool(combatNode, "has_rotating_turret", false);
+    const bool hasRotTurret = YamlBool(combatNode, "has_rotating_turret", false);
     const bool isInf = !building && [&]() {
-        const int arch = yamlInt(doc, "archetype_id", 0);
-        return OpenArtOfWar::Utility::isInfantryArchetype(arch);
+        const int arch = YamlInt(doc, "archetype_id", 0);
+        return OpenArtOfWar::Utility::IsInfantryArchetype(arch);
     }();
 
     if (building) {
-        const int buildingIndex = yamlInt(doc, "building_index", -1);
+        const int buildingIndex = YamlInt(doc, "building_index", -1);
         const YAML::Node size = doc["size"];
-        const int width = yamlInt(size, "width", 1);
-        const int height = yamlInt(size, "height", 1);
+        const int width = YamlInt(size, "width", 1);
+        const int height = YamlInt(size, "height", 1);
         const float footprintX = -static_cast<float>(width * OpenArtOfWar::TILE_WIDTH) * 0.5f;
         const float footprintY = -static_cast<float>(height * OpenArtOfWar::TILE_HEIGHT) * 0.5f;
         unitCenterX = 0.0f;
         unitCenterY = 0.0f;
 
         // Draw building footprint rectangle in world space
-        gameRenderer->fillRectWorld(footprintX, footprintY,
+        gameRenderer->FillRectWorld(footprintX, footprintY,
                                     static_cast<float>(width * OpenArtOfWar::TILE_WIDTH),
                                     static_cast<float>(height * OpenArtOfWar::TILE_HEIGHT),
                                     *camera, SDL_Color{91, 153, 123, 40});
-        gameRenderer->drawRectWorld(footprintX, footprintY,
+        gameRenderer->DrawRectWorld(footprintX, footprintY,
                                     static_cast<float>(width * OpenArtOfWar::TILE_WIDTH),
                                     static_cast<float>(height * OpenArtOfWar::TILE_HEIGHT),
                                     *camera, SDL_Color{118, 176, 146, 180});
@@ -97,11 +97,11 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         if (buildingIndex >= 0) {
             bool attacking = false;
             if (!destroyed && previewMode == PreviewMode::Attack &&
-                yamlBool(combatNode, "can_attack", true)) {
-                const YAML::Node gun = mainWeapon(combatNode);
-                const int burstCount = std::max(1, yamlInt(gun, "burst_count", 1));
-                const float burstDelay = std::max(0.04f, yamlFloat(gun, "burst_delay", 0.1f));
-                const float cooldown = std::max(0.15f, weaponCooldown(gun, false, 0.7f));
+                YamlBool(combatNode, "can_attack", true)) {
+                const YAML::Node gun = MainWeapon(combatNode);
+                const int burstCount = std::max(1, YamlInt(gun, "burst_count", 1));
+                const float burstDelay = std::max(0.04f, YamlFloat(gun, "burst_delay", 0.1f));
+                const float cooldown = std::max(0.15f, WeaponCooldown(gun, false, 0.7f));
                 const float burstSpan = static_cast<float>(burstCount - 1) * burstDelay;
                 const float period = std::max(0.35f, burstSpan + cooldown);
                 const float phase = std::fmod(previewTime, period);
@@ -116,11 +116,11 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
             }
             const int bTurretFacing = hasRotTurret ? turretFacingDir : ((previewMode == PreviewMode::Attack) ? aimDir8 : facing);
             int wreckComp = 0, wreckStages = 0;
-            wreckOf(doc, wreckComp, wreckStages);
+            WreckOf(doc, wreckComp, wreckStages);
 
             if (previewMode == PreviewMode::Wreck) {
-                gameRenderer->drawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
-                                                currentWreckStage(wreckStages), 1.0f, true, 1.0f, 0, false, true,
+                gameRenderer->DrawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
+                                                CurrentWreckStage(wreckStages), 1.0f, true, 1.0f, 0, false, true,
                                                 wreckComp, wreckStages);
             } else if (destroyed) {
                 // Destruction sequence: explosion starts, and from the middle of destruction the crater appears
@@ -129,32 +129,32 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
                 float expDur = expFrames * 0.08f;
                 bool showRemnant = (previewTime >= expDur * 0.45f);
 
-                gameRenderer->drawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
+                gameRenderer->DrawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
                                                 showRemnant ? 0 : frame, buildingProgress, showRemnant,
                                                 static_cast<float>(previewHealthPercent) / 100.0f,
                                                 bTurretFacing, false, buildingPowered, wreckComp, wreckStages);
-                gameRenderer->drawBuildingWorld(buildingIndex, footprintX, footprintY, 1, *camera, faction,
+                gameRenderer->DrawBuildingWorld(buildingIndex, footprintX, footprintY, 1, *camera, faction,
                                                 frame, buildingProgress, showRemnant,
                                                 static_cast<float>(previewHealthPercent) / 100.0f,
                                                 bTurretFacing, false, buildingPowered);
 
                 if (previewTime < expDur) {
                     int expFrame = std::clamp(static_cast<int>(previewTime / 0.08f), 0, expFrames - 1);
-                    gameRenderer->drawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
+                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
                 }
             } else {
-                gameRenderer->drawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
+                gameRenderer->DrawBuildingWorld(buildingIndex, footprintX, footprintY, 0, *camera, faction,
                                                 frame, buildingProgress, false,
                                                 static_cast<float>(previewHealthPercent) / 100.0f,
                                                 bTurretFacing, attacking, buildingPowered);
-                gameRenderer->drawBuildingWorld(buildingIndex, footprintX, footprintY, 1, *camera, faction,
+                gameRenderer->DrawBuildingWorld(buildingIndex, footprintX, footprintY, 1, *camera, faction,
                                                 frame, buildingProgress, false,
                                                 static_cast<float>(previewHealthPercent) / 100.0f,
                                                 bTurretFacing, attacking, buildingPowered);
             }
         } else {
-            gameRenderer->drawLineWorld(-24.0f, -24.0f, 24.0f, 24.0f, *camera, SDL_Color{255, 160, 120, 255});
-            gameRenderer->drawLineWorld(24.0f, -24.0f, -24.0f, 24.0f, *camera, SDL_Color{255, 160, 120, 255});
+            gameRenderer->DrawLineWorld(-24.0f, -24.0f, 24.0f, 24.0f, *camera, SDL_Color{255, 160, 120, 255});
+            gameRenderer->DrawLineWorld(24.0f, -24.0f, -24.0f, 24.0f, *camera, SDL_Color{255, 160, 120, 255});
         }
     } else {
         // Unit drawing: tile top-left is (-15, -10) so center is at (0, 0)
@@ -163,7 +163,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         int unitFacing = facing;
 
         if (previewMode == PreviewMode::Move && !destroyed) {
-            const MoveSample m = sampleMove(yamlInt(doc, "archetype_id", 0), yamlFloat(statsNode, "move_speed", 0.0f), previewTime);
+            const MoveSample m = SampleMove(YamlInt(doc, "archetype_id", 0), YamlFloat(statsNode, "move_speed", 0.0f), previewTime);
             unitX += m.offsetX;
             unitFacing = m.facing;
         } else if (!hasRotTurret && previewMode == PreviewMode::Attack) {
@@ -173,15 +173,15 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         unitCenterX = unitX + static_cast<float>(OpenArtOfWar::TILE_WIDTH) * 0.5f;
         unitCenterY = unitY + static_cast<float>(OpenArtOfWar::TILE_HEIGHT) * 0.5f;
 
-        int archetypeId = yamlInt(doc, "archetype_id", 0);
+        int archetypeId = YamlInt(doc, "archetype_id", 0);
         if (testSiegeMode) {
             int sArch = -1;
             if (doc["abilities"]) {
                 if (doc["abilities"]["siege"] && doc["abilities"]["siege"].IsMap()) {
-                    sArch = yamlInt(doc["abilities"]["siege"], "archetype_id", -1);
+                    sArch = YamlInt(doc["abilities"]["siege"], "archetype_id", -1);
                 }
                 if (sArch < 0) {
-                    sArch = yamlInt(doc["abilities"], "siege_archetype_id", -1);
+                    sArch = YamlInt(doc["abilities"], "siege_archetype_id", -1);
                 }
             }
             if (sArch < 0) {
@@ -201,15 +201,15 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         if (previewMode == PreviewMode::Wreck) {
             // Remains only: vehicles sink stage by stage, infantry leaves its corpse
             int wreckComp = 0, wreckStages = 0;
-            wreckOf(doc, wreckComp, wreckStages);
-            const int stage = currentWreckStage(wreckStages);
+            WreckOf(doc, wreckComp, wreckStages);
+            const int stage = CurrentWreckStage(wreckStages);
             if (isInf) {
                 const YAML::Node seqs = doc["animations"]["death_sequences"];
                 const int corpseSeq = (seqs && seqs.IsSequence() && seqs.size() > 0) ? seqs[0].as<int>(0) : 0;
-                gameRenderer->drawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Die), unitFacing, 99,
+                gameRenderer->DrawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Die), unitFacing, 99,
                                             unitX, unitY, *camera, faction, turretFacing, testFlameDeath, 0, 0, corpseSeq);
             } else {
-                gameRenderer->drawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Die), unitFacing, stage,
+                gameRenderer->DrawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Die), unitFacing, stage,
                                             unitX, unitY, *camera, faction, turretFacing, true, wreckComp, wreckStages);
             }
         } else if (destroyed) {
@@ -222,31 +222,31 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
 
                 if (showWreck) {
                     int wreckComp = 0, wreckStages = 0;
-                    wreckOf(doc, wreckComp, wreckStages);
-                    gameRenderer->drawUnitWorld(archetypeId, action, unitFacing, 0,
+                    WreckOf(doc, wreckComp, wreckStages);
+                    gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, 0,
                                                 unitX, unitY, *camera, faction, turretFacing, true, wreckComp, wreckStages);
                 } else {
-                    gameRenderer->drawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Idle),
+                    gameRenderer->DrawUnitWorld(archetypeId, static_cast<int>(OpenArtOfWar::ActionState::Idle),
                                                 unitFacing, frame, unitX, unitY, *camera, faction, turretFacing, true);
                 }
 
                 if (previewTime < expDur) {
                     int expFrame = std::clamp(static_cast<int>(previewTime / 0.08f), 0, expFrames - 1);
-                    gameRenderer->drawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
+                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
                 }
             } else {
-                gameRenderer->drawUnitWorld(archetypeId, action, unitFacing, frame,
+                gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, frame,
                                             unitX, unitY, *camera, faction, turretFacing, testFlameDeath);
             }
         } else if (previewMode == PreviewMode::Move) {
             action = static_cast<int>(OpenArtOfWar::ActionState::Move);
-            gameRenderer->drawUnitWorld(archetypeId, action, unitFacing, frame,
+            gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, frame,
                                         unitX, unitY, *camera, faction, turretFacing, true);
-        } else if (previewMode == PreviewMode::Attack && yamlBool(combatNode, "can_attack", true)) {
-            const YAML::Node gun = mainWeapon(combatNode);
-            const int burstCount = std::max(1, yamlInt(gun, "burst_count", 1));
-            const float burstDelay = std::max(0.04f, yamlFloat(gun, "burst_delay", 0.1f));
-            const float cooldown = std::max(0.15f, weaponCooldown(gun, false, 0.7f));
+        } else if (previewMode == PreviewMode::Attack && YamlBool(combatNode, "can_attack", true)) {
+            const YAML::Node gun = MainWeapon(combatNode);
+            const int burstCount = std::max(1, YamlInt(gun, "burst_count", 1));
+            const float burstDelay = std::max(0.04f, YamlFloat(gun, "burst_delay", 0.1f));
+            const float cooldown = std::max(0.15f, WeaponCooldown(gun, false, 0.7f));
             const float burstSpan = static_cast<float>(burstCount - 1) * burstDelay;
             const float period = std::max(0.35f, burstSpan + cooldown);
             const float phase = std::fmod(previewTime, period);
@@ -263,12 +263,12 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
                                        : static_cast<int>(OpenArtOfWar::ActionState::Idle);
             const float stepDelay = (archetypeId == 7 || archetypeId == 18) ? 0.04f : 0.07f;
             const int attackFrame = static_cast<int>(sinceShot / stepDelay);
-            gameRenderer->drawUnitWorld(archetypeId, action, unitFacing, attackFrame,
+            gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, attackFrame,
                                         unitX, unitY, *camera, faction, turretFacing, true);
         } else {
-            action = previewAction();
+            action = PreviewAction();
             bool flaming = (action == static_cast<int>(OpenArtOfWar::ActionState::Die)) ? testFlameDeath : true;
-            gameRenderer->drawUnitWorld(archetypeId, action, unitFacing, frame,
+            gameRenderer->DrawUnitWorld(archetypeId, action, unitFacing, frame,
                                         unitX, unitY, *camera, faction, turretFacing, flaming);
         }
     }
@@ -281,9 +281,9 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
     if (combatNode["weapons"] && combatNode["weapons"].IsSequence() && combatNode["weapons"].size() >= 2) {
         bool useW2 = false;
         YAML::Node w2 = combatNode["weapons"][1];
-        bool w2Enabled = yamlBool(w2, "enabled", true);
-        bool w2ReqResearch = yamlBool(w2, "requires_research", false);
-        float w2MaxDist = yamlFloat(w2, "max_distance", 1.5f);
+        bool w2Enabled = YamlBool(w2, "enabled", true);
+        bool w2ReqResearch = YamlBool(w2, "requires_research", false);
+        float w2MaxDist = YamlFloat(w2, "max_distance", 1.5f);
 
         if (testWeaponSelectMode == 2) {
             useW2 = w2Enabled;
@@ -305,7 +305,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
             activeWeaponNode = combatNode["weapons"][0];
         }
     } else {
-        int arch = yamlInt(doc, "archetype_id", 0);
+        int arch = YamlInt(doc, "archetype_id", 0);
         if ((arch == 7 || arch == 18) && distTiles <= 1.5f && simLabUpgradeUnlocked && testWeaponSelectMode != 1) {
             activeWeaponIdx = 1;
         }
@@ -317,7 +317,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
     try {
         if (activeWeaponNode.IsDefined() && activeWeaponNode["range"]) {
             attackRangeTiles = activeWeaponNode["range"].as<float>(0.0f);
-        } else if (const YAML::Node w0 = mainWeapon(combatNode); w0 && w0["range"]) {
+        } else if (const YAML::Node w0 = MainWeapon(combatNode); w0 && w0["range"]) {
             attackRangeTiles = w0["range"].as<float>(0.0f);
         }
     } catch (...) {}
@@ -331,14 +331,14 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
 
     // Green Sight Radius (2px line width)
     if (showSightRange && sightRangeTiles > 0.0f) {
-        drawRadiusCircle2px(unitCenterX, unitCenterY,
+        DrawRadiusCircle2px(unitCenterX, unitCenterY,
                             sightRangeTiles * static_cast<float>(OpenArtOfWar::TILE_WIDTH),
                             SDL_Color{50, 230, 80, 240});
     }
 
     // Red Attack Radius (2px line width)
     if (showAttackRange && attackRangeTiles > 0.0f) {
-        drawRadiusCircle2px(unitCenterX, unitCenterY,
+        DrawRadiusCircle2px(unitCenterX, unitCenterY,
                             attackRangeTiles * static_cast<float>(OpenArtOfWar::TILE_WIDTH),
                             SDL_Color{255, 60, 60, 240});
     }
@@ -351,7 +351,7 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
     if (hasRotTurret) {
         // The turret sits elsewhere on the hull for every hull direction: follow the sprite like the game
         float shiftX = 0.0f, shiftY = 0.0f;
-        if (!building) turretShift(shownArchetype, shownHullFacing, shiftX, shiftY);
+        if (!building) TurretShift(shownArchetype, shownHullFacing, shiftX, shiftY);
         basePivotX += vo.turretX + shiftX;
         basePivotY += vo.turretY + shiftY;
         activeFacing = turretFacingDir;
@@ -392,30 +392,30 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
         // Center pivot indicator (cyan dot)
         OpenArtOfWar::RenderUtility::DrawRadius(*gameRenderer, *camera, basePivotX, basePivotY, 2.0f, SDL_Color{80, 220, 255, 220}, 1.5f);
         // Line from pivot to muzzle exit point
-        gameRenderer->drawLineWorld(basePivotX, basePivotY, muzzleX, muzzleY, *camera,
+        gameRenderer->DrawLineWorld(basePivotX, basePivotY, muzzleX, muzzleY, *camera,
                                     activeFiringWeaponIndex == 1 ? SDL_Color{255, 140, 50, 220} : SDL_Color{255, 200, 50, 180});
 
         // Visual muzzle exit point marker (localePosition)
         SDL_Color muzzleCol = (activeFiringWeaponIndex == 1) ? SDL_Color{255, 120, 30, 255} : SDL_Color{255, 230, 40, 240};
         OpenArtOfWar::RenderUtility::DrawRadius(*gameRenderer, *camera, muzzleX, muzzleY, 3.5f, muzzleCol, 1.5f);
-        gameRenderer->drawLineWorld(muzzleX - 4.0f, muzzleY, muzzleX + 4.0f, muzzleY, *camera, muzzleCol);
-        gameRenderer->drawLineWorld(muzzleX, muzzleY - 4.0f, muzzleX, muzzleY + 4.0f, *camera, muzzleCol);
+        gameRenderer->DrawLineWorld(muzzleX - 4.0f, muzzleY, muzzleX + 4.0f, muzzleY, *camera, muzzleCol);
+        gameRenderer->DrawLineWorld(muzzleX, muzzleY - 4.0f, muzzleX, muzzleY + 4.0f, *camera, muzzleCol);
     }
 
     // Projectile & Combat FX (Burst Simulation) - only the edited character runs the projectile sim
     if (primary && !destroyed && previewMode == PreviewMode::Attack &&
-        yamlBool(combatNode, "can_attack", true)) {
+        YamlBool(combatNode, "can_attack", true)) {
 
         // Draw line of fire toward directed target point
-        gameRenderer->drawLineWorld(muzzleX, muzzleY, targetWorldX, targetWorldY,
+        gameRenderer->DrawLineWorld(muzzleX, muzzleY, targetWorldX, targetWorldY,
                                     *camera, SDL_Color{236, 111, 77, 90});
 
         // Muzzle flash on each shot
-        const bool ownFlame = isInf && yamlString(mainWeapon(combatNode), "projectile", "bullet") == "flame";
+        const bool ownFlame = isInf && YamlString(MainWeapon(combatNode), "projectile", "bullet") == "flame";
         if (muzzleFlashTimer > 0.0f && !ownFlame) { // the flamethrower's own firing layer is its nozzle flame
             float flashDur = 0.08f / std::max(0.1f, previewFxSpeed);
             int mFrame = std::clamp(static_cast<int>((1.0f - muzzleFlashTimer / flashDur) * 3.0f), 0, 2);
-            gameRenderer->drawAnimSequenceWorld(42, mFrame, muzzleFlashX, muzzleFlashY, *camera, faction);
+            gameRenderer->DrawAnimSequenceWorld(42, mFrame, muzzleFlashX, muzzleFlashY, *camera, faction);
         }
 
         // Projectiles and impact effects in flight
@@ -428,29 +428,29 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
                     float angle = std::atan2(p.targetY - p.startY, p.targetX - p.startX);
                     const float prog = std::clamp(p.traveledDist / std::max(1.0f, p.totalDist), 0.0f, 1.0f);
                     const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
-                    gameRenderer->drawAnimSequenceWorldRotated(59, flameFrame, p.startX, p.startY, angle, *camera, faction);
+                    gameRenderer->DrawAnimSequenceWorldRotated(59, flameFrame, p.startX, p.startY, angle, *camera, faction);
                 } else if (p.projectileType != "none") {
                     // The sprite of the projectile kind (projectiles.yaml), as the game draws it
-                    const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(p.projectileType));
+                    const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::FromKey(p.projectileType));
                     if (spec.sprite > 0)
-                        gameRenderer->drawProjectileWorld(spec.sprite, spec.directions == 16 ? p.dir16 : p.dir32, p.curX, p.curY, *camera,
+                        gameRenderer->DrawProjectileWorld(spec.sprite, spec.directions == 16 ? p.dir16 : p.dir32, p.curX, p.curY, *camera,
                                                           faction, spec.directions);
                 }
             } else {
                 float impactProgress = 1.0f - (p.impactTimer / p.maxImpactTime);
                 int impactFrame = std::clamp(static_cast<int>(impactProgress * 4.0f), 0, 3);
                 // The hit animation of the projectile kind, centred like the game does
-                const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(p.projectileType));
-                const int impactAnim = spec.pickImpact(0);
+                const auto& spec = OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::FromKey(p.projectileType));
+                const int impactAnim = spec.PickImpact(0);
                 float offX = 0.0f, offY = 0.0f;
-                OpenArtOfWar::explosionCentering(impactAnim, offX, offY);
-                const OpenArtOfWar::IndexRange impactRange = textures->getAnimRange(std::max(0, impactAnim));
+                OpenArtOfWar::ExplosionCentering(impactAnim, offX, offY);
+                const OpenArtOfWar::IndexRange impactRange = textures->GetAnimRange(std::max(0, impactAnim));
                 impactFrame = std::clamp(static_cast<int>(impactProgress * static_cast<float>(std::max(1, impactRange.end - impactRange.start + 1))), 0,
                                          std::max(0, impactRange.end - impactRange.start));
                 if (p.projectileType == "flame" || impactAnim < 0) {
                     // The game draws no impact for flames: the stream itself ends at the target
                 } else {
-                    gameRenderer->drawAnimSequenceWorld(impactAnim, impactFrame,
+                    gameRenderer->DrawAnimSequenceWorld(impactAnim, impactFrame,
                                                         p.targetX + offX, p.targetY + offY, *camera, faction);
                 }
             }
@@ -459,14 +459,14 @@ void CharacterEditor::drawCharacter(YAML::Node doc, const VisualOffsets& vo, boo
 
 }
 
-void CharacterEditor::drawPreviewGrid() {
+void CharacterEditor::DrawPreviewGrid() {
     float leftWorld = 0.0f;
     float topWorld = 0.0f;
     float rightWorld = 0.0f;
     float bottomWorld = 0.0f;
-    camera->screenToWorld(static_cast<float>(previewRect.x), static_cast<float>(previewRect.y),
+    camera->ScreenToWorld(static_cast<float>(previewRect.x), static_cast<float>(previewRect.y),
                           leftWorld, topWorld);
-    camera->screenToWorld(static_cast<float>(previewRect.x + previewRect.w),
+    camera->ScreenToWorld(static_cast<float>(previewRect.x + previewRect.w),
                           static_cast<float>(previewRect.y + previewRect.h), rightWorld, bottomWorld);
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -476,7 +476,7 @@ void CharacterEditor::drawPreviewGrid() {
     for (int column = firstColumn; column <= lastColumn; ++column) {
         float screenX = 0.0f;
         float screenY = 0.0f;
-        camera->worldToScreen(static_cast<float>(column * OpenArtOfWar::TILE_WIDTH), topWorld,
+        camera->WorldToScreen(static_cast<float>(column * OpenArtOfWar::TILE_WIDTH), topWorld,
                               screenX, screenY);
         SDL_RenderLine(renderer, screenX, static_cast<float>(previewRect.y),
                             screenX, static_cast<float>(previewRect.y + previewRect.h));
@@ -487,36 +487,36 @@ void CharacterEditor::drawPreviewGrid() {
     for (int row = firstRow; row <= lastRow; ++row) {
         float screenX = 0.0f;
         float screenY = 0.0f;
-        camera->worldToScreen(leftWorld, static_cast<float>(row * OpenArtOfWar::TILE_HEIGHT),
+        camera->WorldToScreen(leftWorld, static_cast<float>(row * OpenArtOfWar::TILE_HEIGHT),
                               screenX, screenY);
         SDL_RenderLine(renderer, static_cast<float>(previewRect.x), screenY,
                             static_cast<float>(previewRect.x + previewRect.w), screenY);
     }
 }
 
-void CharacterEditor::updateCombatSim(float dt) {
+void CharacterEditor::UpdateCombatSim(float dt) {
     if (document.IsDefined()) {
-        const bool building = (yamlString(document, "type") == "building");
-        const int arch = yamlInt(document, "archetype_id", 0);
-        const bool isInf = !building && OpenArtOfWar::Utility::isInfantryArchetype(arch);
+        const bool building = (YamlString(document, "type") == "building");
+        const int arch = YamlInt(document, "archetype_id", 0);
+        const bool isInf = !building && OpenArtOfWar::Utility::IsInfantryArchetype(arch);
         YAML::Node cNode = document["combat"];
         if (testSiegeMode && document["abilities"] && document["abilities"]["siege"] &&
             document["abilities"]["siege"]["combat"].IsMap()) {
             cNode = document["abilities"]["siege"]["combat"];
         }
-        const bool hasRotTurret = yamlBool(cNode, "has_rotating_turret", false);
+        const bool hasRotTurret = YamlBool(cNode, "has_rotating_turret", false);
         const int effArch = (simArchetype >= 0) ? simArchetype : arch;
         const float hullDelay = (building || isInf) ? 0.0f
-            : std::max(0.0f, yamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::defaultTurnStepDelay(effArch)));
+            : std::max(0.0f, YamlFloat(document, "turn_step_delay", OpenArtOfWar::Utility::DefaultTurnStepDelay(effArch)));
         const float defTurretDelay = document["turn_step_delay"].IsDefined()
             ? hullDelay
-            : OpenArtOfWar::Utility::defaultTurretTurnStepDelay(effArch);
+            : OpenArtOfWar::Utility::DefaultTurretTurnStepDelay(effArch);
         const float turretDelay = isInf ? 0.0f
-            : (building ? (hasRotTurret ? std::max(0.0f, yamlFloat(cNode, "turret_turn_step_delay", 0.08f)) : 0.0f)
-                        : std::max(0.0f, yamlFloat(cNode, "turret_turn_step_delay",
-                                                   yamlFloat(document, "turret_turn_step_delay", defTurretDelay))));
+            : (building ? (hasRotTurret ? std::max(0.0f, YamlFloat(cNode, "turret_turn_step_delay", 0.08f)) : 0.0f)
+                        : std::max(0.0f, YamlFloat(cNode, "turret_turn_step_delay",
+                                                   YamlFloat(document, "turret_turn_step_delay", defTurretDelay))));
 
-        const int aimDir8 = OpenArtOfWar::Utility::dir8FromVector(targetWorldX, targetWorldY);
+        const int aimDir8 = OpenArtOfWar::Utility::Dir8FromVector(targetWorldX, targetWorldY);
         int targetHullDir = desiredHullFacingDir;
         if (!hasRotTurret && previewMode == PreviewMode::Attack && targetCustomized) {
             targetHullDir = aimDir8;
@@ -530,7 +530,7 @@ void CharacterEditor::updateCombatSim(float dt) {
             previewHullTurnTimer += dt;
             while (previewHullTurnTimer >= hullDelay && facing != targetHullDir) {
                 previewHullTurnTimer -= hullDelay;
-                facing = (facing + OpenArtOfWar::Utility::turnStep8(facing, targetHullDir) + 8) % 8;
+                facing = (facing + OpenArtOfWar::Utility::TurnStep8(facing, targetHullDir) + 8) % 8;
             }
             if (facing == targetHullDir) previewHullTurnTimer = 0.0f;
         }
@@ -555,7 +555,7 @@ void CharacterEditor::updateCombatSim(float dt) {
             previewTurretTurnTimer += dt;
             while (previewTurretTurnTimer >= turretDelay && turretFacingDir != targetTurretDir) {
                 previewTurretTurnTimer -= turretDelay;
-                turretFacingDir = (turretFacingDir + OpenArtOfWar::Utility::turnStep8(turretFacingDir, targetTurretDir) + 8) % 8;
+                turretFacingDir = (turretFacingDir + OpenArtOfWar::Utility::TurnStep8(turretFacingDir, targetTurretDir) + 8) % 8;
             }
             if (turretFacingDir == targetTurretDir) previewTurretTurnTimer = 0.0f;
         }
@@ -578,25 +578,25 @@ void CharacterEditor::updateCombatSim(float dt) {
         document["abilities"]["siege"]["combat"].IsMap()) {
         combatNode = document["abilities"]["siege"]["combat"];
     }
-    if (!yamlBool(combatNode, "can_attack", true)) {
+    if (!YamlBool(combatNode, "can_attack", true)) {
         simProjectiles.clear();
         return;
     }
 
-    const bool building = (yamlString(document, "type") == "building");
+    const bool building = (YamlString(document, "type") == "building");
     const bool isInf = !building && [&]() {
-        const int arch = yamlInt(document, "archetype_id", 0);
-        return OpenArtOfWar::Utility::isInfantryArchetype(arch);
+        const int arch = YamlInt(document, "archetype_id", 0);
+        return OpenArtOfWar::Utility::IsInfantryArchetype(arch);
     }();
-    const bool hasRotTurret = yamlBool(combatNode, "has_rotating_turret", false);
+    const bool hasRotTurret = YamlBool(combatNode, "has_rotating_turret", false);
 
-    const int aimDir8 = OpenArtOfWar::Utility::dir8FromVector(targetWorldX, targetWorldY);
+    const int aimDir8 = OpenArtOfWar::Utility::Dir8FromVector(targetWorldX, targetWorldY);
     const float* s_dirDx = OpenArtOfWar::Utility::kDir8X;
     const float* s_dirDy = OpenArtOfWar::Utility::kDir8Y;
     float tPivotX = 0.0f, tPivotY = 0.0f;
     if (hasRotTurret) {
         float shiftX = 0.0f, shiftY = 0.0f;
-        if (!building) turretShift(simArchetype, simHullFacing, shiftX, shiftY);
+        if (!building) TurretShift(simArchetype, simHullFacing, shiftX, shiftY);
         tPivotX = turretOffsetX + shiftX;
         tPivotY = turretOffsetY + shiftY;
     }
@@ -635,12 +635,12 @@ void CharacterEditor::updateCombatSim(float dt) {
     if (combatNode["weapons"] && combatNode["weapons"].IsSequence() && combatNode["weapons"].size() >= 2) {
         YAML::Node w0 = combatNode["weapons"][0];
         YAML::Node w1 = combatNode["weapons"][1];
-        bool w0Enabled = yamlBool(w0, "enabled", true);
-        bool w1Enabled = yamlBool(w1, "enabled", true);
-        bool w1ReqResearch = yamlBool(w1, "requires_research", false);
-        float w0Range = yamlFloat(w0, "range", 5.0f);
-        float w1Range = yamlFloat(w1, "range", 1.5f);
-        float w1MaxDist = yamlFloat(w1, "max_distance", 1.5f);
+        bool w0Enabled = YamlBool(w0, "enabled", true);
+        bool w1Enabled = YamlBool(w1, "enabled", true);
+        bool w1ReqResearch = YamlBool(w1, "requires_research", false);
+        float w0Range = YamlFloat(w0, "range", 5.0f);
+        float w1Range = YamlFloat(w1, "range", 1.5f);
+        float w1MaxDist = YamlFloat(w1, "max_distance", 1.5f);
 
         bool can0 = w0Enabled && (distTiles <= w0Range);
         bool can1 = w1Enabled && (distTiles <= (w1MaxDist > 0.0f ? w1MaxDist : w1Range)) &&
@@ -656,16 +656,16 @@ void CharacterEditor::updateCombatSim(float dt) {
             if (can1) weaponsToFire.push_back({w1, 1, simShotCooldown2, simBurstIndex2, simBurstDelayTimer2});
         }
     } else {
-        if (const YAML::Node w0 = mainWeapon(combatNode)) {
+        if (const YAML::Node w0 = MainWeapon(combatNode)) {
             weaponsToFire.push_back({w0, 0, simShotCooldown, simBurstIndex, simBurstDelayTimer});
         }
     }
 
     for (auto& sw : weaponsToFire) {
-        const int burstCount = std::max(1, yamlInt(sw.node, "burst_count", 1));
-        const float burstDelay = std::max(0.04f, yamlFloat(sw.node, "burst_delay", 0.1f));
-        const float cooldown = std::max(0.15f, weaponCooldown(sw.node, true, 0.7f)); // random mode: a new delay every cycle
-        std::string projectile = yamlString(sw.node, "projectile", "bullet");
+        const int burstCount = std::max(1, YamlInt(sw.node, "burst_count", 1));
+        const float burstDelay = std::max(0.04f, YamlFloat(sw.node, "burst_delay", 0.1f));
+        const float cooldown = std::max(0.15f, WeaponCooldown(sw.node, true, 0.7f)); // random mode: a new delay every cycle
+        std::string projectile = YamlString(sw.node, "projectile", "bullet");
 
         float curMuzzleX = muzzleOffsetX;
         float curMuzzleY = muzzleOffsetY;
@@ -702,18 +702,18 @@ void CharacterEditor::updateCombatSim(float dt) {
                 float toTgtY = targetWorldY - p.startY;
                 p.totalDist = std::max(1.0f, std::hypot(toTgtX, toTgtY));
 
-                const float normRng = OpenArtOfWar::Utility::randomSigned();
+                const float normRng = OpenArtOfWar::Utility::RandomSigned();
 
                 float maxSpread = 0.0f;
                 if (sw.node["spread_angle"].IsDefined()) {
-                    float sDeg = yamlFloat(sw.node, "spread_angle", 0.0f);
+                    float sDeg = YamlFloat(sw.node, "spread_angle", 0.0f);
                     maxSpread = std::max(0.0f, sDeg * (static_cast<float>(M_PI) / 180.0f));
                 } else if (combatNode["spread_angle"].IsDefined()) {
-                    float sDeg = yamlFloat(combatNode, "spread_angle", 0.0f);
+                    float sDeg = YamlFloat(combatNode, "spread_angle", 0.0f);
                     maxSpread = std::max(0.0f, sDeg * (static_cast<float>(M_PI) / 180.0f));
                 } else {
                     maxSpread = projectile == "none" ? 0.055f
-                                                     : OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::fromKey(projectile)).spread;
+                                                     : OpenArtOfWar::Projectiles::of(OpenArtOfWar::Projectiles::FromKey(projectile)).spread;
                 }
 
                 if (maxSpread <= 0.0001f) {
@@ -730,8 +730,8 @@ void CharacterEditor::updateCombatSim(float dt) {
                     p.dirY = std::sin(spreadAng);
                 }
 
-                p.dir16 = OpenArtOfWar::Utility::dirFromNorth(p.dirX, p.dirY, 16);
-                p.dir32 = OpenArtOfWar::Utility::dirFromNorth(p.dirX, p.dirY, 32);
+                p.dir16 = OpenArtOfWar::Utility::DirFromNorth(p.dirX, p.dirY, 16);
+                p.dir32 = OpenArtOfWar::Utility::DirFromNorth(p.dirX, p.dirY, 32);
 
                 p.projectileType = projectile;
                 if (p.projectileType == "flame") p.speed = 240.0f;

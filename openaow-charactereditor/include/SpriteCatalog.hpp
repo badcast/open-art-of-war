@@ -15,8 +15,8 @@ namespace fs = std::filesystem;
 // What the single sprite export splits the sprites into; a sprite belongs to the first group that uses it
 enum class SpriteGroup { Units = 0, Buildings, Terrain, Other };
 constexpr int kSpriteGroupCount = 4;
-const char* spriteGroupName(SpriteGroup group); // gettext msgid, e.g. "Units"
-const char* spriteGroupSlug(SpriteGroup group); // file name part, e.g. "units"
+const char* SpriteGroupName(SpriteGroup group); // gettext msgid, e.g. "Units"
+const char* SpriteGroupSlug(SpriteGroup group); // file name part, e.g. "units"
 
 // One rectangle of a sprite sheet (assets/characters/sprites.json)
 struct RawSprite {
@@ -63,30 +63,30 @@ public:
     // `assetsRoot` is the assets folder (with characters/, data/, sprites/)
     bool load(const fs::path& assetsRoot, std::string& error);
 
-    const std::vector<RawSprite>& sprites() const { return rawSprites; }
-    const std::vector<SpriteObject>& objects() const { return objs; }
-    SpriteGroup groupOfSprite(int spriteId) const;
+    const std::vector<RawSprite>& Sprites() const { return rawSprites; }
+    const std::vector<SpriteObject>& Objects() const { return objs; }
+    SpriteGroup GroupOfSprite(int spriteId) const;
     // The sprites one unit sequence is drawn from
-    std::set<int> spritesOfSequence(int sequenceId) const;
+    std::set<int> SpritesOfSequence(int sequenceId) const;
 
     // Dependency tree of an object (depth is limited; shared parts are shown where they are used)
     DepNode tree(const SpriteObject& object) const;
     // Everything the object is made of as JSON: roots and the raw tables of sequences, bodies, composites,
     // animations and buildings, enough to rebuild the graphics data of the object
-    nlohmann::json describe(const SpriteObject& object) const;
+    nlohmann::json Describe(const SpriteObject& object) const;
 
 private:
-    void collectComposite(int id, SpriteObject& out, int depth) const;
-    void collectAnim(int id, SpriteObject& out, int depth) const;
-    void collectBody(int id, SpriteObject& out) const;
-    void collectSequence(int id, SpriteObject& out) const;
-    void collectBuilding(int id, SpriteObject& out) const;
-    void collectChild(int kind, int id, SpriteObject& out, int depth) const;
-    void finish(SpriteObject& object) const;
+    void CollectComposite(int id, SpriteObject& out, int depth) const;
+    void CollectAnim(int id, SpriteObject& out, int depth) const;
+    void CollectBody(int id, SpriteObject& out) const;
+    void CollectSequence(int id, SpriteObject& out) const;
+    void CollectBuilding(int id, SpriteObject& out) const;
+    void CollectChild(int kind, int id, SpriteObject& out, int depth) const;
+    void Finish(SpriteObject& object) const;
 
-    DepNode compositeNode(int id, int depth) const;
-    DepNode animNode(int id) const;
-    DepNode childNode(int kind, int id, int ox, int oy, int depth) const;
+    DepNode CompositeNode(int id, int depth) const;
+    DepNode AnimNode(int id) const;
+    DepNode ChildNode(int kind, int id, int ox, int oy, int depth) const;
 
     nlohmann::json gd;                       // graphics_data.json
     std::vector<RawSprite> rawSprites;
@@ -97,9 +97,9 @@ private:
 
 // Digest of one entry of the graphics tables as exported (without its "digest" field): the import applies an entry
 // only when its content no longer matches it, so entries left alone never undo an edit of the same entry elsewhere
-std::string graphicsDigest(nlohmann::json entry);
+std::string GraphicsDigest(nlohmann::json entry);
 
 // Lower case letters and digits, the rest becomes '_' ("TM-40 Fortress" -> "tm_40_fortress")
-std::string spriteSlug(const std::string& text);
+std::string SpriteSlug(const std::string& text);
 
 } // namespace CharEditor

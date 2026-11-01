@@ -17,9 +17,9 @@ namespace OpenArtOfWar
     std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
     bool Localization::s_initialized = false;
 
-    void Localization::init(const std::string &localeDir, const std::string &defaultLang)
+    void Localization::Init(const std::string &localeDir, const std::string &defaultLang)
     {
-        std::filesystem::path dir(Assets::realDirectory(localeDir));
+        std::filesystem::path dir(Assets::RealDirectory(localeDir));
         if(!std::filesystem::exists(dir))
         {
             if(std::filesystem::exists("../" + localeDir))
@@ -58,11 +58,11 @@ namespace OpenArtOfWar
         textdomain("openaow");
 
         s_initialized = true;
-        setLanguage(defaultLang.empty() ? "en" : defaultLang);
+        SetLanguage(defaultLang.empty() ? "en" : defaultLang);
         std::cout << "[Localization] Initialized gettext domain 'openaow' at " << s_localeDir << ", default language: " << s_currentLanguage << std::endl;
     }
 
-    void Localization::setLanguage(const std::string &langCode)
+    void Localization::SetLanguage(const std::string &langCode)
     {
         s_currentLanguage = (langCode == "ru") ? "ru" : "en";
 #if defined(_WIN32)
@@ -83,36 +83,36 @@ namespace OpenArtOfWar
 #endif
     }
 
-    const std::string &Localization::getLanguage()
+    const std::string &Localization::GetLanguage()
     {
         return s_currentLanguage;
     }
 
-    void Localization::toggleLanguage()
+    void Localization::ToggleLanguage()
     {
         if(s_currentLanguage == "en")
         {
-            setLanguage("ru");
+            SetLanguage("ru");
         }
         else
         {
-            setLanguage("en");
+            SetLanguage("en");
         }
     }
 
-    bool Localization::isRussian()
+    bool Localization::IsRussian()
     {
         return s_currentLanguage == "ru";
     }
 
-    const char *Localization::tr(const char *msgid)
+    const char *Localization::Tr(const char *msgid)
     {
         if(!msgid || !msgid[0])
             return "";
         return gettext(msgid);
     }
 
-    std::string Localization::tr(const std::string &msgid)
+    std::string Localization::Tr(const std::string &msgid)
     {
         if(msgid.empty())
             return "";

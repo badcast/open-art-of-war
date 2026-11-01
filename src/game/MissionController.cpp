@@ -27,7 +27,7 @@
 namespace OpenArtOfWar
 {
 
-    const std::vector<MissionInfo> &MissionController::getAvailableMissions()
+    const std::vector<MissionInfo> &MissionController::GetAvailableMissions()
     {
         static const auto infosOf = [](const std::vector<MissionDef> &defs)
         {
@@ -38,27 +38,27 @@ namespace OpenArtOfWar
         };
         static const std::vector<MissionInfo> s_resistance = infosOf(Missions::resistance());
         static const std::vector<MissionInfo> s_confederation = infosOf(Missions::confederation());
-        return playerFaction() == Faction::Confederation ? s_confederation : s_resistance;
+        return PlayerFaction() == Faction::Confederation ? s_confederation : s_resistance;
     }
 
     MissionController::MissionController()
     {
     }
 
-    void MissionController::spawnSquadFromCmd27(int group, int x, int y, int val, TileMap &map, EntityManager &entities, Pathfinder *pathfinder)
+    void MissionController::SpawnSquadFromCmd27(int group, int x, int y, int val, TileMap &map, EntityManager &entities, Pathfinder *pathfinder)
     {
         // Groups 0..2 are the computer's squads, 3 and up the player's - in the Peru campaign as well as in the
         // Confederation one (there the player commands the Confederation)
-        Faction fac = (group < 3) ? aiFaction() : playerFaction();
+        Faction fac = (group < 3) ? AiFaction() : PlayerFaction();
         std::vector<int> spawnedIds;
 
         auto spawnArch = [&](int arch, int idx)
         {
             int ox = (idx % 4) - 1;
             int oy = (idx / 4) - 1;
-            int tx = std::clamp(x + ox, 1, std::max(1, map.getWidth() - 2));
-            int ty = std::clamp(y + oy, 1, std::max(1, map.getHeight() - 2));
-            int uid = entities.spawnUnitByArchetype(arch, tx, ty, fac);
+            int tx = std::clamp(x + ox, 1, std::max(1, map.GetWidth() - 2));
+            int ty = std::clamp(y + oy, 1, std::max(1, map.GetHeight() - 2));
+            int uid = entities.SpawnUnitByArchetype(arch, tx, ty, fac);
             if(uid > 0)
             {
                 spawnedIds.push_back(uid);
@@ -66,7 +66,7 @@ namespace OpenArtOfWar
         };
 
         // Defense missions send the enemy's squads trimmed to the difficulty (an Easy squad of 10 brings 4)
-        const int squadPercent = (m_defenseMission && fac == aiFaction()) ? m_defenseSquadPercent : 100;
+        const int squadPercent = (m_defenseMission && fac == AiFaction()) ? m_defenseSquadPercent : 100;
         auto squadSize = [&](int cnt) { return std::max(1, (cnt * squadPercent + 50) / 100); };
 
         int spawnIdx = 0;
@@ -169,13 +169,13 @@ namespace OpenArtOfWar
         }
 
         // Reinforcements of the computer's side march on the player's base right away
-        if(pathfinder && fac == aiFaction() && !spawnedIds.empty())
+        if(pathfinder && fac == AiFaction() && !spawnedIds.empty())
         {
-            entities.issueAttackMoveOrder(spawnedIds, m_playerHqTileX, m_playerHqTileY, *pathfinder);
+            entities.IssueAttackMoveOrder(spawnedIds, m_playerHqTileX, m_playerHqTileY, *pathfinder);
         }
     }
 
-    void MissionController::setDefensePacing(float firstWaveSeconds, float waveGapSeconds, int squadPercent, float timeScale)
+    void MissionController::SetDefensePacing(float firstWaveSeconds, float waveGapSeconds, int squadPercent, float timeScale)
     {
         m_defenseFirstWave = std::max(0.0f, firstWaveSeconds);
         m_defenseWaveGap = std::max(1.0f, waveGapSeconds);
@@ -198,15 +198,15 @@ namespace OpenArtOfWar
         }
     }
 
-    bool MissionController::loadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+    bool MissionController::LoadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
         // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
         // custom match before left its own slots, colours and local slot behind)
-        setPlayerFaction(playerFaction());
+        SetPlayerFaction(PlayerFaction());
         ++m_loadSerial;
-        resetResearch();
+        ResetResearch();
         m_customMapPath.clear();
-        const auto &mlist = getAvailableMissions();
+        const auto &mlist = GetAvailableMissions();
         if(missionId < 0 || missionId >= static_cast<int>(mlist.size()))
         {
             missionId = 0;
@@ -231,11 +231,11 @@ namespace OpenArtOfWar
         m_enemyHqTileX = 48;
         m_enemyHqTileY = 32;
 
-        entities.clear();
-        economy.reset(1500);
+        entities.Clear();
+        economy.Reset(1500);
 
         // 1. Mission definition of the campaign the player's side belongs to (Missions*.cpp)
-        const MissionData &jmi = Missions::campaign(playerFaction())[missionId].data;
+        const MissionData &jmi = Missions::Campaign(PlayerFaction())[missionId].data;
         const int mapIndex = jmi.mapIndex;
         bool foundPlayerBase = false;
         bool foundPlayerHq = false;
@@ -246,26 +246,26 @@ namespace OpenArtOfWar
         // Walls take the side of the nearer base
         auto setWallZone = [&](const Rect &r)
         {
-            float distP = DetMath::hypot(static_cast<float>(r.x - m_playerHqTileX), static_cast<float>(r.y - m_playerHqTileY));
-            float distE = DetMath::hypot(static_cast<float>(r.x - m_enemyHqTileX), static_cast<float>(r.y - m_enemyHqTileY));
+            float distP = DetMath::Hypot(static_cast<float>(r.x - m_playerHqTileX), static_cast<float>(r.y - m_playerHqTileY));
+            float distE = DetMath::Hypot(static_cast<float>(r.x - m_enemyHqTileX), static_cast<float>(r.y - m_enemyHqTileY));
             Faction wallFac = (distE <= distP) ? Faction::Confederation : Faction::Resistance;
             for(int ty = r.y; ty < r.y + r.h; ++ty)
             {
                 for(int tx = r.x; tx < r.x + r.w; ++tx)
                 {
-                    map.setWall(tx, ty, wallFac, 100);
+                    map.SetWall(tx, ty, wallFac, 100);
                 }
             }
         };
 
         // 2. Load corresponding map
-        std::string mapPath = LoaderResources::mapPath(jmi.mapFile, assetRoot);
-        if(!map.loadMap(mapPath))
+        std::string mapPath = LoaderResources::MapPath(jmi.mapFile, assetRoot);
+        if(!map.LoadMap(mapPath))
         {
             std::cerr << "[MissionController] Failed to load map: " << mapPath << std::endl;
             return false;
         }
-        pathfinder.setMap(&map);
+        pathfinder.SetMap(&map);
 
         // 3. Spawn preplaced authentic structures and walls from the mission
         for(const auto &item : jmi.entities)
@@ -275,17 +275,17 @@ namespace OpenArtOfWar
             {
                 // Authentic faction mapping: 0..7 = Confederation (Blue, Enemy), 8..14 = Resistance (Red, Player)
                 Faction faction = (etype >= 8) ? Faction::Resistance : Faction::Confederation;
-                int bid = entities.spawnBuildingByIndex(etype, ex, ey, faction, 1.0f);
+                int bid = entities.SpawnBuildingByIndex(etype, ex, ey, faction, 1.0f);
                 if(bid > 0)
                 {
-                    const Building *bEnt = entities.getBuilding(bid);
+                    const Building *bEnt = entities.GetBuilding(bid);
                     if(bEnt)
                     {
-                        for(int ty = ey; ty < ey + bEnt->buildHeight && ty < map.getHeight(); ++ty)
+                        for(int ty = ey; ty < ey + bEnt->buildHeight && ty < map.GetHeight(); ++ty)
                         {
-                            for(int tx = ex; tx < ex + bEnt->buildWidth && tx < map.getWidth(); ++tx)
+                            for(int tx = ex; tx < ex + bEnt->buildWidth && tx < map.GetWidth(); ++tx)
                             {
-                                map.setPassable(tx, ty, false);
+                                map.SetPassable(tx, ty, false);
                             }
                         }
                     }
@@ -345,7 +345,7 @@ namespace OpenArtOfWar
                 {
                     // Starting credits (i.java:3938)
                     int startCreds = std::max(1000, sy * 10);
-                    economy.reset(startCreds);
+                    economy.Reset(startCreds);
                 }
                 else if(cmd == 33 && val == 1)
                 {
@@ -379,7 +379,7 @@ namespace OpenArtOfWar
                         }
                         else
                         {
-                            spawnSquadFromCmd27(group, sx, sy, val, map, entities, nullptr);
+                            SpawnSquadFromCmd27(group, sx, sy, val, map, entities, nullptr);
                         }
                     }
                     else
@@ -391,7 +391,7 @@ namespace OpenArtOfWar
                     {
                         // Bases are collected with the Resistance as "player" and swapped at the end when the
                         // player commands the Confederation, so the player's squads go to the other slot then
-                        const bool playerSlot = (group >= 3) == (playerFaction() == Faction::Resistance);
+                        const bool playerSlot = (group >= 3) == (PlayerFaction() == Faction::Resistance);
                         if(playerSlot && !foundPlayerBase)
                         {
                             m_playerHqTileX = sx;
@@ -414,23 +414,23 @@ namespace OpenArtOfWar
         {
             m_playerHqTileX = 8;
             m_playerHqTileY = 8;
-            entities.spawnBuildingByIndex(8, 8, 8, Faction::Resistance, 1.0f);   // Штаб Сопротивления (3x4)
-            entities.spawnBuildingByIndex(9, 13, 8, Faction::Resistance, 1.0f);  // Генератор (3x3)
-            entities.spawnBuildingByIndex(10, 8, 13, Faction::Resistance, 1.0f); // Казарма (3x3)
+            entities.SpawnBuildingByIndex(8, 8, 8, Faction::Resistance, 1.0f);   // Resistance headquarters (3x4)
+            entities.SpawnBuildingByIndex(9, 13, 8, Faction::Resistance, 1.0f);  // Power plant (3x3)
+            entities.SpawnBuildingByIndex(10, 8, 13, Faction::Resistance, 1.0f); // Barracks (3x3)
         }
 
         if(!foundEnemyBase && !hadMissionScript)
         {
-            m_enemyHqTileX = map.getWidth() - 10;
-            m_enemyHqTileY = map.getHeight() - 10;
-            entities.spawnBuildingByIndex(0, m_enemyHqTileX, m_enemyHqTileY, Faction::Confederation, 1.0f);     // Штаб Конфедерации (4x4)
-            entities.spawnBuildingByIndex(6, m_enemyHqTileX - 3, m_enemyHqTileY, Faction::Confederation, 1.0f); // Локатор (2x2)
+            m_enemyHqTileX = map.GetWidth() - 10;
+            m_enemyHqTileY = map.GetHeight() - 10;
+            entities.SpawnBuildingByIndex(0, m_enemyHqTileX, m_enemyHqTileY, Faction::Confederation, 1.0f);     // Confederation headquarters (4x4)
+            entities.SpawnBuildingByIndex(6, m_enemyHqTileX - 3, m_enemyHqTileY, Faction::Confederation, 1.0f); // Radar locator (2x2)
         }
 
         // Add initial guard squads around bases if no script units were spawned for that side
         int playerUnitCount = 0;
         int enemyUnitCount = 0;
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
             if(!e.alive || e.isBuilding)
                 continue;
@@ -442,34 +442,34 @@ namespace OpenArtOfWar
 
         if(playerUnitCount == 0)
         {
-            int px = std::clamp(m_playerHqTileX + 4, 2, map.getWidth() - 3);
-            int py = std::clamp(m_playerHqTileY + 2, 2, map.getHeight() - 3);
-            entities.spawnUnitByArchetype(0, px, py, Faction::Resistance);         // Пехотинец
-            entities.spawnUnitByArchetype(0, px, py + 1, Faction::Resistance);     // Пехотинец
-            entities.spawnUnitByArchetype(2, px - 1, py + 1, Faction::Resistance); // Гренадер
-            entities.spawnUnitByArchetype(6, px + 1, py + 1, Faction::Resistance); // Койот
+            int px = std::clamp(m_playerHqTileX + 4, 2, map.GetWidth() - 3);
+            int py = std::clamp(m_playerHqTileY + 2, 2, map.GetHeight() - 3);
+            entities.SpawnUnitByArchetype(0, px, py, Faction::Resistance);         // Rifleman
+            entities.SpawnUnitByArchetype(0, px, py + 1, Faction::Resistance);     // Rifleman
+            entities.SpawnUnitByArchetype(2, px - 1, py + 1, Faction::Resistance); // Grenadier
+            entities.SpawnUnitByArchetype(6, px + 1, py + 1, Faction::Resistance); // Coyote
         }
 
         if(enemyUnitCount == 0 && foundEnemyBase && !jmi.defense)
         {
-            int ex = std::clamp(m_enemyHqTileX - 2, 2, map.getWidth() - 3);
-            int ey = std::clamp(m_enemyHqTileY + 1, 2, map.getHeight() - 3);
-            entities.spawnUnitByArchetype(1, ex, ey, Faction::Confederation);          // Стрелок
-            entities.spawnUnitByArchetype(3, ex, ey + 1, Faction::Confederation);      // Штурмовик
-            entities.spawnUnitByArchetype(18, ex - 1, ey + 1, Faction::Confederation); // Крепость
+            int ex = std::clamp(m_enemyHqTileX - 2, 2, map.GetWidth() - 3);
+            int ey = std::clamp(m_enemyHqTileY + 1, 2, map.GetHeight() - 3);
+            entities.SpawnUnitByArchetype(1, ex, ey, Faction::Confederation);          // Rifleman
+            entities.SpawnUnitByArchetype(3, ex, ey + 1, Faction::Confederation);      // Assault trooper
+            entities.SpawnUnitByArchetype(18, ex - 1, ey + 1, Faction::Confederation); // Fortress
         }
 
         // The map describes the Resistance base as "player" and the Confederation base as "enemy";
         // playing the Confederation simply swaps the roles
-        if(playerFaction() == Faction::Confederation)
+        if(PlayerFaction() == Faction::Confederation)
         {
             std::swap(m_playerHqTileX, m_enemyHqTileX);
             std::swap(m_playerHqTileY, m_enemyHqTileY);
         }
 
         // Initialize fog of war for player base and starting units
-        map.setViewerTeam(Players::teamOf(Players::local())); // the drawn fog is the local player's from the first frame on
-        entities.updateFogOfWar(map);
+        map.SetViewerTeam(Players::TeamOf(Players::Local())); // the drawn fog is the local player's from the first frame on
+        entities.UpdateFogOfWar(map);
 
         std::cout << "[MissionController] Initialized " << m_missionName << " on Map m" << mapIndex << " | Player Pos: (" << m_playerHqTileX << "," << m_playerHqTileY << ")"
                   << " | Enemy Pos: (" << m_enemyHqTileX << "," << m_enemyHqTileY << ")"
@@ -482,7 +482,7 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void MissionController::update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+    void MissionController::Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
     {
         if(m_isVictory || m_isDefeat)
             return;
@@ -498,7 +498,7 @@ namespace OpenArtOfWar
                 if(m_missionTime >= wave.triggerTime)
                 {
                     wave.spawned = true;
-                    spawnSquadFromCmd27(wave.group, wave.x, wave.y, wave.val, map, entities, &pathfinder);
+                    SpawnSquadFromCmd27(wave.group, wave.x, wave.y, wave.val, map, entities, &pathfinder);
                 }
                 else if(wave.group < 3)
                 {
@@ -508,17 +508,17 @@ namespace OpenArtOfWar
         }
 
         // 2. Check Win/Loss conditions
-        if(isMatch())
+        if(IsMatch())
         {
             // A team is out once it has nothing left; the local player wins when only its team remains
             std::array<bool, kMaxPlayers> teamAlive {};
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
                 if(!e.alive || e.state == ActionState::Die || e.owner >= kMaxPlayers)
                     continue;
-                teamAlive[Players::teamOf(e.owner) % kMaxPlayers] = true;
+                teamAlive[Players::TeamOf(e.owner) % kMaxPlayers] = true;
             }
-            const uint8_t mine = Players::teamOf(Players::local()) % kMaxPlayers;
+            const uint8_t mine = Players::TeamOf(Players::Local()) % kMaxPlayers;
             int others = 0;
             for(int t = 0; t < kMaxPlayers; ++t)
                 others += (t != mine && teamAlive[t]) ? 1 : 0;
@@ -534,11 +534,11 @@ namespace OpenArtOfWar
         int enemyUnitCount = 0;
         bool reachedDestZone = false;
 
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
             if(!e.alive || e.state == ActionState::Die)
                 continue;
-            if(e.faction == playerFaction())
+            if(e.faction == PlayerFaction())
             {
                 if(e.isBuilding)
                     playerBuildingCount++;
@@ -551,7 +551,7 @@ namespace OpenArtOfWar
                     }
                 }
             }
-            else if(e.faction == aiFaction())
+            else if(e.faction == AiFaction())
             {
                 if(e.isBuilding)
                     enemyBuildingCount++;
@@ -584,63 +584,63 @@ namespace OpenArtOfWar
 
             int spawnX = m_enemyHqTileX;
             int spawnY = m_enemyHqTileY;
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
-                if(e.alive && e.state != ActionState::Die && e.faction == aiFaction() && e.isBuilding)
+                if(e.alive && e.state != ActionState::Die && e.faction == AiFaction() && e.isBuilding)
                 {
-                    spawnX = std::clamp(e.tileX - 1, 1, map.getWidth() - 2);
-                    spawnY = std::clamp(e.tileY + 1, 1, map.getHeight() - 2);
+                    spawnX = std::clamp(e.tileX - 1, 1, map.GetWidth() - 2);
+                    spawnY = std::clamp(e.tileY + 1, 1, map.GetHeight() - 2);
                     break;
                 }
             }
 
             // Rifleman, rocket infantry, then a medium and a heavy tank of the computer's faction
-            const Faction ai = aiFaction();
+            const Faction ai = AiFaction();
             const bool conf = (ai == Faction::Confederation);
             const int archRifle = conf ? 1 : 0, archRocket = conf ? 3 : 2, archTank = conf ? 9 : 8, archHeavy = conf ? 11 : 10;
             std::vector<int> waveUnitIds;
-            int u1 = entities.spawnUnitByArchetype(archRifle, spawnX, spawnY, ai);
-            int u2 = entities.spawnUnitByArchetype(archRocket, spawnX + 1, spawnY, ai);
+            int u1 = entities.SpawnUnitByArchetype(archRifle, spawnX, spawnY, ai);
+            int u2 = entities.SpawnUnitByArchetype(archRocket, spawnX + 1, spawnY, ai);
             if(u1 > 0)
                 waveUnitIds.push_back(u1);
             if(u2 > 0)
                 waveUnitIds.push_back(u2);
             if(m_waveCount > 1)
             {
-                int u3 = entities.spawnUnitByArchetype(archTank, spawnX, spawnY + 1, ai);
+                int u3 = entities.SpawnUnitByArchetype(archTank, spawnX, spawnY + 1, ai);
                 if(u3 > 0)
                     waveUnitIds.push_back(u3);
             }
             if(m_waveCount > 3)
             {
-                int u4 = entities.spawnUnitByArchetype(archHeavy, spawnX + 1, spawnY + 1, ai);
+                int u4 = entities.SpawnUnitByArchetype(archHeavy, spawnX + 1, spawnY + 1, ai);
                 if(u4 > 0)
                     waveUnitIds.push_back(u4);
             }
 
             if(!waveUnitIds.empty())
             {
-                entities.issueAttackMoveOrder(waveUnitIds, m_playerHqTileX, m_playerHqTileY, pathfinder);
+                entities.IssueAttackMoveOrder(waveUnitIds, m_playerHqTileX, m_playerHqTileY, pathfinder);
                 std::cout << "[MissionController] AI Wave " << m_waveCount << " attacking the player base!" << std::endl;
             }
         }
     }
 
-    bool MissionController::loadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+    bool MissionController::LoadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
         // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
         // custom match before left its own slots, colours and local slot behind)
-        setPlayerFaction(playerFaction());
-        return loadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
+        SetPlayerFaction(PlayerFaction());
+        return LoadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
     }
 
-    std::vector<SkirmishMapInfo> MissionController::listSkirmishMaps()
+    std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
     {
         std::vector<SkirmishMapInfo> maps;
-        for(const std::string &path : LoaderResources::listMaps())
+        for(const std::string &path : LoaderResources::ListMaps())
         {
             std::string text;
-            if(!Assets::readText(path, text))
+            if(!Assets::ReadText(path, text))
                 continue;
             const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
             if(!doc.is_object() || !doc.contains("terrainRle") || !doc.contains("width") || !doc.contains("height"))
@@ -678,9 +678,9 @@ namespace OpenArtOfWar
         // Top-left corner of the free size x size square (open ground, no walls) nearest to (targetX, targetY);
         // with `reachable` the square's center must lie in that set, and it must keep `minApart` tiles (center to
         // center) away from the square at (apartX, apartY). Returns false when there is no such square.
-        bool findBaseSite(const TileMap &map, int size, int targetX, int targetY, const std::vector<char> *reachable, int &outX, int &outY, int apartX = 0, int apartY = 0, int minApart = 0)
+        bool FindBaseSite(const TileMap &map, int size, int targetX, int targetY, const std::vector<char> *reachable, int &outX, int &outY, int apartX = 0, int apartY = 0, int minApart = 0)
         {
-            const int w = map.getWidth(), h = map.getHeight();
+            const int w = map.GetWidth(), h = map.GetHeight();
             long best = -1;
             for(int y = 0; y + size <= h; ++y)
             {
@@ -691,7 +691,7 @@ namespace OpenArtOfWar
                     {
                         for(int dx = 0; dx < size; ++dx)
                         {
-                            if(!map.isPassable(x + dx, y + dy) || map.isWall(x + dx, y + dy))
+                            if(!map.IsPassable(x + dx, y + dy) || map.IsWall(x + dx, y + dy))
                             {
                                 free = false;
                                 break;
@@ -702,7 +702,7 @@ namespace OpenArtOfWar
                         continue;
                     if(reachable && !(*reachable)[(y + size / 2) * w + x + size / 2])
                         continue;
-                    if(minApart > 0 && DetMath::hypot(static_cast<float>(x - apartX), static_cast<float>(y - apartY)) < minApart)
+                    if(minApart > 0 && DetMath::Hypot(static_cast<float>(x - apartX), static_cast<float>(y - apartY)) < minApart)
                         continue;
                     const long dist = static_cast<long>(x - targetX) * (x - targetX) + static_cast<long>(y - targetY) * (y - targetY);
                     if(best < 0 || dist < best)
@@ -717,9 +717,9 @@ namespace OpenArtOfWar
         }
 
         // Open ground connected to (startX, startY)
-        std::vector<char> reachableFrom(const TileMap &map, int startX, int startY)
+        std::vector<char> ReachableFrom(const TileMap &map, int startX, int startY)
         {
-            const int w = map.getWidth(), h = map.getHeight();
+            const int w = map.GetWidth(), h = map.GetHeight();
             std::vector<char> seen(static_cast<size_t>(w) * h, 0);
             std::queue<std::pair<int, int>> queue;
             queue.push({startX, startY});
@@ -734,7 +734,7 @@ namespace OpenArtOfWar
                     const int nx = x + s[0], ny = y + s[1];
                     if(nx < 0 || ny < 0 || nx >= w || ny >= h || seen[ny * w + nx])
                         continue;
-                    if(!map.isPassable(nx, ny))
+                    if(!map.IsPassable(nx, ny))
                         continue;
                     seen[ny * w + nx] = 1;
                     queue.push({nx, ny});
@@ -748,26 +748,26 @@ namespace OpenArtOfWar
         class BasePlanner
         {
         public:
-            BasePlanner(TileMap &map, EntityManager &entities) : m_map(map), m_entities(entities), m_w(map.getWidth()), m_h(map.getHeight()), m_taken(static_cast<size_t>(m_w) * m_h, 0)
+            BasePlanner(TileMap &map, EntityManager &entities) : m_map(map), m_entities(entities), m_w(map.GetWidth()), m_h(map.GetHeight()), m_taken(static_cast<size_t>(m_w) * m_h, 0)
             {
             }
 
-            bool place(int type, int cx, int cy, Faction faction, PlayerId owner, int &outX, int &outY)
+            bool Place(int type, int cx, int cy, Faction faction, PlayerId owner, int &outX, int &outY)
             {
-                const BuildingConfig *cfg = m_entities.getBuildingConfig(type);
+                const BuildingConfig *cfg = m_entities.GetBuildingConfig(type);
                 const int bw = cfg ? cfg->width : 3, bh = cfg ? cfg->height : 3;
                 int x = 0, y = 0;
-                if(!findSpot(bw + 1, bh + 1, cx - 1, cy - 1, x, y))
+                if(!FindSpot(bw + 1, bh + 1, cx - 1, cy - 1, x, y))
                     return false;
                 x += 1;
                 y += 1;
-                if(m_entities.spawnBuildingByIndex(type, x, y, faction, 1.0f, owner) <= 0)
+                if(m_entities.SpawnBuildingByIndex(type, x, y, faction, 1.0f, owner) <= 0)
                     return false;
                 for(int ty = y; ty < y + bh && ty < m_h; ++ty)
                 {
                     for(int tx = x; tx < x + bw && tx < m_w; ++tx)
                     {
-                        m_map.setPassable(tx, ty, false);
+                        m_map.SetPassable(tx, ty, false);
                         m_taken[ty * m_w + tx] = 1;
                     }
                 }
@@ -776,25 +776,25 @@ namespace OpenArtOfWar
                 return true;
             }
 
-            void placeUnits(const int (&archetypes)[4], int cx, int cy, Faction faction, PlayerId owner)
+            void PlaceUnits(const int (&archetypes)[4], int cx, int cy, Faction faction, PlayerId owner)
             {
                 for(int arch : archetypes)
                 {
                     int x = 0, y = 0;
-                    if(!findSpot(1, 1, cx, cy, x, y))
+                    if(!FindSpot(1, 1, cx, cy, x, y))
                         continue;
                     m_taken[y * m_w + x] = 1;
-                    m_entities.spawnUnitByArchetype(arch, x, y, faction, owner);
+                    m_entities.SpawnUnitByArchetype(arch, x, y, faction, owner);
                 }
             }
 
         private:
-            bool tileFree(int x, int y) const
+            bool TileFree(int x, int y) const
             {
-                return x >= 0 && y >= 0 && x < m_w && y < m_h && m_map.isPassable(x, y) && !m_map.isWall(x, y) && !m_taken[y * m_w + x];
+                return x >= 0 && y >= 0 && x < m_w && y < m_h && m_map.IsPassable(x, y) && !m_map.IsWall(x, y) && !m_taken[y * m_w + x];
             }
             // Nearest spot (by ring distance from cx, cy) where a bw x bh rectangle is free
-            bool findSpot(int bw, int bh, int cx, int cy, int &outX, int &outY) const
+            bool FindSpot(int bw, int bh, int cx, int cy, int &outX, int &outY) const
             {
                 for(int r = 0; r < 40; ++r)
                 {
@@ -810,7 +810,7 @@ namespace OpenArtOfWar
                             {
                                 for(int dx = 0; dx < bw; ++dx)
                                 {
-                                    if(!tileFree(x + dx, y + dy))
+                                    if(!TileFree(x + dx, y + dy))
                                     {
                                         free = false;
                                         break;
@@ -853,7 +853,7 @@ namespace OpenArtOfWar
             return f == Faction::Confederation ? kConfederationBase : kResistanceBase;
         }
 
-        std::vector<std::pair<int, int>> startPositionsOf(const nlohmann::json &doc, int w, int h)
+        std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &doc, int w, int h)
         {
             std::vector<std::pair<int, int>> out;
             auto add = [&](int x, int y)
@@ -898,60 +898,60 @@ namespace OpenArtOfWar
 
         // The buildings and units the map itself carries (the lists the map editor writes). `ownerOf(faction, x, y)` says to whom
         // one belongs (kNoPlayer: left out); `onHq(owner, faction, x, y)` is told about every headquarters.
-        void spawnPrebuilt(const nlohmann::json &doc, TileMap &map, EntityManager &entities, const std::function<PlayerId(Faction, int, int)> &ownerOf, const std::function<void(PlayerId, Faction, int, int)> &onHq)
+        void SpawnPrebuilt(const nlohmann::json &doc, TileMap &map, EntityManager &entities, const std::function<PlayerId(Faction, int, int)> &ownerOf, const std::function<void(PlayerId, Faction, int, int)> &onHq)
         {
             if(!doc.is_object())
                 return;
             for(const auto &b : doc.value("buildings", nlohmann::json::array()))
             {
-                const Faction faction = Utility::parseFaction(b.value("faction", "resistance"));
+                const Faction faction = Utility::ParseFaction(b.value("faction", "resistance"));
                 const int x = b.value("x", 0), y = b.value("y", 0), index = b.value("buildingIndex", 0);
                 const PlayerId owner = ownerOf(faction, x, y);
                 if(owner == kNoPlayer)
                     continue;
-                const int id = entities.spawnBuildingByIndex(index, x, y, faction, b.value("initialProgress", 1.0f), owner);
-                const Building *spawned = id > 0 ? entities.getBuilding(id) : nullptr;
+                const int id = entities.SpawnBuildingByIndex(index, x, y, faction, b.value("initialProgress", 1.0f), owner);
+                const Building *spawned = id > 0 ? entities.GetBuilding(id) : nullptr;
                 if(!spawned)
                     continue;
-                for(int ty = y; ty < y + spawned->buildHeight && ty < map.getHeight(); ++ty)
+                for(int ty = y; ty < y + spawned->buildHeight && ty < map.GetHeight(); ++ty)
                 {
-                    for(int tx = x; tx < x + spawned->buildWidth && tx < map.getWidth(); ++tx)
-                        map.setPassable(tx, ty, false);
+                    for(int tx = x; tx < x + spawned->buildWidth && tx < map.GetWidth(); ++tx)
+                        map.SetPassable(tx, ty, false);
                 }
                 if(index == 0 || index == 8)
                     onHq(owner, faction, x, y);
             }
             for(const auto &u : doc.value("units", nlohmann::json::array()))
             {
-                const Faction faction = Utility::parseFaction(u.value("faction", "resistance"));
+                const Faction faction = Utility::ParseFaction(u.value("faction", "resistance"));
                 const int x = u.value("x", 0), y = u.value("y", 0);
                 const PlayerId owner = ownerOf(faction, x, y);
                 if(owner == kNoPlayer)
                     continue;
-                entities.spawnUnitByArchetype(u.value("archetypeId", 0), x, y, faction, owner);
+                entities.SpawnUnitByArchetype(u.value("archetypeId", 0), x, y, faction, owner);
             }
         }
 
     } // namespace
 
-    bool MissionController::loadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt)
+    bool MissionController::LoadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt)
     {
         // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
         // custom match before left its own slots, colours and local slot behind)
-        setPlayerFaction(playerFaction());
+        SetPlayerFaction(PlayerFaction());
         std::string mapText;
-        if(!Assets::readText(mapPath, mapText) || !map.loadMap(mapPath))
+        if(!Assets::ReadText(mapPath, mapText) || !map.LoadMap(mapPath))
         {
             std::cerr << "[MissionController] Failed to load custom game map: " << mapPath << std::endl;
             return false;
         }
         const nlohmann::json doc = nlohmann::json::parse(mapText, nullptr, false);
         if(!usePrebuilt)
-            map.clearWalls(); // from scratch: the map's own walls are not part of it
+            map.ClearWalls(); // from scratch: the map's own walls are not part of it
         m_customPrebuilt = usePrebuilt;
 
         ++m_loadSerial;
-        resetResearch();
+        ResetResearch();
         m_currentMissionId = kSkirmishMissionId;
         m_customMapPath = mapPath;
         const std::string mapName = std::filesystem::path(mapPath).stem().string();
@@ -974,17 +974,17 @@ namespace OpenArtOfWar
         m_isVictory = false;
         m_isDefeat = false;
 
-        entities.clear();
-        economy.reset(1500);
-        pathfinder.setMap(&map);
-        pathfinder.setEntityManager(&entities);
+        entities.Clear();
+        economy.Reset(1500);
+        pathfinder.SetMap(&map);
+        pathfinder.SetEntityManager(&entities);
 
         // The map's own buildings and units, when the game is to start with them
         bool prebuiltHq[2] = {false, false}; // Resistance, Confederation
         int prebuiltHqX[2] = {0, 0}, prebuiltHqY[2] = {0, 0};
         if(usePrebuilt)
         {
-            spawnPrebuilt(
+            SpawnPrebuilt(
                 doc,
                 map,
                 entities,
@@ -999,7 +999,7 @@ namespace OpenArtOfWar
         }
 
         // Where the bases go: the map's own start positions if it has them, else the bottom-left / top-right corners
-        const int w = map.getWidth(), h = map.getHeight();
+        const int w = map.GetWidth(), h = map.GetHeight();
         int playerTargetX = 6, playerTargetY = h - 14;
         int enemyTargetX = w - 16, enemyTargetY = 4;
         if(doc.is_object())
@@ -1021,7 +1021,7 @@ namespace OpenArtOfWar
         int px = 0, py = 0, psize = 0;
         for(int size : kSizes)
         {
-            if(findBaseSite(map, size, playerTargetX, playerTargetY, nullptr, px, py))
+            if(FindBaseSite(map, size, playerTargetX, playerTargetY, nullptr, px, py))
             {
                 psize = size;
                 break;
@@ -1039,19 +1039,19 @@ namespace OpenArtOfWar
             m_playerHqTileY = prebuiltHqY[0];
             m_enemyHqTileX = prebuiltHqX[1];
             m_enemyHqTileY = prebuiltHqY[1];
-            if(playerFaction() == Faction::Confederation)
+            if(PlayerFaction() == Faction::Confederation)
             {
                 std::swap(m_playerHqTileX, m_enemyHqTileX);
                 std::swap(m_playerHqTileY, m_enemyHqTileY);
             }
-            map.setViewerTeam(Players::teamOf(Players::local()));
-            entities.updateFogOfWar(map);
+            map.SetViewerTeam(Players::TeamOf(Players::Local()));
+            entities.UpdateFogOfWar(map);
             std::cout << "[MissionController] Custom game on " << mapPath << " with the bases of the map" << std::endl;
             if(m_onLoaded)
                 m_onLoaded();
             return true;
         }
-        const std::vector<char> connected = reachableFrom(map, px + psize / 2, py + psize / 2);
+        const std::vector<char> connected = ReachableFrom(map, px + psize / 2, py + psize / 2);
 
         // The enemy base is as far from the player as the map allows (at most half of its short side)
         int ex = 0, ey = 0, esize = 0;
@@ -1059,7 +1059,7 @@ namespace OpenArtOfWar
         {
             for(int apart = std::min(w, h) / 2; apart >= psize && esize == 0; apart -= 2)
             {
-                if(findBaseSite(map, size, enemyTargetX, enemyTargetY, &connected, ex, ey, px, py, apart))
+                if(FindBaseSite(map, size, enemyTargetX, enemyTargetY, &connected, ex, ey, px, py, apart))
                     esize = size;
             }
             if(esize != 0)
@@ -1083,7 +1083,7 @@ namespace OpenArtOfWar
             hqX = prebuiltHqX[0];
             hqY = prebuiltHqY[0];
         }
-        else if(!planner.place(8, pcx, pcy, Faction::Resistance, autoOwner, hqX, hqY))
+        else if(!planner.Place(8, pcx, pcy, Faction::Resistance, autoOwner, hqX, hqY))
         {
             std::cerr << "[MissionController] Could not set the headquarters on " << mapPath << std::endl;
             return false;
@@ -1093,27 +1093,27 @@ namespace OpenArtOfWar
             ehqX = prebuiltHqX[1];
             ehqY = prebuiltHqY[1];
         }
-        else if(!planner.place(0, ecx, ecy, Faction::Confederation, autoOwner, ehqX, ehqY))
+        else if(!planner.Place(0, ecx, ecy, Faction::Confederation, autoOwner, ehqX, ehqY))
         {
             std::cerr << "[MissionController] Could not set the headquarters on " << mapPath << std::endl;
             return false;
         }
         if(!prebuiltHq[0])
         {
-            planner.place(9, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
+            planner.Place(9, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
             if(usePrebuilt)
             {
-                planner.place(10, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
-                planner.placeUnits(kResistanceBase.units, pcx, pcy, Faction::Resistance, autoOwner);
+                planner.Place(10, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
+                planner.PlaceUnits(kResistanceBase.units, pcx, pcy, Faction::Resistance, autoOwner);
             }
         }
         if(!prebuiltHq[1])
         {
-            planner.place(1, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
+            planner.Place(1, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
             if(usePrebuilt)
             {
-                planner.place(2, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
-                planner.placeUnits(kConfederationBase.units, ecx, ecy, Faction::Confederation, autoOwner);
+                planner.Place(2, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
+                planner.PlaceUnits(kConfederationBase.units, ecx, ecy, Faction::Confederation, autoOwner);
             }
         }
 
@@ -1121,14 +1121,14 @@ namespace OpenArtOfWar
         m_playerHqTileY = hqY;
         m_enemyHqTileX = ehqX;
         m_enemyHqTileY = ehqY;
-        if(playerFaction() == Faction::Confederation)
+        if(PlayerFaction() == Faction::Confederation)
         {
             std::swap(m_playerHqTileX, m_enemyHqTileX);
             std::swap(m_playerHqTileY, m_enemyHqTileY);
         }
 
-        map.setViewerTeam(Players::teamOf(Players::local())); // the drawn fog is the local player's from the first frame on
-        entities.updateFogOfWar(map);
+        map.SetViewerTeam(Players::TeamOf(Players::Local())); // the drawn fog is the local player's from the first frame on
+        entities.UpdateFogOfWar(map);
         std::cout << "[MissionController] Custom game on " << mapPath << " | Player base: (" << px << "," << py << ") | Enemy base: (" << ex << "," << ey << ")" << std::endl;
         if(m_onLoaded)
         {
@@ -1137,32 +1137,32 @@ namespace OpenArtOfWar
         return true;
     }
 
-    std::vector<std::pair<int, int>> MissionController::startPositions(const std::string &mapPath)
+    std::vector<std::pair<int, int>> MissionController::StartPositions(const std::string &mapPath)
     {
         std::string text;
-        if(!Assets::readText(mapPath, text))
+        if(!Assets::ReadText(mapPath, text))
             return {};
         const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
         if(!doc.is_object())
             return {};
-        return startPositionsOf(doc, doc.value("width", 64), doc.value("height", 64));
+        return StartPositionsOf(doc, doc.value("width", 64), doc.value("height", 64));
     }
 
-    bool MissionController::loadMatch(const MatchSetup &setup, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+    bool MissionController::LoadMatch(const MatchSetup &setup, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
         std::string mapText;
-        if(!Assets::readText(setup.mapPath, mapText) || !map.loadMap(setup.mapPath))
+        if(!Assets::ReadText(setup.mapPath, mapText) || !map.LoadMap(setup.mapPath))
         {
             std::cerr << "[MissionController] Failed to load match map: " << setup.mapPath << std::endl;
             return false;
         }
         const nlohmann::json doc = nlohmann::json::parse(mapText, nullptr, false);
         if(!setup.prebuilt)
-            map.clearWalls();
+            map.ClearWalls();
         Players::setup(setup.slots, setup.local);
 
         ++m_loadSerial;
-        resetResearch();
+        ResetResearch();
         m_currentMissionId = kMatchMissionId;
         m_customMapPath.clear();
         m_matchSetup = setup;
@@ -1182,20 +1182,20 @@ namespace OpenArtOfWar
         m_isVictory = false;
         m_isDefeat = false;
 
-        entities.clear();
-        economy.reset(setup.startingCredits);
-        economy.setPlayer(setup.local);
-        map.setFogEnabled(setup.fogOfWar);
-        pathfinder.setMap(&map);
-        pathfinder.setEntityManager(&entities);
+        entities.Clear();
+        economy.Reset(setup.startingCredits);
+        economy.SetPlayer(setup.local);
+        map.SetFogEnabled(setup.fogOfWar);
+        pathfinder.SetMap(&map);
+        pathfinder.SetEntityManager(&entities);
 
-        const std::vector<std::pair<int, int>> spots = startPositionsOf(doc, map.getWidth(), map.getHeight());
+        const std::vector<std::pair<int, int>> spots = StartPositionsOf(doc, map.GetWidth(), map.GetHeight());
         // The buildings and units of the map go to the player of their faction whose start position is the nearest
         std::array<std::pair<int, int>, kMaxPlayers> prebuiltHq {};
         std::array<bool, kMaxPlayers> hasPrebuiltHq {};
         if(setup.prebuilt)
         {
-            spawnPrebuilt(
+            SpawnPrebuilt(
                 doc,
                 map,
                 entities,
@@ -1250,7 +1250,7 @@ namespace OpenArtOfWar
                     m_playerHqTileX = prebuiltHq[p].first;
                     m_playerHqTileY = prebuiltHq[p].second;
                 }
-                else if(Players::hostile(p, setup.local))
+                else if(Players::Hostile(p, setup.local))
                 {
                     m_enemyHqTileX = prebuiltHq[p].first;
                     m_enemyHqTileY = prebuiltHq[p].second;
@@ -1261,12 +1261,12 @@ namespace OpenArtOfWar
             int bx = 0, by = 0, size = 0;
             for(int s : kSizes)
             {
-                for(int apart = std::min(map.getWidth(), map.getHeight()) / 3; apart >= 0 && size == 0; apart -= 2)
+                for(int apart = std::min(map.GetWidth(), map.GetHeight()) / 3; apart >= 0 && size == 0; apart -= 2)
                 {
-                    bool ok = findBaseSite(map, s, spots[spot].first, spots[spot].second, connected.empty() ? nullptr : &connected, bx, by);
+                    bool ok = FindBaseSite(map, s, spots[spot].first, spots[spot].second, connected.empty() ? nullptr : &connected, bx, by);
                     for(const auto &c : placed)
                     {
-                        if(DetMath::hypot(static_cast<float>(bx + s / 2 - c.first), static_cast<float>(by + s / 2 - c.second)) < apart)
+                        if(DetMath::Hypot(static_cast<float>(bx + s / 2 - c.first), static_cast<float>(by + s / 2 - c.second)) < apart)
                             ok = false;
                     }
                     if(ok)
@@ -1282,52 +1282,52 @@ namespace OpenArtOfWar
             }
             const int cx = bx + size / 2, cy = by + size / 2;
             if(connected.empty())
-                connected = reachableFrom(map, cx, cy);
+                connected = ReachableFrom(map, cx, cy);
             placed.push_back({cx, cy});
             const StartingBase &base = startingBase(slot.faction);
             int hqX = 0, hqY = 0, unusedX = 0, unusedY = 0;
-            if(!planner.place(base.hq, cx, cy, slot.faction, p, hqX, hqY))
+            if(!planner.Place(base.hq, cx, cy, slot.faction, p, hqX, hqY))
                 return false;
-            planner.place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
+            planner.Place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
             if(setup.prebuilt)
             {
-                planner.place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);
-                planner.placeUnits(base.units, cx, cy, slot.faction, p);
+                planner.Place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);
+                planner.PlaceUnits(base.units, cx, cy, slot.faction, p);
             }
             if(p == setup.local)
             {
                 m_playerHqTileX = hqX;
                 m_playerHqTileY = hqY;
             }
-            else if(Players::hostile(p, setup.local))
+            else if(Players::Hostile(p, setup.local))
             {
                 m_enemyHqTileX = hqX;
                 m_enemyHqTileY = hqY;
             }
         }
 
-        map.setViewerTeam(Players::teamOf(setup.local));
-        entities.updateFogOfWar(map);
+        map.SetViewerTeam(Players::TeamOf(setup.local));
+        entities.UpdateFogOfWar(map);
         std::cout << "[MissionController] Match on " << setup.mapPath << " for " << Players::count() << " players" << std::endl;
         if(m_onLoaded)
             m_onLoaded();
         return true;
     }
 
-    bool MissionController::restart(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+    bool MissionController::Restart(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
         if(!m_customMapPath.empty())
         {
-            return loadSkirmish(m_customMapPath, map, entities, economy, pathfinder, m_customPrebuilt);
+            return LoadSkirmish(m_customMapPath, map, entities, economy, pathfinder, m_customPrebuilt);
         }
-        return loadMission(m_currentMissionId, assetRoot, map, entities, economy, pathfinder);
+        return LoadMission(m_currentMissionId, assetRoot, map, entities, economy, pathfinder);
     }
 
-    bool MissionController::loadTestMap(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+    bool MissionController::LoadTestMap(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
     {
         // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
         // custom match before left its own slots, colours and local slot behind)
-        setPlayerFaction(playerFaction());
+        SetPlayerFaction(PlayerFaction());
         m_currentMissionId = -1; // Standalone test map, not a numbered campaign mission!
         m_customMapPath.clear();
         m_missionTime = 0.0f;
@@ -1339,9 +1339,9 @@ namespace OpenArtOfWar
         m_isVictory = false;
         m_isDefeat = false;
 
-        const std::string testMapPath = LoaderResources::testMap(assetRoot.empty() ? std::string(LoaderResources::kDefaultRoot) : assetRoot);
+        const std::string testMapPath = LoaderResources::TestMap(assetRoot.empty() ? std::string(LoaderResources::kDefaultRoot) : assetRoot);
         std::string mapText;
-        bool haveTestMap = Assets::readText(testMapPath, mapText);
+        bool haveTestMap = Assets::ReadText(testMapPath, mapText);
         if(!haveTestMap)
         {
             std::cerr << "[MissionController] Failed to open test map: " << testMapPath << std::endl;
@@ -1349,7 +1349,7 @@ namespace OpenArtOfWar
         }
 
         nlohmann::json mapData = nlohmann::json::parse(mapText);
-        if(!map.loadMap(testMapPath))
+        if(!map.LoadMap(testMapPath))
         {
             return false;
         }
@@ -1365,29 +1365,29 @@ namespace OpenArtOfWar
         m_enemyHqTileX = enemyHq.value("x", 46);
         m_enemyHqTileY = enemyHq.value("y", 18);
 
-        entities.clear();
-        economy.reset(mapData.value("startingCredits", 10000));
-        pathfinder.setMap(&map);
-        pathfinder.setEntityManager(&entities);
+        entities.Clear();
+        economy.Reset(mapData.value("startingCredits", 10000));
+        pathfinder.SetMap(&map);
+        pathfinder.SetEntityManager(&entities);
 
-        auto parseFaction = [](const nlohmann::json &item) { return Utility::parseFaction(item.value("faction", "resistance")); };
+        auto parseFaction = [](const nlohmann::json &item) { return Utility::ParseFaction(item.value("faction", "resistance")); };
         auto placeBuilding = [&](const nlohmann::json &building)
         {
             const int buildingIndex = building.value("buildingIndex", 0);
             const int bx = building.value("x", 0);
             const int by = building.value("y", 0);
             const Faction faction = parseFaction(building);
-            int bid = entities.spawnBuildingByIndex(buildingIndex, bx, by, faction, building.value("initialProgress", 1.0f));
+            int bid = entities.SpawnBuildingByIndex(buildingIndex, bx, by, faction, building.value("initialProgress", 1.0f));
             if(bid > 0)
             {
-                const Building *bEnt = entities.getBuilding(bid);
+                const Building *bEnt = entities.GetBuilding(bid);
                 if(bEnt)
                 {
-                    for(int ty = by; ty < by + bEnt->buildHeight && ty < map.getHeight(); ++ty)
+                    for(int ty = by; ty < by + bEnt->buildHeight && ty < map.GetHeight(); ++ty)
                     {
-                        for(int tx = bx; tx < bx + bEnt->buildWidth && tx < map.getWidth(); ++tx)
+                        for(int tx = bx; tx < bx + bEnt->buildWidth && tx < map.GetWidth(); ++tx)
                         {
-                            map.setPassable(tx, ty, false);
+                            map.SetPassable(tx, ty, false);
                         }
                     }
                 }
@@ -1400,8 +1400,8 @@ namespace OpenArtOfWar
         }
         for(const auto &unitData : mapData.value("units", nlohmann::json::array()))
         {
-            const int unitId = entities.spawnUnitByArchetype(unitData.value("archetypeId", 0), unitData.value("x", 0), unitData.value("y", 0), parseFaction(unitData));
-            Entity *unit = entities.getEntity(unitId);
+            const int unitId = entities.SpawnUnitByArchetype(unitData.value("archetypeId", 0), unitData.value("x", 0), unitData.value("y", 0), parseFaction(unitData));
+            Entity *unit = entities.GetEntity(unitId);
             if(!unit)
                 continue;
             if(unitData.contains("maxHp"))
@@ -1415,7 +1415,7 @@ namespace OpenArtOfWar
             }
         }
 
-        std::cout << "[MissionController] Loaded test map from " << testMapPath << " (" << map.getWidth() << "x" << map.getHeight() << ")." << std::endl;
+        std::cout << "[MissionController] Loaded test map from " << testMapPath << " (" << map.GetWidth() << "x" << map.GetHeight() << ")." << std::endl;
         if(m_onLoaded)
         {
             m_onLoaded();

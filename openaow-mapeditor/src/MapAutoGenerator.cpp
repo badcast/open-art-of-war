@@ -9,9 +9,9 @@
 
 namespace OpenArtOfWar {
 
-using MapNoise::octaveNoise2D;
+using MapNoise::OctaveNoise2D;
 
-void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
+void MapAutoGenerator::Generate(MapDocument& doc, GeneratorParams params) {
     if (params.randomSeed) {
         std::random_device rd;
         params.seed = rd();
@@ -22,8 +22,8 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
     int tilesetId = (params.biome == GeneratorBiome::DesertCanyon) ? 1 : params.tilesetId;
 
     // Reset document
-    doc.newMap(w, h, tilesetId, 0);
-    doc.setName("gen_map_" + std::to_string(params.seed % 10000));
+    doc.NewMap(w, h, tilesetId, 0);
+    doc.SetName("gen_map_" + std::to_string(params.seed % 10000));
 
     // 1. Generate multi-octave heightmap & moisture map
     std::vector<float> heightmap(w * h, 0.0f);
@@ -34,8 +34,8 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
         for (int x = 0; x < w; ++x) {
             float nx = static_cast<float>(x) * freq;
             float ny = static_cast<float>(y) * freq;
-            float val = octaveNoise2D(nx, ny, 4, 0.5f, params.seed);
-            float moist = octaveNoise2D(nx + 100.0f, ny + 100.0f, 3, 0.5f, params.seed + 999);
+            float val = OctaveNoise2D(nx, ny, 4, 0.5f, params.seed);
+            float moist = OctaveNoise2D(nx + 100.0f, ny + 100.0f, 3, 0.5f, params.seed + 999);
             heightmap[y * w + x] = val;
             moisture[y * w + x] = moist;
         }
@@ -112,13 +112,13 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
         for (int x = 0; x < w; ++x) {
             int idx = y * w + x;
             if (isBridge[idx]) {
-                doc.setTile(x, y, dirtPath);
-                doc.setPassable(x, y, true);
+                doc.SetTile(x, y, dirtPath);
+                doc.SetPassable(x, y, true);
                 continue;
             }
             if (isRiver[idx]) {
-                doc.setTile(x, y, waterTile);
-                doc.setPassable(x, y, false);
+                doc.SetTile(x, y, waterTile);
+                doc.SetPassable(x, y, false);
                 continue;
             }
 
@@ -126,31 +126,31 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
             float mval = moisture[idx];
 
             if (params.biome == GeneratorBiome::Archipelago && hval < 0.42f) {
-                doc.setTile(x, y, (hval < 0.35f) ? waterTile : shallowWater);
-                doc.setPassable(x, y, false);
+                doc.SetTile(x, y, (hval < 0.35f) ? waterTile : shallowWater);
+                doc.SetPassable(x, y, false);
             } else if (tilesetId == 1) { // Desert
                 if (hval < 0.28f && mval > 0.65f) { // Oasis
-                    doc.setTile(x, y, shallowWater);
-                    doc.setPassable(x, y, false);
+                    doc.SetTile(x, y, shallowWater);
+                    doc.SetPassable(x, y, false);
                 } else if (hval < 0.40f) {
-                    doc.setTile(x, y, baseGrass); // Flat sand
+                    doc.SetTile(x, y, baseGrass); // Flat sand
                 } else if (hval < 0.65f) {
-                    doc.setTile(x, y, meadowGrass); // Dunes
+                    doc.SetTile(x, y, meadowGrass); // Dunes
                 } else if (hval < 0.82f) {
-                    doc.setTile(x, y, dirtPath); // Cracked earth
+                    doc.SetTile(x, y, dirtPath); // Cracked earth
                 } else {
-                    doc.setTile(x, y, rockTile); // Rocky canyon
+                    doc.SetTile(x, y, rockTile); // Rocky canyon
                 }
             } else { // Jungle / Plains
                 if (hval < 0.25f) {
-                    doc.setTile(x, y, shallowWater);
-                    doc.setPassable(x, y, false);
+                    doc.SetTile(x, y, shallowWater);
+                    doc.SetPassable(x, y, false);
                 } else if (hval < 0.55f) {
-                    doc.setTile(x, y, (mval > 0.5f) ? meadowGrass : baseGrass);
+                    doc.SetTile(x, y, (mval > 0.5f) ? meadowGrass : baseGrass);
                 } else if (hval < 0.78f) {
-                    doc.setTile(x, y, dirtPath);
+                    doc.SetTile(x, y, dirtPath);
                 } else {
-                    doc.setTile(x, y, rockTile);
+                    doc.SetTile(x, y, rockTile);
                 }
             }
         }
@@ -168,8 +168,8 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
             for (int y = by - 2; y < by + bh + 2; ++y) {
                 for (int x = bx - 2; x < bx + bw + 2; ++x) {
                     if (x >= 0 && x < w && y >= 0 && y < h) {
-                        doc.setTile(x, y, meadowGrass);
-                        doc.setPassable(x, y, true);
+                        doc.SetTile(x, y, meadowGrass);
+                        doc.SetPassable(x, y, true);
                         isRiver[y * w + x] = false;
                         isBridge[y * w + x] = false;
                     }
@@ -189,8 +189,8 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
         while (cx != x1 || cy != y1) {
             if (cx >= 0 && cx < w && cy >= 0 && cy < h) {
                 if (!isRiver[cy * w + cx] || isBridge[cy * w + cx]) {
-                    doc.setTile(cx, cy, dirtPath);
-                    doc.setPassable(cx, cy, true);
+                    doc.SetTile(cx, cy, dirtPath);
+                    doc.SetPassable(cx, cy, true);
                 }
             }
             if (std::abs(x1 - cx) > std::abs(y1 - cy)) {
@@ -218,9 +218,9 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
     // 7. Decorations Placement (Trees, Rocks, Bushes)
     int decorDensityPercent = (params.decorDensity == 0) ? 6 : (params.decorDensity == 1 ? 14 : 24);
     OpenArtOfWar::Utility::Random rng(params.seed);
-    auto distPct = [&](OpenArtOfWar::Utility::Random& r) { return r.range(0, 99); };
+    auto distPct = [&](OpenArtOfWar::Utility::Random& r) { return r.Range(0, 99); };
     const int maxTree = (tilesetId == 1) ? 20 : 35;
-    auto treeDist = [&](OpenArtOfWar::Utility::Random& r) { return r.range(0, maxTree); };
+    auto treeDist = [&](OpenArtOfWar::Utility::Random& r) { return r.Range(0, maxTree); };
 
     for (int y = 1; y < h - 1; ++y) {
         for (int x = 1; x < w - 1; ++x) {
@@ -233,11 +233,11 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
                 if (x >= eBaseX - 3 && x <= eBaseX + 13 && y >= eBaseY - 3 && y <= eBaseY + 13) continue;
             }
 
-            uint8_t t = doc.getTileMap().getBaseTile(x, y);
-            if (TileCollision::isBlocked(tilesetId, t)) continue; // Water / blocked ground
+            uint8_t t = doc.GetTileMap().GetBaseTile(x, y);
+            if (TileCollision::IsBlocked(tilesetId, t)) continue; // Water / blocked ground
 
             float m = moisture[idx];
-            float n = octaveNoise2D(x * 0.12f, y * 0.12f, 2, 0.5f, params.seed + 555);
+            float n = OctaveNoise2D(x * 0.12f, y * 0.12f, 2, 0.5f, params.seed + 555);
 
             if (n > 0.52f && distPct(rng) < decorDensityPercent) {
                 int decorType = treeDist(rng);
@@ -246,32 +246,32 @@ void MapAutoGenerator::generate(MapDocument& doc, GeneratorParams params) {
                 } else {
                     decorType = (distPct(rng) % 32);
                 }
-                doc.addDecoration(decorType, x, y);
+                doc.AddDecoration(decorType, x, y);
             }
         }
     }
 
     // 8. Auto-calculate complete passability map
-    doc.autoRecalculatePassability();
-    doc.setModified(true);
-    std::cout << "[MapAutoGenerator] Generated procedural map '" << doc.getName()
+    doc.AutoRecalculatePassability();
+    doc.SetModified(true);
+    std::cout << "[MapAutoGenerator] Generated procedural map '" << doc.GetName()
               << "' (" << w << "x" << h << ", seed: " << params.seed << ") successfully!" << std::endl;
 }
 
-void MapAutoGenerator::generateQuickRandom(MapDocument& doc) {
+void MapAutoGenerator::GenerateQuickRandom(MapDocument& doc) {
     std::random_device rd;
     GeneratorParams p;
     p.seed = rd();
     p.randomSeed = true;
-    p.width = doc.getWidth();
-    p.height = doc.getHeight();
-    p.tilesetId = doc.getTilesetId();
+    p.width = doc.GetWidth();
+    p.height = doc.GetHeight();
+    p.tilesetId = doc.GetTilesetId();
     p.biome = (p.tilesetId == 1) ? GeneratorBiome::DesertCanyon : GeneratorBiome::RiverValley;
     p.symmetry = GeneratorSymmetry::Rotational180;
     p.addRiver = (p.biome != GeneratorBiome::DesertCanyon);
     p.generateBases = true;
     p.decorDensity = 1;
-    generate(doc, p);
+    Generate(doc, p);
 }
 
 } // namespace OpenArtOfWar

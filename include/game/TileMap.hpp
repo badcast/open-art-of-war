@@ -48,119 +48,119 @@ namespace OpenArtOfWar
     public:
         TileMap();
 
-        bool loadMap(const std::string &jsonPath);
+        bool LoadMap(const std::string &jsonPath);
         // Takes away the walls the map file placed (a game that starts from scratch)
-        void clearWalls();
+        void ClearWalls();
         // Takes the environment settings (fog look, construction rules); missing keys keep the defaults
-        void loadEnvironment(const EnvironmentConfig &env);
-        const FogStyle &getFogStyle() const
+        void LoadEnvironment(const EnvironmentConfig &env);
+        const FogStyle &GetFogStyle() const
         {
             return m_fogStyle;
         }
-        const ConstructionRules &getConstructionRules() const
+        const ConstructionRules &GetConstructionRules() const
         {
             return m_constructionRules;
         }
-        void setFogStyle(const FogStyle &style)
+        void SetFogStyle(const FogStyle &style)
         {
             m_fogStyle = style;
         }
-        void initBlankArena(int width, int height, int tilesetId = 0);
+        void InitBlankArena(int width, int height, int tilesetId = 0);
         void render(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0);
-        void renderTerrain(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
-        void renderWallRubble(Renderer &renderer, const Camera &camera, bool fogEnabled = true) const;
-        void renderDecorations(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
+        void RenderTerrain(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
+        void RenderWallRubble(Renderer &renderer, const Camera &camera, bool fogEnabled = true) const;
+        void RenderDecorations(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
         // `smooth` false (low graphics): one texel per tile, no blur, hard tile edges
-        void renderFog(Renderer &renderer, const Camera &camera, bool smooth = true) const;
-        void renderWalls(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
-        void renderWallRow(int ty, Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0, int startTileX = -1, int endTileX = -1) const;
+        void RenderFog(Renderer &renderer, const Camera &camera, bool smooth = true) const;
+        void RenderWalls(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
+        void RenderWallRow(int ty, Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0, int startTileX = -1, int endTileX = -1) const;
 
-        bool isPassable(int tileX, int tileY) const;
-        void setPassable(int tileX, int tileY, bool passable);
+        bool IsPassable(int tileX, int tileY) const;
+        void SetPassable(int tileX, int tileY, bool passable);
 
         // `owner`: the player the wall belongs to (kNoPlayer + a faction: the first player of that faction)
-        void setWall(int tileX, int tileY, Faction faction, int hpPercent = 100, PlayerId owner = kNoPlayer);
-        PlayerId getWallOwner(int tileX, int tileY) const;
-        uint16_t getWall(int tileX, int tileY) const;
-        void damageWall(int tileX, int tileY, int damage);
+        void SetWall(int tileX, int tileY, Faction faction, int hpPercent = 100, PlayerId owner = kNoPlayer);
+        PlayerId GetWallOwner(int tileX, int tileY) const;
+        uint16_t GetWall(int tileX, int tileY) const;
+        void DamageWall(int tileX, int tileY, int damage);
         // The wall is gone at once (rubble stays), whatever its armour
-        void destroyWall(int tileX, int tileY);
-        int getWallHp(int tileX, int tileY) const;
-        int getWallMaxHp(int /*tileX*/, int /*tileY*/) const
+        void DestroyWall(int tileX, int tileY);
+        int GetWallHp(int tileX, int tileY) const;
+        int GetWallMaxHp(int /*tileX*/, int /*tileY*/) const
         {
             return 150;
         }
-        Faction getWallFaction(int tileX, int tileY) const;
-        uint16_t getWallRubble(int tileX, int tileY) const;
-        bool isWall(int tileX, int tileY) const
+        Faction GetWallFaction(int tileX, int tileY) const;
+        uint16_t GetWallRubble(int tileX, int tileY) const;
+        bool IsWall(int tileX, int tileY) const
         {
-            return getWall(tileX, tileY) > 0;
+            return GetWall(tileX, tileY) > 0;
         }
 
         // Sight: every team (Players::teamOf, 0..7) has its own "seen this tick" bit per tile, worked out
         // the same way on every peer of a network game (the simulation asks isVisibleTo). The fog that is
         // drawn (getFogState: hidden / explored / visible) follows the local player's team, the viewer.
-        void setViewerTeam(uint8_t team)
+        void SetViewerTeam(uint8_t team)
         {
             m_viewerTeam = team & 7;
         }
-        uint8_t getViewerTeam() const
+        uint8_t GetViewerTeam() const
         {
             return m_viewerTeam;
         }
         // Start of a sight update: nothing seen; the viewer's visible tiles become explored
-        void resetVisibility();
-        void resetAllFog(FogState state = FogState::Hidden);
-        void revealArea(int centerTileX, int centerTileY, int radius, uint8_t team);
-        void revealArea(int centerTileX, int centerTileY, int radius)
+        void ResetVisibility();
+        void ResetAllFog(FogState state = FogState::Hidden);
+        void RevealArea(int centerTileX, int centerTileY, int radius, uint8_t team);
+        void RevealArea(int centerTileX, int centerTileY, int radius)
         {
-            revealArea(centerTileX, centerTileY, radius, m_viewerTeam);
+            RevealArea(centerTileX, centerTileY, radius, m_viewerTeam);
         }
         // Exactly the tiles of a footprint (a unit's tile, a building's WxH)
-        void revealRect(int tileX, int tileY, int width, int height, uint8_t team);
-        void revealRect(int tileX, int tileY, int width, int height)
+        void RevealRect(int tileX, int tileY, int width, int height, uint8_t team);
+        void RevealRect(int tileX, int tileY, int width, int height)
         {
-            revealRect(tileX, tileY, width, height, m_viewerTeam);
+            RevealRect(tileX, tileY, width, height, m_viewerTeam);
         }
-        bool isVisibleTo(int tileX, int tileY, uint8_t team) const;
-        FogState getFogState(int tileX, int tileY) const;
-        bool isFogEnabled() const
+        bool IsVisibleTo(int tileX, int tileY, uint8_t team) const;
+        FogState GetFogState(int tileX, int tileY) const;
+        bool IsFogEnabled() const
         {
             return m_hasFog;
         }
-        void setFogEnabled(bool enabled)
+        void SetFogEnabled(bool enabled)
         {
             m_hasFog = enabled;
         }
 
-        int getWidth() const
+        int GetWidth() const
         {
             return m_width;
         }
-        int getHeight() const
+        int GetHeight() const
         {
             return m_height;
         }
-        int getTilesetId() const
+        int GetTilesetId() const
         {
             return m_tilesetId;
         }
 
-        uint8_t getBaseTile(int x, int y) const;
-        void setBaseTile(int x, int y, uint8_t tile);
-        void setSize(int width, int height);
-        void setTilesetId(int tilesetId)
+        uint8_t GetBaseTile(int x, int y) const;
+        void SetBaseTile(int x, int y, uint8_t tile);
+        void SetSize(int width, int height);
+        void SetTilesetId(int tilesetId)
         {
             m_tilesetId = tilesetId;
         }
-        const std::vector<MapDecoration> &getDecorations() const
+        const std::vector<MapDecoration> &GetDecorations() const
         {
             return m_decorations;
         }
-        void clearDecorations();
-        void addDecoration(int type, int x, int y);
-        void removeDecorationAt(int x, int y);
-        uint16_t getDecorGrid(int x, int y) const;
+        void ClearDecorations();
+        void AddDecoration(int type, int x, int y);
+        void RemoveDecorationAt(int x, int y);
+        uint16_t GetDecorGrid(int x, int y) const;
 
     private:
         int m_width {60};

@@ -25,52 +25,52 @@ namespace OpenArtOfWar
         SoundEngine();
         ~SoundEngine();
 
-        bool init(const std::string &assetRoot = LoaderResources::kDefaultRoot);
-        void update(bool inMainMenu, bool inGame);
-        void playMenuMusic();
-        void playRandomGameTrack();
-        void stopMusic();
-        void nextTrack(); // player: mainmenu -> tracks... -> mainmenu
-        void prevTrack();
-        void setMusicVolume(int volume); // 0..128
-        void setFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
-        void setVoiceVolume(int volume); // 0..128: unit replies and the announcer
+        bool Init(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+        void Update(bool inMainMenu, bool inGame);
+        void PlayMenuMusic();
+        void PlayRandomGameTrack();
+        void StopMusic();
+        void NextTrack(); // player: mainmenu -> tracks... -> mainmenu
+        void PrevTrack();
+        void SetMusicVolume(int volume); // 0..128
+        void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
+        void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
 
         // Sound effects (assets/data/sfx.json, assets/audio/sfx), mixed into their own audio stream
-        SfxMixer &sfx()
+        SfxMixer &Sfx()
         {
             return m_sfx;
         }
         // An event heard as is (interface, announcer-free alerts); `gain` 0..1, `pan` -1..1
-        void playSfx(const std::string &event, float gain = 1.0f, float pan = 0.0f);
+        void PlaySfx(const std::string &event, float gain = 1.0f, float pan = 0.0f);
         // Voices (VoiceManager, the game's language): an announcer line (queued, one at a time) and a unit reply
-        void announce(const std::string &event);
-        void playVoice(const std::string &event);
+        void Announce(const std::string &event);
+        void PlayVoice(const std::string &event);
         // The language of the voices (the game's language; lines missing in it are English)
-        void setVoiceLanguage(const std::string &language);
-        VoiceManager &voices()
+        void SetVoiceLanguage(const std::string &language);
+        VoiceManager &Voices()
         {
             return m_voices;
         }
-        void toggleMute();
+        void ToggleMute();
 
-        bool isMuted() const
+        bool IsMuted() const
         {
             return m_muted;
         }
-        int getCurrentTrack() const
+        int GetCurrentTrack() const
         {
             return m_currentTrack;
         }
-        int getTrackCount() const
+        int GetTrackCount() const
         {
             return static_cast<int>(m_gameTracks.size() + (m_hasMenuTrack ? 1 : 0));
         }
-        std::string getCurrentTrackName() const;
-        double getTrackPosition() const; // seconds into the current track
-        double getTrackLength() const;   // seconds of the current track's played range, 0 when nothing plays
-        void seekTrack(double ratio);    // 0..1 within the played range
-        void cleanup();
+        std::string GetCurrentTrackName() const;
+        double GetTrackPosition() const; // seconds into the current track
+        double GetTrackLength() const;   // seconds of the current track's played range, 0 when nothing plays
+        void SeekTrack(double ratio);    // 0..1 within the played range
+        void Cleanup();
 
     private:
         struct Track
@@ -81,13 +81,13 @@ namespace OpenArtOfWar
             double effectiveMax {-1.0};
         };
 
-        static void SDLCALL feedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
-        static void SDLCALL feedSfx(void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
-        void applyGain();
-        void closeDecoder();
-        bool loadTrack(const Track &track, bool loop);
-        void advanceGameTrack();
-        void playPlayerTrack(int index);
+        static void SDLCALL FeedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
+        static void SDLCALL FeedSfx(void *userdata, SDL_AudioStream *stream, int additionalAmount, int totalAmount);
+        void ApplyGain();
+        void CloseDecoder();
+        bool LoadTrack(const Track &track, bool loop);
+        void AdvanceGameTrack();
+        void PlayPlayerTrack(int index);
 
         bool m_initialized {false};
         bool m_muted {false};

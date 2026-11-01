@@ -38,27 +38,27 @@ bool BattleSim::start(const Setup& setup, const fs::path& assetsRoot, OpenArtOfW
     m_height = std::max(18, std::max(rowsA, rowsB) * 4 + 10);
 
     m_map = std::make_unique<OpenArtOfWar::TileMap>();
-    m_map->initBlankArena(m_width, m_height, 0);
-    m_map->setFogEnabled(false);
+    m_map->InitBlankArena(m_width, m_height, 0);
+    m_map->SetFogEnabled(false);
     m_entities = std::make_unique<OpenArtOfWar::EntityManager>();
-    m_entities->setTextureManager(textures);
-    m_entities->setUnlimitedPower(true);
-    if (!m_entities->loadCharacterConfigs(assetsRoot.string())) {
+    m_entities->SetTextureManager(textures);
+    m_entities->SetUnlimitedPower(true);
+    if (!m_entities->LoadCharacterConfigs(assetsRoot.string())) {
         error = "Could not load character configs";
         return false;
     }
     // Apply the editor's current (possibly unsaved) values
-    m_entities->loadCharacterYaml(YAML::Clone(docA));
-    m_entities->loadCharacterYaml(YAML::Clone(docB));
-    m_entities->rebuildBlueprints();
+    m_entities->LoadCharacterYaml(YAML::Clone(docA));
+    m_entities->LoadCharacterYaml(YAML::Clone(docB));
+    m_entities->RebuildBlueprints();
 
     m_pathfinder = std::make_unique<OpenArtOfWar::Pathfinder>(m_map.get());
-    m_pathfinder->setEntityManager(m_entities.get());
+    m_pathfinder->SetEntityManager(m_entities.get());
 
     const int midY = m_height / 2;
     const int bStartX = margin + colsA + setup.distance;
-    spawnSide(docA, setup.countA, OpenArtOfWar::Faction::Resistance, margin, midY, 0, m_a);
-    spawnSide(docB, setup.countB, OpenArtOfWar::Faction::Confederation, bStartX, midY, 4, m_b);
+    SpawnSide(docA, setup.countA, OpenArtOfWar::Faction::Resistance, margin, midY, 0, m_a);
+    SpawnSide(docB, setup.countB, OpenArtOfWar::Faction::Confederation, bStartX, midY, 4, m_b);
     const int rows = std::max(rowsA, rowsB);
     const float tw = static_cast<float>(OpenArtOfWar::TILE_WIDTH);
     const float th = static_cast<float>(OpenArtOfWar::TILE_HEIGHT);
@@ -68,74 +68,74 @@ bool BattleSim::start(const Setup& setup, const fs::path& assetsRoot, OpenArtOfW
         error = "Could not spawn both sides (check archetype_id / building_index)";
         return false;
     }
-    refreshStats();
+    RefreshStats();
     m_a.hpStart = m_a.hpNow;
     m_b.hpStart = m_b.hpNow;
-    issueOrders(true);
+    IssueOrders(true);
     m_active = true;
     return true;
 }
 
-void BattleSim::update(float dt) {
+void BattleSim::Update(float dt) {
     if (!m_active) return;
     m_accumulator += dt;
     const float step = 1.0f / 30.0f;
     int guard = 0;
     while (m_accumulator >= step && guard++ < 60) {
         m_accumulator -= step;
-        m_entities->update(step, *m_map, *m_pathfinder);
+        m_entities->Update(step, *m_map, *m_pathfinder);
         if (m_finished) continue; // keep death animations running, results stay frozen
         m_time += step;
-        refreshStats();
+        RefreshStats();
         m_orderTimer += step;
         if (m_orderTimer >= 1.5f) {
             m_orderTimer = 0.0f;
-            issueOrders(false);
+            IssueOrders(false);
         }
-        checkFinished();
+        CheckFinished();
     }
 }
 
-void BattleSim::runToEnd() {
+void BattleSim::RunToEnd() {
     const float step = 1.0f / 30.0f;
-    while (m_active && !m_finished) update(step);
+    while (m_active && !m_finished) Update(step);
 }
 
 void BattleSim::render(OpenArtOfWar::Renderer& renderer, const OpenArtOfWar::Camera& camera, int animTick) {
     if (!m_map) return;
-    m_map->renderTerrain(renderer, camera, false, animTick);
-    m_entities->renderGroundRemnants(renderer, camera, *m_map, false);
+    m_map->RenderTerrain(renderer, camera, false, animTick);
+    m_entities->RenderGroundRemnants(renderer, camera, *m_map, false);
     m_entities->render(renderer, camera, *m_map, false, animTick, false);
-    renderer.drawRectWorld(0.0f, 0.0f, static_cast<float>(m_width * OpenArtOfWar::TILE_WIDTH),
+    renderer.DrawRectWorld(0.0f, 0.0f, static_cast<float>(m_width * OpenArtOfWar::TILE_WIDTH),
                            static_cast<float>(m_height * OpenArtOfWar::TILE_HEIGHT), camera, SDL_Color{85, 140, 105, 200});
 }
 
-void BattleSim::spawnSide(YAML::Node doc, int count, OpenArtOfWar::Faction faction, int startX, int midY, int facing, Side& side) {
-    const bool building = yamlString(doc, "type") == "building";
+void BattleSim::SpawnSide(YAML::Node doc, int count, OpenArtOfWar::Faction faction, int startX, int midY, int facing, Side& side) {
+    const bool building = YamlString(doc, "type") == "building";
     if (building) {
-        const int index = yamlInt(doc, "building_index", -1);
-        const int w = std::max(1, yamlInt(doc["size"], "width", 1));
-        const int h = std::max(1, yamlInt(doc["size"], "height", 1));
+        const int index = YamlInt(doc, "building_index", -1);
+        const int w = std::max(1, YamlInt(doc["size"], "width", 1));
+        const int h = std::max(1, YamlInt(doc["size"], "height", 1));
         const int perColumn = std::max(1, (m_height - 4) / (h + 1));
         for (int i = 0; i < count; ++i) {
             int x = startX + (i / perColumn) * (w + 1);
             int y = midY - (std::min(count, perColumn) * (h + 1)) / 2 + (i % perColumn) * (h + 1);
-            int id = m_entities->spawnBuildingByIndex(index, x, y, faction, 1.0f);
+            int id = m_entities->SpawnBuildingByIndex(index, x, y, faction, 1.0f);
             if (id <= 0) continue;
             for (int ty = y; ty < y + h; ++ty) {
-                for (int tx = x; tx < x + w; ++tx) m_map->setPassable(tx, ty, false);
+                for (int tx = x; tx < x + w; ++tx) m_map->SetPassable(tx, ty, false);
             }
             side.ids.push_back(id);
         }
     } else {
-        const int arch = yamlInt(doc, "archetype_id", 0);
+        const int arch = YamlInt(doc, "archetype_id", 0);
         const int rows = std::min(count, 5);
         for (int i = 0; i < count; ++i) {
             int x = startX + i / 5;
             int y = midY - rows + (i % 5) * 2;
-            int id = m_entities->spawnUnitByArchetype(arch, x, y, faction);
+            int id = m_entities->SpawnUnitByArchetype(arch, x, y, faction);
             if (id <= 0) continue;
-            if (OpenArtOfWar::Unit* u = m_entities->getUnit(id)) {
+            if (OpenArtOfWar::Unit* u = m_entities->GetUnit(id)) {
                 u->facingDirection = facing;
                 u->turretFacing = facing;
             }
@@ -145,11 +145,11 @@ void BattleSim::spawnSide(YAML::Node doc, int count, OpenArtOfWar::Faction facti
     side.total = static_cast<int>(side.ids.size());
 }
 
-void BattleSim::issueOrders(bool initial) {
+void BattleSim::IssueOrders(bool initial) {
     auto centroid = [&](const Side& s, int& outX, int& outY) -> bool {
         int sx = 0, sy = 0, n = 0;
         for (int id : s.ids) {
-            const OpenArtOfWar::Entity* e = m_entities->getEntity(id);
+            const OpenArtOfWar::Entity* e = m_entities->GetEntity(id);
             if (!e || !e->alive || e->state == OpenArtOfWar::ActionState::Die) continue;
             sx += e->tileX;
             sy += e->tileY;
@@ -165,25 +165,25 @@ void BattleSim::issueOrders(bool initial) {
         if (!centroid(enemy, tx, ty)) return;
         std::vector<int> idle;
         for (int id : own.ids) {
-            const OpenArtOfWar::Unit* u = m_entities->getUnit(id);
+            const OpenArtOfWar::Unit* u = m_entities->GetUnit(id);
             if (!u || !u->alive || u->state == OpenArtOfWar::ActionState::Die || u->moveSpeed <= 0.0f) continue;
             if (initial || (u->state == OpenArtOfWar::ActionState::Idle && u->targetEntityId == 0 &&
                             u->path.empty() && !u->waitingForPath)) {
                 idle.push_back(id);
             }
         }
-        if (!idle.empty()) m_entities->issueAttackMoveOrder(idle, tx, ty, *m_pathfinder);
+        if (!idle.empty()) m_entities->IssueAttackMoveOrder(idle, tx, ty, *m_pathfinder);
     };
     order(m_a, m_b);
     if (m_setup.bAdvances) order(m_b, m_a);
 }
 
-void BattleSim::refreshStats() {
+void BattleSim::RefreshStats() {
     auto account = [&](Side& s, Side& enemy) {
         s.alive = 0;
         s.hpNow = 0;
         for (int id : s.ids) {
-            const OpenArtOfWar::Entity* e = m_entities->getEntity(id);
+            const OpenArtOfWar::Entity* e = m_entities->GetEntity(id);
             int hp = (e && e->alive && e->state != OpenArtOfWar::ActionState::Die) ? std::max(0, e->currentHp) : 0;
             auto it = m_lastHp.find(id);
             if (it != m_lastHp.end() && it->second > hp) enemy.damageDealt += it->second - hp;
@@ -198,7 +198,7 @@ void BattleSim::refreshStats() {
     account(m_b, m_a);
 }
 
-void BattleSim::checkFinished() {
+void BattleSim::CheckFinished() {
     if (m_a.alive == 0 || m_b.alive == 0) {
         m_winner = (m_a.alive == 0 && m_b.alive == 0) ? 3 : (m_a.alive == 0 ? 2 : 1);
         m_finished = true;

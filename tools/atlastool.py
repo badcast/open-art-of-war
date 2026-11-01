@@ -12,7 +12,7 @@ def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     if len(h) == 3:
         h = ''.join(c * 2 for c in h)
     if len(h) != 6:
-        raise ValueError(f"Некорректный HEX-цвет: {hex_str}")
+        raise ValueError(f"Invalid HEX color: {hex_str}")
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
@@ -24,23 +24,23 @@ def remove_color_key_smart(
     auto_corner: bool = True
 ) -> Image.Image:
     """
-    Продвинутое удаление фона после 4K-апскейла:
-    1. Если auto_corner=True, проверяет реальный цвет углов (0,0) и удаляет и его тоже (если редактор исказил HEX).
-    2. Плавно срезает альфу в зоне сглаживания (softness).
-    3. Вычитает паразитный оттенок фона (Despill) из полупрозрачных краев спрайта.
+    Advanced background removal after 4K upscaling:
+    1. If auto_corner=True, checks the actual corner (0,0) color and removes it too (in case the editor distorted the HEX).
+    2. Smoothly fades alpha within the smoothing zone (softness).
+    3. Subtracts the stray background tint (despill) from the semi-transparent sprite edges.
     """
     arr = np.array(img.convert("RGBA"), dtype=np.float32)
     rgb = arr[:, :, :3]
     alpha = arr[:, :, 3]
 
-    # Список ключей для удаления (заданный HEX + реальный цвет из угла (0,0), если там непрозрачный фон)
+    # List of keys to remove (the given HEX + the actual color of corner (0,0) if the background there is opaque)
     keys_to_remove = []
     if key_rgb is not None:
         keys_to_remove.append(np.array(key_rgb, dtype=np.float32))
 
     if auto_corner and alpha[0, 0] > 0:
         corner_rgb = rgb[0, 0].copy()
-        # Добавляем цвет угла, если он еще не в списке
+        # Add the corner color if it is not in the list yet
         if not keys_to_remove or np.linalg.norm(keys_to_remove[0] - corner_rgb) > 2.0:
             keys_to_remove.append(corner_rgb)
 
@@ -48,28 +48,28 @@ def remove_color_key_smart(
         return img
 
     for k_rgb in keys_to_remove:
-        # Евклидово расстояние от каждого пикселя до цвета-ключа
+        # Euclidean distance from each pixel to the key color
         dist = np.linalg.norm(rgb - k_rgb, axis=2)
 
-        # 1. Полное удаление внутри tolerance
-        # 2. Плавный переход альфы от tolerance до (tolerance + softness)
+        # 1. Full removal within tolerance
+        # 2. Smooth alpha transition from tolerance to (tolerance + softness)
         if softness > 0:
             factor = np.clip((dist - tolerance) / float(softness), 0.0, 1.0)
         else:
             factor = np.where(dist <= tolerance, 0.0, 1.0)
 
-        # Применяем к текущему альфа-каналу
+        # Apply to the current alpha channel
         alpha = alpha * factor
 
-        # Despill: убираем цветной ореол на пограничных полупрозрачных пикселях
+        # Despill: remove the colored halo on borderline semi-transparent pixels
         edge_mask = (factor > 0.0) & (factor < 1.0)
         if np.any(edge_mask):
-            # Вытягиваем цвет от фонового ключа обратно к чистому цвету спрайта
+            # Pull the color away from the background key back toward the clean sprite color
             for c in range(3):
                 fg_c = (rgb[:, :, c] - (1.0 - factor) * k_rgb[c]) / np.maximum(factor, 0.05)
                 rgb[:, :, c] = np.where(edge_mask, np.clip(fg_c, 0.0, 255.0), rgb[:, :, c])
 
-    # Полностью обнуляем RGB там, где альфа стала 0
+    # Fully zero out RGB where alpha became 0
     zero_alpha = alpha < 1.0
     rgb[zero_alpha] = 0.0
     alpha[zero_alpha] = 0.0
@@ -107,7 +107,7 @@ def pack_atlas(
             files.append((p, p.name))
 
     if not files:
-        raise RuntimeError("Не найдено изображений для упаковки.")
+        raise RuntimeError("No images found to pack.")
 
     key_rgb = hex_to_rgb(color_key) if color_key else None
     loaded = []
@@ -185,7 +185,7 @@ def pack_atlas(
     with open(output_meta, "w", encoding="utf-8") as f:
         json.dump(meta_data, f, indent=2, ensure_ascii=False)
 
-    print(f"[PACK] Собрано: {output_image} ({atlas_w}x{atlas_h})")
+    print(f"[PACK] Built: {output_image} ({atlas_w}x{atlas_h})")
 
 
 def unpack_atlas(
@@ -218,11 +218,11 @@ def unpack_atlas(
     active_key_hex = color_key_override or meta.get("color_key")
     key_rgb = hex_to_rgb(active_key_hex) if active_key_hex else None
 
-    # Диагностика в консоль: какой цвет реально находится в левом верхнем углу (0,0) атласа
+    # Console diagnostics: which color is actually in the top-left corner (0,0) of the atlas
     top_left_px = atlas.getpixel((0, 0))
-    print(f"[INFO] Разрешение атласа: {actual_w}x{actual_h} (Масштаб: X={scale_x:.2f}, Y={scale_y:.2f})")
-    print(f"[INFO] Пиксель (0,0) в 4K-атласе: RGBA={top_left_px} (HEX: #{top_left_px[0]:02X}{top_left_px[1]:02X}{top_left_px[2]:02X})")
-    print(f"[INFO] Режим ключа: {key_mode}, Заданный HEX: {active_key_hex}, Авто-захват угла: {auto_corner}, Допуск: {tolerance}")
+    print(f"[INFO] Atlas resolution: {actual_w}x{actual_h} (Scale: X={scale_x:.2f}, Y={scale_y:.2f})")
+    print(f"[INFO] Pixel (0,0) in the 4K atlas: RGBA={top_left_px} (HEX: #{top_left_px[0]:02X}{top_left_px[1]:02X}{top_left_px[2]:02X})")
+    print(f"[INFO] Key mode: {key_mode}, Given HEX: {active_key_hex}, Auto corner capture: {auto_corner}, Tolerance: {tolerance}")
 
     out_base = Path(out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
@@ -256,11 +256,11 @@ def unpack_atlas(
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         sub_img.save(dest_path)
 
-    print(f"[UNPACK] Готово! Извлечено файлов: {len(frames)} в '{out_dir}'")
+    print(f"[UNPACK] Done! Files extracted: {len(frames)} to '{out_dir}'")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Упаковщик/распаковщик 4K-атласов с умным удалением Color Key")
+    parser = argparse.ArgumentParser(description="Packer/unpacker for 4K atlases with smart Color Key removal")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     # PACK
@@ -274,16 +274,16 @@ def main():
     p_pack.add_argument("--key-to-alpha", action="store_true")
     p_pack.add_argument("-t", "--tolerance", type=int, default=40)
 
-    # UNPACK (теперь по умолчанию сразу удаляет фон в прозрачность!)
+    # UNPACK (now removes the background to transparency by default!)
     p_unpack = sub.add_parser("unpack")
-    p_unpack.add_argument("atlas", help="Путь к 4K-атласу")
-    p_unpack.add_argument("meta", help="Путь к JSON")
+    p_unpack.add_argument("atlas", help="Path to the 4K atlas")
+    p_unpack.add_argument("meta", help="Path to the JSON")
     p_unpack.add_argument("-d", "--out-dir", default="unpacked_sprites")
-    p_unpack.add_argument("-k", "--color-key", type=str, default=None, help="HEX цвет-ключ (например '#FF00FF')")
+    p_unpack.add_argument("-k", "--color-key", type=str, default=None, help="HEX key color (e.g. '#FF00FF')")
     p_unpack.add_argument("--key-mode", choices=["to_alpha", "from_alpha", "keep"], default="to_alpha")
-    p_unpack.add_argument("-t", "--tolerance", type=int, default=65, help="Жесткий радиус удаления цвета (по умолчанию 65)")
-    p_unpack.add_argument("-s", "--softness", type=int, default=35, help="Мягкий радиус сглаживания бахромы (по умолчанию 35)")
-    p_unpack.add_argument("--no-auto-corner", action="store_true", help="Отключить автоопределение цвета фона по углу (0,0)")
+    p_unpack.add_argument("-t", "--tolerance", type=int, default=65, help="Hard color removal radius (default 65)")
+    p_unpack.add_argument("-s", "--softness", type=int, default=35, help="Soft fringe smoothing radius (default 35)")
+    p_unpack.add_argument("--no-auto-corner", action="store_true", help="Disable automatic background color detection from corner (0,0)")
     p_unpack.add_argument("--scale", type=float, default=None)
     p_unpack.add_argument("--restore-size", action="store_true")
 

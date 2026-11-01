@@ -21,20 +21,20 @@ struct SingleExportOptions {
 // and the edited rows of the graphics tables (composites, animations, bodies, sequences, buildings) into
 // assets/data/graphics_data.json. This OVERWRITES those files (only the sheets and tables that really differ).
 // Reads the object files (<NNN>_*.json + atlas) and the single sprite files (sprites_*.json + grid) of `inDir`.
-bool importSpriteFolder(const fs::path& assetsRoot, const fs::path& inDir, std::string& report);
+bool ImportSpriteFolder(const fs::path& assetsRoot, const fs::path& inDir, std::string& report);
 
 // For every object of the catalog the sprite that shows it best in a list: the one with the most solid pixels
 // (shadows and smoke are translucent). -1 for an object without sprites.
-std::vector<int> pickObjectThumbnails(const SpriteCatalog& catalog, const fs::path& assetsRoot);
+std::vector<int> PickObjectThumbnails(const SpriteCatalog& catalog, const fs::path& assetsRoot);
 
 // One PNG atlas (every sprite the object uses) and one JSON (ids, rectangles, dependency data) per object, named
 // <NNN>_<kind>_<faction>_<name>_id<id>, plus index.json. `objectIndices` index SpriteCatalog::objects().
 // `report` gets the result or the error.
-bool exportSpriteObjects(const SpriteCatalog& catalog, const fs::path& assetsRoot,
+bool ExportSpriteObjects(const SpriteCatalog& catalog, const fs::path& assetsRoot,
                          const fs::path& outDir, const std::vector<int>& objectIndices, std::string& report);
 
 // Every raw sprite in the order of its id on a grid of rows and columns, one PNG (and JSON) per chosen group
-bool exportSingleSprites(const SpriteCatalog& catalog, const fs::path& assetsRoot,
+bool ExportSingleSprites(const SpriteCatalog& catalog, const fs::path& assetsRoot,
                          const fs::path& outDir, const SingleExportOptions& options, std::string& report);
 
 struct CustomAtlasItem {
@@ -46,13 +46,13 @@ struct CustomAtlasItem {
 };
 
 // Exports a custom sprite atlas layout with user-defined positions directly to PNG and JSON.
-bool exportCustomAtlas(const SpriteCatalog& catalog, const fs::path& assetsRoot,
+bool ExportCustomAtlas(const SpriteCatalog& catalog, const fs::path& assetsRoot,
                        const fs::path& outDir, const std::string& baseName,
                        const std::string& title, const std::vector<CustomAtlasItem>& items,
                        int atlasWidth, int atlasHeight,
                        const nlohmann::json* extraGraphicsData, std::string& report);
 
 // Packs items tightly using MaxRects best-short-side fit
-std::vector<CustomAtlasItem> packCustomMaxRects(std::vector<CustomAtlasItem> items, int& width, int& height, int pad);
+std::vector<CustomAtlasItem> PackCustomMaxRects(std::vector<CustomAtlasItem> items, int& width, int& height, int pad);
 
 } // namespace CharEditor

@@ -56,22 +56,22 @@ namespace OpenArtOfWar
     class BitmapFontRenderer
     {
     public:
-        BitmapFontRenderer(SDL_Renderer *renderer, const std::string &regularFontPath = LoaderResources::fontRegular(), const std::string &boldFontPath = LoaderResources::fontBold(), const FontSizes &sizes = {});
+        BitmapFontRenderer(SDL_Renderer *renderer, const std::string &regularFontPath = LoaderResources::FontRegular(), const std::string &boldFontPath = LoaderResources::FontBold(), const FontSizes &sizes = {});
         ~BitmapFontRenderer();
 
-        void drawString(const std::string &text, int x, int y, int scale = 2, SDL_Color color = {255, 255, 255, 255}, bool dropShadow = true, int anchor = Anchor::TOP | Anchor::LEFT);
+        void DrawString(const std::string &text, int x, int y, int scale = 2, SDL_Color color = {255, 255, 255, 255}, bool dropShadow = true, int anchor = Anchor::TOP | Anchor::LEFT);
 
         // Returns the height of the drawn block in pixels
-        int drawTextWrapped(const std::string &text, int x, int y, int maxLineWidth, int scale = 2, SDL_Color color = {255, 255, 255, 255}, bool dropShadow = true);
+        int DrawTextWrapped(const std::string &text, int x, int y, int maxLineWidth, int scale = 2, SDL_Color color = {255, 255, 255, 255}, bool dropShadow = true);
 
-        int getTextWidth(const std::string &text, int scale = 2) const;
-        int getTextHeight(int scale = 2) const;
+        int GetTextWidth(const std::string &text, int scale = 2) const;
+        int GetTextHeight(int scale = 2) const;
 
-        void clearCache();
+        void ClearCache();
 
     private:
-        TTF_Font *getFontForScale(int scale) const;
-        CachedText getOrCreateTexture(const std::string &text, int scale, SDL_Color color);
+        TTF_Font *GetFontForScale(int scale) const;
+        CachedText GetOrCreateTexture(const std::string &text, int scale, SDL_Color color);
 
         SDL_Renderer *m_renderer {nullptr};
         TTF_Font *m_fontSmall {nullptr};        // scale 1 (~13px)

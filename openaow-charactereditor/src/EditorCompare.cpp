@@ -17,11 +17,11 @@
 
 namespace CharEditor {
 
-void CharacterEditor::setEditorMode(EditorMode mode) {
+void CharacterEditor::SetEditorMode(EditorMode mode) {
     if (editorMode == mode) return;
     editorMode = mode;
     if (mode == EditorMode::Simulation) {
-        if (battle.active()) frameBattleCamera();
+        if (battle.Active()) FrameBattleCamera();
     } else {
         cameraPanX = 0.0f;
         cameraPanY = 0.0f;
@@ -29,7 +29,7 @@ void CharacterEditor::setEditorMode(EditorMode mode) {
     }
 }
 
-bool CharacterEditor::loadCompare(int index) {
+bool CharacterEditor::LoadCompare(int index) {
     compareIndex = index;
     compareDoc = YAML::Node();
     comparePath.clear();
@@ -37,7 +37,7 @@ bool CharacterEditor::loadCompare(int index) {
     try {
         compareDoc = YAML::LoadFile(files[static_cast<size_t>(index)].path.string());
         comparePath = files[static_cast<size_t>(index)].path;
-        compareOffsets = readVisualOffsets(compareDoc);
+        compareOffsets = ReadVisualOffsets(compareDoc);
         return true;
     } catch (const std::exception& error) {
         compareDoc = YAML::Node();
@@ -46,41 +46,41 @@ bool CharacterEditor::loadCompare(int index) {
     }
 }
 
-void CharacterEditor::drawOpponentPicker(bool allowMirror) {
+void CharacterEditor::DrawOpponentPicker(bool allowMirror) {
     std::string current = _("(none)");
     if (compareDoc.IsDefined()) {
-        current = yamlString(compareDoc, "name", comparePath.stem().string()) + " (" +
-                  OpenArtOfWar::Utility::factionName(docFaction(compareDoc)) + ")";
+        current = YamlString(compareDoc, "name", comparePath.stem().string()) + " (" +
+                  OpenArtOfWar::Utility::FactionName(DocFaction(compareDoc)) + ")";
     } else if (allowMirror) {
         current = _("Mirror match (same as A)");
     }
     ImGui::SetNextItemWidth(280.0f);
-    if (hinted(ImGui::BeginCombo(_("Opponent B"), current.c_str()), "Opponent B")) {
+    if (Hinted(ImGui::BeginCombo(_("Opponent B"), current.c_str()), "Opponent B")) {
         if (allowMirror && ImGui::Selectable(_("Mirror match (same as A)"), !compareDoc.IsDefined())) {
-            loadCompare(-1);
+            LoadCompare(-1);
         }
         for (size_t i = 0; i < files.size(); ++i) {
             const auto& f = files[i];
             std::string label = (f.type == "building" ? "[B#" : "[#") + std::to_string(f.numericId) + "] " +
                                 f.name + " (" + f.faction + ")";
             if (ImGui::Selectable(label.c_str(), compareIndex == static_cast<int>(i))) {
-                loadCompare(static_cast<int>(i));
+                LoadCompare(static_cast<int>(i));
             }
         }
         ImGui::EndCombo();
     }
 }
 
-void CharacterEditor::drawCompareControls() {
-    drawOpponentPicker(false);
+void CharacterEditor::DrawCompareControls() {
+    DrawOpponentPicker(false);
     ImGui::SameLine();
     ImGui::BeginDisabled(!compareDoc.IsDefined() || dirty);
-    if (hinted(ImGui::Button(_("Swap A <-> B")), "Swap A <-> B")) {
+    if (Hinted(ImGui::Button(_("Swap A <-> B")), "Swap A <-> B")) {
         const fs::path previousA = activePath;
         const fs::path previousB = comparePath;
         if (loadFile(previousB)) {
             for (size_t i = 0; i < files.size(); ++i) {
-                if (files[i].path == previousA) loadCompare(static_cast<int>(i));
+                if (files[i].path == previousA) LoadCompare(static_cast<int>(i));
             }
         }
     }
@@ -90,18 +90,18 @@ void CharacterEditor::drawCompareControls() {
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140.0f);
-    hinted(ImGui::SliderFloat("##spacing", &compareSpacing, 40.0f, 200.0f, _("Spacing %.0f px")), "##spacing");
+    Hinted(ImGui::SliderFloat("##spacing", &compareSpacing, 40.0f, 200.0f, _("Spacing %.0f px")), "##spacing");
 }
 
-void CharacterEditor::drawCompareTable() {
+void CharacterEditor::DrawCompareTable() {
     if (!compareDoc.IsDefined()) {
         ImGui::TextDisabled("%s", _("Pick unit B to compare."));
         return;
     }
-    if (!hinted(ImGui::CollapsingHeader(_("A vs B"), ImGuiTreeNodeFlags_DefaultOpen), "A vs B")) return;
+    if (!Hinted(ImGui::CollapsingHeader(_("A vs B"), ImGuiTreeNodeFlags_DefaultOpen), "A vs B")) return;
 
-    const CharacterStats a = computeStats(document, testSiegeMode);
-    const CharacterStats b = computeStats(compareDoc, testSiegeMode);
+    const CharacterStats a = ComputeStats(document, testSiegeMode);
+    const CharacterStats b = ComputeStats(compareDoc, testSiegeMode);
 
     // better: +1 higher is better, -1 lower is better, 0 informational
     struct Row {
@@ -181,8 +181,8 @@ void CharacterEditor::drawCompareTable() {
     ImGui::TextDisabled("%s", _("A uses the current (unsaved) values; colors: green = better, red = worse."));
 }
 
-void CharacterEditor::frameBattleCamera() {
-    const SDL_FRect area = battle.battleAreaPx();
+void CharacterEditor::FrameBattleCamera() {
+    const SDL_FRect area = battle.BattleAreaPx();
     cameraPanX = area.x + area.w * 0.5f;
     cameraPanY = area.y + area.h * 0.5f;
     const float fit = std::min(static_cast<float>(previewRect.w) / area.w,
@@ -190,19 +190,19 @@ void CharacterEditor::frameBattleCamera() {
     previewZoom = std::clamp(fit, 0.75f, 3.0f);
 }
 
-void CharacterEditor::startBattle() {
+void CharacterEditor::StartBattle() {
     std::string error;
     YAML::Node opponent = compareDoc.IsDefined() ? compareDoc : document;
     if (battle.start(battleSetup, assetsRoot, textures.get(), document, opponent, error)) {
         battlePaused = false;
-        frameBattleCamera();
+        FrameBattleCamera();
         status = _("Battle started");
     } else {
         status = error;
     }
 }
 
-void CharacterEditor::runBattleBatch() {
+void CharacterEditor::RunBattleBatch() {
     YAML::Node opponent = compareDoc.IsDefined() ? compareDoc : document;
     BattleBatchResult r;
     for (int i = 0; i < battleBatchRuns; ++i) {
@@ -212,14 +212,14 @@ void CharacterEditor::runBattleBatch() {
             status = error;
             return;
         }
-        sim.runToEnd();
+        sim.RunToEnd();
         ++r.runs;
-        if (sim.winner() == 1) ++r.winsA;
-        else if (sim.winner() == 2) ++r.winsB;
+        if (sim.Winner() == 1) ++r.winsA;
+        else if (sim.Winner() == 2) ++r.winsB;
         else ++r.draws;
-        r.avgTime += sim.time();
-        r.avgAliveA += static_cast<float>(sim.sideA().alive);
-        r.avgAliveB += static_cast<float>(sim.sideB().alive);
+        r.avgTime += sim.Time();
+        r.avgAliveA += static_cast<float>(sim.SideA().alive);
+        r.avgAliveB += static_cast<float>(sim.SideB().alive);
     }
     if (r.runs > 0) {
         r.avgTime /= static_cast<float>(r.runs);
@@ -229,50 +229,50 @@ void CharacterEditor::runBattleBatch() {
     batchResult = r;
 }
 
-void CharacterEditor::drawSimulationControls() {
+void CharacterEditor::DrawSimulationControls() {
     if (!document.IsDefined()) {
         ImGui::TextWrapped("%s", _("Select a YAML configuration from the list."));
         return;
     }
-    ImGui::Text("A: %s (%s)", yamlString(document, "name", "?").c_str(), _("current values, unsaved edits included"));
+    ImGui::Text("A: %s (%s)", YamlString(document, "name", "?").c_str(), _("current values, unsaved edits included"));
     ImGui::TextDisabled("%s", _("A fights in red team colors on the left, B in blue on the right."));
-    drawOpponentPicker(true);
+    DrawOpponentPicker(true);
 
     ImGui::SetNextItemWidth(130.0f);
-    hinted(ImGui::SliderInt("##countA", &battleSetup.countA, 1, 100, _("A units: %d")), "##countA");
+    Hinted(ImGui::SliderInt("##countA", &battleSetup.countA, 1, 100, _("A units: %d")), "##countA");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(130.0f);
-    hinted(ImGui::SliderInt("##countB", &battleSetup.countB, 1, 100, _("B units: %d")), "##countB");
+    Hinted(ImGui::SliderInt("##countB", &battleSetup.countB, 1, 100, _("B units: %d")), "##countB");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(150.0f);
-    hinted(ImGui::SliderInt("##distance", &battleSetup.distance, 2, 50, _("Distance: %d tiles")), "##distance");
+    Hinted(ImGui::SliderInt("##distance", &battleSetup.distance, 2, 50, _("Distance: %d tiles")), "##distance");
     ImGui::SameLine();
-    hinted(ImGui::Checkbox(_("B advances"), &battleSetup.bAdvances), "B advances");
+    Hinted(ImGui::Checkbox(_("B advances"), &battleSetup.bAdvances), "B advances");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140.0f);
-    hinted(ImGui::SliderFloat("##timeLimit", &battleSetup.timeLimit, 30.0f, 600.0f, _("Time limit %.0f s")), "##timeLimit");
+    Hinted(ImGui::SliderFloat("##timeLimit", &battleSetup.timeLimit, 30.0f, 600.0f, _("Time limit %.0f s")), "##timeLimit");
 
-    if (hinted(ImGui::Button(battle.active() ? _("Restart") : _("Start battle")), battle.active() ? "Restart" : "Start battle")) startBattle();
+    if (Hinted(ImGui::Button(battle.Active() ? _("Restart") : _("Start battle")), battle.Active() ? "Restart" : "Start battle")) StartBattle();
     ImGui::SameLine();
-    ImGui::BeginDisabled(!battle.active());
-    if (hinted(ImGui::Button(battlePaused ? _("Resume") : _("Pause")), battlePaused ? "Resume" : "Pause")) battlePaused = !battlePaused;
+    ImGui::BeginDisabled(!battle.Active());
+    if (Hinted(ImGui::Button(battlePaused ? _("Resume") : _("Pause")), battlePaused ? "Resume" : "Pause")) battlePaused = !battlePaused;
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Step 0.1 s")), "Step 0.1 s")) {
+    if (Hinted(ImGui::Button(_("Step 0.1 s")), "Step 0.1 s")) {
         battlePaused = true;
-        battle.update(0.1f);
+        battle.Update(0.1f);
     }
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Stop")), "Stop")) battle.stop();
+    if (Hinted(ImGui::Button(_("Stop")), "Stop")) battle.stop();
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Fit view")), "Fit view")) frameBattleCamera();
+    if (Hinted(ImGui::Button(_("Fit view")), "Fit view")) FrameBattleCamera();
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(110.0f);
-    hinted(ImGui::SliderFloat("##simSpeed", &playbackSpeed, 0.1f, 4.0f, _("Speed %.1fx")), "##simSpeed");
+    Hinted(ImGui::SliderFloat("##simSpeed", &playbackSpeed, 0.1f, 4.0f, _("Speed %.1fx")), "##simSpeed");
 
-    if (battle.active()) {
-        const auto& a = battle.sideA();
-        const auto& b = battle.sideB();
+    if (battle.Active()) {
+        const auto& a = battle.SideA();
+        const auto& b = battle.SideB();
         if (ImGui::BeginTable("battle-table", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
             ImGui::TableSetupColumn(_("Side"));
             ImGui::TableSetupColumn(_("Alive"));
@@ -291,26 +291,26 @@ void CharacterEditor::drawSimulationControls() {
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", s.damageDealt);
                 ImGui::TableNextColumn();
-                ImGui::Text("%.1f", battle.time() > 0.0f ? static_cast<float>(s.damageDealt) / battle.time() : 0.0f);
+                ImGui::Text("%.1f", battle.Time() > 0.0f ? static_cast<float>(s.damageDealt) / battle.Time() : 0.0f);
             };
-            const std::string labelA = "A: " + yamlString(document, "name", "?");
-            const std::string labelB = "B: " + yamlString(compareDoc.IsDefined() ? compareDoc : document, "name", "?");
+            const std::string labelA = "A: " + YamlString(document, "name", "?");
+            const std::string labelB = "B: " + YamlString(compareDoc.IsDefined() ? compareDoc : document, "name", "?");
             row(labelA.c_str(), a, ImVec4(1.0f, 0.55f, 0.5f, 1.0f));
             row(labelB.c_str(), b, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
             ImGui::EndTable();
         }
-        if (battle.finished()) {
-            const char* result = battle.winner() == 1 ? _("A wins") : battle.winner() == 2 ? _("B wins") : _("Draw");
-            ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "%s  (%.1f s)", result, battle.time());
+        if (battle.Finished()) {
+            const char* result = battle.Winner() == 1 ? _("A wins") : battle.Winner() == 2 ? _("B wins") : _("Draw");
+            ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "%s  (%.1f s)", result, battle.Time());
         } else {
-            ImGui::Text(_("Battle time: %.1f s"), battle.time());
+            ImGui::Text(_("Battle time: %.1f s"), battle.Time());
         }
     }
 
     ImGui::SetNextItemWidth(150.0f);
-    hinted(ImGui::SliderInt("##batchRuns", &battleBatchRuns, 5, 100, _("Battles: %d")), "##batchRuns");
+    Hinted(ImGui::SliderInt("##batchRuns", &battleBatchRuns, 5, 100, _("Battles: %d")), "##batchRuns");
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Run batch (no rendering)")), "Run batch (no rendering)")) runBattleBatch();
+    if (Hinted(ImGui::Button(_("Run batch (no rendering)")), "Run batch (no rendering)")) RunBattleBatch();
     if (batchResult.runs > 0) {
         const float n = static_cast<float>(batchResult.runs);
         ImGui::Text(_("A wins %d (%.0f%%) | B wins %d (%.0f%%) | draws %d | avg %.1f s | survivors A %.1f, B %.1f"),

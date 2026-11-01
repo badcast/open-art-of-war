@@ -16,18 +16,18 @@ public:
     MapEditorApp();
     ~MapEditorApp();
 
-    bool init(int width = 1280, int height = 720, const std::string& initialMap = "");
+    bool Init(int width = 1280, int height = 720, const std::string& initialMap = "");
     void run();
 
 private:
-    void processEvents();
-    void update(float deltaTime);
+    void ProcessEvents();
+    void Update(float deltaTime);
     void render();
-    void screenToTile(float screenX, float screenY, int& tileX, int& tileY) const;
-    void updateWindowTitle();
-    void eraseAtTile(int tileX, int tileY);
+    void ScreenToTile(float screenX, float screenY, int& tileX, int& tileY) const;
+    void UpdateWindowTitle();
+    void EraseAtTile(int tileX, int tileY);
 
-    void applyToolAt(int tileX, int tileY, bool isDrag = false);
+    void ApplyToolAt(int tileX, int tileY, bool isDrag = false);
 
     SDL_Window* m_window{nullptr};
     SDL_Renderer* m_sdlRenderer{nullptr};

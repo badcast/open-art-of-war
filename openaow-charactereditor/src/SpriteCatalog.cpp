@@ -25,21 +25,21 @@ constexpr int kSprite = 0;
 constexpr int kComposite = 1;
 constexpr int kAnim = 2;
 
-const char* kindWord(int kind) { return kind == kComposite ? "composite" : kind == kAnim ? "anim" : "sprite"; }
+const char* KindWord(int kind) { return kind == kComposite ? "composite" : kind == kAnim ? "anim" : "sprite"; }
 
-nlohmann::json readJson(const fs::path& path) {
+nlohmann::json ReadJson(const fs::path& path) {
     std::ifstream in(path);
     if (!in) throw std::runtime_error("cannot open " + path.string());
     return nlohmann::json::parse(in);
 }
 
-int intOf(const nlohmann::json& j, const char* key, int fallback = 0) {
+int IntOf(const nlohmann::json& j, const char* key, int fallback = 0) {
     return j.contains(key) && j[key].is_number() ? j[key].get<int>() : fallback;
 }
 
 } // namespace
 
-const char* spriteGroupName(SpriteGroup group) {
+const char* SpriteGroupName(SpriteGroup group) {
     switch (group) {
         case SpriteGroup::Units: return "Units";
         case SpriteGroup::Buildings: return "Buildings";
@@ -48,7 +48,7 @@ const char* spriteGroupName(SpriteGroup group) {
     }
 }
 
-const char* spriteGroupSlug(SpriteGroup group) {
+const char* SpriteGroupSlug(SpriteGroup group) {
     switch (group) {
         case SpriteGroup::Units: return "units";
         case SpriteGroup::Buildings: return "buildings";
@@ -57,7 +57,7 @@ const char* spriteGroupSlug(SpriteGroup group) {
     }
 }
 
-std::string graphicsDigest(nlohmann::json entry) {
+std::string GraphicsDigest(nlohmann::json entry) {
     entry.erase("digest");
     const std::string text = entry.dump();
     uint64_t hash = 1469598103934665603ull;
@@ -67,7 +67,7 @@ std::string graphicsDigest(nlohmann::json entry) {
     return out;
 }
 
-std::string spriteSlug(const std::string& text) {
+std::string SpriteSlug(const std::string& text) {
     std::string out;
     for (unsigned char c : text) {
         if (std::isalnum(c)) out += static_cast<char>(std::tolower(c));
@@ -77,14 +77,14 @@ std::string spriteSlug(const std::string& text) {
     return out.empty() ? "object" : out;
 }
 
-SpriteGroup SpriteCatalog::groupOfSprite(int spriteId) const {
+SpriteGroup SpriteCatalog::GroupOfSprite(int spriteId) const {
     if (spriteId < 0 || spriteId >= static_cast<int>(spriteGroup.size())) return SpriteGroup::Other;
     return static_cast<SpriteGroup>(spriteGroup[static_cast<size_t>(spriteId)]);
 }
 
-std::set<int> SpriteCatalog::spritesOfSequence(int sequenceId) const {
+std::set<int> SpriteCatalog::SpritesOfSequence(int sequenceId) const {
     SpriteObject tmp;
-    collectSequence(sequenceId, tmp);
+    CollectSequence(sequenceId, tmp);
     return tmp.sprites;
 }
 
@@ -92,66 +92,66 @@ std::set<int> SpriteCatalog::spritesOfSequence(int sequenceId) const {
 // Dependency closure
 // ---------------------------------------------------------------------------------------------------------
 
-void SpriteCatalog::collectChild(int kind, int id, SpriteObject& out, int depth) const {
-    if (kind == kComposite) collectComposite(id, out, depth);
-    else if (kind == kAnim) collectAnim(id, out, depth);
+void SpriteCatalog::CollectChild(int kind, int id, SpriteObject& out, int depth) const {
+    if (kind == kComposite) CollectComposite(id, out, depth);
+    else if (kind == kAnim) CollectAnim(id, out, depth);
     else if (id >= 0 && id < static_cast<int>(rawSprites.size())) out.sprites.insert(id);
 }
 
-void SpriteCatalog::collectComposite(int id, SpriteObject& out, int depth) const {
+void SpriteCatalog::CollectComposite(int id, SpriteObject& out, int depth) const {
     if (depth > kMaxDepth || id < 0 || id >= compCount || !out.composites.insert(id).second) return;
     const auto& comp = gd["composite_sprites"];
     const auto range = comp["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
         const auto& part = comp["parts"][static_cast<size_t>(i)];
-        collectChild(part["is_comp"].get<int>() == 1 ? kComposite : kSprite, part["child"].get<int>(), out, depth + 1);
+        CollectChild(part["is_comp"].get<int>() == 1 ? kComposite : kSprite, part["child"].get<int>(), out, depth + 1);
     }
 }
 
-void SpriteCatalog::collectAnim(int id, SpriteObject& out, int depth) const {
+void SpriteCatalog::CollectAnim(int id, SpriteObject& out, int depth) const {
     if (depth > kMaxDepth || id < 0 || id >= animCount || !out.anims.insert(id).second) return;
     const auto& anim = gd["anim_sequences"];
     const auto range = anim["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
         const auto& frame = anim["frames"][static_cast<size_t>(i)];
-        collectChild(frame["is_comp"].get<int>() == 1 ? kComposite : kSprite, frame["child"].get<int>(), out, depth + 1);
+        CollectChild(frame["is_comp"].get<int>() == 1 ? kComposite : kSprite, frame["child"].get<int>(), out, depth + 1);
     }
 }
 
-void SpriteCatalog::collectBody(int id, SpriteObject& out) const {
+void SpriteCatalog::CollectBody(int id, SpriteObject& out) const {
     if (id < 0 || id >= bodyCount || !out.bodies.insert(id).second) return;
     const auto& bodies = gd["unit_bodies"];
     const auto range = bodies["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
         const auto& layer = bodies["layers"][static_cast<size_t>(i)];
-        collectChild(layer["is_comp"].get<int>(), layer["child"].get<int>(), out, 1);
+        CollectChild(layer["is_comp"].get<int>(), layer["child"].get<int>(), out, 1);
     }
 }
 
-void SpriteCatalog::collectSequence(int id, SpriteObject& out) const {
+void SpriteCatalog::CollectSequence(int id, SpriteObject& out) const {
     if (id < 0 || id >= seqCount || !out.sequences.insert(id).second) return;
     const auto& seqs = gd["unit_sequences"];
     const auto range = seqs["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
-        collectBody(seqs["steps"][static_cast<size_t>(i)]["body"].get<int>(), out);
+        CollectBody(seqs["steps"][static_cast<size_t>(i)]["body"].get<int>(), out);
     }
 }
 
-void SpriteCatalog::collectBuilding(int id, SpriteObject& out) const {
+void SpriteCatalog::CollectBuilding(int id, SpriteObject& out) const {
     if (id < 0 || id >= buildingCount || !out.buildings.insert(id).second) return;
     const auto& blds = gd["buildings"];
     const auto range = blds["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
         const auto& part = blds["parts"][static_cast<size_t>(i)];
-        collectChild(part["is_comp"].get<int>(), part["child"].get<int>(), out, 1);
+        CollectChild(part["is_comp"].get<int>(), part["child"].get<int>(), out, 1);
     }
 }
 
-void SpriteCatalog::finish(SpriteObject& object) const {
-    for (int s : object.rootSequences) collectSequence(s, object);
-    for (int c : object.rootComposites) collectComposite(c, object, 0);
-    for (int a : object.rootAnims) collectAnim(a, object, 0);
-    for (int b : object.rootBuildings) collectBuilding(b, object);
+void SpriteCatalog::Finish(SpriteObject& object) const {
+    for (int s : object.rootSequences) CollectSequence(s, object);
+    for (int c : object.rootComposites) CollectComposite(c, object, 0);
+    for (int a : object.rootAnims) CollectAnim(a, object, 0);
+    for (int b : object.rootBuildings) CollectBuilding(b, object);
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -163,18 +163,18 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
     objs.clear();
     spriteGroup.clear();
     try {
-        const nlohmann::json sp = readJson(assetsRoot / "characters" / "sprites.json");
-        gd = readJson(assetsRoot / "data" / "graphics_data.json");
+        const nlohmann::json sp = ReadJson(assetsRoot / "characters" / "sprites.json");
+        gd = ReadJson(assetsRoot / "data" / "graphics_data.json");
         rawSprites.reserve(sp.size());
         for (const auto& s : sp) {
             RawSprite r;
-            r.id = intOf(s, "id", static_cast<int>(rawSprites.size()));
-            r.page = intOf(s, "page");
-            r.x = intOf(s, "x");
-            r.y = intOf(s, "y");
-            r.w = intOf(s, "width");
-            r.h = intOf(s, "height");
-            r.palette = intOf(s, "palette");
+            r.id = IntOf(s, "id", static_cast<int>(rawSprites.size()));
+            r.page = IntOf(s, "page");
+            r.x = IntOf(s, "x");
+            r.y = IntOf(s, "y");
+            r.w = IntOf(s, "width");
+            r.h = IntOf(s, "height");
+            r.palette = IntOf(s, "palette");
             rawSprites.push_back(r);
         }
         // Ids are indices everywhere in the tables
@@ -221,10 +221,10 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
         o.kind = SpriteObjectKind::Unit;
         o.group = SpriteGroup::Units;
         o.kindName = "unit";
-        o.faction = U::factionName(info->faction);
+        o.faction = U::FactionName(info->faction);
         o.id = a;
         o.name = info->name;
-        o.slug = spriteSlug(o.name);
+        o.slug = SpriteSlug(o.name);
         const bool form = info->baseFormId >= 0; // siege / baseline forms have single sequences
         if (!bases[a].empty()) o.thumbSequence = bases[a][0].get<int>() + (form ? 0 : 2);
         for (size_t k = 0; k < bases[a].size(); ++k) {
@@ -243,7 +243,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
         }
         std::sort(o.rootSequences.begin(), o.rootSequences.end());
         o.rootSequences.erase(std::unique(o.rootSequences.begin(), o.rootSequences.end()), o.rootSequences.end());
-        finish(o);
+        Finish(o);
         objs.push_back(std::move(o));
     }
 
@@ -256,7 +256,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
         o.id = b;
         if (const U::BuildingKindInfo* info = U::buildingKindInfo(b)) {
             o.name = info->name;
-            o.faction = U::factionName(info->faction);
+            o.faction = U::FactionName(info->faction);
         } else if (b >= 15 && b <= 19) {
             o.name = "Concrete Wall damage " + std::to_string(b - 15);
             o.faction = "Confederation";
@@ -270,9 +270,9 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
             o.name = b == 30 ? "Construction scaffolding" : "Building " + std::to_string(b);
             o.faction = "Neutral";
         }
-        o.slug = spriteSlug(o.name);
+        o.slug = SpriteSlug(o.name);
         o.rootBuildings = {b};
-        finish(o);
+        Finish(o);
         objs.push_back(std::move(o));
     }
 
@@ -286,7 +286,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
         o.faction = "Neutral";
         o.id = t;
         o.name = "Tileset " + std::to_string(t);
-        o.slug = spriteSlug(o.name);
+        o.slug = SpriteSlug(o.name);
         const auto& list = tilesets[static_cast<size_t>(t)];
         for (int i = 0; i < kTileCount && i < static_cast<int>(list.size()); ++i) o.rootComposites.push_back(list[static_cast<size_t>(i)].get<int>());
         const int offset = gd["decor_offsets"].size() > static_cast<size_t>(t) ? gd["decor_offsets"][static_cast<size_t>(t)].get<int>() : kTileCount;
@@ -296,7 +296,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
             if (b >= 0 && b < buildingCount) decor.insert(b);
         }
         o.rootBuildings.assign(decor.begin(), decor.end());
-        finish(o);
+        Finish(o);
         objs.push_back(std::move(o));
     }
 
@@ -308,7 +308,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
     rest.faction = "Neutral";
     rest.id = 0;
     rest.name = "Unassigned graphics";
-    rest.slug = spriteSlug(rest.name);
+    rest.slug = SpriteSlug(rest.name);
     std::set<int> seqs, comps, anims, blds;
     for (const auto& o : objs) {
         seqs.insert(o.sequences.begin(), o.sequences.end());
@@ -320,7 +320,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
     for (int i = 0; i < compCount; ++i) if (!comps.count(i)) rest.rootComposites.push_back(i);
     for (int i = 0; i < animCount; ++i) if (!anims.count(i)) rest.rootAnims.push_back(i);
     for (int i = 0; i < buildingCount; ++i) if (!blds.count(i)) rest.rootBuildings.push_back(i);
-    finish(rest);
+    Finish(rest);
 
     // Sprites nothing uses at all, one object per sheet
     std::vector<bool> used(rawSprites.size(), false);
@@ -338,7 +338,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
             o.faction = "Neutral";
             o.id = 1 + s.page;
             o.name = "Loose sprites sheet " + std::to_string(s.page);
-            o.slug = spriteSlug(o.name);
+            o.slug = SpriteSlug(o.name);
         }
         o.sprites.insert(s.id);
     }
@@ -375,10 +375,10 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
 // Dependency tree (for the editor)
 // ---------------------------------------------------------------------------------------------------------
 
-DepNode SpriteCatalog::childNode(int kind, int id, int ox, int oy, int depth) const {
+DepNode SpriteCatalog::ChildNode(int kind, int id, int ox, int oy, int depth) const {
     DepNode n;
-    if (kind == kComposite) n = compositeNode(id, depth + 1);
-    else if (kind == kAnim) n = animNode(id);
+    if (kind == kComposite) n = CompositeNode(id, depth + 1);
+    else if (kind == kAnim) n = AnimNode(id);
     else {
         n.kind = "sprite";
         n.id = id;
@@ -389,7 +389,7 @@ DepNode SpriteCatalog::childNode(int kind, int id, int ox, int oy, int depth) co
     return n;
 }
 
-DepNode SpriteCatalog::compositeNode(int id, int depth) const {
+DepNode SpriteCatalog::CompositeNode(int id, int depth) const {
     DepNode n;
     n.kind = "composite";
     n.id = id;
@@ -399,13 +399,13 @@ DepNode SpriteCatalog::compositeNode(int id, int depth) const {
     const auto range = comp["ranges"][static_cast<size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
         const auto& part = comp["parts"][static_cast<size_t>(i)];
-        n.children.push_back(childNode(part["is_comp"].get<int>() == 1 ? kComposite : kSprite, part["child"].get<int>(),
+        n.children.push_back(ChildNode(part["is_comp"].get<int>() == 1 ? kComposite : kSprite, part["child"].get<int>(),
                                        part["ox"].get<int>(), part["oy"].get<int>(), depth));
     }
     return n;
 }
 
-DepNode SpriteCatalog::animNode(int id) const {
+DepNode SpriteCatalog::AnimNode(int id) const {
     DepNode n;
     n.kind = "anim";
     n.id = id;
@@ -416,7 +416,7 @@ DepNode SpriteCatalog::animNode(int id) const {
     int k = 0;
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i, ++k) {
         const auto& frame = anim["frames"][static_cast<size_t>(i)];
-        DepNode f = childNode(frame["is_comp"].get<int>() == 1 ? kComposite : kSprite, frame["child"].get<int>(),
+        DepNode f = ChildNode(frame["is_comp"].get<int>() == 1 ? kComposite : kSprite, frame["child"].get<int>(),
                               frame["ox"].get<int>(), frame["oy"].get<int>(), 3);
         f.label = "Frame " + std::to_string(k) + ": " + f.label;
         n.children.push_back(std::move(f));
@@ -453,7 +453,7 @@ DepNode SpriteCatalog::tree(const SpriteObject& o) const {
                 const auto br = bodies["ranges"][static_cast<size_t>(body)];
                 for (int l = br[0].get<int>(); l <= br[1].get<int>(); ++l) {
                     const auto& layer = bodies["layers"][static_cast<size_t>(l)];
-                    DepNode ln = childNode(layer["is_comp"].get<int>(), layer["child"].get<int>(), layer["ox"].get<int>(),
+                    DepNode ln = ChildNode(layer["is_comp"].get<int>(), layer["child"].get<int>(), layer["ox"].get<int>(),
                                            layer["oy"].get<int>(), 1);
                     ln.label = "Layer (flag " + std::to_string(layer["flag"].get<int>()) + "): " + ln.label;
                     st.children.push_back(std::move(ln));
@@ -463,8 +463,8 @@ DepNode SpriteCatalog::tree(const SpriteObject& o) const {
         }
         root.children.push_back(std::move(sn));
     }
-    for (int c : o.rootComposites) root.children.push_back(compositeNode(c, 0));
-    for (int a : o.rootAnims) root.children.push_back(animNode(a));
+    for (int c : o.rootComposites) root.children.push_back(CompositeNode(c, 0));
+    for (int a : o.rootAnims) root.children.push_back(AnimNode(a));
     const auto& blds = gd["buildings"];
     for (int b : o.rootBuildings) {
         if (b < 0 || b >= buildingCount) continue;
@@ -475,7 +475,7 @@ DepNode SpriteCatalog::tree(const SpriteObject& o) const {
         const auto range = blds["ranges"][static_cast<size_t>(b)];
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) {
             const auto& part = blds["parts"][static_cast<size_t>(i)];
-            DepNode pn = childNode(part["is_comp"].get<int>(), part["child"].get<int>(), part["ox"].get<int>(),
+            DepNode pn = ChildNode(part["is_comp"].get<int>(), part["child"].get<int>(), part["ox"].get<int>(),
                                    part["oy"].get<int>(), 1);
             pn.label = "Part (layer " + std::to_string(part["layer"].get<int>()) + ", state " +
                        std::to_string(part["state"].get<int>()) + "): " + pn.label;
@@ -490,14 +490,14 @@ DepNode SpriteCatalog::tree(const SpriteObject& o) const {
 // JSON of an object
 // ---------------------------------------------------------------------------------------------------------
 
-nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
+nlohmann::json SpriteCatalog::Describe(const SpriteObject& o) const {
     using nlohmann::json;
     json out = json::object();
     out["roots"] = {{"sequences", o.rootSequences}, {"composites", o.rootComposites},
                     {"animations", o.rootAnims}, {"buildings", o.rootBuildings}};
 
     auto childJson = [](const json& src, int kind) {
-        return json{{"kind", kindWord(kind)}, {"child", src["child"]}, {"ox", src["ox"]}, {"oy", src["oy"]}};
+        return json{{"kind", KindWord(kind)}, {"child", src["child"]}, {"ox", src["ox"]}, {"oy", src["oy"]}};
     };
 
     json seqs = json::array();
@@ -505,7 +505,7 @@ nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
         const auto range = gd["unit_sequences"]["ranges"][static_cast<size_t>(s)];
         json steps = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i) steps.push_back(gd["unit_sequences"]["steps"][static_cast<size_t>(i)]);
-        { json e = {{"id", s}, {"steps", steps}}; e["digest"] = graphicsDigest(e); seqs.push_back(e); }
+        { json e = {{"id", s}, {"steps", steps}}; e["digest"] = GraphicsDigest(e); seqs.push_back(e); }
     }
     out["sequences"] = seqs;
 
@@ -519,7 +519,7 @@ nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
             item["flag"] = l["flag"];
             layers.push_back(item);
         }
-        { json e = {{"id", b}, {"layers", layers}}; e["digest"] = graphicsDigest(e); bodies.push_back(e); }
+        { json e = {{"id", b}, {"layers", layers}}; e["digest"] = GraphicsDigest(e); bodies.push_back(e); }
     }
     out["bodies"] = bodies;
 
@@ -531,7 +531,7 @@ nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
             const auto& p = gd["composite_sprites"]["parts"][static_cast<size_t>(i)];
             parts.push_back(childJson(p, p["is_comp"].get<int>() == 1 ? kComposite : kSprite));
         }
-        { json e = {{"id", c}, {"parts", parts}}; e["digest"] = graphicsDigest(e); comps.push_back(e); }
+        { json e = {{"id", c}, {"parts", parts}}; e["digest"] = GraphicsDigest(e); comps.push_back(e); }
     }
     out["composites"] = comps;
 
@@ -543,7 +543,7 @@ nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
             const auto& f = gd["anim_sequences"]["frames"][static_cast<size_t>(i)];
             frames.push_back(childJson(f, f["is_comp"].get<int>() == 1 ? kComposite : kSprite));
         }
-        { json e = {{"id", a}, {"frames", frames}}; e["digest"] = graphicsDigest(e); anims.push_back(e); }
+        { json e = {{"id", a}, {"frames", frames}}; e["digest"] = GraphicsDigest(e); anims.push_back(e); }
     }
     out["animations"] = anims;
 
@@ -562,7 +562,7 @@ nlohmann::json SpriteCatalog::describe(const SpriteObject& o) const {
                       {"width", gd["buildings"]["widths"][static_cast<size_t>(b)]},
                       {"height", gd["buildings"]["heights"][static_cast<size_t>(b)]},
                       {"parts", parts}};
-        entry["digest"] = graphicsDigest(entry);
+        entry["digest"] = GraphicsDigest(entry);
         blds.push_back(entry);
     }
     out["buildings"] = blds;

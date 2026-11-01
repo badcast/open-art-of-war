@@ -25,11 +25,11 @@ namespace CharEditor {
 namespace fs = std::filesystem;
 
 // Tooltip of the last widget: `key` is the widget label (msgid) or its ##id; widgets without a hint get none
-void fieldHint(const char* key);
+void FieldHint(const char* key);
 
 // Shows the hint of a widget just drawn and passes its result on: if (hinted(ImGui::Button(_("Idle")), "Idle")) ...
-inline bool hinted(bool result, const char* key) {
-    fieldHint(key);
+inline bool Hinted(bool result, const char* key) {
+    FieldHint(key);
     return result;
 }
 
@@ -57,7 +57,7 @@ enum class PreviewMode {
     Wreck   // the remains left behind, stage by stage
 };
 
-// Wreck ("остов") composite families: first composite of the family and the number of burial stages
+// Wreck (hull remains) composite families: first composite of the family and the number of burial stages
 struct WreckFamily {
     int composite;
     int stages;
@@ -73,39 +73,39 @@ inline const WreckFamily kWreckFamilies[] = {
     {1753, 6, "Rubble 4x4"},
 };
 
-fs::path findAssetRoot();
+fs::path FindAssetRoot();
 
-std::string yamlString(const YAML::Node& node, const char* key, const std::string& fallback = {});
+std::string YamlString(const YAML::Node& node, const char* key, const std::string& fallback = {});
 
-int yamlInt(const YAML::Node& node, const char* key, int fallback = 0);
+int YamlInt(const YAML::Node& node, const char* key, int fallback = 0);
 
-float yamlFloat(const YAML::Node& node, const char* key, float fallback = 0.0f);
+float YamlFloat(const YAML::Node& node, const char* key, float fallback = 0.0f);
 
-bool yamlBool(const YAML::Node& node, const char* key, bool fallback = false);
+bool YamlBool(const YAML::Node& node, const char* key, bool fallback = false);
 
 // The main gun of a combat block: combat.weapons[0]; an undefined node when there are no weapons.
 // Damage, range, delay, projectile and muzzle live only in weapons (combat keeps turret / FX settings).
-YAML::Node mainWeapon(const YAML::Node& combat);
+YAML::Node MainWeapon(const YAML::Node& combat);
 
 // Same, creating weapons[0] for editing when the block has none yet
-YAML::Node ensureMainWeapon(YAML::Node combat);
+YAML::Node EnsureMainWeapon(YAML::Node combat);
 
-bool weaponRandomDelay(const YAML::Node& w);
+bool WeaponRandomDelay(const YAML::Node& w);
 
 // Delay between attack cycles: fixed `cooldown`, or random in [cooldown_min, cooldown_max].
 // sample=false gives the average (for DPS figures), sample=true draws one delay (for the shot simulation).
-float weaponCooldown(const YAML::Node& w, bool sample, float fallback = 1.0f);
+float WeaponCooldown(const YAML::Node& w, bool sample, float fallback = 1.0f);
 
 // Files store only archetype_id / building_index; faction, class and internal type are what the game
 // derives from them (OpenArtOfWar::Utility tables), never typed in by hand
-bool docIsBuilding(const YAML::Node& doc);
+bool DocIsBuilding(const YAML::Node& doc);
 
-OpenArtOfWar::Faction docFaction(const YAML::Node& doc);
+OpenArtOfWar::Faction DocFaction(const YAML::Node& doc);
 
 // Wreck of a character: from its YAML (animations.wreck_composite / wreck_stages) or the game's default
-void wreckOf(const YAML::Node& doc, int& composite, int& stages);
+void WreckOf(const YAML::Node& doc, int& composite, int& stages);
 
-void getDefaultTurretOffset(int archetypeId, bool isBuilding, float& outX, float& outY);
+void GetDefaultTurretOffset(int archetypeId, bool isBuilding, float& outX, float& outY);
 
 // Muzzle (localePosition) and turret pivot offsets of one character, read from its YAML
 struct VisualOffsets {
@@ -117,7 +117,7 @@ struct VisualOffsets {
 };
 
 // Takes the node by value: yaml-cpp lookups of missing keys need a mutable node
-VisualOffsets readVisualOffsets(YAML::Node doc);
+VisualOffsets ReadVisualOffsets(YAML::Node doc);
 
 // Combat and economy figures used by Compare mode
 struct CharacterStats {
@@ -140,9 +140,9 @@ struct CharacterStats {
 };
 
 // Damage per second of one weapon: a burst of N shots every (cooldown + burst span)
-float weaponDps(YAML::Node weapon);
+float WeaponDps(YAML::Node weapon);
 
-CharacterStats computeStats(YAML::Node doc, bool siege);
+CharacterStats ComputeStats(YAML::Node doc, bool siege);
 
 enum class EditorMode {
     Preview,

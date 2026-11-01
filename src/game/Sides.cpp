@@ -5,17 +5,17 @@ namespace OpenArtOfWar
 {
 
     // The local player's slot decides (see Players); a single-player mission sets up both slots here
-    Faction playerFaction()
+    Faction PlayerFaction()
     {
-        return Players::factionOf(Players::local());
+        return Players::FactionOf(Players::Local());
     }
-    Faction aiFaction()
+    Faction AiFaction()
     {
-        return opposingFaction(playerFaction());
+        return OpposingFaction(PlayerFaction());
     }
-    void setPlayerFaction(Faction faction)
+    void SetPlayerFaction(Faction faction)
     {
-        Players::setupSinglePlayer(faction);
+        Players::SetupSinglePlayer(faction);
     }
 
 } // namespace OpenArtOfWar

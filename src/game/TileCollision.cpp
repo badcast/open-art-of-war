@@ -18,7 +18,7 @@ namespace OpenArtOfWar
         using Table = std::array<std::array<bool, kTiles>, kTilesets>;
 
         // Without the data file: the old rule, the tiles from the first water tile up are blocked
-        Table fallbackTable()
+        Table FallbackTable()
         {
             constexpr int kBlockedFrom[kTilesets] = {211, 191};
             Table table {};
@@ -30,13 +30,13 @@ namespace OpenArtOfWar
             return table;
         }
 
-        Table loadTable()
+        Table LoadTable()
         {
             std::string text;
-            if(!Assets::readText(LoaderResources::tileCollision(), text))
+            if(!Assets::ReadText(LoaderResources::tileCollision(), text))
             {
                 std::cerr << "[TileCollision] assets/data/tile_collision.json not found, using the water-tile rule" << std::endl;
-                return fallbackTable();
+                return FallbackTable();
             }
             Table table {};
             try
@@ -58,16 +58,16 @@ namespace OpenArtOfWar
             catch(const nlohmann::json::exception &error)
             {
                 std::cerr << "[TileCollision] bad tile_collision.json (" << error.what() << "), using the water-tile rule" << std::endl;
-                return fallbackTable();
+                return FallbackTable();
             }
             return table;
         }
 
     } // namespace
 
-    bool TileCollision::isBlocked(int tilesetId, int tile)
+    bool TileCollision::IsBlocked(int tilesetId, int tile)
     {
-        static const Table table = loadTable();
+        static const Table table = LoadTable();
         if(tile < 0 || tile >= kTiles)
             return false;
         return table[tilesetId == 1 ? 1 : 0][tile];

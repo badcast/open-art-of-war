@@ -137,7 +137,7 @@ open-art-of-war/
 │   ├── sprites/            # Sprite sheets and frame metadata
 │   └── ui/                 # Logo, title, icon
 ├── include/, src/          # Engine and game
-│   ├── core/               # Application, settings, environment, deterministic math
+│   ├── core/               # Application (main loop + Application{Settings,Network,Overlays}.cpp), settings, environment, deterministic math
 │   ├── game/               # Simulation, commands, players, AI, map, pathfinding, missions
 │   ├── graphics/           # Renderer, render API choice, shader effects, textures, fonts
 │   ├── net/                # The game's side of network matches, map transfer
@@ -148,11 +148,19 @@ open-art-of-war/
 ├── openaow-mapeditor/      # Map editor
 ├── openaow-charactereditor/# Character archetype editor
 ├── po/                     # Translations (English, Russian)
-├── tools/                  # Asset extraction, packing, network self-test
+├── tools/                  # Sprite unpacking (unpackassets.py), atlas pack/unpack (atlastool.py), asset blob packing
 ├── docs/                   # Reverse-engineering notes and binary format specs
 └── 3rdParty/               # Dear ImGui, ENet, stb_vorbis, brainmap
 
 ```
+
+## Code style
+
+- Functions and methods are `PascalCase` (`UpdateNetwork()`, `DrawRadius()`); types are `PascalCase`, variables and parameters `lowerCamelCase`, class members `m_lowerCamel`, constants `kPascalCase`.
+  Exceptions: the game-agnostic `src/networking` library and `openaow-server` keep their own `lowerCamelCase` API, and a few methods whose name would clash with a type of the same name (`mode()`, `player()`, `state()`...) stay lowerCamel.
+- All code, comments, log messages and editor UI are English. Player-facing text goes through `_()` and the `po/` catalogs. Russian appears only where it is data (the language name, Russian voice lines, UTF-8 tests).
+- `Application` is split by concern: `Application.cpp` (lifecycle, main loop, update, render), `ApplicationSettings.cpp` (settings, window, render API switch), `ApplicationNetwork.cpp` (network games and lobby glue), `ApplicationOverlays.cpp` (loading screens, banner, notices, scoreboard, statistics).
+- Shared drawing helpers live in `graphics/RenderUtility` and `ui/UiKit`; add new reusable helpers there rather than to a `.cpp` of a single screen.
 
 ## Editors
 
@@ -388,10 +396,6 @@ The tests need a debug build (`-DAOW_DEBUG=ON`), except `openaow-net-tests` and 
 ```bash
 ./build/openaow --test                                # simulation, AI, determinism, replays, matches
 ./build/openaow-net-tests                             # serializer, protocol fuzzing, sessions, discovery, server
-python tools/net_selftest.py build/openaow 30         # two game processes play a network match
-python tools/net_selftest.py build/openaow 30 brod --server      # ... through openaow-server
-python tools/net_selftest.py build/openaow 40 brod --reconnect   # ... with a dropped connection
-python tools/net_selftest.py build/openaow 30 brod --hosted      # ... a player-hosted game joined by code
 
 ```
 

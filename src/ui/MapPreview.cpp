@@ -10,10 +10,10 @@ namespace OpenArtOfWar
 
     MapPreview::~MapPreview()
     {
-        clear();
+        Clear();
     }
 
-    void MapPreview::clear()
+    void MapPreview::Clear()
     {
         for(auto &[key, entry] : m_cache)
         {
@@ -23,7 +23,7 @@ namespace OpenArtOfWar
         m_cache.clear();
     }
 
-    SDL_Texture *MapPreview::get(SDL_Renderer *renderer, TextureManager &textures, const std::string &key, const std::string &mapPath, const std::vector<PreviewMarker> &markers, int &width, int &height)
+    SDL_Texture *MapPreview::Get(SDL_Renderer *renderer, TextureManager &textures, const std::string &key, const std::string &mapPath, const std::vector<PreviewMarker> &markers, int &width, int &height)
     {
         const auto cached = m_cache.find(key);
         if(cached != m_cache.end())
@@ -36,7 +36,7 @@ namespace OpenArtOfWar
         Entry entry;
         std::string text;
         nlohmann::json doc;
-        if(Assets::readText(mapPath, text))
+        if(Assets::ReadText(mapPath, text))
             doc = nlohmann::json::parse(text, nullptr, false);
         if(doc.is_object() && doc.contains("width") && doc.contains("height") && doc.contains("terrainRle"))
         {
@@ -63,7 +63,7 @@ namespace OpenArtOfWar
                 {
                     const int run = span.value("runLength", 0);
                     const int tile = span.value("tileType", 0);
-                    const SDL_Color color = textures.getTileColor(tileset, tile);
+                    const SDL_Color color = textures.GetTileColor(tileset, tile);
                     for(int i = 0; i < run && cy < h; ++i)
                     {
                         put(cx, cy, color);

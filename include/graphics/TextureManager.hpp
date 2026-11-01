@@ -84,60 +84,60 @@ namespace OpenArtOfWar
         TextureManager(SDL_Renderer *renderer);
         ~TextureManager();
 
-        bool loadAllAssets(const std::string &assetRoot = LoaderResources::kDefaultRoot);
-        SDL_Texture *loadTexture(const std::string &filePath);
+        bool LoadAllAssets(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+        SDL_Texture *LoadTexture(const std::string &filePath);
 
         // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).
         // `sharpPixels` (pixel-art filter of the shader effects) needs linear samples on the sprite sheets but
         // keeps the terrain sheets as they are: their tiles touch each other in the atlas, and linear samples
         // at a tile edge would pull in the neighbouring tile as a faint grid line.
-        void setSpriteFiltering(bool linear, bool sharpPixels = false);
-        SDL_Texture *getSpriteSheet(int page) const;
-        float getSheetScale(int page) const;
+        void SetSpriteFiltering(bool linear, bool sharpPixels = false);
+        SDL_Texture *GetSpriteSheet(int page) const;
+        float GetSheetScale(int page) const;
         // Width of a sprite sheet of the original game (the sheets may be enlarged: scale = width / this); 0 when unknown
-        static int baseSheetWidth(int page);
-        SDL_Texture *getTileset(int index) const;
-        SDL_Texture *getUiTexture(const std::string &name) const;
-        const SpriteFrame *getSpriteFrame(int spriteId) const;
+        static int BaseSheetWidth(int page);
+        SDL_Texture *GetTileset(int index) const;
+        SDL_Texture *GetUiTexture(const std::string &name) const;
+        const SpriteFrame *GetSpriteFrame(int spriteId) const;
 
         // Average color of a map tile's picture (for minimap-like previews); computed from the sprite sheet
         // pixels on first use and cached
-        SDL_Color getTileColor(int tilesetId, int tileIdx);
+        SDL_Color GetTileColor(int tilesetId, int tileIdx);
 
         // Graphics data lookups
-        IndexRange getCompositeRange(int compId) const;
-        const CompositePart *getCompositePart(int index) const;
+        IndexRange GetCompositeRange(int compId) const;
+        const CompositePart *GetCompositePart(int index) const;
 
-        IndexRange getAnimRange(int animId) const;
-        const AnimFrame *getAnimFrame(int index) const;
+        IndexRange GetAnimRange(int animId) const;
+        const AnimFrame *GetAnimFrame(int index) const;
 
-        IndexRange getUnitBodyRange(int bodyId) const;
-        const UnitLayer *getUnitLayer(int index) const;
+        IndexRange GetUnitBodyRange(int bodyId) const;
+        const UnitLayer *GetUnitLayer(int index) const;
 
-        IndexRange getUnitSequenceRange(int seqId) const;
-        const UnitSequenceStep *getUnitSequenceStep(int index) const;
+        IndexRange GetUnitSequenceRange(int seqId) const;
+        const UnitSequenceStep *GetUnitSequenceStep(int index) const;
 
-        const BuildingDef *getBuildingDef(int buildingType) const;
-        const BuildingPart *getBuildingPart(int index) const;
+        const BuildingDef *GetBuildingDef(int buildingType) const;
+        const BuildingPart *GetBuildingPart(int index) const;
 
-        int getTileCompositeId(int tilesetId, int tileIdx) const;
-        int getDecorCompositeId(int tilesetId, int decorType) const;
-        int getDecorBuildingId(int tilesetId, int decorType) const;
-        int getUnitBaseSeq(int unitType, int actionState) const;
+        int GetTileCompositeId(int tilesetId, int tileIdx) const;
+        int GetDecorCompositeId(int tilesetId, int decorType) const;
+        int GetDecorBuildingId(int tilesetId, int decorType) const;
+        int GetUnitBaseSeq(int unitType, int actionState) const;
         // Where the rotating turret layer sits for a hull facing (idle sequence, first step), relative to
         // the unit's draw origin; false when the unit has no turret layer
-        bool getTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const;
-        const std::vector<int16_t> &getDecorAnims() const
+        bool GetTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const;
+        const std::vector<int16_t> &GetDecorAnims() const
         {
             return m_decorAnims;
         }
 
-        void cleanup();
+        void Cleanup();
 
     private:
-        bool loadGraphicsData(const std::string &jsonPath);
-        SDL_Surface *sheetSurface(int page);
-        void sumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);
+        bool LoadGraphicsData(const std::string &jsonPath);
+        SDL_Surface *SheetSurface(int page);
+        void SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);
 
         SDL_Renderer *m_renderer {nullptr};
         std::unordered_map<std::string, SDL_Texture *> m_textureCache;
@@ -148,7 +148,7 @@ namespace OpenArtOfWar
         std::unordered_map<int, SDL_Color> m_tileColors;
         std::vector<SDL_Texture *> m_tilesets;
         std::vector<bool> m_terrainPages; // sheet pages that hold terrain tiles (worked out on first use)
-        void collectTerrainPages();
+        void CollectTerrainPages();
         std::unordered_map<std::string, SDL_Texture *> m_uiTextures;
         std::vector<SpriteFrame> m_spriteFrames;
 

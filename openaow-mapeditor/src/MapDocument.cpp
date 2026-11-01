@@ -15,10 +15,10 @@ namespace OpenArtOfWar {
 
 namespace {
 
-Faction readFaction(const nlohmann::json& item) {
+Faction ReadFaction(const nlohmann::json& item) {
     const auto faction = item.find("faction");
     if (faction == item.end()) return Faction::Resistance;
-    if (faction->is_string()) return Utility::parseFaction(faction->get<std::string>());
+    if (faction->is_string()) return Utility::ParseFaction(faction->get<std::string>());
     if (faction->is_number_integer()) {
         const int value = faction->get<int>();
         return value == 1 ? Faction::Confederation : (value == 2 ? Faction::Neutral : Faction::Resistance);
@@ -26,7 +26,7 @@ Faction readFaction(const nlohmann::json& item) {
     return Faction::Resistance;
 }
 
-int legacyBuildingIndex(int type, Faction faction) {
+int LegacyBuildingIndex(int type, Faction faction) {
     if (faction == Faction::Confederation) {
         switch (type) {
             case 8: return 0;
@@ -52,7 +52,7 @@ int legacyBuildingIndex(int type, Faction faction) {
     }
 }
 
-std::pair<int, int> buildingSize(int type) {
+std::pair<int, int> BuildingSize(int type) {
     static constexpr int widths[] = {4, 3, 3, 4, 3, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2};
     static constexpr int heights[] = {4, 3, 3, 3, 3, 2, 2, 2, 4, 3, 3, 3, 3, 2, 2};
     if (type < 0 || type >= 15) return {1, 1};
@@ -62,26 +62,26 @@ std::pair<int, int> buildingSize(int type) {
 } // namespace
 
 MapDocument::MapDocument() {
-    newMap(60, 40, 0, 0);
+    NewMap(60, 40, 0, 0);
 }
 
-void MapDocument::newMap(int width, int height, int tilesetId, uint8_t fillTile) {
+void MapDocument::NewMap(int width, int height, int tilesetId, uint8_t fillTile) {
     width = std::clamp(width, 10, MAX_MAP_SIZE);
     height = std::clamp(height, 10, MAX_MAP_SIZE);
     tilesetId = std::clamp(tilesetId, 0, 1);
 
-    m_map.initBlankArena(width, height, tilesetId);
-    m_map.setSize(width, height);
-    m_map.setTilesetId(tilesetId);
+    m_map.InitBlankArena(width, height, tilesetId);
+    m_map.SetSize(width, height);
+    m_map.SetTilesetId(tilesetId);
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            m_map.setBaseTile(x, y, fillTile);
-            m_map.setPassable(x, y, !TileCollision::isBlocked(tilesetId, fillTile));
+            m_map.SetBaseTile(x, y, fillTile);
+            m_map.SetPassable(x, y, !TileCollision::IsBlocked(tilesetId, fillTile));
         }
     }
 
-    m_map.clearDecorations();
+    m_map.ClearDecorations();
     m_entities.clear();
     m_undoStack.clear();
     m_redoStack.clear();
@@ -99,9 +99,9 @@ void MapDocument::newMap(int width, int height, int tilesetId, uint8_t fillTile)
     m_modified = false;
 }
 
-bool MapDocument::loadMap(const std::string& path) {
+bool MapDocument::LoadMap(const std::string& path) {
     std::string fileText;
-    if (!OpenArtOfWar::Assets::readText(path, fileText)) {
+    if (!OpenArtOfWar::Assets::ReadText(path, fileText)) {
         std::cerr << "[MapDocument] Failed to open file: " << path << std::endl;
         return false;
     }
@@ -114,7 +114,7 @@ bool MapDocument::loadMap(const std::string& path) {
         return false;
     }
 
-    if (!m_map.loadMap(path)) {
+    if (!m_map.LoadMap(path)) {
         return false;
     }
 
@@ -136,14 +136,14 @@ bool MapDocument::loadMap(const std::string& path) {
     }
 
     if (j.contains("headquarters") && j["headquarters"].is_object() && j["headquarters"].contains("enemy")) {
-        m_enemyStartX = j["headquarters"]["enemy"].value("x", m_map.getWidth() - 8);
-        m_enemyStartY = j["headquarters"]["enemy"].value("y", m_map.getHeight() - 8);
+        m_enemyStartX = j["headquarters"]["enemy"].value("x", m_map.GetWidth() - 8);
+        m_enemyStartY = j["headquarters"]["enemy"].value("y", m_map.GetHeight() - 8);
     } else if (j.contains("enemyPos") && j["enemyPos"].is_object()) {
-        m_enemyStartX = j["enemyPos"].value("x", m_map.getWidth() - 8);
-        m_enemyStartY = j["enemyPos"].value("y", m_map.getHeight() - 8);
+        m_enemyStartX = j["enemyPos"].value("x", m_map.GetWidth() - 8);
+        m_enemyStartY = j["enemyPos"].value("y", m_map.GetHeight() - 8);
     } else {
-        m_enemyStartX = std::clamp(m_map.getWidth() - 8, 0, m_map.getWidth() - 1);
-        m_enemyStartY = std::clamp(m_map.getHeight() - 8, 0, m_map.getHeight() - 1);
+        m_enemyStartX = std::clamp(m_map.GetWidth() - 8, 0, m_map.GetWidth() - 1);
+        m_enemyStartY = std::clamp(m_map.GetHeight() - 8, 0, m_map.GetHeight() - 1);
     }
 
     // start_positions: player, enemy, then the extra ones (players 3..8)
@@ -152,8 +152,8 @@ bool MapDocument::loadMap(const std::string& path) {
         for (size_t i = 2; i < j["start_positions"].size() && m_extraStarts.size() < kMaxExtraStarts; ++i) {
             const auto& p = j["start_positions"][i];
             if (!p.is_object()) continue;
-            m_extraStarts.push_back({std::clamp(p.value("x", 0), 0, std::max(0, m_map.getWidth() - 1)),
-                                     std::clamp(p.value("y", 0), 0, std::max(0, m_map.getHeight() - 1))});
+            m_extraStarts.push_back({std::clamp(p.value("x", 0), 0, std::max(0, m_map.GetWidth() - 1)),
+                                     std::clamp(p.value("y", 0), 0, std::max(0, m_map.GetHeight() - 1))});
         }
     }
 
@@ -161,20 +161,20 @@ bool MapDocument::loadMap(const std::string& path) {
         EditorEntity ent;
         ent.id = m_nextEntityId++;
         ent.isBuilding = isBuilding;
-        ent.faction = readFaction(item);
+        ent.faction = ReadFaction(item);
         ent.tileX = item.value("x", 0);
         ent.tileY = item.value("y", 0);
         ent.facing = item.value("facing", 0);
         ent.mapData = item;
         if (isBuilding) {
             const int type = gameFormat ? item.value("buildingIndex", 0) : item.value("type", 0);
-            ent.type = gameFormat ? type : legacyBuildingIndex(type, ent.faction);
-            const auto [width, height] = buildingSize(ent.type);
+            ent.type = gameFormat ? type : LegacyBuildingIndex(type, ent.faction);
+            const auto [width, height] = BuildingSize(ent.type);
             ent.buildWidth = item.value("buildWidth", width);
             ent.buildHeight = item.value("buildHeight", height);
-            for (int y = ent.tileY; y < ent.tileY + ent.buildHeight && y < m_map.getHeight(); ++y) {
-                for (int x = ent.tileX; x < ent.tileX + ent.buildWidth && x < m_map.getWidth(); ++x) {
-                    m_map.setPassable(x, y, false);
+            for (int y = ent.tileY; y < ent.tileY + ent.buildHeight && y < m_map.GetHeight(); ++y) {
+                for (int x = ent.tileX; x < ent.tileX + ent.buildWidth && x < m_map.GetWidth(); ++x) {
+                    m_map.SetPassable(x, y, false);
                 }
             }
         } else {
@@ -202,23 +202,23 @@ bool MapDocument::loadMap(const std::string& path) {
     return true;
 }
 
-bool MapDocument::saveMap(const std::string& path) {
+bool MapDocument::SaveMap(const std::string& path) {
     nlohmann::json j = m_mapData.is_object() ? m_mapData : nlohmann::json::object();
     j["name"] = m_name;
-    j["width"] = m_map.getWidth();
-    j["height"] = m_map.getHeight();
-    j["tilesetId"] = m_map.getTilesetId();
+    j["width"] = m_map.GetWidth();
+    j["height"] = m_map.GetHeight();
+    j["tilesetId"] = m_map.GetTilesetId();
 
     // 1. RLE Compression of terrain base tiles
     nlohmann::json rleArray = nlohmann::json::array();
     int curTile = -1;
     int runLength = 0;
-    int w = m_map.getWidth();
-    int h = m_map.getHeight();
+    int w = m_map.GetWidth();
+    int h = m_map.GetHeight();
 
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            uint8_t t = m_map.getBaseTile(x, y);
+            uint8_t t = m_map.GetBaseTile(x, y);
             if (curTile < 0) {
                 curTile = t;
                 runLength = 1;
@@ -244,7 +244,7 @@ bool MapDocument::saveMap(const std::string& path) {
 
     // 2. Decorations
     nlohmann::json decArray = nlohmann::json::array();
-    for (const auto& d : m_map.getDecorations()) {
+    for (const auto& d : m_map.GetDecorations()) {
         decArray.push_back({
             {"type", d.type},
             {"x", d.x},
@@ -263,7 +263,7 @@ bool MapDocument::saveMap(const std::string& path) {
             for (int bit = 0; bit < 32; ++bit) {
                 int x = chunkIdx * 32 + bit;
                 if (x < w) {
-                    bool blocked = !m_map.isPassable(x, y);
+                    bool blocked = !m_map.IsPassable(x, y);
                     if (blocked) {
                         mask |= (1u << (31 - bit));
                     }
@@ -279,9 +279,9 @@ bool MapDocument::saveMap(const std::string& path) {
     nlohmann::json wallsArray = nlohmann::json::array();
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            if (m_map.getWall(x, y) > 0) {
-                Faction fac = m_map.getWallFaction(x, y);
-                int hp = m_map.getWallHp(x, y);
+            if (m_map.GetWall(x, y) > 0) {
+                Faction fac = m_map.GetWallFaction(x, y);
+                int hp = m_map.GetWallHp(x, y);
                 int facInt = (fac == Faction::Resistance) ? 1 : 0;
                 wallsArray.push_back({
                     {"x", x},
@@ -301,7 +301,7 @@ bool MapDocument::saveMap(const std::string& path) {
     nlohmann::json unitsArray = nlohmann::json::array();
     for (const auto& e : m_entities) {
         nlohmann::json item = e.mapData.is_object() ? e.mapData : nlohmann::json::object();
-        item["faction"] = Utility::factionKey(e.faction);
+        item["faction"] = Utility::FactionKey(e.faction);
         item["x"] = e.tileX;
         item["y"] = e.tileY;
         if (e.isBuilding) {
@@ -349,70 +349,70 @@ bool MapDocument::saveMap(const std::string& path) {
     return true;
 }
 
-void MapDocument::setTile(int x, int y, uint8_t tile) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    if (m_map.getBaseTile(x, y) != tile) {
-        m_map.setBaseTile(x, y, tile);
-        refreshPassability(x, y);
+void MapDocument::SetTile(int x, int y, uint8_t tile) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    if (m_map.GetBaseTile(x, y) != tile) {
+        m_map.SetBaseTile(x, y, tile);
+        RefreshPassability(x, y);
         m_modified = true;
     }
 }
 
 // Footprint (width, height in tiles) of a decoration, anchored at its top-left tile
-std::pair<int, int> MapDocument::decorationSize(int type) const {
+std::pair<int, int> MapDocument::DecorationSize(int type) const {
     if (m_textures) {
-        const int building = m_textures->getDecorBuildingId(m_map.getTilesetId(), type);
-        if (const BuildingDef* def = m_textures->getBuildingDef(building)) {
+        const int building = m_textures->GetDecorBuildingId(m_map.GetTilesetId(), type);
+        if (const BuildingDef* def = m_textures->GetBuildingDef(building)) {
             return {std::max<int>(1, def->width), std::max<int>(1, def->height)};
         }
     }
     return {1, 1};
 }
 
-bool MapDocument::coveredByDecoration(int x, int y) const {
-    for (const auto& d : m_map.getDecorations()) {
+bool MapDocument::CoveredByDecoration(int x, int y) const {
+    for (const auto& d : m_map.GetDecorations()) {
         if (x < d.x || y < d.y) continue;
-        const auto [dw, dh] = decorationSize(d.type);
+        const auto [dw, dh] = DecorationSize(d.type);
         if (x < d.x + dw && y < d.y + dh) return true;
     }
     return false;
 }
 
 // Passability of a tile follows its sprite; decorations, walls and buildings on it block as well
-void MapDocument::refreshPassability(int x, int y) {
-    bool open = !TileCollision::isBlocked(m_map.getTilesetId(), m_map.getBaseTile(x, y)) &&
-                !m_map.isWall(x, y) && !coveredByDecoration(x, y);
+void MapDocument::RefreshPassability(int x, int y) {
+    bool open = !TileCollision::IsBlocked(m_map.GetTilesetId(), m_map.GetBaseTile(x, y)) &&
+                !m_map.IsWall(x, y) && !CoveredByDecoration(x, y);
     for (const auto& ent : m_entities) {
         if (open && ent.isBuilding && x >= ent.tileX && x < ent.tileX + ent.buildWidth &&
             y >= ent.tileY && y < ent.tileY + ent.buildHeight) {
             open = false;
         }
     }
-    m_map.setPassable(x, y, open);
+    m_map.SetPassable(x, y, open);
 }
 
-void MapDocument::setTileBrush(int x, int y, uint8_t tile, int brushSize) {
+void MapDocument::SetTileBrush(int x, int y, uint8_t tile, int brushSize) {
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
     for (int dy = start; dy < start + brushSize; ++dy) {
         for (int dx = start; dx < start + brushSize; ++dx) {
-            setTile(x + dx, y + dy, tile);
+            SetTile(x + dx, y + dy, tile);
         }
     }
 }
 
-void MapDocument::floodFill(int startX, int startY, uint8_t newTile) {
-    int w = m_map.getWidth();
-    int h = m_map.getHeight();
+void MapDocument::FloodFill(int startX, int startY, uint8_t newTile) {
+    int w = m_map.GetWidth();
+    int h = m_map.GetHeight();
     if (startX < 0 || startX >= w || startY < 0 || startY >= h) return;
 
-    uint8_t targetTile = m_map.getBaseTile(startX, startY);
+    uint8_t targetTile = m_map.GetBaseTile(startX, startY);
     if (targetTile == newTile) return;
 
     std::queue<std::pair<int, int>> q;
     q.push({startX, startY});
-    m_map.setBaseTile(startX, startY, newTile);
-    refreshPassability(startX, startY);
+    m_map.SetBaseTile(startX, startY, newTile);
+    RefreshPassability(startX, startY);
     m_modified = true;
 
     const int dx[] = {1, -1, 0, 0};
@@ -426,9 +426,9 @@ void MapDocument::floodFill(int startX, int startY, uint8_t newTile) {
             int nx = cx + dx[i];
             int ny = cy + dy[i];
             if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-                if (m_map.getBaseTile(nx, ny) == targetTile) {
-                    m_map.setBaseTile(nx, ny, newTile);
-                    refreshPassability(nx, ny);
+                if (m_map.GetBaseTile(nx, ny) == targetTile) {
+                    m_map.SetBaseTile(nx, ny, newTile);
+                    RefreshPassability(nx, ny);
                     q.push({nx, ny});
                 }
             }
@@ -436,64 +436,64 @@ void MapDocument::floodFill(int startX, int startY, uint8_t newTile) {
     }
 }
 
-void MapDocument::fillAll(uint8_t tile) {
-    int w = m_map.getWidth();
-    int h = m_map.getHeight();
+void MapDocument::FillAll(uint8_t tile) {
+    int w = m_map.GetWidth();
+    int h = m_map.GetHeight();
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            m_map.setBaseTile(x, y, tile);
-            refreshPassability(x, y);
+            m_map.SetBaseTile(x, y, tile);
+            RefreshPassability(x, y);
         }
     }
     m_modified = true;
 }
 
-void MapDocument::addDecoration(int type, int x, int y) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    m_map.addDecoration(type, x, y);
-    const auto [dw, dh] = decorationSize(type);
-    for (int ty = y; ty < y + dh && ty < m_map.getHeight(); ++ty) {
-        for (int tx = x; tx < x + dw && tx < m_map.getWidth(); ++tx) m_map.setPassable(tx, ty, false);
+void MapDocument::AddDecoration(int type, int x, int y) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    m_map.AddDecoration(type, x, y);
+    const auto [dw, dh] = DecorationSize(type);
+    for (int ty = y; ty < y + dh && ty < m_map.GetHeight(); ++ty) {
+        for (int tx = x; tx < x + dw && tx < m_map.GetWidth(); ++tx) m_map.SetPassable(tx, ty, false);
     }
     m_modified = true;
 }
 
-void MapDocument::removeDecoration(int x, int y) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
+void MapDocument::RemoveDecoration(int x, int y) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
     int footprintW = 1, footprintH = 1;
-    for (const auto& d : m_map.getDecorations()) {
+    for (const auto& d : m_map.GetDecorations()) {
         if (d.x == x && d.y == y) {
-            std::tie(footprintW, footprintH) = decorationSize(d.type);
+            std::tie(footprintW, footprintH) = DecorationSize(d.type);
             break;
         }
     }
-    m_map.removeDecorationAt(x, y);
-    for (int ty = y; ty < y + footprintH && ty < m_map.getHeight(); ++ty) {
-        for (int tx = x; tx < x + footprintW && tx < m_map.getWidth(); ++tx) refreshPassability(tx, ty);
+    m_map.RemoveDecorationAt(x, y);
+    for (int ty = y; ty < y + footprintH && ty < m_map.GetHeight(); ++ty) {
+        for (int tx = x; tx < x + footprintW && tx < m_map.GetWidth(); ++tx) RefreshPassability(tx, ty);
     }
     m_modified = true;
 }
 
-void MapDocument::setWall(int x, int y, Faction faction, int hp) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    m_map.setWall(x, y, faction, (hp * 100) / 150);
+void MapDocument::SetWall(int x, int y, Faction faction, int hp) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    m_map.SetWall(x, y, faction, (hp * 100) / 150);
     m_modified = true;
 }
 
-bool MapDocument::canPlaceWallBrush(int x, int y, Faction faction, int brushSize) const {
+bool MapDocument::CanPlaceWallBrush(int x, int y, Faction faction, int brushSize) const {
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
     for (int dy = start; dy < start + brushSize; ++dy) {
         for (int dx = start; dx < start + brushSize; ++dx) {
             const int tileX = x + dx;
             const int tileY = y + dy;
-            if (tileX < 0 || tileX >= m_map.getWidth() || tileY < 0 || tileY >= m_map.getHeight() ||
-                m_map.getDecorGrid(tileX, tileY) > 0 || getEntityAt(tileX, tileY)) {
+            if (tileX < 0 || tileX >= m_map.GetWidth() || tileY < 0 || tileY >= m_map.GetHeight() ||
+                m_map.GetDecorGrid(tileX, tileY) > 0 || GetEntityAt(tileX, tileY)) {
                 return false;
             }
-            if (m_map.isWall(tileX, tileY)) {
-                if (m_map.getWallFaction(tileX, tileY) != faction) return false;
-            } else if (!m_map.isPassable(tileX, tileY)) {
+            if (m_map.IsWall(tileX, tileY)) {
+                if (m_map.GetWallFaction(tileX, tileY) != faction) return false;
+            } else if (!m_map.IsPassable(tileX, tileY)) {
                 return false;
             }
         }
@@ -501,26 +501,26 @@ bool MapDocument::canPlaceWallBrush(int x, int y, Faction faction, int brushSize
     return true;
 }
 
-bool MapDocument::setWallBrush(int x, int y, Faction faction, int brushSize) {
-    if (!canPlaceWallBrush(x, y, faction, brushSize)) return false;
+bool MapDocument::SetWallBrush(int x, int y, Faction faction, int brushSize) {
+    if (!CanPlaceWallBrush(x, y, faction, brushSize)) return false;
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
     for (int dy = start; dy < start + brushSize; ++dy) {
         for (int dx = start; dx < start + brushSize; ++dx) {
-            setWall(x + dx, y + dy, faction, 150);
+            SetWall(x + dx, y + dy, faction, 150);
         }
     }
     return true;
 }
 
-void MapDocument::removeWall(int x, int y) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    m_map.setWall(x, y, Faction::Resistance, 0);
+void MapDocument::RemoveWall(int x, int y) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    m_map.SetWall(x, y, Faction::Resistance, 0);
     m_modified = true;
 }
 
-int MapDocument::addEntity(int type, bool isBuilding, Faction faction, int x, int y, int facing) {
-    if (!canPlaceEntity(type, isBuilding, x, y)) return -1;
+int MapDocument::AddEntity(int type, bool isBuilding, Faction faction, int x, int y, int facing) {
+    if (!CanPlaceEntity(type, isBuilding, x, y)) return -1;
 
     EditorEntity ent;
     ent.id = m_nextEntityId++;
@@ -533,7 +533,7 @@ int MapDocument::addEntity(int type, bool isBuilding, Faction faction, int x, in
 
     if (isBuilding) {
         ent.type = type;
-        const auto [width, height] = buildingSize(ent.type);
+        const auto [width, height] = BuildingSize(ent.type);
         ent.buildWidth = width;
         ent.buildHeight = height;
     } else {
@@ -546,50 +546,50 @@ int MapDocument::addEntity(int type, bool isBuilding, Faction faction, int x, in
     return ent.id;
 }
 
-bool MapDocument::hasObjectsInBrush(int x, int y, int brushSize) const {
+bool MapDocument::HasObjectsInBrush(int x, int y, int brushSize) const {
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
     for (int dy = start; dy < start + brushSize; ++dy) {
         for (int dx = start; dx < start + brushSize; ++dx) {
             const int tileX = x + dx;
             const int tileY = y + dy;
-            if (tileX < 0 || tileX >= m_map.getWidth() || tileY < 0 || tileY >= m_map.getHeight()) continue;
-            const bool hasObject = getEntityAt(tileX, tileY) != nullptr || m_map.isWall(tileX, tileY) ||
-                                   m_map.getDecorGrid(tileX, tileY) > 0;
+            if (tileX < 0 || tileX >= m_map.GetWidth() || tileY < 0 || tileY >= m_map.GetHeight()) continue;
+            const bool hasObject = GetEntityAt(tileX, tileY) != nullptr || m_map.IsWall(tileX, tileY) ||
+                                   m_map.GetDecorGrid(tileX, tileY) > 0;
             if (hasObject) return true;
         }
     }
     return false;
 }
 
-bool MapDocument::removeObjectsBrush(int x, int y, int brushSize) {
-    if (!hasObjectsInBrush(x, y, brushSize)) return false;
+bool MapDocument::RemoveObjectsBrush(int x, int y, int brushSize) {
+    if (!HasObjectsInBrush(x, y, brushSize)) return false;
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
     for (int dy = start; dy < start + brushSize; ++dy) {
         for (int dx = start; dx < start + brushSize; ++dx) {
             const int tileX = x + dx;
             const int tileY = y + dy;
-            if (tileX < 0 || tileX >= m_map.getWidth() || tileY < 0 || tileY >= m_map.getHeight()) continue;
-            const bool hasObject = getEntityAt(tileX, tileY) != nullptr || m_map.isWall(tileX, tileY) ||
-                                   m_map.getDecorGrid(tileX, tileY) > 0;
+            if (tileX < 0 || tileX >= m_map.GetWidth() || tileY < 0 || tileY >= m_map.GetHeight()) continue;
+            const bool hasObject = GetEntityAt(tileX, tileY) != nullptr || m_map.IsWall(tileX, tileY) ||
+                                   m_map.GetDecorGrid(tileX, tileY) > 0;
             if (!hasObject) continue;
-            removeEntityAt(tileX, tileY);
-            removeWall(tileX, tileY);
-            removeDecoration(tileX, tileY);
+            RemoveEntityAt(tileX, tileY);
+            RemoveWall(tileX, tileY);
+            RemoveDecoration(tileX, tileY);
         }
     }
     return true;
 }
 
-bool MapDocument::canPlaceEntity(int type, bool isBuilding, int x, int y) const {
-    const auto [width, height] = isBuilding ? buildingSize(type) : std::pair<int, int>{1, 1};
-    if (x < 0 || y < 0 || x + width > m_map.getWidth() || y + height > m_map.getHeight()) return false;
+bool MapDocument::CanPlaceEntity(int type, bool isBuilding, int x, int y) const {
+    const auto [width, height] = isBuilding ? BuildingSize(type) : std::pair<int, int>{1, 1};
+    if (x < 0 || y < 0 || x + width > m_map.GetWidth() || y + height > m_map.GetHeight()) return false;
 
     for (int tileY = y; tileY < y + height; ++tileY) {
         for (int tileX = x; tileX < x + width; ++tileX) {
-            if (!m_map.isPassable(tileX, tileY) || m_map.isWall(tileX, tileY) ||
-                m_map.getDecorGrid(tileX, tileY) > 0 || getEntityAt(tileX, tileY)) {
+            if (!m_map.IsPassable(tileX, tileY) || m_map.IsWall(tileX, tileY) ||
+                m_map.GetDecorGrid(tileX, tileY) > 0 || GetEntityAt(tileX, tileY)) {
                 return false;
             }
         }
@@ -597,28 +597,28 @@ bool MapDocument::canPlaceEntity(int type, bool isBuilding, int x, int y) const 
     return true;
 }
 
-bool MapDocument::selectEntityAt(int x, int y, bool additive) {
-    EditorEntity* target = getEntityAt(x, y);
+bool MapDocument::SelectEntityAt(int x, int y, bool additive) {
+    EditorEntity* target = GetEntityAt(x, y);
     if (!additive) {
-        clearEntitySelection();
+        ClearEntitySelection();
     }
     if (!target) return false;
     target->selected = additive ? !target->selected : true;
     return true;
 }
 
-void MapDocument::clearEntitySelection() {
+void MapDocument::ClearEntitySelection() {
     for (auto& entity : m_entities) {
         entity.selected = false;
     }
 }
 
-int MapDocument::countSelectedUnits() const {
+int MapDocument::CountSelectedUnits() const {
     return static_cast<int>(std::count_if(m_entities.begin(), m_entities.end(),
         [](const EditorEntity& entity) { return entity.selected && !entity.isBuilding; }));
 }
 
-int MapDocument::setSelectedUnitFacing(int facing) {
+int MapDocument::SetSelectedUnitFacing(int facing) {
     facing = (facing % 8 + 8) % 8;
     int changed = 0;
     for (auto& entity : m_entities) {
@@ -632,7 +632,7 @@ int MapDocument::setSelectedUnitFacing(int facing) {
     return changed;
 }
 
-void MapDocument::removeEntityAt(int x, int y) {
+void MapDocument::RemoveEntityAt(int x, int y) {
     for (auto it = m_entities.begin(); it != m_entities.end(); ) {
         if (it->isBuilding) {
             if (x >= it->tileX && x < it->tileX + it->buildWidth &&
@@ -652,7 +652,7 @@ void MapDocument::removeEntityAt(int x, int y) {
     }
 }
 
-const EditorEntity* MapDocument::getEntityAt(int x, int y) const {
+const EditorEntity* MapDocument::GetEntityAt(int x, int y) const {
     for (const auto& e : m_entities) {
         if (e.isBuilding) {
             if (x >= e.tileX && x < e.tileX + e.buildWidth &&
@@ -668,7 +668,7 @@ const EditorEntity* MapDocument::getEntityAt(int x, int y) const {
     return nullptr;
 }
 
-EditorEntity* MapDocument::getEntityAt(int x, int y) {
+EditorEntity* MapDocument::GetEntityAt(int x, int y) {
     for (auto& e : m_entities) {
         if (e.isBuilding) {
             if (x >= e.tileX && x < e.tileX + e.buildWidth &&
@@ -684,35 +684,35 @@ EditorEntity* MapDocument::getEntityAt(int x, int y) {
     return nullptr;
 }
 
-void MapDocument::setPassable(int x, int y, bool passable) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    m_map.setPassable(x, y, passable);
+void MapDocument::SetPassable(int x, int y, bool passable) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    m_map.SetPassable(x, y, passable);
     m_modified = true;
 }
 
-void MapDocument::togglePassable(int x, int y) {
-    if (x < 0 || x >= m_map.getWidth() || y < 0 || y >= m_map.getHeight()) return;
-    m_map.setPassable(x, y, !m_map.isPassable(x, y));
+void MapDocument::TogglePassable(int x, int y) {
+    if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight()) return;
+    m_map.SetPassable(x, y, !m_map.IsPassable(x, y));
     m_modified = true;
 }
 
-void MapDocument::autoRecalculatePassability() {
-    int w = m_map.getWidth();
-    int h = m_map.getHeight();
+void MapDocument::AutoRecalculatePassability() {
+    int w = m_map.GetWidth();
+    int h = m_map.GetHeight();
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            uint8_t t = m_map.getBaseTile(x, y);
-            bool passable = !TileCollision::isBlocked(m_map.getTilesetId(), t);
-            if (m_map.getWall(x, y) > 0) passable = false;
-            m_map.setPassable(x, y, passable);
+            uint8_t t = m_map.GetBaseTile(x, y);
+            bool passable = !TileCollision::IsBlocked(m_map.GetTilesetId(), t);
+            if (m_map.GetWall(x, y) > 0) passable = false;
+            m_map.SetPassable(x, y, passable);
         }
     }
 
     // A decoration blocks its whole footprint, not only the anchor tile
-    for (const auto& d : m_map.getDecorations()) {
-        const auto [dw, dh] = decorationSize(d.type);
+    for (const auto& d : m_map.GetDecorations()) {
+        const auto [dw, dh] = DecorationSize(d.type);
         for (int dy = d.y; dy < d.y + dh && dy < h; ++dy) {
-            for (int dx = d.x; dx < d.x + dw && dx < w; ++dx) m_map.setPassable(dx, dy, false);
+            for (int dx = d.x; dx < d.x + dw && dx < w; ++dx) m_map.SetPassable(dx, dy, false);
         }
     }
 
@@ -720,7 +720,7 @@ void MapDocument::autoRecalculatePassability() {
         if (ent.isBuilding) {
             for (int by = ent.tileY; by < ent.tileY + ent.buildHeight && by < h; ++by) {
                 for (int bx = ent.tileX; bx < ent.tileX + ent.buildWidth && bx < w; ++bx) {
-                    m_map.setPassable(bx, by, false);
+                    m_map.SetPassable(bx, by, false);
                 }
             }
         }
@@ -728,15 +728,15 @@ void MapDocument::autoRecalculatePassability() {
     m_modified = true;
 }
 
-void MapDocument::clearAll() {
-    newMap(m_map.getWidth(), m_map.getHeight(), m_map.getTilesetId(), 0);
+void MapDocument::ClearAll() {
+    NewMap(m_map.GetWidth(), m_map.GetHeight(), m_map.GetTilesetId(), 0);
 }
 
-MapSnapshot MapDocument::createSnapshot() const {
+MapSnapshot MapDocument::CreateSnapshot() const {
     MapSnapshot snap;
-    snap.width = m_map.getWidth();
-    snap.height = m_map.getHeight();
-    snap.tilesetId = m_map.getTilesetId();
+    snap.width = m_map.GetWidth();
+    snap.height = m_map.GetHeight();
+    snap.tilesetId = m_map.GetTilesetId();
 
     int total = snap.width * snap.height;
     snap.baseTiles.resize(total);
@@ -747,14 +747,14 @@ MapSnapshot MapDocument::createSnapshot() const {
     for (int y = 0; y < snap.height; ++y) {
         for (int x = 0; x < snap.width; ++x) {
             int idx = y * snap.width + x;
-            snap.baseTiles[idx] = m_map.getBaseTile(x, y);
-            snap.wallGrid[idx] = m_map.getWall(x, y);
-            snap.wallHp[idx] = static_cast<int16_t>(m_map.getWallHp(x, y));
-            snap.passability[idx] = m_map.isPassable(x, y);
+            snap.baseTiles[idx] = m_map.GetBaseTile(x, y);
+            snap.wallGrid[idx] = m_map.GetWall(x, y);
+            snap.wallHp[idx] = static_cast<int16_t>(m_map.GetWallHp(x, y));
+            snap.passability[idx] = m_map.IsPassable(x, y);
         }
     }
 
-    snap.decorations = m_map.getDecorations();
+    snap.decorations = m_map.GetDecorations();
     snap.entities = m_entities;
     snap.playerStartX = m_playerStartX;
     snap.playerStartY = m_playerStartY;
@@ -764,27 +764,27 @@ MapSnapshot MapDocument::createSnapshot() const {
     return snap;
 }
 
-void MapDocument::restoreSnapshot(const MapSnapshot& snap) {
-    m_map.setSize(snap.width, snap.height);
-    m_map.setTilesetId(snap.tilesetId);
-    m_map.clearDecorations();
+void MapDocument::RestoreSnapshot(const MapSnapshot& snap) {
+    m_map.SetSize(snap.width, snap.height);
+    m_map.SetTilesetId(snap.tilesetId);
+    m_map.ClearDecorations();
 
     for (int y = 0; y < snap.height; ++y) {
         for (int x = 0; x < snap.width; ++x) {
             int idx = y * snap.width + x;
-            m_map.setBaseTile(x, y, snap.baseTiles[idx]);
-            m_map.setPassable(x, y, snap.passability[idx]);
+            m_map.SetBaseTile(x, y, snap.baseTiles[idx]);
+            m_map.SetPassable(x, y, snap.passability[idx]);
             if (snap.wallGrid[idx] > 0) {
                 Faction fac = (snap.wallGrid[idx] >= 1101) ? Faction::Resistance : Faction::Confederation;
-                m_map.setWall(x, y, fac, (snap.wallHp[idx] * 100) / 150);
+                m_map.SetWall(x, y, fac, (snap.wallHp[idx] * 100) / 150);
             } else {
-                m_map.setWall(x, y, Faction::Resistance, 0);
+                m_map.SetWall(x, y, Faction::Resistance, 0);
             }
         }
     }
 
     for (const auto& d : snap.decorations) {
-        m_map.addDecoration(d.type, d.x, d.y);
+        m_map.AddDecoration(d.type, d.x, d.y);
     }
 
     m_entities = snap.entities;
@@ -796,26 +796,26 @@ void MapDocument::restoreSnapshot(const MapSnapshot& snap) {
     m_modified = true;
 }
 
-void MapDocument::pushUndoSnapshot() {
-    m_undoStack.push_back(createSnapshot());
+void MapDocument::PushUndoSnapshot() {
+    m_undoStack.push_back(CreateSnapshot());
     if (m_undoStack.size() > MAX_UNDO_LEVELS) {
         m_undoStack.erase(m_undoStack.begin());
     }
     m_redoStack.clear();
 }
 
-bool MapDocument::undo() {
+bool MapDocument::Undo() {
     if (m_undoStack.empty()) return false;
-    m_redoStack.push_back(createSnapshot());
-    restoreSnapshot(m_undoStack.back());
+    m_redoStack.push_back(CreateSnapshot());
+    RestoreSnapshot(m_undoStack.back());
     m_undoStack.pop_back();
     return true;
 }
 
-bool MapDocument::redo() {
+bool MapDocument::Redo() {
     if (m_redoStack.empty()) return false;
-    m_undoStack.push_back(createSnapshot());
-    restoreSnapshot(m_redoStack.back());
+    m_undoStack.push_back(CreateSnapshot());
+    RestoreSnapshot(m_redoStack.back());
     m_redoStack.pop_back();
     return true;
 }

@@ -21,7 +21,7 @@ namespace OpenArtOfWar
 
         bool g_completed[kMaxPlayers][kResearchCount] = {};
 
-        bool valid(PlayerId p)
+        bool Valid(PlayerId p)
         {
             return p < kMaxPlayers;
         }
@@ -37,7 +37,7 @@ namespace OpenArtOfWar
             std::array<std::string, kResearchCount> names, descs;
         };
 
-        void applyYaml(LoadedCatalog &c, const std::string &text)
+        void ApplyYaml(LoadedCatalog &c, const std::string &text)
         {
             const YAML::Node list = YAML::Load(text)["research"];
             if(!list || !list.IsSequence())
@@ -88,7 +88,7 @@ namespace OpenArtOfWar
                     }
                 }
                 ResearchEffect e;
-                if(n["effect"] && parseResearchEffect(n["effect"].as<std::string>(""), e))
+                if(n["effect"] && ParseResearchEffect(n["effect"].as<std::string>(""), e))
                     d.effect = e;
             }
         }
@@ -115,36 +115,36 @@ namespace OpenArtOfWar
                         c.defs[i].desc = c.descs[i].c_str();
                     }
                     std::string text;
-                    if(!Assets::readText(LoaderResources::research(side == Faction::Confederation ? "confederation" : "resistance"), text))
+                    if(!Assets::ReadText(LoaderResources::research(side == Faction::Confederation ? "confederation" : "resistance"), text))
                         continue;
                     try
                     {
-                        applyYaml(c, text);
+                        ApplyYaml(c, text);
                     }
                     catch(const std::exception &e)
                     {
-                        std::cerr << "[Research] " << researchFile(side) << ": " << e.what() << std::endl;
+                        std::cerr << "[Research] " << ResearchFile(side) << ": " << e.what() << std::endl;
                     }
                 }
             }
             return catalogs[conf ? 0 : 1];
         }
 
-        const ResearchDef *catalogOf(Faction faction)
+        const ResearchDef *CatalogOf(Faction faction)
         {
             return loadedCatalog(faction).defs.data();
         }
 
         // Siege and baseline forms count as the unit they belong to
-        int baseArchetype(int archetypeId)
+        int BaseArchetype(int archetypeId)
         {
             const Utility::ArchetypeInfo *info = Utility::archetypeInfo(archetypeId);
             return info && info->baseFormId >= 0 ? info->baseFormId : archetypeId;
         }
 
-        bool aboutUnit(const ResearchDef &def, const Unit &u)
+        bool AboutUnit(const ResearchDef &def, const Unit &u)
         {
-            const int base = baseArchetype(u.archetypeId);
+            const int base = BaseArchetype(u.archetypeId);
             return (def.archA >= 0 && base == def.archA) || (def.archB >= 0 && base == def.archB);
         }
 
@@ -153,9 +153,9 @@ namespace OpenArtOfWar
         // Armor points: one point is -8% of the damage taken
         constexpr int kArmorPointPercent = 8;
 
-        void applyEffectToUnit(const ResearchDef &def, Unit &u)
+        void ApplyEffectToUnit(const ResearchDef &def, Unit &u)
         {
-            const bool infantry = u.isInfantry();
+            const bool infantry = u.IsInfantry();
             auto scaleDamage = [&](int percent) { u.attackDamage = static_cast<int>(u.attackDamage * (100 + percent) / 100.0f); };
             switch(def.effect)
             {
@@ -168,7 +168,7 @@ namespace OpenArtOfWar
                         u.moveSpeed *= 1.0f + kSpeedPoint * def.value;
                     break;
                 case ResearchEffect::FireRate:
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                     {
                         const float f = 100.0f / (100 + def.value);
                         u.attackCooldown *= f;
@@ -176,7 +176,7 @@ namespace OpenArtOfWar
                     }
                     break;
                 case ResearchEffect::Reload:
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                     {
                         const float f = (100 - def.value) / 100.0f;
                         u.attackCooldown *= f;
@@ -184,11 +184,11 @@ namespace OpenArtOfWar
                     }
                     break;
                 case ResearchEffect::Damage:
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                         scaleDamage(def.value);
                     break;
                 case ResearchEffect::VisionRange:
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                     {
                         u.attackRange += static_cast<float>(def.value);
                         u.sightRadius += def.value;
@@ -196,7 +196,7 @@ namespace OpenArtOfWar
                     }
                     break;
                 case ResearchEffect::RangePercent:
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                     {
                         u.attackRange *= 1.0f + def.value / 100.0f;
                         scaleDamage(def.value2);
@@ -204,7 +204,7 @@ namespace OpenArtOfWar
                     break;
                 case ResearchEffect::RocketTurret:
                     // The extra rocket launcher adds firepower to the Zeus
-                    if(aboutUnit(def, u))
+                    if(AboutUnit(def, u))
                         scaleDamage(15);
                     break;
                 default:
@@ -214,13 +214,13 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    const char *researchEffectName(ResearchEffect effect)
+    const char *ResearchEffectName(ResearchEffect effect)
     {
         const int i = static_cast<int>(effect);
         return i >= 0 && i < static_cast<int>(ResearchEffect::Count) ? kEffectNames[i] : "";
     }
 
-    bool parseResearchEffect(const std::string &name, ResearchEffect &out)
+    bool ParseResearchEffect(const std::string &name, ResearchEffect &out)
     {
         for(int i = 0; i < static_cast<int>(ResearchEffect::Count); ++i)
         {
@@ -233,21 +233,21 @@ namespace OpenArtOfWar
         return false;
     }
 
-    const char *researchFile(Faction faction)
+    const char *ResearchFile(Faction faction)
     {
         return faction == Faction::Confederation ? "characters/research_confederation.yaml" : "characters/research_resistance.yaml";
     }
 
     const ResearchDef &researchDef(Faction faction, int index)
     {
-        return catalogOf(faction)[std::clamp(index, 0, kResearchCount - 1)];
+        return CatalogOf(faction)[std::clamp(index, 0, kResearchCount - 1)];
     }
 
-    bool hasResearchBuilding(PlayerId player, const EntityManager &entities)
+    bool HasResearchBuilding(PlayerId player, const EntityManager &entities)
     {
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(b && b->alive && b->state != ActionState::Die && b->owner == player && b->type == UnitType::ResearchLab && b->buildProgress >= 1.0f)
             {
                 return true;
@@ -256,74 +256,74 @@ namespace OpenArtOfWar
         return false;
     }
 
-    void resetResearch()
+    void ResetResearch()
     {
         for(auto &side : g_completed)
             std::fill(std::begin(side), std::end(side), false);
     }
 
-    void resetResearch(PlayerId player)
+    void ResetResearch(PlayerId player)
     {
-        if(!valid(player))
+        if(!Valid(player))
             return;
         std::fill(std::begin(g_completed[player]), std::end(g_completed[player]), false);
     }
 
-    bool isResearched(PlayerId player, int index)
+    bool IsResearched(PlayerId player, int index)
     {
-        return valid(player) && index >= 0 && index < kResearchCount && g_completed[player][index];
+        return Valid(player) && index >= 0 && index < kResearchCount && g_completed[player][index];
     }
 
-    bool isResearchAvailable(PlayerId player, int index)
+    bool IsResearchAvailable(PlayerId player, int index)
     {
-        const int req = researchDef(Players::factionOf(player), index).needs;
-        return req < 0 || isResearched(player, req);
+        const int req = researchDef(Players::FactionOf(player), index).needs;
+        return req < 0 || IsResearched(player, req);
     }
 
-    void completeResearch(PlayerId player, int index, EntityManager &entities)
+    void CompleteResearch(PlayerId player, int index, EntityManager &entities)
     {
-        if(!valid(player) || index < 0 || index >= kResearchCount || isResearched(player, index))
+        if(!Valid(player) || index < 0 || index >= kResearchCount || IsResearched(player, index))
             return;
         g_completed[player][index] = true;
-        const ResearchDef &def = researchDef(Players::factionOf(player), index);
-        for(auto &e : entities.getAllEntities())
+        const ResearchDef &def = researchDef(Players::FactionOf(player), index);
+        for(auto &e : entities.GetAllEntities())
         {
-            Unit *u = e.asUnit();
+            Unit *u = e.AsUnit();
             if(!u || !u->alive || u->owner != player)
                 continue;
-            applyEffectToUnit(def, *u);
+            ApplyEffectToUnit(def, *u);
         }
         if(def.effect == ResearchEffect::FortressFlamethrower)
         {
-            entities.setFortressFlamethrowerUnlocked(player, true);
+            entities.SetFortressFlamethrowerUnlocked(player, true);
         }
         else if(def.effect == ResearchEffect::SiegeMode)
         {
-            entities.setSiegeUnlocked(player, true);
+            entities.SetSiegeUnlocked(player, true);
         }
         else if(def.effect == ResearchEffect::BuildRadius)
         {
-            entities.setBuildRadiusPercent(player, researchTotal(player, ResearchEffect::BuildRadius));
+            entities.SetBuildRadiusPercent(player, ResearchTotal(player, ResearchEffect::BuildRadius));
         }
     }
 
-    void applyCompletedResearch(Unit &unit)
+    void ApplyCompletedResearch(Unit &unit)
     {
         for(int i = 0; i < kResearchCount; ++i)
         {
-            if(isResearched(unit.owner, i))
-                applyEffectToUnit(researchDef(Players::factionOf(unit.owner), i), unit);
+            if(IsResearched(unit.owner, i))
+                ApplyEffectToUnit(researchDef(Players::FactionOf(unit.owner), i), unit);
         }
     }
 
-    float researchedAttackRange(PlayerId player, int archetypeId, float range)
+    float ResearchedAttackRange(PlayerId player, int archetypeId, float range)
     {
-        const int base = baseArchetype(archetypeId);
-        const Faction faction = Players::factionOf(player);
+        const int base = BaseArchetype(archetypeId);
+        const Faction faction = Players::FactionOf(player);
         for(int i = 0; i < kResearchCount; ++i)
         {
             const ResearchDef &def = researchDef(faction, i);
-            if(!isResearched(player, i) || (def.archA != base && def.archB != base) || base < 0)
+            if(!IsResearched(player, i) || (def.archA != base && def.archB != base) || base < 0)
                 continue;
             if(def.effect == ResearchEffect::VisionRange)
                 range += static_cast<float>(def.value);
@@ -333,33 +333,33 @@ namespace OpenArtOfWar
         return range;
     }
 
-    int researchTotal(PlayerId player, ResearchEffect effect)
+    int ResearchTotal(PlayerId player, ResearchEffect effect)
     {
         int total = 0;
-        const Faction faction = Players::factionOf(player);
+        const Faction faction = Players::FactionOf(player);
         for(int i = 0; i < kResearchCount; ++i)
         {
             const ResearchDef &def = researchDef(faction, i);
-            if(def.effect == effect && isResearched(player, i))
+            if(def.effect == effect && IsResearched(player, i))
                 total += def.value;
         }
         return total;
     }
 
-    bool isEffectResearched(PlayerId player, ResearchEffect effect)
+    bool IsEffectResearched(PlayerId player, ResearchEffect effect)
     {
-        const Faction faction = Players::factionOf(player);
+        const Faction faction = Players::FactionOf(player);
         for(int i = 0; i < kResearchCount; ++i)
         {
-            if(researchDef(faction, i).effect == effect && isResearched(player, i))
+            if(researchDef(faction, i).effect == effect && IsResearched(player, i))
                 return true;
         }
         return false;
     }
 
-    int unitUnlockResearch(Faction faction, int archetype)
+    int UnitUnlockResearch(Faction faction, int archetype)
     {
-        const int base = baseArchetype(archetype);
+        const int base = BaseArchetype(archetype);
         for(int i = 0; i < kResearchCount; ++i)
         {
             const ResearchDef &def = researchDef(faction, i);
@@ -369,35 +369,35 @@ namespace OpenArtOfWar
         return -1;
     }
 
-    bool isUnitUnlocked(PlayerId player, int archetype)
+    bool IsUnitUnlocked(PlayerId player, int archetype)
     {
-        const int index = unitUnlockResearch(Players::factionOf(player), archetype);
-        return index < 0 || isResearched(player, index);
+        const int index = UnitUnlockResearch(Players::FactionOf(player), archetype);
+        return index < 0 || IsResearched(player, index);
     }
 
-    bool isRadarUnlocked(PlayerId player)
+    bool IsRadarUnlocked(PlayerId player)
     {
-        const Faction faction = Players::factionOf(player);
+        const Faction faction = Players::FactionOf(player);
         for(int i = 0; i < kResearchCount; ++i)
         {
             if(researchDef(faction, i).effect == ResearchEffect::UnlockRadar)
-                return isResearched(player, i);
+                return IsResearched(player, i);
         }
         return true;
     }
 
-    int reduceDamageByArmor(int damage, const Entity &target)
+    int ReduceDamageByArmor(int damage, const Entity &target)
     {
         if(damage <= 0)
             return damage;
         int percent = 0;
         if(target.isBuilding)
         {
-            percent = researchTotal(target.owner, ResearchEffect::BuildingArmor);
+            percent = ResearchTotal(target.owner, ResearchEffect::BuildingArmor);
         }
-        else if(const Unit *u = target.asUnit())
+        else if(const Unit *u = target.AsUnit())
         {
-            const int points = researchTotal(u->owner, u->isInfantry() ? ResearchEffect::InfantryArmor : ResearchEffect::VehicleArmor);
+            const int points = ResearchTotal(u->owner, u->IsInfantry() ? ResearchEffect::InfantryArmor : ResearchEffect::VehicleArmor);
             percent = points * kArmorPointPercent;
         }
         if(percent <= 0)
@@ -405,9 +405,9 @@ namespace OpenArtOfWar
         return std::max(1, damage * 100 / (100 + percent));
     }
 
-    int reduceWallDamage(int damage, PlayerId player)
+    int ReduceWallDamage(int damage, PlayerId player)
     {
-        const int percent = researchTotal(player, ResearchEffect::WallStrength);
+        const int percent = ResearchTotal(player, ResearchEffect::WallStrength);
         return percent <= 0 || damage <= 0 ? damage : std::max(1, damage * 100 / (100 + percent));
     }
 

@@ -12,8 +12,8 @@ const char* const kLevelLabels[4] = {"Easy", "Medium", "Hard", "Hardcore"};
 const ImU32 kLevelColors[4] = {IM_COL32(104, 204, 124, 255), IM_COL32(232, 200, 74, 255), IM_COL32(236, 140, 60, 255),
                                IM_COL32(226, 80, 70, 255)};
 
-double num(const CommentedYaml& y, const std::string& path, double fallback) {
-    const YAML::Node n = y.at(path);
+double Num(const CommentedYaml& y, const std::string& path, double fallback) {
+    const YAML::Node n = y.At(path);
     try {
         return n.IsScalar() ? n.as<double>() : fallback;
     } catch (...) {
@@ -22,7 +22,7 @@ double num(const CommentedYaml& y, const std::string& path, double fallback) {
 }
 
 // A small line chart: one series per difficulty, x = 0..count-1
-void drawChart(const char* id, const char* title, const std::vector<double> series[4], int count, ImVec2 size, const char* xLabel) {
+void DrawChart(const char* id, const char* title, const std::vector<double> series[4], int count, ImVec2 size, const char* xLabel) {
     ImGui::TextUnformatted(title);
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton(id, size);
@@ -63,15 +63,15 @@ void drawChart(const char* id, const char* title, const std::vector<double> seri
 
 } // namespace
 
-void CharacterEditor::ensureAi() {
+void CharacterEditor::EnsureAi() {
     if (aiTried) return;
     aiTried = true;
-    loadYamlFile(aiYaml, "difficulty.yaml");
+    LoadYamlFile(aiYaml, "difficulty.yaml");
 }
 
-void CharacterEditor::drawAiDifficulty() {
-    ensureAi();
-    if (!aiYaml.loaded()) {
+void CharacterEditor::DrawAiDifficulty() {
+    EnsureAi();
+    if (!aiYaml.Loaded()) {
         ImGui::TextWrapped("%s", _("The difficulty file could not be loaded."));
         return;
     }
@@ -93,7 +93,7 @@ void CharacterEditor::drawAiDifficulty() {
         dl->AddRectFilled(a, b, hot ? IM_COL32(38, 46, 56, 255) : IM_COL32(26, 32, 40, 255), 4.0f);
         dl->AddRect(a, b, selected ? kLevelColors[i] : IM_COL32(70, 80, 92, 255), 4.0f, 0, selected ? 3.0f : 1.0f);
         dl->AddRectFilled(a, ImVec2(a.x + 5.0f, b.y), kLevelColors[i]);
-        const std::string name = aiYaml.at(base + ".name").IsScalar() ? aiYaml.at(base + ".name").Scalar() : base;
+        const std::string name = aiYaml.At(base + ".name").IsScalar() ? aiYaml.At(base + ".name").Scalar() : base;
         dl->AddText(ImVec2(a.x + 14.0f, a.y + 8.0f), IM_COL32(236, 240, 246, 255), name.c_str());
         char line[96];
         float y = a.y + 30.0f;
@@ -102,10 +102,10 @@ void CharacterEditor::drawAiDifficulty() {
             dl->AddText(ImVec2(a.x + 14.0f, y), IM_COL32(170, 180, 194, 255), line);
             y += 17.0f;
         };
-        row(_("Credits %.0f, +%.0f / s"), num(aiYaml, base + ".starting_credits", 0), num(aiYaml, base + ".credits_per_second", 0));
-        row(_("Waves %.0f..%.0f units"), num(aiYaml, base + ".tactics.wave_base_size", 0), num(aiYaml, base + ".tactics.wave_max_size", 0));
-        row(_("Every %.0f s, tier %.0f"), num(aiYaml, base + ".tactics.wave_interval_seconds", 0), num(aiYaml, base + ".tactics.max_wave_tier", 0));
-        row(_("Groups up to %.0f, research %.0f s"), num(aiYaml, base + ".tactics.max_attack_groups", 0), num(aiYaml, base + ".tactics.research_seconds", 0));
+        row(_("Credits %.0f, +%.0f / s"), Num(aiYaml, base + ".starting_credits", 0), Num(aiYaml, base + ".credits_per_second", 0));
+        row(_("Waves %.0f..%.0f units"), Num(aiYaml, base + ".tactics.wave_base_size", 0), Num(aiYaml, base + ".tactics.wave_max_size", 0));
+        row(_("Every %.0f s, tier %.0f"), Num(aiYaml, base + ".tactics.wave_interval_seconds", 0), Num(aiYaml, base + ".tactics.max_wave_tier", 0));
+        row(_("Groups up to %.0f, research %.0f s"), Num(aiYaml, base + ".tactics.max_attack_groups", 0), Num(aiYaml, base + ".tactics.research_seconds", 0));
         if (i < 3) {
             const ImVec2 m(b.x, a.y + nodeH * 0.5f);
             dl->AddLine(m, ImVec2(m.x + gap, m.y), IM_COL32(120, 130, 142, 255), 2.0f);
@@ -121,26 +121,26 @@ void CharacterEditor::drawAiDifficulty() {
     constexpr int kMinutes = 15;
     for (int s = 0; s < 4; ++s) {
         const std::string base = kLevels[s];
-        const double b0 = num(aiYaml, base + ".tactics.wave_base_size", 10), grow = num(aiYaml, base + ".tactics.wave_growth", 1),
-                     mx = num(aiYaml, base + ".tactics.wave_max_size", 14);
+        const double b0 = Num(aiYaml, base + ".tactics.wave_base_size", 10), grow = Num(aiYaml, base + ".tactics.wave_growth", 1),
+                     mx = Num(aiYaml, base + ".tactics.wave_max_size", 14);
         for (int n = 0; n < kWaves; ++n) waves[s].push_back(std::min(mx, b0 + grow * n));
-        const double c0 = num(aiYaml, base + ".starting_credits", 0), cps = num(aiYaml, base + ".credits_per_second", 0);
+        const double c0 = Num(aiYaml, base + ".starting_credits", 0), cps = Num(aiYaml, base + ".credits_per_second", 0);
         for (int m = 0; m <= kMinutes; ++m) bank[s].push_back(c0 + cps * 60.0 * m);
     }
     const float chartW = std::max(240.0f, (ImGui::GetContentRegionAvail().x - 12.0f) * 0.5f);
-    drawChart("waves", _("Units in wave N"), waves, kWaves, ImVec2(chartW, 190.0f), _("wave number"));
+    DrawChart("waves", _("Units in wave N"), waves, kWaves, ImVec2(chartW, 190.0f), _("wave number"));
     ImGui::SameLine();
     ImGui::BeginGroup();
-    drawChart("bank", _("Credits earned by minute"), bank, kMinutes + 1, ImVec2(chartW, 190.0f), _("minutes"));
+    DrawChart("bank", _("Credits earned by minute"), bank, kMinutes + 1, ImVec2(chartW, 190.0f), _("minutes"));
     ImGui::EndGroup();
 
     // Time between waves, as bars
     ImGui::Spacing();
     ImGui::TextUnformatted(_("Pause between waves (seconds)"));
     double longest = 1.0;
-    for (int s = 0; s < 4; ++s) longest = std::max(longest, num(aiYaml, std::string(kLevels[s]) + ".tactics.wave_interval_seconds", 0));
+    for (int s = 0; s < 4; ++s) longest = std::max(longest, Num(aiYaml, std::string(kLevels[s]) + ".tactics.wave_interval_seconds", 0));
     for (int s = 0; s < 4; ++s) {
-        const double v = num(aiYaml, std::string(kLevels[s]) + ".tactics.wave_interval_seconds", 0);
+        const double v = Num(aiYaml, std::string(kLevels[s]) + ".tactics.wave_interval_seconds", 0);
         const ImVec2 p = ImGui::GetCursorScreenPos();
         const float full = std::max(100.0f, ImGui::GetContentRegionAvail().x - 120.0f);
         ImGui::Dummy(ImVec2(full + 100.0f, 18.0f));
@@ -152,34 +152,34 @@ void CharacterEditor::drawAiDifficulty() {
     }
 }
 
-void CharacterEditor::drawAiProperties() {
-    ensureAi();
-    if (!aiYaml.loaded()) {
+void CharacterEditor::DrawAiProperties() {
+    EnsureAi();
+    if (!aiYaml.Loaded()) {
         ImGui::TextWrapped("%s", _("The difficulty file could not be loaded."));
         return;
     }
-    drawSettingsBar(aiYaml, "difficulty.yaml");
+    DrawSettingsBar(aiYaml, "difficulty.yaml");
     ImGui::Separator();
     // Level used when the game starts
-    const YAML::Node def = aiYaml.at("default_difficulty");
+    const YAML::Node def = aiYaml.At("default_difficulty");
     const std::string current = def.IsScalar() ? def.Scalar() : "medium";
     ImGui::SetNextItemWidth(180.0f);
     int idx = 1;
     for (int i = 0; i < 4; ++i) if (current == kLevels[i]) idx = i;
     if (ImGui::BeginCombo(_("Default difficulty"), _(kLevelLabels[idx]))) {
         for (int i = 0; i < 4; ++i) {
-            if (ImGui::Selectable(_(kLevelLabels[i]), i == idx)) aiYaml.set("default_difficulty", std::string("\"") + kLevels[i] + "\"");
+            if (ImGui::Selectable(_(kLevelLabels[i]), i == idx)) aiYaml.Set("default_difficulty", std::string("\"") + kLevels[i] + "\"");
         }
         ImGui::EndCombo();
     }
-    fieldHint("Default difficulty");
+    FieldHint("Default difficulty");
     ImGui::Spacing();
     for (int i = 0; i < 4; ++i) {
         if (i) ImGui::SameLine();
-        if (hinted(ImGui::RadioButton(_(kLevelLabels[i]), aiSelected == i), kLevelLabels[i])) aiSelected = i;
+        if (Hinted(ImGui::RadioButton(_(kLevelLabels[i]), aiSelected == i), kLevelLabels[i])) aiSelected = i;
     }
     ImGui::Separator();
-    editYamlTree(aiYaml, kLevels[aiSelected], 0);
+    EditYamlTree(aiYaml, kLevels[aiSelected], 0);
 }
 
 } // namespace CharEditor

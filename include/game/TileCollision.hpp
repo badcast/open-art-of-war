@@ -9,7 +9,7 @@ namespace OpenArtOfWar
     class TileCollision
     {
     public:
-        static bool isBlocked(int tilesetId, int tile);
+        static bool IsBlocked(int tilesetId, int tile);
     };
 
 } // namespace OpenArtOfWar

@@ -32,24 +32,6 @@ msgstr "ОБ ИГРЕ"
 msgid "EXIT"
 msgstr "ВЫХОД"
 
-msgid "[ SELECT ]"
-msgstr "[ ВЫБРАТЬ ]"
-
-msgid "[ EXIT ]"
-msgstr "[ ВЫХОД ]"
-
-msgid "Select"
-msgstr "Выбор"
-
-msgid "Exit"
-msgstr "Выход"
-
-msgid "Back"
-msgstr "Назад"
-
-msgid "Toggle"
-msgstr "Переключить"
-
 msgid "GAME PAUSED"
 msgstr "ИГРА ПРИОСТАНОВЛЕНА"
 
@@ -59,41 +41,8 @@ msgstr "ПРОДОЛЖИТЬ"
 msgid "OBJECTIVES"
 msgstr "ЗАДАНИЕ"
 
-msgid "CONSTRUCTION"
-msgstr "СТРОИТЕЛЬСТВО"
-
-msgid "SOUND & MUSIC"
-msgstr "ЗВУК И МУЗЫКА"
-
 msgid "RESTART MISSION"
 msgstr "НАЧАТЬ ЗАНОВО"
-
-msgid "1. CONTINUE"
-msgstr "1. ПРОДОЛЖИТЬ ИГРУ"
-
-msgid "2. OBJECTIVES"
-msgstr "2. ЗАДАНИЕ МИССИИ"
-
-msgid "3. BASE CONSTRUCTION"
-msgstr "3. СТРОИТЕЛЬСТВО БАЗЫ"
-
-msgid "4. SOUND & MUSIC"
-msgstr "4. ЗВУК И МУЗЫКА"
-
-msgid "5. RESTART MISSION"
-msgstr "5. НАЧАТЬ ЗАНОВО"
-
-msgid "6. MAIN MENU"
-msgstr "6. ГЛАВНОЕ МЕНЮ"
-
-msgid "[ SELECT / ENTER ]"
-msgstr "[ ВЫБРАТЬ / ENTER ]"
-
-msgid "[ BACK / ESC ]"
-msgstr "[ НАЗАД / ESC ]"
-
-msgid "MISSION OBJECTIVES"
-msgstr "ЦЕЛИ ЗАДАНИЯ"
 
 msgid " - OBJECTIVES"
 msgstr " - ЗАДАНИЕ"
@@ -103,30 +52,6 @@ msgstr "ОСНОВНЫЕ ЗАДАЧИ:"
 
 msgid "OPERATION BRIEFING:"
 msgstr "ОПИСАНИЕ ОПЕРАЦИИ:"
-
-msgid "CONTINUE (ESC)"
-msgstr "ПРОДОЛЖИТЬ (ESC)"
-
-msgid "Press SPACE, ENTER or Click to return"
-msgstr "Нажмите ПРОБЕЛ, ENTER или ЛКМ для возврата"
-
-msgid "BASE CONSTRUCTION (RESISTANCE)"
-msgstr "СТРОИТЕЛЬСТВО БАЗЫ (СОПРОТИВЛЕНИЕ)"
-
-msgid "BASE CONSTRUCTION"
-msgstr "СТРОИТЕЛЬСТВО БАЗЫ"
-
-msgid "[ SELECT & PLACE ]"
-msgstr "[ ВЫБРАТЬ И РАЗМЕСТИТЬ ]"
-
-msgid "[ CANCEL / ESC ]"
-msgstr "[ ОТМЕНА / ESC ]"
-
-msgid "Cost: $"
-msgstr "Стоимость: $"
-
-msgid "Power: "
-msgstr "Энергия: "
 
 msgid " kW"
 msgstr " кВт"
@@ -146,26 +71,8 @@ msgstr "НАЧАТЬ МИССИЮ"
 msgid "BACK"
 msgstr "НАЗАД"
 
-msgid "MISSION BRIEFING - FREEDOM FOR LIBERTY"
-msgstr "БРИФИНГ МИССИИ - FREEDOM FOR LIBERTY"
-
-msgid "START MISSION [ENTER]"
-msgstr "НАЧАТЬ МИССИЮ [ENTER]"
-
 msgid "MISSION BRIEFING"
 msgstr "БРИФИНГ ЗАДАНИЯ"
-
-msgid "RESISTANCE HIGH COMMAND - SECTOR REPORT"
-msgstr "КОМАНДОВАНИЕ СОПРОТИВЛЕНИЯ - ОТЧЕТ ПО СЕКТОРУ"
-
-msgid "OPERATIONAL OBJECTIVES:"
-msgstr "ЦЕЛИ ОПЕРАЦИИ:"
-
-msgid "PRESS [SPACE] OR [ENTER] TO BEGIN MISSION"
-msgstr "НАЖМИТЕ [ПРОБЕЛ] ИЛИ [ENTER] ДЛЯ НАЧАЛА"
-
-msgid "AUDIO & SYSTEM SETTINGS"
-msgstr "НАСТРОЙКИ ЗВУКА И СИСТЕМЫ"
 
 msgid "Sound & Music"
 msgstr "Звук и Музыка"
@@ -185,47 +92,8 @@ msgstr "ВКЛ"
 msgid "OFF"
 msgstr "ВЫКЛ"
 
-msgid "Synthesizer"
-msgstr "Синтезатор"
-
-msgid "Graphics"
-msgstr "Графика"
-
-msgid "Pixel-Perfect High-Res"
-msgstr "Высокое разрешение (Pixel-Perfect)"
-
-msgid "Press [1] to toggle Sound, [2] to toggle Language"
-msgstr "Нажмите [1] для переключения звука, [2] для выбора языка"
-
-msgid "BACK (ESC / ENTER)"
-msgstr "НАЗАД (ESC / ENTER)"
-
 msgid "HELP & CONTROLS"
 msgstr "ПОМОЩЬ И УПРАВЛЕНИЕ"
-
-msgid "- Mouse: LMB - select unit / box selection."
-msgstr "- Управление мышью: ЛКМ - выбор юнита / рамка выделения."
-
-msgid "- Orders: RMB on ground - move, RMB on enemy - attack."
-msgstr "- Приказы: ПКМ на карту - перемещение, ПКМ на врага - атака."
-
-msgid "- Camera: Arrow keys, WASD, or move mouse to screen edges."
-msgstr "- Камера: Стрелки, WASD, или перемещение мыши к краям экрана."
-
-msgid "- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets."
-msgstr "- Строительство (B): Штаб, Генератор, Казарма, Завод, Локатор, Турели."
-
-msgid "- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS."
-msgstr "- Производство (1..7): Пехотинец, Гренадер, Снайпер, Койот, Броненосец, Носорог, Дикобраз."
-
-msgid "- Siege mode (G): Deploy Sniper and Rhino heavy tank."
-msgstr "- Осадный режим (G): Развертывание Снайпера и тяжелого танка Носорог."
-
-msgid "- Hotkeys: F12 - debug overlay, Space / ESC - pause."
-msgstr "- Быстрые клавиши: F12 - панель отладки, Пробел / ESC - пауза."
-
-msgid "ABOUT OPEN ART OF WAR"
-msgstr "ОБ ИГРЕ OPEN ART OF WAR"
 
 msgid "ABOUT GAME"
 msgstr "ОБ ИГРЕ"
@@ -254,9 +122,6 @@ msgstr "ПЕХОТА"
 msgid "VEHICLES"
 msgstr "ТЕХНИКА"
 
-msgid "BASE"
-msgstr "БАЗА"
-
 msgid "ORDERS"
 msgstr "ПРИКАЗЫ"
 
@@ -269,71 +134,11 @@ msgstr "ГОТОВО"
 msgid "LOCK"
 msgstr "БЛОК"
 
-msgid "BUILDING PLACEMENT: "
-msgstr "РАЗМЕЩЕНИЕ: "
-
-msgid " (LMB - build, RMB - cancel)"
-msgstr " (ЛКМ - построить на карте, ПКМ - отмена)"
-
 msgid "Select building to construct"
 msgstr "Выберите здание для постройки"
 
-msgid "BODY ARMOR"
-msgstr "БРОНЕЖИЛЕТЫ"
-
-msgid "+30% armor and HP for infantry"
-msgstr "+30% броня и здоровье всей пехоты"
-
-msgid "SPECIAL TRAINING"
-msgstr "СПЕЦПОДГОТОВКА"
-
-msgid "+25% movement speed for infantry"
-msgstr "+25% скорость передвижения пехоты"
-
-msgid "OPTICS"
-msgstr "ОПТИКА"
-
-msgid "+1.5 range and +25% infantry damage"
-msgstr "+1.5 дальность и +25% урон пехоты"
-
-msgid "MEDIC STATION"
-msgstr "МЕДПУНКТ"
-
-msgid "+40 max HP and healing for infantry"
-msgstr "+40 макс. HP и лечение всей пехоты"
-
-msgid "TANK ARMOR"
-msgstr "БРОНЯ ТАНКОВ"
-
-msgid "+25% durability for all vehicles"
-msgstr "+25% прочность всей бронетехники"
-
-msgid "AFTERBURNER"
-msgstr "ФОРСАЖ"
-
-msgid "+25% vehicle movement speed"
-msgstr "+25% скорость движения бронетехники"
-
-msgid "SIEGE CANNONS"
-msgstr "ОСАДНЫЕ ОРУДИЯ"
-
-msgid "+25% heavy firepower"
-msgstr "+25% огневая мощь тяжелой техники"
-
-msgid "LOGISTICS"
-msgstr "ЛОГИСТИКА"
-
-msgid "Emergency supply +$600 credits"
-msgstr "Экстренная поставка +$600 кредитов"
-
-msgid "[LAB REQUIRED] Construct Research Lab to unlock"
-msgstr "[ТРЕБУЕТСЯ ЛАБОРАТОРИЯ] Постройте лабораторию для исследований"
-
 msgid "[RESEARCHED] "
 msgstr "[ИЗУЧЕНО] "
-
-msgid "Researching: "
-msgstr "Исследование: "
 
 msgid "Select technology to research"
 msgstr "Выберите технологию для исследования"
@@ -368,32 +173,8 @@ msgstr "СНАЙПЕР"
 msgid "Long-range sniper (Camouflage mode [G])"
 msgstr "Дальнобойный снайпер (Режим маскировки [G])"
 
-msgid "ASSAULT TROOPER"
-msgstr "ШТУРМОВИК"
-
-msgid "Heavy assault infantryman"
-msgstr "Штурмовой тяжелый пехотинец Сопротивления"
-
 msgid "[BARRACKS REQUIRED] Construct Barracks to recruit "
 msgstr "[ТРЕБУЕТСЯ КАЗАРМА] Постройте казарму для найма "
-
-msgid "ACTIVE BARRACKS: #"
-msgstr "АКТИВНАЯ КАЗАРМА: #"
-
-msgid " [PRIMARY RALLY POINT]"
-msgstr " [ОСНОВНАЯ ТОЧКА ВЫХОДА]"
-
-msgid "TRAINING: "
-msgstr "ПОДГОТОВКА: "
-
-msgid " (QUEUE: "
-msgstr " (ОЧЕРЕДЬ: "
-
-msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO RECRUIT"
-msgstr "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ НАЙМА"
-
-msgid "BARRACKS NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
-msgstr "КАЗАРМА НЕ ПОСТРОЕНА. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"
 
 msgid "BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"
 msgstr "ТРЕБУЕТСЯ КАЗАРМА ДЛЯ НАЙМА ПЕХОТЫ!"
@@ -425,50 +206,8 @@ msgstr "Реактивная система залпового огня (РСЗ�
 msgid "[FACTORY REQUIRED] Construct Factory to build "
 msgstr "[ТРЕБУЕТСЯ ЗАВОД] Постройте завод техники для производства "
 
-msgid "ACTIVE FACTORY: #"
-msgstr "АКТИВНЫЙ ЗАВОД: #"
-
-msgid "PRODUCTION: "
-msgstr "ПРОИЗВОДСТВО: "
-
-msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO BUILD VEHICLES"
-msgstr "ОЧЕРЕДЬ ПРОИЗВОДСТВА ПУСТА. НАЖМИТЕ [1..4] ДЛЯ СБОРКИ ТЕХНИКИ"
-
-msgid "FACTORY NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
-msgstr "ЗАВОД ТЕХНИКИ НЕ ПОСТРОЕН. НАЖМИТЕ В СТРОИТЕЛЬСТВЕ ДЛЯ РАЗМЕЩЕНИЯ"
-
 msgid "VEHICLE FACTORY REQUIRED FOR PRODUCTION!"
 msgstr "ТРЕБУЕТСЯ ЗАВОД ТЕХНИКИ ДЛЯ ПРОИЗВОДСТВА!"
-
-msgid "BARRACKS (CLICK: SET PRIMARY)"
-msgstr "КАЗАРМЫ (КЛИК: ВЫБРАТЬ ОСНОВНУЮ)"
-
-msgid "NO BARRACKS"
-msgstr "НЕТ КАЗАРМ"
-
-msgid "BARRACKS #"
-msgstr "КАЗАРМА #"
-
-msgid " [PRIMARY]"
-msgstr " [ОСНОВНАЯ]"
-
-msgid "FACTORIES (CLICK: SET PRIMARY)"
-msgstr "ЗАВОДЫ (КЛИК: ВЫБРАТЬ ОСНОВНОЙ)"
-
-msgid "NO FACTORIES"
-msgstr "НЕТ ЗАВОДОВ"
-
-msgid "FACTORY #"
-msgstr "ЗАВОД #"
-
-msgid "Base grouping: Click Barracks or Factory to set primary rally point."
-msgstr "Группировка баз: Клик по казарме или заводу назначает точку появления подкреплений."
-
-msgid "Assigned primary Barracks #"
-msgstr "Назначена основная Казарма #"
-
-msgid "Assigned primary Factory #"
-msgstr "Назначен основной Завод #"
 
 msgid "ATTACK-MOVE"
 msgstr "АТАКА-ХОД"
@@ -494,35 +233,11 @@ msgstr "ОБОРОНА"
 msgid "Hold current position and engage enemies in range"
 msgstr "Удерживать текущую позицию и атаковать в радиусе"
 
-msgid "TACTICAL ORDERS: Select units and issue a command"
-msgstr "ТАКТИЧЕСКИЕ ПРИКАЗЫ: Выберите юнитов и нажмите команду"
-
-msgid "Attack-Move [A] is the primary offensive tactic for Resistance forces!"
-msgstr "Атака на ходу [A] - базовый режим наступления повстанцев!"
-
-msgid "ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)"
-msgstr "АТАКА-ДВИЖЕНИЕ [A]: укажите точку (ЛКМ - подтвердить, ПКМ/ESC - отмена)"
-
-msgid "GAME SAVED (F5)"
-msgstr "ИГРА СОХРАНЕНА (F5)"
-
-msgid "GAME LOADED (F9)"
-msgstr "ИГРА ЗАГРУЖЕНА (F9)"
-
-msgid "TEST MAP: Test passages, wall destruction and AI!"
-msgstr "ТЕСТОВАЯ КАРТА: Проверьте проходы, разрушение стен и ИИ!"
-
 msgid "MISSION ACCOMPLISHED!"
 msgstr "ЗАДАНИЕ ВЫПОЛНЕНО!"
 
-msgid "Press SPACE / ENTER to return to menu"
-msgstr "Нажмите ПРОБЕЛ / ENTER для перехода в меню"
-
 msgid "MISSION FAILED!"
 msgstr "ЗАДАНИЕ ПРОВАЛЕНО!"
-
-msgid "Press SPACE / ENTER to retry"
-msgstr "Нажмите ПРОБЕЛ / ENTER для повтора"
 
 msgid "HEADQUARTERS"
 msgstr "ШТАБ"
@@ -748,32 +463,11 @@ msgstr ""
 msgid "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
 msgstr "Древние оазисы в пустыне дают ключевые ресурсы в этих безжизненных песках. Захватите источники воды и штурмуйте базу противника."
 
-msgid "Test Map (Polygon)"
-msgstr "Тестовая карта (Полигон)"
-
-msgid "Map: AI & Pathfinding Polygon"
-msgstr "Карта: Полигон ИИ и проходимости"
-
-msgid ""
-"- Verify pathfinding in narrow and closed passages.\n"
-"- Test wall destruction and AI rebuilding.\n"
-"- Test Attack-Move [A]."
-msgstr ""
-"- Проверить проходимость узких проходов и закрытых стен.\n"
-"- Проверить разрушаемость стен и отстройку базы ИИ.\n"
-"- Проверить атаку в движении [A]."
-
-msgid "Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls."
-msgstr "Специальный тестовый полигон: 1) Сектор закрытых стен (юнит подходит вплотную к закрытому проходу и ждет открытия пути или пробивает стену), 2) Узкий коридор, перекрытый вражеским юнитом, 3) Лабиринт препятствий, 4) Укрепленная база ИИ с авто-восстановлением зданий и стен."
-
 msgid "Open Art Of War Character Archetype Editor"
 msgstr "Редактор архетипов Open Art Of War"
 
 msgid "SDL error: "
 msgstr "Ошибка SDL: "
-
-msgid "SDL_image error: "
-msgstr "Ошибка SDL_image: "
 
 msgid "SDL window error: "
 msgstr "Ошибка окна SDL: "
@@ -829,12 +523,6 @@ msgstr "Обновить список"
 msgid "Archetypes"
 msgstr "Архетипы"
 
-msgid "%zu archetypes"
-msgstr "%zu конфигураций"
-
-msgid "Search by name or ID"
-msgstr "Поиск по имени или ID"
-
 msgid "Properties"
 msgstr "Параметры"
 
@@ -853,26 +541,8 @@ msgstr "Основное"
 msgid "Name"
 msgstr "Название"
 
-msgid "Description"
-msgstr "Описание"
-
 msgid "Faction"
 msgstr "Сторона"
-
-msgid "Category (unit/building)"
-msgstr "Категория (unit/building)"
-
-msgid "Internal type"
-msgstr "Внутренний тип"
-
-msgid "Class"
-msgstr "Класс"
-
-msgid "Archetype ID"
-msgstr "ID архетипа"
-
-msgid "Building index"
-msgstr "Индекс здания"
 
 msgid "Size and stats"
 msgstr "Размер и характеристики"
@@ -898,23 +568,11 @@ msgstr "Производство"
 msgid "Cost"
 msgstr "Стоимость"
 
-msgid "Credit cost"
-msgstr "Стоимость в кредитах"
-
 msgid "Power (+/-)"
 msgstr "Мощность (+/-)"
 
 msgid "Build time"
 msgstr "Время производства"
-
-msgid "Produced in"
-msgstr "Где производится"
-
-msgid "Icon composite ID"
-msgstr "ID иконки"
-
-msgid "Prerequisites (one per line)"
-msgstr "Предпосылки (по одной на строку)"
 
 msgid "Combat"
 msgstr "Бой"
@@ -925,17 +583,11 @@ msgstr "Может атаковать"
 msgid "Damage"
 msgstr "Урон"
 
-msgid "Range (tiles)"
-msgstr "Дальность (клетки)"
-
 msgid "Cooldown (seconds)"
 msgstr "Перезарядка (сек.)"
 
 msgid "Shots per burst"
 msgstr "Выстрелов в очереди"
-
-msgid "Burst interval (seconds)"
-msgstr "Интервал очереди (сек.)"
 
 msgid "Projectile"
 msgstr "Снаряд"
@@ -949,44 +601,14 @@ msgstr "Поворотная антенна"
 msgid "Animation"
 msgstr "Анимация"
 
-msgid "Sprite sheet"
-msgstr "Лист спрайтов"
-
-msgid "Base sequence"
-msgstr "Базовая последовательность"
-
-msgid "Composite ID"
-msgstr "Составной спрайт"
-
-msgid "Rubble composite base"
-msgstr "База обломков"
-
-msgid "Attack offset"
-msgstr "Смещение атаки"
-
-msgid "Walk frames"
-msgstr "Кадров ходьбы"
-
-msgid "Idle frames"
-msgstr "Кадров покоя"
-
-msgid "Death frames"
-msgstr "Кадров гибели"
-
 msgid "Abilities"
 msgstr "Способности"
-
-msgid "Siege mode"
-msgstr "Режим осады"
 
 msgid "Siege archetype ID"
 msgstr "ID осадного архетипа"
 
 msgid "Parent archetype ID"
 msgstr "ID родительского архетипа"
-
-msgid "Independent turret"
-msgstr "Независимая башня"
 
 msgid "Filename for Save As"
 msgstr "Имя файла для Сохранить как"
@@ -1030,12 +652,6 @@ msgstr "Прочность"
 msgid "Powered"
 msgstr "Питание"
 
-msgid "Preview zoom"
-msgstr "Масштаб предпросмотра"
-
-msgid "Game sprites and animation sequences from assets/data"
-msgstr "Игровые спрайты и последовательности из assets/data"
-
 msgid "Open Art Of War Map Editor - [openaow-mapeditor]"
 msgstr "Редактор карт Open Art Of War - [openaow-mapeditor]"
 
@@ -1060,9 +676,6 @@ msgstr "Пипетка: выбран тайл #"
 msgid "+30% Resources, +10% Speed"
 msgstr "+30% ресурсов, +10% скорости"
 
-msgid "+5 tiles HQ build radius for buildings and walls"
-msgstr "+5 клеток к радиусу застройки вокруг штаба"
-
 msgid "-20% AI Resources"
 msgstr "-20% ресурсов ИИ"
 
@@ -1075,14 +688,8 @@ msgstr "Сложность ИИ"
 msgid "ATTACK-MOVE [Q]: select target (LMB to confirm, RMB/ESC to cancel)"
 msgstr "АТАКА-ХОД [Q]: выберите цель (ЛКМ — подтвердить, ПКМ / Esc — отмена)"
 
-msgid "Arrow keys - navigate, Enter - select"
-msgstr "Стрелки — выбор, Enter — подтвердить"
-
 msgid "Attack-move: units engage every enemy on the way"
 msgstr "Атака-ход: юниты атакуют всех врагов по пути"
-
-msgid "BASE EXPANSION"
-msgstr "РАСШИРЕНИЕ БАЗЫ"
 
 msgid "BUILD"
 msgstr "ЗДАНИЯ"
@@ -1090,14 +697,8 @@ msgstr "ЗДАНИЯ"
 msgid "Barracks"
 msgstr "Казарма"
 
-msgid "Build vehicles at the primary Factory"
-msgstr "Производство техники на основном заводе"
-
 msgid "Cancel / game menu"
 msgstr "Отмена / меню игры"
-
-msgid "Click a row to change the value"
-msgstr "Нажмите на строку, чтобы изменить значение"
 
 msgid "Click or press Enter to begin"
 msgstr "Нажмите кнопку мыши или Enter, чтобы начать"
@@ -1111,9 +712,6 @@ msgstr "Перетаскивание карты"
 msgid "Easy"
 msgstr "Легко"
 
-msgid "FORTRESS FLAMETHROWER"
-msgstr "ОГНЕМЁТ КРЕПОСТИ"
-
 msgid "FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"
 msgstr "ОГНЕМЁТ ДЛЯ КРЕПОСТИ ИССЛЕДОВАН!"
 
@@ -1122,9 +720,6 @@ msgstr "Завод"
 
 msgid "Fair AI, No Handicap"
 msgstr "Честный ИИ, без форы"
-
-msgid "HQ BUILD RADIUS INCREASED (+5 TILES)!"
-msgstr "РАДИУС ЗАСТРОЙКИ УВЕЛИЧЕН (+5 КЛЕТОК)!"
 
 msgid "Hard"
 msgstr "Сложно"
@@ -1162,9 +757,6 @@ msgstr "ЭНЕРГИЯ"
 msgid "RMB"
 msgstr "ПКМ"
 
-msgid "Recruit infantry at the primary Barracks"
-msgstr "Набор пехоты в основной казарме"
-
 msgid "Scroll the camera"
 msgstr "Прокрутка камеры"
 
@@ -1182,9 +774,6 @@ msgstr "Режим осады для снайпера и «Носорога»"
 
 msgid "TECH"
 msgstr "НАУКА"
-
-msgid "Upgrades Fortress with auxiliary flamethrower (targets <= 1 tile)"
-msgstr "Дополнительный огнемёт для «Крепости» (цели в радиусе 1 клетки)"
 
 msgid "W A S D / Arrows"
 msgstr "W A S D / Стрелки"
@@ -1371,17 +960,11 @@ msgstr "текущие значения, включая несохранённы
 msgid "(RMB - cancel one)"
 msgstr "(ПКМ — отменить один)"
 
-msgid "+20% damage for all vehicles"
-msgstr "+20% урона всей технике"
-
 msgid "Armored machine-gun carrier"
 msgstr "Бронированный пулемётный транспорт"
 
 msgid "Build vehicles at the selected or primary Factory (RMB - cancel)"
 msgstr "Техника строится на выбранном или основном заводе (ПКМ — отмена)"
-
-msgid "COMBAT STIMULANTS"
-msgstr "БОЕВЫЕ СТИМУЛЯТОРЫ"
 
 msgid "CONFEDERACY"
 msgstr "КОНФЕДЕРАЦИЯ"
@@ -1445,12 +1028,6 @@ msgstr "[НУЖНА ЛАБОРАТОРИЯ] Исследования стоят,
 
 msgid "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
 msgstr "[НУЖЕН ТЕХ-ЦЕНТР] Исследования стоят, пока не построен тех-центр"
-
-msgid "SIEGE ARTILLERY"
-msgstr "ОСАДНАЯ АРТИЛЛЕРИЯ"
-
-msgid "+20% vehicle damage, unlocks the Rhino siege mode"
-msgstr "+20% урона технике, открывает осадный режим «Носорога»"
 
 msgid " (default)"
 msgstr " (по умолчанию)"
@@ -1523,9 +1100,6 @@ msgstr "Остов"
 msgid "Wreck composite %d, %d stage(s)%s"
 msgstr "Композит остова %d, стадий: %d%s"
 
-msgid "Infantry leaves a corpse instead of a wreck: the last frame of its death sequence (death_sequences / flame_death_sequences in Animation)."
-msgstr "Пехота оставляет тело, а не остов: последний кадр анимации смерти (death_sequences / flame_death_sequences в разделе «Анимация»)."
-
 msgid "(unknown)"
 msgstr "(неизвестно)"
 
@@ -1546,10 +1120,6 @@ msgstr "Фракция: %s   Класс: %s   Внутренний тип: %s"
 #, c-format
 msgid "Faction: %s   Structure type: %s"
 msgstr "Фракция: %s   Тип здания: %s"
-
-#, c-format
-msgid "Hull turn: %.2f s per 45 degrees"
-msgstr "Поворот корпуса: %.2f с на 45°"
 
 #, c-format
 msgid "Produced in: %s (follows from the archetype)"
@@ -1804,9 +1374,6 @@ msgstr "Счётчик кадров в углу экрана"
 msgid "Graphics quality"
 msgstr "Качество графики"
 
-msgid "Fog of war detail and smooth sprite scaling"
-msgstr "Детализация тумана войны и сглаживание спрайтов"
-
 msgid "Low"
 msgstr "Низкое"
 
@@ -1846,9 +1413,6 @@ msgstr "Громкость звуковых эффектов"
 msgid "DEFAULTS"
 msgstr "ПО УМОЛЧАНИЮ"
 
-msgid "Arrows change the value, Tab switches the page"
-msgstr "Стрелки меняют значение, Tab переключает вкладку"
-
 msgid "KEEP THESE DISPLAY SETTINGS?"
 msgstr "ОСТАВИТЬ ЭТИ НАСТРОЙКИ ЭКРАНА?"
 
@@ -1864,20 +1428,11 @@ msgstr "ОСТАВИТЬ"
 msgid "REVERT"
 msgstr "ВЕРНУТЬ"
 
-msgid "Ultra"
-msgstr "Ультра"
-
-msgid "Preset: fog of war detail and sprite scaling"
-msgstr "Пресет: детализация тумана войны и масштабирование спрайтов"
-
 msgid "Sprites at 1/3 of the resolution"
 msgstr "Спрайты в 1/3 разрешения"
 
 msgid "Sprites at 1/2 of the resolution"
 msgstr "Спрайты в 1/2 разрешения"
-
-msgid "Original resolution with smoothing"
-msgstr "Оригинальное разрешение со сглаживанием"
 
 msgid "Smoothing"
 msgstr "Сглаживание"
@@ -1887,58 +1442,6 @@ msgstr "Плавное масштабирование спрайтов вмес�
 
 msgid "Original resolution"
 msgstr "Оригинальное разрешение"
-
-# Map titles (the "title" key of assets/maps/*.json is the msgid)
-msgid "Pukalpa"
-msgstr "Пукальпа"
-
-msgid "Ukayali Shore"
-msgstr "Берег Укаяли"
-
-msgid "Capture of Miguel"
-msgstr "Захват Мигеля"
-
-msgid "Outpost / Meat Grinder"
-msgstr "Застава / Мясорубка"
-
-msgid "Outpost"
-msgstr "Застава"
-
-msgid "Meat Grinder"
-msgstr "Мясорубка"
-
-msgid "Gorge Assault"
-msgstr "Штурм в ущелье"
-
-msgid "Last Stand"
-msgstr "Последний бой"
-
-msgid "Demo Map"
-msgstr "Демо-карта"
-
-msgid "Matter of Seconds"
-msgstr "Счет на секунды"
-
-msgid "Radio Station"
-msgstr "Радиостанция"
-
-msgid "The Return"
-msgstr "Возвращение"
-
-msgid "Jungle"
-msgstr "Джунгли"
-
-msgid "Sabotage"
-msgstr "Диверсия"
-
-msgid "The Gorge"
-msgstr "Ущелье"
-
-msgid "Lima"
-msgstr "Лима"
-
-msgid "Sabotage / The Gorge"
-msgstr "Диверсия / Ущелье"
 
 msgid "MAP EDITOR"
 msgstr "РЕДАКТОР КАРТ"
@@ -2345,9 +1848,6 @@ msgstr "Обычный"
 msgid "Army color"
 msgstr "Цвет армии"
 
-msgid "Color of your units (classic: the original sheets)"
-msgstr "Цвет ваших юнитов (классический — исходные спрайты)"
-
 msgid "Classic"
 msgstr "Классический"
 
@@ -2428,12 +1928,6 @@ msgstr "ИНТЕРНЕТ"
 
 msgid "Looking for games on the local network..."
 msgstr "Поиск игр в локальной сети..."
-
-msgid "Address of the host (host or host:port, port 38100 by default)"
-msgstr "Адрес хоста (хост или хост:порт, по умолчанию порт 38100)"
-
-msgid "To be reachable from the internet the host forwards UDP port 38100 on its router. A server list and room codes through openaow.imister.tech come with the dedicated server."
-msgstr "Чтобы хост был доступен из интернета, на его роутере нужно пробросить UDP-порт 38100. Список серверов и коды комнат через openaow.imister.tech появятся вместе с выделенным сервером."
 
 msgid "CREATE GAME"
 msgstr "СОЗДАТЬ ИГРУ"
@@ -2527,33 +2021,6 @@ msgstr "P — продолжить"
 
 msgid "code"
 msgstr "код"
-
-msgid "MILITARY RANK"
-msgstr "ЗВАНИЕ"
-
-msgid "RANK & SERVICE RECORD"
-msgstr "ЗВАНИЕ И ДОСТИЖЕНИЯ"
-
-msgid "Commander of Peru Resistance Forces"
-msgstr "Командующий силами Сопротивления Перу"
-
-msgid "Military Rank: Lieutenant-General"
-msgstr "Воинское звание: Генерал-лейтенант"
-
-msgid "Faction: Resistance (Red)"
-msgstr "Фракция: Сопротивление (Красные)"
-
-msgid "Campaign Victories: 8 of 8"
-msgstr "Победы в кампаниях: 8 из 8"
-
-msgid "Confederation Bases Destroyed: 24"
-msgstr "Уничтожено баз Конфедерации: 24"
-
-msgid "Medals: Liberator Star, Medal of Courage"
-msgstr "Награды: Звезда Освободителя, Медаль за Отвагу"
-
-msgid "Combat Readiness: 100%"
-msgstr "Боевая готовность: 100%"
 
 msgid "Technology name"
 msgstr "Название технологии"
@@ -3218,9 +2685,6 @@ msgstr "Загрузка юнитов и зданий..."
 msgid "Preparing the interface..."
 msgstr "Подготовка интерфейса..."
 
-msgid "Loading the match..."
-msgstr "Загрузка матча..."
-
 msgid "No other map has a start position for everybody in the room."
 msgstr "Нет другой карты со стартовой позицией для каждого в комнате."
 
@@ -3245,14 +2709,8 @@ msgstr "ГОТОВЫЕ БАЗЫ"
 msgid "FROM SCRATCH"
 msgstr "С НУЛЯ"
 
-msgid "SIDE"
-msgstr "СТОРОНА"
-
 msgid "Color"
 msgstr "Цвет"
-
-msgid "Click a value to pick from the list, arrows step through it, Tab switches the page"
-msgstr "Клик по значению открывает список, стрелки листают его, Tab переключает страницу"
 
 msgid "Click: pick from a list. Arrows: step. Tab: next page"
 msgstr "Клик: список. Стрелки: листать. Tab: страница"

@@ -41,47 +41,47 @@ enum class PreviewSourceMode {
 
 class CharacterEditor {
 public:
-    const std::string& errorMessage() const { return status; }
+    const std::string& ErrorMessage() const { return status; }
 
-    bool init();
+    bool Init();
 
     int run();
 
     ~CharacterEditor();
 
 private:
-    void sortCatalogFiles();
+    void SortCatalogFiles();
 
-    void loadCatalog();
+    void LoadCatalog();
 
     bool loadFile(const fs::path& path);
 
-    bool saveFile();
+    bool SaveFile();
 
-    bool saveFileAs();
+    bool SaveFileAs();
 
-    void reloadCatalogSelection();
+    void ReloadCatalogSelection();
 
-    YAML::Node section(const char* name);
+    YAML::Node Section(const char* name);
 
-    bool editString(YAML::Node parent, const char* key, const char* label, const std::string& scope,
+    bool EditString(YAML::Node parent, const char* key, const char* label, const std::string& scope,
                     bool multiline = false);
 
-    bool editInt(YAML::Node parent, const char* key, const char* label, int fallback = 0);
+    bool EditInt(YAML::Node parent, const char* key, const char* label, int fallback = 0);
 
-    bool editFloat(YAML::Node parent, const char* key, const char* label, float fallback = 0.0f,
+    bool EditFloat(YAML::Node parent, const char* key, const char* label, float fallback = 0.0f,
                    float step = 0.05f);
 
-    bool editBool(YAML::Node parent, const char* key, const char* label, bool fallback = false);
+    bool EditBool(YAML::Node parent, const char* key, const char* label, bool fallback = false);
 
     // Delay between attack cycles: Fixed (always `cooldown`) or Random (a new delay in [min, max] every cycle)
-    bool editWeaponDelay(YAML::Node w);
+    bool EditWeaponDelay(YAML::Node w);
 
-    bool editProjectileCombo(YAML::Node parent);
+    bool EditProjectileCombo(YAML::Node parent);
 
-    void setMode(PreviewMode mode);
+    void SetMode(PreviewMode mode);
 
-    void drawEditor();
+    void DrawEditor();
 
     // Move preview driven like the game: drive right, turn around on the spot (vehicles swing through
     // south, one 45-degree step per turn delay), drive left, turn back - in a loop
@@ -90,145 +90,145 @@ private:
         int facing{0};
     };
 
-    MoveSample sampleMove(int archetype, float moveSpeed, float time) const;
+    MoveSample SampleMove(int archetype, float moveSpeed, float time) const;
 
     // How far the turret sits from where it is with the hull facing south (the facing offsets are tuned in):
     // taken from the sprite's turret layer, exactly like the game does
-    void turretShift(int archetype, int hullFacing, float& dx, float& dy) const;
+    void TurretShift(int archetype, int hullFacing, float& dx, float& dy) const;
 
     // Wreck stage on screen: the stage picked in the Wreck section, otherwise the stages play in a loop
-    int currentWreckStage(int stages) const;
+    int CurrentWreckStage(int stages) const;
 
     // Small picture of a wreck composite (first stage) for the family list, rendered once
-    SDL_Texture* wreckThumbnail(int composite) { return compositeThumbnail(composite, true); }
+    SDL_Texture* WreckThumbnail(int composite) { return CompositeThumbnail(composite, true); }
 
     // Picture of a composite: centred canvases (wrecks, 180x120) or top-left cameos (icons, 60x38)
-    SDL_Texture* compositeThumbnail(int composite, bool centred);
+    SDL_Texture* CompositeThumbnail(int composite, bool centred);
 
     // Archetype / building kind picked from what the game knows; everything that follows from it is shown, not edited
-    bool drawIdentity(bool isBuilding);
+    bool DrawIdentity(bool isBuilding);
 
     // Build-menu icon of a building, picked from the cameo composites of the game
-    bool drawIconPicker(YAML::Node production);
+    bool DrawIconPicker(YAML::Node production);
 
-    bool drawWreckProperties(bool isBuilding);
+    bool DrawWreckProperties(bool isBuilding);
 
-    void drawProperties();
+    void DrawProperties();
 
-    void drawRadiusCircle2px(float centerX, float centerY, float radiusPixels, SDL_Color color);
+    void DrawRadiusCircle2px(float centerX, float centerY, float radiusPixels, SDL_Color color);
 
-    void setEditorMode(EditorMode mode);
+    void SetEditorMode(EditorMode mode);
 
     // Opponent (B) used by Compare and Simulation; -1 = mirror match against the edited unit itself
-    bool loadCompare(int index);
+    bool LoadCompare(int index);
 
-    void drawOpponentPicker(bool allowMirror);
+    void DrawOpponentPicker(bool allowMirror);
 
-    void drawCompareControls();
+    void DrawCompareControls();
 
-    void drawCompareTable();
+    void DrawCompareTable();
 
-    void frameBattleCamera();
+    void FrameBattleCamera();
 
-    void startBattle();
+    void StartBattle();
 
-    void runBattleBatch();
+    void RunBattleBatch();
 
-    void drawSimulationControls();
+    void DrawSimulationControls();
 
-    void drawPreviewControls();
+    void DrawPreviewControls();
 
-    void drawCanvasGuides(const ImVec2& min, const ImVec2& size);
+    void DrawCanvasGuides(const ImVec2& min, const ImVec2& size);
 
-    int previewAction() const;
+    int PreviewAction() const;
 
-    void drawPreviewScene();
+    void DrawPreviewScene();
 
-    void drawCharacter(YAML::Node doc, const VisualOffsets& vo, bool primary);
+    void DrawCharacter(YAML::Node doc, const VisualOffsets& vo, bool primary);
 
-    void drawPreviewGrid();
+    void DrawPreviewGrid();
 
-    void updateCombatSim(float dt);
+    void UpdateCombatSim(float dt);
 
     // Research tab: the technology tree of one faction (assets/characters/research_<faction>.yaml)
-    bool loadResearch(int faction);
-    bool saveResearch();
-    void drawResearchTree();
-    void drawResearchProperties();
+    bool LoadResearch(int faction);
+    bool SaveResearch();
+    void DrawResearchTree();
+    void DrawResearchProperties();
 
     // Sprite Tools tab: browser of the sprite data and the exports for repacking the assets
-    void ensureSpriteCatalog();
-    void drawSpriteTools();
-    void drawSpriteProperties();
-    void drawSpriteImage(int spriteId, float box);
-    void drawSpriteImageAt(const ImVec2& pos, int spriteId, float box);
-    void drawDepNode(const DepNode& node, int depth);
+    void EnsureSpriteCatalog();
+    void DrawSpriteTools();
+    void DrawSpriteProperties();
+    void DrawSpriteImage(int spriteId, float box);
+    void DrawSpriteImageAt(const ImVec2& pos, int spriteId, float box);
+    void DrawDepNode(const DepNode& node, int depth);
 
     // Sprite Tools Export Preview & Layout Editor
-    void initPreviewFromObject(int objectIndex);
-    void initPreviewFromSingleSprites();
-    void updatePreviewCollisions();
-    void layoutPreviewLine(bool horizontal = true, int pad = 2);
-    void layoutPreviewGrid(int cols, int pad = 2, bool compress = true);
-    void layoutPreviewPack(int pad = 1);
-    void layoutPreviewByObject(int pad = 2);
-    void layoutPreviewScatter();
-    void layoutPreviewSeparateOverlaps(int pad = 2);
-    void layoutPreviewAlign(int mode); // 0=left, 1=top, 2=right, 3=bottom, 4=distribH, 5=distribV
-    void fitPreviewView(const ImVec2& canvasSize);
-    void drawSpritePreview();
-    void drawSpritePreviewCanvas(const ImVec2& size);
-    bool exportCurrentPreview(std::string& report);
-    void drawLoadedSprites();
+    void InitPreviewFromObject(int objectIndex);
+    void InitPreviewFromSingleSprites();
+    void UpdatePreviewCollisions();
+    void LayoutPreviewLine(bool horizontal = true, int pad = 2);
+    void LayoutPreviewGrid(int cols, int pad = 2, bool compress = true);
+    void LayoutPreviewPack(int pad = 1);
+    void LayoutPreviewByObject(int pad = 2);
+    void LayoutPreviewScatter();
+    void LayoutPreviewSeparateOverlaps(int pad = 2);
+    void LayoutPreviewAlign(int mode); // 0=left, 1=top, 2=right, 3=bottom, 4=distribH, 5=distribV
+    void FitPreviewView(const ImVec2& canvasSize);
+    void DrawSpritePreview();
+    void DrawSpritePreviewCanvas(const ImVec2& size);
+    bool ExportCurrentPreview(std::string& report);
+    void DrawLoadedSprites();
 
     // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
-    bool loadYamlFile(CommentedYaml& y, const char* name);
-    bool saveYamlFile(CommentedYaml& y);
+    bool LoadYamlFile(CommentedYaml& y, const char* name);
+    bool SaveYamlFile(CommentedYaml& y);
     // One value / a whole map of a settings file as widgets (the comment above a key is its tooltip)
-    bool editYamlScalar(CommentedYaml& y, const std::string& path, const std::string& label);
-    bool editYamlTree(CommentedYaml& y, const std::string& path, int depth = 0);
-    void saveActiveSettings();             // Ctrl+S / the Save button of the current tab
-    void drawSettingsBar(CommentedYaml& y, const char* fileName);
+    bool EditYamlScalar(CommentedYaml& y, const std::string& path, const std::string& label);
+    bool EditYamlTree(CommentedYaml& y, const std::string& path, int depth = 0);
+    void SaveActiveSettings();             // Ctrl+S / the Save button of the current tab
+    void DrawSettingsBar(CommentedYaml& y, const char* fileName);
 
-    void ensureEffects();
-    void effectsChanged();                 // the game's shared effects settings follow the editor at once
-    void drawExplosionControls();
-    void drawWreckControls();
-    void drawExplosionProperties();
-    void drawWreckTabProperties();
-    void drawAnimGallery(float height);
-    SDL_Texture* animThumbnail(int animId);
-    void startExplosionPreview(int preset);
-    void updateEffectsSim(float dt);
-    void drawEffectsScene();
+    void EnsureEffects();
+    void EffectsChanged();                 // the game's shared effects settings follow the editor at once
+    void DrawExplosionControls();
+    void DrawWreckControls();
+    void DrawExplosionProperties();
+    void DrawWreckTabProperties();
+    void DrawAnimGallery(float height);
+    SDL_Texture* AnimThumbnail(int animId);
+    void StartExplosionPreview(int preset);
+    void UpdateEffectsSim(float dt);
+    void DrawEffectsScene();
 
     // --- Projectiles tab (assets/characters/projectiles.yaml) ---
-    void ensureProjectiles();
-    void projectilesChanged();             // the game's projectile settings follow the editor at once
+    void EnsureProjectiles();
+    void ProjectilesChanged();             // the game's projectile settings follow the editor at once
     const OpenArtOfWar::ProjectileSpec& projectileSpec() const; // of the kind on the canvas
-    void fireProjectilePreview();
-    void updateProjectilesSim(float dt);
-    void drawProjectilesScene();
-    void drawProjectileControls();
-    void drawProjectileProperties();
-    SDL_Texture* zoomedThumbnail(int composite, float scale); // a composite magnified around its centre (96x64)
+    void FireProjectilePreview();
+    void UpdateProjectilesSim(float dt);
+    void DrawProjectilesScene();
+    void DrawProjectileControls();
+    void DrawProjectileProperties();
+    SDL_Texture* ZoomedThumbnail(int composite, float scale); // a composite magnified around its centre (96x64)
     std::map<std::pair<int, int>, SDL_Texture*> zoomThumbs;
 
-    void drawGameUi();
-    void drawGameUiProperties();
-    void ensureUi();
+    void DrawGameUi();
+    void DrawGameUiProperties();
+    void EnsureUi();
 
-    void ensureEnvironment();
-    bool saveEnvironment();
-    bool editEnvJson(nlohmann::ordered_json& node, const std::string& path, int depth);
-    void drawEnvironment();
-    void drawEnvironmentProperties();
-    SDL_Texture* fontPreview(const std::string& path, float size, const std::string& text);
+    void EnsureEnvironment();
+    bool SaveEnvironment();
+    bool EditEnvJson(nlohmann::ordered_json& node, const std::string& path, int depth);
+    void DrawEnvironment();
+    void DrawEnvironmentProperties();
+    SDL_Texture* FontPreview(const std::string& path, float size, const std::string& text);
 
-    void ensureAi();
-    void drawAiDifficulty();
-    void drawAiProperties();
+    void EnsureAi();
+    void DrawAiDifficulty();
+    void DrawAiProperties();
 
     SDL_Window* window{nullptr};
     SDL_Renderer* renderer{nullptr};
@@ -237,7 +237,7 @@ private:
     std::unique_ptr<OpenArtOfWar::ShaderEffects> shaderEffects;   // army colours need the SDL GPU renderer
     int previewArmyColor{0};
     float previewBackground[3]{0.0f, 0.0f, 0.0f}; // canvas background (black by default)                  // 0 classic sheets, 1..8 the army colours of the game
-    void drawArmyColorCombo();
+    void DrawArmyColorCombo();
     std::map<int, SDL_Texture*> wreckThumbs;  // wreck family pictures
     int wreckPreviewStage{-1};               // -1: the stages play in a loop
     int simHullFacing{2};                    // hull direction / sprite set of the edited character on screen,

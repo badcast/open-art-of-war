@@ -14,7 +14,7 @@ namespace {
 using Json = nlohmann::ordered_json;
 
 // Called by SDL (possibly from another thread) when the file dialog closes
-void SDLCALL onFontChosen(void* userdata, const char* const* list, int /*filter*/) {
+void SDLCALL OnFontChosen(void* userdata, const char* const* list, int /*filter*/) {
     auto* pick = static_cast<FolderPick*>(userdata);
     std::lock_guard<std::mutex> lock(pick->mutex);
     if (list && list[0]) {
@@ -73,12 +73,12 @@ const char* envHint(const std::string& path) {
     return nullptr;
 }
 
-bool hiddenKey(const std::string& path) {
+bool HiddenKey(const std::string& path) {
     return path == "font" || path == "render.probed" || path == "render.probe_key" || path == "render.init_pending" ||
            path == "render.confirm_from";
 }
 
-std::string pretty(const std::string& key) {
+std::string Pretty(const std::string& key) {
     std::string s = key;
     for (char& c : s) if (c == '_') c = ' ';
     if (!s.empty()) s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
@@ -87,7 +87,7 @@ std::string pretty(const std::string& key) {
 
 } // namespace
 
-void CharacterEditor::ensureEnvironment() {
+void CharacterEditor::EnsureEnvironment() {
     if (envTried) return;
     envTried = true;
     envPath = assetsRoot / "data" / "game_environment.json";
@@ -103,7 +103,7 @@ void CharacterEditor::ensureEnvironment() {
     envDirty = false;
 }
 
-bool CharacterEditor::saveEnvironment() {
+bool CharacterEditor::SaveEnvironment() {
     if (!envLoaded) return false;
     // Only the editor's changes on top of the file as it is now (sections it does not show stay)
     Json disk;
@@ -111,9 +111,9 @@ bool CharacterEditor::saveEnvironment() {
         std::ifstream in(envPath);
         if (in) disk = Json::parse(in, nullptr, false, true);
     }
-    Json merged = disk.is_object() ? mergeJsonEdits(envBase, envJson, disk) : envJson;
+    Json merged = disk.is_object() ? MergeJsonEdits(envBase, envJson, disk) : envJson;
     std::string error;
-    if (!writeFileAtomic(envPath, merged.dump(2) + "\n", error)) {
+    if (!WriteFileAtomic(envPath, merged.dump(2) + "\n", error)) {
         status = error;
         return false;
     }
@@ -124,12 +124,12 @@ bool CharacterEditor::saveEnvironment() {
     return true;
 }
 
-bool CharacterEditor::editEnvJson(Json& node, const std::string& path, int depth) {
+bool CharacterEditor::EditEnvJson(Json& node, const std::string& path, int depth) {
     bool changed = false;
     for (auto it = node.begin(); it != node.end(); ++it) {
         const std::string key = it.key();
         const std::string sub = path.empty() ? key : path + "." + key;
-        if (hiddenKey(sub)) continue;
+        if (HiddenKey(sub)) continue;
         Json& v = it.value();
         const char* hint = envHint(sub);
         auto tip = [&]() {
@@ -142,13 +142,13 @@ bool CharacterEditor::editEnvJson(Json& node, const std::string& path, int depth
             }
         };
         ImGui::PushID(sub.c_str());
-        const std::string label = pretty(key);
+        const std::string label = Pretty(key);
         if (v.is_object()) {
             ImGui::SetNextItemOpen(depth < 1, ImGuiCond_Once);
             const bool open = ImGui::TreeNodeEx((label + "##" + sub).c_str(), ImGuiTreeNodeFlags_Framed);
             tip();
             if (open) {
-                changed |= editEnvJson(v, sub, depth + 1);
+                changed |= EditEnvJson(v, sub, depth + 1);
                 ImGui::TreePop();
             }
         } else if (v.is_boolean()) {
@@ -207,7 +207,7 @@ bool CharacterEditor::editEnvJson(Json& node, const std::string& path, int depth
     return changed;
 }
 
-SDL_Texture* CharacterEditor::fontPreview(const std::string& path, float size, const std::string& text) {
+SDL_Texture* CharacterEditor::FontPreview(const std::string& path, float size, const std::string& text) {
     const std::string key = path + "|" + std::to_string(size) + "|" + text;
     auto it = fontPreviews.find(key);
     if (it != fontPreviews.end()) return it->second;
@@ -227,8 +227,8 @@ SDL_Texture* CharacterEditor::fontPreview(const std::string& path, float size, c
     return tex;
 }
 
-void CharacterEditor::drawEnvironment() {
-    ensureEnvironment();
+void CharacterEditor::DrawEnvironment() {
+    EnsureEnvironment();
     if (!envLoaded) {
         ImGui::TextWrapped("%s", _("The environment file could not be loaded."));
         return;
@@ -236,7 +236,7 @@ void CharacterEditor::drawEnvironment() {
     Json& font = envJson["font"];
     if (!font.is_object()) font = Json::object();
     ImGui::TextUnformatted(_("Game font"));
-    fieldHint("Game font");
+    FieldHint("Game font");
     ImGui::TextWrapped("%s", _("The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."));
     bool changed = false;
     static const char* const kKeys[2] = {"regular", "bold"};
@@ -256,14 +256,14 @@ void CharacterEditor::drawEnvironment() {
         if (!ImGui::IsAnyItemActive()) std::snprintf(buf.data(), buf.size(), "%s", cur.c_str());
         ImGui::PushID(i);
         ImGui::SetNextItemWidth(std::max(200.0f, ImGui::GetContentRegionAvail().x - 190.0f));
-        if (hinted(ImGui::InputText(_(kLabels[i]), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue), kLabels[i])) {
+        if (Hinted(ImGui::InputText(_(kLabels[i]), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue), kLabels[i])) {
             font[kKeys[i]] = std::string(buf.data());
             changed = true;
         }
         ImGui::SameLine();
-        if (hinted(ImGui::Button(_("Choose...")), "Choose font file")) {
+        if (Hinted(ImGui::Button(_("Choose...")), "Choose font file")) {
             static const SDL_DialogFileFilter filters[] = {{"Fonts", "ttf;otf;ttc"}};
-            SDL_ShowOpenFileDialog(onFontChosen, &pick, window, filters, 1, nullptr, false);
+            SDL_ShowOpenFileDialog(OnFontChosen, &pick, window, filters, 1, nullptr, false);
         }
         fs::path resolved(cur);
         if (resolved.is_relative()) resolved = assetsRoot.parent_path() / resolved;
@@ -287,12 +287,12 @@ void CharacterEditor::drawEnvironment() {
         int size = font.value(row.key, row.def);
         ImGui::PushID(row.key);
         ImGui::SetNextItemWidth(120.0f);
-        if (hinted(ImGui::DragInt(_(row.label), &size, 0.2f, 6, 120), row.label)) {
+        if (Hinted(ImGui::DragInt(_(row.label), &size, 0.2f, 6, 120), row.label)) {
             font[row.key] = std::clamp(size, 6, 120);
             changed = true;
         }
         ImGui::PopID();
-        SDL_Texture* tex = fontPreview(row.bold ? bold : regular, static_cast<float>(size),
+        SDL_Texture* tex = FontPreview(row.bold ? bold : regular, static_cast<float>(size),
                                        "Open Art Of War - Свобода ради свободы 0123456789");
         if (tex) {
             float w = 0.0f, h = 0.0f;
@@ -302,11 +302,11 @@ void CharacterEditor::drawEnvironment() {
     }
     if (changed) envDirty = true;
     ImGui::Separator();
-    if (hinted(ImGui::Button(_("Save")), "Save settings")) saveEnvironment();
+    if (Hinted(ImGui::Button(_("Save")), "Save settings")) SaveEnvironment();
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Reload")), "Reload")) {
+    if (Hinted(ImGui::Button(_("Reload")), "Reload")) {
         envTried = false;
-        ensureEnvironment();
+        EnsureEnvironment();
     }
     if (envDirty) {
         ImGui::SameLine();
@@ -315,19 +315,19 @@ void CharacterEditor::drawEnvironment() {
     ImGui::TextDisabled("assets/data/game_environment.json");
 }
 
-void CharacterEditor::drawEnvironmentProperties() {
-    ensureEnvironment();
+void CharacterEditor::DrawEnvironmentProperties() {
+    EnsureEnvironment();
     if (!envLoaded) {
         ImGui::TextWrapped("%s", _("The environment file could not be loaded."));
         return;
     }
-    if (hinted(ImGui::Button(_("Save")), "Save settings")) saveEnvironment();
+    if (Hinted(ImGui::Button(_("Save")), "Save settings")) SaveEnvironment();
     if (envDirty) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
     }
     ImGui::Separator();
-    if (editEnvJson(envJson, std::string(), 0)) envDirty = true;
+    if (EditEnvJson(envJson, std::string(), 0)) envDirty = true;
 }
 
 } // namespace CharEditor

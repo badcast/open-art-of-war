@@ -44,11 +44,11 @@ namespace OpenArtOfWar
         {
             return m_items.empty();
         }
-        void reserve(size_t n)
+        void Reserve(size_t n)
         {
             m_items.reserve(n);
         }
-        void clear()
+        void Clear()
         {
             m_items.clear();
         }
@@ -288,11 +288,11 @@ namespace OpenArtOfWar
             return const_iterator(m_items.cend());
         }
 
-        Storage &raw()
+        Storage &Raw()
         {
             return m_items;
         }
-        const Storage &raw() const
+        const Storage &Raw() const
         {
             return m_items;
         }
@@ -421,172 +421,172 @@ namespace OpenArtOfWar
     public:
         EntityManager();
 
-        void clear();
-        void setTextureManager(TextureManager *texManager)
+        void Clear();
+        void SetTextureManager(TextureManager *texManager)
         {
             m_texManager = texManager;
         }
 
         // `owner`: the player it belongs to; kAutoOwner = the (first) player of that faction (single player)
         static constexpr PlayerId kAutoOwner = 0xFE;
-        int spawnUnit(UnitType type, int tileX, int tileY, Faction faction);
-        int spawnUnitByArchetype(int archetypeId, int tileX, int tileY, Faction faction, PlayerId owner = kAutoOwner);
-        int spawnBuilding(UnitType type, int tileX, int tileY, Faction faction);
-        int spawnBuildingByIndex(int buildingIdx, int tileX, int tileY, Faction faction, float initialProgress = 1.0f, PlayerId owner = kAutoOwner);
+        int SpawnUnit(UnitType type, int tileX, int tileY, Faction faction);
+        int SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, Faction faction, PlayerId owner = kAutoOwner);
+        int SpawnBuilding(UnitType type, int tileX, int tileY, Faction faction);
+        int SpawnBuildingByIndex(int buildingIdx, int tileX, int tileY, Faction faction, float initialProgress = 1.0f, PlayerId owner = kAutoOwner);
 
-        bool loadCharacterConfigs(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+        bool LoadCharacterConfigs(const std::string &assetRoot = LoaderResources::kDefaultRoot);
         // Parses one character YAML document (unit or building) and replaces its config; used by the
         // loader above and by the character editor to apply unsaved edits. Call rebuildBlueprints() after.
         // Taken by value: lookups of missing keys need a mutable node (pass YAML::Clone to keep yours intact).
-        bool loadCharacterYaml(YAML::Node root);
+        bool LoadCharacterYaml(YAML::Node root);
         // gettext key of a character's description: "<id>.description" (the text lives in po/*.po)
-        static std::string descriptionKey(const std::string &characterId);
-        void rebuildBlueprints();
-        const UnitConfig *getUnitConfig(int archetypeId) const;
-        const BuildingConfig *getBuildingConfig(int buildingIndex) const;
-        const UnitConfig *getUnitConfigByUnitType(UnitType type, Faction faction) const;
+        static std::string DescriptionKey(const std::string &characterId);
+        void RebuildBlueprints();
+        const UnitConfig *GetUnitConfig(int archetypeId) const;
+        const BuildingConfig *GetBuildingConfig(int buildingIndex) const;
+        const UnitConfig *GetUnitConfigByUnitType(UnitType type, Faction faction) const;
 
         // `player` builds there: within the radius of one of its headquarters, on ground it sees (people)
-        bool canPlaceBuilding(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
+        bool CanPlaceBuilding(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
         // The footprint would not shut the player's base in: from the headquarters and from the exits of the unit
         // producers the rest of the map stays reachable, and the new building keeps a free side of its own.
         // Checked for computer players (a human may wall himself in).
-        bool keepsBaseOpen(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
+        bool KeepsBaseOpen(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
         // Building radius around a player's headquarters (the mission's radius plus the player's technologies)
-        int getBuildRadius(PlayerId player) const;
-        int getBuildRadius() const
+        int GetBuildRadius(PlayerId player) const;
+        int GetBuildRadius() const
         {
-            return getBuildRadius(Players::local());
+            return GetBuildRadius(Players::Local());
         }
-        void setBuildRadius(int r)
+        void SetBuildRadius(int r)
         {
             m_baseBuildRadius = r;
             m_buildRadiusExtra = {};
         }
-        void expandBuildRadius(int delta)
+        void ExpandBuildRadius(int delta)
         {
-            m_buildRadiusExtra[Players::local() % kMaxPlayers] += delta;
+            m_buildRadiusExtra[Players::Local() % kMaxPlayers] += delta;
         }
         // Technologies widen the base building radius by a percentage of the mission's own radius (people only:
         // the computer's bases are laid out by the AI)
-        void setBuildRadiusPercent(PlayerId player, int percent);
+        void SetBuildRadiusPercent(PlayerId player, int percent);
         // Build menu of the local player's faction
-        static const std::vector<BuildingBlueprint> &getBlueprints();
+        static const std::vector<BuildingBlueprint> &GetBlueprints();
         // Build menu of any faction; blueprintId is the slot in the canonical order (HQ, power, barracks,
         // factory, lab, bunker, tower, wall), the same for both factions, so it is what a network command carries
-        static const std::vector<BuildingBlueprint> &getBlueprints(Faction faction);
-        static const BuildingBlueprint *findBlueprint(Faction faction, int blueprintId);
+        static const std::vector<BuildingBlueprint> &GetBlueprints(Faction faction);
+        static const BuildingBlueprint *FindBlueprint(Faction faction, int blueprintId);
 
-        bool hasBuildingType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
-        bool hasBuildingType(UnitType type, Faction faction, bool mustBeComplete = true) const
+        bool HasBuildingType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
+        bool HasBuildingType(UnitType type, Faction faction, bool mustBeComplete = true) const
         {
-            return hasBuildingType(type, Players::ownerOf(faction), mustBeComplete);
+            return HasBuildingType(type, Players::OwnerOf(faction), mustBeComplete);
         }
-        std::vector<int> getBuildingsByType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
+        std::vector<int> GetBuildingsByType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
         // The (first) player of that faction's buildings (single player, the AI)
-        std::vector<int> getBuildingsByType(UnitType type, Faction faction, bool mustBeComplete = true) const
+        std::vector<int> GetBuildingsByType(UnitType type, Faction faction, bool mustBeComplete = true) const
         {
-            return getBuildingsByType(type, Players::ownerOf(faction), mustBeComplete);
+            return GetBuildingsByType(type, Players::OwnerOf(faction), mustBeComplete);
         }
-        bool getBuildingSpawnPoint(int buildingId, const TileMap &map, int &outTileX, int &outTileY) const;
-        bool isTileOccupiedByUnit(int tileX, int tileY, int ignoreEntityId = 0) const;
+        bool GetBuildingSpawnPoint(int buildingId, const TileMap &map, int &outTileX, int &outTileY) const;
+        bool IsTileOccupiedByUnit(int tileX, int tileY, int ignoreEntityId = 0) const;
 
-        void update(float deltaTime, TileMap &map, Pathfinder &pathfinder);
-        void updateFogOfWar(TileMap &map);
+        void Update(float deltaTime, TileMap &map, Pathfinder &pathfinder);
+        void UpdateFogOfWar(TileMap &map);
         // Something of the player took damage: an attacker hidden in the fog shows up for a moment
         // (only its own spot, so long-range units reveal where they fire from, not their surroundings)
         // `attackerId` hit something of `victim`: its team sees the attacker for a moment
-        void noteHit(PlayerId victim, int attackerId);
+        void NoteHit(PlayerId victim, int attackerId);
         // noteHit plus the victim remembers its attacker (retaliation, see Unit::updateCombat)
-        void noteEntityHit(Entity &victim, int attackerId);
+        void NoteEntityHit(Entity &victim, int attackerId);
         // Keeps Unit::turretShiftX/Y in line with the turret layer of the unit's current hull sprite
-        void updateTurretShift(Unit &u) const;
+        void UpdateTurretShift(Unit &u) const;
         // Siege-capable units deploy by themselves when a visible enemy is out of normal range but within
         // siege range (AI always, the player only on an attack-move [Q] order), and pack up again when idle
-        void updateAutoSiege(Unit &u, const TileMap &map, float deltaTime);
-        bool isEntityVisibleToAi(const Entity &entity) const;
+        void UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime);
+        bool IsEntityVisibleToAi(const Entity &entity) const;
         // Seen by a computer player: within the sight radius of any of its units / buildings
-        bool isEntityVisibleToAi(const Entity &entity, PlayerId observer) const;
+        bool IsEntityVisibleToAi(const Entity &entity, PlayerId observer) const;
         // Seen by `observer`: own and allied things always; people see what their team's sight covers this
         // tick, the computer what is within the sight radius of its units / buildings
-        bool isEntityVisibleToPlayer(const Entity &entity, PlayerId observer, const TileMap &map) const;
+        bool IsEntityVisibleToPlayer(const Entity &entity, PlayerId observer, const TileMap &map) const;
         // An enemy structure as the local player may see it: while it is in sight, and afterwards (as it was) only when
         // it was seen before and is finished. What is built out of sight stays hidden, and so does its progress.
-        bool isHostileBuildingShown(const Building &building, const TileMap &map, bool *outInSight = nullptr) const;
-        void renderGroundRemnants(Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled = true) const;
+        bool IsHostileBuildingShown(const Building &building, const TileMap &map, bool *outInSight = nullptr) const;
+        void RenderGroundRemnants(Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled = true) const;
         void render(Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled = true, int globalAnimTick = 0, bool debugMode = false, bool showAllHealth = false);
         // What shines: projectiles and explosions (the glow pass of the shader effects draws them once more)
-        void renderEmissive(Renderer &renderer, const Camera &camera) const;
+        void RenderEmissive(Renderer &renderer, const Camera &camera) const;
 
         // Fortress auxiliary flamethrower, researched per faction
-        bool isFortressFlamethrowerUnlocked(PlayerId p) const
+        bool IsFortressFlamethrowerUnlocked(PlayerId p) const
         {
             return p < kMaxPlayers && m_flamethrowerUnlocked[p];
         }
         // Siege deployment of units whose YAML says siege.requires_research
-        bool isSiegeUnlocked(PlayerId p) const
+        bool IsSiegeUnlocked(PlayerId p) const
         {
             return p < kMaxPlayers && m_siegeUnlocked[p];
         }
-        void setSiegeUnlocked(PlayerId p, bool u)
+        void SetSiegeUnlocked(PlayerId p, bool u)
         {
             if(p < kMaxPlayers)
                 m_siegeUnlocked[p] = u;
         }
-        bool canDeploySiege(const Unit &u) const;
-        void setFortressFlamethrowerUnlocked(PlayerId p, bool u)
+        bool CanDeploySiege(const Unit &u) const;
+        void SetFortressFlamethrowerUnlocked(PlayerId p, bool u)
         {
             if(p < kMaxPlayers)
                 m_flamethrowerUnlocked[p] = u;
         }
 
         // Sandbox (character editor battles): every structure counts as powered
-        void setUnlimitedPower(bool unlimited)
+        void SetUnlimitedPower(bool unlimited)
         {
             m_unlimitedPower = unlimited;
         }
 
-        void issueMoveOrder(const std::vector<int> &unitIds, int targetTileX, int targetTileY, Pathfinder &pathfinder, bool attackMove = false);
-        void issueAttackMoveOrder(const std::vector<int> &unitIds, int targetTileX, int targetTileY, Pathfinder &pathfinder);
-        void issueAttackOrder(const std::vector<int> &unitIds, int targetEntityId, Pathfinder *pathfinder = nullptr);
-        void issueAttackWallOrder(const std::vector<int> &unitIds, int wallTileX, int wallTileY, Pathfinder &pathfinder);
-        void toggleSiegeMode(const std::vector<int> &unitIds);
+        void IssueMoveOrder(const std::vector<int> &unitIds, int targetTileX, int targetTileY, Pathfinder &pathfinder, bool attackMove = false);
+        void IssueAttackMoveOrder(const std::vector<int> &unitIds, int targetTileX, int targetTileY, Pathfinder &pathfinder);
+        void IssueAttackOrder(const std::vector<int> &unitIds, int targetEntityId, Pathfinder *pathfinder = nullptr);
+        void IssueAttackWallOrder(const std::vector<int> &unitIds, int wallTileX, int wallTileY, Pathfinder &pathfinder);
+        void ToggleSiegeMode(const std::vector<int> &unitIds);
 
         // Selects the units of `owner` inside the box (and unselects the rest)
-        void getUnitsInBox(float minWorldX, float minWorldY, float maxWorldX, float maxWorldY, PlayerId owner, std::vector<int> &outUnitIds);
-        int getUnitAt(float worldX, float worldY, float tolerance = 15.0f) const;
+        void GetUnitsInBox(float minWorldX, float minWorldY, float maxWorldX, float maxWorldY, PlayerId owner, std::vector<int> &outUnitIds);
+        int GetUnitAt(float worldX, float worldY, float tolerance = 15.0f) const;
 
-        Entity *getEntity(int id);
-        const Entity *getEntity(int id) const;
+        Entity *GetEntity(int id);
+        const Entity *GetEntity(int id) const;
 
-        Unit *getUnit(int id);
-        const Unit *getUnit(int id) const;
+        Unit *GetUnit(int id);
+        const Unit *GetUnit(int id) const;
 
-        Building *getBuilding(int id);
-        const Building *getBuilding(int id) const;
+        Building *GetBuilding(int id);
+        const Building *GetBuilding(int id) const;
 
-        const EntityContainer &getAllEntities() const
+        const EntityContainer &GetAllEntities() const
         {
             return m_entities;
         }
-        EntityContainer &getAllEntities()
+        EntityContainer &GetAllEntities()
         {
             return m_entities;
         }
 
-        const std::vector<Projectile> &getProjectiles() const
+        const std::vector<Projectile> &GetProjectiles() const
         {
             return m_projectiles;
         }
 
         // Enemy units / buildings destroyed by a player (kill rewards)
-        int getKillCount(PlayerId player) const
+        int GetKillCount(PlayerId player) const
         {
             return player < kMaxPlayers ? m_kills[player] : 0;
         }
-        int getPlayerKillCount() const
+        int GetPlayerKillCount() const
         {
-            return getKillCount(Players::local());
+            return GetKillCount(Players::Local());
         }
         // Match statistics (Tab): what a player destroyed of the enemy and lost itself, in credits of the
         // things' price; units and buildings counted separately
@@ -599,15 +599,15 @@ namespace OpenArtOfWar
             int valueDestroyed {0};
             int valueLost {0};
         };
-        const PlayerStats &getPlayerStats(PlayerId player) const
+        const PlayerStats &GetPlayerStats(PlayerId player) const
         {
             static const PlayerStats kNone {};
             return player < kMaxPlayers ? m_stats[player] : kNone;
         }
         // Efficiency points: a point per 10 credits of enemy forces destroyed
-        int getEfficiencyPoints(PlayerId player) const
+        int GetEfficiencyPoints(PlayerId player) const
         {
-            return getPlayerStats(player).valueDestroyed / 10;
+            return GetPlayerStats(player).valueDestroyed / 10;
         }
         // Sounds of the world, collected for the game's sound effects (only a picture: never part of the simulation).
         // Deaths are found by the sound side itself (entities that turned to Die).
@@ -633,11 +633,11 @@ namespace OpenArtOfWar
             PlayerId owner {kNoPlayer}; // who fired
         };
         // Changes whenever the world is cleared (entity ids start again)
-        uint32_t generation() const
+        uint32_t Generation() const
         {
             return m_generation;
         }
-        std::vector<SoundCueEvent> takeSoundCues()
+        std::vector<SoundCueEvent> TakeSoundCues()
         {
             std::vector<SoundCueEvent> out;
             out.swap(m_soundCues);
@@ -646,40 +646,40 @@ namespace OpenArtOfWar
 
         // The player left a network match: every building, wall and unit of it is destroyed at once
         // (no kills for anybody)
-        void destroyPlayer(PlayerId player, TileMap &map);
+        void DestroyPlayer(PlayerId player, TileMap &map);
         // Price of a unit / building in credits (statistics)
-        int valueOf(const Entity &e) const;
-        void updateRegeneration(float deltaTime);
+        int ValueOf(const Entity &e) const;
+        void UpdateRegeneration(float deltaTime);
 
-        static int applyMovingUnitDamage(int baseDamage, const Entity *target);
+        static int ApplyMovingUnitDamage(int baseDamage, const Entity *target);
 
-        int getUnitIdAtTile(int tileX, int tileY, int ignoreEntityId = 0) const;
-        void resolveUnitStacking(TileMap &map);
+        int GetUnitIdAtTile(int tileX, int tileY, int ignoreEntityId = 0) const;
+        void ResolveUnitStacking(TileMap &map);
 
         // The owner blows up its own structure (sidebar "Destroy"); returns the credits of the orders that were
         // still queued in it, for a refund
-        int demolishBuilding(int buildingId, TileMap &map);
+        int DemolishBuilding(int buildingId, TileMap &map);
 
-        void spawnExplosion(float worldX, float worldY, int animId = 12, float delay = 0.0f);
+        void SpawnExplosion(float worldX, float worldY, int animId = 12, float delay = 0.0f);
         // Destruction of a building or vehicle: the main blast plus secondary ones (over a building's whole footprint)
-        void spawnDeathExplosions(const Entity &e);
-        void spawnProjectileFromEntity(Entity &entity, float srcX, float srcY, float dstX, float dstY, int targetEntityId, TileMap &map);
+        void SpawnDeathExplosions(const Entity &e);
+        void SpawnProjectileFromEntity(Entity &entity, float srcX, float srcY, float dstX, float dstY, int targetEntityId, TileMap &map);
 
     private:
         int m_nextId {1};
         std::array<int, kMaxPlayers> m_kills {};
         std::array<PlayerStats, kMaxPlayers> m_stats {};
-        void noteKill(PlayerId victim, PlayerId killer)
+        void NoteKill(PlayerId victim, PlayerId killer)
         {
-            if(killer < kMaxPlayers && Players::hostile(victim, killer))
+            if(killer < kMaxPlayers && Players::Hostile(victim, killer))
                 ++m_kills[killer];
         }
         // A kill with the statistics of both sides
-        void noteKill(const Entity &victim, PlayerId killer);
+        void NoteKill(const Entity &victim, PlayerId killer);
         // Only the statistics (kills by splash damage, which earn no kill reward)
-        void noteStats(const Entity &victim, PlayerId killer);
+        void NoteStats(const Entity &victim, PlayerId killer);
         // Puts a living entity into its death (state, death animation, explosions, frees a building's tiles)
-        void killEntity(Entity &e, TileMap &map);
+        void KillEntity(Entity &e, TileMap &map);
         int m_baseBuildRadius {16};                         // radius before Base Expansion research
         std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
         bool m_flamethrowerUnlocked[kMaxPlayers] {};
@@ -710,21 +710,21 @@ namespace OpenArtOfWar
         std::vector<GroundMark> m_groundMarks;
         std::vector<SoundCueEvent> m_soundCues;
         uint32_t m_generation {0};
-        void cue(SoundCue c, float x, float y, PlayerId owner)
+        void Cue(SoundCue c, float x, float y, PlayerId owner)
         {
             if(m_soundCues.size() < 256) // nobody takes them (headless, editor): they stop piling up
                 m_soundCues.push_back({c, x, y, owner});
         }
-        void addGroundMark(float x, float y, int composite, float seconds);
+        void AddGroundMark(float x, float y, int composite, float seconds);
 
     public:
         // Flamethrower jets on screen (tests)
-        size_t flameBurstCount() const
+        size_t FlameBurstCount() const
         {
             return m_flameBursts.size();
         }
         // Craters on the ground (tests)
-        size_t groundMarkCount() const
+        size_t GroundMarkCount() const
         {
             return m_groundMarks.size();
         }

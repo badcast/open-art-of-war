@@ -36,7 +36,7 @@ namespace OpenArtOfWar::RenderBackend
             {"software", "Software"},
         };
 
-        std::string probeKey()
+        std::string ProbeKey()
         {
             const int v = SDL_GetVersion();
             const char *video = SDL_GetCurrentVideoDriver();
@@ -44,10 +44,10 @@ namespace OpenArtOfWar::RenderBackend
         }
 
         // The "render" section, reset when it was probed with another SDL / video driver
-        nlohmann::json &renderSection(EnvironmentConfig &env)
+        nlohmann::json &RenderSection(EnvironmentConfig &env)
         {
-            nlohmann::json &r = env.edit("render");
-            const std::string key = probeKey();
+            nlohmann::json &r = env.Edit("render");
+            const std::string key = ProbeKey();
             if(r.value("probe_key", std::string()) != key)
             {
                 r["probe_key"] = key;
@@ -58,19 +58,19 @@ namespace OpenArtOfWar::RenderBackend
             return r;
         }
 
-        void markProbed(nlohmann::json &r, const std::string &name, bool works)
+        void MarkProbed(nlohmann::json &r, const std::string &name, bool works)
         {
             r["probed"][name] = works;
         }
 
-        bool knownToFail(const nlohmann::json &r, const std::string &name)
+        bool KnownToFail(const nlohmann::json &r, const std::string &name)
         {
             auto it = r["probed"].find(name);
             return it != r["probed"].end() && it->is_boolean() && !it->get<bool>();
         }
 
         // Checks what the game needs from a renderer; logs the reason when it falls short
-        bool usable(SDL_Renderer *renderer, const std::string &name)
+        bool Usable(SDL_Renderer *renderer, const std::string &name)
         {
             const char *actual = SDL_GetRendererName(renderer);
             if(!actual || name != actual)
@@ -95,7 +95,7 @@ namespace OpenArtOfWar::RenderBackend
             return true;
         }
 
-        SDL_Renderer *tryCreate(SDL_Window *window, const std::string &name)
+        SDL_Renderer *TryCreate(SDL_Window *window, const std::string &name)
         {
 #ifdef _WIN32
             // The shader effects are built as SPIR-V (and Metal source), not DXIL: SDL GPU on Vulkan here
@@ -108,7 +108,7 @@ namespace OpenArtOfWar::RenderBackend
                 std::cerr << "[Render] " << name << " failed: " << SDL_GetError() << std::endl;
                 return nullptr;
             }
-            if(!usable(renderer, name))
+            if(!Usable(renderer, name))
             {
                 SDL_DestroyRenderer(renderer);
                 return nullptr;
@@ -118,7 +118,7 @@ namespace OpenArtOfWar::RenderBackend
 
     } // namespace
 
-    std::vector<std::string> candidates()
+    std::vector<std::string> Candidates()
     {
         std::vector<std::string> compiled;
         const int n = SDL_GetNumRenderDrivers();
@@ -136,7 +136,7 @@ namespace OpenArtOfWar::RenderBackend
         return out;
     }
 
-    std::string label(const std::string &name)
+    std::string Label(const std::string &name)
     {
         for(const DriverName &d : kPreference)
         {
@@ -146,25 +146,25 @@ namespace OpenArtOfWar::RenderBackend
         return name;
     }
 
-    std::string configured(const EnvironmentConfig &env)
+    std::string Configured(const EnvironmentConfig &env)
     {
-        return env.section("render").value("api", std::string());
+        return env.Section("render").value("api", std::string());
     }
 
     void select(EnvironmentConfig &env, const std::string &name)
     {
-        nlohmann::json &r = renderSection(env);
+        nlohmann::json &r = RenderSection(env);
         const std::string previous = r.value("api", std::string());
         if(previous == name)
             return;
         r["api"] = name;
         // The one that ran so far is a good fallback for the new choice
-        if(!previous.empty() && !knownToFail(r, previous))
+        if(!previous.empty() && !KnownToFail(r, previous))
             r["fallback"] = previous;
-        env.save();
+        env.Save();
     }
 
-    SDL_Renderer *create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced)
+    SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced)
     {
         // Without a real display (dummy / offscreen video: servers, CI, tests) nothing found out here says
         // anything about the player's system: work on a copy, store nothing
@@ -175,21 +175,21 @@ namespace OpenArtOfWar::RenderBackend
             if(!renderer)
                 renderer = SDL_CreateRenderer(window, nullptr);
             if(renderer)
-                std::cout << "[Render] API: " << label(SDL_GetRendererName(renderer)) << " (no display)" << std::endl;
+                std::cout << "[Render] API: " << Label(SDL_GetRendererName(renderer)) << " (no display)" << std::endl;
             return renderer;
         }
-        nlohmann::json &r = renderSection(env);
+        nlohmann::json &r = RenderSection(env);
 
         // A start that died while bringing an API up leaves it in init_pending
         const std::string crashed = r.value("init_pending", std::string());
         if(!crashed.empty())
         {
-            std::cerr << "[Render] WARNING: the last start did not survive the " << label(crashed) << " initialization, it is skipped from now on" << std::endl;
-            markProbed(r, crashed, false);
+            std::cerr << "[Render] WARNING: the last start did not survive the " << Label(crashed) << " initialization, it is skipped from now on" << std::endl;
+            MarkProbed(r, crashed, false);
             r["init_pending"] = "";
         }
 
-        const std::vector<std::string> all = candidates();
+        const std::vector<std::string> all = Candidates();
         std::vector<std::string> order;
         auto add = [&](const std::string &name)
         {
@@ -214,12 +214,12 @@ namespace OpenArtOfWar::RenderBackend
         for(const std::string &name : order)
         {
             // A forced API is tried even when it failed before (that is what forcing is for)
-            if(name != forced && knownToFail(r, name))
+            if(name != forced && KnownToFail(r, name))
                 continue;
             r["init_pending"] = name;
-            env.save(); // on disk before the driver gets a chance to take the process down
-            renderer = tryCreate(window, name);
-            markProbed(r, name, renderer != nullptr);
+            env.Save(); // on disk before the driver gets a chance to take the process down
+            renderer = TryCreate(window, name);
+            MarkProbed(r, name, renderer != nullptr);
             if(renderer)
             {
                 chosen = name;
@@ -236,15 +236,15 @@ namespace OpenArtOfWar::RenderBackend
         if(!renderer)
         {
             r["init_pending"] = "";
-            env.save();
+            env.Save();
             return nullptr;
         }
 
         if(chosen != wanted)
         {
-            std::cerr << "[Render] WARNING: " << label(wanted) << " could not be used, running on " << label(chosen) << std::endl;
+            std::cerr << "[Render] WARNING: " << Label(wanted) << " could not be used, running on " << Label(chosen) << std::endl;
         }
-        std::cout << "[Render] API: " << label(chosen) << std::endl;
+        std::cout << "[Render] API: " << Label(chosen) << std::endl;
 
         // A forced API is a one-off: the stored choice is left alone
         if(forced.empty())
@@ -254,7 +254,7 @@ namespace OpenArtOfWar::RenderBackend
             std::string fallback;
             for(auto it = std::find(order.begin(), order.end(), chosen); it != order.end(); ++it)
             {
-                if(*it != chosen && !knownToFail(r, *it))
+                if(*it != chosen && !KnownToFail(r, *it))
                 {
                     fallback = *it;
                     break;
@@ -264,24 +264,24 @@ namespace OpenArtOfWar::RenderBackend
                 fallback = "software";
             r["fallback"] = fallback;
         }
-        env.save(); // init_pending stays set until confirmFirstFrame
+        env.Save(); // init_pending stays set until confirmFirstFrame
         return renderer;
     }
 
-    void confirmFirstFrame(EnvironmentConfig &env)
+    void ConfirmFirstFrame(EnvironmentConfig &env)
     {
-        if(env.section("render").value("init_pending", std::string()).empty())
+        if(env.Section("render").value("init_pending", std::string()).empty())
             return;
-        env.edit("render")["init_pending"] = "";
-        env.save();
+        env.Edit("render")["init_pending"] = "";
+        env.Save();
     }
 
-    bool probe(const std::string &name)
+    bool Probe(const std::string &name)
     {
         SDL_Window *window = SDL_CreateWindow("probe", 64, 64, SDL_WINDOW_HIDDEN);
         if(!window)
             return false;
-        SDL_Renderer *renderer = tryCreate(window, name);
+        SDL_Renderer *renderer = TryCreate(window, name);
         const bool ok = renderer != nullptr;
         if(renderer)
             SDL_DestroyRenderer(renderer);
@@ -291,19 +291,19 @@ namespace OpenArtOfWar::RenderBackend
 
     std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUnknown)
     {
-        nlohmann::json &r = renderSection(env);
+        nlohmann::json &r = RenderSection(env);
         const std::string current = r.value("api", std::string());
         std::vector<RenderApiOption> out;
         bool probedNow = false;
-        for(const std::string &name : candidates())
+        for(const std::string &name : Candidates())
         {
             RenderApiOption o;
             o.name = name;
-            o.label = label(name);
+            o.label = Label(name);
             auto it = r["probed"].find(name);
             if(it == r["probed"].end() && probeUnknown && name != current)
             {
-                markProbed(r, name, probe(name));
+                MarkProbed(r, name, Probe(name));
                 it = r["probed"].find(name);
                 probedNow = true;
             }
@@ -314,7 +314,7 @@ namespace OpenArtOfWar::RenderBackend
             out.push_back(std::move(o));
         }
         if(probedNow)
-            env.save();
+            env.Save();
         return out;
     }
 

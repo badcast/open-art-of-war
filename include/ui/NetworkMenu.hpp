@@ -56,18 +56,18 @@ namespace OpenArtOfWar
 
         // `net`: the session (nullptr while browsing); `lan`: games found on the local network
         // `server`: rooms of the dedicated server, `serverStatus`: what the server connection is doing
-        NetworkAction update(InputManager &input, int windowW, int windowH, NetMatch *net, Settings &settings, const std::vector<LanGame> &lan, const std::vector<LanGame> &server);
+        NetworkAction Update(InputManager &input, int windowW, int windowH, NetMatch *net, Settings &settings, const std::vector<LanGame> &lan, const std::vector<LanGame> &server);
         void render(Renderer &renderer, BitmapFontRenderer &font, TextureManager &textures, int windowW, int windowH, const NetMatch *net, const Settings &settings, const std::vector<LanGame> &lan, const std::vector<LanGame> &server, const std::string &serverStatus);
-        bool internetTab() const
+        bool InternetTab() const
         {
             return m_tab == Tab::Internet;
         }
         // The host's choice: prebuilt bases (true) or start from scratch (only HQ + power plant, no units)
-        bool prebuilt() const
+        bool Prebuilt() const
         {
             return m_prebuilt;
         }
-        void setPrebuilt(bool prebuilt)
+        void SetPrebuilt(bool prebuilt)
         {
             m_prebuilt = prebuilt;
         }
@@ -76,31 +76,31 @@ namespace OpenArtOfWar
         {
             return m_password;
         }
-        const std::string &joinCode() const
+        const std::string &JoinCode() const
         {
             return m_joinCode;
         }
 
         // Where to connect after NetworkAction::Join
-        const std::string &joinAddress() const
+        const std::string &JoinAddress() const
         {
             return m_joinAddress;
         }
-        uint16_t joinPort() const
+        uint16_t JoinPort() const
         {
             return m_joinPort;
         }
         // A text field has the focus: the application turns SDL text input on
-        bool wantsText() const
+        bool WantsText() const
         {
             return m_focus != Field::None;
         }
         // A message for the browser (a failed connection, a rejection)
-        void setNotice(std::string text)
+        void SetNotice(std::string text)
         {
             m_notice = std::move(text);
         }
-        void reset();
+        void Reset();
 
     private:
         enum class Field
@@ -121,7 +121,7 @@ namespace OpenArtOfWar
         struct BrowserLayout
         {
             ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, serverList, refreshBtn, codeField, codeBtn, joinBtn, hostBtn, serverBtn, backBtn;
-            ui::UiRect serverRow(int i) const
+            ui::UiRect ServerRow(int i) const
             {
                 return {serverList.x + 4, serverList.y + 4 + i * 34, serverList.w - 8, 30};
             }
@@ -134,33 +134,33 @@ namespace OpenArtOfWar
                 return {players.x, players.y + 30 + i * 40, players.w, 36};
             }
             // Columns of a row: name, faction, team, colour, start
-            ui::UiRect factionCell(int i) const
+            ui::UiRect FactionCell(int i) const
             {
                 const ui::UiRect r = row(i);
                 return {r.x + 170, r.y + 4, 120, r.h - 8};
             }
-            ui::UiRect teamCell(int i) const
+            ui::UiRect TeamCell(int i) const
             {
                 const ui::UiRect r = row(i);
                 return {r.x + 296, r.y + 4, 70, r.h - 8};
             }
-            ui::UiRect colorCell(int i) const
+            ui::UiRect ColorCell(int i) const
             {
                 const ui::UiRect r = row(i);
                 return {r.x + 372, r.y + 4, 40, r.h - 8};
             }
-            ui::UiRect removeCell(int i) const
+            ui::UiRect RemoveCell(int i) const
             {
                 const ui::UiRect r = row(i);
-                return {r.right() - 30, r.y + 6, 24, r.h - 12};
+                return {r.Right() - 30, r.y + 6, 24, r.h - 12};
             }
-            ui::UiRect nameCell(int i) const
+            ui::UiRect NameCell(int i) const
             {
                 const ui::UiRect r = row(i);
                 return {r.x, r.y, 165, r.h};
             }
             // "+ AI" under the last row
-            ui::UiRect addAi(int rows) const
+            ui::UiRect AddAi(int rows) const
             {
                 const ui::UiRect r = row(rows);
                 return {r.x, r.y + 2, 150, 30};
@@ -169,12 +169,12 @@ namespace OpenArtOfWar
         static BrowserLayout browserLayout(int w, int h);
         static LobbyLayout lobbyLayout(int w, int h);
 
-        NetworkAction updateBrowser(InputManager &input, int w, int h, Settings &settings, const std::vector<LanGame> &lan, const std::vector<LanGame> &server);
-        NetworkAction updateLobby(InputManager &input, int w, int h, NetMatch &net);
-        void editText(InputManager &input, std::string &text, size_t maxLength);
-        bool parseAddress(const std::string &text);
+        NetworkAction UpdateBrowser(InputManager &input, int w, int h, Settings &settings, const std::vector<LanGame> &lan, const std::vector<LanGame> &server);
+        NetworkAction UpdateLobby(InputManager &input, int w, int h, NetMatch &net);
+        void EditText(InputManager &input, std::string &text, size_t maxLength);
+        bool ParseAddress(const std::string &text);
         // The map picture area: where a start position (tile) lands on the screen
-        bool spotOnScreen(const ui::UiRect &area, int mapW, int mapH, int tileX, int tileY, int &sx, int &sy) const;
+        bool SpotOnScreen(const ui::UiRect &area, int mapW, int mapH, int tileX, int tileY, int &sx, int &sy) const;
 
         Tab m_tab {Tab::Lan};
         Field m_focus {Field::None};

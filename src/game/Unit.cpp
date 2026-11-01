@@ -14,14 +14,14 @@
 namespace OpenArtOfWar
 {
 
-    static float computeDistanceToEntityPixels(const Unit &attacker, const Entity &target)
+    static float ComputeDistanceToEntityPixels(const Unit &attacker, const Entity &target)
     {
-        float srcX = attacker.getUnitCenterPixelX();
-        float srcY = attacker.getUnitCenterPixelY();
+        float srcX = attacker.GetUnitCenterPixelX();
+        float srcY = attacker.GetUnitCenterPixelY();
 
         if(target.isBuilding)
         {
-            const Building *b = target.asBuilding();
+            const Building *b = target.AsBuilding();
             int w = b ? std::max(1, b->buildWidth) : 1;
             int h = b ? std::max(1, b->buildHeight) : 1;
 
@@ -32,12 +32,12 @@ namespace OpenArtOfWar
 
             float closestX = std::clamp(srcX, minCenterX, maxCenterX);
             float closestY = std::clamp(srcY, minCenterY, maxCenterY);
-            return DetMath::hypot(closestX - srcX, closestY - srcY);
+            return DetMath::Hypot(closestX - srcX, closestY - srcY);
         }
 
-        float dstX = target.getUnitCenterPixelX();
-        float dstY = target.getUnitCenterPixelY();
-        return DetMath::hypot(dstX - srcX, dstY - srcY);
+        float dstX = target.GetUnitCenterPixelX();
+        float dstY = target.GetUnitCenterPixelY();
+        return DetMath::Hypot(dstX - srcX, dstY - srcY);
     }
 
     Unit::Unit() : Entity(false)
@@ -54,10 +54,10 @@ namespace OpenArtOfWar
         burstDelay = 0.1f;
     }
 
-    void Unit::getMuzzlePoint(float &outX, float &outY) const
+    void Unit::GetMuzzlePoint(float &outX, float &outY) const
     {
-        float cx = getUnitCenterPixelX();
-        float cy = getUnitCenterPixelY();
+        float cx = GetUnitCenterPixelX();
+        float cy = GetUnitCenterPixelY();
 
         const float *s_dirDx = Utility::kDir8X;
         const float *s_dirDy = Utility::kDir8Y;
@@ -89,13 +89,13 @@ namespace OpenArtOfWar
         {
             // Non-turret units (infantry, fixed vehicles): localePosition rotates with facingDirection
             int f = (facingDirection % 8 + 8) % 8;
-            float pivotY = isInfantry() ? (cy - 4.0f) : cy;
+            float pivotY = IsInfantry() ? (cy - 4.0f) : cy;
             outX = cx + s_dirDx[f] * muzzleOffsetX - s_dirDy[f] * muzzleOffsetY;
             outY = pivotY + s_dirDy[f] * muzzleOffsetX + s_dirDx[f] * muzzleOffsetY;
         }
     }
 
-    void Unit::update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
+    void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
     {
         if(!alive)
             return;
@@ -103,7 +103,7 @@ namespace OpenArtOfWar
         if(state == ActionState::Die)
         {
             deathTimer -= deltaTime;
-            if(isInfantry())
+            if(IsInfantry())
             {
                 animTimer += deltaTime;
                 if(animTimer >= 0.08f)
@@ -118,9 +118,9 @@ namespace OpenArtOfWar
             else
             {
                 // Gradual burial into the ground over the burial time of effects.yaml
-                const EffectsConfig &fx = EffectsConfig::get();
+                const EffectsConfig &fx = EffectsConfig::Get();
                 const float elapsed = std::clamp(fx.burialSeconds - deathTimer, 0.0f, fx.burialSeconds);
-                const int stages = (wreckStages > 0) ? wreckStages : fx.wreckOfVehicle(archetypeId).stages;
+                const int stages = (wreckStages > 0) ? wreckStages : fx.WreckOfVehicle(archetypeId).stages;
                 animFrame = std::min(stages - 1, static_cast<int>((elapsed / fx.burialSeconds) * static_cast<float>(stages)));
             }
             if(deathTimer <= 0.0f)
@@ -144,7 +144,7 @@ namespace OpenArtOfWar
             }
         }
         // Queueing time: grows while the unit has somewhere to go but stays on the same tile
-        if(hasMoveTarget() && targetWallTileX < 0 && targetEntityId == 0 && tileX == blockedTileX && tileY == blockedTileY)
+        if(HasMoveTarget() && targetWallTileX < 0 && targetEntityId == 0 && tileX == blockedTileX && tileY == blockedTileY)
             blockedTimer += deltaTime;
         else
             blockedTimer = 0.0f;
@@ -155,7 +155,7 @@ namespace OpenArtOfWar
             secondaryCooldownTimer -= deltaTime;
         }
 
-        updateBurst(deltaTime, map, delegates);
+        UpdateBurst(deltaTime, map, delegates);
 
         // Muzzle flash / attack animation decay
         if(attackAnimTimer > 0.0f)
@@ -172,7 +172,7 @@ namespace OpenArtOfWar
                     // Infantry keeps its crouched firing pose for as long as it has a target, instead of
                     // standing up after every shot and crouching again for the next one
                     bool hasTarget = (targetEntityId != 0 || targetWallTileX >= 0);
-                    if(!isInfantry() || !hasTarget || isSiegeMode)
+                    if(!IsInfantry() || !hasTarget || isSiegeMode)
                     {
                         state = ActionState::Idle;
                         animFrame = 0;
@@ -187,11 +187,11 @@ namespace OpenArtOfWar
             Entity *target = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
             if(target && target->alive && target->state != ActionState::Die)
             {
-                float dist = computeDistanceToEntityPixels(*this, *target);
+                float dist = ComputeDistanceToEntityPixels(*this, *target);
                 if(dist > attackRange * TILE_WIDTH && !waitingForPath)
                 {
                     bool isPartial = false;
-                    if(findPathToAttack(*target, pathfinder, &isPartial))
+                    if(FindPathToAttack(*target, pathfinder, &isPartial))
                     {
                         pathIndex = 0;
                         state = ActionState::Move;
@@ -205,8 +205,8 @@ namespace OpenArtOfWar
             }
         }
 
-        updateMovement(deltaTime, map, pathfinder, delegates);
-        updateCombat(deltaTime, map, pathfinder, delegates);
+        UpdateMovement(deltaTime, map, pathfinder, delegates);
+        UpdateCombat(deltaTime, map, pathfinder, delegates);
 
         // Update animation frame timer
         if(state == ActionState::Move)
@@ -230,7 +230,7 @@ namespace OpenArtOfWar
         }
         else if(state == ActionState::Transform)
         {
-            updateTransformation(deltaTime, delegates);
+            UpdateTransformation(deltaTime, delegates);
         }
         else
         {
@@ -241,11 +241,11 @@ namespace OpenArtOfWar
         // Sight of the unit's side moves along with it
         if(owner < kMaxPlayers)
         {
-            map.revealArea(tileX, tileY, sightRadius, Players::teamOf(owner));
+            map.RevealArea(tileX, tileY, sightRadius, Players::TeamOf(owner));
         }
     }
 
-    void Unit::updateBurst(float deltaTime, TileMap &map, const UnitDelegates &delegates)
+    void Unit::UpdateBurst(float deltaTime, TileMap &map, const UnitDelegates &delegates)
     {
         if(burstShotsRemaining > 0)
         {
@@ -263,9 +263,9 @@ namespace OpenArtOfWar
                     if(target && target->alive && target->state != ActionState::Die)
                     {
                         float srcX, srcY;
-                        getMuzzlePoint(srcX, srcY);
-                        float dstX = target->getUnitCenterPixelX();
-                        float dstY = target->getUnitCenterPixelY();
+                        GetMuzzlePoint(srcX, srcY);
+                        float dstX = target->GetUnitCenterPixelX();
+                        float dstY = target->GetUnitCenterPixelY();
                         if(delegates.spawnProjectile)
                         {
                             delegates.spawnProjectile(*this, srcX, srcY, dstX, dstY, target->id, map);
@@ -274,10 +274,10 @@ namespace OpenArtOfWar
                 }
                 else if(targetWallTileX >= 0 && targetWallTileY >= 0)
                 {
-                    if(map.getWall(targetWallTileX, targetWallTileY) > 0)
+                    if(map.GetWall(targetWallTileX, targetWallTileY) > 0)
                     {
                         float srcX, srcY;
-                        getMuzzlePoint(srcX, srcY);
+                        GetMuzzlePoint(srcX, srcY);
                         float dstX = targetWallTileX * TILE_WIDTH + (TILE_WIDTH * 0.5f);
                         float dstY = targetWallTileY * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
                         if(delegates.spawnProjectile)
@@ -290,7 +290,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void Unit::updateTransformation(float deltaTime, const UnitDelegates &delegates)
+    void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
     {
         animTimer += deltaTime;
         if(animTimer >= 0.09f)
@@ -319,7 +319,7 @@ namespace OpenArtOfWar
                 animTimer = 0.0f;
                 pendingArchetypeId = -1;
                 // Packed up with an order still open (attack-move): carry on toward it right away
-                if(!isSiegeMode && hasMoveTarget())
+                if(!isSiegeMode && HasMoveTarget())
                 {
                     waitingForPath = true;
                     pathRetryTimer = 0.45f;
@@ -376,29 +376,29 @@ namespace OpenArtOfWar
         }
     }
 
-    void Unit::finalizeArrivalIfPathDone()
+    void Unit::FinalizeArrivalIfPathDone()
     {
         if(pathIndex < path.size())
             return;
         state = ActionState::Idle;
-        clearPathState();
+        ClearPathState();
         if(!waitingForPath)
         {
-            if(isAttackMoving && hasMoveTarget() && std::abs(tileX - targetTileX) <= 1 && std::abs(tileY - targetTileY) <= 1)
+            if(isAttackMoving && HasMoveTarget() && std::abs(tileX - targetTileX) <= 1 && std::abs(tileY - targetTileY) <= 1)
             {
                 isAttackMoving = false;
             }
-            clearMoveTarget();
+            ClearMoveTarget();
         }
     }
 
-    float Unit::advanceStep(float budget)
+    float Unit::AdvanceStep(float budget)
     {
         // Slide from the origin tile toward the reserved tile. tileX/tileY flip only once the step is complete,
         // so the logical tile never runs ahead of (or lags behind) the sprite.
         float dx = static_cast<float>((resTileX - tileX) * TILE_WIDTH) - subX;
         float dy = static_cast<float>((resTileY - tileY) * TILE_HEIGHT) - subY;
-        float dist = DetMath::hypot(dx, dy);
+        float dist = DetMath::Hypot(dx, dy);
 
         if(dist > budget)
         {
@@ -411,7 +411,7 @@ namespace OpenArtOfWar
         tileY = resTileY;
         subX = 0.0f;
         subY = 0.0f;
-        releaseReservation();
+        ReleaseReservation();
 
         if(pathIndex < path.size() && path[pathIndex].x == tileX && path[pathIndex].y == tileY)
         {
@@ -419,12 +419,12 @@ namespace OpenArtOfWar
         }
         if(state == ActionState::Move)
         {
-            finalizeArrivalIfPathDone();
+            FinalizeArrivalIfPathDone();
         }
         return budget - dist;
     }
 
-    void Unit::updateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
+    void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
     {
         float budget = std::max(0.0f, moveSpeed) * std::clamp(paceScale, 0.1f, 1.0f) * (deltaTime * 60.0f);
 
@@ -433,7 +433,7 @@ namespace OpenArtOfWar
         if(makeWayCooldown > 0.0f)
             makeWayCooldown = std::max(0.0f, makeWayCooldown - deltaTime);
         // Any order (or a target of its own) and the spot it stepped away from no longer matters
-        if(yieldHomeX >= 0 && (hasMoveTarget() || targetEntityId != 0 || targetWallTileX >= 0 || isSiegeMode))
+        if(yieldHomeX >= 0 && (HasMoveTarget() || targetEntityId != 0 || targetWallTileX >= 0 || isSiegeMode))
         {
             yieldHomeX = yieldHomeY = -1;
             yieldHomeTries = 0;
@@ -441,7 +441,7 @@ namespace OpenArtOfWar
 
         // A step that is under way is always finished: the unit owns both tiles until it arrives, so it never
         // snaps back to the origin tile and never gets parked between two tiles (whatever its state is now).
-        if(hasReservation())
+        if(HasReservation())
         {
             if(budget <= 0.0f)
             {
@@ -453,19 +453,19 @@ namespace OpenArtOfWar
                 }
                 subX = 0.0f;
                 subY = 0.0f;
-                releaseReservation();
+                ReleaseReservation();
             }
             else
             {
                 if(targetEntityId == 0 && targetWallTileX < 0 && moveFireTargetId == 0)
                 {
                     if(hasRotatingTurret && archetypeId != 17)
-                        stepTurretToward(facingDirection, deltaTime);
+                        StepTurretToward(facingDirection, deltaTime);
                     else
                         turretFacing = facingDirection;
                 }
-                budget = advanceStep(budget);
-                if(hasReservation())
+                budget = AdvanceStep(budget);
+                if(HasReservation())
                     return;
             }
         }
@@ -477,7 +477,7 @@ namespace OpenArtOfWar
             {
                 state = ActionState::Idle;
             }
-            clearPathState();
+            ClearPathState();
             waitingForPath = false;
             return;
         }
@@ -485,22 +485,22 @@ namespace OpenArtOfWar
         // Closing in on something to shoot: stop on the first tile from which it is in firing range, before
         // committing to the next step (a started step is always finished, so checking only in updateCombat
         // walked every unit a tile or more too close)
-        if(state == ActionState::Move && !hasReservation())
+        if(state == ActionState::Move && !HasReservation())
         {
             bool inRange = false;
             if(targetEntityId != 0 && delegates.getEntity)
             {
                 const Entity *t = delegates.getEntity(targetEntityId);
-                inRange = t && t->alive && t->state != ActionState::Die && computeDistanceToEntityPixels(*this, *t) <= attackRange * TILE_WIDTH && (!delegates.isEntityVisible || delegates.isEntityVisible(*t, owner));
+                inRange = t && t->alive && t->state != ActionState::Die && ComputeDistanceToEntityPixels(*this, *t) <= attackRange * TILE_WIDTH && (!delegates.isEntityVisible || delegates.isEntityVisible(*t, owner));
             }
-            else if(targetWallTileX >= 0 && map.getWall(targetWallTileX, targetWallTileY) > 0)
+            else if(targetWallTileX >= 0 && map.GetWall(targetWallTileX, targetWallTileY) > 0)
             {
                 const float wx = targetWallTileX * TILE_WIDTH + TILE_WIDTH * 0.5f, wy = targetWallTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-                inRange = DetMath::hypot(wx - getUnitCenterPixelX(), wy - getUnitCenterPixelY()) <= attackRange * TILE_WIDTH;
+                inRange = DetMath::Hypot(wx - GetUnitCenterPixelX(), wy - GetUnitCenterPixelY()) <= attackRange * TILE_WIDTH;
             }
             if(inRange)
             {
-                clearPathState();
+                ClearPathState();
                 state = ActionState::Idle;
                 animFrame = 0;
                 waitingForPath = false;
@@ -508,8 +508,8 @@ namespace OpenArtOfWar
             }
         }
 
-        const int mapW = map.getWidth();
-        const int mapH = map.getHeight();
+        const int mapW = map.GetWidth();
+        const int mapH = map.GetHeight();
 
         // Sanitize out-of-bounds target coordinates immediately (Invariant enforcement)
         if(targetTileX < 0 || targetTileX >= mapW || targetTileY < 0 || targetTileY >= mapH)
@@ -530,7 +530,7 @@ namespace OpenArtOfWar
 
             if(yieldHomeX >= 0 && state == ActionState::Idle && !waitingForPath)
             {
-                updateYieldHome(deltaTime, pathfinder, delegates);
+                UpdateYieldHome(deltaTime, pathfinder, delegates);
                 if(state == ActionState::Move)
                     return; // walks back from the next frame on
             }
@@ -563,7 +563,7 @@ namespace OpenArtOfWar
                     // Priority 2: Explicit ground destination (ONLY if valid >= 0)
                     if(goalX < 0 || goalY < 0)
                     {
-                        if(hasMoveTarget())
+                        if(HasMoveTarget())
                         {
                             goalX = targetTileX;
                             goalY = targetTileY;
@@ -575,7 +575,7 @@ namespace OpenArtOfWar
                     {
                         std::vector<PathNode> newPath;
                         bool isPartial = false;
-                        if(findPathThroughAllies(goalX, goalY, pathfinder, newPath, &isPartial) && !newPath.empty())
+                        if(FindPathThroughAllies(goalX, goalY, pathfinder, newPath, &isPartial) && !newPath.empty())
                         {
                             int curDistSq = (tileX - goalX) * (tileX - goalX) + (tileY - goalY) * (tileY - goalY);
                             int endDistSq = (newPath.back().x - goalX) * (newPath.back().x - goalX) + (newPath.back().y - goalY) * (newPath.back().y - goalY);
@@ -593,9 +593,9 @@ namespace OpenArtOfWar
                     {
                         // No valid goal or already arrived: clear waiting state to prevent (0,0) ghost marches
                         waitingForPath = false;
-                        if(hasMoveTarget() && std::abs(tileX - targetTileX) <= 1 && std::abs(tileY - targetTileY) <= 1)
+                        if(HasMoveTarget() && std::abs(tileX - targetTileX) <= 1 && std::abs(tileY - targetTileY) <= 1)
                         {
-                            clearMoveTarget();
+                            ClearMoveTarget();
                             isAttackMoving = false;
                         }
                     }
@@ -611,8 +611,8 @@ namespace OpenArtOfWar
         // Helper: Try an instant 1-tile local sidestep around a friendly unit occupying (blockedX, blockedY)
         auto tryLocalSidestep = [&](int blockedX, int blockedY) -> bool
         {
-            int nextGoalX = (pathIndex + 1 < path.size()) ? path[pathIndex + 1].x : (hasMoveTarget() ? targetTileX : blockedX);
-            int nextGoalY = (pathIndex + 1 < path.size()) ? path[pathIndex + 1].y : (hasMoveTarget() ? targetTileY : blockedY);
+            int nextGoalX = (pathIndex + 1 < path.size()) ? path[pathIndex + 1].x : (HasMoveTarget() ? targetTileX : blockedX);
+            int nextGoalY = (pathIndex + 1 < path.size()) ? path[pathIndex + 1].y : (HasMoveTarget() ? targetTileY : blockedY);
 
             int bestSx = -1, bestSy = -1;
             int bestScore = 999999;
@@ -630,7 +630,7 @@ namespace OpenArtOfWar
                         continue;
                     if(sx < 0 || sx >= mapW || sy < 0 || sy >= mapH)
                         continue;
-                    if(!map.isPassable(sx, sy) || map.getWall(sx, sy) > 0)
+                    if(!map.IsPassable(sx, sy) || map.GetWall(sx, sy) > 0)
                         continue;
                     if(delegates.isTileOccupied && delegates.isTileOccupied(sx, sy, id))
                         continue;
@@ -641,12 +641,12 @@ namespace OpenArtOfWar
 
                     int dGoalSq = (sx - nextGoalX) * (sx - nextGoalX) + (sy - nextGoalY) * (sy - nextGoalY);
                     int curGoalSq = (tileX - nextGoalX) * (tileX - nextGoalX) + (tileY - nextGoalY) * (tileY - nextGoalY);
-                    if(!isInfantry())
+                    if(!IsInfantry())
                     {
                         // Vehicles turn in place before a step: a sidestep that needs more than a 90-degree turn
                         // (or does not even get closer) means turning around and back again - wait / re-plan instead
-                        const int stepFacing = Utility::dir8FromVector(static_cast<float>(dx), static_cast<float>(dy));
-                        if(Utility::dir8Distance(stepFacing, facingDirection) > 2 || dGoalSq >= curGoalSq)
+                        const int stepFacing = Utility::Dir8FromVector(static_cast<float>(dx), static_cast<float>(dy));
+                        if(Utility::Dir8Distance(stepFacing, facingDirection) > 2 || dGoalSq >= curGoalSq)
                             continue;
                     }
                     if(dGoalSq <= curGoalSq + 1)
@@ -673,8 +673,8 @@ namespace OpenArtOfWar
         // Helper: Re-plan from the current tile to the current goal, optionally walking around one tile
         auto replanFromHere = [&](int avoidX, int avoidY) -> bool
         {
-            int goalX = hasMoveTarget() ? targetTileX : path.back().x;
-            int goalY = hasMoveTarget() ? targetTileY : path.back().y;
+            int goalX = HasMoveTarget() ? targetTileX : path.back().x;
+            int goalY = HasMoveTarget() ? targetTileY : path.back().y;
             if(targetEntityId != 0 && delegates.getEntity)
             {
                 if(const Entity *t = delegates.getEntity(targetEntityId); t && t->alive && t->state != ActionState::Die)
@@ -692,7 +692,7 @@ namespace OpenArtOfWar
 
             std::vector<PathNode> altPath;
             bool isPartial = false;
-            if(findPathThroughAllies(goalX, goalY, pathfinder, altPath, &isPartial, avoidX, avoidY) && !altPath.empty() && (!delegates.isTileOccupied || !delegates.isTileOccupied(altPath[0].x, altPath[0].y, id)))
+            if(FindPathThroughAllies(goalX, goalY, pathfinder, altPath, &isPartial, avoidX, avoidY) && !altPath.empty() && (!delegates.isTileOccupied || !delegates.isTileOccupied(altPath[0].x, altPath[0].y, id)))
             {
                 int curDistSq = (tileX - goalX) * (tileX - goalX) + (tileY - goalY) * (tileY - goalY);
                 int endDistSq = (altPath.back().x - goalX) * (altPath.back().x - goalX) + (altPath.back().y - goalY) * (altPath.back().y - goalY);
@@ -710,9 +710,9 @@ namespace OpenArtOfWar
         // Helper: Passage completely sealed -> enter Idle and schedule a retry only if the goal is valid
         auto parkAndRetry = [&]()
         {
-            bool hasGoal = hasMoveTarget() || targetEntityId != 0;
+            bool hasGoal = HasMoveTarget() || targetEntityId != 0;
             state = ActionState::Idle;
-            clearPathState();
+            ClearPathState();
             waitingForPath = hasGoal;
             pathRetryTimer = 0.0f;
         };
@@ -723,11 +723,11 @@ namespace OpenArtOfWar
         {
             // A. Destructible Wall: breach ONLY if hostile, and only when there is no way around it
             //    (otherwise one wall would stop the whole column while an open route exists)
-            if(map.getWall(blockedX, blockedY) > 0 && Players::hostile(map.getWallOwner(blockedX, blockedY), owner) && canBreachWalls())
+            if(map.GetWall(blockedX, blockedY) > 0 && Players::Hostile(map.GetWallOwner(blockedX, blockedY), owner) && CanBreachWalls())
             {
-                int goalX = hasMoveTarget() ? targetTileX : path.back().x;
-                int goalY = hasMoveTarget() ? targetTileY : path.back().y;
-                if(!shouldBreachWalls(goalX, goalY, pathfinder))
+                int goalX = HasMoveTarget() ? targetTileX : path.back().x;
+                int goalY = HasMoveTarget() ? targetTileY : path.back().y;
+                if(!ShouldBreachWalls(goalX, goalY, pathfinder))
                 {
                     if(replanFromHere(blockedX, blockedY))
                         return false;
@@ -737,7 +737,7 @@ namespace OpenArtOfWar
                 targetWallTileX = blockedX;
                 targetWallTileY = blockedY;
                 state = ActionState::Idle;
-                clearPathState();
+                ClearPathState();
                 waitingForPath = false;
                 return true;
             }
@@ -748,29 +748,29 @@ namespace OpenArtOfWar
             if(blocker && blocker->alive && blocker->state != ActionState::Die)
             {
                 // B. Hostile Entity Blocking Choke Point -> "Breach & Clear"
-                if(Players::hostile(blocker->owner, owner))
+                if(Players::Hostile(blocker->owner, owner))
                 {
                     targetEntityId = blockerId;
                     targetWallTileX = -1;
                     targetWallTileY = -1;
                     state = ActionState::Idle; // updateCombat will fire immediately on this frame
-                    clearPathState();
+                    ClearPathState();
                     waitingForPath = false;
                     return true;
                 }
 
                 // C. Friendly Unit Occupation -> NO single-file column waiting!
-                Unit *friendlyUnit = blocker->asUnit();
-                const bool allyLeaving = friendlyUnit && (friendlyUnit->state == ActionState::Move || friendlyUnit->hasReservation());
+                Unit *friendlyUnit = blocker->AsUnit();
+                const bool allyLeaving = friendlyUnit && (friendlyUnit->state == ActionState::Move || friendlyUnit->HasReservation());
                 //    1) If blocked tile is destination (or adjacent to destination), arrived at squad cluster!
                 //       (not while a make-way chain is moving: the ally in front is about to free the tile)
-                if(targetEntityId == 0 && !(allyWaitTimer > 0.0f && allyLeaving) && (pathIndex + 1 >= path.size() || (hasMoveTarget() && std::max(std::abs(tileX - targetTileX), std::abs(tileY - targetTileY)) <= 1)))
+                if(targetEntityId == 0 && !(allyWaitTimer > 0.0f && allyLeaving) && (pathIndex + 1 >= path.size() || (HasMoveTarget() && std::max(std::abs(tileX - targetTileX), std::abs(tileY - targetTileY)) <= 1)))
                 {
                     state = ActionState::Idle;
-                    clearPathState();
+                    ClearPathState();
                     if(!waitingForPath)
                     {
-                        clearMoveTarget();
+                        ClearMoveTarget();
                         isAttackMoving = false;
                     }
                     return true;
@@ -779,15 +779,15 @@ namespace OpenArtOfWar
                 //    2) Ask the ally to make way: it steps aside, together with the allies behind it when it has
                 //       no free tile of its own (a packed gap in a wall). Head-on in a narrow passage, the one
                 //       that passes first (Unit::passesBefore) moves the other one off the road.
-                const bool headOn = friendlyUnit && friendlyUnit->state == ActionState::Move && !friendlyUnit->hasReservation() && friendlyUnit->pathIndex < friendlyUnit->path.size() &&
+                const bool headOn = friendlyUnit && friendlyUnit->state == ActionState::Move && !friendlyUnit->HasReservation() && friendlyUnit->pathIndex < friendlyUnit->path.size() &&
                     friendlyUnit->path[friendlyUnit->pathIndex].x == tileX && friendlyUnit->path[friendlyUnit->pathIndex].y == tileY;
-                const bool standing = friendlyUnit && friendlyUnit->canMakeWayFor(*this);
+                const bool standing = friendlyUnit && friendlyUnit->CanMakeWayFor(*this);
                 auto askToMakeWay = [&]() -> bool
                 {
                     if(makeWayCooldown > 0.0f)
                         return false;
                     makeWayCooldown = 0.5f;
-                    if(!requestMakeWay(*friendlyUnit, map, delegates))
+                    if(!RequestMakeWay(*friendlyUnit, map, delegates))
                         return false;
                     allyWaitTimer = 2.5f; // vehicles turn on the spot first: give the chain time
                     waitBlockedTimer = 0.0f;
@@ -797,7 +797,7 @@ namespace OpenArtOfWar
                 //       have been stuck behind for a while, is asked first: walking around it only leads in circles
                 if(standing)
                 {
-                    auto closed = [&](int x, int y) { return x < 0 || y < 0 || x >= mapW || y >= mapH || !map.isPassable(x, y) || map.getWall(x, y) > 0; };
+                    auto closed = [&](int x, int y) { return x < 0 || y < 0 || x >= mapW || y >= mapH || !map.IsPassable(x, y) || map.GetWall(x, y) > 0; };
                     const int sx = blockedX - tileX, sy = blockedY - tileY;
                     const bool inPassage = closed(blockedX - sy, blockedY + sx) && closed(blockedX + sy, blockedY - sx);
                     if((inPassage || blockedTimer >= 1.5f) && askToMakeWay())
@@ -813,13 +813,13 @@ namespace OpenArtOfWar
 
                 if(friendlyUnit)
                 {
-                    if((standing || (headOn && passesBefore(*friendlyUnit))) && askToMakeWay())
+                    if((standing || (headOn && PassesBefore(*friendlyUnit))) && askToMakeWay())
                         return true;
                     // Brief micro-yield while the friendly unit is actively walking out of our way;
                     // in flow mode simply queue behind it instead of re-pathing around. Longer while a chain
                     // makes way, and head-on for the one that gives way (the other one moves it aside).
                     float yieldLimit = flowMode ? 2.0f : 0.18f;
-                    if(headOn && !passesBefore(*friendlyUnit))
+                    if(headOn && !PassesBefore(*friendlyUnit))
                         yieldLimit = std::max(yieldLimit, 1.0f);
                     if(allyLeaving && (waitBlockedTimer < yieldLimit || allyWaitTimer > 0.0f))
                     {
@@ -856,7 +856,7 @@ namespace OpenArtOfWar
                 return;
             if(pathIndex >= path.size())
             {
-                finalizeArrivalIfPathDone();
+                FinalizeArrivalIfPathDone();
                 return;
             }
 
@@ -866,7 +866,7 @@ namespace OpenArtOfWar
             if(node.x == tileX && node.y == tileY)
             {
                 pathIndex++;
-                finalizeArrivalIfPathDone();
+                FinalizeArrivalIfPathDone();
                 continue;
             }
 
@@ -881,7 +881,7 @@ namespace OpenArtOfWar
                 continue;
             }
 
-            bool nextTileBlocked = node.x < 0 || node.x >= mapW || node.y < 0 || node.y >= mapH || !map.isPassable(node.x, node.y) || map.getWall(node.x, node.y) > 0 || (delegates.isTileOccupied && delegates.isTileOccupied(node.x, node.y, id)) ||
+            bool nextTileBlocked = node.x < 0 || node.x >= mapW || node.y < 0 || node.y >= mapH || !map.IsPassable(node.x, node.y) || map.GetWall(node.x, node.y) > 0 || (delegates.isTileOccupied && delegates.isTileOccupied(node.x, node.y, id)) ||
                 (delegates.getUnitAtTile && delegates.getUnitAtTile(node.x, node.y, id) != 0);
             if(nextTileBlocked)
             {
@@ -894,9 +894,9 @@ namespace OpenArtOfWar
 
             int stepX = node.x - tileX;
             int stepY = node.y - tileY;
-            int desiredFacing = Utility::dir8FromVector(static_cast<float>(stepX), static_cast<float>(stepY));
+            int desiredFacing = Utility::Dir8FromVector(static_cast<float>(stepX), static_cast<float>(stepY));
 
-            if(!isInfantry() && facingDirection != desiredFacing && turnStepDelay > 0.0f)
+            if(!IsInfantry() && facingDirection != desiredFacing && turnStepDelay > 0.0f)
             {
                 // Vehicles turn in place on the tile centre before committing to the step
 
@@ -904,13 +904,13 @@ namespace OpenArtOfWar
                 while(turnTimer >= turnStepDelay && facingDirection != desiredFacing)
                 {
                     turnTimer -= turnStepDelay;
-                    facingDirection = (facingDirection + Utility::turnStep8(facingDirection, desiredFacing) + 8) % 8;
+                    facingDirection = (facingDirection + Utility::TurnStep8(facingDirection, desiredFacing) + 8) % 8;
                 }
 
                 if(targetEntityId == 0 && targetWallTileX < 0 && moveFireTargetId == 0)
                 {
                     if(hasRotatingTurret && archetypeId != 17)
-                        stepTurretToward(facingDirection, deltaTime);
+                        StepTurretToward(facingDirection, deltaTime);
                     else
                         turretFacing = facingDirection;
                 }
@@ -926,7 +926,7 @@ namespace OpenArtOfWar
             if(targetEntityId == 0 && targetWallTileX < 0 && moveFireTargetId == 0)
             {
                 if(hasRotatingTurret && archetypeId != 17)
-                    stepTurretToward(facingDirection, deltaTime);
+                    StepTurretToward(facingDirection, deltaTime);
                 else
                     turretFacing = facingDirection;
             }
@@ -939,13 +939,13 @@ namespace OpenArtOfWar
             waitBlockedTimer = 0.0f;
             resTileX = node.x;
             resTileY = node.y;
-            budget = advanceStep(budget);
-            if(hasReservation())
+            budget = AdvanceStep(budget);
+            if(HasReservation())
                 return;
         }
     }
 
-    bool Unit::stepTurretToward(int targetDir8, float deltaTime)
+    bool Unit::StepTurretToward(int targetDir8, float deltaTime)
     {
         targetDir8 = (targetDir8 % 8 + 8) % 8;
         turretFacing = (turretFacing % 8 + 8) % 8;
@@ -955,7 +955,7 @@ namespace OpenArtOfWar
             return true;
         }
         const float delay = (turretTurnStepDelay > 0.0f) ? turretTurnStepDelay : turnStepDelay;
-        if(isInfantry() || delay <= 0.0f)
+        if(IsInfantry() || delay <= 0.0f)
         {
             turretFacing = targetDir8;
             turretTurnTimer = 0.0f;
@@ -965,7 +965,7 @@ namespace OpenArtOfWar
         while(turretTurnTimer >= delay && turretFacing != targetDir8)
         {
             turretTurnTimer -= delay;
-            int delta = Utility::turnStep8(turretFacing, targetDir8);
+            int delta = Utility::TurnStep8(turretFacing, targetDir8);
             turretFacing = (turretFacing + delta + 8) % 8;
         }
         if(turretFacing == targetDir8)
@@ -976,11 +976,11 @@ namespace OpenArtOfWar
         return false;
     }
 
-    void Unit::fireOnTheMove(float deltaTime, TileMap &map, const UnitDelegates &delegates)
+    void Unit::FireOnTheMove(float deltaTime, TileMap &map, const UnitDelegates &delegates)
     {
         // Keep shooting at the same enemy while it stays in range, otherwise pick the next one in range
         Entity *target = (moveFireTargetId != 0 && delegates.getEntity) ? delegates.getEntity(moveFireTargetId) : nullptr;
-        if(target && (target->state == ActionState::Die || computeDistanceToEntityPixels(*this, *target) > attackRange * TILE_WIDTH || (delegates.isEntityVisible && !delegates.isEntityVisible(*target, owner))))
+        if(target && (target->state == ActionState::Die || ComputeDistanceToEntityPixels(*this, *target) > attackRange * TILE_WIDTH || (delegates.isEntityVisible && !delegates.isEntityVisible(*target, owner))))
         {
             target = nullptr;
         }
@@ -992,27 +992,27 @@ namespace OpenArtOfWar
         if(!target)
         {
             moveFireTargetId = 0;
-            stepTurretToward(facingDirection, deltaTime);
+            StepTurretToward(facingDirection, deltaTime);
             return;
         }
 
-        float sx = getUnitCenterPixelX(), sy = getUnitCenterPixelY();
-        float dstX = target->getUnitCenterPixelX(), dstY = target->getUnitCenterPixelY();
-        int targetDir8 = Utility::dir8FromVector(dstX - sx, dstY - sy);
-        if(!stepTurretToward(targetDir8, deltaTime))
+        float sx = GetUnitCenterPixelX(), sy = GetUnitCenterPixelY();
+        float dstX = target->GetUnitCenterPixelX(), dstY = target->GetUnitCenterPixelY();
+        int targetDir8 = Utility::Dir8FromVector(dstX - sx, dstY - sy);
+        if(!StepTurretToward(targetDir8, deltaTime))
             return;
 
         if(cooldownTimer > 0.0f)
             return;
-        cooldownTimer = nextCooldown();
+        cooldownTimer = NextCooldown();
         attackAnimTimer = Projectiles::of(projectile).hitscan ? 0.12f : 0.22f; // state stays Move: the hull keeps driving
         float mx = 0.0f, my = 0.0f;
-        getMuzzlePoint(mx, my);
+        GetMuzzlePoint(mx, my);
         if(delegates.spawnProjectile)
             delegates.spawnProjectile(*this, mx, my, dstX, dstY, target->id, map);
     }
 
-    bool Unit::hasOpenRouteTo(int goalX, int goalY, Pathfinder &pathfinder, int *outRouteLen) const
+    bool Unit::HasOpenRouteTo(int goalX, int goalY, Pathfinder &pathfinder, int *outRouteLen) const
     {
         if(outRouteLen)
             *outRouteLen = 0;
@@ -1022,8 +1022,8 @@ namespace OpenArtOfWar
             return true;
         std::vector<PathNode> route;
         bool partial = false;
-        pathfinder.setIgnoreUnitsOnce();
-        bool found = pathfinder.findPath(tileX, tileY, goalX, goalY, route, id, &partial);
+        pathfinder.SetIgnoreUnitsOnce();
+        bool found = pathfinder.FindPath(tileX, tileY, goalX, goalY, route, id, &partial);
         if(outRouteLen)
             *outRouteLen = static_cast<int>(route.size());
         return found && !partial && !route.empty();
@@ -1033,37 +1033,37 @@ namespace OpenArtOfWar
     // Making way: allies let each other through narrow passages
     // ---------------------------------------------------------------------------
 
-    int Unit::movePriority() const
+    int Unit::MovePriority() const
     {
         int p = 0;
         if(groupOrder || isAttackMoving)
             p += 2;
-        if(hasMoveTarget() || targetEntityId != 0)
+        if(HasMoveTarget() || targetEntityId != 0)
             p += 1;
         return p;
     }
 
-    bool Unit::passesBefore(const Unit &other) const
+    bool Unit::PassesBefore(const Unit &other) const
     {
-        const int a = movePriority(), b = other.movePriority();
+        const int a = MovePriority(), b = other.MovePriority();
         return a != b ? a > b : id < other.id;
     }
 
-    bool Unit::canMakeWayFor(const Unit &requester) const
+    bool Unit::CanMakeWayFor(const Unit &requester) const
     {
         if(!alive || state == ActionState::Die || state == ActionState::Transform || state == ActionState::Attack || state == ActionState::Move)
             return false;
-        if(id == requester.id || moveSpeed <= 0.0f || isSiegeMode || isDirectEngaged || hasReservation() || targetWallTileX >= 0)
+        if(id == requester.id || moveSpeed <= 0.0f || isSiegeMode || isDirectEngaged || HasReservation() || targetWallTileX >= 0)
             return false;
-        if(Players::hostile(owner, requester.owner))
+        if(Players::Hostile(owner, requester.owner))
             return false;
-        const bool ownGoal = hasMoveTarget() || targetEntityId != 0;
-        return !ownGoal || requester.passesBefore(*this);
+        const bool ownGoal = HasMoveTarget() || targetEntityId != 0;
+        return !ownGoal || requester.PassesBefore(*this);
     }
 
-    void Unit::makeWayStep(int x, int y)
+    void Unit::MakeWayStep(int x, int y)
     {
-        const bool ownGoal = hasMoveTarget() || targetEntityId != 0;
+        const bool ownGoal = HasMoveTarget() || targetEntityId != 0;
         if(!ownGoal && yieldHomeX < 0)
         {
             yieldHomeX = tileX;
@@ -1081,7 +1081,7 @@ namespace OpenArtOfWar
         pathRetryTimer = 0.0f;
     }
 
-    bool Unit::requestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates &delegates)
+    bool Unit::RequestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates &delegates)
     {
         if(!delegates.getUnitAtTile || !delegates.getEntity)
             return false;
@@ -1090,8 +1090,8 @@ namespace OpenArtOfWar
         constexpr int kMaxNodes = 96;
         constexpr int kMaxChain = 6;
 
-        const int mapW = map.getWidth(), mapH = map.getHeight();
-        auto open = [&](int x, int y) { return x >= 0 && y >= 0 && x < mapW && y < mapH && map.isPassable(x, y) && map.getWall(x, y) == 0; };
+        const int mapW = map.GetWidth(), mapH = map.GetHeight();
+        auto open = [&](int x, int y) { return x >= 0 && y >= 0 && x < mapW && y < mapH && map.IsPassable(x, y) && map.GetWall(x, y) == 0; };
 
         // Our road ahead: the chain moves off it, not along it (where it would be in the way again)
         auto roadCost = [&](int x, int y)
@@ -1163,8 +1163,8 @@ namespace OpenArtOfWar
                     {
                         // Through an ally only when it can step on as well
                         const Entity *e = delegates.getEntity(occupant);
-                        const Unit *u = e ? e->asUnit() : nullptr;
-                        if(!u || u->tileX != nx || u->tileY != ny || !u->canMakeWayFor(*this))
+                        const Unit *u = e ? e->AsUnit() : nullptr;
+                        if(!u || u->tileX != nx || u->tileY != ny || !u->CanMakeWayFor(*this))
                             continue;
                     }
                     if(static_cast<int>(nodes.size()) >= kMaxNodes)
@@ -1189,20 +1189,20 @@ namespace OpenArtOfWar
             if(chain[k] != 0)
             {
                 Entity *e = delegates.getEntity(delegates.getUnitAtTile(from.x, from.y, 0));
-                u = e ? e->asUnit() : nullptr;
+                u = e ? e->AsUnit() : nullptr;
             }
             if(u)
-                u->makeWayStep(to.x, to.y);
+                u->MakeWayStep(to.x, to.y);
         }
         return true;
     }
 
-    bool Unit::findPathThroughAllies(int goalX, int goalY, Pathfinder &pathfinder, std::vector<PathNode> &outPath, bool *outPartial, int avoidX, int avoidY) const
+    bool Unit::FindPathThroughAllies(int goalX, int goalY, Pathfinder &pathfinder, std::vector<PathNode> &outPath, bool *outPartial, int avoidX, int avoidY) const
     {
         bool partial = false;
         if(avoidX >= 0 && avoidY >= 0)
-            pathfinder.setAvoidTiles({{avoidX, avoidY}});
-        const bool found = pathfinder.findPath(tileX, tileY, goalX, goalY, outPath, id, &partial);
+            pathfinder.SetAvoidTiles({{avoidX, avoidY}});
+        const bool found = pathfinder.FindPath(tileX, tileY, goalX, goalY, outPath, id, &partial);
         if(outPartial)
             *outPartial = partial;
         // Same rule as for walls: a detour longer than twice the straight way plus 10 tiles is not a way around
@@ -1215,22 +1215,22 @@ namespace OpenArtOfWar
         std::vector<PathNode> avoid;
         if(avoidX >= 0 && avoidY >= 0)
             avoid.push_back({avoidX, avoidY});
-        if(const EntityManager *entities = pathfinder.getEntityManager())
+        if(const EntityManager *entities = pathfinder.GetEntityManager())
         {
-            for(const auto &e : entities->getAllEntities())
+            for(const auto &e : entities->GetAllEntities())
             {
-                const Unit *u = e.asUnit();
-                if(!u || u->id == id || !u->alive || u->state == ActionState::Die || u->state == ActionState::Move || Players::hostile(u->owner, owner))
+                const Unit *u = e.AsUnit();
+                if(!u || u->id == id || !u->alive || u->state == ActionState::Die || u->state == ActionState::Move || Players::Hostile(u->owner, owner))
                     continue;
-                if(!u->canMakeWayFor(*this))
+                if(!u->CanMakeWayFor(*this))
                     avoid.push_back({u->tileX, u->tileY});
             }
         }
         std::vector<PathNode> through;
         bool throughPartial = false;
-        pathfinder.setAvoidTiles(std::move(avoid));
-        pathfinder.setIgnoreUnitsOnce();
-        if(pathfinder.findPath(tileX, tileY, goalX, goalY, through, id, &throughPartial) && !through.empty() && !throughPartial && (!found || partial || through.size() < outPath.size()))
+        pathfinder.SetAvoidTiles(std::move(avoid));
+        pathfinder.SetIgnoreUnitsOnce();
+        if(pathfinder.FindPath(tileX, tileY, goalX, goalY, through, id, &throughPartial) && !through.empty() && !throughPartial && (!found || partial || through.size() < outPath.size()))
         {
             outPath = std::move(through);
             if(outPartial)
@@ -1240,9 +1240,9 @@ namespace OpenArtOfWar
         return found;
     }
 
-    void Unit::updateYieldHome(float deltaTime, Pathfinder &pathfinder, const UnitDelegates &delegates)
+    void Unit::UpdateYieldHome(float deltaTime, Pathfinder &pathfinder, const UnitDelegates &delegates)
     {
-        if(hasMoveTarget() || targetEntityId != 0 || !path.empty())
+        if(HasMoveTarget() || targetEntityId != 0 || !path.empty())
             return;
         yieldHomeTimer -= deltaTime;
         if(yieldHomeTimer > 0.0f)
@@ -1261,7 +1261,7 @@ namespace OpenArtOfWar
             return; // still taken: try again later
         std::vector<PathNode> back;
         bool partial = false;
-        if(pathfinder.findPath(tileX, tileY, yieldHomeX, yieldHomeY, back, id, &partial) && !back.empty() && !partial && back.size() <= static_cast<size_t>(kMaxDistance + 4))
+        if(pathfinder.FindPath(tileX, tileY, yieldHomeX, yieldHomeY, back, id, &partial) && !back.empty() && !partial && back.size() <= static_cast<size_t>(kMaxDistance + 4))
         {
             path = std::move(back);
             pathIndex = 0;
@@ -1269,15 +1269,15 @@ namespace OpenArtOfWar
         }
     }
 
-    void Unit::approachTile(const Entity &target, const TileMap &map, int &outX, int &outY) const
+    void Unit::ApproachTile(const Entity &target, const TileMap &map, int &outX, int &outY) const
     {
         outX = target.tileX;
         outY = target.tileY;
         if(target.isBuilding)
             return;
-        const float tx = target.getUnitCenterPixelX(), ty = target.getUnitCenterPixelY();
-        const float dx = getUnitCenterPixelX() - tx, dy = getUnitCenterPixelY() - ty;
-        const float len = DetMath::hypot(dx, dy);
+        const float tx = target.GetUnitCenterPixelX(), ty = target.GetUnitCenterPixelY();
+        const float dx = GetUnitCenterPixelX() - tx, dy = GetUnitCenterPixelY() - ty;
+        const float len = DetMath::Hypot(dx, dy);
         const float stand = std::max(0.0f, attackRange - 0.6f) * TILE_WIDTH;
         if(len <= stand || len <= 0.0f)
             return;
@@ -1291,13 +1291,13 @@ namespace OpenArtOfWar
         {
             for(int x = cx - 1; x <= cx + 1; ++x)
             {
-                if(x < 0 || y < 0 || x >= map.getWidth() || y >= map.getHeight() || !map.isPassable(x, y) || map.getWall(x, y) > 0)
+                if(x < 0 || y < 0 || x >= map.GetWidth() || y >= map.GetHeight() || !map.IsPassable(x, y) || map.GetWall(x, y) > 0)
                     continue;
                 const float px = x * TILE_WIDTH + TILE_WIDTH * 0.5f, py = y * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-                const float dTarget = DetMath::hypot(px - tx, py - ty);
+                const float dTarget = DetMath::Hypot(px - tx, py - ty);
                 if(dTarget > range)
                     continue;
-                const float dUnit = DetMath::hypot(px - getUnitCenterPixelX(), py - getUnitCenterPixelY());
+                const float dUnit = DetMath::Hypot(px - GetUnitCenterPixelX(), py - GetUnitCenterPixelY());
                 if(dTarget > bestTargetDist + 0.01f || (std::abs(dTarget - bestTargetDist) <= 0.01f && dUnit < bestUnitDist))
                 {
                     bestTargetDist = dTarget;
@@ -1309,22 +1309,22 @@ namespace OpenArtOfWar
         }
     }
 
-    bool Unit::findPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial)
+    bool Unit::FindPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial)
     {
         int gx = target.tileX, gy = target.tileY;
-        if(const TileMap *map = pathfinder.getMap())
-            approachTile(target, *map, gx, gy);
-        if(pathfinder.findPath(tileX, tileY, gx, gy, path, id, outPartial))
+        if(const TileMap *map = pathfinder.GetMap())
+            ApproachTile(target, *map, gx, gy);
+        if(pathfinder.FindPath(tileX, tileY, gx, gy, path, id, outPartial))
             return true;
-        return (gx != target.tileX || gy != target.tileY) && pathfinder.findPath(tileX, tileY, target.tileX, target.tileY, path, id, outPartial);
+        return (gx != target.tileX || gy != target.tileY) && pathfinder.FindPath(tileX, tileY, target.tileX, target.tileY, path, id, outPartial);
     }
 
-    bool Unit::canBreachWalls() const
+    bool Unit::CanBreachWalls() const
     {
-        return isAttackMoving || groupOrder || !Players::slot(owner).human;
+        return isAttackMoving || groupOrder || !Players::Slot(owner).human;
     }
 
-    bool Unit::shouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const
+    bool Unit::ShouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const
     {
         // Tuning: a detour longer than twice the straight way plus 10 tiles goes through the wall instead;
         // so does a unit that has been waiting in front of a gap for 3 seconds
@@ -1332,7 +1332,7 @@ namespace OpenArtOfWar
         constexpr int kDetourSlack = 10;
         constexpr float kQueueSeconds = 3.0f;
         int routeLen = 0;
-        if(!hasOpenRouteTo(goalX, goalY, pathfinder, &routeLen))
+        if(!HasOpenRouteTo(goalX, goalY, pathfinder, &routeLen))
             return true;
         const int straight = std::max(std::abs(goalX - tileX), std::abs(goalY - tileY));
         if(routeLen > straight * kDetourFactor + kDetourSlack)
@@ -1341,7 +1341,7 @@ namespace OpenArtOfWar
         // at the wall itself - one queueing further back is held up by its allies, not by the wall)
         if(blockedTimer < kQueueSeconds || straight <= 3)
             return false;
-        const TileMap *map = pathfinder.getMap();
+        const TileMap *map = pathfinder.GetMap();
         if(!map)
             return false;
         constexpr int kAtWall = 1;
@@ -1349,17 +1349,17 @@ namespace OpenArtOfWar
         {
             for(int x = tileX - kAtWall; x <= tileX + kAtWall; ++x)
             {
-                if(map->getWall(x, y) > 0 && Players::hostile(map->getWallOwner(x, y), owner))
+                if(map->GetWall(x, y) > 0 && Players::Hostile(map->GetWallOwner(x, y), owner))
                     return true;
             }
         }
         return false;
     }
 
-    bool Unit::hasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) const
+    bool Unit::HasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) const
     {
         int x0 = target.tileX, y0 = target.tileY, x1 = target.tileX, y1 = target.tileY;
-        if(const Building *b = target.asBuilding())
+        if(const Building *b = target.AsBuilding())
         {
             x1 = b->tileX + b->buildWidth - 1;
             y1 = b->tileY + b->buildHeight - 1;
@@ -1370,13 +1370,13 @@ namespace OpenArtOfWar
         // A building fills its own tiles: the route counts as open when it ends right next to the footprint
         std::vector<PathNode> route;
         bool partial = false;
-        pathfinder.setIgnoreUnitsOnce();
-        if(!pathfinder.findPath(tileX, tileY, target.tileX, target.tileY, route, id, &partial) || route.empty())
+        pathfinder.SetIgnoreUnitsOnce();
+        if(!pathfinder.FindPath(tileX, tileY, target.tileX, target.tileY, route, id, &partial) || route.empty())
             return false;
         return !partial || touches(route.back().x, route.back().y);
     }
 
-    void Unit::updateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
+    void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
     {
         if(state == ActionState::Transform || attackDamage <= 0 || state == ActionState::Die)
         {
@@ -1388,7 +1388,7 @@ namespace OpenArtOfWar
         // must NOT be interrupted by auto-targeting:
         if(state == ActionState::Move && targetEntityId == 0 && targetWallTileX < 0 && hasRotatingTurret)
         {
-            fireOnTheMove(deltaTime, map, delegates);
+            FireOnTheMove(deltaTime, map, delegates);
         }
         else
         {
@@ -1418,19 +1418,19 @@ namespace OpenArtOfWar
         // 2. Handle Wall Target Engagement
         if(targetWallTileX >= 0 && targetWallTileY >= 0)
         {
-            if(map.getWall(targetWallTileX, targetWallTileY) == 0)
+            if(map.GetWall(targetWallTileX, targetWallTileY) == 0)
             {
                 targetWallTileX = -1;
                 targetWallTileY = -1;
                 isManualWallTarget = false;
                 isDirectEngaged = false;
 
-                if(hasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
+                if(HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
                 {
                     if(std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
                     {
                         bool isPartial = false;
-                        if(pathfinder.findPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                        if(pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
                         {
                             pathIndex = 0;
                             state = ActionState::Move;
@@ -1444,7 +1444,7 @@ namespace OpenArtOfWar
                     }
                     else
                     {
-                        clearMoveTarget();
+                        ClearMoveTarget();
                         isAttackMoving = false;
                         state = ActionState::Idle;
                     }
@@ -1457,7 +1457,7 @@ namespace OpenArtOfWar
             }
 
             // Fog of War visibility gate for Siege Mode attacking walls
-            if(isSiegeMode && Players::slot(owner).human && !map.isVisibleTo(targetWallTileX, targetWallTileY, Players::teamOf(owner)))
+            if(isSiegeMode && Players::Slot(owner).human && !map.IsVisibleTo(targetWallTileX, targetWallTileY, Players::TeamOf(owner)))
             {
                 targetWallTileX = -1;
                 targetWallTileY = -1;
@@ -1471,13 +1471,13 @@ namespace OpenArtOfWar
                 return;
             }
 
-            float srcX = getUnitCenterPixelX();
-            float srcY = getUnitCenterPixelY();
+            float srcX = GetUnitCenterPixelX();
+            float srcY = GetUnitCenterPixelY();
             float dstX = targetWallTileX * TILE_WIDTH + (TILE_WIDTH * 0.5f);
             float dstY = targetWallTileY * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
             float dx = dstX - srcX;
             float dy = dstY - srcY;
-            float dist = DetMath::hypot(dx, dy);
+            float dist = DetMath::Hypot(dx, dy);
 
             // Siege Mode / Immobile unit cannot chase an out-of-range wall: drop target immediately
             if(dist > attackRange * TILE_WIDTH)
@@ -1503,7 +1503,7 @@ namespace OpenArtOfWar
                 if(state != ActionState::Move && !waitingForPath)
                 {
                     bool isPartial = false;
-                    if(pathfinder.findPath(tileX, tileY, targetWallTileX, targetWallTileY, path, id, &isPartial))
+                    if(pathfinder.FindPath(tileX, tileY, targetWallTileX, targetWallTileY, path, id, &isPartial))
                     {
                         pathIndex = 0;
                         state = ActionState::Move;
@@ -1514,18 +1514,18 @@ namespace OpenArtOfWar
             }
 
             // Within firing range: orient turret/hull and fire when cooldown is ready
-            int targetDir8 = Utility::dir8FromVector(dx, dy);
+            int targetDir8 = Utility::Dir8FromVector(dx, dy);
 
             if(!isSiegeMode)
             {
-                clearPathState();
+                ClearPathState();
                 if(state == ActionState::Move)
                     state = ActionState::Idle;
             }
 
             if(hasRotatingTurret)
             {
-                const bool turretAligned = stepTurretToward(targetDir8, deltaTime);
+                const bool turretAligned = StepTurretToward(targetDir8, deltaTime);
                 if(isSiegeMode)
                 {
                     facingDirection = turretFacing;
@@ -1535,7 +1535,7 @@ namespace OpenArtOfWar
             }
             else if(state != ActionState::Move)
             {
-                if(!isInfantry() && facingDirection != targetDir8)
+                if(!IsInfantry() && facingDirection != targetDir8)
                 {
                     if(turnStepDelay <= 0.0f)
                     {
@@ -1547,7 +1547,7 @@ namespace OpenArtOfWar
                         while(turnTimer >= turnStepDelay && facingDirection != targetDir8)
                         {
                             turnTimer -= turnStepDelay;
-                            int delta = Utility::turnStep8(facingDirection, targetDir8);
+                            int delta = Utility::TurnStep8(facingDirection, targetDir8);
                             facingDirection = (facingDirection + delta + 8) % 8;
                         }
                     }
@@ -1564,9 +1564,9 @@ namespace OpenArtOfWar
 
             if(cooldownTimer <= 0.0f)
             {
-                cooldownTimer = nextCooldown();
+                cooldownTimer = NextCooldown();
 
-                if(isFortress())
+                if(IsFortress())
                 {
                     int tdx = std::abs(targetWallTileX - tileX);
                     int tdy = std::abs(targetWallTileY - tileY);
@@ -1578,7 +1578,7 @@ namespace OpenArtOfWar
                         if(delegates.spawnProjectile)
                         {
                             float mSrcX, mSrcY;
-                            getMuzzlePoint(mSrcX, mSrcY);
+                            GetMuzzlePoint(mSrcX, mSrcY);
                             ProjectileType origProj = projectile;
                             projectile = ProjectileType::Bullet;
                             delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
@@ -1591,13 +1591,13 @@ namespace OpenArtOfWar
                     }
                 }
 
-                attackAnimTimer = isFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
+                attackAnimTimer = IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
                 animFrame = 0;
                 animTimer = 0.0f;
                 state = ActionState::Attack;
 
                 float mSrcX, mSrcY;
-                getMuzzlePoint(mSrcX, mSrcY);
+                GetMuzzlePoint(mSrcX, mSrcY);
                 if(delegates.spawnProjectile)
                 {
                     delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
@@ -1619,11 +1619,11 @@ namespace OpenArtOfWar
         //    Only a unit the wall actually hinders shoots at it: one whose goal is walled off, whose way around
         //    is a long detour, or that has been queueing in front of a gap for a while. Units that can walk
         //    on through an open route leave the wall alone.
-        const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath) || (hasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
-        if(targetEntityId == 0 && targetWallTileX < 0 && stuckWithGoal && hasMoveTarget() && canBreachWalls() && wallCheckCooldown <= 0.0f)
+        const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath) || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
+        if(targetEntityId == 0 && targetWallTileX < 0 && stuckWithGoal && HasMoveTarget() && CanBreachWalls() && wallCheckCooldown <= 0.0f)
         {
             wallCheckCooldown = 1.0f;
-            const bool wallsInTheWay = shouldBreachWalls(targetTileX, targetTileY, pathfinder);
+            const bool wallsInTheWay = ShouldBreachWalls(targetTileX, targetTileY, pathfinder);
             if(wallsInTheWay && delegates.findWallTarget)
             {
                 int wx = -1, wy = -1;
@@ -1635,7 +1635,7 @@ namespace OpenArtOfWar
                     if(state == ActionState::Move)
                     {
                         // Keep the move goal: the route is planned again once the wall is down
-                        clearPathState();
+                        ClearPathState();
                         state = ActionState::Idle;
                         animFrame = 0;
                     }
@@ -1659,13 +1659,13 @@ namespace OpenArtOfWar
         if(lastAttackedTimer > 0.0f && lastAttackerId != 0 && lastAttackerId != targetEntityId && !(state == ActionState::Move && !isAttackMoving) && !holdPosition && !isSiegeMode && moveSpeed > 0.0f && targetWallTileX < 0 && attackDamage > 0 && state != ActionState::Transform)
         {
             Entity *attacker = delegates.getEntity ? delegates.getEntity(lastAttackerId) : nullptr;
-            if(attacker && attacker->alive && attacker->state != ActionState::Die && Players::hostile(attacker->owner, owner))
+            if(attacker && attacker->alive && attacker->state != ActionState::Die && Players::Hostile(attacker->owner, owner))
             {
                 bool busyInRange = false;
                 if(targetEntityId != 0)
                 {
                     const Entity *current = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
-                    busyInRange = current && current->alive && current->state != ActionState::Die && computeDistanceToEntityPixels(*this, *current) <= attackRange * TILE_WIDTH;
+                    busyInRange = current && current->alive && current->state != ActionState::Die && ComputeDistanceToEntityPixels(*this, *current) <= attackRange * TILE_WIDTH;
                 }
                 if(!busyInRange)
                 {
@@ -1674,7 +1674,7 @@ namespace OpenArtOfWar
                     waitingForPath = false;
                     if(state == ActionState::Move)
                     {
-                        clearPathState();
+                        ClearPathState();
                         state = ActionState::Idle;
                         animFrame = 0;
                     }
@@ -1688,7 +1688,7 @@ namespace OpenArtOfWar
         }
 
         // 4. Auto-acquire Enemy Target & Support Assist (Depth = 1)
-        if(targetEntityId == 0 && (state == ActionState::Idle || isAttackMoving || waitingForPath || !Players::slot(owner).human))
+        if(targetEntityId == 0 && (state == ActionState::Idle || isAttackMoving || waitingForPath || !Players::Slot(owner).human))
         {
             if(delegates.findTarget)
             {
@@ -1700,7 +1700,7 @@ namespace OpenArtOfWar
                     if(validForUnit && (isSiegeMode || moveSpeed <= 0.0f))
                     {
                         // Siege mode units ONLY acquire targets strictly within attackRange
-                        float d = computeDistanceToEntityPixels(*this, *cand);
+                        float d = ComputeDistanceToEntityPixels(*this, *cand);
                         validForUnit = (d <= attackRange * TILE_WIDTH);
                     }
                     if(validForUnit && !isManualWallTarget)
@@ -1712,14 +1712,14 @@ namespace OpenArtOfWar
                         waitingForPath = false;
                     }
                 }
-                else if(isAttackMoving && hasMoveTarget())
+                else if(isAttackMoving && HasMoveTarget())
                 {
                     if(state == ActionState::Idle && !isSiegeMode && moveSpeed > 0.0f && !waitingForPath)
                     {
                         if(std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
                         {
                             bool isPartial = false;
-                            if(pathfinder.findPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                            if(pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
                             {
                                 pathIndex = 0;
                                 state = ActionState::Move;
@@ -1733,7 +1733,7 @@ namespace OpenArtOfWar
                         else
                         {
                             isAttackMoving = false;
-                            clearMoveTarget();
+                            ClearMoveTarget();
                         }
                     }
                 }
@@ -1758,7 +1758,7 @@ namespace OpenArtOfWar
                             isSupportAssisting = true; // Marks depth = 1 so other units do NOT chain off this unit!
                             waitingForPath = false;
                             bool isPartial = false;
-                            if(pathfinder.findPath(tileX, tileY, enemy->tileX, enemy->tileY, path, id, &isPartial))
+                            if(pathfinder.FindPath(tileX, tileY, enemy->tileX, enemy->tileY, path, id, &isPartial))
                             {
                                 pathIndex = 0;
                                 state = ActionState::Move;
@@ -1788,7 +1788,7 @@ namespace OpenArtOfWar
                     if(nextTargetId != 0)
                     {
                         Entity *cand = delegates.getEntity ? delegates.getEntity(nextTargetId) : nullptr;
-                        if(cand && (!isSiegeMode || computeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
+                        if(cand && (!isSiegeMode || ComputeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
                         {
                             targetEntityId = nextTargetId;
                             return;
@@ -1797,12 +1797,12 @@ namespace OpenArtOfWar
                 }
 
                 // Resume original move / attack-move order if a valid ground destination exists
-                if(hasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
+                if(HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
                 {
                     if(std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
                     {
                         bool isPartial = false;
-                        if(pathfinder.findPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                        if(pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
                         {
                             pathIndex = 0;
                             state = ActionState::Move;
@@ -1816,7 +1816,7 @@ namespace OpenArtOfWar
                     }
                     else
                     {
-                        clearMoveTarget();
+                        ClearMoveTarget();
                         isAttackMoving = false;
                         state = ActionState::Idle;
                     }
@@ -1845,13 +1845,13 @@ namespace OpenArtOfWar
                 return;
             }
 
-            float srcX = getUnitCenterPixelX();
-            float srcY = getUnitCenterPixelY();
-            float dstX = target->getUnitCenterPixelX();
-            float dstY = target->getUnitCenterPixelY();
+            float srcX = GetUnitCenterPixelX();
+            float srcY = GetUnitCenterPixelY();
+            float dstX = target->GetUnitCenterPixelX();
+            float dstY = target->GetUnitCenterPixelY();
             float dx = dstX - srcX;
             float dy = dstY - srcY;
-            float dist = computeDistanceToEntityPixels(*this, *target);
+            float dist = ComputeDistanceToEntityPixels(*this, *target);
 
             // 5c. Out-of-Range Check (Crucial for Siege Mode Anti-Vibration!)
             if(dist > attackRange * TILE_WIDTH)
@@ -1878,10 +1878,10 @@ namespace OpenArtOfWar
                 }
 
                 // Stuck in front of the target (a base walled in all around): shoot a way through the wall
-                if(state != ActionState::Move && path.empty() && canBreachWalls() && !isManualWallTarget && wallCheckCooldown <= 0.0f && delegates.findWallTarget)
+                if(state != ActionState::Move && path.empty() && CanBreachWalls() && !isManualWallTarget && wallCheckCooldown <= 0.0f && delegates.findWallTarget)
                 {
                     wallCheckCooldown = 1.0f;
-                    if(!hasOpenRouteToEntity(*target, pathfinder))
+                    if(!HasOpenRouteToEntity(*target, pathfinder))
                     {
                         int wx = -1, wy = -1;
                         delegates.findWallTarget(*this, wx, wy);
@@ -1900,7 +1900,7 @@ namespace OpenArtOfWar
                 if(state != ActionState::Move && !waitingForPath)
                 {
                     bool isPartial = false;
-                    if(findPathToAttack(*target, pathfinder, &isPartial))
+                    if(FindPathToAttack(*target, pathfinder, &isPartial))
                     {
                         pathIndex = 0;
                         state = ActionState::Move;
@@ -1915,14 +1915,14 @@ namespace OpenArtOfWar
             }
 
             // 5d. Target is Visible AND Within Firing Range: Aim and Fire
-            int targetDir8 = Utility::dir8FromVector(dx, dy);
+            int targetDir8 = Utility::Dir8FromVector(dx, dy);
 
             // Mark unit as actively engaged in direct firing range
             isDirectEngaged = true;
 
             if(!isSiegeMode)
             {
-                clearPathState();
+                ClearPathState();
                 if(state == ActionState::Move)
                 {
                     state = ActionState::Idle;
@@ -1932,7 +1932,7 @@ namespace OpenArtOfWar
 
             if(hasRotatingTurret)
             {
-                const bool turretAligned = stepTurretToward(targetDir8, deltaTime);
+                const bool turretAligned = StepTurretToward(targetDir8, deltaTime);
                 if(isSiegeMode)
                 {
                     facingDirection = turretFacing;
@@ -1944,7 +1944,7 @@ namespace OpenArtOfWar
             }
             else if(state != ActionState::Move)
             {
-                if(!isInfantry() && facingDirection != targetDir8)
+                if(!IsInfantry() && facingDirection != targetDir8)
                 {
                     if(turnStepDelay <= 0.0f)
                     {
@@ -1956,7 +1956,7 @@ namespace OpenArtOfWar
                         while(turnTimer >= turnStepDelay && facingDirection != targetDir8)
                         {
                             turnTimer -= turnStepDelay;
-                            int delta = Utility::turnStep8(facingDirection, targetDir8);
+                            int delta = Utility::TurnStep8(facingDirection, targetDir8);
                             facingDirection = (facingDirection + delta + 8) % 8;
                         }
                     }
@@ -1975,9 +1975,9 @@ namespace OpenArtOfWar
 
             if(cooldownTimer <= 0.0f)
             {
-                cooldownTimer = nextCooldown();
+                cooldownTimer = NextCooldown();
 
-                if(isFortress())
+                if(IsFortress())
                 {
                     int tdx = std::abs(target->tileX - tileX);
                     int tdy = std::abs(target->tileY - tileY);
@@ -1989,7 +1989,7 @@ namespace OpenArtOfWar
                         if(delegates.spawnProjectile)
                         {
                             float mSrcX, mSrcY;
-                            getMuzzlePoint(mSrcX, mSrcY);
+                            GetMuzzlePoint(mSrcX, mSrcY);
                             ProjectileType origProj = projectile;
                             projectile = ProjectileType::Bullet;
                             delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
@@ -2002,13 +2002,13 @@ namespace OpenArtOfWar
                     }
                 }
 
-                attackAnimTimer = isFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
+                attackAnimTimer = IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
                 animFrame = 0;
                 animTimer = 0.0f;
                 state = ActionState::Attack;
 
                 float mSrcX, mSrcY;
-                getMuzzlePoint(mSrcX, mSrcY);
+                GetMuzzlePoint(mSrcX, mSrcY);
                 if(delegates.spawnProjectile)
                 {
                     delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);

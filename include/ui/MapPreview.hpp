@@ -30,8 +30,8 @@ namespace OpenArtOfWar
 
         // The preview of `mapPath` ("assets/maps/m37.json"); `key` tells the cached pictures apart (the same map
         // with other markers needs another key). Returns nullptr when the map cannot be read.
-        SDL_Texture *get(SDL_Renderer *renderer, TextureManager &textures, const std::string &key, const std::string &mapPath, const std::vector<PreviewMarker> &markers, int &width, int &height);
-        void clear();
+        SDL_Texture *Get(SDL_Renderer *renderer, TextureManager &textures, const std::string &key, const std::string &mapPath, const std::vector<PreviewMarker> &markers, int &width, int &height);
+        void Clear();
 
     private:
         struct Entry

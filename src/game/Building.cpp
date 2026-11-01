@@ -16,7 +16,7 @@ namespace OpenArtOfWar
         sightRadius = 7;
     }
 
-    int Building::getPowerOutput() const
+    int Building::GetPowerOutput() const
     {
         int bMod = (rawBuildingType >= 0) ? (rawBuildingType % 8) : 0;
         if(bMod == 0)
@@ -34,7 +34,7 @@ namespace OpenArtOfWar
         return -15;   // Turrets / Radar
     }
 
-    void Building::getMuzzlePoint(float &outX, float &outY) const
+    void Building::GetMuzzlePoint(float &outX, float &outY) const
     {
         float bcx = (tileX + buildWidth * 0.5f) * TILE_WIDTH;
         float bcy = (tileY + buildHeight * 0.5f) * TILE_HEIGHT;
@@ -67,7 +67,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void Building::update(float deltaTime, TileMap &map, const BuildingDelegates &delegates)
+    void Building::Update(float deltaTime, TileMap &map, const BuildingDelegates &delegates)
     {
         if(!alive)
             return;
@@ -75,9 +75,9 @@ namespace OpenArtOfWar
         if(state == ActionState::Die)
         {
             deathTimer -= deltaTime;
-            const EffectsConfig &fx = EffectsConfig::get();
+            const EffectsConfig &fx = EffectsConfig::Get();
             const float elapsed = std::clamp(fx.burialSeconds - deathTimer, 0.0f, fx.burialSeconds);
-            const int stages = wreckStages > 0 ? wreckStages : fx.wreckOfBuilding(buildWidth, buildHeight).stages;
+            const int stages = wreckStages > 0 ? wreckStages : fx.WreckOfBuilding(buildWidth, buildHeight).stages;
             animFrame = std::min(stages - 1, static_cast<int>((elapsed / fx.burialSeconds) * static_cast<float>(stages)));
             if(deathTimer <= 0.0f)
             {
@@ -100,12 +100,12 @@ namespace OpenArtOfWar
             }
         }
 
-        updateConstruction(deltaTime);
-        updateProduction(deltaTime);
-        updateDefenseCombat(deltaTime, map, delegates);
+        UpdateConstruction(deltaTime);
+        UpdateProduction(deltaTime);
+        UpdateDefenseCombat(deltaTime, map, delegates);
     }
 
-    void Building::updateConstruction(float deltaTime)
+    void Building::UpdateConstruction(float deltaTime)
     {
         if(buildProgress < 1.0f)
         {
@@ -121,7 +121,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void Building::updateProduction(float deltaTime)
+    void Building::UpdateProduction(float deltaTime)
     {
         if(productionTimer > 0.0f)
         {
@@ -138,7 +138,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void Building::updateDefenseCombat(float /*deltaTime*/, TileMap &map, const BuildingDelegates &delegates)
+    void Building::UpdateDefenseCombat(float /*deltaTime*/, TileMap &map, const BuildingDelegates &delegates)
     {
         bool requiresPower = (rawBuildingType != 5 && rawBuildingType != 13);
         if(attackDamage <= 0 || buildProgress < 1.0f || (requiresPower && !isPowered) || state == ActionState::Die)
@@ -153,15 +153,15 @@ namespace OpenArtOfWar
         if(targetEntityId != 0)
         {
             Entity *tgt = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
-            if(!tgt || !tgt->alive || tgt->state == ActionState::Die || !Players::hostile(tgt->owner, owner) || (delegates.isEntityVisible && !delegates.isEntityVisible(*tgt, owner)))
+            if(!tgt || !tgt->alive || tgt->state == ActionState::Die || !Players::Hostile(tgt->owner, owner) || (delegates.isEntityVisible && !delegates.isEntityVisible(*tgt, owner)))
             {
                 targetEntityId = 0;
             }
             else
             {
-                float dstX = tgt->getUnitCenterPixelX();
-                float dstY = tgt->getUnitCenterPixelY();
-                float dist = DetMath::hypot(dstX - srcX, dstY - srcY);
+                float dstX = tgt->GetUnitCenterPixelX();
+                float dstY = tgt->GetUnitCenterPixelY();
+                float dist = DetMath::Hypot(dstX - srcX, dstY - srcY);
                 if(dist > attackRange * TILE_WIDTH)
                 {
                     targetEntityId = 0;
@@ -180,21 +180,21 @@ namespace OpenArtOfWar
             Entity *target = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
             if(target && target->alive && target->state != ActionState::Die)
             {
-                float dstX = target->getUnitCenterPixelX();
-                float dstY = target->getUnitCenterPixelY();
+                float dstX = target->GetUnitCenterPixelX();
+                float dstY = target->GetUnitCenterPixelY();
                 float dx = dstX - srcX;
                 float dy = dstY - srcY;
 
-                turretFacing = Utility::dir8FromVector(dx, dy);
+                turretFacing = Utility::Dir8FromVector(dx, dy);
 
                 if(cooldownTimer <= 0.0f)
                 {
-                    cooldownTimer = nextCooldown();
+                    cooldownTimer = NextCooldown();
                     attackAnimTimer = 0.15f;
                     state = ActionState::Attack;
 
                     float mSrcX, mSrcY;
-                    getMuzzlePoint(mSrcX, mSrcY);
+                    GetMuzzlePoint(mSrcX, mSrcY);
                     if(delegates.spawnProjectile)
                     {
                         delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);

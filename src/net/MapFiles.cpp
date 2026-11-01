@@ -18,16 +18,16 @@ namespace OpenArtOfWar::MapFiles
     namespace
     {
 
-        std::string downloadedPath(const std::string &path, uint64_t hash)
+        std::string DownloadedPath(const std::string &path, uint64_t hash)
         {
             char suffix[24];
             std::snprintf(suffix, sizeof suffix, "_%016llx.json", static_cast<unsigned long long>(hash));
-            return (fs::path(Assets::userDataDir()) / "downloaded_maps" / (fs::path(path).stem().string() + suffix)).string();
+            return (fs::path(Assets::UserDataDir()) / "downloaded_maps" / (fs::path(path).stem().string() + suffix)).string();
         }
 
-        bool readAll(const std::string &path, std::vector<uint8_t> &out)
+        bool ReadAll(const std::string &path, std::vector<uint8_t> &out)
         {
-            if(Assets::readBytes(path, out))
+            if(Assets::ReadBytes(path, out))
                 return true;
             std::ifstream in(path, std::ios::binary);
             if(!in)
@@ -38,7 +38,7 @@ namespace OpenArtOfWar::MapFiles
 
     } // namespace
 
-    uint64_t hashOfBytes(const std::vector<uint8_t> &bytes)
+    uint64_t HashOfBytes(const std::vector<uint8_t> &bytes)
     {
         // Two CRCs side by side: 64 bits, cheap, the same on every platform
         const uint32_t a = Net::crc32(bytes.data(), bytes.size());
@@ -46,24 +46,24 @@ namespace OpenArtOfWar::MapFiles
         return (static_cast<uint64_t>(a) << 32) | b;
     }
 
-    uint64_t hashOf(const std::string &path)
+    uint64_t HashOf(const std::string &path)
     {
         std::vector<uint8_t> bytes;
-        return readAll(path, bytes) ? hashOfBytes(bytes) : 0;
+        return ReadAll(path, bytes) ? HashOfBytes(bytes) : 0;
     }
 
-    std::string resolve(const std::string &path, uint64_t hash)
+    std::string Resolve(const std::string &path, uint64_t hash)
     {
-        if(hash == 0 || hashOf(path) == hash)
+        if(hash == 0 || HashOf(path) == hash)
             return path;
-        const std::string copy = downloadedPath(path, hash);
-        return hashOf(copy) == hash ? copy : std::string();
+        const std::string copy = DownloadedPath(path, hash);
+        return HashOf(copy) == hash ? copy : std::string();
     }
 
-    std::vector<uint8_t> packed(const std::string &path)
+    std::vector<uint8_t> Packed(const std::string &path)
     {
         std::vector<uint8_t> raw;
-        if(!readAll(path, raw))
+        if(!ReadAll(path, raw))
             return {};
         std::vector<uint8_t> out(ZSTD_compressBound(raw.size()));
         const size_t n = ZSTD_compress(out.data(), out.size(), raw.data(), raw.size(), 15);
@@ -73,7 +73,7 @@ namespace OpenArtOfWar::MapFiles
         return out;
     }
 
-    std::string store(const std::string &path, uint64_t hash, const std::vector<uint8_t> &packedBytes)
+    std::string Store(const std::string &path, uint64_t hash, const std::vector<uint8_t> &packedBytes)
     {
         if(packedBytes.empty())
             return {};
@@ -83,13 +83,13 @@ namespace OpenArtOfWar::MapFiles
             return {};
         std::vector<uint8_t> raw(static_cast<size_t>(size));
         const size_t n = ZSTD_decompress(raw.data(), raw.size(), packedBytes.data(), packedBytes.size());
-        if(ZSTD_isError(n) || n != raw.size() || hashOfBytes(raw) != hash)
+        if(ZSTD_isError(n) || n != raw.size() || HashOfBytes(raw) != hash)
             return {};
         // It must be a map: a JSON object with a sensible size
         const nlohmann::json doc = nlohmann::json::parse(raw.begin(), raw.end(), nullptr, false);
         if(!doc.is_object() || !doc.contains("width") || !doc.contains("height"))
             return {};
-        const std::string target = downloadedPath(path, hash);
+        const std::string target = DownloadedPath(path, hash);
         std::error_code ec;
         fs::create_directories(fs::path(target).parent_path(), ec);
         const fs::path tmp = target + ".tmp";

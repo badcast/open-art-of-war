@@ -26,16 +26,16 @@ namespace OpenArtOfWar
 
     SoundEngine::~SoundEngine()
     {
-        cleanup();
+        Cleanup();
     }
 
-    bool SoundEngine::init(const std::string &assetRoot)
+    bool SoundEngine::Init(const std::string &assetRoot)
     {
         if(m_initialized)
             return true;
 
         std::string tracklistText;
-        if(Assets::readText(LoaderResources::tracklist(assetRoot), tracklistText))
+        if(Assets::ReadText(LoaderResources::Tracklist(assetRoot), tracklistText))
         {
             const nlohmann::json tracklist = nlohmann::json::parse(tracklistText, nullptr, false);
             if(tracklist.is_object())
@@ -47,7 +47,7 @@ namespace OpenArtOfWar
                     const std::string filename = item["filename"].get<std::string>();
                     if(filename.empty())
                         return false;
-                    track.path = LoaderResources::audioFile(filename, assetRoot);
+                    track.path = LoaderResources::AudioFile(filename, assetRoot);
                     track.name = item.contains("name") && item["name"].is_string() ? item["name"].get<std::string>() : filename.substr(0, filename.rfind('.'));
                     if((item.contains("effective_min") && !item["effective_min"].is_number()) || (item.contains("effective_max") && !item["effective_max"].is_number()))
                     {
@@ -97,7 +97,7 @@ namespace OpenArtOfWar
 
         // Placeholder format; each track switches the stream input to its own rate and channel count
         SDL_AudioSpec spec {SDL_AUDIO_S16, 2, 44100};
-        m_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SoundEngine::feedAudio, this);
+        m_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SoundEngine::FeedAudio, this);
         if(!m_stream)
         {
             std::cerr << "[SoundEngine] Warning: could not open audio device: " << SDL_GetError() << std::endl;
@@ -108,14 +108,14 @@ namespace OpenArtOfWar
 
         m_assetRoot = assetRoot;
         // Sound effects: their own stream, fed by the mixer (decoded once at start)
-        m_sfx.loadBank(LoaderResources::sfxConfig(assetRoot), LoaderResources::sfxDir(assetRoot));
-        m_sfx.setFxVolume(m_fxVolume);
-        m_sfx.setVoiceVolume(m_voiceVolume);
-        m_sfx.setMuted(m_muted);
-        m_voices.setVolume(m_voiceVolume);
-        m_voices.setMuted(m_muted);
+        m_sfx.LoadBank(LoaderResources::SfxConfig(assetRoot), LoaderResources::SfxDir(assetRoot));
+        m_sfx.SetFxVolume(m_fxVolume);
+        m_sfx.SetVoiceVolume(m_voiceVolume);
+        m_sfx.SetMuted(m_muted);
+        m_voices.SetVolume(m_voiceVolume);
+        m_voices.SetMuted(m_muted);
         SDL_AudioSpec sfxSpec {SDL_AUDIO_S16, 2, SfxMixer::kRate};
-        m_sfxStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &sfxSpec, &SoundEngine::feedSfx, this);
+        m_sfxStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &sfxSpec, &SoundEngine::FeedSfx, this);
         if(m_sfxStream)
             SDL_ResumeAudioStreamDevice(m_sfxStream);
         else
@@ -123,25 +123,25 @@ namespace OpenArtOfWar
 
         std::cout << "[SoundEngine] SDL3 audio ready, " << m_gameTracks.size() << " game music tracks." << std::endl;
         m_initialized = true;
-        applyGain();
+        ApplyGain();
         return true;
     }
 
-    void SoundEngine::cleanup()
+    void SoundEngine::Cleanup()
     {
         if(m_sfxStream)
         {
             SDL_DestroyAudioStream(m_sfxStream);
             m_sfxStream = nullptr;
         }
-        m_sfx.stopAll();
-        m_voices.stopAll();
+        m_sfx.StopAll();
+        m_voices.StopAll();
         if(m_stream)
         {
             SDL_DestroyAudioStream(m_stream); // stops the callback before the decoder goes away
             m_stream = nullptr;
         }
-        closeDecoder();
+        CloseDecoder();
         if(m_lock)
         {
             SDL_DestroyMutex(m_lock);
@@ -156,7 +156,7 @@ namespace OpenArtOfWar
         m_manualPlayback = false;
     }
 
-    void SoundEngine::closeDecoder()
+    void SoundEngine::CloseDecoder()
     {
         if(m_decoder)
         {
@@ -166,19 +166,19 @@ namespace OpenArtOfWar
         }
     }
 
-    void SDLCALL SoundEngine::feedSfx(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
+    void SDLCALL SoundEngine::FeedSfx(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
     {
         auto *self = static_cast<SoundEngine *>(userdata);
         const int frames = additionalAmount / 4; // stereo int16
         if(frames <= 0)
             return;
         self->m_sfxBuffer.assign(static_cast<size_t>(frames) * 2, 0);
-        self->m_sfx.mix(self->m_sfxBuffer.data(), frames);
-        self->m_voices.mix(self->m_sfxBuffer.data(), frames); // the voices on top
+        self->m_sfx.Mix(self->m_sfxBuffer.data(), frames);
+        self->m_voices.Mix(self->m_sfxBuffer.data(), frames); // the voices on top
         SDL_PutAudioStreamData(stream, self->m_sfxBuffer.data(), frames * 4);
     }
 
-    void SDLCALL SoundEngine::feedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
+    void SDLCALL SoundEngine::FeedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
     {
         auto *self = static_cast<SoundEngine *>(userdata);
         SDL_LockMutex(self->m_lock);
@@ -194,13 +194,13 @@ namespace OpenArtOfWar
                 {
                     if(!self->m_loopTrack)
                     {
-                        self->closeDecoder();
+                        self->CloseDecoder();
                         self->m_trackFinished = true;
                         break;
                     }
                     if(!stb_vorbis_seek(self->m_decoder, self->m_startSample))
                     {
-                        self->closeDecoder();
+                        self->CloseDecoder();
                         self->m_trackFinished = true;
                         break;
                     }
@@ -217,7 +217,7 @@ namespace OpenArtOfWar
                     self->m_currentSample += static_cast<unsigned int>(got);
                     continue;
                 }
-                self->closeDecoder();
+                self->CloseDecoder();
                 self->m_trackFinished = true;
                 break;
             }
@@ -229,7 +229,7 @@ namespace OpenArtOfWar
         SDL_UnlockMutex(self->m_lock);
     }
 
-    bool SoundEngine::loadTrack(const Track &track, bool loop)
+    bool SoundEngine::LoadTrack(const Track &track, bool loop)
     {
         if(!m_initialized)
             return false;
@@ -237,7 +237,7 @@ namespace OpenArtOfWar
         std::vector<uint8_t> oggData;
         int error = 0;
         stb_vorbis *decoder = nullptr;
-        if(Assets::readBytes(track.path, oggData) && !oggData.empty())
+        if(Assets::ReadBytes(track.path, oggData) && !oggData.empty())
         {
             decoder = stb_vorbis_open_memory(oggData.data(), static_cast<int>(oggData.size()), &error, nullptr);
         }
@@ -259,7 +259,7 @@ namespace OpenArtOfWar
         }
 
         SDL_LockMutex(m_lock);
-        closeDecoder();
+        CloseDecoder();
         m_oggData = std::move(oggData);
         m_decoder = decoder;
         m_channels = std::clamp(info.channels, 1, 2);
@@ -276,7 +276,7 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void SoundEngine::playMenuMusic()
+    void SoundEngine::PlayMenuMusic()
     {
         if(!m_initialized || !m_hasMenuTrack)
             return;
@@ -285,18 +285,18 @@ namespace OpenArtOfWar
         SDL_UnlockMutex(m_lock);
         if(m_musicContext == 1 && alreadyPlaying)
             return;
-        if(loadTrack(m_menuTrack, true))
+        if(LoadTrack(m_menuTrack, true))
         {
             m_musicContext = 1;
             m_currentTrack = 0;
         }
         else
         {
-            stopMusic();
+            StopMusic();
         }
     }
 
-    void SoundEngine::advanceGameTrack()
+    void SoundEngine::AdvanceGameTrack()
     {
         if(!m_initialized || m_gameTracks.empty())
             return;
@@ -312,31 +312,31 @@ namespace OpenArtOfWar
         }
         const size_t index = m_shuffledTracks[m_nextGameTrack++];
         m_lastGameTrack = index;
-        if(loadTrack(m_gameTracks[index], false))
+        if(LoadTrack(m_gameTracks[index], false))
         {
             m_musicContext = 2;
             m_currentTrack = static_cast<int>(index + 1);
         }
         else
         {
-            stopMusic();
+            StopMusic();
         }
     }
 
-    void SoundEngine::playRandomGameTrack()
+    void SoundEngine::PlayRandomGameTrack()
     {
         if(!m_initialized || m_gameTracks.empty())
             return;
         m_nextGameTrack = m_shuffledTracks.size();
-        advanceGameTrack();
+        AdvanceGameTrack();
     }
 
-    void SoundEngine::playPlayerTrack(int index)
+    void SoundEngine::PlayPlayerTrack(int index)
     {
         const bool menuTrack = index == 0 && m_hasMenuTrack;
         const int gameIndex = m_hasMenuTrack ? index - 1 : index;
         const Track &track = menuTrack ? m_menuTrack : m_gameTracks[gameIndex];
-        if(loadTrack(track, menuTrack))
+        if(LoadTrack(track, menuTrack))
         {
             m_musicContext = menuTrack ? 1 : 2;
             m_currentTrack = menuTrack ? 0 : gameIndex + 1;
@@ -344,50 +344,50 @@ namespace OpenArtOfWar
         }
         else
         {
-            stopMusic();
+            StopMusic();
         }
     }
 
     // In the game the playlist is the game tracks only; the main menu theme belongs to the menu
-    void SoundEngine::nextTrack()
+    void SoundEngine::NextTrack()
     {
-        const int count = getTrackCount();
+        const int count = GetTrackCount();
         const int first = (m_lastArea == 2 && m_hasMenuTrack && !m_gameTracks.empty()) ? 1 : 0;
         const int n = count - first;
         if(!m_initialized || n <= 0)
             return;
         const int cur = m_currentTrack < 0 ? -1 : (m_hasMenuTrack ? m_currentTrack : m_currentTrack - 1);
         const int rel = cur - first;
-        playPlayerTrack(first + (rel < 0 ? 0 : (rel + 1) % n));
+        PlayPlayerTrack(first + (rel < 0 ? 0 : (rel + 1) % n));
     }
 
-    void SoundEngine::prevTrack()
+    void SoundEngine::PrevTrack()
     {
-        const int count = getTrackCount();
+        const int count = GetTrackCount();
         const int first = (m_lastArea == 2 && m_hasMenuTrack && !m_gameTracks.empty()) ? 1 : 0;
         const int n = count - first;
         if(!m_initialized || n <= 0)
             return;
         const int cur = m_currentTrack < 0 ? -1 : (m_hasMenuTrack ? m_currentTrack : m_currentTrack - 1);
         const int rel = cur - first;
-        playPlayerTrack(first + (rel <= 0 ? n - 1 : rel - 1));
+        PlayPlayerTrack(first + (rel <= 0 ? n - 1 : rel - 1));
     }
 
-    double SoundEngine::getTrackPosition() const
+    double SoundEngine::GetTrackPosition() const
     {
         if(!m_initialized || !m_decoder || m_sampleRate <= 0)
             return 0.0;
         return static_cast<double>(m_currentSample - m_startSample) / m_sampleRate;
     }
 
-    double SoundEngine::getTrackLength() const
+    double SoundEngine::GetTrackLength() const
     {
         if(!m_initialized || !m_decoder || m_sampleRate <= 0)
             return 0.0;
         return static_cast<double>(m_endSample - m_startSample) / m_sampleRate;
     }
 
-    void SoundEngine::seekTrack(double ratio)
+    void SoundEngine::SeekTrack(double ratio)
     {
         if(!m_initialized)
             return;
@@ -408,7 +408,7 @@ namespace OpenArtOfWar
             SDL_ClearAudioStream(m_stream);
     }
 
-    std::string SoundEngine::getCurrentTrackName() const
+    std::string SoundEngine::GetCurrentTrackName() const
     {
         if(m_currentTrack < 0)
             return {};
@@ -418,11 +418,11 @@ namespace OpenArtOfWar
         return i < m_gameTracks.size() ? m_gameTracks[i].name : std::string();
     }
 
-    void SoundEngine::update(bool inMainMenu, bool inGame)
+    void SoundEngine::Update(bool inMainMenu, bool inGame)
     {
         if(!m_initialized)
             return;
-        m_voices.update(SDL_GetTicks()); // the next announcer line once the current one is over
+        m_voices.Update(SDL_GetTicks()); // the next announcer line once the current one is over
         const int area = inMainMenu ? 1 : (inGame ? 2 : 0);
         if(area != m_lastArea)
         {
@@ -440,7 +440,7 @@ namespace OpenArtOfWar
         if(m_manualPlayback && (inMainMenu || inGame))
         {
             if(finished || !hasDecoder)
-                nextTrack();
+                NextTrack();
             return;
         }
         if(inMainMenu)
@@ -448,11 +448,11 @@ namespace OpenArtOfWar
             if(!m_hasMenuTrack)
             {
                 if(m_musicContext != 0)
-                    stopMusic();
+                    StopMusic();
             }
             else if(m_musicContext != 1 || !hasDecoder || finished)
             {
-                playMenuMusic();
+                PlayMenuMusic();
             }
         }
         else if(inGame)
@@ -460,25 +460,25 @@ namespace OpenArtOfWar
             if(m_gameTracks.empty())
             {
                 if(m_musicContext != 0)
-                    stopMusic();
+                    StopMusic();
             }
             else if(m_musicContext != 2 || !hasDecoder || finished)
             {
-                advanceGameTrack();
+                AdvanceGameTrack();
             }
         }
         else if(m_musicContext != 0)
         {
-            stopMusic();
+            StopMusic();
         }
     }
 
-    void SoundEngine::stopMusic()
+    void SoundEngine::StopMusic()
     {
         if(!m_initialized)
             return;
         SDL_LockMutex(m_lock);
-        closeDecoder();
+        CloseDecoder();
         SDL_ClearAudioStream(m_stream);
         SDL_UnlockMutex(m_lock);
         m_currentTrack = -1;
@@ -486,7 +486,7 @@ namespace OpenArtOfWar
         m_manualPlayback = false;
     }
 
-    void SoundEngine::applyGain()
+    void SoundEngine::ApplyGain()
     {
         if(m_stream)
         {
@@ -494,68 +494,68 @@ namespace OpenArtOfWar
         }
     }
 
-    void SoundEngine::setMusicVolume(int volume)
+    void SoundEngine::SetMusicVolume(int volume)
     {
         m_volume = std::clamp(volume, 0, 128);
-        applyGain();
+        ApplyGain();
     }
 
-    void SoundEngine::setFxVolume(int volume)
+    void SoundEngine::SetFxVolume(int volume)
     {
         m_fxVolume = std::clamp(volume, 0, 128);
-        m_sfx.setFxVolume(m_fxVolume);
+        m_sfx.SetFxVolume(m_fxVolume);
     }
 
-    void SoundEngine::setVoiceVolume(int volume)
+    void SoundEngine::SetVoiceVolume(int volume)
     {
         m_voiceVolume = std::clamp(volume, 0, 128);
-        m_voices.setVolume(m_voiceVolume);
+        m_voices.SetVolume(m_voiceVolume);
     }
 
-    void SoundEngine::playSfx(const std::string &event, float gain, float pan)
+    void SoundEngine::PlaySfx(const std::string &event, float gain, float pan)
     {
         if(!m_sfxStream)
             return;
-        const bool played = m_sfx.play(event, gain, pan, SDL_GetTicks());
+        const bool played = m_sfx.Play(event, gain, pan, SDL_GetTicks());
         // OAOW_SFX_TRACE=1 (debug builds): every sound that starts, to check the events without listening
-        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        static const bool trace = DebugEnv("OAOW_SFX_TRACE") != nullptr;
         if(trace && played)
             std::cout << "[Sfx] " << event << " gain " << gain << " pan " << pan << std::endl;
     }
 
-    void SoundEngine::announce(const std::string &event)
+    void SoundEngine::Announce(const std::string &event)
     {
         if(!m_sfxStream)
             return;
-        const bool queued = m_voices.announce(event, SDL_GetTicks());
-        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        const bool queued = m_voices.Announce(event, SDL_GetTicks());
+        static const bool trace = DebugEnv("OAOW_SFX_TRACE") != nullptr;
         if(trace && queued)
-            std::cout << "[Sfx] announcer (" << m_voices.language() << "): " << event << std::endl;
+            std::cout << "[Sfx] announcer (" << m_voices.Language() << "): " << event << std::endl;
     }
 
-    void SoundEngine::playVoice(const std::string &event)
+    void SoundEngine::PlayVoice(const std::string &event)
     {
         if(!m_sfxStream)
             return;
-        const bool played = m_voices.play(event, SDL_GetTicks());
-        static const bool trace = debugEnv("OAOW_SFX_TRACE") != nullptr;
+        const bool played = m_voices.Play(event, SDL_GetTicks());
+        static const bool trace = DebugEnv("OAOW_SFX_TRACE") != nullptr;
         if(trace && played)
-            std::cout << "[Sfx] voice (" << m_voices.language() << "): " << event << std::endl;
+            std::cout << "[Sfx] voice (" << m_voices.Language() << "): " << event << std::endl;
     }
 
-    void SoundEngine::setVoiceLanguage(const std::string &language)
+    void SoundEngine::SetVoiceLanguage(const std::string &language)
     {
-        if(!m_initialized || language == m_voices.language())
+        if(!m_initialized || language == m_voices.Language())
             return;
         m_voices.load(language, m_assetRoot.empty() ? LoaderResources::kDefaultRoot : m_assetRoot);
     }
 
-    void SoundEngine::toggleMute()
+    void SoundEngine::ToggleMute()
     {
         m_muted = !m_muted;
-        m_sfx.setMuted(m_muted);
-        m_voices.setMuted(m_muted);
-        applyGain();
+        m_sfx.SetMuted(m_muted);
+        m_voices.SetMuted(m_muted);
+        ApplyGain();
     }
 
 } // namespace OpenArtOfWar

@@ -20,7 +20,7 @@ namespace OpenArtOfWar
         float gain {0.0f};
         float pan {0.0f}; // -1 left .. 1 right
     };
-    SfxPlacement placeSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx);
+    SfxPlacement PlaceSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx);
 
     // Sound effects: short clips decoded once (mono 44.1 kHz), mixed into a stereo stream by up to `voices`
     // voices. Events (assets/data/sfx.json) pick one of their clips at random and bring their own volume,
@@ -57,37 +57,37 @@ namespace OpenArtOfWar
         };
 
         // sfx.json and the <event>_<n>.ogg files of `dir` (read through AssetStore); false when nothing loaded
-        bool loadBank(const std::string &configPath, const std::string &dir);
+        bool LoadBank(const std::string &configPath, const std::string &dir);
         // The <event>_<n>.ogg clips of `dir`; `onlyMissing`: only for events that have no clip yet (a fallback
         // language). Returns the number of clips loaded.
-        int loadClips(const std::string &dir, bool onlyMissing = false);
+        int LoadClips(const std::string &dir, bool onlyMissing = false);
         // Event settings from JSON ({"defaults": {...}, "events": {name: {...}}, "voices": n})
-        void configure(const nlohmann::json &doc);
+        void Configure(const nlohmann::json &doc);
         // A clip of an event (mono, kRate); tests and loadBank
-        void addClip(const std::string &event, std::vector<int16_t> pcm);
+        void AddClip(const std::string &event, std::vector<int16_t> pcm);
 
-        bool has(const std::string &event) const;
-        const EventConfig *config(const std::string &event) const;
-        size_t eventCount() const;
+        bool Has(const std::string &event) const;
+        const EventConfig *Config(const std::string &event) const;
+        size_t EventCount() const;
 
         // Starts one of the event's clips; `gain` 0..1 (distance), `pan` -1..1. False when the event is
         // unknown, silent or held back by its limits.
-        bool play(const std::string &event, float gain, float pan, uint64_t nowMs);
+        bool Play(const std::string &event, float gain, float pan, uint64_t nowMs);
         // Queues an announcer line (dropped while its cooldown runs or when it is queued already)
-        bool announce(const std::string &event, uint64_t nowMs);
+        bool Announce(const std::string &event, uint64_t nowMs);
         // Starts the next announcer line once the current one is over; call once per frame
-        void update(uint64_t nowMs);
+        void Update(uint64_t nowMs);
         // Adds `frames` stereo frames (interleaved int16) of everything playing
-        void mix(int16_t *out, int frames);
-        void stopAll();
+        void Mix(int16_t *out, int frames);
+        void StopAll();
 
-        void setFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
-        void setVoiceVolume(int volume); // 0..128: unit replies and the announcer
-        void setMuted(bool muted);
+        void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
+        void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
+        void SetMuted(bool muted);
 
-        int activeVoices() const;
-        bool announcerBusy() const;
-        size_t announcerQueued() const;
+        int ActiveVoices() const;
+        bool AnnouncerBusy() const;
+        size_t AnnouncerQueued() const;
 
     private:
         struct Voice
@@ -110,10 +110,10 @@ namespace OpenArtOfWar
             bool played {false};
         };
 
-        int eventIndex(const std::string &event) const;
-        bool startLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer);
-        bool announceLocked(int eventIdx, uint64_t nowMs);
-        int instancesLocked(int eventIdx) const;
+        int EventIndex(const std::string &event) const;
+        bool StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer);
+        bool AnnounceLocked(int eventIdx, uint64_t nowMs);
+        int InstancesLocked(int eventIdx) const;
 
         mutable std::mutex m_lock;
         std::vector<std::vector<int16_t>> m_clips;

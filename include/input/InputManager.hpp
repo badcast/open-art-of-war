@@ -21,7 +21,7 @@ namespace OpenArtOfWar
         int currentScreenX {0};
         int currentScreenY {0};
 
-        bool hasSignificantArea() const
+        bool HasSignificantArea() const
         {
             return std::abs(currentScreenX - startScreenX) > 6 || std::abs(currentScreenY - startScreenY) > 6;
         }
@@ -32,33 +32,33 @@ namespace OpenArtOfWar
     public:
         InputManager();
 
-        void update(float deltaTime, Camera &camera);
-        void updateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles);
-        void updateKeystates();
-        bool processEvent(const SDL_Event &event, Camera &camera);
+        void Update(float deltaTime, Camera &camera);
+        void UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles);
+        void UpdateKeystates();
+        bool ProcessEvent(const SDL_Event &event, Camera &camera);
 
         // Queries
         bool isKeyPressed(SDL_Scancode scancode) const;
-        bool isKeyJustPressed(SDL_Scancode scancode);
+        bool IsKeyJustPressed(SDL_Scancode scancode);
 
-        const SelectionBox &getSelectionBox() const
+        const SelectionBox &GetSelectionBox() const
         {
             return m_selectionBox;
         }
-        void cancelSelectionBox()
+        void CancelSelectionBox()
         {
             m_selectionBox.active = false;
         }
-        bool wasRightClickIssued(float &worldX, float &worldY);
-        bool wasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY);
-        bool wasLeftClickIssued(float &worldX, float &worldY);
-        bool wasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY);
-        bool isLeftMouseDown() const
+        bool WasRightClickIssued(float &worldX, float &worldY);
+        bool WasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY);
+        bool WasLeftClickIssued(float &worldX, float &worldY);
+        bool WasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY);
+        bool IsLeftMouseDown() const
         {
             return m_leftMouseDown;
         }
         // The left button went down since the last call (a click only fires on release), for grabbing scroll and seek bars
-        bool consumeLeftPress(int &screenX, int &screenY)
+        bool ConsumeLeftPress(int &screenX, int &screenY)
         {
             if(!m_leftPressed)
                 return false;
@@ -68,44 +68,44 @@ namespace OpenArtOfWar
             return true;
         }
 
-        int getLeftClickScreenX() const
+        int GetLeftClickScreenX() const
         {
             return m_leftClickScreenX;
         }
-        int getLeftClickScreenY() const
+        int GetLeftClickScreenY() const
         {
             return m_leftClickScreenY;
         }
 
-        float getMouseWorldX() const
+        float GetMouseWorldX() const
         {
             return m_mouseWorldX;
         }
-        float getMouseWorldY() const
+        float GetMouseWorldY() const
         {
             return m_mouseWorldY;
         }
-        int getMouseScreenX() const
+        int GetMouseScreenX() const
         {
             return m_mouseScreenX;
         }
-        int getMouseScreenY() const
+        int GetMouseScreenY() const
         {
             return m_mouseScreenY;
         }
 
         // ENTER or SPACE (consumes both keys)
-        bool isConfirmJustPressed();
+        bool IsConfirmJustPressed();
 
         // Mouse wheel steps scrolled over the UI sidebar since the last call (positive = up)
         // Mouse wheel steps anywhere in the window since the last call (positive = up), for menus and lists
-        int consumeWheel()
+        int ConsumeWheel()
         {
             int v = m_wheel;
             m_wheel = 0;
             return v;
         }
-        int consumeUiWheel()
+        int ConsumeUiWheel()
         {
             int v = m_uiWheel;
             m_uiWheel = 0;
@@ -114,20 +114,20 @@ namespace OpenArtOfWar
 
         // Text typed since the last call (UTF-8) and the Backspace presses (key repeat included), while
         // SDL text input is on (SDL_StartTextInput)
-        std::string takeTypedText()
+        std::string TakeTypedText()
         {
             std::string t;
             t.swap(m_typed);
             return t;
         }
-        int takeBackspaces()
+        int TakeBackspaces()
         {
             int n = m_backspaces;
             m_backspaces = 0;
             return n;
         }
 
-        void resetFrameEvents();
+        void ResetFrameEvents();
 
     private:
         const bool *m_keystates {nullptr};

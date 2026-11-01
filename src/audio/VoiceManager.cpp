@@ -15,18 +15,18 @@ namespace OpenArtOfWar
         // A fresh set is prepared off to the side and swapped in, so the audio thread never mixes a half-loaded one
         auto mixer = std::make_unique<SfxMixer>();
         std::string text;
-        if(Assets::readText(LoaderResources::voicesConfig(assetRoot), text))
-            mixer->configure(JsonFile::readFromString(text));
+        if(Assets::ReadText(LoaderResources::VoicesConfig(assetRoot), text))
+            mixer->Configure(JsonFile::ReadFromString(text));
         else
-            std::cerr << "[VoiceManager] " << LoaderResources::voicesConfig(assetRoot) << " not found: voices play with default settings" << std::endl;
-        int lines = mixer->loadClips(LoaderResources::voicesDir(language, assetRoot));
-        const std::string fallback = LoaderResources::voicesFallbackLanguage();
+            std::cerr << "[VoiceManager] " << LoaderResources::VoicesConfig(assetRoot) << " not found: voices play with default settings" << std::endl;
+        int lines = mixer->LoadClips(LoaderResources::VoicesDir(language, assetRoot));
+        const std::string fallback = LoaderResources::VoicesFallbackLanguage();
         int borrowed = 0;
         if(language != fallback)
-            borrowed = mixer->loadClips(LoaderResources::voicesDir(fallback, assetRoot), true);
-        mixer->setVoiceVolume(m_volume);
-        mixer->setFxVolume(m_volume); // whatever the category: every line of this mixer is a voice
-        mixer->setMuted(m_muted);
+            borrowed = mixer->LoadClips(LoaderResources::VoicesDir(fallback, assetRoot), true);
+        mixer->SetVoiceVolume(m_volume);
+        mixer->SetFxVolume(m_volume); // whatever the category: every line of this mixer is a voice
+        mixer->SetMuted(m_muted);
         {
             std::lock_guard<std::mutex> guard(m_swap);
             m_mixer = std::move(mixer);
@@ -40,69 +40,69 @@ namespace OpenArtOfWar
         return m_lines > 0;
     }
 
-    void VoiceManager::setLanguage(const std::string &language)
+    void VoiceManager::SetLanguage(const std::string &language)
     {
         if(language == m_language && m_mixer)
             return;
         load(language, m_root.empty() ? LoaderResources::kDefaultRoot : m_root);
     }
 
-    bool VoiceManager::play(const std::string &event, uint64_t nowMs)
+    bool VoiceManager::Play(const std::string &event, uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_swap);
-        return m_mixer && m_mixer->play(event, 1.0f, 0.0f, nowMs);
+        return m_mixer && m_mixer->Play(event, 1.0f, 0.0f, nowMs);
     }
 
-    bool VoiceManager::announce(const std::string &event, uint64_t nowMs)
+    bool VoiceManager::Announce(const std::string &event, uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_swap);
-        return m_mixer && m_mixer->announce(event, nowMs);
+        return m_mixer && m_mixer->Announce(event, nowMs);
     }
 
-    void VoiceManager::update(uint64_t nowMs)
-    {
-        std::lock_guard<std::mutex> guard(m_swap);
-        if(m_mixer)
-            m_mixer->update(nowMs);
-    }
-
-    void VoiceManager::mix(int16_t *out, int frames)
+    void VoiceManager::Update(uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_swap);
         if(m_mixer)
-            m_mixer->mix(out, frames);
+            m_mixer->Update(nowMs);
     }
 
-    void VoiceManager::stopAll()
+    void VoiceManager::Mix(int16_t *out, int frames)
     {
         std::lock_guard<std::mutex> guard(m_swap);
         if(m_mixer)
-            m_mixer->stopAll();
+            m_mixer->Mix(out, frames);
     }
 
-    void VoiceManager::setVolume(int volume)
+    void VoiceManager::StopAll()
+    {
+        std::lock_guard<std::mutex> guard(m_swap);
+        if(m_mixer)
+            m_mixer->StopAll();
+    }
+
+    void VoiceManager::SetVolume(int volume)
     {
         m_volume = volume;
         std::lock_guard<std::mutex> guard(m_swap);
         if(m_mixer)
         {
-            m_mixer->setVoiceVolume(volume);
-            m_mixer->setFxVolume(volume);
+            m_mixer->SetVoiceVolume(volume);
+            m_mixer->SetFxVolume(volume);
         }
     }
 
-    void VoiceManager::setMuted(bool muted)
+    void VoiceManager::SetMuted(bool muted)
     {
         m_muted = muted;
         std::lock_guard<std::mutex> guard(m_swap);
         if(m_mixer)
-            m_mixer->setMuted(muted);
+            m_mixer->SetMuted(muted);
     }
 
-    bool VoiceManager::has(const std::string &event) const
+    bool VoiceManager::Has(const std::string &event) const
     {
         std::lock_guard<std::mutex> guard(m_swap);
-        return m_mixer && m_mixer->has(event);
+        return m_mixer && m_mixer->Has(event);
     }
 
 } // namespace OpenArtOfWar

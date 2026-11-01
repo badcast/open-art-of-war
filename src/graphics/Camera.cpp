@@ -7,25 +7,25 @@ namespace OpenArtOfWar
     {
     }
 
-    void Camera::setViewport(int w, int h)
+    void Camera::SetViewport(int w, int h)
     {
         m_viewportW = std::max(1, w);
         m_viewportH = std::max(1, h);
     }
 
-    void Camera::setPosition(float x, float y)
+    void Camera::SetPosition(float x, float y)
     {
         m_x = x;
         m_y = y;
     }
 
-    void Camera::pan(float dx, float dy)
+    void Camera::Pan(float dx, float dy)
     {
         m_x += dx / m_zoom;
         m_y += dy / m_zoom;
     }
 
-    void Camera::setZoom(float newZoom, float pivotX, float pivotY)
+    void Camera::SetZoom(float newZoom, float pivotX, float pivotY)
     {
         float clamped = std::clamp(newZoom, m_minZoom, m_maxZoom);
         if(clamped == m_zoom)
@@ -38,7 +38,7 @@ namespace OpenArtOfWar
         }
 
         float worldPivotX, worldPivotY;
-        screenToWorld(pivotX, pivotY, worldPivotX, worldPivotY);
+        ScreenToWorld(pivotX, pivotY, worldPivotX, worldPivotY);
 
         m_zoom = clamped;
 
@@ -46,14 +46,14 @@ namespace OpenArtOfWar
         m_y = worldPivotY - (pivotY / m_zoom);
     }
 
-    void Camera::setZoomLimits(float minZoom, float maxZoom)
+    void Camera::SetZoomLimits(float minZoom, float maxZoom)
     {
         m_minZoom = std::min(minZoom, maxZoom);
         m_maxZoom = std::max(minZoom, maxZoom);
-        setZoom(m_zoom);
+        SetZoom(m_zoom);
     }
 
-    Camera Camera::scaledDown(int divisor) const
+    Camera Camera::ScaledDown(int divisor) const
     {
         Camera c = *this;
         divisor = std::max(1, divisor);
@@ -65,13 +65,13 @@ namespace OpenArtOfWar
         return c;
     }
 
-    void Camera::centerOn(float targetWorldX, float targetWorldY)
+    void Camera::CenterOn(float targetWorldX, float targetWorldY)
     {
         m_x = targetWorldX - (m_viewportW * 0.5f / m_zoom);
         m_y = targetWorldY - (m_viewportH * 0.5f / m_zoom);
     }
 
-    void Camera::clampToBounds(int mapWidthTiles, int mapHeightTiles)
+    void Camera::ClampToBounds(int mapWidthTiles, int mapHeightTiles)
     {
         float maxWorldW = static_cast<float>(mapWidthTiles * TILE_WIDTH);
         float maxWorldH = static_cast<float>(mapHeightTiles * TILE_HEIGHT);
@@ -90,13 +90,13 @@ namespace OpenArtOfWar
         m_y = std::clamp(m_y, minY, maxY);
     }
 
-    void Camera::worldToScreen(float wx, float wy, float &sx, float &sy) const
+    void Camera::WorldToScreen(float wx, float wy, float &sx, float &sy) const
     {
         sx = (wx - m_x) * m_zoom;
         sy = (wy - m_y) * m_zoom;
     }
 
-    void Camera::screenToWorld(float sx, float sy, float &wx, float &wy) const
+    void Camera::ScreenToWorld(float sx, float sy, float &wx, float &wy) const
     {
         wx = m_x + (sx / m_zoom);
         wy = m_y + (sy / m_zoom);
