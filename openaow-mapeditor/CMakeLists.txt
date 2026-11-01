@@ -2,8 +2,7 @@ set(EDITOR_SOURCES
     src/main.cpp
     src/MapEditorApp.cpp
     src/MapDocument.cpp
-    src/MapAutoGenerator.cpp
-    src/SmartGenerator.cpp
+    src/MapGenerator.cpp
     src/EditorUI.cpp
 )
 

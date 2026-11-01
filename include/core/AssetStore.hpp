@@ -16,44 +16,54 @@
 namespace OpenArtOfWar::Assets
 {
 
-    enum class Mode
-    {
-        None,
-        Directory,
-        Blob
-    };
+enum class Mode
+{
+    None,
+    Directory,
+    Blob
+};
 
-    // Locates the assets (working directory, then next to the executable, one level up and in
-    // ../share/openaow). Switches the working directory to the folder that holds "assets" when found.
-    // Safe to call more than once.
-    bool Init();
+// Locates the assets (working directory, then next to the executable, one level up and in
+// ../share/openaow). Switches the working directory to the folder that holds "assets" when found.
+// Safe to call more than once.
+bool Init();
 
-    Mode mode();
-    inline bool IsBlob()
-    {
-        return mode() == Mode::Blob;
-    }
-    std::string Describe();
+Mode mode();
+inline bool IsBlob()
+{
+    return mode() == Mode::Blob;
+}
+std::string Describe();
 
-    bool Exists(const std::string &path);
-    bool ReadBytes(const std::string &path, std::vector<uint8_t> &out);
-    bool ReadText(const std::string &path, std::string &out);
+// The integrity certificate of a blob: an entry of the blob itself, written by tools/pack_assets.py, one
+// "<path>  <sha256>" line per packed file
+inline constexpr const char *kCertificateName = "certificate.sha256";
 
-    // Regular files directly inside `dir`, sorted, as "<dir>/<name>"; `extension` is e.g. ".json" (empty = all)
-    std::vector<std::string> List(const std::string &dir, const std::string &extension = "");
+// Checks a loaded blob against the certificate it carries: the certificate must be there, every file it lists must
+// be in the blob with that SHA-256, and the blob must hold no file the certificate does not list. The packed files
+// are checked, never a per-user copy. A plain assets directory has no certificate and is not checked (true).
+// False with a readable report in `problems` (one line per file); `certificatePath` names the blob's certificate.
+bool VerifyCertificate(std::vector<std::string> &problems, std::string &certificatePath);
 
-    // Where to write `path`: unchanged in directory mode, below the per-user directory in blob mode.
-    // Parent directories are created.
-    std::string WritablePath(const std::string &path);
+bool Exists(const std::string &path);
+bool ReadBytes(const std::string &path, std::vector<uint8_t> &out);
+bool ReadText(const std::string &path, std::string &out);
 
-    // A directory on disk with the contents of `dir` (for libraries that need real files, like gettext):
-    // `dir` itself in directory mode, an extracted copy in the per-user cache in blob mode.
-    std::string RealDirectory(const std::string &dir);
+// Regular files directly inside `dir`, sorted, as "<dir>/<name>"; `extension` is e.g. ".json" (empty = all)
+std::vector<std::string> List(const std::string &dir, const std::string &extension = "");
 
-    // Per-user directory for settings, saves and caches: SDL_GetPrefPath("openaow", "openaow"), i.e. below
-    // ~/.local/share (Linux), %APPDATA% (Windows) or ~/Library/Application Support (macOS)
-    std::string UserDataDir();
-    // Replaces that directory (tests use a temporary one); call before anything reads or writes there
-    void SetUserDataDir(const std::string &dir);
+// Where to write `path`: unchanged in directory mode, below the per-user directory in blob mode.
+// Parent directories are created.
+std::string WritablePath(const std::string &path);
+
+// A directory on disk with the contents of `dir` (for libraries that need real files, like gettext):
+// `dir` itself in directory mode, an extracted copy in the per-user cache in blob mode.
+std::string RealDirectory(const std::string &dir);
+
+// Per-user directory for settings, saves and caches: SDL_GetPrefPath("openaow", "openaow"), i.e. below
+// ~/.local/share (Linux), %APPDATA% (Windows) or ~/Library/Application Support (macOS)
+std::string UserDataDir();
+// Replaces that directory (tests use a temporary one); call before anything reads or writes there
+void SetUserDataDir(const std::string &dir);
 
 } // namespace OpenArtOfWar::Assets

@@ -393,9 +393,9 @@ void CharacterEditor::DrawSpriteProperties() {
     ImGui::Separator();
     ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "%s", _("IMPORT SPRITES"));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.35f, 1.0f));
-    ImGui::TextWrapped("%s", _("WARNING: the import writes into assets/sprites and assets/data/graphics_data.json. Your data there may be overwritten."));
+    ImGui::TextWrapped("%s", _("WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."));
     ImGui::PopStyleColor();
-    ImGui::TextWrapped("%s", _("Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to graphics_data.json."));
+    ImGui::TextWrapped("%s", _("Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."));
     {
         std::lock_guard<std::mutex> lock(importPick.mutex);
         if (importPick.ready) {
@@ -418,7 +418,7 @@ void CharacterEditor::DrawSpriteProperties() {
         importConfirm = false;
     }
     if (ImGui::BeginPopupModal(_("Overwrite assets?"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("%s", _("The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/graphics_data.json with what is in the folder. Your data there may be lost."));
+        ImGui::TextWrapped("%s", _("The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."));
         ImGui::Spacing();
         ImGui::TextDisabled("%s", spriteInDir.data());
         ImGui::Spacing();
@@ -1768,7 +1768,7 @@ void CharacterEditor::DrawLoadedSprites() {
         if (textures && textures->GetSpriteSheet(p) != nullptr) ++loadedSheetsCount;
     }
     const fs::path spritesJsonPath = assetsRoot / "characters" / "sprites.json";
-    const fs::path graphicsJsonPath = assetsRoot / "data" / "graphics_data.json";
+    const fs::path graphicsJsonPath = assetsRoot / "data" / "sprites_graphics.json";
     const fs::path sheetsDirPath = assetsRoot / "sprites";
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.11f, 0.14f, 0.15f, 0.95f));
@@ -2021,7 +2021,7 @@ void CharacterEditor::DrawLoadedSprites() {
         ImGui::TableSetupColumn(_("Loaded From (Sheet File)"), ImGuiTableColumnFlags_WidthStretch, 1.3f);
         ImGui::TableSetupColumn(_("Source Rect (sprites.json / PNG)"), ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn(_("Group"), ImGuiTableColumnFlags_WidthFixed, 76.0f);
-        ImGui::TableSetupColumn(_("Used By Objects (graphics_data.json)"), ImGuiTableColumnFlags_WidthStretch, 1.8f);
+        ImGui::TableSetupColumn(_("Used By Objects (sprites_graphics.json)"), ImGuiTableColumnFlags_WidthStretch, 1.8f);
         ImGui::TableHeadersRow();
 
         ImGuiListClipper clipper;

@@ -1,6 +1,6 @@
 #include "EditorUI.hpp"
 #include "core/LoaderResources.hpp"
-#include "SmartGenerator.hpp"
+#include "MapGenerator.hpp"
 #include "game/TileCollision.hpp"
 #include "core/AssetStore.hpp"
 #include <imgui.h>
@@ -250,12 +250,7 @@ void EditorUI::Init() {
     m_genParams.width = 60;
     m_genParams.height = 40;
     m_genParams.tilesetId = 0;
-    m_genParams.biome = GeneratorBiome::RiverValley;
     m_genParams.symmetry = GeneratorSymmetry::Rotational180;
-    m_genParams.addRiver = true;
-    m_genParams.riverBridges = 2;
-    m_genParams.generateBases = true;
-    m_genParams.decorDensity = 1;
     m_genParams.randomSeed = true;
 
     ScanAvailableMaps();
@@ -427,23 +422,13 @@ void EditorUI::RenderMenuBar(MapDocument& doc, Camera& camera) {
         }
 
         if (ImGui::BeginMenu("Generator")) {
-            if (ImGui::MenuItem("Map auto-generator...", "Ctrl+G")) {
+            if (ImGui::MenuItem("Map generator...", "Ctrl+G")) {
                 OpenGeneratorDialog();
             }
-            if (ImGui::MenuItem("Quick random map (1 click!)")) {
+            if (ImGui::MenuItem("Generate map (1 click, modelled on the original)")) {
                 doc.PushUndoSnapshot();
-                MapAutoGenerator::GenerateQuickRandom(doc);
-                ShowToast("Random map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
-            }
-            if (ImGui::MenuItem("Smart map (1 click, modelled on the original)")) {
-                GeneratorParams params;
-                params.width = doc.GetWidth();
-                params.height = doc.GetHeight();
-                params.tilesetId = doc.GetTilesetId();
-                SmartGenerator::OriginalDefaults(params, params.tilesetId);
-                doc.PushUndoSnapshot();
-                SmartGenerator::Generate(doc, params);
-                ShowToast("Smart map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
+                MapGenerator::GenerateQuick(doc);
+                ShowToast("Map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
             }
             ImGui::EndMenu();
         }
@@ -469,10 +454,10 @@ void EditorUI::RenderMenuBar(MapDocument& doc, Camera& camera) {
         const float centeredActionX = (ImGui::GetWindowWidth() - actionGroupWidth) * 0.5f;
         const float actionGroupX = std::max(ImGui::GetCursorPosX() + 12.0f, centeredActionX);
         ImGui::SameLine(actionGroupX);
-        if (ImGui::Button("Random map")) {
+        if (ImGui::Button("Generate map")) {
             doc.PushUndoSnapshot();
-            MapAutoGenerator::GenerateQuickRandom(doc);
-            ShowToast("Random map generated!");
+            MapGenerator::GenerateQuick(doc);
+            ShowToast("Map generated!");
         }
         ImGui::SameLine();
         if (ImGui::Button("Save to assets/maps/")) {
@@ -577,13 +562,13 @@ void EditorUI::RenderToolbar(MapDocument& doc, TextureManager& texManager) {
         }
 
         ImGui::Separator();
-        if (ImGui::Button("Random map", ImVec2(96, 30))) {
+        if (ImGui::Button("Generate map", ImVec2(110, 30))) {
             doc.PushUndoSnapshot();
-            MapAutoGenerator::GenerateQuickRandom(doc);
-            ShowToast("Random map generated!");
+            MapGenerator::GenerateQuick(doc);
+            ShowToast("Map generated!");
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Quick map auto-generation in 1 click");
+            ImGui::SetTooltip("A map modelled on the original ones in 1 click (Ctrl+G: the generator with its settings)");
         }
     }
     ImGui::End();
@@ -1223,7 +1208,7 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
         m_openGenModalReq = false;
         m_genParams.width = doc.GetWidth();
         m_genParams.height = doc.GetHeight();
-        if (m_genParams.tilesetId != doc.GetTilesetId()) SmartGenerator::OriginalDefaults(m_genParams, doc.GetTilesetId());
+        if (m_genParams.tilesetId != doc.GetTilesetId()) MapGenerator::OriginalDefaults(m_genParams, doc.GetTilesetId());
         m_genParams.tilesetId = doc.GetTilesetId();
     }
 
@@ -1231,34 +1216,15 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
     if (ImGui::BeginPopupModal("Map Generator##GenModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Procedural map generation with bases and terrain:");
+        ImGui::Text("A skirmish map modelled on the original maps:");
         ImGui::Separator();
 
         ImGui::SliderInt("Width", &m_genParams.width, 30, 128);
         ImGui::SliderInt("Height", &m_genParams.height, 30, 128);
 
-        const char* modeNames[] = {"Classic (biomes and river)", "Smart (modelled on the original maps)"};
-        ImGui::Combo("Generator", &m_genMode, modeNames, 2);
-        const bool smart = m_genMode == 1;
-
-        if (smart) {
-            const char* tilesetNames[] = {"Jungle", "Second tileset"};
-            if (ImGui::Combo("Tileset", &m_genParams.tilesetId, tilesetNames, 2)) {
-                SmartGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
-            }
-        } else {
-            const char* biomeNames[] = {
-                "Green plains and meadows",
-                "River valley with bridges",
-                "Wild Peruvian jungle",
-                "Desert canyon and dunes",
-                "Island archipelago"
-            };
-            int biomeInt = static_cast<int>(m_genParams.biome);
-            if (ImGui::Combo("Terrain biome", &biomeInt, biomeNames, 5)) {
-                m_genParams.biome = static_cast<GeneratorBiome>(biomeInt);
-                m_genParams.tilesetId = (m_genParams.biome == GeneratorBiome::DesertCanyon) ? 1 : 0;
-            }
+        const char* tilesetNames[] = {"Jungle", "Second tileset"};
+        if (ImGui::Combo("Tileset", &m_genParams.tilesetId, tilesetNames, 2)) {
+            MapGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
         }
 
         const char* symNames[] = {
@@ -1273,30 +1239,17 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
             m_genParams.symmetry = static_cast<GeneratorSymmetry>(symInt);
         }
 
-        if (smart) {
-            // Every share in percent; hover a slider for the range measured on the original maps
-            ImGui::SeparatorText("Shares, %");
-            int settingCount = 0;
-            const SmartGenerator::Setting* settings = SmartGenerator::Settings(settingCount);
-            for (int i = 0; i < settingCount; ++i) {
-                ImGui::SliderInt(settings[i].label, &(m_genParams.*settings[i].field), settings[i].min, settings[i].max,
-                                 "%d %%", ImGuiSliderFlags_AlwaysClamp);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", settings[i].hint);
-            }
-            if (ImGui::Button("Values of the original maps")) {
-                SmartGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
-            }
-        } else {
-            ImGui::Checkbox("Clear the players' starting areas", &m_genParams.generateBases);
-            ImGui::Checkbox("Add a winding river and bridges", &m_genParams.addRiver);
-            if (m_genParams.addRiver) {
-                ImGui::SliderInt("Number of bridges", &m_genParams.riverBridges, 1, 4);
-            }
+        // Every share in percent; hover a slider for the range measured on the original maps
+        ImGui::SeparatorText("Shares, %");
+        int settingCount = 0;
+        const MapGenerator::Setting* settings = MapGenerator::Settings(settingCount);
+        for (int i = 0; i < settingCount; ++i) {
+            ImGui::SliderInt(settings[i].label, &(m_genParams.*settings[i].field), settings[i].min, settings[i].max,
+                             "%d %%", ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", settings[i].hint);
         }
-
-        if (!smart) {
-            const char* densityNames[] = {"Low (sparse trees)", "Medium (balanced)", "High (dense groves)"};
-            ImGui::Combo("Decoration density", &m_genParams.decorDensity, densityNames, 3);
+        if (ImGui::Button("Values of the original maps")) {
+            MapGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
         }
 
         ImGui::Checkbox("Random seed", &m_genParams.randomSeed);
@@ -1310,11 +1263,7 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
         ImGui::Separator();
         if (ImGui::Button("Generate map", ImVec2(220, 36))) {
             doc.PushUndoSnapshot();
-            if (smart) {
-                SmartGenerator::Generate(doc, m_genParams);
-            } else {
-                MapAutoGenerator::Generate(doc, m_genParams);
-            }
+            MapGenerator::Generate(doc, m_genParams);
             ShowToast("Map generated!");
             ImGui::CloseCurrentPopup();
         }

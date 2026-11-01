@@ -2574,3 +2574,423 @@ msgstr ""
 
 msgid "Volume of the unit replies and the announcer"
 msgstr ""
+
+#. Campaign mission dialogue (MissionDialogs.cpp): dialog.<res|conf>.<mission>.title / <line>.speaker / <line>.text
+msgid "dialog.res.1.title"
+msgstr ""
+
+msgid "dialog.res.1.1.speaker"
+msgstr ""
+
+msgid "dialog.res.1.1.text"
+msgstr ""
+
+msgid "dialog.res.1.2.speaker"
+msgstr ""
+
+msgid "dialog.res.1.2.text"
+msgstr ""
+
+msgid "dialog.res.1.3.speaker"
+msgstr ""
+
+msgid "dialog.res.1.3.text"
+msgstr ""
+
+msgid "dialog.res.1.4.speaker"
+msgstr ""
+
+msgid "dialog.res.1.4.text"
+msgstr ""
+
+msgid "dialog.res.2.title"
+msgstr ""
+
+msgid "dialog.res.2.1.speaker"
+msgstr ""
+
+msgid "dialog.res.2.1.text"
+msgstr ""
+
+msgid "dialog.res.2.2.speaker"
+msgstr ""
+
+msgid "dialog.res.2.2.text"
+msgstr ""
+
+msgid "dialog.res.2.3.speaker"
+msgstr ""
+
+msgid "dialog.res.2.3.text"
+msgstr ""
+
+msgid "dialog.res.2.4.speaker"
+msgstr ""
+
+msgid "dialog.res.2.4.text"
+msgstr ""
+
+msgid "dialog.res.3.title"
+msgstr ""
+
+msgid "dialog.res.3.1.speaker"
+msgstr ""
+
+msgid "dialog.res.3.1.text"
+msgstr ""
+
+msgid "dialog.res.3.2.speaker"
+msgstr ""
+
+msgid "dialog.res.3.2.text"
+msgstr ""
+
+msgid "dialog.res.3.3.speaker"
+msgstr ""
+
+msgid "dialog.res.3.3.text"
+msgstr ""
+
+msgid "dialog.res.3.4.speaker"
+msgstr ""
+
+msgid "dialog.res.3.4.text"
+msgstr ""
+
+msgid "dialog.res.4.title"
+msgstr ""
+
+msgid "dialog.res.4.1.speaker"
+msgstr ""
+
+msgid "dialog.res.4.1.text"
+msgstr ""
+
+msgid "dialog.res.4.2.speaker"
+msgstr ""
+
+msgid "dialog.res.4.2.text"
+msgstr ""
+
+msgid "dialog.res.4.3.speaker"
+msgstr ""
+
+msgid "dialog.res.4.3.text"
+msgstr ""
+
+msgid "dialog.res.4.4.speaker"
+msgstr ""
+
+msgid "dialog.res.4.4.text"
+msgstr ""
+
+msgid "dialog.res.5.title"
+msgstr ""
+
+msgid "dialog.res.5.1.speaker"
+msgstr ""
+
+msgid "dialog.res.5.1.text"
+msgstr ""
+
+msgid "dialog.res.5.2.speaker"
+msgstr ""
+
+msgid "dialog.res.5.2.text"
+msgstr ""
+
+msgid "dialog.res.5.3.speaker"
+msgstr ""
+
+msgid "dialog.res.5.3.text"
+msgstr ""
+
+msgid "dialog.res.5.4.speaker"
+msgstr ""
+
+msgid "dialog.res.5.4.text"
+msgstr ""
+
+msgid "dialog.res.6.title"
+msgstr ""
+
+msgid "dialog.res.6.1.speaker"
+msgstr ""
+
+msgid "dialog.res.6.1.text"
+msgstr ""
+
+msgid "dialog.res.6.2.speaker"
+msgstr ""
+
+msgid "dialog.res.6.2.text"
+msgstr ""
+
+msgid "dialog.res.6.3.speaker"
+msgstr ""
+
+msgid "dialog.res.6.3.text"
+msgstr ""
+
+msgid "dialog.res.6.4.speaker"
+msgstr ""
+
+msgid "dialog.res.6.4.text"
+msgstr ""
+
+msgid "dialog.res.7.title"
+msgstr ""
+
+msgid "dialog.res.7.1.speaker"
+msgstr ""
+
+msgid "dialog.res.7.1.text"
+msgstr ""
+
+msgid "dialog.res.7.2.speaker"
+msgstr ""
+
+msgid "dialog.res.7.2.text"
+msgstr ""
+
+msgid "dialog.res.7.3.speaker"
+msgstr ""
+
+msgid "dialog.res.7.3.text"
+msgstr ""
+
+msgid "dialog.res.7.4.speaker"
+msgstr ""
+
+msgid "dialog.res.7.4.text"
+msgstr ""
+
+msgid "dialog.conf.1.title"
+msgstr ""
+
+msgid "dialog.conf.1.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.1.1.text"
+msgstr ""
+
+msgid "dialog.conf.1.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.1.2.text"
+msgstr ""
+
+msgid "dialog.conf.1.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.1.3.text"
+msgstr ""
+
+msgid "dialog.conf.1.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.1.4.text"
+msgstr ""
+
+msgid "dialog.conf.2.title"
+msgstr ""
+
+msgid "dialog.conf.2.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.2.1.text"
+msgstr ""
+
+msgid "dialog.conf.2.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.2.2.text"
+msgstr ""
+
+msgid "dialog.conf.2.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.2.3.text"
+msgstr ""
+
+msgid "dialog.conf.2.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.2.4.text"
+msgstr ""
+
+msgid "dialog.conf.3.title"
+msgstr ""
+
+msgid "dialog.conf.3.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.3.1.text"
+msgstr ""
+
+msgid "dialog.conf.3.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.3.2.text"
+msgstr ""
+
+msgid "dialog.conf.3.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.3.3.text"
+msgstr ""
+
+msgid "dialog.conf.3.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.3.4.text"
+msgstr ""
+
+msgid "dialog.conf.4.title"
+msgstr ""
+
+msgid "dialog.conf.4.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.4.1.text"
+msgstr ""
+
+msgid "dialog.conf.4.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.4.2.text"
+msgstr ""
+
+msgid "dialog.conf.4.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.4.3.text"
+msgstr ""
+
+msgid "dialog.conf.4.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.4.4.text"
+msgstr ""
+
+msgid "dialog.conf.5.title"
+msgstr ""
+
+msgid "dialog.conf.5.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.5.1.text"
+msgstr ""
+
+msgid "dialog.conf.5.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.5.2.text"
+msgstr ""
+
+msgid "dialog.conf.5.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.5.3.text"
+msgstr ""
+
+msgid "dialog.conf.5.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.5.4.text"
+msgstr ""
+
+msgid "dialog.conf.6.title"
+msgstr ""
+
+msgid "dialog.conf.6.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.6.1.text"
+msgstr ""
+
+msgid "dialog.conf.6.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.6.2.text"
+msgstr ""
+
+msgid "dialog.conf.6.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.6.3.text"
+msgstr ""
+
+msgid "dialog.conf.6.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.6.4.text"
+msgstr ""
+
+msgid "dialog.conf.7.title"
+msgstr ""
+
+msgid "dialog.conf.7.1.speaker"
+msgstr ""
+
+msgid "dialog.conf.7.1.text"
+msgstr ""
+
+msgid "dialog.conf.7.2.speaker"
+msgstr ""
+
+msgid "dialog.conf.7.2.text"
+msgstr ""
+
+msgid "dialog.conf.7.3.speaker"
+msgstr ""
+
+msgid "dialog.conf.7.3.text"
+msgstr ""
+
+msgid "dialog.conf.7.4.speaker"
+msgstr ""
+
+msgid "dialog.conf.7.4.text"
+msgstr ""
+
+msgid "ACKNOWLEDGED"
+msgstr ""
+
+#. Network screen
+msgid "Type a message"
+msgstr ""
+
+msgid "Your name in the game"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Direct connection (the host forwards UDP port 38100)"
+msgstr ""
+
+msgid "Address or address:port, e.g. 192.168.1.10"
+msgstr ""
+
+msgid "6 characters"
+msgstr ""
+
+msgid "CREATE"
+msgstr ""
+
+msgid "Pick a game in the list first"
+msgstr ""
+
+msgid "the game through the server"
+msgstr ""
+
+msgid "Connecting to"
+msgstr ""
+
+msgid "No answer: check the address, and that the host forwards UDP port 38100"
+msgstr ""
+
+
+msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
+msgstr ""

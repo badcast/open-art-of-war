@@ -7,23 +7,25 @@
 namespace OpenArtOfWar
 {
 
-    class Localization
-    {
-    public:
-        static void Init(const std::string &localeDir = LoaderResources::LocaleDir(), const std::string &defaultLang = LoaderResources::DefaultLanguage());
-        static void SetLanguage(const std::string &langCode);
-        static const std::string &GetLanguage();
-        static void ToggleLanguage();
-        static bool IsRussian();
+class Localization
+{
+public:
+    static void Init(
+        const std::string &localeDir = LoaderResources::LocaleDir(),
+        const std::string &defaultLang = LoaderResources::DefaultLanguage());
+    static void SetLanguage(const std::string &langCode);
+    static const std::string &GetLanguage();
+    static void ToggleLanguage();
+    static bool IsRussian();
 
-        static const char *Tr(const char *msgid);
-        static std::string Tr(const std::string &msgid);
+    static const char *Tr(const char *msgid);
+    static std::string Tr(const std::string &msgid);
 
-    private:
-        static std::string s_currentLanguage;
-        static std::string s_localeDir;
-        static bool s_initialized;
-    };
+private:
+    static std::string s_currentLanguage;
+    static std::string s_localeDir;
+    static bool s_initialized;
+};
 
 } // namespace OpenArtOfWar
 

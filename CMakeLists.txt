@@ -100,6 +100,7 @@ set(ENGINE_SOURCES
     src/core/ApplicationOverlays.cpp
     src/core/Localization.cpp
     src/core/AssetStore.cpp
+    src/core/Sha256.cpp
     src/core/LoaderResources.cpp
     src/audio/SfxMixer.cpp
     src/audio/GameSounds.cpp
@@ -137,6 +138,7 @@ set(ENGINE_SOURCES
     src/ui/MapPreview.cpp
     src/ui/MenuBackdropFx.cpp
     src/game/Missions.cpp
+    src/game/MissionDialogs.cpp
     src/game/MissionsResistance.cpp
     src/game/MissionsConfederation.cpp
     src/game/GameplayController.cpp
@@ -282,7 +284,7 @@ if(Python3_FOUND AND BUILD_ASSETS_BLOB)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/pack_assets.py
                 ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/${MAIN_ASSET_BLOB_NAME}
         DEPENDS ${OAOW_ASSET_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/tools/pack_assets.py
-        COMMENT "Packing assets into ${MAIN_ASSET_BLOB_NAME}..."
+        COMMENT "Packing assets and their certificate into ${MAIN_ASSET_BLOB_NAME}..."
     )
     add_custom_target(pack-assets ALL DEPENDS ${CMAKE_BINARY_DIR}/${MAIN_ASSET_BLOB_NAME})
     if(TARGET translations)

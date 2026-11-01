@@ -7,7 +7,7 @@
 
 namespace
 {
-    const char *const kHelp = R"(Usage: openaow [options]
+const char *const kHelp = R"(Usage: openaow [options]
 
 Open Art Of War: Freedom for Liberty. Run it from the folder that holds ./assets.
 
@@ -45,8 +45,8 @@ int main(int argc, char *argv[])
     bool testMapMode = false;
     bool fromScratch = false; // --map without a network game: a custom game, --from-scratch ignores the map's own bases
     std::string rendererOverride;
-    // Network game from the command line: --host[=port] --players=N --map=<name> | --join=<address>[:port], --name=<player>
-    // Single player: --map=<name|path> [--from-scratch] starts a custom game on that map
+    // Network game from the command line: --host[=port] --players=N --map=<name> | --join=<address>[:port],
+    // --name=<player> Single player: --map=<name|path> [--from-scratch] starts a custom game on that map
     bool netHost = false;
     std::string netJoin;
     uint16_t netPort = 38100;
@@ -56,20 +56,20 @@ int main(int argc, char *argv[])
     std::string netServer;
     bool netServerCreate = false;
     std::string netServerCode;
-    for(int i = 1; i < argc; ++i)
+    for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
-        if(arg == "--help" || arg == "-h")
+        if (arg == "--help" || arg == "-h")
         {
             std::cout << kHelp;
             return 0;
         }
-        if(arg == "--version")
+        if (arg == "--version")
         {
             std::cout << "openaow " << OAOW_VERSION << std::endl;
             return 0;
         }
-        if(arg == "--test" || arg == "--headless" || arg == "--headless-test" || arg == "-t")
+        if (arg == "--test" || arg == "--headless" || arg == "--headless-test" || arg == "-t")
         {
 #if defined(AOW_DEBUG)
             testMode = true;
@@ -77,42 +77,42 @@ int main(int argc, char *argv[])
             std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
 #endif
         }
-        if(arg == "--host" || arg.rfind("--host=", 0) == 0)
+        if (arg == "--host" || arg.rfind("--host=", 0) == 0)
         {
             netHost = true;
-            if(arg.size() > 7)
+            if (arg.size() > 7)
                 netPort = static_cast<uint16_t>(std::stoi(arg.substr(7)));
         }
-        if(arg.rfind("--join=", 0) == 0)
+        if (arg.rfind("--join=", 0) == 0)
         {
             netJoin = arg.substr(7);
             const size_t colon = netJoin.rfind(':');
-            if(colon != std::string::npos)
+            if (colon != std::string::npos)
             {
                 netPort = static_cast<uint16_t>(std::stoi(netJoin.substr(colon + 1)));
                 netJoin.resize(colon);
             }
         }
-        if(arg.rfind("--players=", 0) == 0)
+        if (arg.rfind("--players=", 0) == 0)
             netPlayers = std::stoi(arg.substr(10));
         // Through a dedicated server: --server=host[:port] with --server-create or --server-code=<code>
-        if(arg.rfind("--server=", 0) == 0)
+        if (arg.rfind("--server=", 0) == 0)
             netServer = arg.substr(9);
-        if(arg == "--server-create")
+        if (arg == "--server-create")
             netServerCreate = true;
-        if(arg.rfind("--server-code=", 0) == 0)
+        if (arg.rfind("--server-code=", 0) == 0)
             netServerCode = arg.substr(14);
-        if(arg.rfind("--map=", 0) == 0)
+        if (arg.rfind("--map=", 0) == 0)
             netMapName = arg.substr(6);
-        if(arg == "--from-scratch")
+        if (arg == "--from-scratch")
             fromScratch = true;
-        if(arg.rfind("--name=", 0) == 0)
+        if (arg.rfind("--name=", 0) == 0)
             netName = arg.substr(7);
-        if(arg.rfind("--renderer=", 0) == 0)
+        if (arg.rfind("--renderer=", 0) == 0)
         {
             rendererOverride = arg.substr(11);
         }
-        if(arg == "--debug" || arg == "-d")
+        if (arg == "--debug" || arg == "-d")
         {
 #if defined(AOW_DEBUG)
             debugMode = true;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
             std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
 #endif
         }
-        if(arg == "--testmap" || arg == "--test-map" || arg == "-tm")
+        if (arg == "--testmap" || arg == "--test-map" || arg == "-tm")
         {
             testMapMode = true;
 #if defined(AOW_DEBUG)
@@ -131,11 +131,11 @@ int main(int argc, char *argv[])
 
     std::cout << "========================================================" << std::endl;
     std::cout << "Open Art Of War: Freedom for Liberty" << std::endl;
-    if(debugMode)
+    if (debugMode)
     {
         std::cout << "[DEBUG MODE ENABLED: Navigation Inspection & Full Enemy Control]" << std::endl;
     }
-    if(testMapMode)
+    if (testMapMode)
     {
         std::cout << "[DIRECT TEST MAP LAUNCH: Test Polygon]" << std::endl;
     }
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 
     // The self-test works in a throw-away user directory: it must neither read nor change the player's files
     std::filesystem::path testUserDir;
-    if(testMode)
+    if (testMode)
     {
         testUserDir = std::filesystem::temp_directory_path() / "openaow-test-user";
         std::error_code ec;
@@ -158,30 +158,37 @@ int main(int argc, char *argv[])
         OpenArtOfWar::Application app;
         app.SetRendererOverride(restart ? std::string() : rendererOverride);
         app.SetHeadless(testMode);
-        if(!app.Init(1280, 720))
+        if (!app.Init(1280, 720))
         {
             std::cerr << "Engine initialization failed." << std::endl;
             return 1;
         }
         app.SetDebugMode(debugMode);
-        if(testMapMode && !restart)
+        if (testMapMode && !restart)
         {
             app.LaunchTestMap();
         }
         // --map=<name> alone: a single-player custom game on that map (with --host / --server it is the match map)
-        const bool netGame = netHost || !netJoin.empty() || (!netServer.empty() && (netServerCreate || !netServerCode.empty()));
-        if(!restart && !testMapMode && !testMode && !netGame && !netMapName.empty())
+        const bool netGame
+            = netHost || !netJoin.empty() || (!netServer.empty() && (netServerCreate || !netServerCode.empty()));
+        if (!restart && !testMapMode && !testMode && !netGame && !netMapName.empty())
             app.LaunchMap(netMapName, fromScratch);
-        if(!restart && netHost)
+        if (!restart && netHost)
         {
-            app.HostNetworkGame(netPort, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap() : OpenArtOfWar::LoaderResources::MapPath(netMapName), netName, fromScratch);
+            app.HostNetworkGame(
+                netPort,
+                netPlayers,
+                netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap()
+                                   : OpenArtOfWar::LoaderResources::MapPath(netMapName),
+                netName,
+                fromScratch);
             // --server too: the hosted game is listed there and reachable by its code
-            if(!netServer.empty())
+            if (!netServer.empty())
             {
                 std::string host = netServer;
                 uint16_t port = 38100;
                 const size_t colon = host.rfind(':');
-                if(colon != std::string::npos)
+                if (colon != std::string::npos)
                 {
                     port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
                     host.resize(colon);
@@ -189,23 +196,31 @@ int main(int argc, char *argv[])
                 app.AnnounceNetworkGame(host, port);
             }
         }
-        if(!restart && !netJoin.empty())
+        if (!restart && !netJoin.empty())
             app.JoinNetworkGame(netJoin, netPort, netName);
-        if(!restart && !netServer.empty() && (netServerCreate || !netServerCode.empty()))
+        if (!restart && !netServer.empty() && (netServerCreate || !netServerCode.empty()))
         {
             std::string host = netServer;
             uint16_t port = 38100;
             const size_t colon = host.rfind(':');
-            if(colon != std::string::npos)
+            if (colon != std::string::npos)
             {
                 port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
                 host.resize(colon);
             }
-            app.ServerNetworkGame(host, port, netServerCreate ? std::string() : netServerCode, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap() : OpenArtOfWar::LoaderResources::MapPath(netMapName), netName, fromScratch);
+            app.ServerNetworkGame(
+                host,
+                port,
+                netServerCreate ? std::string() : netServerCode,
+                netPlayers,
+                netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap()
+                                   : OpenArtOfWar::LoaderResources::MapPath(netMapName),
+                netName,
+                fromScratch);
         }
 
 #if defined(AOW_DEBUG)
-        if(testMode)
+        if (testMode)
         {
             bool ok = app.RunHeadlessTest(200);
             std::cout << "Headless test result: " << (ok ? "SUCCESS" : "FAILED") << std::endl;
@@ -217,7 +232,7 @@ int main(int argc, char *argv[])
 
         app.run();
         restart = app.RestartRequested();
-    } while(restart);
+    } while (restart);
     std::cout << "Engine shut down cleanly." << std::endl;
     return 0;
 }

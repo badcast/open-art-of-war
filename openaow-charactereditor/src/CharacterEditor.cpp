@@ -1,3 +1,4 @@
+#include "core/LoaderResources.hpp"
 #include "CharacterEditor.hpp"
 #include "ConfigMerge.hpp"
 
@@ -54,7 +55,7 @@ bool CharacterEditor::Init() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
-    const fs::path fontPath = assetsRoot / "fonts" / "Roboto-Regular.ttf";
+    const fs::path fontPath = OpenArtOfWar::LoaderResources::FontRegular(assetsRoot.string());
     if (fs::exists(fontPath)) {
         io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 15.0f, nullptr,
                                      io.Fonts->GetGlyphRangesCyrillic());

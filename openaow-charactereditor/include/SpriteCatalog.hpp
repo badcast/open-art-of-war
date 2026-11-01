@@ -56,7 +56,7 @@ struct DepNode {
     std::vector<DepNode> children;
 };
 
-// The sprite data of the game (sprites.json + graphics_data.json) grouped into objects. No SDL, no ImGui:
+// The sprite data of the game (sprites.json + sprites_graphics.json) grouped into objects. No SDL, no ImGui:
 // it can be checked without a window.
 class SpriteCatalog {
 public:
@@ -88,7 +88,7 @@ private:
     DepNode AnimNode(int id) const;
     DepNode ChildNode(int kind, int id, int ox, int oy, int depth) const;
 
-    nlohmann::json gd;                       // graphics_data.json
+    nlohmann::json gd;                       // sprites_graphics.json
     std::vector<RawSprite> rawSprites;
     std::vector<SpriteObject> objs;
     std::vector<uint8_t> spriteGroup;        // per sprite id

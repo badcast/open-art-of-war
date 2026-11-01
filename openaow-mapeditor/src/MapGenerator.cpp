@@ -1,4 +1,4 @@
-#include "SmartGenerator.hpp"
+#include "MapGenerator.hpp"
 #include "MapNoise.hpp"
 #include "TileCorners.hpp"
 #include "core/Utility.hpp"
@@ -866,7 +866,7 @@ private:
 
 } // namespace
 
-void SmartGenerator::Generate(MapDocument& doc, GeneratorParams params) {
+void MapGenerator::Generate(MapDocument& doc, GeneratorParams params) {
     if (params.randomSeed) {
         std::random_device rd;
         params.seed = rd();
@@ -876,17 +876,26 @@ void SmartGenerator::Generate(MapDocument& doc, GeneratorParams params) {
     const int tilesetId = std::clamp(params.tilesetId, 0, 1);
 
     doc.NewMap(w, h, tilesetId, 0);
-    doc.SetName("smart_map_" + std::to_string(params.seed % 10000));
+    doc.SetName("generated_map_" + std::to_string(params.seed % 10000));
 
     Builder(doc, params, w, h, tilesetId).run();
 
-    std::cout << "[SmartGenerator] Generated map '" << doc.GetName() << "' (" << w << "x" << h
+    std::cout << "[MapGenerator] Generated map '" << doc.GetName() << "' (" << w << "x" << h
               << ", seed: " << params.seed << ")" << std::endl;
+}
+
+void MapGenerator::GenerateQuick(MapDocument& doc) {
+    GeneratorParams params;
+    params.width = doc.GetWidth();
+    params.height = doc.GetHeight();
+    params.tilesetId = doc.GetTilesetId();
+    OriginalDefaults(params, params.tilesetId);
+    Generate(doc, params);
 }
 
 // Medians over map_mission_* and map_skirmish_* of each tileset (tools/derive_tile_corners.py gives the table
 // the ground shares are counted with)
-void SmartGenerator::OriginalDefaults(GeneratorParams& params, int tilesetId) {
+void MapGenerator::OriginalDefaults(GeneratorParams& params, int tilesetId) {
     if (tilesetId == 1) {
         params.islandPercent = 48;
         params.edgePercent = 64;
@@ -912,7 +921,7 @@ void SmartGenerator::OriginalDefaults(GeneratorParams& params, int tilesetId) {
     }
 }
 
-const SmartGenerator::Setting* SmartGenerator::Settings(int& count) {
+const MapGenerator::Setting* MapGenerator::Settings(int& count) {
     static const Setting settings[] = {
         {"Islands, % of the map", &GeneratorParams::islandPercent, 10, 70,
          "Impassable rock and forest islands. Original maps: 17..67 %, median 46 %."},

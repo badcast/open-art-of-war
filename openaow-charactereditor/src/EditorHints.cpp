@@ -247,7 +247,7 @@ const Hint kHints[] = {
     {"Export sprites", "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the cells."},
     {"Import folder", "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."},
     {"Choose import folder...", "Opens the system dialog to pick the folder to import from."},
-    {"Import sprites", "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/graphics_data.json, you are asked first."},
+    {"Import sprites", "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."},
     {"Packed atlas", "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."},
     {"Dependencies", "Shows the dependency tree of the selected object (sequences, bodies, composites, animations, sprites)."},
     {"Export Preview", "Interactive atlas layout editor where you can arrange, pack, group by object, and export sprites."},

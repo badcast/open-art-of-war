@@ -5,285 +5,297 @@
 namespace OpenArtOfWar
 {
 
-    InputManager::InputManager()
+InputManager::InputManager()
+{
+    m_keystates = SDL_GetKeyboardState(nullptr);
+    std::memset(m_prevKeystates, 0, sizeof(m_prevKeystates));
+    std::memset(m_keysJustPressed, 0, sizeof(m_keysJustPressed));
+}
+
+void InputManager::ResetFrameEvents()
+{
+    // Note: Do not clear click/action events here, as simulation updates run on fixed timesteps
+    // and events must persist until consumed by the update logic.
+}
+
+void InputManager::UpdateKeystates()
+{
+    if (m_keystates)
     {
-        m_keystates = SDL_GetKeyboardState(nullptr);
-        std::memset(m_prevKeystates, 0, sizeof(m_prevKeystates));
-        std::memset(m_keysJustPressed, 0, sizeof(m_keysJustPressed));
+        std::memcpy(m_prevKeystates, m_keystates, SDL_SCANCODE_COUNT);
+    }
+}
+
+void InputManager::UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles)
+{
+    float panSpeed = 650.0f * frameDeltaTime; // pixels/sec in world space
+    float curX = camera.GetX();
+    float curY = camera.GetY();
+    if (m_keystates[SDL_SCANCODE_W] || m_keystates[SDL_SCANCODE_UP])
+    {
+        curY -= panSpeed;
+    }
+    if (m_keystates[SDL_SCANCODE_S] || m_keystates[SDL_SCANCODE_DOWN])
+    {
+        curY += panSpeed;
+    }
+    if (m_keystates[SDL_SCANCODE_A] || m_keystates[SDL_SCANCODE_LEFT])
+    {
+        curX -= panSpeed;
+    }
+    if (m_keystates[SDL_SCANCODE_D] || m_keystates[SDL_SCANCODE_RIGHT])
+    {
+        curX += panSpeed;
+    }
+    camera.SetPosition(curX, curY);
+    camera.ClampToBounds(mapWidthTiles, mapHeightTiles);
+}
+
+void InputManager::Update(float /*deltaTime*/, Camera &camera)
+{
+    // Update mouse world position
+    float mouseX = 0.0f, mouseY = 0.0f;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    m_mouseScreenX = static_cast<int>(mouseX);
+    m_mouseScreenY = static_cast<int>(mouseY);
+    camera.ScreenToWorld(
+        static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY), m_mouseWorldX, m_mouseWorldY);
+
+    if (m_selectionBox.active)
+    {
+        m_selectionBox.currentScreenX = m_mouseScreenX;
+        m_selectionBox.currentScreenY = m_mouseScreenY;
+        m_selectionBox.currentWorldX = m_mouseWorldX;
+        m_selectionBox.currentWorldY = m_mouseWorldY;
     }
 
-    void InputManager::ResetFrameEvents()
+    UpdateKeystates();
+}
+
+bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
+{
+    switch (event.type)
     {
-        // Note: Do not clear click/action events here, as simulation updates run on fixed timesteps
-        // and events must persist until consumed by the update logic.
-    }
+        case SDL_EVENT_TEXT_INPUT:
+            if (m_typed.size() < 256)
+                m_typed += event.text.text;
+            break;
 
-    void InputManager::UpdateKeystates()
-    {
-        if(m_keystates)
+        case SDL_EVENT_KEY_DOWN:
         {
-            std::memcpy(m_prevKeystates, m_keystates, SDL_SCANCODE_COUNT);
-        }
-    }
-
-    void InputManager::UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles)
-    {
-        float panSpeed = 650.0f * frameDeltaTime; // pixels/sec in world space
-        float curX = camera.GetX();
-        float curY = camera.GetY();
-        if(m_keystates[SDL_SCANCODE_W] || m_keystates[SDL_SCANCODE_UP])
-        {
-            curY -= panSpeed;
-        }
-        if(m_keystates[SDL_SCANCODE_S] || m_keystates[SDL_SCANCODE_DOWN])
-        {
-            curY += panSpeed;
-        }
-        if(m_keystates[SDL_SCANCODE_A] || m_keystates[SDL_SCANCODE_LEFT])
-        {
-            curX -= panSpeed;
-        }
-        if(m_keystates[SDL_SCANCODE_D] || m_keystates[SDL_SCANCODE_RIGHT])
-        {
-            curX += panSpeed;
-        }
-        camera.SetPosition(curX, curY);
-        camera.ClampToBounds(mapWidthTiles, mapHeightTiles);
-    }
-
-    void InputManager::Update(float /*deltaTime*/, Camera &camera)
-    {
-        // Update mouse world position
-        float mouseX = 0.0f, mouseY = 0.0f;
-        SDL_GetMouseState(&mouseX, &mouseY);
-        m_mouseScreenX = static_cast<int>(mouseX);
-        m_mouseScreenY = static_cast<int>(mouseY);
-        camera.ScreenToWorld(static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY), m_mouseWorldX, m_mouseWorldY);
-
-        if(m_selectionBox.active)
-        {
-            m_selectionBox.currentScreenX = m_mouseScreenX;
-            m_selectionBox.currentScreenY = m_mouseScreenY;
-            m_selectionBox.currentWorldX = m_mouseWorldX;
-            m_selectionBox.currentWorldY = m_mouseWorldY;
-        }
-
-        UpdateKeystates();
-    }
-
-    bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
-    {
-        switch(event.type)
-        {
-            case SDL_EVENT_TEXT_INPUT:
-                if(m_typed.size() < 256)
-                    m_typed += event.text.text;
-                break;
-
-            case SDL_EVENT_KEY_DOWN:
-            {
-                if(event.key.scancode == SDL_SCANCODE_BACKSPACE)
-                    ++m_backspaces;
-                if(event.key.repeat == 0)
-                {
-                    SDL_Scancode sc = event.key.scancode;
-                    if(sc >= 0 && sc < SDL_SCANCODE_COUNT)
-                    {
-                        m_keysJustPressed[sc] = 1;
-                    }
-                }
-                break;
-            }
-
-            case SDL_EVENT_KEY_UP:
+            if (event.key.scancode == SDL_SCANCODE_BACKSPACE)
+                ++m_backspaces;
+            if (event.key.repeat == 0)
             {
                 SDL_Scancode sc = event.key.scancode;
-                if(sc >= 0 && sc < SDL_SCANCODE_COUNT)
+                if (sc >= 0 && sc < SDL_SCANCODE_COUNT)
                 {
-                    m_keysJustPressed[sc] = 0;
+                    m_keysJustPressed[sc] = 1;
                 }
-                break;
             }
+            break;
+        }
 
-            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_KEY_UP:
+        {
+            SDL_Scancode sc = event.key.scancode;
+            if (sc >= 0 && sc < SDL_SCANCODE_COUNT)
             {
-                if(event.button.button == SDL_BUTTON_LEFT)
-                {
-                    m_leftMouseDown = true;
-                    m_leftPressed = true;
-                    m_leftPressX = static_cast<int>(event.button.x);
-                    m_leftPressY = static_cast<int>(event.button.y);
-                    m_leftClickScreenX = static_cast<int>(event.button.x);
-                    m_leftClickScreenY = static_cast<int>(event.button.y);
-                    camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
+                m_keysJustPressed[sc] = 0;
+            }
+            break;
+        }
 
-                    // Immediate click dispatch for the UI sidebar (right of the map viewport) and the top debug bar
-                    if(static_cast<int>(event.button.x) >= camera.GetViewportWidth() || static_cast<int>(event.button.y) <= 40)
-                    {
-                        m_leftClickIssued = true;
-                        m_selectionBox.active = false;
-                    }
-                    else
-                    {
-                        m_selectionBox.active = true;
-                        m_selectionBox.startScreenX = static_cast<int>(event.button.x);
-                        m_selectionBox.startScreenY = static_cast<int>(event.button.y);
-                        m_selectionBox.currentScreenX = static_cast<int>(event.button.x);
-                        m_selectionBox.currentScreenY = static_cast<int>(event.button.y);
-                        m_selectionBox.startWorldX = m_leftClickWorldX;
-                        m_selectionBox.startWorldY = m_leftClickWorldY;
-                        m_selectionBox.currentWorldX = m_leftClickWorldX;
-                        m_selectionBox.currentWorldY = m_leftClickWorldY;
-                    }
-                }
-                else if(event.button.button == SDL_BUTTON_RIGHT)
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        {
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                m_leftMouseDown = true;
+                m_leftPressed = true;
+                m_leftPressX = static_cast<int>(event.button.x);
+                m_leftPressY = static_cast<int>(event.button.y);
+                m_leftClickScreenX = static_cast<int>(event.button.x);
+                m_leftClickScreenY = static_cast<int>(event.button.y);
+                camera.ScreenToWorld(
+                    static_cast<int>(event.button.x),
+                    static_cast<int>(event.button.y),
+                    m_leftClickWorldX,
+                    m_leftClickWorldY);
+
+                // Immediate click dispatch for the UI sidebar (right of the map viewport) and the top debug bar
+                if (static_cast<int>(event.button.x) >= camera.GetViewportWidth()
+                    || static_cast<int>(event.button.y) <= 40)
                 {
-                    m_rightClickIssued = true;
-                    m_rightClickScreenX = static_cast<int>(event.button.x);
-                    m_rightClickScreenY = static_cast<int>(event.button.y);
-                    camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_rightClickWorldX, m_rightClickWorldY);
+                    m_leftClickIssued = true;
                     m_selectionBox.active = false;
                 }
-                else if(event.button.button == SDL_BUTTON_MIDDLE)
+                else
                 {
-                    m_middleMouseDown = true;
-                    m_lastMouseX = static_cast<int>(event.button.x);
-                    m_lastMouseY = static_cast<int>(event.button.y);
+                    m_selectionBox.active = true;
+                    m_selectionBox.startScreenX = static_cast<int>(event.button.x);
+                    m_selectionBox.startScreenY = static_cast<int>(event.button.y);
+                    m_selectionBox.currentScreenX = static_cast<int>(event.button.x);
+                    m_selectionBox.currentScreenY = static_cast<int>(event.button.y);
+                    m_selectionBox.startWorldX = m_leftClickWorldX;
+                    m_selectionBox.startWorldY = m_leftClickWorldY;
+                    m_selectionBox.currentWorldX = m_leftClickWorldX;
+                    m_selectionBox.currentWorldY = m_leftClickWorldY;
                 }
-                break;
             }
-
-            case SDL_EVENT_MOUSE_BUTTON_UP:
+            else if (event.button.button == SDL_BUTTON_RIGHT)
             {
-                if(event.button.button == SDL_BUTTON_LEFT)
-                {
-                    m_leftMouseDown = false;
-                    if(m_selectionBox.active)
-                    {
-                        if(!m_selectionBox.HasSignificantArea())
-                        {
-                            m_leftClickIssued = true;
-                            m_leftClickScreenX = static_cast<int>(event.button.x);
-                            m_leftClickScreenY = static_cast<int>(event.button.y);
-                            camera.ScreenToWorld(static_cast<int>(event.button.x), static_cast<int>(event.button.y), m_leftClickWorldX, m_leftClickWorldY);
-                        }
-                        m_selectionBox.active = false;
-                    }
-                }
-                else if(event.button.button == SDL_BUTTON_MIDDLE)
-                {
-                    m_middleMouseDown = false;
-                }
-                break;
+                m_rightClickIssued = true;
+                m_rightClickScreenX = static_cast<int>(event.button.x);
+                m_rightClickScreenY = static_cast<int>(event.button.y);
+                camera.ScreenToWorld(
+                    static_cast<int>(event.button.x),
+                    static_cast<int>(event.button.y),
+                    m_rightClickWorldX,
+                    m_rightClickWorldY);
+                m_selectionBox.active = false;
             }
-
-            case SDL_EVENT_MOUSE_MOTION:
+            else if (event.button.button == SDL_BUTTON_MIDDLE)
             {
-                if(m_middleMouseDown)
-                {
-                    float dx = static_cast<float>(m_lastMouseX - static_cast<int>(event.motion.x));
-                    float dy = static_cast<float>(m_lastMouseY - static_cast<int>(event.motion.y));
-                    camera.Pan(dx, dy);
-                    m_lastMouseX = static_cast<int>(event.motion.x);
-                    m_lastMouseY = static_cast<int>(event.motion.y);
-                }
-                break;
+                m_middleMouseDown = true;
+                m_lastMouseX = static_cast<int>(event.button.x);
+                m_lastMouseY = static_cast<int>(event.button.y);
             }
-
-            case SDL_EVENT_MOUSE_WHEEL:
-            {
-                m_wheel += (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
-                if(m_mouseScreenX >= camera.GetViewportWidth())
-                {
-                    m_uiWheel += (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
-                    break;
-                }
-                if(event.wheel.y == 0.0f)
-                    break;
-                float zoomDelta = (event.wheel.y > 0.0f) ? 1.15f : (1.0f / 1.15f);
-                camera.SetZoom(camera.GetZoom() * zoomDelta, static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY));
-                break;
-            }
+            break;
         }
+
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+        {
+            if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                m_leftMouseDown = false;
+                if (m_selectionBox.active)
+                {
+                    if (!m_selectionBox.HasSignificantArea())
+                    {
+                        m_leftClickIssued = true;
+                        m_leftClickScreenX = static_cast<int>(event.button.x);
+                        m_leftClickScreenY = static_cast<int>(event.button.y);
+                        camera.ScreenToWorld(
+                            static_cast<int>(event.button.x),
+                            static_cast<int>(event.button.y),
+                            m_leftClickWorldX,
+                            m_leftClickWorldY);
+                    }
+                    m_selectionBox.active = false;
+                }
+            }
+            else if (event.button.button == SDL_BUTTON_MIDDLE)
+            {
+                m_middleMouseDown = false;
+            }
+            break;
+        }
+
+        case SDL_EVENT_MOUSE_MOTION:
+        {
+            if (m_middleMouseDown)
+            {
+                float dx = static_cast<float>(m_lastMouseX - static_cast<int>(event.motion.x));
+                float dy = static_cast<float>(m_lastMouseY - static_cast<int>(event.motion.y));
+                camera.Pan(dx, dy);
+                m_lastMouseX = static_cast<int>(event.motion.x);
+                m_lastMouseY = static_cast<int>(event.motion.y);
+            }
+            break;
+        }
+
+        case SDL_EVENT_MOUSE_WHEEL:
+        {
+            // Only counted here: the game decides who gets the steps (a list, the sidebar, or the camera zoom when
+            // the cursor is on the open map and no window is in the way - GameplayController)
+            const int step = (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
+            m_wheel += step;
+            if (event.wheel.mouse_x >= static_cast<float>(camera.GetViewportWidth()))
+                m_uiWheel += step;
+            else
+                m_mapWheel += step;
+            break;
+        }
+    }
+    return true;
+}
+
+bool InputManager::WasRightClickIssued(float &worldX, float &worldY)
+{
+    if (m_rightClickIssued)
+    {
+        worldX = m_rightClickWorldX;
+        worldY = m_rightClickWorldY;
+        m_rightClickIssued = false;
         return true;
     }
+    return false;
+}
 
-    bool InputManager::WasRightClickIssued(float &worldX, float &worldY)
+bool InputManager::WasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
+{
+    if (m_rightClickIssued)
     {
-        if(m_rightClickIssued)
-        {
-            worldX = m_rightClickWorldX;
-            worldY = m_rightClickWorldY;
-            m_rightClickIssued = false;
-            return true;
-        }
+        worldX = m_rightClickWorldX;
+        worldY = m_rightClickWorldY;
+        screenX = m_rightClickScreenX;
+        screenY = m_rightClickScreenY;
+        m_rightClickIssued = false;
+        return true;
+    }
+    return false;
+}
+
+bool InputManager::WasLeftClickIssued(float &worldX, float &worldY)
+{
+    if (m_leftClickIssued)
+    {
+        worldX = m_leftClickWorldX;
+        worldY = m_leftClickWorldY;
+        m_leftClickIssued = false;
+        return true;
+    }
+    return false;
+}
+
+bool InputManager::WasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
+{
+    if (m_leftClickIssued)
+    {
+        worldX = m_leftClickWorldX;
+        worldY = m_leftClickWorldY;
+        screenX = m_leftClickScreenX;
+        screenY = m_leftClickScreenY;
+        m_leftClickIssued = false;
+        return true;
+    }
+    return false;
+}
+
+bool InputManager::isKeyPressed(SDL_Scancode scancode) const
+{
+    if (!m_keystates || scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
         return false;
-    }
+    return m_keystates[scancode] != 0;
+}
 
-    bool InputManager::WasRightClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
-    {
-        if(m_rightClickIssued)
-        {
-            worldX = m_rightClickWorldX;
-            worldY = m_rightClickWorldY;
-            screenX = m_rightClickScreenX;
-            screenY = m_rightClickScreenY;
-            m_rightClickIssued = false;
-            return true;
-        }
+bool InputManager::IsKeyJustPressed(SDL_Scancode scancode)
+{
+    if (scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
         return false;
-    }
-
-    bool InputManager::WasLeftClickIssued(float &worldX, float &worldY)
+    if (m_keysJustPressed[scancode])
     {
-        if(m_leftClickIssued)
-        {
-            worldX = m_leftClickWorldX;
-            worldY = m_leftClickWorldY;
-            m_leftClickIssued = false;
-            return true;
-        }
-        return false;
+        m_keysJustPressed[scancode] = 0; // Strictly consume key event!
+        return true;
     }
+    return false;
+}
 
-    bool InputManager::WasLeftClickIssued(float &worldX, float &worldY, int &screenX, int &screenY)
-    {
-        if(m_leftClickIssued)
-        {
-            worldX = m_leftClickWorldX;
-            worldY = m_leftClickWorldY;
-            screenX = m_leftClickScreenX;
-            screenY = m_leftClickScreenY;
-            m_leftClickIssued = false;
-            return true;
-        }
-        return false;
-    }
-
-    bool InputManager::isKeyPressed(SDL_Scancode scancode) const
-    {
-        if(!m_keystates || scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
-            return false;
-        return m_keystates[scancode] != 0;
-    }
-
-    bool InputManager::IsKeyJustPressed(SDL_Scancode scancode)
-    {
-        if(scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
-            return false;
-        if(m_keysJustPressed[scancode])
-        {
-            m_keysJustPressed[scancode] = 0; // Strictly consume key event!
-            return true;
-        }
-        return false;
-    }
-
-    bool InputManager::IsConfirmJustPressed()
-    {
-        bool returnPressed = IsKeyJustPressed(SDL_SCANCODE_RETURN);
-        bool spacePressed = IsKeyJustPressed(SDL_SCANCODE_SPACE);
-        return returnPressed || spacePressed;
-    }
+bool InputManager::IsConfirmJustPressed()
+{
+    bool returnPressed = IsKeyJustPressed(SDL_SCANCODE_RETURN);
+    bool spacePressed = IsKeyJustPressed(SDL_SCANCODE_SPACE);
+    return returnPressed || spacePressed;
+}
 
 } // namespace OpenArtOfWar
