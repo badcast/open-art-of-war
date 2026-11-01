@@ -20,19 +20,19 @@ namespace fs = std::filesystem;
 
 namespace {
 
-ImTextureID spriteTextureId(SDL_Texture* texture) {
+ImTextureID SpriteTextureId(SDL_Texture* texture) {
     return static_cast<ImTextureID>(reinterpret_cast<intptr_t>(texture));
 }
 
-void drawSpriteFrame(ImDrawList* drawList, TextureManager& textureManager, int spriteId,
+void DrawSpriteFrame(ImDrawList* drawList, TextureManager& textureManager, int spriteId,
                      float x, float y, float scale, Faction faction, int depth = 0) {
     if (depth > 6) return;
-    const SpriteFrame* frame = textureManager.getSpriteFrame(spriteId);
+    const SpriteFrame* frame = textureManager.GetSpriteFrame(spriteId);
     if (!frame || frame->width <= 0 || frame->height <= 0) return;
 
     int page = frame->page;
     if (page == 8 && faction == Faction::Resistance) page = 9;
-    SDL_Texture* sheet = textureManager.getSpriteSheet(page);
+    SDL_Texture* sheet = textureManager.GetSpriteSheet(page);
     if (!sheet) return;
 
     static std::unordered_map<SDL_Texture*, ImVec2> sheetSizes;
@@ -45,31 +45,31 @@ void drawSpriteFrame(ImDrawList* drawList, TextureManager& textureManager, int s
     }
     if (size->second.x <= 0.0f || size->second.y <= 0.0f) return;
 
-    const float sheetScale = textureManager.getSheetScale(page);
+    const float sheetScale = textureManager.GetSheetScale(page);
     const ImVec2 uv0(frame->x * sheetScale / size->second.x,
                      frame->y * sheetScale / size->second.y);
     const ImVec2 uv1((frame->x + frame->width) * sheetScale / size->second.x,
                      (frame->y + frame->height) * sheetScale / size->second.y);
     const ImVec2 min(x, y);
     const ImVec2 max(x + frame->width * scale, y + frame->height * scale);
-    drawList->AddImage(spriteTextureId(sheet), min, max, uv0, uv1);
+    drawList->AddImage(SpriteTextureId(sheet), min, max, uv0, uv1);
 }
 
-void drawCompositeSprite(ImDrawList* drawList, TextureManager& textureManager, int compositeId,
+void DrawCompositeSprite(ImDrawList* drawList, TextureManager& textureManager, int compositeId,
                          float x, float y, float scale, Faction faction, int depth = 0) {
     if (depth > 6) return;
-    const IndexRange range = textureManager.getCompositeRange(compositeId);
+    const IndexRange range = textureManager.GetCompositeRange(compositeId);
     if (range.end < range.start) return;
 
     for (int index = range.start; index <= range.end; ++index) {
-        const CompositePart* part = textureManager.getCompositePart(index);
+        const CompositePart* part = textureManager.GetCompositePart(index);
         if (!part) continue;
         const float childX = x + part->ox * scale;
         const float childY = y + part->oy * scale;
         if (part->isComp == 0) {
-            drawSpriteFrame(drawList, textureManager, part->child, childX, childY, scale, faction);
+            DrawSpriteFrame(drawList, textureManager, part->child, childX, childY, scale, faction);
         } else {
-            drawCompositeSprite(drawList, textureManager, part->child, childX, childY,
+            DrawCompositeSprite(drawList, textureManager, part->child, childX, childY,
                                 scale, faction, depth + 1);
         }
     }
@@ -82,7 +82,7 @@ struct SpriteBounds {
     float bottom{std::numeric_limits<float>::lowest()};
     bool valid{false};
 
-    void include(float x, float y, float width, float height) {
+    void Include(float x, float y, float width, float height) {
         if (width <= 0.0f || height <= 0.0f) return;
         left = std::min(left, x);
         top = std::min(top, y);
@@ -92,23 +92,23 @@ struct SpriteBounds {
     }
 };
 
-void includeSpriteBounds(TextureManager& textureManager, int spriteId, float x, float y,
+void IncludeSpriteBounds(TextureManager& textureManager, int spriteId, float x, float y,
                          SpriteBounds& bounds) {
-    const SpriteFrame* frame = textureManager.getSpriteFrame(spriteId);
-    if (frame) bounds.include(x, y, static_cast<float>(frame->width), static_cast<float>(frame->height));
+    const SpriteFrame* frame = textureManager.GetSpriteFrame(spriteId);
+    if (frame) bounds.Include(x, y, static_cast<float>(frame->width), static_cast<float>(frame->height));
 }
 
-void includeCompositeBounds(TextureManager& textureManager, int compositeId, float x, float y,
+void IncludeCompositeBounds(TextureManager& textureManager, int compositeId, float x, float y,
                             SpriteBounds& bounds, int depth = 0) {
     if (depth > 6) return;
-    const IndexRange range = textureManager.getCompositeRange(compositeId);
+    const IndexRange range = textureManager.GetCompositeRange(compositeId);
     for (int index = range.start; index <= range.end; ++index) {
-        const CompositePart* part = textureManager.getCompositePart(index);
+        const CompositePart* part = textureManager.GetCompositePart(index);
         if (!part) continue;
         const float partX = x + part->ox;
         const float partY = y + part->oy;
-        if (part->isComp == 0) includeSpriteBounds(textureManager, part->child, partX, partY, bounds);
-        else includeCompositeBounds(textureManager, part->child, partX, partY, bounds, depth + 1);
+        if (part->isComp == 0) IncludeSpriteBounds(textureManager, part->child, partX, partY, bounds);
+        else IncludeCompositeBounds(textureManager, part->child, partX, partY, bounds, depth + 1);
     }
 }
 
@@ -117,7 +117,7 @@ struct ThumbnailTransform {
     float scale{1.0f};
 };
 
-ThumbnailTransform fitThumbnail(const SpriteBounds& bounds, const ImVec2& itemMin,
+ThumbnailTransform FitThumbnail(const SpriteBounds& bounds, const ImVec2& itemMin,
                                 const ImVec2& itemMax) {
     constexpr float slotWidth = 48.0f;
     const ImVec2 slotMin(itemMin.x + 4.0f, itemMin.y + 4.0f);
@@ -133,120 +133,120 @@ ThumbnailTransform fitThumbnail(const SpriteBounds& bounds, const ImVec2& itemMi
     return {ImVec2(x, y), scale};
 }
 
-void drawThumbnailFrame(ImDrawList* drawList, const ImVec2& itemMin, const ImVec2& itemMax) {
+void DrawThumbnailFrame(ImDrawList* drawList, const ImVec2& itemMin, const ImVec2& itemMax) {
     drawList->AddRect(ImVec2(itemMin.x + 4.0f, itemMin.y + 4.0f),
                       ImVec2(itemMin.x + 48.0f, itemMax.y - 4.0f), IM_COL32(255, 255, 255, 55));
 }
 
-void drawDecorThumbnail(ImDrawList* drawList, TextureManager& textureManager,
+void DrawDecorThumbnail(ImDrawList* drawList, TextureManager& textureManager,
                         int tilesetId, int decorType, const ImVec2& min, const ImVec2& max) {
-    const int compositeId = textureManager.getDecorCompositeId(tilesetId, decorType);
+    const int compositeId = textureManager.GetDecorCompositeId(tilesetId, decorType);
     SpriteBounds bounds;
-    includeCompositeBounds(textureManager, compositeId, 0.0f, 0.0f, bounds);
-    const ThumbnailTransform transform = fitThumbnail(bounds, min, max);
+    IncludeCompositeBounds(textureManager, compositeId, 0.0f, 0.0f, bounds);
+    const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
     drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f),
                            ImVec2(min.x + 48.0f, max.y - 4.0f), true);
-    drawCompositeSprite(drawList, textureManager, compositeId,
+    DrawCompositeSprite(drawList, textureManager, compositeId,
                         transform.origin.x, transform.origin.y, transform.scale, Faction::Resistance);
     drawList->PopClipRect();
-    drawThumbnailFrame(drawList, min, max);
+    DrawThumbnailFrame(drawList, min, max);
 }
 
-void drawBuildingThumbnail(ImDrawList* drawList, TextureManager& textureManager,
+void DrawBuildingThumbnail(ImDrawList* drawList, TextureManager& textureManager,
                            int buildingType, Faction faction, const ImVec2& min, const ImVec2& max) {
-    const BuildingDef* def = textureManager.getBuildingDef(buildingType);
+    const BuildingDef* def = textureManager.GetBuildingDef(buildingType);
     if (!def || def->end < def->start) return;
     SpriteBounds bounds;
     for (int index = def->start; index <= def->end; ++index) {
-        const BuildingPart* part = textureManager.getBuildingPart(index);
+        const BuildingPart* part = textureManager.GetBuildingPart(index);
         if (!part || part->state != 0) continue;
-        if (part->isComp == 0) includeSpriteBounds(textureManager, part->child, part->ox, part->oy, bounds);
-        else if (part->isComp == 1) includeCompositeBounds(textureManager, part->child, part->ox, part->oy, bounds);
+        if (part->isComp == 0) IncludeSpriteBounds(textureManager, part->child, part->ox, part->oy, bounds);
+        else if (part->isComp == 1) IncludeCompositeBounds(textureManager, part->child, part->ox, part->oy, bounds);
         else {
-            const IndexRange range = textureManager.getAnimRange(part->child);
+            const IndexRange range = textureManager.GetAnimRange(part->child);
             if (range.end < range.start) continue;
-            const AnimFrame* frame = textureManager.getAnimFrame(range.start);
+            const AnimFrame* frame = textureManager.GetAnimFrame(range.start);
             if (!frame) continue;
             const float x = part->ox + frame->ox;
             const float y = part->oy + frame->oy;
-            if (frame->isComp == 0) includeSpriteBounds(textureManager, frame->child, x, y, bounds);
-            else includeCompositeBounds(textureManager, frame->child, x, y, bounds);
+            if (frame->isComp == 0) IncludeSpriteBounds(textureManager, frame->child, x, y, bounds);
+            else IncludeCompositeBounds(textureManager, frame->child, x, y, bounds);
         }
     }
-    const ThumbnailTransform transform = fitThumbnail(bounds, min, max);
+    const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
     drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f),
                            ImVec2(min.x + 48.0f, max.y - 4.0f), true);
     for (int index = def->start; index <= def->end; ++index) {
-        const BuildingPart* part = textureManager.getBuildingPart(index);
+        const BuildingPart* part = textureManager.GetBuildingPart(index);
         if (!part || part->state != 0) continue;
         const float x = transform.origin.x + part->ox * transform.scale;
         const float y = transform.origin.y + part->oy * transform.scale;
         if (part->isComp == 0) {
-            drawSpriteFrame(drawList, textureManager, part->child, x, y, transform.scale, faction);
+            DrawSpriteFrame(drawList, textureManager, part->child, x, y, transform.scale, faction);
         } else if (part->isComp == 1) {
-            drawCompositeSprite(drawList, textureManager, part->child, x, y, transform.scale, faction);
+            DrawCompositeSprite(drawList, textureManager, part->child, x, y, transform.scale, faction);
         } else {
-            const IndexRange range = textureManager.getAnimRange(part->child);
+            const IndexRange range = textureManager.GetAnimRange(part->child);
             if (range.end >= range.start) {
-                const AnimFrame* frame = textureManager.getAnimFrame(range.start);
+                const AnimFrame* frame = textureManager.GetAnimFrame(range.start);
                 if (frame) {
                     const float frameX = x + frame->ox * transform.scale;
                     const float frameY = y + frame->oy * transform.scale;
                     if (frame->isComp == 0) {
-                        drawSpriteFrame(drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
+                        DrawSpriteFrame(drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
                     } else {
-                        drawCompositeSprite(drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
+                        DrawCompositeSprite(drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
                     }
                 }
             }
         }
     }
     drawList->PopClipRect();
-    drawThumbnailFrame(drawList, min, max);
+    DrawThumbnailFrame(drawList, min, max);
 }
 
-void drawUnitThumbnail(ImDrawList* drawList, TextureManager& textureManager,
+void DrawUnitThumbnail(ImDrawList* drawList, TextureManager& textureManager,
                        int unitType, Faction faction, const ImVec2& min, const ImVec2& max) {
-    const int sequence = textureManager.getUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle));
-    const IndexRange sequenceRange = textureManager.getUnitSequenceRange(sequence);
+    const int sequence = textureManager.GetUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle));
+    const IndexRange sequenceRange = textureManager.GetUnitSequenceRange(sequence);
     if (sequenceRange.end < sequenceRange.start) return;
-    const UnitSequenceStep* step = textureManager.getUnitSequenceStep(sequenceRange.start);
+    const UnitSequenceStep* step = textureManager.GetUnitSequenceStep(sequenceRange.start);
     if (!step) return;
-    const IndexRange bodyRange = textureManager.getUnitBodyRange(step->bodyId);
+    const IndexRange bodyRange = textureManager.GetUnitBodyRange(step->bodyId);
     SpriteBounds bounds;
     for (int index = bodyRange.start; index <= bodyRange.end; ++index) {
-        const UnitLayer* layer = textureManager.getUnitLayer(index);
+        const UnitLayer* layer = textureManager.GetUnitLayer(index);
         if (!layer || layer->flag > 2) continue;
         const float x = step->ox + layer->ox;
         const float y = step->oy + layer->oy;
-        if (layer->isComp == 0) includeSpriteBounds(textureManager, layer->child, x, y, bounds);
-        else includeCompositeBounds(textureManager, layer->child, x, y, bounds);
+        if (layer->isComp == 0) IncludeSpriteBounds(textureManager, layer->child, x, y, bounds);
+        else IncludeCompositeBounds(textureManager, layer->child, x, y, bounds);
     }
-    const ThumbnailTransform transform = fitThumbnail(bounds, min, max);
+    const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
     drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f),
                            ImVec2(min.x + 48.0f, max.y - 4.0f), true);
     for (int index = bodyRange.start; index <= bodyRange.end; ++index) {
-        const UnitLayer* layer = textureManager.getUnitLayer(index);
+        const UnitLayer* layer = textureManager.GetUnitLayer(index);
         if (!layer || layer->flag > 2) continue;
         const float x = transform.origin.x + (step->ox + layer->ox) * transform.scale;
         const float y = transform.origin.y + (step->oy + layer->oy) * transform.scale;
         if (layer->isComp == 0) {
-            drawSpriteFrame(drawList, textureManager, layer->child, x, y, transform.scale, faction);
+            DrawSpriteFrame(drawList, textureManager, layer->child, x, y, transform.scale, faction);
         } else {
-            drawCompositeSprite(drawList, textureManager, layer->child, x, y, transform.scale, faction);
+            DrawCompositeSprite(drawList, textureManager, layer->child, x, y, transform.scale, faction);
         }
     }
     drawList->PopClipRect();
-    drawThumbnailFrame(drawList, min, max);
+    DrawThumbnailFrame(drawList, min, max);
 }
 
 } // namespace
 
 EditorUI::EditorUI() {
-    init();
+    Init();
 }
 
-void EditorUI::init() {
+void EditorUI::Init() {
     m_genParams.width = 60;
     m_genParams.height = 40;
     m_genParams.tilesetId = 0;
@@ -258,16 +258,16 @@ void EditorUI::init() {
     m_genParams.decorDensity = 1;
     m_genParams.randomSeed = true;
 
-    scanAvailableMaps();
+    ScanAvailableMaps();
 }
 
-void EditorUI::showToast(const std::string& message, float duration) {
+void EditorUI::ShowToast(const std::string& message, float duration) {
     m_toastMessage = message;
     m_toastTimer = duration;
 }
 
-void EditorUI::openSaveAsDialog(const MapDocument& doc) {
-    std::string base = doc.getName();
+void EditorUI::OpenSaveAsDialog(const MapDocument& doc) {
+    std::string base = doc.GetName();
     if (base.empty() || base == "untitled" || base == "new_map") {
         base = "custom_map_01";
     }
@@ -276,33 +276,33 @@ void EditorUI::openSaveAsDialog(const MapDocument& doc) {
     m_openSaveModalReq = true;
 }
 
-void EditorUI::openOpenDialog() {
-    scanAvailableMaps();
+void EditorUI::OpenOpenDialog() {
+    ScanAvailableMaps();
     m_openOpenModalReq = true;
 }
 
-void EditorUI::openNewMapDialog() {
+void EditorUI::OpenNewMapDialog() {
     m_openNewModalReq = true;
 }
 
-void EditorUI::openGeneratorDialog() {
+void EditorUI::OpenGeneratorDialog() {
     m_openGenModalReq = true;
 }
 
-void EditorUI::requestClose(const MapDocument& doc) {
-    if (!doc.isModified()) {
+void EditorUI::RequestClose(const MapDocument& doc) {
+    if (!doc.IsModified()) {
         m_shouldClose = true;
         return;
     }
     m_openCloseConfirmationReq = true;
 }
 
-void EditorUI::scanAvailableMaps() {
+void EditorUI::ScanAvailableMaps() {
     m_availableMaps.clear();
-    const std::string searchDirs[] = {OpenArtOfWar::LoaderResources::mapsDir()};
+    const std::string searchDirs[] = {OpenArtOfWar::LoaderResources::MapsDir()};
 
     for (const auto& sdir : searchDirs) {
-        for (const std::string& mapPath : OpenArtOfWar::Assets::list(sdir, ".json")) {
+        for (const std::string& mapPath : OpenArtOfWar::Assets::List(sdir, ".json")) {
             {
                 MapFileInfo info;
                 info.filename = fs::path(mapPath).filename().string();
@@ -310,7 +310,7 @@ void EditorUI::scanAvailableMaps() {
 
                 // Quick metadata peek
                 std::string text;
-                if (OpenArtOfWar::Assets::readText(info.fullPath, text)) {
+                if (OpenArtOfWar::Assets::ReadText(info.fullPath, text)) {
                     info.fileSize = text.size();
                     try {
                         nlohmann::json j = nlohmann::json::parse(text);
@@ -342,56 +342,56 @@ void EditorUI::scanAvailableMaps() {
 
 void EditorUI::render(MapDocument& doc, Camera& camera, TextureManager& texManager, Renderer& /*renderer*/) {
     // Top menu bar
-    renderMenuBar(doc, camera);
+    RenderMenuBar(doc, camera);
 
     // Left toolbar
-    renderToolbar(doc, texManager);
+    RenderToolbar(doc, texManager);
 
     // Right palette panel
-    renderPalettePanel(doc, texManager);
+    RenderPalettePanel(doc, texManager);
 
     // Minimap window
     if (m_showMiniMap) {
-        renderMiniMapWindow(doc, camera);
+        RenderMiniMapWindow(doc, camera);
     }
 
     // Bottom status bar
-    renderStatusBar(doc, camera);
+    RenderStatusBar(doc, camera);
 
     // Modals
-    renderSaveAsModal(doc);
-    renderOpenModal(doc);
-    renderNewMapModal(doc);
-    renderGeneratorModal(doc);
-    renderCloseConfirmation(doc);
+    RenderSaveAsModal(doc);
+    RenderOpenModal(doc);
+    RenderNewMapModal(doc);
+    RenderGeneratorModal(doc);
+    RenderCloseConfirmation(doc);
 
     // Toast
-    renderToastNotification();
+    RenderToastNotification();
 }
 
-void EditorUI::renderMenuBar(MapDocument& doc, Camera& camera) {
+void EditorUI::RenderMenuBar(MapDocument& doc, Camera& camera) {
     if (ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("Файл")) {
-            if (ImGui::MenuItem("Новая карта...", "Ctrl+N")) {
-                openNewMapDialog();
+    if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("New map...", "Ctrl+N")) {
+                OpenNewMapDialog();
             }
-            if (ImGui::MenuItem("Открыть карту...", "Ctrl+O")) {
-                openOpenDialog();
+            if (ImGui::MenuItem("Open map...", "Ctrl+O")) {
+                OpenOpenDialog();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Сохранить", "Ctrl+S")) {
-                if (doc.getFilePath().empty()) {
-                    openSaveAsDialog(doc);
+            if (ImGui::MenuItem("Save", "Ctrl+S")) {
+                if (doc.GetFilePath().empty()) {
+                    OpenSaveAsDialog(doc);
                 } else {
-                    doc.saveMap(doc.getFilePath());
-                    showToast("Карта сохранена: " + doc.getFilePath());
+                    doc.SaveMap(doc.GetFilePath());
+                    ShowToast("Map saved: " + doc.GetFilePath());
                 }
             }
-            if (ImGui::MenuItem("Сохранить карту как...", "Ctrl+Shift+S")) {
-                openSaveAsDialog(doc);
+            if (ImGui::MenuItem("Save map as...", "Ctrl+Shift+S")) {
+                OpenSaveAsDialog(doc);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Выход", "Alt+F4")) {
+            if (ImGui::MenuItem("Exit", "Alt+F4")) {
                 SDL_Event quitEv;
                 quitEv.type = SDL_EVENT_QUIT;
                 SDL_PushEvent(&quitEv);
@@ -399,66 +399,67 @@ void EditorUI::renderMenuBar(MapDocument& doc, Camera& camera) {
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Правка")) {
-            if (ImGui::MenuItem("Отменить", "Ctrl+Z", false, doc.canUndo())) {
-                doc.undo();
-                showToast("Отмена действия");
+        if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Undo", "Ctrl+Z", false, doc.CanUndo())) {
+                doc.Undo();
+                ShowToast("Action undone");
             }
-            if (ImGui::MenuItem("Повторить", "Ctrl+Y", false, doc.canRedo())) {
-                doc.redo();
-                showToast("Повтор действия");
+            if (ImGui::MenuItem("Redo", "Ctrl+Y", false, doc.CanRedo())) {
+                doc.Redo();
+                ShowToast("Action redone");
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Залить карту выбранным тайлом")) {
-                doc.pushUndoSnapshot();
-                doc.fillAll(static_cast<uint8_t>(m_selectedTile));
-                showToast("Вся карта залита тайлом #" + std::to_string(m_selectedTile));
+            if (ImGui::MenuItem("Fill map with the selected tile")) {
+                doc.PushUndoSnapshot();
+                doc.FillAll(static_cast<uint8_t>(m_selectedTile));
+                ShowToast("Whole map filled with tile #" + std::to_string(m_selectedTile));
             }
-            if (ImGui::MenuItem("Пересчитать проходимость")) {
-                doc.autoRecalculatePassability();
-                showToast("Сетка проходимости обновлена");
+            if (ImGui::MenuItem("Recompute passability")) {
+                doc.AutoRecalculatePassability();
+                ShowToast("Passability grid updated");
             }
-            if (ImGui::MenuItem("Очистить всё")) {
-                doc.pushUndoSnapshot();
-                doc.clearAll();
-                showToast("Карта очищена");
+            if (ImGui::MenuItem("Clear all")) {
+                doc.PushUndoSnapshot();
+                doc.ClearAll();
+                ShowToast("Map cleared");
             }
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Генератор")) {
-            if (ImGui::MenuItem("Автогенератор карт...", "Ctrl+G")) {
-                openGeneratorDialog();
+        if (ImGui::BeginMenu("Generator")) {
+            if (ImGui::MenuItem("Map auto-generator...", "Ctrl+G")) {
+                OpenGeneratorDialog();
             }
-            if (ImGui::MenuItem("Быстрая случайная карта (1 клик!)")) {
-                doc.pushUndoSnapshot();
-                MapAutoGenerator::generateQuickRandom(doc);
-                showToast("Сгенерирована случайная карта (" + std::to_string(doc.getWidth()) + "x" + std::to_string(doc.getHeight()) + ")");
+            if (ImGui::MenuItem("Quick random map (1 click!)")) {
+                doc.PushUndoSnapshot();
+                MapAutoGenerator::GenerateQuickRandom(doc);
+                ShowToast("Random map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
             }
-            if (ImGui::MenuItem("Smart-карта (1 клик, по образцу оригинала)")) {
+            if (ImGui::MenuItem("Smart map (1 click, modelled on the original)")) {
                 GeneratorParams params;
-                params.width = doc.getWidth();
-                params.height = doc.getHeight();
-                params.tilesetId = doc.getTilesetId();
-                doc.pushUndoSnapshot();
-                SmartGenerator::generate(doc, params);
-                showToast("Сгенерирована Smart-карта (" + std::to_string(doc.getWidth()) + "x" + std::to_string(doc.getHeight()) + ")");
+                params.width = doc.GetWidth();
+                params.height = doc.GetHeight();
+                params.tilesetId = doc.GetTilesetId();
+                SmartGenerator::OriginalDefaults(params, params.tilesetId);
+                doc.PushUndoSnapshot();
+                SmartGenerator::Generate(doc, params);
+                ShowToast("Smart map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
             }
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Вид")) {
-            ImGui::MenuItem("Сетка тайлов (G)", nullptr, &m_showGrid);
-            ImGui::MenuItem("Коллизии / Проходимость (C)", nullptr, &m_showPassability);
-            ImGui::MenuItem("Миникарта (M)", nullptr, &m_showMiniMap);
+        if (ImGui::BeginMenu("View")) {
+            ImGui::MenuItem("Tile grid (G)", nullptr, &m_showGrid);
+            ImGui::MenuItem("Collisions / Passability (C)", nullptr, &m_showPassability);
+            ImGui::MenuItem("Minimap (M)", nullptr, &m_showMiniMap);
             ImGui::Separator();
-            if (ImGui::MenuItem("Центрировать камеру (F)")) {
-                float mw = doc.getWidth() * TILE_WIDTH * 0.5f;
-                float mh = doc.getHeight() * TILE_HEIGHT * 0.5f;
-                camera.centerOn(mw, mh);
+            if (ImGui::MenuItem("Center camera (F)")) {
+                float mw = doc.GetWidth() * TILE_WIDTH * 0.5f;
+                float mh = doc.GetHeight() * TILE_HEIGHT * 0.5f;
+                camera.CenterOn(mw, mh);
             }
-            if (ImGui::MenuItem("Масштаб 100% (1:1)")) {
-                camera.setZoom(1.0f);
+            if (ImGui::MenuItem("Zoom 100% (1:1)")) {
+                camera.SetZoom(1.0f);
             }
             ImGui::EndMenu();
         }
@@ -468,40 +469,40 @@ void EditorUI::renderMenuBar(MapDocument& doc, Camera& camera) {
         const float centeredActionX = (ImGui::GetWindowWidth() - actionGroupWidth) * 0.5f;
         const float actionGroupX = std::max(ImGui::GetCursorPosX() + 12.0f, centeredActionX);
         ImGui::SameLine(actionGroupX);
-        if (ImGui::Button("Случайная карта")) {
-            doc.pushUndoSnapshot();
-            MapAutoGenerator::generateQuickRandom(doc);
-            showToast("Сгенерирована случайная карта!");
+        if (ImGui::Button("Random map")) {
+            doc.PushUndoSnapshot();
+            MapAutoGenerator::GenerateQuickRandom(doc);
+            ShowToast("Random map generated!");
         }
         ImGui::SameLine();
-        if (ImGui::Button("Сохранить в assets/maps/")) {
-            openSaveAsDialog(doc);
+        if (ImGui::Button("Save to assets/maps/")) {
+            OpenSaveAsDialog(doc);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Открыть")) {
-            openOpenDialog();
+        if (ImGui::Button("Open")) {
+            OpenOpenDialog();
         }
 
         ImGui::EndMainMenuBar();
     }
 }
 
-void EditorUI::renderToolbar(MapDocument& doc, TextureManager& texManager) {
+void EditorUI::RenderToolbar(MapDocument& doc, TextureManager& texManager) {
     const ImVec2 viewport = ImGui::GetMainViewport()->Size;
     ImGui::SetNextWindowPos(ImVec2(8.0f, 30.0f), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(150.0f, std::max(240.0f, viewport.y - 66.0f)), ImGuiCond_Always);
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
-    if (ImGui::Begin("Инструменты##Toolbar", nullptr, flags)) {
-        ImGui::Text("Выбранный тайл: #%d", m_selectedTile);
+    if (ImGui::Begin("Tools##Toolbar", nullptr, flags)) {
+        ImGui::Text("Selected tile: #%d", m_selectedTile);
         const ImVec2 previewPos = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("selected-tile-preview", ImVec2(96.0f, 42.0f));
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         const ImVec2 previewMin = ImGui::GetItemRectMin();
         const ImVec2 previewMax = ImGui::GetItemRectMax();
         drawList->PushClipRect(previewMin, previewMax, true);
-        const int tileComposite = texManager.getTileCompositeId(doc.getTilesetId(), m_selectedTile);
-        drawCompositeSprite(drawList, texManager, tileComposite,
+        const int tileComposite = texManager.GetTileCompositeId(doc.GetTilesetId(), m_selectedTile);
+        DrawCompositeSprite(drawList, texManager, tileComposite,
                             previewPos.x + 20.0f, previewPos.y + 8.0f, 0.85f,
                             Faction::Resistance);
         drawList->PopClipRect();
@@ -551,24 +552,24 @@ void EditorUI::renderToolbar(MapDocument& doc, TextureManager& texManager) {
             }
         };
 
-        toolBtn("Кисть тайлов", EditorTool::TileBrush, "Кисть тайлов (Pencil / Brush)");
-        toolBtn("Заливка", EditorTool::BucketFill, "Заливка области тайлом (Bucket Fill)");
-        toolBtn("Декорации", EditorTool::PlaceDecor, "Размещение декораций (деревья, скалы)");
-        toolBtn("Стены", EditorTool::PlaceWall, "Размещение защитных стен");
-        toolBtn("Постройки", EditorTool::PlaceBuilding, "Размещение построек баз");
-        toolBtn("Юниты", EditorTool::PlaceUnit, "Размещение стартовых юнитов");
-        toolBtn("Старт игрока", EditorTool::SetPlayerStart, "Установка точки старта игрока (HQ)");
-        toolBtn("Старт врага", EditorTool::SetEnemyStart, "Установка точки старта врага (HQ)");
-        toolBtn("Ещё старт", EditorTool::AddStartPosition,
-                "Дополнительные точки старта (игроки 3-8 сетевой игры): клик добавляет, клик по точке убирает. "
-                "Карта вмещает столько игроков, сколько на ней точек старта"),
-        toolBtn("Проходимость", EditorTool::PassabilityBrush, "Кисть проходимости (блок/проход)");
-        toolBtn("Ластик", EditorTool::Eraser, "Ластик (удаление объекта/стены/декора)");
-        toolBtn("Пипетка", EditorTool::Eyedropper, "Пипетка (выбрать тайл под курсором)");
-        toolBtn("Выделение", EditorTool::Select, "Выделить объект; Shift добавляет или убирает из выделения");
+        toolBtn("Tile brush", EditorTool::TileBrush, "Tile brush (Pencil / Brush)");
+        toolBtn("Fill", EditorTool::BucketFill, "Fill an area with a tile (Bucket Fill)");
+        toolBtn("Decorations", EditorTool::PlaceDecor, "Place decorations (trees, rocks)");
+        toolBtn("Walls", EditorTool::PlaceWall, "Place defensive walls");
+        toolBtn("Buildings", EditorTool::PlaceBuilding, "Place base buildings");
+        toolBtn("Units", EditorTool::PlaceUnit, "Place starting units");
+        toolBtn("Player start", EditorTool::SetPlayerStart, "Set the player start point (HQ)");
+        toolBtn("Enemy start", EditorTool::SetEnemyStart, "Set the enemy start point (HQ)");
+        toolBtn("More starts", EditorTool::AddStartPosition,
+                "Extra start points (players 3-8 of a network game): a click adds one, a click on a point removes it. "
+                "The map holds as many players as it has start points"),
+        toolBtn("Passability", EditorTool::PassabilityBrush, "Passability brush (block/pass)");
+        toolBtn("Eraser", EditorTool::Eraser, "Eraser (removes an object/wall/decoration)");
+        toolBtn("Eyedropper", EditorTool::Eyedropper, "Eyedropper (pick the tile under the cursor)");
+        toolBtn("Select", EditorTool::Select, "Select an object; Shift adds or removes from the selection");
 
         ImGui::Separator();
-        ImGui::Text("Размер кисти:");
+        ImGui::Text("Brush size:");
         const char* brushSizes[] = {"1x1", "2x2", "3x3"};
         int brushIndex = std::clamp(m_brushSize, 1, 3) - 1;
         if (ImGui::Combo("##BrushSize", &brushIndex, brushSizes, IM_ARRAYSIZE(brushSizes))) {
@@ -576,55 +577,55 @@ void EditorUI::renderToolbar(MapDocument& doc, TextureManager& texManager) {
         }
 
         ImGui::Separator();
-        if (ImGui::Button("Случайная карта", ImVec2(96, 30))) {
-            doc.pushUndoSnapshot();
-            MapAutoGenerator::generateQuickRandom(doc);
-            showToast("Сгенерирована случайная карта!");
+        if (ImGui::Button("Random map", ImVec2(96, 30))) {
+            doc.PushUndoSnapshot();
+            MapAutoGenerator::GenerateQuickRandom(doc);
+            ShowToast("Random map generated!");
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Быстрая автогенерация карты в 1 клик");
+            ImGui::SetTooltip("Quick map auto-generation in 1 click");
         }
     }
     ImGui::End();
 }
 
-void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) {
+void EditorUI::RenderPalettePanel(MapDocument& doc, TextureManager& texManager) {
     ImVec2 mainViewport = ImGui::GetMainViewport()->Size;
     float panelW = 410.0f;
     ImGui::SetNextWindowPos(ImVec2(std::max(158.0f, mainViewport.x - panelW - 8.0f), 30.0f), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(panelW, std::max(240.0f, mainViewport.y - 66.0f)), ImGuiCond_Always);
 
-    if (ImGui::Begin("Палитра и настройки##Palettes", nullptr,
+    if (ImGui::Begin("Palette and settings##Palettes", nullptr,
                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
         if (ImGui::BeginTabBar("PaletteTabs")) {
             // Tab 1: Terrain Tiles
             const ImGuiTabItemFlags tileTabFlags = (m_paletteTabToSelect == 0)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Тайлы", nullptr, tileTabFlags)) {
-                int tileset = doc.getTilesetId();
-                ImGui::Text("Тайлсет: %s (ID %d)", (tileset == 1 ? "Пустыня / Каньон" : "Джунгли / Перу"), tileset);
+            if (ImGui::BeginTabItem("Tiles", nullptr, tileTabFlags)) {
+                int tileset = doc.GetTilesetId();
+                ImGui::Text("Tileset: %s (ID %d)", (tileset == 1 ? "Desert / Canyon" : "Jungle / Peru"), tileset);
 
-                ImGui::Text("Выбранный тайл: #%d", m_selectedTile);
+                ImGui::Text("Selected tile: #%d", m_selectedTile);
                 ImGui::SameLine();
-                if (ImGui::Button("Залить всё")) {
-                    doc.pushUndoSnapshot();
-                    doc.fillAll(static_cast<uint8_t>(m_selectedTile));
+                if (ImGui::Button("Fill all")) {
+                    doc.PushUndoSnapshot();
+                    doc.FillAll(static_cast<uint8_t>(m_selectedTile));
                 }
 
                 ImGui::Separator();
-                ImGui::Text("Быстрые категории:");
-                if (ImGui::Button("Трава (0)")) m_selectedTile = 0;
+                ImGui::Text("Quick categories:");
+                if (ImGui::Button("Grass (0)")) m_selectedTile = 0;
                 ImGui::SameLine();
-                if (ImGui::Button("Луг (10)")) m_selectedTile = 10;
+                if (ImGui::Button("Meadow (10)")) m_selectedTile = 10;
                 ImGui::SameLine();
-                if (ImGui::Button("Дорога (18)")) m_selectedTile = 18;
+                if (ImGui::Button("Road (18)")) m_selectedTile = 18;
                 ImGui::SameLine();
-                if (ImGui::Button("Земля (26)")) m_selectedTile = 26;
+                if (ImGui::Button("Dirt (26)")) m_selectedTile = 26;
                 ImGui::SameLine();
-                if (ImGui::Button("Заросли (235)")) m_selectedTile = (tileset == 1 ? 238 : 235);
+                if (ImGui::Button("Thicket (235)")) m_selectedTile = (tileset == 1 ? 238 : 235);
 
                 ImGui::Separator();
-                ImGui::Text("Сетка всех тайлов (красный уголок - спрайт непроходим):");
+                ImGui::Text("Grid of all tiles (red corner - the sprite is impassable):");
 
                 ImGui::BeginChild("TileGridScroll", ImVec2(0, 360), true);
                 int totalTiles = 245;
@@ -642,8 +643,8 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                     const ImVec2 itemMax = ImGui::GetItemRectMax();
                     ImDrawList* drawList = ImGui::GetWindowDrawList();
                     drawList->PushClipRect(itemMin, itemMax, true);
-                    const int compositeId = texManager.getTileCompositeId(tileset, t);
-                    drawCompositeSprite(drawList, texManager, compositeId,
+                    const int compositeId = texManager.GetTileCompositeId(tileset, t);
+                    DrawCompositeSprite(drawList, texManager, compositeId,
                                         itemMin.x + 17.0f, itemMin.y + 4.0f, 1.0f,
                                         Faction::Resistance);
                     char tileLabel[16];
@@ -653,7 +654,7 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                                             itemMax.y - labelSize.y - 3.0f),
                                       ImGui::GetColorU32(ImGuiCol_Text), tileLabel);
                     drawList->PopClipRect();
-                    if (TileCollision::isBlocked(tileset, t)) {
+                    if (TileCollision::IsBlocked(tileset, t)) {
                         // Corner mark: this sprite blocks movement
                         drawList->AddTriangleFilled(ImVec2(itemMax.x - 14.0f, itemMin.y), ImVec2(itemMax.x, itemMin.y),
                                                     ImVec2(itemMax.x, itemMin.y + 14.0f), IM_COL32(220, 50, 40, 255));
@@ -681,17 +682,17 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
             // Tab 2: Decorations
             const ImGuiTabItemFlags decorTabFlags = (m_paletteTabToSelect == 1)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Декорации", nullptr, decorTabFlags)) {
-                ImGui::Text("Аутентичные объекты карты:");
-                ImGui::Text("Выбран декор: тип %d", m_selectedDecorType);
+            if (ImGui::BeginTabItem("Decorations", nullptr, decorTabFlags)) {
+                ImGui::Text("Authentic map objects:");
+                ImGui::Text("Selected decoration: type %d", m_selectedDecorType);
 
                 const char* decorNames[] = {
-                    "0: Пальма малая", "1: Пальма средняя", "2: Пальма высокая",
-                    "3: Джунгли дерево", "4: Тропический куст", "5: Заросли лиан",
-                    "6: Валун гранитный", "7: Каменная гряда", "8: Осыпь",
-                    "14: Руины инков", "15: Деревянный мост", "16: Каменный мост",
-                    "20: Кратер от снаряда", "21: Остов вертолета", "22: Заброшенный бункер",
-                    "25: Водный перекат", "28: Тропический цветок", "30: Ствол дерева"
+                    "0: Small palm", "1: Medium palm", "2: Tall palm",
+                    "3: Jungle tree", "4: Tropical bush", "5: Vine thicket",
+                    "6: Granite boulder", "7: Rock ridge", "8: Scree",
+                    "14: Inca ruins", "15: Wooden bridge", "16: Stone bridge",
+                    "20: Shell crater", "21: Helicopter wreck", "22: Abandoned bunker",
+                    "25: Water rapids", "28: Tropical flower", "30: Tree trunk"
                 };
 
                 ImGui::BeginChild("DecorListScroll", ImVec2(0, 360), true);
@@ -708,15 +709,15 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                     const ImVec2 itemMin = ImGui::GetItemRectMin();
                     const ImVec2 itemMax = ImGui::GetItemRectMax();
                     ImDrawList* drawList = ImGui::GetWindowDrawList();
-                    drawDecorThumbnail(drawList, texManager, doc.getTilesetId(), dtype, itemMin, itemMax);
+                    DrawDecorThumbnail(drawList, texManager, doc.GetTilesetId(), dtype, itemMin, itemMax);
                     drawList->AddText(ImVec2(itemMin.x + 54.0f, itemMin.y + 15.0f),
                                       ImGui::GetColorU32(ImGuiCol_Text), decorNames[i]);
                 }
 
                 ImGui::Separator();
-                ImGui::Text("Любой номер декора (0..95):");
-                ImGui::SliderInt("Тип##DecorSlider", &m_selectedDecorType, 0, 95);
-                if (ImGui::Button("Выбрать этот декор")) {
+                ImGui::Text("Any decoration number (0..95):");
+                ImGui::SliderInt("Type##DecorSlider", &m_selectedDecorType, 0, 95);
+                if (ImGui::Button("Pick this decoration")) {
                     m_activeTool = EditorTool::PlaceDecor;
                 }
                 ImGui::EndChild();
@@ -727,21 +728,21 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
             // Tab 3: Walls
             const ImGuiTabItemFlags wallTabFlags = (m_paletteTabToSelect == 2)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Стены", nullptr, wallTabFlags)) {
-                ImGui::Text("Оборонительные укрепления:");
+            if (ImGui::BeginTabItem("Walls", nullptr, wallTabFlags)) {
+                ImGui::Text("Defensive fortifications:");
 
                 int wallFacInt = (m_selectedWallFaction == Faction::Resistance) ? 0 : 1;
-                if (ImGui::RadioButton("Сопротивление (Красные 1101)", wallFacInt == 0)) {
+                if (ImGui::RadioButton("Resistance (Red 1101)", wallFacInt == 0)) {
                     m_selectedWallFaction = Faction::Resistance;
                     m_activeTool = EditorTool::PlaceWall;
                 }
-                if (ImGui::RadioButton("Конфедерация (Синие 1001)", wallFacInt == 1)) {
+                if (ImGui::RadioButton("Confederation (Blue 1001)", wallFacInt == 1)) {
                     m_selectedWallFaction = Faction::Confederation;
                     m_activeTool = EditorTool::PlaceWall;
                 }
 
-                for (const auto& wall : {std::pair<const char*, int>{"Стена (Сопротивление)", 25},
-                                         std::pair<const char*, int>{"Стена (Конфедерация)", 15}}) {
+                for (const auto& wall : {std::pair<const char*, int>{"Wall (Resistance)", 25},
+                                         std::pair<const char*, int>{"Wall (Confederation)", 15}}) {
                     const bool selected = (wall.second == 25 && m_selectedWallFaction == Faction::Resistance) ||
                                           (wall.second == 15 && m_selectedWallFaction == Faction::Confederation);
                     const std::string id = std::string("##Wall") + std::to_string(wall.second);
@@ -751,13 +752,13 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                     }
                     const ImVec2 itemMin = ImGui::GetItemRectMin();
                     const ImVec2 itemMax = ImGui::GetItemRectMax();
-                    drawBuildingThumbnail(ImGui::GetWindowDrawList(), texManager, wall.second,
+                    DrawBuildingThumbnail(ImGui::GetWindowDrawList(), texManager, wall.second,
                                           wall.second == 25 ? Faction::Resistance : Faction::Confederation,
                                           itemMin, itemMax);
                     ImGui::GetWindowDrawList()->AddText(ImVec2(itemMin.x + 54.0f, itemMin.y + 15.0f),
                                                        ImGui::GetColorU32(ImGuiCol_Text), wall.first);
                 }
-                if (ImGui::Button("Активировать кисть стен", ImVec2(200, 30))) {
+                if (ImGui::Button("Activate the wall brush", ImVec2(200, 30))) {
                     m_activeTool = EditorTool::PlaceWall;
                 }
                 ImGui::EndTabItem();
@@ -766,15 +767,15 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
             // Tab 4: Buildings
             const ImGuiTabItemFlags buildingTabFlags = (m_paletteTabToSelect == 3)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Постройки", nullptr, buildingTabFlags)) {
-                ImGui::Text("Фракция постройки:");
+            if (ImGui::BeginTabItem("Buildings", nullptr, buildingTabFlags)) {
+                ImGui::Text("Building faction:");
                 int bFacInt = (m_selectedBuildingFaction == Faction::Resistance) ? 0 : (m_selectedBuildingFaction == Faction::Confederation ? 1 : 2);
-                if (ImGui::RadioButton("Сопротивление##BFac", bFacInt == 0)) {
+                if (ImGui::RadioButton("Resistance##BFac", bFacInt == 0)) {
                     m_selectedBuildingFaction = Faction::Resistance;
                     m_selectedBuildingType = 8;
                 }
                 ImGui::SameLine();
-                if (ImGui::RadioButton("Конфедерация##BFac", bFacInt == 1)) {
+                if (ImGui::RadioButton("Confederation##BFac", bFacInt == 1)) {
                     m_selectedBuildingFaction = Faction::Confederation;
                     m_selectedBuildingType = 0;
                 }
@@ -792,14 +793,14 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                 };
 
                 const BuildingDef bdefs[] = {
-                    {8, 0, "Штаб-квартира (Сопротивление)", "Штаб-квартира (Конфедерация)", 3, 4, 4, 4},
-                    {10, 2, "Казармы (Сопротивление)", "Казармы (Конфедерация)", 3, 3, 3, 3},
-                    {11, 3, "Завод (Сопротивление)", "Завод (Конфедерация)", 3, 3, 4, 3},
-                    {12, 4, "Лаборатория (Сопротивление)", "Техцентр (Конфедерация)", 3, 3, 3, 3},
-                    {14, 7, "Башня (Сопротивление)", "Ракетная турель (Конфедерация)", 2, 2, 2, 2},
-                    {13, 5, "Бункер (Сопротивление)", "Бункер (Конфедерация)", 2, 2, 2, 2},
-                    {9, 1, "Электростанция (Сопротивление)", "Электростанция (Конфедерация)", 3, 3, 3, 3},
-                    {-1, 6, "", "РЛС (Конфедерация)", 0, 0, 2, 2}
+                    {8, 0, "Headquarters (Resistance)", "Headquarters (Confederation)", 3, 4, 4, 4},
+                    {10, 2, "Barracks (Resistance)", "Barracks (Confederation)", 3, 3, 3, 3},
+                    {11, 3, "Factory (Resistance)", "Factory (Confederation)", 3, 3, 4, 3},
+                    {12, 4, "Laboratory (Resistance)", "Tech center (Confederation)", 3, 3, 3, 3},
+                    {14, 7, "Tower (Resistance)", "Missile turret (Confederation)", 2, 2, 2, 2},
+                    {13, 5, "Bunker (Resistance)", "Bunker (Confederation)", 2, 2, 2, 2},
+                    {9, 1, "Power plant (Resistance)", "Power plant (Confederation)", 3, 3, 3, 3},
+                    {-1, 6, "", "Radar (Confederation)", 0, 0, 2, 2}
                 };
 
                 for (const auto& bd : bdefs) {
@@ -817,7 +818,7 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                     }
                     const ImVec2 itemMin = ImGui::GetItemRectMin();
                     const ImVec2 itemMax = ImGui::GetItemRectMax();
-                    drawBuildingThumbnail(ImGui::GetWindowDrawList(), texManager, btype,
+                    DrawBuildingThumbnail(ImGui::GetWindowDrawList(), texManager, btype,
                                           m_selectedBuildingFaction, itemMin, itemMax);
                     std::snprintf(label, sizeof(label), "%s (%dx%d)",
                                   m_selectedBuildingFaction == Faction::Resistance ? bd.resName : bd.confName,
@@ -831,15 +832,15 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
             // Tab 5: Units
             const ImGuiTabItemFlags unitTabFlags = (m_paletteTabToSelect == 4)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Юниты", nullptr, unitTabFlags)) {
-                ImGui::Text("Фракция юнита:");
+            if (ImGui::BeginTabItem("Units", nullptr, unitTabFlags)) {
+                ImGui::Text("Unit faction:");
                 int uFacInt = (m_selectedUnitFaction == Faction::Resistance) ? 0 : 1;
-                if (ImGui::RadioButton("Сопротивление##UFac", uFacInt == 0)) {
+                if (ImGui::RadioButton("Resistance##UFac", uFacInt == 0)) {
                     m_selectedUnitFaction = Faction::Resistance;
                     m_selectedUnitArchetype = 0;
                 }
                 ImGui::SameLine();
-                if (ImGui::RadioButton("Конфедерация##UFac", uFacInt == 1)) {
+                if (ImGui::RadioButton("Confederation##UFac", uFacInt == 1)) {
                     m_selectedUnitFaction = Faction::Confederation;
                     m_selectedUnitArchetype = 1;
                 }
@@ -853,16 +854,16 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                 };
 
                 const UnitDef udefs[] = {
-                    {0, 1, "Стрелок (Сопротивление)", "Стрелок (Конфедерация)"},
-                    {2, 5, "Гренадер (Сопротивление)", "Огнемётчик (Конфедерация)"},
-                    {4, 3, "Снайпер (Сопротивление)", "Штурмовик (Конфедерация)"},
-                    {6, 7, "Койот (Сопротивление)", "Крепость (Конфедерация)"},
-                    {8, 9, "Штурмовой танк (Сопротивление)", "Хаммер (Конфедерация)"},
-                    {10, 11, "Тяжёлый танк (Сопротивление)", "Зевс (Конфедерация)"},
-                    {12, 13, "РСЗО (Сопротивление)", "Град (Конфедерация)"},
-                    {14, -1, "Снайпер в осадном режиме", ""},
-                    {15, -1, "Танк в осадном режиме", ""},
-                    {16, -1, "РСЗО в осадном режиме", ""}
+                    {0, 1, "Rifleman (Resistance)", "Rifleman (Confederation)"},
+                    {2, 5, "Grenadier (Resistance)", "Flamethrower (Confederation)"},
+                    {4, 3, "Sniper (Resistance)", "Assault trooper (Confederation)"},
+                    {6, 7, "Coyote (Resistance)", "Fortress (Confederation)"},
+                    {8, 9, "Assault tank (Resistance)", "Hammer (Confederation)"},
+                    {10, 11, "Heavy tank (Resistance)", "Zeus (Confederation)"},
+                    {12, 13, "MLRS (Resistance)", "Grad (Confederation)"},
+                    {14, -1, "Sniper in siege mode", ""},
+                    {15, -1, "Tank in siege mode", ""},
+                    {16, -1, "MLRS in siege mode", ""}
                 };
 
                 for (const auto& ud : udefs) {
@@ -877,7 +878,7 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                     }
                     const ImVec2 itemMin = ImGui::GetItemRectMin();
                     const ImVec2 itemMax = ImGui::GetItemRectMax();
-                    drawUnitThumbnail(ImGui::GetWindowDrawList(), texManager, archetypeId,
+                    DrawUnitThumbnail(ImGui::GetWindowDrawList(), texManager, archetypeId,
                                       m_selectedUnitFaction, itemMin, itemMax);
                     const char* unitName = resistance ? ud.resistanceName : ud.confederationName;
                     ImGui::GetWindowDrawList()->AddText(ImVec2(itemMin.x + 54.0f, itemMin.y + 17.0f),
@@ -885,21 +886,21 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                 }
 
                 ImGui::Separator();
-                const int selectedUnits = doc.countSelectedUnits();
+                const int selectedUnits = doc.CountSelectedUnits();
                 if (selectedUnits > 0) {
-                    for (const auto& entity : doc.getEntities()) {
+                    for (const auto& entity : doc.GetEntities()) {
                         if (entity.selected && !entity.isBuilding) {
                             m_selectedUnitFacing = entity.facing;
                             break;
                         }
                     }
                 }
-                ImGui::Text("Выделено юнитов: %d", selectedUnits);
-                ImGui::Text(selectedUnits > 0 ? "Направление выбранных и новых:" : "Направление новых юнитов:");
-                const char* dirs[] = {"Восток (Вправо)", "Юго-Восток", "Юг (Вниз)", "Юго-Запад", "Запад (Влево)", "Северо-Запад", "Север (Вверх)", "Северо-Восток"};
-                if (ImGui::Combo("Взгляд", &m_selectedUnitFacing, dirs, IM_ARRAYSIZE(dirs)) && doc.countSelectedUnits() > 0) {
-                    doc.pushUndoSnapshot();
-                    doc.setSelectedUnitFacing(m_selectedUnitFacing);
+                ImGui::Text("Selected units: %d", selectedUnits);
+                ImGui::Text(selectedUnits > 0 ? "Facing of the selected and new units:" : "Facing of new units:");
+                const char* dirs[] = {"East (Right)", "South-East", "South (Down)", "South-West", "West (Left)", "North-West", "North (Up)", "North-East"};
+                if (ImGui::Combo("Facing", &m_selectedUnitFacing, dirs, IM_ARRAYSIZE(dirs)) && doc.CountSelectedUnits() > 0) {
+                    doc.PushUndoSnapshot();
+                    doc.SetSelectedUnitFacing(m_selectedUnitFacing);
                 }
                 ImGui::EndTabItem();
             }
@@ -907,21 +908,21 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
             // Tab 6: Map Properties
             const ImGuiTabItemFlags propertiesTabFlags = (m_paletteTabToSelect == 5)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-            if (ImGui::BeginTabItem("Свойства", nullptr, propertiesTabFlags)) {
-                ImGui::Text("Карта: %s", doc.getName().c_str());
-                ImGui::Text("Размер: %d x %d ячеек", doc.getWidth(), doc.getHeight());
-                ImGui::Text("Декораций: %zu", doc.getTileMap().getDecorations().size());
-                ImGui::Text("Объектов/Юнитов: %zu", doc.getEntities().size());
-                ImGui::Text("Старт игрока: (%d, %d)", doc.getPlayerStartX(), doc.getPlayerStartY());
-                ImGui::Text("Старт врага: (%d, %d)", doc.getEnemyStartX(), doc.getEnemyStartY());
+            if (ImGui::BeginTabItem("Properties", nullptr, propertiesTabFlags)) {
+                ImGui::Text("Map: %s", doc.GetName().c_str());
+                ImGui::Text("Size: %d x %d cells", doc.GetWidth(), doc.GetHeight());
+                ImGui::Text("Decorations: %zu", doc.GetTileMap().GetDecorations().size());
+                ImGui::Text("Objects/Units: %zu", doc.GetEntities().size());
+                ImGui::Text("Player start: (%d, %d)", doc.GetPlayerStartX(), doc.GetPlayerStartY());
+                ImGui::Text("Enemy start: (%d, %d)", doc.GetEnemyStartX(), doc.GetEnemyStartY());
 
                 ImGui::Separator();
-                if (ImGui::Button("Пересчитать проходимость (Auto)", ImVec2(240, 30))) {
-                    doc.autoRecalculatePassability();
-                    showToast("Сетка проходимости успешно пересчитана!");
+                if (ImGui::Button("Recompute passability (Auto)", ImVec2(240, 30))) {
+                    doc.AutoRecalculatePassability();
+                    ShowToast("Passability grid recomputed!");
                 }
-                if (ImGui::Button("Сохранить в assets/maps/", ImVec2(240, 30))) {
-                    openSaveAsDialog(doc);
+                if (ImGui::Button("Save to assets/maps/", ImVec2(240, 30))) {
+                    OpenSaveAsDialog(doc);
                 }
                 ImGui::EndTabItem();
             }
@@ -933,7 +934,7 @@ void EditorUI::renderPalettePanel(MapDocument& doc, TextureManager& texManager) 
     ImGui::End();
 }
 
-void EditorUI::renderMiniMapWindow(MapDocument& doc, Camera& camera) {
+void EditorUI::RenderMiniMapWindow(MapDocument& doc, Camera& camera) {
     ImVec2 mainViewport = ImGui::GetMainViewport()->Size;
     float mw = 220.0f;
     float mh = 180.0f;
@@ -944,12 +945,12 @@ void EditorUI::renderMiniMapWindow(MapDocument& doc, Camera& camera) {
                             ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(mw, mh), ImGuiCond_FirstUseEver);
 
-    if (ImGui::Begin("Миникарта##MiniMap", &m_showMiniMap, ImGuiWindowFlags_NoScrollbar)) {
+    if (ImGui::Begin("Minimap##MiniMap", &m_showMiniMap, ImGuiWindowFlags_NoScrollbar)) {
         ImVec2 canvasPos = ImGui::GetCursorScreenPos();
         ImVec2 canvasSize = ImGui::GetContentRegionAvail();
 
-        int mapW = doc.getWidth();
-        int mapH = doc.getHeight();
+        int mapW = doc.GetWidth();
+        int mapH = doc.GetHeight();
         if (mapW > 0 && mapH > 0 && canvasSize.x > 10 && canvasSize.y > 10) {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
 
@@ -964,13 +965,13 @@ void EditorUI::renderMiniMapWindow(MapDocument& doc, Camera& camera) {
 
             for (int y = 0; y < mapH; y += step) {
                 for (int x = 0; x < mapW; x += step) {
-                    uint8_t t = doc.getTileMap().getBaseTile(x, y);
-                    ImU32 col = TileCollision::isBlocked(doc.getTilesetId(), t) ? IM_COL32(40, 70, 40, 255) :
+                    uint8_t t = doc.GetTileMap().GetBaseTile(x, y);
+                    ImU32 col = TileCollision::IsBlocked(doc.GetTilesetId(), t) ? IM_COL32(40, 70, 40, 255) :
                                 (t >= 26 ? IM_COL32(110, 95, 80, 255) :
                                 (t >= 18 ? IM_COL32(150, 125, 90, 255) :
-                                (doc.getTilesetId() == 1 ? IM_COL32(190, 160, 105, 255) : IM_COL32(65, 120, 50, 255))));
+                                (doc.GetTilesetId() == 1 ? IM_COL32(190, 160, 105, 255) : IM_COL32(65, 120, 50, 255))));
 
-                    if (doc.getTileMap().getWall(x, y) > 0) {
+                    if (doc.GetTileMap().GetWall(x, y) > 0) {
                         col = IM_COL32(220, 200, 50, 255);
                     }
 
@@ -981,19 +982,19 @@ void EditorUI::renderMiniMapWindow(MapDocument& doc, Camera& camera) {
             }
 
             // Draw player & enemy base flags
-            float ppx = canvasPos.x + doc.getPlayerStartX() * scaleX;
-            float ppy = canvasPos.y + doc.getPlayerStartY() * scaleY;
+            float ppx = canvasPos.x + doc.GetPlayerStartX() * scaleX;
+            float ppy = canvasPos.y + doc.GetPlayerStartY() * scaleY;
             drawList->AddCircleFilled(ImVec2(ppx, ppy), 4.0f, IM_COL32(240, 40, 40, 255));
 
-            float epx = canvasPos.x + doc.getEnemyStartX() * scaleX;
-            float epy = canvasPos.y + doc.getEnemyStartY() * scaleY;
+            float epx = canvasPos.x + doc.GetEnemyStartX() * scaleX;
+            float epy = canvasPos.y + doc.GetEnemyStartY() * scaleY;
             drawList->AddCircleFilled(ImVec2(epx, epy), 4.0f, IM_COL32(50, 100, 240, 255));
 
             // Draw camera view rectangle
-            float viewW = (camera.getViewportWidth() / TILE_WIDTH) * scaleX / camera.getZoom();
-            float viewH = (camera.getViewportHeight() / TILE_HEIGHT) * scaleY / camera.getZoom();
-            float viewX = canvasPos.x + (camera.getX() / TILE_WIDTH) * scaleX;
-            float viewY = canvasPos.y + (camera.getY() / TILE_HEIGHT) * scaleY;
+            float viewW = (camera.GetViewportWidth() / TILE_WIDTH) * scaleX / camera.GetZoom();
+            float viewH = (camera.GetViewportHeight() / TILE_HEIGHT) * scaleY / camera.GetZoom();
+            float viewX = canvasPos.x + (camera.GetX() / TILE_WIDTH) * scaleX;
+            float viewY = canvasPos.y + (camera.GetY() / TILE_HEIGHT) * scaleY;
             drawList->AddRect(ImVec2(viewX, viewY), ImVec2(viewX + viewW, viewY + viewH), IM_COL32(255, 255, 255, 240), 0.0f, 0, 1.5f);
 
             // Handle minimap click navigation
@@ -1003,14 +1004,14 @@ void EditorUI::renderMiniMapWindow(MapDocument& doc, Camera& camera) {
                 float relY = (mousePos.y - canvasPos.y) / canvasSize.y;
                 float worldTargetX = relX * mapW * TILE_WIDTH;
                 float worldTargetY = relY * mapH * TILE_HEIGHT;
-                camera.centerOn(worldTargetX, worldTargetY);
+                camera.CenterOn(worldTargetX, worldTargetY);
             }
         }
     }
     ImGui::End();
 }
 
-void EditorUI::renderStatusBar(const MapDocument& doc, const Camera& camera) {
+void EditorUI::RenderStatusBar(const MapDocument& doc, const Camera& camera) {
     ImVec2 mainViewport = ImGui::GetMainViewport()->Size;
     float h = 26.0f;
     ImGui::SetNextWindowPos(ImVec2(0, mainViewport.y - h));
@@ -1018,28 +1019,28 @@ void EditorUI::renderStatusBar(const MapDocument& doc, const Camera& camera) {
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("##StatusBar", nullptr, flags)) {
-        const char* toolNames[] = {"Кисть тайлов", "Заливка", "Декорация", "Стена", "Постройка", "Юнит", "База игрока", "База врага", "Проходимость", "Ластик", "Пипетка", "Выделение"};
+        const char* toolNames[] = {"Tile brush", "Fill", "Decoration", "Wall", "Building", "Unit", "Player base", "Enemy base", "Passability", "Eraser", "Eyedropper", "Select"};
         int toolIdx = static_cast<int>(m_activeTool);
         const char* tname = (toolIdx >= 0 && toolIdx < IM_ARRAYSIZE(toolNames)) ? toolNames[toolIdx] : "None";
 
-        if (m_hoverTileX >= 0 && m_hoverTileY >= 0 && m_hoverTileX < doc.getWidth() && m_hoverTileY < doc.getHeight()) {
-            uint8_t t = doc.getTileMap().getBaseTile(m_hoverTileX, m_hoverTileY);
-            bool pass = doc.getTileMap().isPassable(m_hoverTileX, m_hoverTileY);
-            uint16_t w = doc.getTileMap().getWall(m_hoverTileX, m_hoverTileY);
+        if (m_hoverTileX >= 0 && m_hoverTileY >= 0 && m_hoverTileX < doc.GetWidth() && m_hoverTileY < doc.GetHeight()) {
+            uint8_t t = doc.GetTileMap().GetBaseTile(m_hoverTileX, m_hoverTileY);
+            bool pass = doc.GetTileMap().IsPassable(m_hoverTileX, m_hoverTileY);
+            uint16_t w = doc.GetTileMap().GetWall(m_hoverTileX, m_hoverTileY);
 
-            ImGui::Text("Ячейка: (%d, %d) | Тайл #%d [%s] | Стена: %s | Инструмент: %s | Карта: %dx%d | Зум: %d%%",
-                        m_hoverTileX, m_hoverTileY, t, pass ? "Проходимо" : "Блок",
-                        w > 0 ? "Да" : "Нет", tname, doc.getWidth(), doc.getHeight(),
-                        static_cast<int>(camera.getZoom() * 100.0f));
+            ImGui::Text("Cell: (%d, %d) | Tile #%d [%s] | Wall: %s | Tool: %s | Map: %dx%d | Zoom: %d%%",
+                        m_hoverTileX, m_hoverTileY, t, pass ? "Passable" : "Blocked",
+                        w > 0 ? "Yes" : "No", tname, doc.GetWidth(), doc.GetHeight(),
+                        static_cast<int>(camera.GetZoom() * 100.0f));
         } else {
-            ImGui::Text("Карта: %dx%d | Инструмент: %s | Зум: %d%% | [ПКМ/СКМ: Панорама, Колесо: Зум]",
-                        doc.getWidth(), doc.getHeight(), tname, static_cast<int>(camera.getZoom() * 100.0f));
+            ImGui::Text("Map: %dx%d | Tool: %s | Zoom: %d%% | [RMB/MMB: Pan, Wheel: Zoom]",
+                        doc.GetWidth(), doc.GetHeight(), tname, static_cast<int>(camera.GetZoom() * 100.0f));
         }
     }
     ImGui::End();
 }
 
-void EditorUI::renderToastNotification() {
+void EditorUI::RenderToastNotification() {
     if (m_toastTimer > 0.0f && !m_toastMessage.empty()) {
         m_toastTimer -= ImGui::GetIO().DeltaTime;
         ImVec2 mainViewport = ImGui::GetMainViewport()->Size;
@@ -1057,25 +1058,25 @@ void EditorUI::renderToastNotification() {
     }
 }
 
-void EditorUI::renderSaveAsModal(MapDocument& doc) {
+void EditorUI::RenderSaveAsModal(MapDocument& doc) {
     if (m_openSaveModalReq) {
-        ImGui::OpenPopup("Сохранить карту как... (Save Map As)##SaveModal");
+        ImGui::OpenPopup("Save Map As##SaveModal");
         m_openSaveModalReq = false;
-        scanAvailableMaps();
+        ScanAvailableMaps();
     }
 
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_Appearing);
 
-    if (ImGui::BeginPopupModal("Сохранить карту как... (Save Map As)##SaveModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Сохранение карты в каталог assets/maps/:");
+    if (ImGui::BeginPopupModal("Save Map As##SaveModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Saving the map to assets/maps/:");
         ImGui::Separator();
 
-        ImGui::InputText("Имя файла (.json)", m_saveFilename, sizeof(m_saveFilename));
-        ImGui::InputText("Название карты", m_saveMapName, sizeof(m_saveMapName));
+        ImGui::InputText("File name (.json)", m_saveFilename, sizeof(m_saveFilename));
+        ImGui::InputText("Map name", m_saveMapName, sizeof(m_saveMapName));
 
-        ImGui::Text("Существующие карты в папке:");
+        ImGui::Text("Existing maps in the folder:");
         ImGui::BeginChild("ExistingMapsSaveList", ImVec2(0, 180), true);
         for (const auto& m : m_availableMaps) {
             if (ImGui::Selectable(m.filename.c_str())) {
@@ -1085,15 +1086,15 @@ void EditorUI::renderSaveAsModal(MapDocument& doc) {
         ImGui::EndChild();
 
         ImGui::Separator();
-        if (ImGui::Button("Сохранить карту в assets/maps/", ImVec2(220, 36))) {
+        if (ImGui::Button("Save map to assets/maps/", ImVec2(220, 36))) {
             std::string fname = m_saveFilename;
             if (fname.find(".json") == std::string::npos) {
                 fname += ".json";
             }
-            std::string savePath = OpenArtOfWar::Assets::writablePath(OpenArtOfWar::LoaderResources::mapsDir() + "/" + fname);
-            doc.setName(m_saveMapName);
-            if (doc.saveMap(savePath)) {
-                showToast("Карта успешно сохранена в " + savePath);
+            std::string savePath = OpenArtOfWar::Assets::WritablePath(OpenArtOfWar::LoaderResources::MapsDir() + "/" + fname);
+            doc.SetName(m_saveMapName);
+            if (doc.SaveMap(savePath)) {
+                ShowToast("Map saved to " + savePath);
                 if (m_closeAfterSave) {
                     m_closeAfterSave = false;
                     m_shouldClose = true;
@@ -1102,7 +1103,7 @@ void EditorUI::renderSaveAsModal(MapDocument& doc) {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Отмена", ImVec2(120, 36))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             m_closeAfterSave = false;
             ImGui::CloseCurrentPopup();
         }
@@ -1111,20 +1112,20 @@ void EditorUI::renderSaveAsModal(MapDocument& doc) {
     }
 }
 
-void EditorUI::renderOpenModal(MapDocument& doc) {
+void EditorUI::RenderOpenModal(MapDocument& doc) {
     if (m_openOpenModalReq) {
-        ImGui::OpenPopup("Открыть карту (Open Map)##OpenModal");
+        ImGui::OpenPopup("Open Map##OpenModal");
         m_openOpenModalReq = false;
-        scanAvailableMaps();
+        ScanAvailableMaps();
     }
 
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(560, 440), ImGuiCond_Appearing);
 
-    if (ImGui::BeginPopupModal("Открыть карту (Open Map)##OpenModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Выберите карту из каталога assets/maps/:");
-        ImGui::InputText("Поиск / Фильтр", m_openSearchFilter, sizeof(m_openSearchFilter));
+    if (ImGui::BeginPopupModal("Open Map##OpenModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Choose a map from assets/maps/:");
+        ImGui::InputText("Search / Filter", m_openSearchFilter, sizeof(m_openSearchFilter));
 
         ImGui::BeginChild("OpenMapsList", ImVec2(0, 240), true);
         for (size_t i = 0; i < m_availableMaps.size(); ++i) {
@@ -1137,14 +1138,14 @@ void EditorUI::renderOpenModal(MapDocument& doc) {
             char entryLabel[128];
             std::snprintf(entryLabel, sizeof(entryLabel), "%s  [%dx%d, %s, %zu KB]",
                           m.filename.c_str(), m.width, m.height,
-                          (m.tilesetId == 1 ? "Пустыня" : "Джунгли"),
+                          (m.tilesetId == 1 ? "Desert" : "Jungle"),
                           m.fileSize / 1024);
 
             if (ImGui::Selectable(entryLabel, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
                 m_selectedMapIndex = static_cast<int>(i);
                 if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                    doc.loadMap(m.fullPath);
-                    showToast("Загружена карта: " + m.filename);
+                    doc.LoadMap(m.fullPath);
+                    ShowToast("Map loaded: " + m.filename);
                     ImGui::CloseCurrentPopup();
                 }
             }
@@ -1152,15 +1153,15 @@ void EditorUI::renderOpenModal(MapDocument& doc) {
         ImGui::EndChild();
 
         ImGui::Separator();
-        if (ImGui::Button("Открыть", ImVec2(140, 36))) {
+        if (ImGui::Button("Open", ImVec2(140, 36))) {
             if (m_selectedMapIndex >= 0 && m_selectedMapIndex < static_cast<int>(m_availableMaps.size())) {
-                doc.loadMap(m_availableMaps[m_selectedMapIndex].fullPath);
-                showToast("Загружена карта: " + m_availableMaps[m_selectedMapIndex].filename);
+                doc.LoadMap(m_availableMaps[m_selectedMapIndex].fullPath);
+                ShowToast("Map loaded: " + m_availableMaps[m_selectedMapIndex].filename);
                 ImGui::CloseCurrentPopup();
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Отмена", ImVec2(120, 36))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
 
@@ -1168,47 +1169,47 @@ void EditorUI::renderOpenModal(MapDocument& doc) {
     }
 }
 
-void EditorUI::renderNewMapModal(MapDocument& doc) {
+void EditorUI::RenderNewMapModal(MapDocument& doc) {
     if (m_openNewModalReq) {
-        ImGui::OpenPopup("Создать новую карту (New Map)##NewModal");
+        ImGui::OpenPopup("New Map##NewModal");
         m_openNewModalReq = false;
     }
 
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-    if (ImGui::BeginPopupModal("Создать новую карту (New Map)##NewModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Параметры новой карты:");
+    if (ImGui::BeginPopupModal("New Map##NewModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("New map parameters:");
         ImGui::Separator();
 
-        ImGui::SliderInt("Ширина (Width)", &m_newMapWidth, 20, 128);
-        ImGui::SliderInt("Высота (Height)", &m_newMapHeight, 20, 128);
+        ImGui::SliderInt("Width", &m_newMapWidth, 20, 128);
+        ImGui::SliderInt("Height", &m_newMapHeight, 20, 128);
 
-        ImGui::Text("Пресеты размеров:");
+        ImGui::Text("Size presets:");
         if (ImGui::Button("40x40")) { m_newMapWidth = 40; m_newMapHeight = 40; }
         ImGui::SameLine();
-        if (ImGui::Button("56x44 (Полигон)")) { m_newMapWidth = 56; m_newMapHeight = 44; }
+        if (ImGui::Button("56x44 (Test range)")) { m_newMapWidth = 56; m_newMapHeight = 44; }
         ImGui::SameLine();
-        if (ImGui::Button("60x40 (Стандарт)")) { m_newMapWidth = 60; m_newMapHeight = 40; }
+        if (ImGui::Button("60x40 (Standard)")) { m_newMapWidth = 60; m_newMapHeight = 40; }
         ImGui::SameLine();
         if (ImGui::Button("80x60")) { m_newMapWidth = 80; m_newMapHeight = 60; }
         ImGui::SameLine();
         if (ImGui::Button("80x80")) { m_newMapWidth = 80; m_newMapHeight = 80; }
 
         ImGui::Separator();
-        ImGui::Text("Тайлсет ландшафта:");
-        ImGui::RadioButton("0: Джунгли / Зеленые равнины Перу", &m_newMapTileset, 0);
-        ImGui::RadioButton("1: Пустыня / Песчаный каньон", &m_newMapTileset, 1);
+        ImGui::Text("Terrain tileset:");
+        ImGui::RadioButton("0: Jungle / Green plains of Peru", &m_newMapTileset, 0);
+        ImGui::RadioButton("1: Desert / Sand canyon", &m_newMapTileset, 1);
 
         ImGui::Separator();
-        if (ImGui::Button("Создать карту", ImVec2(160, 36))) {
-            doc.pushUndoSnapshot();
-            doc.newMap(m_newMapWidth, m_newMapHeight, m_newMapTileset, static_cast<uint8_t>(m_newMapFillTile));
-            showToast("Создана новая карта " + std::to_string(m_newMapWidth) + "x" + std::to_string(m_newMapHeight));
+        if (ImGui::Button("Create map", ImVec2(160, 36))) {
+            doc.PushUndoSnapshot();
+            doc.NewMap(m_newMapWidth, m_newMapHeight, m_newMapTileset, static_cast<uint8_t>(m_newMapFillTile));
+            ShowToast("New map created " + std::to_string(m_newMapWidth) + "x" + std::to_string(m_newMapHeight));
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Отмена", ImVec2(120, 36))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
 
@@ -1216,76 +1217,89 @@ void EditorUI::renderNewMapModal(MapDocument& doc) {
     }
 }
 
-void EditorUI::renderGeneratorModal(MapDocument& doc) {
+void EditorUI::RenderGeneratorModal(MapDocument& doc) {
     if (m_openGenModalReq) {
-        ImGui::OpenPopup("Автогенератор карт (Map Generator)##GenModal");
+        ImGui::OpenPopup("Map Generator##GenModal");
         m_openGenModalReq = false;
-        m_genParams.width = doc.getWidth();
-        m_genParams.height = doc.getHeight();
-        m_genParams.tilesetId = doc.getTilesetId();
+        m_genParams.width = doc.GetWidth();
+        m_genParams.height = doc.GetHeight();
+        if (m_genParams.tilesetId != doc.GetTilesetId()) SmartGenerator::OriginalDefaults(m_genParams, doc.GetTilesetId());
+        m_genParams.tilesetId = doc.GetTilesetId();
     }
 
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-    if (ImGui::BeginPopupModal("Автогенератор карт (Map Generator)##GenModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Процедурная генерация карты с базами и ландшафтом:");
+    if (ImGui::BeginPopupModal("Map Generator##GenModal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Procedural map generation with bases and terrain:");
         ImGui::Separator();
 
-        ImGui::SliderInt("Ширина", &m_genParams.width, 30, 128);
-        ImGui::SliderInt("Высота", &m_genParams.height, 30, 128);
+        ImGui::SliderInt("Width", &m_genParams.width, 30, 128);
+        ImGui::SliderInt("Height", &m_genParams.height, 30, 128);
 
-        const char* modeNames[] = {"Классический (биомы и река)", "Smart (по образцу оригинальных карт)"};
-        ImGui::Combo("Генератор", &m_genMode, modeNames, 2);
+        const char* modeNames[] = {"Classic (biomes and river)", "Smart (modelled on the original maps)"};
+        ImGui::Combo("Generator", &m_genMode, modeNames, 2);
         const bool smart = m_genMode == 1;
 
         if (smart) {
-            const char* tilesetNames[] = {"Джунгли", "Второй тайлсет"};
-            ImGui::Combo("Тайлсет", &m_genParams.tilesetId, tilesetNames, 2);
+            const char* tilesetNames[] = {"Jungle", "Second tileset"};
+            if (ImGui::Combo("Tileset", &m_genParams.tilesetId, tilesetNames, 2)) {
+                SmartGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
+            }
         } else {
             const char* biomeNames[] = {
-                "Зеленые равнины и луга",
-                "Речная долина с мостами",
-                "Дикие джунгли Перу",
-                "Пустынный каньон и дюны",
-                "Островной архипелаг"
+                "Green plains and meadows",
+                "River valley with bridges",
+                "Wild Peruvian jungle",
+                "Desert canyon and dunes",
+                "Island archipelago"
             };
             int biomeInt = static_cast<int>(m_genParams.biome);
-            if (ImGui::Combo("Биом ландшафта", &biomeInt, biomeNames, 5)) {
+            if (ImGui::Combo("Terrain biome", &biomeInt, biomeNames, 5)) {
                 m_genParams.biome = static_cast<GeneratorBiome>(biomeInt);
                 m_genParams.tilesetId = (m_genParams.biome == GeneratorBiome::DesertCanyon) ? 1 : 0;
             }
         }
 
         const char* symNames[] = {
-            "Естественная асимметрия",
-            "Ротационная 180° (Турнирная RTS)",
-            "Диагональная",
-            "Зеркальная по горизонтали",
-            "Зеркальная по вертикали"
+            "Natural asymmetry",
+            "180° rotational (tournament RTS)",
+            "Diagonal",
+            "Mirrored horizontally",
+            "Mirrored vertically"
         };
         int symInt = static_cast<int>(m_genParams.symmetry);
-        if (ImGui::Combo("Симметрия карты", &symInt, symNames, 5)) {
+        if (ImGui::Combo("Map symmetry", &symInt, symNames, 5)) {
             m_genParams.symmetry = static_cast<GeneratorSymmetry>(symInt);
         }
 
         if (smart) {
-            const char* levelNames[] = {"Мало", "Средне", "Много"};
-            ImGui::Combo("Земля между травой", &m_genParams.dirtLevel, levelNames, 3);
-            ImGui::Combo("Непроходимые заросли", &m_genParams.obstacleLevel, levelNames, 3);
-            ImGui::Checkbox("Лесная стена по краю карты", &m_genParams.borderForest);
+            // Every share in percent; hover a slider for the range measured on the original maps
+            ImGui::SeparatorText("Shares, %");
+            int settingCount = 0;
+            const SmartGenerator::Setting* settings = SmartGenerator::Settings(settingCount);
+            for (int i = 0; i < settingCount; ++i) {
+                ImGui::SliderInt(settings[i].label, &(m_genParams.*settings[i].field), settings[i].min, settings[i].max,
+                                 "%d %%", ImGuiSliderFlags_AlwaysClamp);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", settings[i].hint);
+            }
+            if (ImGui::Button("Values of the original maps")) {
+                SmartGenerator::OriginalDefaults(m_genParams, m_genParams.tilesetId);
+            }
         } else {
-            ImGui::Checkbox("Расчистить стартовые площадки игроков", &m_genParams.generateBases);
-            ImGui::Checkbox("Добавить извилистую реку и мосты", &m_genParams.addRiver);
+            ImGui::Checkbox("Clear the players' starting areas", &m_genParams.generateBases);
+            ImGui::Checkbox("Add a winding river and bridges", &m_genParams.addRiver);
             if (m_genParams.addRiver) {
-                ImGui::SliderInt("Количество мостов", &m_genParams.riverBridges, 1, 4);
+                ImGui::SliderInt("Number of bridges", &m_genParams.riverBridges, 1, 4);
             }
         }
 
-        const char* densityNames[] = {"Низкая (редкие деревья)", "Средняя (сбалансированная)", "Высокая (густые рощи)"};
-        ImGui::Combo("Плотность декораций", &m_genParams.decorDensity, densityNames, 3);
+        if (!smart) {
+            const char* densityNames[] = {"Low (sparse trees)", "Medium (balanced)", "High (dense groves)"};
+            ImGui::Combo("Decoration density", &m_genParams.decorDensity, densityNames, 3);
+        }
 
-        ImGui::Checkbox("Случайный Seed", &m_genParams.randomSeed);
+        ImGui::Checkbox("Random seed", &m_genParams.randomSeed);
         if (!m_genParams.randomSeed) {
             int seedInt = static_cast<int>(m_genParams.seed);
             if (ImGui::InputInt("Seed", &seedInt)) {
@@ -1294,18 +1308,18 @@ void EditorUI::renderGeneratorModal(MapDocument& doc) {
         }
 
         ImGui::Separator();
-        if (ImGui::Button("Сгенерировать карту", ImVec2(220, 36))) {
-            doc.pushUndoSnapshot();
+        if (ImGui::Button("Generate map", ImVec2(220, 36))) {
+            doc.PushUndoSnapshot();
             if (smart) {
-                SmartGenerator::generate(doc, m_genParams);
+                SmartGenerator::Generate(doc, m_genParams);
             } else {
-                MapAutoGenerator::generate(doc, m_genParams);
+                MapAutoGenerator::Generate(doc, m_genParams);
             }
-            showToast("Карта успешно сгенерирована!");
+            ShowToast("Map generated!");
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Отмена", ImVec2(120, 36))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
 
@@ -1313,37 +1327,37 @@ void EditorUI::renderGeneratorModal(MapDocument& doc) {
     }
 }
 
-void EditorUI::renderCloseConfirmation(MapDocument& doc) {
+void EditorUI::RenderCloseConfirmation(MapDocument& doc) {
     if (m_openCloseConfirmationReq) {
-        ImGui::OpenPopup("Несохранённые изменения##CloseConfirmation");
+        ImGui::OpenPopup("Unsaved changes##CloseConfirmation");
         m_openCloseConfirmationReq = false;
     }
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing,
                             ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal("Несохранённые изменения##CloseConfirmation", nullptr,
+    if (ImGui::BeginPopupModal("Unsaved changes##CloseConfirmation", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextWrapped("В карте есть несохранённые изменения. Сохранить их перед закрытием?");
+        ImGui::TextWrapped("The map has unsaved changes. Save them before closing?");
         ImGui::Separator();
-        if (ImGui::Button("Сохранить", ImVec2(140, 36))) {
-            if (doc.getFilePath().empty()) {
+        if (ImGui::Button("Save", ImVec2(140, 36))) {
+            if (doc.GetFilePath().empty()) {
                 m_closeAfterSave = true;
-                openSaveAsDialog(doc);
+                OpenSaveAsDialog(doc);
                 ImGui::CloseCurrentPopup();
-            } else if (doc.saveMap(doc.getFilePath())) {
+            } else if (doc.SaveMap(doc.GetFilePath())) {
                 m_shouldClose = true;
                 ImGui::CloseCurrentPopup();
             } else {
-                showToast("Не удалось сохранить карту");
+                ShowToast("Failed to save the map");
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Не сохранять", ImVec2(140, 36))) {
+        if (ImGui::Button("Do not save", ImVec2(140, 36))) {
             m_shouldClose = true;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Отмена", ImVec2(120, 36))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

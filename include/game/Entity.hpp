@@ -106,16 +106,16 @@ namespace OpenArtOfWar
         // so no other unit can enter either tile (prevents stacking and "squeezing" into each other).
         int resTileX {-1};
         int resTileY {-1};
-        bool hasReservation() const noexcept
+        bool HasReservation() const noexcept
         {
             return resTileX >= 0 && resTileY >= 0;
         }
-        void releaseReservation() noexcept
+        void ReleaseReservation() noexcept
         {
             resTileX = -1;
             resTileY = -1;
         }
-        bool occupiesTile(int x, int y) const noexcept
+        bool OccupiesTile(int x, int y) const noexcept
         {
             return (tileX == x && tileY == y) || (resTileX == x && resTileY == y);
         }
@@ -137,7 +137,7 @@ namespace OpenArtOfWar
         float attackCooldownMax {0.0f}; // > attackCooldown: each cycle waits a random time in between
 
         // Delay until the next attack cycle (fixed, or random within [attackCooldown, attackCooldownMax])
-        float nextCooldown() const;
+        float NextCooldown() const;
         float cooldownTimer {0.0f};
         float attackAnimTimer {0.0f};
         float deathTimer {0.0f};
@@ -163,51 +163,51 @@ namespace OpenArtOfWar
         explicit Entity(bool isBuildingVal = false);
         virtual ~Entity() = default;
 
-        virtual bool isBuildingEntity() const
+        virtual bool IsBuildingEntity() const
         {
             return isBuilding;
         }
-        virtual bool isUnitEntity() const
+        virtual bool IsUnitEntity() const
         {
             return !isBuilding;
         }
 
-        virtual Unit *asUnit()
+        virtual Unit *AsUnit()
         {
             return nullptr;
         }
-        virtual const Unit *asUnit() const
-        {
-            return nullptr;
-        }
-
-        virtual Building *asBuilding()
-        {
-            return nullptr;
-        }
-        virtual const Building *asBuilding() const
+        virtual const Unit *AsUnit() const
         {
             return nullptr;
         }
 
-        float getWorldPixelX() const
+        virtual Building *AsBuilding()
+        {
+            return nullptr;
+        }
+        virtual const Building *AsBuilding() const
+        {
+            return nullptr;
+        }
+
+        float GetWorldPixelX() const
         {
             return tileX * TILE_WIDTH + subX;
         }
-        float getWorldPixelY() const
+        float GetWorldPixelY() const
         {
             return tileY * TILE_HEIGHT + subY;
         }
-        virtual float getUnitCenterPixelX() const
+        virtual float GetUnitCenterPixelX() const
         {
-            return getWorldPixelX() + (TILE_WIDTH * 0.5f);
+            return GetWorldPixelX() + (TILE_WIDTH * 0.5f);
         }
-        virtual float getUnitCenterPixelY() const
+        virtual float GetUnitCenterPixelY() const
         {
-            return getWorldPixelY() + (TILE_HEIGHT * 0.5f);
+            return GetWorldPixelY() + (TILE_HEIGHT * 0.5f);
         }
 
-        virtual void getMuzzlePoint(float &outX, float &outY) const;
+        virtual void GetMuzzlePoint(float &outX, float &outY) const;
     };
 
 } // namespace OpenArtOfWar

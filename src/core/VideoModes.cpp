@@ -10,7 +10,7 @@ namespace OpenArtOfWar::VideoModes
     namespace
     {
 
-        SDL_DisplayID displayOf(SDL_Window *window)
+        SDL_DisplayID DisplayOf(SDL_Window *window)
         {
             SDL_DisplayID display = window ? SDL_GetDisplayForWindow(window) : 0;
             return display ? display : SDL_GetPrimaryDisplay();
@@ -18,9 +18,9 @@ namespace OpenArtOfWar::VideoModes
 
     } // namespace
 
-    std::vector<Resolution> availableResolutions(SDL_Window *window)
+    std::vector<Resolution> AvailableResolutions(SDL_Window *window)
     {
-        const SDL_DisplayID display = displayOf(window);
+        const SDL_DisplayID display = DisplayOf(window);
         std::vector<Resolution> list;
         int desktopW = 0, desktopH = 0;
         if(const SDL_DisplayMode *desktop = SDL_GetDesktopDisplayMode(display))
@@ -53,7 +53,7 @@ namespace OpenArtOfWar::VideoModes
         return list;
     }
 
-    Resolution currentResolution(SDL_Window *window)
+    Resolution CurrentResolution(SDL_Window *window)
     {
         Resolution r;
         if(window)
@@ -61,11 +61,11 @@ namespace OpenArtOfWar::VideoModes
         return r;
     }
 
-    void apply(SDL_Window *window, SDL_Renderer *renderer, const Settings &settings)
+    void Apply(SDL_Window *window, SDL_Renderer *renderer, const Settings &settings)
     {
         if(!window)
             return;
-        const SDL_DisplayID display = displayOf(window);
+        const SDL_DisplayID display = DisplayOf(window);
 
         switch(settings.windowMode)
         {

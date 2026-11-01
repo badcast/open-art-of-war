@@ -54,28 +54,28 @@ namespace OpenArtOfWar
         }
 
         // Keys of `over` replace those of `base`, objects are merged key by key
-        void overlay(nlohmann::json &base, const nlohmann::json &over)
+        void Overlay(nlohmann::json &base, const nlohmann::json &over)
         {
             for(auto it = over.begin(); it != over.end(); ++it)
             {
                 if(it.value().is_object() && base.contains(it.key()) && base[it.key()].is_object())
-                    overlay(base[it.key()], it.value());
+                    Overlay(base[it.key()], it.value());
                 else
                     base[it.key()] = it.value();
             }
         }
 
-        bool loadInto(State &s, const std::string &path)
+        bool LoadInto(State &s, const std::string &path)
         {
             nlohmann::json doc = nlohmann::json::parse(kBuiltinManifest);
             std::string text;
             bool ok = false;
-            if(Assets::readText(path, text))
+            if(Assets::ReadText(path, text))
             {
-                nlohmann::json file = JsonFile::readFromString(text);
+                nlohmann::json file = JsonFile::ReadFromString(text);
                 if(file.is_object() && !file.empty())
                 {
-                    overlay(doc, file);
+                    Overlay(doc, file);
                     ok = true;
                 }
                 else
@@ -90,13 +90,13 @@ namespace OpenArtOfWar
             return ok;
         }
 
-        void ensureLoaded()
+        void EnsureLoaded()
         {
             State &s = state();
-            std::call_once(s.loaded, [&] { loadInto(s, LoaderResources::kManifestPath); });
+            std::call_once(s.loaded, [&] { LoadInto(s, LoaderResources::kManifestPath); });
         }
 
-        std::string withExt(const std::string &name, const std::string &ext)
+        std::string WithExt(const std::string &name, const std::string &ext)
         {
             if(ext.empty() || (name.size() >= ext.size() && name.compare(name.size() - ext.size(), ext.size(), ext) == 0))
                 return name;
@@ -104,28 +104,28 @@ namespace OpenArtOfWar
         }
     } // namespace
 
-    bool LoaderResources::init(const std::string &manifestPath)
+    bool LoaderResources::Init(const std::string &manifestPath)
     {
         State &s = state();
         std::call_once(s.loaded, [] {}); // later lazy loads must not overwrite this one
-        return loadInto(s, manifestPath);
+        return LoadInto(s, manifestPath);
     }
 
-    bool LoaderResources::hasManifest()
+    bool LoaderResources::HasManifest()
     {
-        ensureLoaded();
+        EnsureLoaded();
         return state().fromFile;
     }
 
-    const std::string &LoaderResources::manifestText()
+    const std::string &LoaderResources::ManifestText()
     {
-        ensureLoaded();
+        EnsureLoaded();
         return state().text;
     }
 
-    const nlohmann::json &LoaderResources::manifest()
+    const nlohmann::json &LoaderResources::Manifest()
     {
-        ensureLoaded();
+        EnsureLoaded();
         return state().doc;
     }
 
@@ -140,9 +140,9 @@ namespace OpenArtOfWar
         return root + "/" + relative;
     }
 
-    std::string LoaderResources::str(const char *section, const char *key, const char *fallback)
+    std::string LoaderResources::Str(const char *section, const char *key, const char *fallback)
     {
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         const nlohmann::json *node = &m;
         if(section)
         {
@@ -157,44 +157,44 @@ namespace OpenArtOfWar
         return it->get<std::string>();
     }
 
-    std::string LoaderResources::localeDir(const std::string &root)
+    std::string LoaderResources::LocaleDir(const std::string &root)
     {
-        return join(root, str("locale", "dir", "locale"));
+        return join(root, Str("locale", "dir", "locale"));
     }
 
-    std::string LoaderResources::defaultLanguage()
+    std::string LoaderResources::DefaultLanguage()
     {
-        return str("locale", "default_language", "en");
+        return Str("locale", "default_language", "en");
     }
 
     std::string LoaderResources::environment(const std::string &root)
     {
-        return join(root, str(nullptr, "environment", "data/game_environment.json"));
+        return join(root, Str(nullptr, "environment", "data/game_environment.json"));
     }
 
-    std::string LoaderResources::uiTheme(const std::string &root)
+    std::string LoaderResources::UiTheme(const std::string &root)
     {
-        return join(root, str(nullptr, "ui_theme", "characters/game_ui.yaml"));
+        return join(root, Str(nullptr, "ui_theme", "characters/game_ui.yaml"));
     }
 
-    std::string LoaderResources::fontRegular(const std::string &root)
+    std::string LoaderResources::FontRegular(const std::string &root)
     {
-        return join(root, str("fonts", "regular", "fonts/Roboto-Regular.ttf"));
+        return join(root, Str("fonts", "regular", "fonts/Roboto-Regular.ttf"));
     }
 
-    std::string LoaderResources::fontBold(const std::string &root)
+    std::string LoaderResources::FontBold(const std::string &root)
     {
-        return join(root, str("fonts", "bold", "fonts/Roboto-Bold.ttf"));
+        return join(root, Str("fonts", "bold", "fonts/Roboto-Bold.ttf"));
     }
 
-    std::string LoaderResources::spriteFrames(const std::string &root)
+    std::string LoaderResources::SpriteFrames(const std::string &root)
     {
-        return join(root, str("sprites", "frames", "characters/sprites.json"));
+        return join(root, Str("sprites", "frames", "characters/sprites.json"));
     }
 
-    int LoaderResources::spriteSheetCount()
+    int LoaderResources::SpriteSheetCount()
     {
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         auto it = m.find("sprites");
         if(it != m.end() && it->is_object())
         {
@@ -205,18 +205,18 @@ namespace OpenArtOfWar
         return 39;
     }
 
-    std::string LoaderResources::spriteSheet(int index, const std::string &root)
+    std::string LoaderResources::SpriteSheet(int index, const std::string &root)
     {
         char num[16];
         std::snprintf(num, sizeof(num), "%02d", index);
-        const std::string dir = str("sprites", "sheet_dir", "sprites");
-        return join(join(root, dir), str("sprites", "sheet_prefix", "sheet_") + num + str("sprites", "sheet_ext", ".png"));
+        const std::string dir = Str("sprites", "sheet_dir", "sprites");
+        return join(join(root, dir), Str("sprites", "sheet_prefix", "sheet_") + num + Str("sprites", "sheet_ext", ".png"));
     }
 
-    std::vector<std::pair<std::string, std::string>> LoaderResources::uiTextures(const std::string &root)
+    std::vector<std::pair<std::string, std::string>> LoaderResources::UiTextures(const std::string &root)
     {
         std::vector<std::pair<std::string, std::string>> out;
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         auto it = m.find("ui_textures");
         if(it == m.end() || !it->is_object())
             return out;
@@ -228,96 +228,96 @@ namespace OpenArtOfWar
         return out;
     }
 
-    std::string LoaderResources::graphicsData(const std::string &root)
+    std::string LoaderResources::GraphicsData(const std::string &root)
     {
-        return join(root, str(nullptr, "graphics_data", "data/graphics_data.json"));
+        return join(root, Str(nullptr, "graphics_data", "data/graphics_data.json"));
     }
 
-    std::string LoaderResources::audioDir(const std::string &root)
+    std::string LoaderResources::AudioDir(const std::string &root)
     {
-        return join(root, str("audio", "dir", "audio"));
+        return join(root, Str("audio", "dir", "audio"));
     }
 
-    std::string LoaderResources::audioFile(const std::string &name, const std::string &root)
+    std::string LoaderResources::AudioFile(const std::string &name, const std::string &root)
     {
-        return join(audioDir(root), name);
+        return join(AudioDir(root), name);
     }
 
-    std::string LoaderResources::tracklist(const std::string &root)
+    std::string LoaderResources::Tracklist(const std::string &root)
     {
-        return join(root, str("audio", "tracklist", "data/tracklist.json"));
+        return join(root, Str("audio", "tracklist", "data/tracklist.json"));
     }
 
-    std::string LoaderResources::audioLicense(const std::string &root)
+    std::string LoaderResources::AudioLicense(const std::string &root)
     {
-        return join(root, str("audio", "license", "audio/LICENSE"));
+        return join(root, Str("audio", "license", "audio/LICENSE"));
     }
 
-    std::string LoaderResources::sfxConfig(const std::string &root)
+    std::string LoaderResources::SfxConfig(const std::string &root)
     {
-        return join(root, str("sfx", "config", "data/sfx.json"));
+        return join(root, Str("sfx", "config", "data/sfx.json"));
     }
 
-    std::string LoaderResources::voicesConfig(const std::string &root)
+    std::string LoaderResources::VoicesConfig(const std::string &root)
     {
-        return join(root, str("voices", "config", "data/voices.json"));
+        return join(root, Str("voices", "config", "data/voices.json"));
     }
 
-    std::string LoaderResources::voicesDir(const std::string &language, const std::string &root)
+    std::string LoaderResources::VoicesDir(const std::string &language, const std::string &root)
     {
-        return join(join(root, str("voices", "dir", "audio/voices")), language);
+        return join(join(root, Str("voices", "dir", "audio/voices")), language);
     }
 
-    std::string LoaderResources::voicesFallbackLanguage()
+    std::string LoaderResources::VoicesFallbackLanguage()
     {
-        return str("voices", "fallback_language", "en");
+        return Str("voices", "fallback_language", "en");
     }
 
-    std::string LoaderResources::sfxDir(const std::string &root)
+    std::string LoaderResources::SfxDir(const std::string &root)
     {
-        return join(root, str("sfx", "dir", "audio/sfx"));
+        return join(root, Str("sfx", "dir", "audio/sfx"));
     }
 
-    std::string LoaderResources::sfxCredits(const std::string &root)
+    std::string LoaderResources::SfxCredits(const std::string &root)
     {
-        return join(root, str("sfx", "credits", "audio/sfx/CREDITS.txt"));
+        return join(root, Str("sfx", "credits", "audio/sfx/CREDITS.txt"));
     }
 
     std::string LoaderResources::aiDifficulty(const std::string &root)
     {
-        return join(root, str(nullptr, "ai_difficulty", "characters/difficulty.yaml"));
+        return join(root, Str(nullptr, "ai_difficulty", "characters/difficulty.yaml"));
     }
 
-    std::string LoaderResources::effects(const std::string &root)
+    std::string LoaderResources::Effects(const std::string &root)
     {
-        return join(root, str(nullptr, "effects", "characters/effects.yaml"));
+        return join(root, Str(nullptr, "effects", "characters/effects.yaml"));
     }
 
     std::string LoaderResources::projectiles(const std::string &root)
     {
-        return join(root, str(nullptr, "projectiles", "characters/projectiles.yaml"));
+        return join(root, Str(nullptr, "projectiles", "characters/projectiles.yaml"));
     }
 
     std::string LoaderResources::research(const std::string &faction, const std::string &root)
     {
         const std::string fallback = "characters/research_" + faction + ".yaml";
-        return join(root, str("research", faction.c_str(), fallback.c_str()));
+        return join(root, Str("research", faction.c_str(), fallback.c_str()));
     }
 
     std::string LoaderResources::tileCollision(const std::string &root)
     {
-        return join(root, str(nullptr, "tile_collision", "data/tile_collision.json"));
+        return join(root, Str(nullptr, "tile_collision", "data/tile_collision.json"));
     }
 
-    std::string LoaderResources::charactersDir(const std::string &root)
+    std::string LoaderResources::CharactersDir(const std::string &root)
     {
-        return join(root, str("characters", "dir", "characters"));
+        return join(root, Str("characters", "dir", "characters"));
     }
 
-    std::vector<std::string> LoaderResources::characterExtensions()
+    std::vector<std::string> LoaderResources::CharacterExtensions()
     {
         std::vector<std::string> out;
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         auto it = m.find("characters");
         if(it != m.end() && it->is_object())
         {
@@ -336,9 +336,9 @@ namespace OpenArtOfWar
         return out;
     }
 
-    bool LoaderResources::isCharacterExcluded(const std::string &fileName)
+    bool LoaderResources::IsCharacterExcluded(const std::string &fileName)
     {
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         auto it = m.find("characters");
         if(it == m.end() || !it->is_object())
             return false;
@@ -353,59 +353,59 @@ namespace OpenArtOfWar
         return false;
     }
 
-    std::vector<std::string> LoaderResources::characterFiles(const std::string &root)
+    std::vector<std::string> LoaderResources::CharacterFiles(const std::string &root)
     {
         std::vector<std::string> files;
-        const std::string dir = charactersDir(root);
-        for(const std::string &ext : characterExtensions())
+        const std::string dir = CharactersDir(root);
+        for(const std::string &ext : CharacterExtensions())
         {
-            for(std::string &f : Assets::list(dir, ext))
+            for(std::string &f : Assets::List(dir, ext))
             {
                 const auto slash = f.find_last_of("/\\");
                 const std::string name = slash == std::string::npos ? f : f.substr(slash + 1);
-                if(!isCharacterExcluded(name))
+                if(!IsCharacterExcluded(name))
                     files.push_back(std::move(f));
             }
         }
         return files;
     }
 
-    std::string LoaderResources::mapsDir(const std::string &root)
+    std::string LoaderResources::MapsDir(const std::string &root)
     {
-        return join(root, str("maps", "dir", "maps"));
+        return join(root, Str("maps", "dir", "maps"));
     }
 
-    std::string LoaderResources::mapExtension()
+    std::string LoaderResources::MapExtension()
     {
-        return str("maps", "ext", ".json");
+        return Str("maps", "ext", ".json");
     }
 
-    std::string LoaderResources::mapPath(const std::string &name, const std::string &root)
+    std::string LoaderResources::MapPath(const std::string &name, const std::string &root)
     {
         if(name.find('/') != std::string::npos || name.find('\\') != std::string::npos)
-            return withExt(name, mapExtension());
-        return join(mapsDir(root), withExt(name, mapExtension()));
+            return WithExt(name, MapExtension());
+        return join(MapsDir(root), WithExt(name, MapExtension()));
     }
 
-    std::string LoaderResources::testMap(const std::string &root)
+    std::string LoaderResources::TestMap(const std::string &root)
     {
-        return mapPath(str("maps", "test_map", "testmap"), root);
+        return MapPath(Str("maps", "test_map", "testmap"), root);
     }
 
-    std::string LoaderResources::netDefaultMap(const std::string &root)
+    std::string LoaderResources::NetDefaultMap(const std::string &root)
     {
-        return mapPath(str("maps", "net_default", "m26"), root);
+        return MapPath(Str("maps", "net_default", "m26"), root);
     }
 
-    std::vector<std::string> LoaderResources::listMaps(const std::string &root)
+    std::vector<std::string> LoaderResources::ListMaps(const std::string &root)
     {
-        return Assets::list(mapsDir(root), mapExtension());
+        return Assets::List(MapsDir(root), MapExtension());
     }
 
-    std::vector<std::string> LoaderResources::netHashFiles(const std::string &root)
+    std::vector<std::string> LoaderResources::NetHashFiles(const std::string &root)
     {
         std::vector<std::string> files;
-        const nlohmann::json &m = manifest();
+        const nlohmann::json &m = Manifest();
         auto it = m.find("net_hash_dirs");
         if(it != m.end() && it->is_array())
         {
@@ -414,9 +414,9 @@ namespace OpenArtOfWar
                 if(!d.is_object() || !d.contains("dir") || !d["dir"].is_string())
                     continue;
                 const std::string ext = d.value("ext", std::string());
-                const std::string sfx = sfxConfig(root);
-                const std::string voices = voicesConfig(root);
-                for(std::string &f : Assets::list(join(root, d["dir"].get<std::string>()), ext))
+                const std::string sfx = SfxConfig(root);
+                const std::string voices = VoicesConfig(root);
+                for(std::string &f : Assets::List(join(root, d["dir"].get<std::string>()), ext))
                 {
                     // Sound and voice settings do not change the simulation: different ones must not keep players apart
                     if(f != sfx && f != voices)

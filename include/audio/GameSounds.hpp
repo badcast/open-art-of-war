@@ -24,14 +24,14 @@ namespace OpenArtOfWar
     {
     public:
         // A new world (entity ids start again): forget what was seen
-        void reset();
+        void Reset();
         // Once per frame while a match is shown
-        void update(SoundEngine &sound, EntityManager &entities, const Economy &economy, const TileMap &map, const Camera &camera, bool fogEnabled, const RadarAlert &radar,
+        void Update(SoundEngine &sound, EntityManager &entities, const Economy &economy, const TileMap &map, const Camera &camera, bool fogEnabled, const RadarAlert &radar,
                     uint64_t nowMs);
         // Unit replies of the '@' requests (see SoundRequests): by the first selected unit
-        void playReply(SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, const char *what);
+        void PlayReply(SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, const char *what);
         // The player picked units: a reply when the selection got someone new of the player's own
-        void selectionChanged(SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected);
+        void SelectionChanged(SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected);
 
     private:
         struct Seen

@@ -19,9 +19,9 @@ namespace OpenArtOfWar
             SDL_DestroyTexture(m_maskTexture);
     }
 
-    void Renderer::drawAlphaMaskWorld(const std::vector<uint8_t> &alpha, int w, int h, float worldX, float worldY, float worldW, float worldH, const Camera &camera, SDL_Color color, bool smooth)
+    void Renderer::DrawAlphaMaskWorld(const std::vector<uint8_t> &alpha, int w, int h, float worldX, float worldY, float worldW, float worldH, const Camera &camera, SDL_Color color, bool smooth)
     {
-        plainState();
+        PlainState();
         if(w <= 0 || h <= 0 || alpha.size() < static_cast<size_t>(w) * h)
             return;
         // The streaming texture only grows, so panning the camera does not reallocate it every frame
@@ -45,8 +45,8 @@ namespace OpenArtOfWar
         SDL_UpdateTexture(m_maskTexture, &region, m_maskPixels.data(), w * static_cast<int>(sizeof(uint32_t)));
 
         float sx = 0.0f, sy = 0.0f;
-        camera.worldToScreen(worldX, worldY, sx, sy);
-        const float zoom = camera.getZoom();
+        camera.WorldToScreen(worldX, worldY, sx, sy);
+        const float zoom = camera.GetZoom();
         if(!smooth)
         {
             SDL_FRect src {0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h)};
@@ -62,7 +62,7 @@ namespace OpenArtOfWar
         SDL_RenderTexture(m_renderer, m_maskTexture, &src, &dst);
     }
 
-    void Renderer::setArmyColor(PlayerId player, bool custom, SDL_Color color)
+    void Renderer::SetArmyColor(PlayerId player, bool custom, SDL_Color color)
     {
         if(player >= kMaxPlayers)
             return;
@@ -70,20 +70,20 @@ namespace OpenArtOfWar
         m_armyColor[player] = color;
     }
 
-    void Renderer::endWorldPass()
+    void Renderer::EndWorldPass()
     {
         m_drawOwner = kNoPlayer;
         m_structureTeam = 0;
-        plainState();
+        PlainState();
     }
 
-    void Renderer::plainState()
+    void Renderer::PlainState()
     {
         if(m_effects)
-            m_effects->useDefaultState();
+            m_effects->UseDefaultState();
     }
 
-    SDL_Texture *Renderer::bindSheet(int &page, Faction faction)
+    SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
     {
         // Sheets with team armour: Confederation (blue) 5, 7, 8, 10, 11, 14, 15 and Resistance (red) 6, 12, 13, 16, 17, 29, 31;
         // sheet 9 is the red copy of 8 (same layout). An army colour recolours the armour; every other pixel stays.
@@ -91,7 +91,7 @@ namespace OpenArtOfWar
         const PlayerId owner = m_drawOwner;
         const bool blueSheet = page == 5 || page == 7 || page == 8 || page == 10 || page == 11 || page == 14 || page == 15;
         const bool redSheet = page == 6 || page == 12 || page == 13 || page == 16 || page == 17 || page == 29 || page == 31;
-        const bool custom = m_effects && m_effects->available() && owner < kMaxPlayers && m_armyCustom[owner];
+        const bool custom = m_effects && m_effects->Available() && owner < kMaxPlayers && m_armyCustom[owner];
         int team = 0;
         if(custom)
         {
@@ -102,12 +102,12 @@ namespace OpenArtOfWar
             if(m_structureTeam != 0)
                 team = m_structureTeam;
         }
-        SDL_Texture *sheet = m_texManager->getSpriteSheet(page);
+        SDL_Texture *sheet = m_texManager->GetSpriteSheet(page);
         if(!sheet)
             return nullptr;
         SDL_SetTextureAlphaMod(sheet, static_cast<Uint8>(m_drawAlpha * 255.0f + 0.5f));
         if(m_effects)
-            m_effects->useSpriteState(team);
+            m_effects->UseSpriteState(team);
         const bool tracked = page >= 0 && page < 64;
         if(team != 0 || blueSheet || redSheet || page == 8 || (tracked && m_tintedSheet[page]))
         {
@@ -120,22 +120,22 @@ namespace OpenArtOfWar
         return sheet;
     }
 
-    void Renderer::clear(SDL_Color clearColor)
+    void Renderer::Clear(SDL_Color clearColor)
     {
         SDL_SetRenderDrawColor(m_renderer, clearColor.r, clearColor.g, clearColor.b, clearColor.a);
         SDL_RenderClear(m_renderer);
     }
 
-    void Renderer::present()
+    void Renderer::Present()
     {
         SDL_RenderPresent(m_renderer);
     }
 
-    void Renderer::drawRawSpriteWorld(int spriteId, float worldX, float worldY, const Camera &camera, Faction faction)
+    void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, const Camera &camera, Faction faction)
     {
         if(!m_texManager)
             return;
-        const auto *frame = m_texManager->getSpriteFrame(spriteId);
+        const auto *frame = m_texManager->GetSpriteFrame(spriteId);
         if(!frame || frame->width <= 0 || frame->height <= 0)
             return;
 
@@ -146,9 +146,9 @@ namespace OpenArtOfWar
         }
 
         float sx, sy;
-        camera.worldToScreen(worldX, worldY, sx, sy);
+        camera.WorldToScreen(worldX, worldY, sx, sy);
 
-        float zoom = camera.getZoom();
+        float zoom = camera.GetZoom();
         float drawW = frame->width * zoom;
         float drawH = frame->height * zoom;
 
@@ -158,31 +158,31 @@ namespace OpenArtOfWar
         float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
         SDL_FRect dstRect = {sx, sy, drawW + bleed, drawH + bleed};
 
-        if(dstRect.x + dstRect.w < 0 || dstRect.x > camera.getViewportWidth() || dstRect.y + dstRect.h < 0 || dstRect.y > camera.getViewportHeight())
+        if(dstRect.x + dstRect.w < 0 || dstRect.x > camera.GetViewportWidth() || dstRect.y + dstRect.h < 0 || dstRect.y > camera.GetViewportHeight())
         {
             return;
         }
 
-        SDL_Texture *sheet = bindSheet(page, faction);
+        SDL_Texture *sheet = BindSheet(page, faction);
         if(!sheet)
             return;
-        float sScale = m_texManager->getSheetScale(page);
+        float sScale = m_texManager->GetSheetScale(page);
         SDL_FRect srcRect = {std::round(frame->x * sScale), std::round(frame->y * sScale), std::round(frame->width * sScale), std::round(frame->height * sScale)};
         SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
     }
 
-    void Renderer::drawCompositeWorld(int compId, float worldX, float worldY, const Camera &camera, Faction faction, int depth)
+    void Renderer::DrawCompositeWorld(int compId, float worldX, float worldY, const Camera &camera, Faction faction, int depth)
     {
         if(depth > 6 || !m_texManager)
             return;
 
-        IndexRange r = m_texManager->getCompositeRange(compId);
+        IndexRange r = m_texManager->GetCompositeRange(compId);
         if(r.end < r.start)
             return;
 
         for(int p = r.start; p <= r.end; ++p)
         {
-            const auto *part = m_texManager->getCompositePart(p);
+            const auto *part = m_texManager->GetCompositePart(p);
             if(!part)
                 continue;
 
@@ -191,28 +191,28 @@ namespace OpenArtOfWar
 
             if(part->isComp == 0)
             {
-                drawRawSpriteWorld(part->child, px, py, camera, faction);
+                DrawRawSpriteWorld(part->child, px, py, camera, faction);
             }
             else
             {
-                drawCompositeWorld(part->child, px, py, camera, faction, depth + 1);
+                DrawCompositeWorld(part->child, px, py, camera, faction, depth + 1);
             }
         }
     }
 
-    void Renderer::drawAnimSequenceWorld(int animId, int frame, float worldX, float worldY, const Camera &camera, Faction faction)
+    void Renderer::DrawAnimSequenceWorld(int animId, int frame, float worldX, float worldY, const Camera &camera, Faction faction)
     {
         if(!m_texManager)
             return;
 
-        IndexRange r = m_texManager->getAnimRange(animId);
+        IndexRange r = m_texManager->GetAnimRange(animId);
         if(r.end < r.start)
             return;
 
         int count = (r.end - r.start) + 1;
         int idx = r.start + (std::abs(frame) % count);
 
-        const auto *f = m_texManager->getAnimFrame(idx);
+        const auto *f = m_texManager->GetAnimFrame(idx);
         if(!f)
             return;
 
@@ -221,25 +221,25 @@ namespace OpenArtOfWar
 
         if(f->isComp == 0)
         {
-            drawRawSpriteWorld(f->child, px, py, camera, faction);
+            DrawRawSpriteWorld(f->child, px, py, camera, faction);
         }
         else
         {
-            drawCompositeWorld(f->child, px, py, camera, faction);
+            DrawCompositeWorld(f->child, px, py, camera, faction);
         }
     }
 
-    void Renderer::renderCompositePartsRotated(TextureManager *tm, SDL_Renderer *sdlRnd, int compId, float originX, float originY, float baseOx, float baseOy, float angleDeg, const Camera &camera, Faction faction, int depth)
+    void Renderer::RenderCompositePartsRotated(TextureManager *tm, SDL_Renderer *sdlRnd, int compId, float originX, float originY, float baseOx, float baseOy, float angleDeg, const Camera &camera, Faction faction, int depth)
     {
         if(depth > 6 || !tm)
             return;
-        IndexRange r = tm->getCompositeRange(compId);
+        IndexRange r = tm->GetCompositeRange(compId);
         if(r.end < r.start)
             return;
 
         for(int p = r.start; p <= r.end; ++p)
         {
-            const auto *part = tm->getCompositePart(p);
+            const auto *part = tm->GetCompositePart(p);
             if(!part)
                 continue;
 
@@ -253,7 +253,7 @@ namespace OpenArtOfWar
                 float worldX = originX + ox;
                 float worldY = originY + oy;
 
-                const auto *sf = tm->getSpriteFrame(part->child);
+                const auto *sf = tm->GetSpriteFrame(part->child);
                 if(!sf)
                     continue;
                 int page = sf->page;
@@ -261,43 +261,43 @@ namespace OpenArtOfWar
                     page = 8;
                 else if(faction == Faction::Confederation && page == 12)
                     page = 10;
-                SDL_Texture *sheet = bindSheet(page, faction);
+                SDL_Texture *sheet = BindSheet(page, faction);
                 if(!sheet)
                     continue;
 
                 float sx, sy;
-                camera.worldToScreen(worldX, worldY, sx, sy);
-                float zoom = camera.getZoom();
+                camera.WorldToScreen(worldX, worldY, sx, sy);
+                float zoom = camera.GetZoom();
                 float drawW = sf->width * zoom;
                 float drawH = sf->height * zoom;
                 float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
                 SDL_FRect dstRect = {sx, sy, drawW + bleed, drawH + bleed};
 
-                float sScale = tm->getSheetScale(page);
+                float sScale = tm->GetSheetScale(page);
                 SDL_FRect srcRect = {std::round(sf->x * sScale), std::round(sf->y * sScale), std::round(sf->width * sScale), std::round(sf->height * sScale)};
                 SDL_FPoint center = {-ox * zoom, -oy * zoom};
                 SDL_RenderTextureRotated(sdlRnd, sheet, &srcRect, &dstRect, angleDeg, &center, SDL_FLIP_NONE);
             }
             else
             {
-                renderCompositePartsRotated(tm, sdlRnd, part->child, originX, originY, ox, oy, angleDeg, camera, faction, depth + 1);
+                RenderCompositePartsRotated(tm, sdlRnd, part->child, originX, originY, ox, oy, angleDeg, camera, faction, depth + 1);
             }
         }
     }
 
-    void Renderer::drawAnimSequenceWorldRotated(int animId, int frame, float worldX, float worldY, float angleRad, const Camera &camera, Faction faction)
+    void Renderer::DrawAnimSequenceWorldRotated(int animId, int frame, float worldX, float worldY, float angleRad, const Camera &camera, Faction faction)
     {
         if(!m_texManager)
             return;
 
-        IndexRange r = m_texManager->getAnimRange(animId);
+        IndexRange r = m_texManager->GetAnimRange(animId);
         if(r.end < r.start)
             return;
 
         int count = (r.end - r.start) + 1;
         int idx = r.start + (std::abs(frame) % count);
 
-        const auto *f = m_texManager->getAnimFrame(idx);
+        const auto *f = m_texManager->GetAnimFrame(idx);
         if(!f)
             return;
 
@@ -307,7 +307,7 @@ namespace OpenArtOfWar
         {
             float baseOx = static_cast<float>(f->ox);
             float baseOy = static_cast<float>(f->oy);
-            const auto *sf = m_texManager->getSpriteFrame(f->child);
+            const auto *sf = m_texManager->GetSpriteFrame(f->child);
             if(!sf)
                 return;
             int page = sf->page;
@@ -315,19 +315,19 @@ namespace OpenArtOfWar
                 page = 8;
             else if(faction == Faction::Confederation && page == 12)
                 page = 10;
-            SDL_Texture *sheet = bindSheet(page, faction);
+            SDL_Texture *sheet = BindSheet(page, faction);
             if(!sheet)
                 return;
 
             float sx, sy;
-            camera.worldToScreen(worldX + baseOx, worldY + baseOy, sx, sy);
-            float zoom = camera.getZoom();
+            camera.WorldToScreen(worldX + baseOx, worldY + baseOy, sx, sy);
+            float zoom = camera.GetZoom();
             float drawW = sf->width * zoom;
             float drawH = sf->height * zoom;
             float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
             SDL_FRect dstRect = {sx, sy, drawW + bleed, drawH + bleed};
 
-            float sScale = m_texManager->getSheetScale(page);
+            float sScale = m_texManager->GetSheetScale(page);
             SDL_FRect srcRect = {std::round(sf->x * sScale), std::round(sf->y * sScale), std::round(sf->width * sScale), std::round(sf->height * sScale)};
             SDL_FPoint center = {-baseOx * zoom, -baseOy * zoom}; // rotate about (worldX, worldY)
             SDL_RenderTextureRotated(m_renderer, sheet, &srcRect, &dstRect, angleDeg, &center, SDL_FLIP_NONE);
@@ -336,21 +336,21 @@ namespace OpenArtOfWar
         {
             float baseOx = static_cast<float>(f->ox);
             float baseOy = static_cast<float>(f->oy);
-            renderCompositePartsRotated(m_texManager, m_renderer, f->child, worldX, worldY, baseOx, baseOy, angleDeg, camera, faction, 0);
+            RenderCompositePartsRotated(m_texManager, m_renderer, f->child, worldX, worldY, baseOx, baseOy, angleDeg, camera, faction, 0);
         }
     }
 
-    void Renderer::drawTileWorld(int tilesetId, int tileIndex, float worldX, float worldY, const Camera &camera, int /*globalAnimTick*/)
+    void Renderer::DrawTileWorld(int tilesetId, int tileIndex, float worldX, float worldY, const Camera &camera, int /*globalAnimTick*/)
     {
         if(!m_texManager)
             return;
 
         // Authentic J2ME terrain rendering (f.java:6603): all ground, cliff, and water tiles are 100% static!
-        int compId = m_texManager->getTileCompositeId(tilesetId, tileIndex);
-        drawCompositeWorld(compId, worldX, worldY, camera, Faction::Resistance);
+        int compId = m_texManager->GetTileCompositeId(tilesetId, tileIndex);
+        DrawCompositeWorld(compId, worldX, worldY, camera, Faction::Resistance);
     }
 
-    void Renderer::drawDecorWorld(int tilesetId, int decorType, float worldX, float worldY, const Camera &camera, int animFrame, int layer)
+    void Renderer::DrawDecorWorld(int tilesetId, int decorType, float worldX, float worldY, const Camera &camera, int animFrame, int layer)
     {
         if(!m_texManager)
             return;
@@ -358,27 +358,27 @@ namespace OpenArtOfWar
         // Authentic map decoration rendering (f.java:2212, 6826-6836):
         // tileset_d[offset + decorType] is a Building ID (31..338: trees, bridges 83..108, cliffs, landmarks 121..132).
         // Never use m_decorAnims (f1131c = 1741..1810) here because f1131c are post-destruction craters & vehicle wrecks!
-        int buildingId = m_texManager->getDecorBuildingId(tilesetId, decorType);
+        int buildingId = m_texManager->GetDecorBuildingId(tilesetId, decorType);
         if(buildingId >= 0)
         {
             if(layer < 0)
             {
-                drawBuildingWorld(buildingId, worldX, worldY, 0, camera, Faction::Neutral, animFrame, 1.0f, false);
-                drawBuildingWorld(buildingId, worldX, worldY, 1, camera, Faction::Neutral, animFrame, 1.0f, false);
+                DrawBuildingWorld(buildingId, worldX, worldY, 0, camera, Faction::Neutral, animFrame, 1.0f, false);
+                DrawBuildingWorld(buildingId, worldX, worldY, 1, camera, Faction::Neutral, animFrame, 1.0f, false);
             }
             else
             {
-                drawBuildingWorld(buildingId, worldX, worldY, layer, camera, Faction::Neutral, animFrame, 1.0f, false);
+                DrawBuildingWorld(buildingId, worldX, worldY, layer, camera, Faction::Neutral, animFrame, 1.0f, false);
             }
         }
     }
 
-    void Renderer::drawBuildingWorld(int buildingType, float worldX, float worldY, int layer, const Camera &camera, Faction faction, int animFrame, float buildProgress, bool isDestroyed, float hpRatio, int turretFacing, bool isAttacking, bool isPowered, int customWreckComp, int customWreckStages)
+    void Renderer::DrawBuildingWorld(int buildingType, float worldX, float worldY, int layer, const Camera &camera, Faction faction, int animFrame, float buildProgress, bool isDestroyed, float hpRatio, int turretFacing, bool isAttacking, bool isPowered, int customWreckComp, int customWreckStages)
     {
         if(!m_texManager)
             return;
 
-        const auto *bdef = m_texManager->getBuildingDef(buildingType);
+        const auto *bdef = m_texManager->GetBuildingDef(buildingType);
         if(!bdef || bdef->end < bdef->start)
             return;
 
@@ -389,7 +389,7 @@ namespace OpenArtOfWar
             if(layer == 0)
             {
                 int baseRemnant = 0, stages = 0;
-                defaultBuildingWreck(bdef->width, bdef->height, baseRemnant, stages);
+                DefaultBuildingWreck(bdef->width, bdef->height, baseRemnant, stages);
                 if(customWreckComp > 0)
                     baseRemnant = customWreckComp;
                 if(customWreckStages > 0)
@@ -399,7 +399,7 @@ namespace OpenArtOfWar
                 // Remnant composite is centered at (centerX, centerY) of the building
                 float centerX = worldX + (bdef->width * OpenArtOfWar::TILE_WIDTH * 0.5f);
                 float centerY = worldY + (bdef->height * OpenArtOfWar::TILE_HEIGHT * 0.5f);
-                drawCompositeWorld(baseRemnant + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
+                DrawCompositeWorld(baseRemnant + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
             }
             return;
         }
@@ -410,18 +410,18 @@ namespace OpenArtOfWar
             Renderer &r;
             ~StructureScope()
             {
-                r.setStructureFaction(Faction::Neutral);
+                r.SetStructureFaction(Faction::Neutral);
             }
         } structureScope {*this};
         if(buildingType < 30 && !isDestroyed)
-            setStructureFaction(faction);
+            SetStructureFaction(faction);
 
         // 2. Walls (15..29), construction scaffolding (30), and Map Decorations (31..338) (i6 == 0 in f.java:10806)
         if(buildingType >= 15)
         {
             for(int p = bdef->start; p <= bdef->end; ++p)
             {
-                const auto *part = m_texManager->getBuildingPart(p);
+                const auto *part = m_texManager->GetBuildingPart(p);
                 if(!part)
                     continue;
                 if((part->layer == layer || buildingType >= 133) && part->state == 0)
@@ -430,15 +430,15 @@ namespace OpenArtOfWar
                     float py = worldY + part->oy;
                     if(part->isComp == 0)
                     {
-                        drawRawSpriteWorld(part->child, px, py, camera, faction);
+                        DrawRawSpriteWorld(part->child, px, py, camera, faction);
                     }
                     else if(part->isComp == 1)
                     {
-                        drawCompositeWorld(part->child, px, py, camera, faction);
+                        DrawCompositeWorld(part->child, px, py, camera, faction);
                     }
                     else if(part->isComp == 2 && buildingType < 30)
                     {
-                        drawAnimSequenceWorld(part->child, animFrame, px, py, camera, faction);
+                        DrawAnimSequenceWorld(part->child, animFrame, px, py, camera, faction);
                     }
                 }
             }
@@ -459,7 +459,7 @@ namespace OpenArtOfWar
 
         for(int p = bdef->start; p <= bdef->end; ++p)
         {
-            const auto *part = m_texManager->getBuildingPart(p);
+            const auto *part = m_texManager->GetBuildingPart(p);
             if(!part)
                 continue;
 
@@ -478,7 +478,7 @@ namespace OpenArtOfWar
                     bool pwrOk = (buildingType == 5 || buildingType == 13) || isPowered;
                     if(!underConstruction && pwrOk && isAttacking && part->isComp == 2)
                     {
-                        drawAnimSequenceWorld(part->child + tdir8, animFrame, px, py, camera, faction);
+                        DrawAnimSequenceWorld(part->child + tdir8, animFrame, px, py, camera, faction);
                     }
                 }
                 else if(part->state == 2)
@@ -487,7 +487,7 @@ namespace OpenArtOfWar
                     // construction site, else the tower stands headless until it is finished
                     if(part->isComp == 1)
                     {
-                        drawCompositeWorld(part->child + tdir8, px, py, camera, faction);
+                        DrawCompositeWorld(part->child + tdir8, px, py, camera, faction);
                     }
                 }
                 else if(part->state == 10)
@@ -496,7 +496,7 @@ namespace OpenArtOfWar
                     bool needsPower = (buildingType != 5 && buildingType != 13);
                     if((underConstruction || (!isPowered && needsPower)) && part->isComp == 1)
                     {
-                        drawCompositeWorld(part->child, px, py, camera, faction);
+                        DrawCompositeWorld(part->child, px, py, camera, faction);
                     }
                 }
             }
@@ -509,38 +509,38 @@ namespace OpenArtOfWar
 
                 if(part->isComp == 0)
                 {
-                    drawRawSpriteWorld(part->child, px, py, camera, faction);
+                    DrawRawSpriteWorld(part->child, px, py, camera, faction);
                 }
                 else if(part->isComp == 1)
                 {
-                    drawCompositeWorld(part->child, px, py, camera, faction);
+                    DrawCompositeWorld(part->child, px, py, camera, faction);
                 }
                 else if(part->isComp == 2)
                 {
                     // Animated building parts (Radar 6 spinning dish, PowerPlant 1/9 glow, Factory/Lab lights)
                     if(!underConstruction && isPowered)
                     {
-                        drawAnimSequenceWorld(part->child, animFrame, px, py, camera, faction);
+                        DrawAnimSequenceWorld(part->child, animFrame, px, py, camera, faction);
                     }
                 }
             }
         }
     }
 
-    void Renderer::defaultBuildingWreck(int width, int height, int &outComposite, int &outStages)
+    void Renderer::DefaultBuildingWreck(int width, int height, int &outComposite, int &outStages)
     {
-        const EffectsConfig::Wreck w = EffectsConfig::get().wreckOfBuilding(width, height);
+        const EffectsConfig::Wreck w = EffectsConfig::Get().WreckOfBuilding(width, height);
         outComposite = w.composite;
         outStages = w.stages;
     }
 
-    void Renderer::drawUnitWorld(int unitTypeId, int actionState, int facingDir, int animStep, float worldX, float worldY, const Camera &camera, Faction faction, int targetFacing, bool isFlaming, int customWreckComp, int customWreckStages, int customDeathSeq)
+    void Renderer::DrawUnitWorld(int unitTypeId, int actionState, int facingDir, int animStep, float worldX, float worldY, const Camera &camera, Faction faction, int targetFacing, bool isFlaming, int customWreckComp, int customWreckStages, int customDeathSeq)
     {
         if(!m_texManager)
             return;
 
         unitTypeId = std::clamp(unitTypeId, 0, 18);
-        bool isInfantry = Utility::isInfantryArchetype(unitTypeId); // archetypes 0..5 and 14 (prone sniper)
+        bool isInfantry = Utility::IsInfantryArchetype(unitTypeId); // archetypes 0..5 and 14 (prone sniper)
 
         // 1. Dying / Wrecked state (i.java:3286, f.java:6740)
         if(actionState == static_cast<int>(ActionState::Die))
@@ -548,14 +548,14 @@ namespace OpenArtOfWar
             if(!isInfantry)
             {
                 // Destroyed vehicle remnant (f1131c = 1759, 1764, 1769) - static wreck that fades over 2 minutes!
-                const EffectsConfig::Wreck def = EffectsConfig::get().wreckOfVehicle(unitTypeId);
+                const EffectsConfig::Wreck def = EffectsConfig::Get().WreckOfVehicle(unitTypeId);
                 const int baseWreck = (customWreckComp > 0) ? customWreckComp : def.composite;
                 const int maxStages = (customWreckStages > 0) ? customWreckStages : def.stages;
                 int stage = std::clamp(animStep, 0, maxStages - 1);
                 // Vehicle wreck composite is centered at (centerX, centerY) of the unit tile
                 float centerX = worldX + (static_cast<float>(OpenArtOfWar::TILE_WIDTH) * 0.5f);
                 float centerY = worldY + (static_cast<float>(OpenArtOfWar::TILE_HEIGHT) * 0.5f);
-                drawCompositeWorld(baseWreck + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
+                DrawCompositeWorld(baseWreck + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
                 return;
             }
             else
@@ -575,31 +575,31 @@ namespace OpenArtOfWar
                         deathSeq = 247 + (unitTypeId % 2);
                     }
                 }
-                IndexRange r = m_texManager->getUnitSequenceRange(deathSeq);
+                IndexRange r = m_texManager->GetUnitSequenceRange(deathSeq);
                 if(r.end >= r.start)
                 {
                     int count = (r.end - r.start) + 1;
                     int stepIdx = r.start + std::clamp(animStep, 0, count - 1);
-                    const auto *step = m_texManager->getUnitSequenceStep(stepIdx);
+                    const auto *step = m_texManager->GetUnitSequenceStep(stepIdx);
                     if(step)
                     {
                         float baseX = worldX + step->ox;
                         float baseY = worldY + step->oy;
-                        IndexRange br = m_texManager->getUnitBodyRange(step->bodyId);
+                        IndexRange br = m_texManager->GetUnitBodyRange(step->bodyId);
                         for(int b = br.start; b <= br.end; ++b)
                         {
-                            const auto *layer = m_texManager->getUnitLayer(b);
+                            const auto *layer = m_texManager->GetUnitLayer(b);
                             if(!layer)
                                 continue;
                             float lx = baseX + layer->ox;
                             float ly = baseY + layer->oy;
                             if(layer->isComp == 0)
                             {
-                                drawRawSpriteWorld(layer->child, lx, ly, camera, faction);
+                                DrawRawSpriteWorld(layer->child, lx, ly, camera, faction);
                             }
                             else if(layer->isComp == 1)
                             {
-                                drawCompositeWorld(layer->child, lx, ly, camera, faction);
+                                DrawCompositeWorld(layer->child, lx, ly, camera, faction);
                             }
                         }
                         return;
@@ -608,7 +608,7 @@ namespace OpenArtOfWar
             }
         }
 
-        int baseSeq = m_texManager->getUnitBaseSeq(unitTypeId, actionState);
+        int baseSeq = m_texManager->GetUnitBaseSeq(unitTypeId, actionState);
 
         // Authentic J2ME infantry shooting pose offset (+8) from f.java:10955:
         // archetypes 0..3 (riflemen, heavy assault, grenadiers) switch to their firing pose. The flamethrower (5)
@@ -629,7 +629,7 @@ namespace OpenArtOfWar
             seqIdx = baseSeq + shootOffset + dir8;
         }
 
-        IndexRange r = m_texManager->getUnitSequenceRange(seqIdx);
+        IndexRange r = m_texManager->GetUnitSequenceRange(seqIdx);
         if(r.end < r.start)
             return;
 
@@ -637,14 +637,14 @@ namespace OpenArtOfWar
         bool clampAnim = (actionState == static_cast<int>(ActionState::Die) || actionState == static_cast<int>(ActionState::Transform));
         int stepIdx = r.start + (clampAnim ? std::clamp(animStep, 0, count - 1) : (std::abs(animStep) % count));
 
-        const auto *step = m_texManager->getUnitSequenceStep(stepIdx);
+        const auto *step = m_texManager->GetUnitSequenceStep(stepIdx);
         if(!step)
             return;
 
         float baseX = worldX + step->ox;
         float baseY = worldY + step->oy;
 
-        IndexRange br = m_texManager->getUnitBodyRange(step->bodyId);
+        IndexRange br = m_texManager->GetUnitBodyRange(step->bodyId);
         if(br.end < br.start)
             return;
 
@@ -662,7 +662,7 @@ namespace OpenArtOfWar
 
         for(int lay = br.start; lay <= br.end; ++lay)
         {
-            const auto *layer = m_texManager->getUnitLayer(lay);
+            const auto *layer = m_texManager->GetUnitLayer(lay);
             if(!layer)
                 continue;
 
@@ -698,51 +698,51 @@ namespace OpenArtOfWar
 
             if(layer->isComp == 0)
             {
-                drawRawSpriteWorld(childId, lx, ly, camera, faction);
+                DrawRawSpriteWorld(childId, lx, ly, camera, faction);
             }
             else if(layer->isComp == 1)
             {
-                drawCompositeWorld(childId, lx, ly, camera, faction);
+                DrawCompositeWorld(childId, lx, ly, camera, faction);
             }
             else if(layer->isComp == 2)
             {
                 if(flag <= 2)
                 {
-                    drawAnimSequenceWorld(childId, animStep, lx, ly, camera, faction);
+                    DrawAnimSequenceWorld(childId, animStep, lx, ly, camera, faction);
                 }
                 else
                 {
                     // Firing muzzle flash / recoiling turret layer (flag 3..5):
                     // Replaces the corresponding idle layer (flag 0..2) while firing!
-                    IndexRange ar = m_texManager->getAnimRange(childId);
+                    IndexRange ar = m_texManager->GetAnimRange(childId);
                     int animLen = (ar.end >= ar.start) ? (ar.end - ar.start + 1) : 1;
                     int fireFrame = std::abs(animStep) % std::max(1, animLen);
                     bMask &= ~(1 << s_b54[flag - 3]);
-                    drawAnimSequenceWorld(childId, fireFrame, lx, ly, camera, faction);
+                    DrawAnimSequenceWorld(childId, fireFrame, lx, ly, camera, faction);
                 }
             }
         }
     }
 
-    void Renderer::drawProjectileWorld(int baseCompId, int dir, float worldX, float worldY, const Camera &camera, Faction faction, int numDirs)
+    void Renderer::DrawProjectileWorld(int baseCompId, int dir, float worldX, float worldY, const Camera &camera, Faction faction, int numDirs)
     {
         int safeDirs = (numDirs > 0) ? numDirs : 16;
         int d = (dir % safeDirs + safeDirs) % safeDirs;
-        drawCompositeWorld(baseCompId + d, worldX - 90.0f, worldY - 60.0f, camera, faction);
+        DrawCompositeWorld(baseCompId + d, worldX - 90.0f, worldY - 60.0f, camera, faction);
     }
 
-    void Renderer::drawSmokePuffWorld(int frame, float worldX, float worldY, const Camera &camera)
+    void Renderer::DrawSmokePuffWorld(int frame, float worldX, float worldY, const Camera &camera)
     {
         int f = std::clamp(frame, 0, 13);
-        drawCompositeWorld(1440 + f, worldX - 90.0f, worldY - 60.0f, camera, Faction::Resistance);
+        DrawCompositeWorld(1440 + f, worldX - 90.0f, worldY - 60.0f, camera, Faction::Resistance);
     }
 
-    void Renderer::fillRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)
+    void Renderer::FillRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)
     {
-        plainState();
+        PlainState();
         float sx, sy;
-        camera.worldToScreen(wx, wy, sx, sy);
-        float zoom = camera.getZoom();
+        camera.WorldToScreen(wx, wy, sx, sy);
+        float zoom = camera.GetZoom();
         float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
         SDL_FRect rect = {sx, sy, ww * zoom + bleed, wh * zoom + bleed};
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
@@ -750,34 +750,34 @@ namespace OpenArtOfWar
         SDL_RenderFillRect(m_renderer, &rect);
     }
 
-    void Renderer::drawRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)
+    void Renderer::DrawRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)
     {
-        plainState();
+        PlainState();
         float sx, sy;
-        camera.worldToScreen(wx, wy, sx, sy);
-        float zoom = camera.getZoom();
+        camera.WorldToScreen(wx, wy, sx, sy);
+        float zoom = camera.GetZoom();
         SDL_FRect rect = {sx, sy, ww * zoom, wh * zoom};
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
         SDL_RenderRect(m_renderer, &rect);
     }
 
-    void Renderer::drawLineWorld(float wx1, float wy1, float wx2, float wy2, const Camera &camera, SDL_Color color)
+    void Renderer::DrawLineWorld(float wx1, float wy1, float wx2, float wy2, const Camera &camera, SDL_Color color)
     {
-        plainState();
+        PlainState();
         float sx1, sy1, sx2, sy2;
-        camera.worldToScreen(wx1, wy1, sx1, sy1);
-        camera.worldToScreen(wx2, wy2, sx2, sy2);
+        camera.WorldToScreen(wx1, wy1, sx1, sy1);
+        camera.WorldToScreen(wx2, wy2, sx2, sy2);
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
         SDL_RenderLine(m_renderer, sx1, sy1, sx2, sy2);
     }
 
-    void Renderer::drawRingScreen(float cx, float cy, float rx, float ry, float thickness, SDL_Color color, int segments)
+    void Renderer::DrawRingScreen(float cx, float cy, float rx, float ry, float thickness, SDL_Color color, int segments)
     {
         if(rx <= 0.5f || ry <= 0.5f || color.a == 0)
             return;
-        plainState();
+        PlainState();
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         segments = std::clamp(segments, 24, 720);
         const float half = std::max(0.5f, thickness * 0.5f);
@@ -798,7 +798,7 @@ namespace OpenArtOfWar
         SDL_RenderGeometry(m_renderer, nullptr, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()));
     }
 
-    void Renderer::drawThickLineScreen(float x0, float y0, float x1, float y1, float width, SDL_Color color)
+    void Renderer::DrawThickLineScreen(float x0, float y0, float x1, float y1, float width, SDL_Color color)
     {
         if(color.a == 0)
             return;
@@ -806,7 +806,7 @@ namespace OpenArtOfWar
         const float len = std::sqrt(dx * dx + dy * dy);
         if(len < 0.01f)
             return;
-        plainState();
+        PlainState();
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         const float nx = -dy / len * std::max(0.5f, width) * 0.5f, ny = dx / len * std::max(0.5f, width) * 0.5f;
         const SDL_FColor c {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f};
@@ -815,35 +815,35 @@ namespace OpenArtOfWar
         SDL_RenderGeometry(m_renderer, nullptr, v, 4, idx, 6);
     }
 
-    void Renderer::fillRectScreen(int x, int y, int w, int h, SDL_Color color)
+    void Renderer::FillRectScreen(int x, int y, int w, int h, SDL_Color color)
     {
-        plainState();
+        PlainState();
         SDL_FRect rect = {static_cast<float>(x), static_cast<float>(y), static_cast<float>(w), static_cast<float>(h)};
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(m_renderer, &rect);
     }
 
-    void Renderer::drawRectScreen(int x, int y, int w, int h, SDL_Color color)
+    void Renderer::DrawRectScreen(int x, int y, int w, int h, SDL_Color color)
     {
-        plainState();
+        PlainState();
         SDL_FRect rect = {static_cast<float>(x), static_cast<float>(y), static_cast<float>(w), static_cast<float>(h)};
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
         SDL_RenderRect(m_renderer, &rect);
     }
 
-    void Renderer::drawLineScreen(int x1, int y1, int x2, int y2, SDL_Color color)
+    void Renderer::DrawLineScreen(int x1, int y1, int x2, int y2, SDL_Color color)
     {
-        plainState();
+        PlainState();
         SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
         SDL_RenderLine(m_renderer, static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(x2), static_cast<float>(y2));
     }
 
-    void Renderer::drawTextureScreen(SDL_Texture *tex, int x, int y, int w, int h, int anchor)
+    void Renderer::DrawTextureScreen(SDL_Texture *tex, int x, int y, int w, int h, int anchor)
     {
-        plainState();
+        PlainState();
         if(!tex)
             return;
         float texW = 0.0f, texH = 0.0f;
@@ -853,17 +853,17 @@ namespace OpenArtOfWar
         if(h <= 0)
             h = static_cast<int>(texH);
 
-        applyAnchor(x, y, w, h, anchor);
+        ApplyAnchor(x, y, w, h, anchor);
         SDL_FRect dstRect = {static_cast<float>(x), static_cast<float>(y), static_cast<float>(w), static_cast<float>(h)};
         SDL_RenderTexture(m_renderer, tex, nullptr, &dstRect);
     }
 
-    void Renderer::drawRawSpriteScreen(int spriteId, int screenX, int screenY, float scale, Faction faction)
+    void Renderer::DrawRawSpriteScreen(int spriteId, int screenX, int screenY, float scale, Faction faction)
     {
-        plainState();
+        PlainState();
         if(!m_texManager)
             return;
-        const auto *frame = m_texManager->getSpriteFrame(spriteId);
+        const auto *frame = m_texManager->GetSpriteFrame(spriteId);
         if(!frame || frame->width <= 0 || frame->height <= 0)
             return;
 
@@ -874,7 +874,7 @@ namespace OpenArtOfWar
         }
 
         // An owner set (HUD icons of the player): the army colour as in the world; otherwise the plain sheet
-        SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? bindSheet(page, faction) : m_texManager->getSpriteSheet(page);
+        SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? BindSheet(page, faction) : m_texManager->GetSpriteSheet(page);
         if(!sheet)
             return;
         if(m_drawOwner >= kMaxPlayers && page >= 0 && page < 64 && m_tintedSheet[page])
@@ -883,24 +883,24 @@ namespace OpenArtOfWar
             m_tintedSheet[page] = false;
         }
 
-        float sScale = m_texManager->getSheetScale(page);
+        float sScale = m_texManager->GetSheetScale(page);
         SDL_FRect srcRect = {std::round(frame->x * sScale), std::round(frame->y * sScale), std::round(frame->width * sScale), std::round(frame->height * sScale)};
         SDL_FRect dstRect = {static_cast<float>(screenX), static_cast<float>(screenY), std::max(1.0f, std::round(frame->width * scale)), std::max(1.0f, std::round(frame->height * scale))};
         SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
     }
 
-    void Renderer::drawCompositeScreen(int compId, int screenX, int screenY, float scale, Faction faction, int depth)
+    void Renderer::DrawCompositeScreen(int compId, int screenX, int screenY, float scale, Faction faction, int depth)
     {
         if(depth > 6 || !m_texManager)
             return;
 
-        IndexRange r = m_texManager->getCompositeRange(compId);
+        IndexRange r = m_texManager->GetCompositeRange(compId);
         if(r.end < r.start)
             return;
 
         for(int p = r.start; p <= r.end; ++p)
         {
-            const auto *part = m_texManager->getCompositePart(p);
+            const auto *part = m_texManager->GetCompositePart(p);
             if(!part)
                 continue;
 
@@ -909,16 +909,16 @@ namespace OpenArtOfWar
 
             if(part->isComp == 0)
             {
-                drawRawSpriteScreen(part->child, px, py, scale, faction);
+                DrawRawSpriteScreen(part->child, px, py, scale, faction);
             }
             else
             {
-                drawCompositeScreen(part->child, px, py, scale, faction, depth + 1);
+                DrawCompositeScreen(part->child, px, py, scale, faction, depth + 1);
             }
         }
     }
 
-    void Renderer::applyAnchor(int &x, int &y, int w, int h, int anchor) const
+    void Renderer::ApplyAnchor(int &x, int &y, int w, int h, int anchor) const
     {
         if(anchor & Anchor::HCENTER)
         {
@@ -939,12 +939,12 @@ namespace OpenArtOfWar
         }
     }
 
-    void Renderer::setClipRect(const SDL_Rect &rect)
+    void Renderer::SetClipRect(const SDL_Rect &rect)
     {
         SDL_SetRenderClipRect(m_renderer, &rect);
     }
 
-    void Renderer::resetClipRect()
+    void Renderer::ResetClipRect()
     {
         SDL_SetRenderClipRect(m_renderer, nullptr);
     }

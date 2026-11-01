@@ -67,15 +67,15 @@ namespace OpenArtOfWar
     class ChokepointMap
     {
     public:
-        void rebuild(const TileMap &map);
-        bool isChoke(int x, int y) const;
+        void Rebuild(const TileMap &map);
+        bool IsChoke(int x, int y) const;
         // Open width across the passage at a tile (min of horizontal/vertical open run), 0 = blocked
-        int openWidth(int x, int y) const;
-        int width() const
+        int OpenWidth(int x, int y) const;
+        int Width() const
         {
             return m_width;
         }
-        int height() const
+        int Height() const
         {
             return m_height;
         }
@@ -99,7 +99,7 @@ namespace OpenArtOfWar
         Retreating     // Hard: wave lost without effect, survivors fall back to staging
     };
 
-    const char *squadStateName(AISquadState state);
+    const char *SquadStateName(AISquadState state);
 
     struct AISquad
     {
@@ -147,50 +147,50 @@ namespace OpenArtOfWar
     class AISquadController
     {
     public:
-        void clear();
+        void Clear();
 
         // viaX / viaY (optional): the group first marches through that point, e.g. a second base exit or a flank
-        int createSquad(const std::vector<int> &unitIds, int targetX, int targetY, int waveNumber, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics, int viaX = -1, int viaY = -1);
+        int CreateSquad(const std::vector<int> &unitIds, int targetX, int targetY, int waveNumber, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics, int viaX = -1, int viaY = -1);
 
-        void update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
+        void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
 
-        void setStagingPoint(int x, int y)
+        void SetStagingPoint(int x, int y)
         {
             m_stagingX = x;
             m_stagingY = y;
         }
-        bool isSquadMember(int unitId) const;
-        AISquad *findSquad(int squadId);
+        bool IsSquadMember(int unitId) const;
+        AISquad *FindSquad(int squadId);
         // Takes units out of their squads (they got a new order of their own)
-        void releaseUnits(const std::vector<int> &unitIds, EntityManager &entities);
-        const std::vector<AISquad> &getSquads() const
+        void ReleaseUnits(const std::vector<int> &unitIds, EntityManager &entities);
+        const std::vector<AISquad> &GetSquads() const
         {
             return m_squads;
         }
 
         // Units dropped from groups (stuck stragglers, retreat survivors) since the last call
-        std::vector<int> takeReleasedUnits();
+        std::vector<int> TakeReleasedUnits();
 
-        void renderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities, float leashTiles) const;
+        void RenderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities, float leashTiles) const;
 
     private:
-        void tick(AISquad &sq, float dt, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
-        void advanceMarch(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
-        void beginTransit(AISquad &sq, int chokeIndex, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes);
-        void orderMarch(AISquad &sq, int routeIndex, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics);
-        void paceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active);
-        void holdUnits(const std::vector<int> &ids, EntityManager &entities);
-        void orderLeg(const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder);
+        void Tick(AISquad &sq, float dt, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
+        void AdvanceMarch(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics);
+        void BeginTransit(AISquad &sq, int chokeIndex, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes);
+        void OrderMarch(AISquad &sq, int routeIndex, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics);
+        void PaceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active);
+        void HoldUnits(const std::vector<int> &ids, EntityManager &entities);
+        void OrderLeg(const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder);
         // A member whose path is far longer than the straight way (e.g. to reach a slot behind the crowd
         // or around a wall) stays where it is instead of running across the map; the next leg moves it on
         // Units whose route is a long detour: an attack-moving group with a hostile wall at hand breaches it
         // instead, everyone else waits (`map` may be null: then nobody breaches)
-        void capDetours(const AISquad &sq, EntityManager &entities, const TileMap *map = nullptr);
-        void releaseUnit(AISquad &sq, int unitId, EntityManager &entities);
-        void setState(AISquad &sq, AISquadState state);
-        void rebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);
-        int pickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const;
-        int damageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const;
+        void CapDetours(const AISquad &sq, EntityManager &entities, const TileMap *map = nullptr);
+        void ReleaseUnit(AISquad &sq, int unitId, EntityManager &entities);
+        void SetState(AISquad &sq, AISquadState state);
+        void RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);
+        int PickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const;
+        int DamageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const;
 
         std::vector<AISquad> m_squads;
         std::vector<int> m_released;

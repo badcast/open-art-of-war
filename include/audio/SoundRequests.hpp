@@ -17,43 +17,43 @@ namespace OpenArtOfWar
             bool announcer {false}; // queued announcer line
         };
 
-        inline std::vector<Request> &queue()
+        inline std::vector<Request> &Queue()
         {
             static std::vector<Request> q;
             return q;
         }
-        inline void play(const char *event)
+        inline void Play(const char *event)
         {
-            if(queue().size() < 64) // nobody plays them (headless): they stop piling up
-                queue().push_back({event, false});
+            if(Queue().size() < 64) // nobody plays them (headless): they stop piling up
+                Queue().push_back({event, false});
         }
-        inline void announce(const char *event)
+        inline void Announce(const char *event)
         {
-            if(queue().size() < 64)
-                queue().push_back({event, true});
+            if(Queue().size() < 64)
+                Queue().push_back({event, true});
         }
-        inline std::vector<Request> take()
+        inline std::vector<Request> Take()
         {
             std::vector<Request> out;
-            out.swap(queue());
+            out.swap(Queue());
             return out;
         }
 
         // A clickable control was under the mouse when it was drawn this frame: a click there sounds (the
         // widgets mark it, the Application plays ui_click on the next mouse press)
-        inline bool &hoverFlag()
+        inline bool &HoverFlag()
         {
             static bool hovered = false;
             return hovered;
         }
-        inline void markHover()
+        inline void MarkHover()
         {
-            hoverFlag() = true;
+            HoverFlag() = true;
         }
-        inline bool takeHover()
+        inline bool TakeHover()
         {
-            const bool h = hoverFlag();
-            hoverFlag() = false;
+            const bool h = HoverFlag();
+            HoverFlag() = false;
             return h;
         }
     } // namespace SoundRequests

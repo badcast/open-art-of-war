@@ -11,9 +11,9 @@
 namespace OpenArtOfWar
 {
 
-    void rallyPointOf(const Building &b, const TileMap &map, int &outTileX, int &outTileY)
+    void RallyPointOf(const Building &b, const TileMap &map, int &outTileX, int &outTileY)
     {
-        if(b.hasRallyPoint())
+        if(b.HasRallyPoint())
         {
             outTileX = b.rallyTileX;
             outTileY = b.rallyTileY;
@@ -25,7 +25,7 @@ namespace OpenArtOfWar
         outTileY = base;
         for(int d = 2; d >= 0; --d)
         {
-            if(map.isPassable(cx, base + d))
+            if(map.IsPassable(cx, base + d))
             {
                 outTileY = base + d;
                 return;
@@ -35,12 +35,12 @@ namespace OpenArtOfWar
 
     Economy::Economy()
     {
-        reset();
+        Reset();
     }
 
-    void Economy::reset(int startingCredits)
+    void Economy::Reset(int startingCredits)
     {
-        m_player = Players::local();
+        m_player = Players::Local();
         m_credits = startingCredits;
         m_powerProduced = 100;
         m_powerConsumed = 30;
@@ -48,7 +48,7 @@ namespace OpenArtOfWar
         m_seenKills = 0;
     }
 
-    bool Economy::spendCredits(int amount)
+    bool Economy::SpendCredits(int amount)
     {
         if(m_credits >= amount)
         {
@@ -58,27 +58,27 @@ namespace OpenArtOfWar
         return false;
     }
 
-    bool Economy::queueUnit(int archetype, int cost, float buildTime, int buildingId, EntityManager &entities)
+    bool Economy::QueueUnit(int archetype, int cost, float buildTime, int buildingId, EntityManager &entities)
     {
-        Building *b = entities.getBuilding(buildingId);
-        if(!b || !b->alive || b->state == ActionState::Die || !b->isUnitProducer())
+        Building *b = entities.GetBuilding(buildingId);
+        if(!b || !b->alive || b->state == ActionState::Die || !b->IsUnitProducer())
             return false;
-        if(!spendCredits(cost))
+        if(!SpendCredits(cost))
             return false;
         ProductionItem item;
         item.archetype = archetype;
         item.cost = cost;
         // Training / production technologies shorten the order of the player's side
-        const int cut = researchTotal(m_player, Utility::isInfantryArchetype(archetype) ? ResearchEffect::TrainTime : ResearchEffect::VehicleTime);
+        const int cut = ResearchTotal(m_player, Utility::IsInfantryArchetype(archetype) ? ResearchEffect::TrainTime : ResearchEffect::VehicleTime);
         item.totalTime = std::max(0.01f, buildTime * (100 - cut) / 100.0f);
         item.progressTime = 0.0f;
         b->productionQueue.push_back(item);
         return true;
     }
 
-    bool Economy::cancelUnit(int archetype, int buildingId, EntityManager &entities)
+    bool Economy::CancelUnit(int archetype, int buildingId, EntityManager &entities)
     {
-        Building *b = entities.getBuilding(buildingId);
+        Building *b = entities.GetBuilding(buildingId);
         if(!b)
             return false;
         for(auto it = b->productionQueue.rbegin(); it != b->productionQueue.rend(); ++it)
@@ -93,24 +93,24 @@ namespace OpenArtOfWar
         return false;
     }
 
-    void Economy::update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder)
+    void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder)
     {
         const PlayerId player = m_player;
-        const Faction faction = Players::factionOf(player);
+        const Faction faction = Players::FactionOf(player);
 
         // 1. Passive income from headquarters: +50 credits every 3 seconds
         m_incomeTimer += deltaTime;
         if(m_incomeTimer >= 3.0f)
         {
             m_incomeTimer = 0.0f;
-            m_credits += 50 * (100 + researchTotal(player, ResearchEffect::Income)) / 100;
+            m_credits += 50 * (100 + ResearchTotal(player, ResearchEffect::Income)) / 100;
         }
 
         // Reward for every enemy unit destroyed since the last tick
-        const int kills = entities.getKillCount(player);
+        const int kills = entities.GetKillCount(player);
         if(kills > m_seenKills)
         {
-            m_credits += (kills - m_seenKills) * kKillReward * (100 + researchTotal(player, ResearchEffect::KillReward)) / 100;
+            m_credits += (kills - m_seenKills) * kKillReward * (100 + ResearchTotal(player, ResearchEffect::KillReward)) / 100;
         }
         m_seenKills = kills;
 
@@ -118,9 +118,9 @@ namespace OpenArtOfWar
         int powerProd = 0;
         int powerCons = 0;
 
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(!b || !b->alive || b->state == ActionState::Die || b->owner != player)
                 continue;
             if(b->buildProgress < 1.0f)
@@ -155,12 +155,12 @@ namespace OpenArtOfWar
                 powerCons += 25;
             }
         }
-        powerProd += powerProd * researchTotal(player, ResearchEffect::PowerBonus) / 100;
+        powerProd += powerProd * ResearchTotal(player, ResearchEffect::PowerBonus) / 100;
         m_powerProduced = powerProd;
         m_powerConsumed = powerCons;
 
         // 3. Every Barracks / Factory trains its own queue; units appear only at that building's exit
-        const bool powerOk = !hasPowerDeficit();
+        const bool powerOk = !HasPowerDeficit();
         const float speedMultiplier = powerOk ? 1.0f : 0.5f;
         struct Spawn
         {
@@ -169,9 +169,9 @@ namespace OpenArtOfWar
             int rallyX, rallyY;
         };
         std::vector<Spawn> spawns; // spawning while iterating would invalidate the entity container
-        for(auto &e : entities.getAllEntities())
+        for(auto &e : entities.GetAllEntities())
         {
-            Building *b = e.asBuilding();
+            Building *b = e.AsBuilding();
             if(!b || b->owner != player)
                 continue;
 
@@ -184,7 +184,7 @@ namespace OpenArtOfWar
                 continue;
             }
             b->isPowered = powerOk;
-            if(!b->isUnitProducer())
+            if(!b->IsUnitProducer())
                 continue;
             b->isProducing = !b->productionQueue.empty();
             if(b->productionQueue.empty() || b->buildProgress < 1.0f)
@@ -196,22 +196,22 @@ namespace OpenArtOfWar
                 continue;
 
             int sx = 0, sy = 0;
-            if(!entities.getBuildingSpawnPoint(b->id, map, sx, sy))
+            if(!entities.GetBuildingSpawnPoint(b->id, map, sx, sy))
                 continue; // exit blocked: retry next tick
             int rx = sx, ry = sy;
-            rallyPointOf(*b, map, rx, ry);
+            RallyPointOf(*b, map, rx, ry);
             spawns.push_back({item.archetype, sx, sy, rx, ry});
             b->productionQueue.pop_front();
         }
 
         for(const Spawn &sp : spawns)
         {
-            int unitId = entities.spawnUnitByArchetype(sp.archetype, sp.x, sp.y, faction, player);
-            if(Unit *u = entities.getUnit(unitId))
-                applyCompletedResearch(*u);
+            int unitId = entities.SpawnUnitByArchetype(sp.archetype, sp.x, sp.y, faction, player);
+            if(Unit *u = entities.GetUnit(unitId))
+                ApplyCompletedResearch(*u);
             if(unitId > 0 && (sp.rallyX != sp.x || sp.rallyY != sp.y))
             {
-                entities.issueMoveOrder({unitId}, sp.rallyX, sp.rallyY, pathfinder);
+                entities.IssueMoveOrder({unitId}, sp.rallyX, sp.rallyY, pathfinder);
             }
         }
     }

@@ -16,10 +16,10 @@ namespace OpenArtOfWar
 
     TextureManager::~TextureManager()
     {
-        cleanup();
+        Cleanup();
     }
 
-    void TextureManager::cleanup()
+    void TextureManager::Cleanup()
     {
         for(auto &[path, tex] : m_textureCache)
         {
@@ -57,7 +57,7 @@ namespace OpenArtOfWar
         m_decorAnims.clear();
     }
 
-    SDL_Texture *TextureManager::loadTexture(const std::string &filePath)
+    SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
     {
         auto it = m_textureCache.find(filePath);
         if(it != m_textureCache.end())
@@ -68,7 +68,7 @@ namespace OpenArtOfWar
         // SDL3 decodes PNG natively; all game art is PNG
         std::vector<uint8_t> pngData;
         SDL_Surface *surface = nullptr;
-        if(Assets::readBytes(filePath, pngData) && !pngData.empty())
+        if(Assets::ReadBytes(filePath, pngData) && !pngData.empty())
         {
             surface = SDL_LoadPNG_IO(SDL_IOFromConstMem(pngData.data(), pngData.size()), true);
         }
@@ -96,10 +96,10 @@ namespace OpenArtOfWar
         return texture;
     }
 
-    bool TextureManager::loadGraphicsData(const std::string &jsonPath)
+    bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
     {
         std::string jtext;
-        if(!Assets::readText(jsonPath, jtext))
+        if(!Assets::ReadText(jsonPath, jtext))
         {
             std::cerr << "[TextureManager] Error: could not open " << jsonPath << std::endl;
             return false;
@@ -221,14 +221,14 @@ namespace OpenArtOfWar
         }
     }
 
-    bool TextureManager::loadAllAssets(const std::string &assetRoot)
+    bool TextureManager::LoadAllAssets(const std::string &assetRoot)
     {
         std::cout << "[TextureManager] Loading game assets from: " << assetRoot << "..." << std::endl;
 
         // 1. Load sprite frame definitions from sprites.json
-        std::string jsonPath = LoaderResources::spriteFrames(assetRoot);
+        std::string jsonPath = LoaderResources::SpriteFrames(assetRoot);
         std::string sprites;
-        if(Assets::readText(jsonPath, sprites))
+        if(Assets::ReadText(jsonPath, sprites))
         {
             nlohmann::json j = nlohmann::json::parse(sprites);
             m_spriteFrames.reserve(j.size());
@@ -252,37 +252,37 @@ namespace OpenArtOfWar
         }
 
         // 2. Load the sprite sheets listed in main.json and compute dynamic HD resolution scaling
-        const int sheetCount = LoaderResources::spriteSheetCount();
+        const int sheetCount = LoaderResources::SpriteSheetCount();
         m_assetRoot = assetRoot;
         m_spriteSheets.assign(sheetCount, nullptr);
         m_sheetScales.assign(sheetCount, 1.0f);
         for(int i = 0; i < sheetCount; ++i)
         {
-            m_spriteSheets[i] = loadTexture(LoaderResources::spriteSheet(i, assetRoot));
+            m_spriteSheets[i] = LoadTexture(LoaderResources::SpriteSheet(i, assetRoot));
             if(m_spriteSheets[i])
             {
                 float tw = 0.0f, th = 0.0f;
                 SDL_GetTextureSize(m_spriteSheets[i], &tw, &th);
-                if(baseSheetWidth(i) > 0)
+                if(BaseSheetWidth(i) > 0)
                 {
-                    m_sheetScales[i] = tw / static_cast<float>(baseSheetWidth(i));
+                    m_sheetScales[i] = tw / static_cast<float>(BaseSheetWidth(i));
                 }
             }
         }
 
         // 3. Load UI screens
-        for(const auto &[name, path] : LoaderResources::uiTextures(assetRoot))
-            m_uiTextures[name] = loadTexture(path);
+        for(const auto &[name, path] : LoaderResources::UiTextures(assetRoot))
+            m_uiTextures[name] = LoadTexture(path);
 
         // 4. Load comprehensive graphics data (composites, animations, units, buildings, tilesets)
-        std::string gdataPath = LoaderResources::graphicsData(assetRoot);
-        loadGraphicsData(gdataPath);
+        std::string gdataPath = LoaderResources::GraphicsData(assetRoot);
+        LoadGraphicsData(gdataPath);
 
         std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
         return true;
     }
 
-    void TextureManager::collectTerrainPages()
+    void TextureManager::CollectTerrainPages()
     {
         m_terrainPages.assign(m_spriteSheets.size(), false);
         // Sprites of a composite, nested composites included
@@ -304,17 +304,17 @@ namespace OpenArtOfWar
             if(seen[comp])
                 continue;
             seen[comp] = true;
-            const IndexRange r = getCompositeRange(comp);
+            const IndexRange r = GetCompositeRange(comp);
             for(int p = r.start; p <= r.end; ++p)
             {
-                const CompositePart *part = getCompositePart(p);
+                const CompositePart *part = GetCompositePart(p);
                 if(!part)
                     continue;
                 if(part->isComp)
                 {
                     stack.push_back(part->child);
                 }
-                else if(const auto *frame = getSpriteFrame(part->child))
+                else if(const auto *frame = GetSpriteFrame(part->child))
                 {
                     if(frame->page >= 0 && frame->page < static_cast<int>(m_terrainPages.size()))
                         m_terrainPages[frame->page] = true;
@@ -323,10 +323,10 @@ namespace OpenArtOfWar
         }
     }
 
-    void TextureManager::setSpriteFiltering(bool linear, bool sharpPixels)
+    void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
     {
         if(m_terrainPages.size() != m_spriteSheets.size())
-            collectTerrainPages();
+            CollectTerrainPages();
         const SDL_ScaleMode mode = linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
         const SDL_ScaleMode spriteMode = (linear || sharpPixels) ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
         for(size_t i = 0; i < m_spriteSheets.size(); ++i)
@@ -341,7 +341,7 @@ namespace OpenArtOfWar
         }
     }
 
-    SDL_Texture *TextureManager::getSpriteSheet(int page) const
+    SDL_Texture *TextureManager::GetSpriteSheet(int page) const
     {
         if(page >= 0 && page < static_cast<int>(m_spriteSheets.size()))
         {
@@ -350,13 +350,13 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    int TextureManager::baseSheetWidth(int page)
+    int TextureManager::BaseSheetWidth(int page)
     {
         static const int kWidths[42] = {240, 179, 206, 229, 200, 274, 268, 240, 77, 77, 107, 153, 91, 112, 223, 154, 193, 158, 135, 73, 65, 121, 91, 94, 106, 169, 68, 78, 126, 231, 272, 45, 166, 123, 122, 1, 61, 88, 50, 63, 98, 33};
         return page >= 0 && page < 42 ? kWidths[page] : 0;
     }
 
-    float TextureManager::getSheetScale(int page) const
+    float TextureManager::GetSheetScale(int page) const
     {
         if(page >= 0 && page < static_cast<int>(m_sheetScales.size()))
         {
@@ -365,7 +365,7 @@ namespace OpenArtOfWar
         return 1.0f;
     }
 
-    SDL_Texture *TextureManager::getTileset(int index) const
+    SDL_Texture *TextureManager::GetTileset(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_tilesets.size()))
         {
@@ -374,7 +374,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    SDL_Texture *TextureManager::getUiTexture(const std::string &name) const
+    SDL_Texture *TextureManager::GetUiTexture(const std::string &name) const
     {
         auto it = m_uiTextures.find(name);
         if(it != m_uiTextures.end())
@@ -384,7 +384,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    const SpriteFrame *TextureManager::getSpriteFrame(int spriteId) const
+    const SpriteFrame *TextureManager::GetSpriteFrame(int spriteId) const
     {
         if(spriteId >= 0 && spriteId < static_cast<int>(m_spriteFrames.size()))
         {
@@ -393,7 +393,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    IndexRange TextureManager::getCompositeRange(int compId) const
+    IndexRange TextureManager::GetCompositeRange(int compId) const
     {
         if(compId >= 0 && compId < static_cast<int>(m_compositeRanges.size()))
         {
@@ -402,7 +402,7 @@ namespace OpenArtOfWar
         return {0, -1};
     }
 
-    const CompositePart *TextureManager::getCompositePart(int index) const
+    const CompositePart *TextureManager::GetCompositePart(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_compositeParts.size()))
         {
@@ -411,7 +411,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    IndexRange TextureManager::getAnimRange(int animId) const
+    IndexRange TextureManager::GetAnimRange(int animId) const
     {
         if(animId >= 0 && animId < static_cast<int>(m_animRanges.size()))
         {
@@ -420,7 +420,7 @@ namespace OpenArtOfWar
         return {0, -1};
     }
 
-    const AnimFrame *TextureManager::getAnimFrame(int index) const
+    const AnimFrame *TextureManager::GetAnimFrame(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_animFrames.size()))
         {
@@ -429,7 +429,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    IndexRange TextureManager::getUnitBodyRange(int bodyId) const
+    IndexRange TextureManager::GetUnitBodyRange(int bodyId) const
     {
         if(bodyId >= 0 && bodyId < static_cast<int>(m_unitBodyRanges.size()))
         {
@@ -438,7 +438,7 @@ namespace OpenArtOfWar
         return {0, -1};
     }
 
-    const UnitLayer *TextureManager::getUnitLayer(int index) const
+    const UnitLayer *TextureManager::GetUnitLayer(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_unitLayers.size()))
         {
@@ -447,7 +447,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    IndexRange TextureManager::getUnitSequenceRange(int seqId) const
+    IndexRange TextureManager::GetUnitSequenceRange(int seqId) const
     {
         if(seqId >= 0 && seqId < static_cast<int>(m_unitSequenceRanges.size()))
         {
@@ -456,7 +456,7 @@ namespace OpenArtOfWar
         return {0, -1};
     }
 
-    const UnitSequenceStep *TextureManager::getUnitSequenceStep(int index) const
+    const UnitSequenceStep *TextureManager::GetUnitSequenceStep(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_unitSteps.size()))
         {
@@ -465,7 +465,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    const BuildingDef *TextureManager::getBuildingDef(int buildingType) const
+    const BuildingDef *TextureManager::GetBuildingDef(int buildingType) const
     {
         if(buildingType >= 0 && buildingType < static_cast<int>(m_buildings.size()))
         {
@@ -474,7 +474,7 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    const BuildingPart *TextureManager::getBuildingPart(int index) const
+    const BuildingPart *TextureManager::GetBuildingPart(int index) const
     {
         if(index >= 0 && index < static_cast<int>(m_buildingParts.size()))
         {
@@ -483,9 +483,9 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    SDL_Surface *TextureManager::sheetSurface(int page)
+    SDL_Surface *TextureManager::SheetSurface(int page)
     {
-        const int sheetCount = LoaderResources::spriteSheetCount();
+        const int sheetCount = LoaderResources::SpriteSheetCount();
         if(page < 0 || page >= sheetCount)
             return nullptr;
         if(static_cast<int>(m_sheetSurfaces.size()) < sheetCount)
@@ -493,7 +493,7 @@ namespace OpenArtOfWar
         if(!m_sheetSurfaces[page])
         {
             std::vector<uint8_t> png;
-            if(!Assets::readBytes(LoaderResources::spriteSheet(page, m_assetRoot), png) || png.empty())
+            if(!Assets::ReadBytes(LoaderResources::SpriteSheet(page, m_assetRoot), png) || png.empty())
                 return nullptr;
             SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
             if(!loaded)
@@ -504,28 +504,28 @@ namespace OpenArtOfWar
         return m_sheetSurfaces[page];
     }
 
-    void TextureManager::sumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight)
+    void TextureManager::SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight)
     {
         if(depth > 6)
             return;
-        const IndexRange range = getCompositeRange(compId);
+        const IndexRange range = GetCompositeRange(compId);
         for(int p = range.start; p <= range.end; ++p)
         {
-            const CompositePart *part = getCompositePart(p);
+            const CompositePart *part = GetCompositePart(p);
             if(!part)
                 continue;
             if(part->isComp)
             {
-                sumCompositeColor(part->child, depth + 1, r, g, b, weight);
+                SumCompositeColor(part->child, depth + 1, r, g, b, weight);
                 continue;
             }
-            const SpriteFrame *frame = getSpriteFrame(part->child);
+            const SpriteFrame *frame = GetSpriteFrame(part->child);
             if(!frame || frame->width <= 0 || frame->height <= 0)
                 continue;
-            SDL_Surface *surface = sheetSurface(frame->page);
+            SDL_Surface *surface = SheetSurface(frame->page);
             if(!surface)
                 continue;
-            const float scale = getSheetScale(frame->page);
+            const float scale = GetSheetScale(frame->page);
             const int x0 = static_cast<int>(frame->x * scale), y0 = static_cast<int>(frame->y * scale);
             const int x1 = std::min(surface->w, static_cast<int>((frame->x + frame->width) * scale));
             const int y1 = std::min(surface->h, static_cast<int>((frame->y + frame->height) * scale));
@@ -546,7 +546,7 @@ namespace OpenArtOfWar
         }
     }
 
-    SDL_Color TextureManager::getTileColor(int tilesetId, int tileIdx)
+    SDL_Color TextureManager::GetTileColor(int tilesetId, int tileIdx)
     {
         const int key = tilesetId * 4096 + tileIdx;
         const auto it = m_tileColors.find(key);
@@ -554,7 +554,7 @@ namespace OpenArtOfWar
             return it->second;
 
         long long r = 0, g = 0, b = 0, weight = 0;
-        sumCompositeColor(getTileCompositeId(tilesetId, tileIdx), 0, r, g, b, weight);
+        SumCompositeColor(GetTileCompositeId(tilesetId, tileIdx), 0, r, g, b, weight);
         SDL_Color color {90, 90, 90, 255};
         if(weight > 0)
         {
@@ -564,7 +564,7 @@ namespace OpenArtOfWar
         return color;
     }
 
-    int TextureManager::getTileCompositeId(int tilesetId, int tileIdx) const
+    int TextureManager::GetTileCompositeId(int tilesetId, int tileIdx) const
     {
         if(tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetsList.size()))
         {
@@ -581,12 +581,12 @@ namespace OpenArtOfWar
         return 1; // Fallback to basic tile composite
     }
 
-    int TextureManager::getDecorCompositeId(int tilesetId, int decorType) const
+    int TextureManager::GetDecorCompositeId(int tilesetId, int decorType) const
     {
-        return getDecorBuildingId(tilesetId, decorType);
+        return GetDecorBuildingId(tilesetId, decorType);
     }
 
-    int TextureManager::getDecorBuildingId(int tilesetId, int decorType) const
+    int TextureManager::GetDecorBuildingId(int tilesetId, int decorType) const
     {
         if(tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetsList.size()))
         {
@@ -605,19 +605,19 @@ namespace OpenArtOfWar
         return -1;
     }
 
-    bool TextureManager::getTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const
+    bool TextureManager::GetTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const
     {
-        const int seq = getUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle)) + ((hullDir8 % 8 + 8) % 8);
-        IndexRange r = getUnitSequenceRange(seq);
+        const int seq = GetUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle)) + ((hullDir8 % 8 + 8) % 8);
+        IndexRange r = GetUnitSequenceRange(seq);
         if(r.end < r.start)
             return false;
-        const UnitSequenceStep *step = getUnitSequenceStep(r.start);
+        const UnitSequenceStep *step = GetUnitSequenceStep(r.start);
         if(!step)
             return false;
-        IndexRange br = getUnitBodyRange(step->bodyId);
+        IndexRange br = GetUnitBodyRange(step->bodyId);
         for(int lay = br.start; lay <= br.end; ++lay)
         {
-            const UnitLayer *layer = getUnitLayer(lay);
+            const UnitLayer *layer = GetUnitLayer(lay);
             // Turret layers are the idle weapon slots (flags 0 and 2), the ones the renderer rotates
             if(layer && (layer->flag == 0 || layer->flag == 2))
             {
@@ -629,7 +629,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    int TextureManager::getUnitBaseSeq(int unitType, int actionState) const
+    int TextureManager::GetUnitBaseSeq(int unitType, int actionState) const
     {
         if(unitType >= 0 && unitType < static_cast<int>(m_unitArchetypes.size()))
         {

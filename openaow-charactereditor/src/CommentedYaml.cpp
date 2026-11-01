@@ -8,7 +8,7 @@ namespace CharEditor {
 
 namespace {
 
-std::string trim(const std::string& s) {
+std::string Trim(const std::string& s) {
     size_t a = s.find_first_not_of(" \t\r");
     if (a == std::string::npos) return {};
     size_t b = s.find_last_not_of(" \t\r");
@@ -16,7 +16,7 @@ std::string trim(const std::string& s) {
 }
 
 // Start of a trailing " # comment" outside quotes, npos when there is none
-size_t trailingComment(const std::string& s) {
+size_t TrailingComment(const std::string& s) {
     char quote = 0;
     for (size_t i = 0; i < s.size(); ++i) {
         const char c = s[i];
@@ -69,11 +69,11 @@ bool CommentedYaml::load(const std::filesystem::path& path, std::string& error) 
     m_edits.clear();
     m_dirty = false;
     m_loaded = true;
-    index();
+    Index();
     return true;
 }
 
-bool CommentedYaml::save(std::string& error) {
+bool CommentedYaml::Save(std::string& error) {
     if (!m_loaded) return false;
     // The file as it is now, with the editor's edits applied again: whatever was added there since loading
     // stays. An edit whose key is gone from the file is dropped: the file's contents are never overwritten
@@ -82,18 +82,18 @@ bool CommentedYaml::save(std::string& error) {
     std::string loadError;
     const std::vector<std::pair<std::string, std::string>> edits = m_edits;
     if (fresh.load(m_path, loadError)) {
-        for (const auto& [path, value] : edits) fresh.set(path, value);
+        for (const auto& [path, value] : edits) fresh.Set(path, value);
         m_lines = fresh.m_lines;
         m_node = fresh.m_node;
-        index();
+        Index();
     }
-    if (!writeFileAtomic(m_path, text(), error)) return false;
+    if (!WriteFileAtomic(m_path, text(), error)) return false;
     m_edits.clear();
     m_dirty = false;
     return true;
 }
 
-void CommentedYaml::index() {
+void CommentedYaml::Index() {
     m_lineOf.clear();
     m_comments.clear();
     struct Level {
@@ -104,13 +104,13 @@ void CommentedYaml::index() {
     std::vector<std::string> pending;
     for (size_t i = 0; i < m_lines.size(); ++i) {
         const std::string& l = m_lines[i];
-        const std::string t = trim(l);
+        const std::string t = Trim(l);
         if (t.empty()) {
             pending.clear();
             continue;
         }
         if (t[0] == '#') {
-            pending.push_back(trim(t.substr(1)));
+            pending.push_back(Trim(t.substr(1)));
             continue;
         }
         const size_t indent = l.find_first_not_of(' ');
@@ -135,7 +135,7 @@ void CommentedYaml::index() {
     }
 }
 
-YAML::Node CommentedYaml::at(const std::string& path) const {
+YAML::Node CommentedYaml::At(const std::string& path) const {
     YAML::Node n = m_node;   // a handle onto the same data; read only through const lookups below
     size_t start = 0;
     while (start <= path.size() && n.IsDefined()) {
@@ -154,12 +154,12 @@ YAML::Node CommentedYaml::at(const std::string& path) const {
     return n;
 }
 
-std::string CommentedYaml::comment(const std::string& path) const {
+std::string CommentedYaml::Comment(const std::string& path) const {
     auto it = m_comments.find(path);
     return it == m_comments.end() ? std::string() : it->second;
 }
 
-bool CommentedYaml::set(const std::string& path, const std::string& valueText) {
+bool CommentedYaml::Set(const std::string& path, const std::string& valueText) {
     auto it = m_lineOf.find(path);
     if (it == m_lineOf.end()) return false;
     const std::string old = m_lines[it->second];
@@ -167,7 +167,7 @@ bool CommentedYaml::set(const std::string& path, const std::string& valueText) {
     if (colon == std::string::npos) return false;
     // Everything after the value that must stay: " # comment"
     const std::string rest = old.substr(colon + 1);
-    const size_t c = trailingComment(rest);
+    const size_t c = TrailingComment(rest);
     std::string tail;
     if (c != std::string::npos) {
         size_t gap = c;

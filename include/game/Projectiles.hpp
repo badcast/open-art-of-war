@@ -29,8 +29,8 @@ namespace OpenArtOfWar
         float groundMarkSeconds {45.0f};          // how long a crater stays on the ground
 
         // Impact animation for a target / place (-1 none)
-        int pickImpact(int seed) const;
-        int pickGroundMark(int seed) const;
+        int PickImpact(int seed) const;
+        int PickGroundMark(int seed) const;
     };
 
     namespace Projectiles
@@ -38,16 +38,16 @@ namespace OpenArtOfWar
         constexpr int kCount = 5; // ProjectileType values
 
         const ProjectileSpec &of(ProjectileType type);
-        const char *keyOf(ProjectileType type);
+        const char *KeyOf(ProjectileType type);
         // A key of the file / a weapon's `projectile:` (unknown: bullet)
-        ProjectileType fromKey(const std::string &key);
+        ProjectileType FromKey(const std::string &key);
 
         // Reads the file text over the defaults; false when it cannot be parsed
-        bool loadText(const std::string &yamlText);
+        bool LoadText(const std::string &yamlText);
         // Back to the defaults overlaid with assets/characters/projectiles.yaml
         void reload();
         // Defaults overlaid with this text (the editor shows its changes at once)
-        void apply(const std::string &yamlText);
+        void Apply(const std::string &yamlText);
     } // namespace Projectiles
 
 } // namespace OpenArtOfWar

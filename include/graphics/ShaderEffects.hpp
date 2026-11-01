@@ -18,7 +18,7 @@ namespace OpenArtOfWar
     };
 
     // Own colours a player can give the army (index 1..8 of Settings::armyColor; 0 = classic sheets)
-    inline SDL_Color armyColor(int index)
+    inline SDL_Color ArmyColor(int index)
     {
         static const SDL_Color kColors[8] = {
             {40, 110, 230, 255},
@@ -32,7 +32,7 @@ namespace OpenArtOfWar
         };
         return (index >= 1 && index <= 8) ? kColors[index - 1] : SDL_Color {255, 255, 255, 255};
     }
-    inline const char *armyColorName(int index)
+    inline const char *ArmyColorName(int index)
     {
         static const char *const kNames[9] = {"Classic", "Blue", "Red", "Green", "Yellow", "Purple", "Orange", "Cyan", "White"};
         return (index >= 0 && index <= 8) ? kNames[index] : kNames[0];
@@ -53,49 +53,49 @@ namespace OpenArtOfWar
         ShaderEffects(const ShaderEffects &) = delete;
         ShaderEffects &operator=(const ShaderEffects &) = delete;
 
-        bool init(SDL_Renderer *renderer);
-        void shutdown();
-        bool available() const
+        bool Init(SDL_Renderer *renderer);
+        void Shutdown();
+        bool Available() const
         {
             return m_available;
         }
 
-        void configure(ColorGrade grade, bool glow, bool sharp);
-        bool sharp() const
+        void Configure(ColorGrade grade, bool glow, bool sharp);
+        bool Sharp() const
         {
             return m_available && m_sharp;
         }
-        bool glow() const
+        bool Glow() const
         {
             return m_available && m_glow;
         }
         // The world goes through an offscreen picture this frame (grading, glow or sharp upscaling)
-        bool postActive() const
+        bool PostActive() const
         {
             return m_available && (m_grade != ColorGrade::Off || m_glow || m_sharp);
         }
 
         // Sprite draws: `team` recolours the blue armour into the texture's colour mod
         // team: 0 plain, 1 blue (Confederation) armour recoloured, 2 red (Resistance) armour recoloured
-        void useSpriteState(int team);
+        void UseSpriteState(int team);
         // Untextured primitives, fog, UI: SDL's own shaders
-        void useDefaultState();
+        void UseDefaultState();
 
         // Offscreen picture of the world, (re)created at w x h
-        SDL_Texture *sceneTarget(int w, int h);
+        SDL_Texture *SceneTarget(int w, int h);
         // Glow pass: target of w x h (a fraction of the view), everything drawn until endGlow is bright-passed
-        void beginGlow(int w, int h);
-        void endGlow();
+        void BeginGlow(int w, int h);
+        void EndGlow();
         // The world picture onto `dst` of the screen (current render target must be the screen), then the glow
         // onto `glowDst` (the glow target scaled back to the view)
-        void composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bool smoothing);
+        void Composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bool smoothing);
 
     private:
-        SDL_GPUShader *createShader(const unsigned char *spv, size_t spvSize, const unsigned char *msl, size_t mslSize, int uniformBuffers);
-        SDL_GPURenderState *createState(SDL_GPUShader *shader);
-        void setState(SDL_GPURenderState *state);
-        void updateSpriteUniforms();
-        SDL_Texture *ensureTarget(SDL_Texture *&tex, int &curW, int &curH, int w, int h, SDL_ScaleMode mode);
+        SDL_GPUShader *CreateShader(const unsigned char *spv, size_t spvSize, const unsigned char *msl, size_t mslSize, int uniformBuffers);
+        SDL_GPURenderState *CreateState(SDL_GPUShader *shader);
+        void SetState(SDL_GPURenderState *state);
+        void UpdateSpriteUniforms();
+        SDL_Texture *EnsureTarget(SDL_Texture *&tex, int &curW, int &curH, int w, int h, SDL_ScaleMode mode);
 
         SDL_Renderer *m_renderer {nullptr};
         SDL_GPUDevice *m_device {nullptr};

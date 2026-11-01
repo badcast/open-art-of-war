@@ -10,7 +10,7 @@
 namespace OpenArtOfWar
 {
 
-    void Settings::clamp()
+    void Settings::Clamp()
     {
         constexpr int MaxResolution = 16384;
         windowMode = static_cast<WindowMode>(std::clamp(static_cast<int>(windowMode), 0, 2));
@@ -38,17 +38,17 @@ namespace OpenArtOfWar
             lastAddress.clear();
     }
 
-    std::string Settings::defaultPath()
+    std::string Settings::DefaultPath()
     {
-        return (std::filesystem::path(Assets::userDataDir()) / "settings.json").string();
+        return (std::filesystem::path(Assets::UserDataDir()) / "settings.json").string();
     }
 
-    bool Settings::save(const std::string &path) const
+    bool Settings::Save(const std::string &path) const
     {
         try
         {
             // Other parts of the game keep their own keys in this file (e.g. "environment"): leave them alone
-            nlohmann::json j = JsonFile::readObjectFromFileName(path);
+            nlohmann::json j = JsonFile::ReadObjectFromFileName(path);
             j["windowMode"] = static_cast<int>(windowMode);
             j["windowWidth"] = windowW;
             j["windowHeight"] = windowH;
@@ -75,7 +75,7 @@ namespace OpenArtOfWar
             j["lastAddress"] = lastAddress;
             j["difficulty"] = difficulty;
 
-            return JsonFile::writeAtomic(path, j);
+            return JsonFile::WriteAtomic(path, j);
         }
         catch(const std::exception &e)
         {
@@ -120,7 +120,7 @@ namespace OpenArtOfWar
             playerName = j.value("playerName", playerName);
             lastAddress = j.value("lastAddress", lastAddress);
             difficulty = j.value("difficulty", difficulty);
-            clamp();
+            Clamp();
             return true;
         }
         catch(const std::exception &e)

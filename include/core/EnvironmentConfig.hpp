@@ -18,18 +18,18 @@ namespace OpenArtOfWar
         // The path comes from assets/main.json (LoaderResources::environment())
         bool load(const std::string &assetPath = LoaderResources::environment());
         // Writes the runtime sections into settings.json if anything changed (atomically: temp file + rename)
-        bool save();
+        bool Save();
 
-        const nlohmann::json &root() const
+        const nlohmann::json &Root() const
         {
             return m_root;
         }
         // Section `name`; an empty object when it is missing
-        const nlohmann::json &section(const std::string &name) const;
+        const nlohmann::json &Section(const std::string &name) const;
         // Writable section, created on demand; marks the config as changed
-        nlohmann::json &edit(const std::string &name);
+        nlohmann::json &Edit(const std::string &name);
 
-        bool isDirty() const
+        bool IsDirty() const
         {
             return m_dirty;
         }

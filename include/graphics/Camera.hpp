@@ -11,45 +11,45 @@ namespace OpenArtOfWar
     public:
         Camera(int viewportW = DEFAULT_WINDOW_WIDTH, int viewportH = DEFAULT_WINDOW_HEIGHT);
 
-        void setViewport(int w, int h);
-        void setPosition(float x, float y);
-        void pan(float dx, float dy);
-        void setZoom(float newZoom, float pivotX = -1.0f, float pivotY = -1.0f);
+        void SetViewport(int w, int h);
+        void SetPosition(float x, float y);
+        void Pan(float dx, float dy);
+        void SetZoom(float newZoom, float pivotX = -1.0f, float pivotY = -1.0f);
         // Range the zoom stays in (the mouse wheel and setZoom); the current zoom is moved into it
-        void setZoomLimits(float minZoom, float maxZoom);
+        void SetZoomLimits(float minZoom, float maxZoom);
         // The same view at 1/divisor of the resolution (viewport and zoom divided, zoom limits do not apply)
-        Camera scaledDown(int divisor) const;
-        float getMinZoom() const
+        Camera ScaledDown(int divisor) const;
+        float GetMinZoom() const
         {
             return m_minZoom;
         }
-        float getMaxZoom() const
+        float GetMaxZoom() const
         {
             return m_maxZoom;
         }
-        void centerOn(float targetWorldX, float targetWorldY);
-        void clampToBounds(int mapWidthTiles, int mapHeightTiles);
+        void CenterOn(float targetWorldX, float targetWorldY);
+        void ClampToBounds(int mapWidthTiles, int mapHeightTiles);
 
-        void worldToScreen(float wx, float wy, float &sx, float &sy) const;
-        void screenToWorld(float sx, float sy, float &wx, float &wy) const;
+        void WorldToScreen(float wx, float wy, float &sx, float &sy) const;
+        void ScreenToWorld(float sx, float sy, float &wx, float &wy) const;
 
-        float getX() const
+        float GetX() const
         {
             return m_x;
         }
-        float getY() const
+        float GetY() const
         {
             return m_y;
         }
-        float getZoom() const
+        float GetZoom() const
         {
             return m_zoom;
         }
-        int getViewportWidth() const
+        int GetViewportWidth() const
         {
             return m_viewportW;
         }
-        int getViewportHeight() const
+        int GetViewportHeight() const
         {
             return m_viewportH;
         }

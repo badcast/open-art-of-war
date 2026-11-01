@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         testUserDir = std::filesystem::temp_directory_path() / "openaow-test-user";
         std::error_code ec;
         std::filesystem::remove_all(testUserDir, ec);
-        OpenArtOfWar::Assets::setUserDataDir(testUserDir.string());
+        OpenArtOfWar::Assets::SetUserDataDir(testUserDir.string());
     }
 
     // A changed render API rebuilds the whole window: run() returns and a fresh Application takes over
@@ -156,25 +156,25 @@ int main(int argc, char *argv[])
     do
     {
         OpenArtOfWar::Application app;
-        app.setRendererOverride(restart ? std::string() : rendererOverride);
-        app.setHeadless(testMode);
-        if(!app.init(1280, 720))
+        app.SetRendererOverride(restart ? std::string() : rendererOverride);
+        app.SetHeadless(testMode);
+        if(!app.Init(1280, 720))
         {
             std::cerr << "Engine initialization failed." << std::endl;
             return 1;
         }
-        app.setDebugMode(debugMode);
+        app.SetDebugMode(debugMode);
         if(testMapMode && !restart)
         {
-            app.launchTestMap();
+            app.LaunchTestMap();
         }
         // --map=<name> alone: a single-player custom game on that map (with --host / --server it is the match map)
         const bool netGame = netHost || !netJoin.empty() || (!netServer.empty() && (netServerCreate || !netServerCode.empty()));
         if(!restart && !testMapMode && !testMode && !netGame && !netMapName.empty())
-            app.launchMap(netMapName, fromScratch);
+            app.LaunchMap(netMapName, fromScratch);
         if(!restart && netHost)
         {
-            app.hostNetworkGame(netPort, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::netDefaultMap() : OpenArtOfWar::LoaderResources::mapPath(netMapName), netName, fromScratch);
+            app.HostNetworkGame(netPort, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap() : OpenArtOfWar::LoaderResources::MapPath(netMapName), netName, fromScratch);
             // --server too: the hosted game is listed there and reachable by its code
             if(!netServer.empty())
             {
@@ -186,11 +186,11 @@ int main(int argc, char *argv[])
                     port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
                     host.resize(colon);
                 }
-                app.announceNetworkGame(host, port);
+                app.AnnounceNetworkGame(host, port);
             }
         }
         if(!restart && !netJoin.empty())
-            app.joinNetworkGame(netJoin, netPort, netName);
+            app.JoinNetworkGame(netJoin, netPort, netName);
         if(!restart && !netServer.empty() && (netServerCreate || !netServerCode.empty()))
         {
             std::string host = netServer;
@@ -201,13 +201,13 @@ int main(int argc, char *argv[])
                 port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
                 host.resize(colon);
             }
-            app.serverNetworkGame(host, port, netServerCreate ? std::string() : netServerCode, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::netDefaultMap() : OpenArtOfWar::LoaderResources::mapPath(netMapName), netName, fromScratch);
+            app.ServerNetworkGame(host, port, netServerCreate ? std::string() : netServerCode, netPlayers, netMapName.empty() ? OpenArtOfWar::LoaderResources::NetDefaultMap() : OpenArtOfWar::LoaderResources::MapPath(netMapName), netName, fromScratch);
         }
 
 #if defined(AOW_DEBUG)
         if(testMode)
         {
-            bool ok = app.runHeadlessTest(200);
+            bool ok = app.RunHeadlessTest(200);
             std::cout << "Headless test result: " << (ok ? "SUCCESS" : "FAILED") << std::endl;
             std::error_code ec;
             std::filesystem::remove_all(testUserDir, ec);
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
 #endif
 
         app.run();
-        restart = app.restartRequested();
+        restart = app.RestartRequested();
     } while(restart);
     std::cout << "Engine shut down cleanly." << std::endl;
     return 0;

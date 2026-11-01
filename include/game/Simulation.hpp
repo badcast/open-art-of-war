@@ -60,47 +60,47 @@ namespace OpenArtOfWar
 
         // A new match / mission. `seed` starts the gameplay random numbers (shot spread, damage rolls, ...):
         // every peer of a network game uses the host's seed, so they all roll the same numbers.
-        void reset(uint32_t seed = kDefaultSeed);
+        void Reset(uint32_t seed = kDefaultSeed);
 
         // A match of several players: seeds the random numbers and gives every other player an economy
         // (the local player's is SimContext::economy)
         void startMatch(const MatchSetup &setup);
         // The economy of a player in this tick
-        Economy &economyOf(PlayerId player, SimContext &ctx);
+        Economy &EconomyOf(PlayerId player, SimContext &ctx);
         // Income, power and production of every economy (the local one too), in slot order
-        void updateEconomies(float dt, SimContext &ctx);
+        void UpdateEconomies(float dt, SimContext &ctx);
 
         // From the interface: applied on the next tick that runs (the current one when issued before it).
         // In a network game the sink takes it instead (it goes to the host and comes back in a turn).
-        void issue(SimCommand command);
-        void setCommandSink(std::function<void(SimCommand)> sink)
+        void Issue(SimCommand command);
+        void SetCommandSink(std::function<void(SimCommand)> sink)
         {
             m_sink = std::move(sink);
         }
         // Turn bundle of a network game: applied on `tick`
-        void schedule(uint32_t tick, SimCommand command);
+        void Schedule(uint32_t tick, SimCommand command);
 
         // One tick: due commands in a fixed order, then the research timers
-        void applyCommands(SimContext &ctx);
-        void updateResearch(float dt, SimContext &ctx);
+        void ApplyCommands(SimContext &ctx);
+        void UpdateResearch(float dt, SimContext &ctx);
         // The marching control groups of every player
-        void updateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints);
-        void endTick()
+        void UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints);
+        void EndTick()
         {
             ++m_tick;
         }
 
-        uint32_t tick() const
+        uint32_t Tick() const
         {
             return m_tick;
         }
 
         // Per player (out-of-range ids get player 0's, never used by the game)
-        AISquadController &squads(PlayerId player)
+        AISquadController &Squads(PlayerId player)
         {
             return m_squads[player % kMaxPlayers];
         }
-        const AISquadController &squads(PlayerId player) const
+        const AISquadController &Squads(PlayerId player) const
         {
             return m_squads[player % kMaxPlayers];
         }
@@ -109,10 +109,10 @@ namespace OpenArtOfWar
             return m_research[player % kMaxPlayers];
         }
 
-        std::vector<SimEvent> takeEvents();
+        std::vector<SimEvent> TakeEvents();
 
         // Every applied command with its tick (a replay of the match)
-        void setRecording(bool on)
+        void SetRecording(bool on)
         {
             m_recording = on;
         }
@@ -122,16 +122,16 @@ namespace OpenArtOfWar
         }
 
         // 64-bit checksum of the world: equal on every peer of a network game as long as they are in sync
-        uint64_t checksum(const SimContext &ctx) const;
+        uint64_t Checksum(const SimContext &ctx) const;
 
         // Settings of the player-commanded marches (shared by every side)
-        static const AITacticsConfig &groupTactics();
+        static const AITacticsConfig &GroupTactics();
 
     private:
-        void apply(const SimCommand &cmd, SimContext &ctx);
+        void Apply(const SimCommand &cmd, SimContext &ctx);
         // Units of `cmd` that its issuer may command and that can take an order
-        std::vector<int> ownUnits(const SimCommand &cmd, const SimContext &ctx) const;
-        bool marchAsGroup(PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx);
+        std::vector<int> OwnUnits(const SimCommand &cmd, const SimContext &ctx) const;
+        bool MarchAsGroup(PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx);
 
         uint32_t m_tick {0};
         std::vector<TimedCommand> m_pending;

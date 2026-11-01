@@ -30,7 +30,7 @@ namespace OpenArtOfWar
                 {{15, 21, 31, 246}, {22, 31, 46, 255}, {10, 14, 22, 255}, {44, 62, 90, 255}, {70, 98, 136, 255}, {29, 41, 60, 255}, {88, 166, 238, 255}, {28, 70, 122, 255}, {6, 14, 26, 255}},
             };
 
-            SDL_Color readColor(const YAML::Node &n, const char *key, SDL_Color fallback)
+            SDL_Color ReadColor(const YAML::Node &n, const char *key, SDL_Color fallback)
             {
                 try
                 {
@@ -45,7 +45,7 @@ namespace OpenArtOfWar
 
         } // namespace
 
-        bool loadTheme(const std::string &yamlText)
+        bool LoadTheme(const std::string &yamlText)
         {
             try
             {
@@ -57,26 +57,26 @@ namespace OpenArtOfWar
                 {
                     const YAML::Node n = root["themes"] ? root["themes"][names[i]] : YAML::Node();
                     Theme &t = g_themes[i];
-                    t.panel = readColor(n, "panel", t.panel);
-                    t.raised = readColor(n, "panel_raised", t.raised);
-                    t.sunken = readColor(n, "panel_sunken", t.sunken);
-                    t.border = readColor(n, "border", t.border);
-                    t.borderStrong = readColor(n, "border_strong", t.borderStrong);
-                    t.hover = readColor(n, "hover", t.hover);
-                    t.accent = readColor(n, "accent", t.accent);
-                    t.accentDeep = readColor(n, "accent_deep", t.accentDeep);
-                    t.accentText = readColor(n, "accent_text", t.accentText);
+                    t.panel = ReadColor(n, "panel", t.panel);
+                    t.raised = ReadColor(n, "panel_raised", t.raised);
+                    t.sunken = ReadColor(n, "panel_sunken", t.sunken);
+                    t.border = ReadColor(n, "border", t.border);
+                    t.borderStrong = ReadColor(n, "border_strong", t.borderStrong);
+                    t.hover = ReadColor(n, "hover", t.hover);
+                    t.accent = ReadColor(n, "accent", t.accent);
+                    t.accentDeep = ReadColor(n, "accent_deep", t.accentDeep);
+                    t.accentText = ReadColor(n, "accent_text", t.accentText);
                 }
                 const YAML::Node c = root["colors"];
-                color::Backdrop = readColor(c, "backdrop", color::Backdrop);
-                color::Scrim = readColor(c, "scrim", color::Scrim);
-                color::Text = readColor(c, "text", color::Text);
-                color::TextDim = readColor(c, "text_dim", color::TextDim);
-                color::TextMuted = readColor(c, "text_muted", color::TextMuted);
-                color::Danger = readColor(c, "danger", color::Danger);
-                color::DangerDeep = readColor(c, "danger_deep", color::DangerDeep);
-                color::Ok = readColor(c, "ok", color::Ok);
-                color::Info = readColor(c, "info", color::Info);
+                color::Backdrop = ReadColor(c, "backdrop", color::Backdrop);
+                color::Scrim = ReadColor(c, "scrim", color::Scrim);
+                color::Text = ReadColor(c, "text", color::Text);
+                color::TextDim = ReadColor(c, "text_dim", color::TextDim);
+                color::TextMuted = ReadColor(c, "text_muted", color::TextMuted);
+                color::Danger = ReadColor(c, "danger", color::Danger);
+                color::DangerDeep = ReadColor(c, "danger_deep", color::DangerDeep);
+                color::Ok = ReadColor(c, "ok", color::Ok);
+                color::Info = ReadColor(c, "info", color::Info);
                 return true;
             }
             catch(...)
@@ -85,7 +85,7 @@ namespace OpenArtOfWar
             }
         }
 
-        void applyTheme(Faction faction, const SDL_Color *army)
+        void ApplyTheme(Faction faction, const SDL_Color *army)
         {
             Theme t = faction == Faction::Resistance ? g_themes[1] : faction == Faction::Confederation ? g_themes[2] : g_themes[0];
             if(army)
@@ -95,15 +95,15 @@ namespace OpenArtOfWar
                 const SDL_Color black {0, 0, 0, 255};
                 const float luma = 0.299f * a.r + 0.587f * a.g + 0.114f * a.b;
                 t.accent = {a.r, a.g, a.b, 255};
-                t.accentDeep = mix(a, black, 0.55f);
+                t.accentDeep = Mix(a, black, 0.55f);
                 t.accentDeep.a = 255;
                 t.accentText = luma > 140.0f ? SDL_Color {20, 16, 10, 255} : SDL_Color {245, 245, 245, 255};
-                t.panel = mix(t.panel, a, 0.07f);
-                t.raised = mix(t.raised, a, 0.08f);
-                t.sunken = mix(t.sunken, a, 0.05f);
-                t.border = mix(t.border, a, 0.30f);
-                t.borderStrong = mix(t.borderStrong, a, 0.45f);
-                t.hover = mix(t.hover, a, 0.14f);
+                t.panel = Mix(t.panel, a, 0.07f);
+                t.raised = Mix(t.raised, a, 0.08f);
+                t.sunken = Mix(t.sunken, a, 0.05f);
+                t.border = Mix(t.border, a, 0.30f);
+                t.borderStrong = Mix(t.borderStrong, a, 0.45f);
+                t.hover = Mix(t.hover, a, 0.14f);
                 t.panel.a = 246;
             }
             color::Panel = t.panel;
@@ -117,71 +117,71 @@ namespace OpenArtOfWar
             color::AccentText = t.accentText;
         }
 
-        SDL_Color withAlpha(SDL_Color c, Uint8 a)
+        SDL_Color WithAlpha(SDL_Color c, Uint8 a)
         {
             c.a = a;
             return c;
         }
 
-        SDL_Color mix(SDL_Color a, SDL_Color b, float t)
+        SDL_Color Mix(SDL_Color a, SDL_Color b, float t)
         {
             t = std::clamp(t, 0.0f, 1.0f);
             auto lerp = [t](Uint8 x, Uint8 y) { return static_cast<Uint8>(x + (y - x) * t); };
             return {lerp(a.r, b.r), lerp(a.g, b.g), lerp(a.b, b.b), lerp(a.a, b.a)};
         }
 
-        void fillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Color bottom)
+        void FillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Color bottom)
         {
             if(rect.h <= 0 || rect.w <= 0)
                 return;
             for(int i = 0; i < rect.h; ++i)
             {
                 float t = (rect.h > 1) ? static_cast<float>(i) / static_cast<float>(rect.h - 1) : 0.0f;
-                SDL_Color c = mix(top, bottom, t);
-                r.drawLineScreen(rect.x, rect.y + i, rect.x + rect.w - 1, rect.y + i, c);
+                SDL_Color c = Mix(top, bottom, t);
+                r.DrawLineScreen(rect.x, rect.y + i, rect.x + rect.w - 1, rect.y + i, c);
             }
         }
 
-        void fillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right)
+        void FillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right)
         {
             if(rect.h <= 0 || rect.w <= 0)
                 return;
             for(int i = 0; i < rect.w; ++i)
             {
                 float t = (rect.w > 1) ? static_cast<float>(i) / static_cast<float>(rect.w - 1) : 0.0f;
-                SDL_Color c = mix(left, right, t);
-                r.drawLineScreen(rect.x + i, rect.y, rect.x + i, rect.y + rect.h - 1, c);
+                SDL_Color c = Mix(left, right, t);
+                r.DrawLineScreen(rect.x + i, rect.y, rect.x + i, rect.y + rect.h - 1, c);
             }
         }
 
-        void drawPanel(Renderer &r, const UiRect &rect, SDL_Color fill, SDL_Color border)
+        void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill, SDL_Color border)
         {
-            r.fillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
-            r.drawLineScreen(rect.x + 1, rect.y + 1, rect.right() - 2, rect.y + 1, {255, 255, 255, 14});
-            r.drawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
+            r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
+            r.DrawLineScreen(rect.x + 1, rect.y + 1, rect.Right() - 2, rect.y + 1, {255, 255, 255, 14});
+            r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
         }
 
-        UiRect drawDialog(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, const std::string &title)
+        UiRect DrawDialog(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, const std::string &title)
         {
-            r.fillRectScreen(0, 0, windowW, windowH, color::Scrim);
+            r.FillRectScreen(0, 0, windowW, windowH, color::Scrim);
 
             // Soft drop shadow
-            r.fillRectScreen(rect.x + 6, rect.y + 8, rect.w, rect.h, {0, 0, 0, 90});
-            drawPanel(r, rect, color::Panel, color::BorderStrong);
+            r.FillRectScreen(rect.x + 6, rect.y + 8, rect.w, rect.h, {0, 0, 0, 90});
+            DrawPanel(r, rect, color::Panel, color::BorderStrong);
 
             const int titleH = 52;
-            fillVerticalGradient(r, {rect.x + 1, rect.y + 1, rect.w - 2, titleH - 1}, color::PanelRaised, color::Panel);
-            r.fillRectScreen(rect.x + 1, rect.y + titleH, rect.w - 2, 1, color::Border);
-            r.fillRectScreen(rect.x + 20, rect.y + titleH - 1, 56, 2, color::Accent);
-            font.drawString(fitText(font, title, FONT_H2, rect.w - 40), rect.x + 20, rect.y + 14, FONT_H2, color::Text, false);
+            FillVerticalGradient(r, {rect.x + 1, rect.y + 1, rect.w - 2, titleH - 1}, color::PanelRaised, color::Panel);
+            r.FillRectScreen(rect.x + 1, rect.y + titleH, rect.w - 2, 1, color::Border);
+            r.FillRectScreen(rect.x + 20, rect.y + titleH - 1, 56, 2, color::Accent);
+            font.DrawString(FitText(font, title, FONT_H2, rect.w - 40), rect.x + 20, rect.y + 14, FONT_H2, color::Text, false);
 
             return {rect.x + 20, rect.y + titleH + 16, rect.w - 40, rect.h - titleH - 32};
         }
 
-        void drawButton(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &label, ButtonStyle style, bool hovered, bool enabled)
+        void DrawButton(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &label, ButtonStyle style, bool hovered, bool enabled)
         {
             if(hovered && enabled)
-                SoundRequests::markHover();
+                SoundRequests::MarkHover();
             SDL_Color fill = color::PanelRaised;
             SDL_Color border = color::Border;
             SDL_Color text = color::Text;
@@ -215,96 +215,96 @@ namespace OpenArtOfWar
                 text = color::TextMuted;
             }
 
-            r.fillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
+            r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
             if(border.a > 0)
-                r.drawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
-            std::string shown = fitText(font, label, FONT_BODY_BOLD, rect.w - 16);
-            font.drawString(shown, rect.centerX(), rect.centerY(), FONT_BODY_BOLD, text, style != ButtonStyle::Primary, Anchor::HCENTER | Anchor::VCENTER);
+                r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
+            std::string shown = FitText(font, label, FONT_BODY_BOLD, rect.w - 16);
+            font.DrawString(shown, rect.CenterX(), rect.CenterY(), FONT_BODY_BOLD, text, style != ButtonStyle::Primary, Anchor::HCENTER | Anchor::VCENTER);
         }
 
-        void drawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor)
+        void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor)
         {
-            r.fillRectScreen(rect.x, rect.y, rect.w, rect.h, color::PanelSunken);
+            r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, color::PanelSunken);
             int fw = static_cast<int>((rect.w - 2) * std::clamp(ratio, 0.0f, 1.0f));
             if(fw > 0)
-                r.fillRectScreen(rect.x + 1, rect.y + 1, fw, rect.h - 2, fillColor);
-            r.drawRectScreen(rect.x, rect.y, rect.w, rect.h, color::Border);
+                r.FillRectScreen(rect.x + 1, rect.y + 1, fw, rect.h - 2, fillColor);
+            r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, color::Border);
         }
 
         namespace
         {
-            UiRect confirmDialogRect(int windowW, int windowH)
+            UiRect ConfirmDialogRect(int windowW, int windowH)
             {
-                return centeredRect(windowW, windowH, 520, 230);
+                return CenteredRect(windowW, windowH, 520, 230);
             }
-            UiRect confirmYes(const UiRect &d)
+            UiRect ConfirmYes(const UiRect &d)
             {
-                return {d.x + 24, d.bottom() - 64, (d.w - 60) / 2, 40};
+                return {d.x + 24, d.Bottom() - 64, (d.w - 60) / 2, 40};
             }
-            UiRect confirmNo(const UiRect &d)
+            UiRect ConfirmNo(const UiRect &d)
             {
-                return {d.right() - 24 - (d.w - 60) / 2, d.bottom() - 64, (d.w - 60) / 2, 40};
+                return {d.Right() - 24 - (d.w - 60) / 2, d.Bottom() - 64, (d.w - 60) / 2, 40};
             }
         } // namespace
 
-        int confirmUpdate(const ConfirmState &state, int windowW, int windowH, int mx, int my, bool clicked, bool enterPressed, bool escPressed)
+        int ConfirmUpdate(const ConfirmState &state, int windowW, int windowH, int mx, int my, bool clicked, bool enterPressed, bool escPressed)
         {
             if(!state.open)
                 return -1;
-            const UiRect d = confirmDialogRect(windowW, windowH);
-            if(enterPressed || (clicked && confirmYes(d).contains(mx, my)))
+            const UiRect d = ConfirmDialogRect(windowW, windowH);
+            if(enterPressed || (clicked && ConfirmYes(d).Contains(mx, my)))
                 return 1;
-            if(escPressed || (clicked && confirmNo(d).contains(mx, my)))
+            if(escPressed || (clicked && ConfirmNo(d).Contains(mx, my)))
                 return 0;
             return -1;
         }
 
-        void drawConfirm(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my)
+        void DrawConfirm(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my)
         {
             if(!state.open)
                 return;
-            const UiRect d = confirmDialogRect(windowW, windowH);
-            const UiRect content = drawDialog(r, font, windowW, windowH, d, state.title);
-            font.drawTextWrapped(state.text, content.x + 24, content.y + 18, content.w - 48, FONT_BODY, color::Text, false);
-            drawButton(r, font, confirmYes(d), _("YES"), ButtonStyle::Danger, confirmYes(d).contains(mx, my));
-            drawButton(r, font, confirmNo(d), _("NO"), ButtonStyle::Secondary, confirmNo(d).contains(mx, my));
+            const UiRect d = ConfirmDialogRect(windowW, windowH);
+            const UiRect content = DrawDialog(r, font, windowW, windowH, d, state.title);
+            font.DrawTextWrapped(state.text, content.x + 24, content.y + 18, content.w - 48, FONT_BODY, color::Text, false);
+            DrawButton(r, font, ConfirmYes(d), _("YES"), ButtonStyle::Danger, ConfirmYes(d).Contains(mx, my));
+            DrawButton(r, font, ConfirmNo(d), _("NO"), ButtonStyle::Secondary, ConfirmNo(d).Contains(mx, my));
         }
 
-        void drawComboField(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &value, bool open, bool hovered, bool enabled, SDL_Color valueColor)
+        void DrawComboField(Renderer &r, BitmapFontRenderer &font, const UiRect &rect, const std::string &value, bool open, bool hovered, bool enabled, SDL_Color valueColor)
         {
             if(hovered && enabled)
-                SoundRequests::markHover();
+                SoundRequests::MarkHover();
             const SDL_Color fill = !enabled ? color::PanelSunken : (open || hovered) ? color::Hover : color::PanelRaised;
-            r.fillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
-            r.drawRectScreen(rect.x, rect.y, rect.w, rect.h, open ? color::Accent : (hovered && enabled ? color::BorderStrong : color::Border));
+            r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
+            r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, open ? color::Accent : (hovered && enabled ? color::BorderStrong : color::Border));
             const bool narrow = rect.w < 100; // a cell of a table
-            font.drawString(fitText(font, value, FONT_BODY, rect.w - (narrow ? 26 : 40)), rect.x + (narrow ? 6 : 12), rect.centerY(), FONT_BODY, enabled ? valueColor : color::TextMuted, false, Anchor::LEFT | Anchor::VCENTER);
+            font.DrawString(FitText(font, value, FONT_BODY, rect.w - (narrow ? 26 : 40)), rect.x + (narrow ? 6 : 12), rect.CenterY(), FONT_BODY, enabled ? valueColor : color::TextMuted, false, Anchor::LEFT | Anchor::VCENTER);
             // The arrow: a small triangle, pointing up while the list is open
             const SDL_Color arrow = enabled ? (open ? color::Accent : color::TextDim) : color::TextMuted;
-            const int ax = rect.right() - (narrow ? 11 : 20), ay = rect.centerY();
+            const int ax = rect.Right() - (narrow ? 11 : 20), ay = rect.CenterY();
             for(int i = 0; i < 5; ++i)
             {
                 const int half = open ? i : 4 - i;
-                r.fillRectScreen(ax - half, ay - 3 + i, half * 2 + 1, 1, arrow);
+                r.FillRectScreen(ax - half, ay - 3 + i, half * 2 + 1, 1, arrow);
             }
         }
 
-        UiRect comboListRect(const UiRect &field, int itemCount, int windowH)
+        UiRect ComboListRect(const UiRect &field, int itemCount, int windowH)
         {
             const int visible = std::clamp(itemCount, 1, kComboMaxVisible);
             const int h = visible * kComboItemH + 4;
-            int y = field.bottom() + 2;
+            int y = field.Bottom() + 2;
             if(y + h > windowH - 8)
                 y = std::max(8, field.y - 2 - h);
             return {field.x, y, std::max(field.w, kComboMinListW), h};
         }
 
-        void drawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY, const std::vector<bool> *disabled)
+        void DrawComboList(Renderer &r, BitmapFontRenderer &font, const UiRect &field, const std::vector<std::string> &items, int current, const ComboState &state, int windowH, int mouseX, int mouseY, const std::vector<bool> *disabled)
         {
             const int n = static_cast<int>(items.size());
-            const UiRect list = comboListRect(field, n, windowH);
-            r.fillRectScreen(list.x, list.y, list.w, list.h, color::PanelRaised);
-            r.drawRectScreen(list.x, list.y, list.w, list.h, color::Accent);
+            const UiRect list = ComboListRect(field, n, windowH);
+            r.FillRectScreen(list.x, list.y, list.w, list.h, color::PanelRaised);
+            r.DrawRectScreen(list.x, list.y, list.w, list.h, color::Accent);
             const int visible = std::min(n, kComboMaxVisible);
             for(int row = 0; row < visible; ++row)
             {
@@ -313,42 +313,42 @@ namespace OpenArtOfWar
                     break;
                 const UiRect item {list.x + 2, list.y + 2 + row * kComboItemH, list.w - (n > visible ? 10 : 4), kComboItemH};
                 const bool off = disabled && static_cast<size_t>(i) < disabled->size() && (*disabled)[static_cast<size_t>(i)] && i != current;
-                const bool hot = item.contains(mouseX, mouseY) && !off;
+                const bool hot = item.Contains(mouseX, mouseY) && !off;
                 if(hot)
-                    SoundRequests::markHover();
+                    SoundRequests::MarkHover();
                 if(i == current)
-                    r.fillRectScreen(item.x, item.y, item.w, item.h, color::AccentDeep);
+                    r.FillRectScreen(item.x, item.y, item.w, item.h, color::AccentDeep);
                 else if(hot)
-                    r.fillRectScreen(item.x, item.y, item.w, item.h, color::Hover);
+                    r.FillRectScreen(item.x, item.y, item.w, item.h, color::Hover);
                 const SDL_Color textColor = i == current ? color::Accent : (off ? color::TextMuted : color::Text);
-                font.drawString(fitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - 20), item.x + 10, item.centerY(), FONT_BODY, textColor, false, Anchor::LEFT | Anchor::VCENTER);
+                font.DrawString(FitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - 20), item.x + 10, item.CenterY(), FONT_BODY, textColor, false, Anchor::LEFT | Anchor::VCENTER);
             }
             if(n > visible)
             { // a thin scroll bar for a long list
                 const int trackH = list.h - 4;
                 const int thumbH = std::max(16, trackH * visible / n);
                 const int thumbY = list.y + 2 + (trackH - thumbH) * state.scroll / std::max(1, n - visible);
-                r.fillRectScreen(list.right() - 8, list.y + 2, 5, trackH, color::PanelSunken);
-                r.fillRectScreen(list.right() - 8, thumbY, 5, thumbH, color::BorderStrong);
+                r.FillRectScreen(list.Right() - 8, list.y + 2, 5, trackH, color::PanelSunken);
+                r.FillRectScreen(list.Right() - 8, thumbY, 5, thumbH, color::BorderStrong);
             }
         }
 
-        bool comboUpdate(ComboState &state, const UiRect &field, int itemCount, int windowH, int mx, int my, bool clicked, int wheel, int &picked)
+        bool ComboUpdate(ComboState &state, const UiRect &field, int itemCount, int windowH, int mx, int my, bool clicked, int wheel, int &picked)
         {
             picked = -1;
             if(state.open < 0)
                 return false;
-            const UiRect list = comboListRect(field, itemCount, windowH);
+            const UiRect list = ComboListRect(field, itemCount, windowH);
             const int visible = std::min(itemCount, kComboMaxVisible);
             state.scroll = std::clamp(state.scroll, 0, std::max(0, itemCount - visible));
-            if(wheel != 0 && (list.contains(mx, my) || field.contains(mx, my)))
+            if(wheel != 0 && (list.Contains(mx, my) || field.Contains(mx, my)))
             {
                 state.scroll = std::clamp(state.scroll - wheel, 0, std::max(0, itemCount - visible));
                 return true;
             }
             if(!clicked)
                 return false;
-            if(list.contains(mx, my))
+            if(list.Contains(mx, my))
             {
                 const int row = (my - list.y - 2) / kComboItemH;
                 const int index = state.scroll + row;
@@ -360,34 +360,34 @@ namespace OpenArtOfWar
             return true;
         }
 
-        void drawLoadingScreen(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const std::string &title, const std::string &status, float progress, Uint32 ticks, SDL_Texture *preview, int previewW, int previewH)
+        void DrawLoadingScreen(Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const std::string &title, const std::string &status, float progress, Uint32 ticks, SDL_Texture *preview, int previewW, int previewH)
         {
-            fillVerticalGradient(r, {0, 0, windowW, windowH}, mix(color::Backdrop, color::PanelRaised, 0.55f), color::Backdrop);
+            FillVerticalGradient(r, {0, 0, windowW, windowH}, Mix(color::Backdrop, color::PanelRaised, 0.55f), color::Backdrop);
             const int cx = windowW / 2, cy = windowH / 2;
 
             if(preview && previewW > 0 && previewH > 0)
             {
                 // A map is loading: its name on top, its picture in the middle, the bar and the state under it
-                font.drawString(fitText(font, title, FONT_H1, windowW - 80), cx, 56, FONT_H1, color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
-                r.fillRectScreen(cx - 60, 86, 120, 3, color::Accent);
+                font.DrawString(FitText(font, title, FONT_H1, windowW - 80), cx, 56, FONT_H1, color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
+                r.FillRectScreen(cx - 60, 86, 120, 3, color::Accent);
                 const int maxW = std::min(windowW - 120, 640), maxH = std::max(120, windowH - 300);
                 const float scale = std::min(static_cast<float>(maxW) / previewW, static_cast<float>(maxH) / previewH);
                 const int w = std::max(1, static_cast<int>(previewW * scale)), h = std::max(1, static_cast<int>(previewH * scale));
                 const UiRect frame {cx - w / 2 - 6, 110, w + 12, h + 12};
-                r.fillRectScreen(frame.x, frame.y, frame.w, frame.h, color::PanelSunken);
-                r.drawRectScreen(frame.x, frame.y, frame.w, frame.h, color::BorderStrong);
+                r.FillRectScreen(frame.x, frame.y, frame.w, frame.h, color::PanelSunken);
+                r.DrawRectScreen(frame.x, frame.y, frame.w, frame.h, color::BorderStrong);
                 const SDL_FRect dst {static_cast<float>(frame.x + 6), static_cast<float>(frame.y + 6), static_cast<float>(w), static_cast<float>(h)};
-                SDL_RenderTexture(r.getSDLRenderer(), preview, nullptr, &dst);
+                SDL_RenderTexture(r.GetSdlRenderer(), preview, nullptr, &dst);
                 const int barW = std::min(frame.w, 640), barH = 8;
-                const UiRect bar {cx - barW / 2, frame.bottom() + 32, barW, barH};
-                r.fillRectScreen(bar.x, bar.y, bar.w, bar.h, color::PanelSunken);
+                const UiRect bar {cx - barW / 2, frame.Bottom() + 32, barW, barH};
+                r.FillRectScreen(bar.x, bar.y, bar.w, bar.h, color::PanelSunken);
                 if(progress >= 0.0f)
                 {
                     const int fw = static_cast<int>((bar.w - 2) * std::clamp(progress, 0.0f, 1.0f));
                     if(fw > 0)
-                        fillHorizontalGradient(r, {bar.x + 1, bar.y + 1, fw, bar.h - 2}, color::AccentDeep, color::Accent);
+                        FillHorizontalGradient(r, {bar.x + 1, bar.y + 1, fw, bar.h - 2}, color::AccentDeep, color::Accent);
                 }
-                r.drawRectScreen(bar.x, bar.y, bar.w, bar.h, color::Border);
+                r.DrawRectScreen(bar.x, bar.y, bar.w, bar.h, color::Border);
                 // The turning ring beside the state text
                 const int head = static_cast<int>((ticks / 90) % 12);
                 const int tx = cx - 90;
@@ -395,15 +395,15 @@ namespace OpenArtOfWar
                 {
                     const float a = 2.0f * static_cast<float>(M_PI) * static_cast<float>(i) / 12 - static_cast<float>(M_PI) * 0.5f;
                     const Uint8 alpha = static_cast<Uint8>(255 - ((head - i + 12) % 12) * 19);
-                    r.fillRectScreen(tx + static_cast<int>(std::cos(a) * 9.0f) - 1, bar.y + 34 + static_cast<int>(std::sin(a) * 9.0f) - 1, 3, 3, withAlpha(color::Accent, alpha));
+                    r.FillRectScreen(tx + static_cast<int>(std::cos(a) * 9.0f) - 1, bar.y + 34 + static_cast<int>(std::sin(a) * 9.0f) - 1, 3, 3, WithAlpha(color::Accent, alpha));
                 }
-                font.drawString(fitText(font, status, FONT_BODY, windowW - 200), cx - 66, bar.y + 34, FONT_BODY, color::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
+                font.DrawString(FitText(font, status, FONT_BODY, windowW - 200), cx - 66, bar.y + 34, FONT_BODY, color::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
                 return;
             }
 
             // The name of the game, with an accent line under it
-            font.drawString(title, cx, cy - 96, FONT_HERO, color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
-            r.fillRectScreen(cx - 60, cy - 58, 120, 3, color::Accent);
+            font.DrawString(title, cx, cy - 96, FONT_HERO, color::Text, true, Anchor::HCENTER | Anchor::VCENTER);
+            r.FillRectScreen(cx - 60, cy - 58, 120, 3, color::Accent);
 
             // Turning indicator: a ring of squares, the head bright and a tail fading behind it
             constexpr int kDots = 12;
@@ -414,18 +414,18 @@ namespace OpenArtOfWar
                 const int behind = (head - i + kDots) % kDots;
                 const Uint8 alpha = static_cast<Uint8>(255 - behind * 19);
                 const int px = cx + static_cast<int>(std::cos(a) * 20.0f) - 2, py = cy - 8 + static_cast<int>(std::sin(a) * 20.0f) - 2;
-                r.fillRectScreen(px, py, 5, 5, withAlpha(color::Accent, alpha));
+                r.FillRectScreen(px, py, 5, 5, WithAlpha(color::Accent, alpha));
             }
 
             // Progress bar
             const int barW = std::min(440, windowW * 6 / 10), barH = 8;
             const UiRect bar {cx - barW / 2, cy + 44, barW, barH};
-            r.fillRectScreen(bar.x, bar.y, bar.w, bar.h, color::PanelSunken);
+            r.FillRectScreen(bar.x, bar.y, bar.w, bar.h, color::PanelSunken);
             if(progress >= 0.0f)
             {
                 const int fw = static_cast<int>((bar.w - 2) * std::clamp(progress, 0.0f, 1.0f));
                 if(fw > 0)
-                    fillHorizontalGradient(r, {bar.x + 1, bar.y + 1, fw, bar.h - 2}, color::AccentDeep, color::Accent);
+                    FillHorizontalGradient(r, {bar.x + 1, bar.y + 1, fw, bar.h - 2}, color::AccentDeep, color::Accent);
             }
             else
             {
@@ -434,29 +434,29 @@ namespace OpenArtOfWar
                 const float t = static_cast<float>(ticks % 1600) / 800.0f;
                 const float pos = t < 1.0f ? t : 2.0f - t;
                 const int sx = bar.x + 1 + static_cast<int>((bar.w - 2 - seg) * pos);
-                fillHorizontalGradient(r, {sx, bar.y + 1, seg, bar.h - 2}, color::AccentDeep, color::Accent);
+                FillHorizontalGradient(r, {sx, bar.y + 1, seg, bar.h - 2}, color::AccentDeep, color::Accent);
             }
-            r.drawRectScreen(bar.x, bar.y, bar.w, bar.h, color::Border);
+            r.DrawRectScreen(bar.x, bar.y, bar.w, bar.h, color::Border);
 
             // What is going on
-            font.drawString(fitText(font, status, FONT_BODY, windowW - 80), cx, bar.y + 34, FONT_BODY, color::TextDim, false, Anchor::HCENTER | Anchor::VCENTER);
+            font.DrawString(FitText(font, status, FONT_BODY, windowW - 80), cx, bar.y + 34, FONT_BODY, color::TextDim, false, Anchor::HCENTER | Anchor::VCENTER);
             if(progress >= 0.0f)
             {
-                font.drawString(std::to_string(static_cast<int>(std::clamp(progress, 0.0f, 1.0f) * 100.0f + 0.5f)) + "%", cx, bar.y - 14, FONT_SMALL_BOLD, color::TextMuted, false, Anchor::HCENTER | Anchor::VCENTER);
+                font.DrawString(std::to_string(static_cast<int>(std::clamp(progress, 0.0f, 1.0f) * 100.0f + 0.5f)) + "%", cx, bar.y - 14, FONT_SMALL_BOLD, color::TextMuted, false, Anchor::HCENTER | Anchor::VCENTER);
             }
         }
 
-        void drawCaption(BitmapFontRenderer &font, Renderer &r, int x, int y, const std::string &text, SDL_Color tick)
+        void DrawCaption(BitmapFontRenderer &font, Renderer &r, int x, int y, const std::string &text, SDL_Color tick)
         {
-            r.fillRectScreen(x, y + 3, 3, 10, tick);
-            font.drawString(text, x + 9, y, FONT_SMALL_BOLD, color::TextDim, false);
+            r.FillRectScreen(x, y + 3, 3, 10, tick);
+            font.DrawString(text, x + 9, y, FONT_SMALL_BOLD, color::TextDim, false);
         }
 
-        std::string fitText(const BitmapFontRenderer &font, const std::string &text, int scale, int maxWidth)
+        std::string FitText(const BitmapFontRenderer &font, const std::string &text, int scale, int maxWidth)
         {
             if(maxWidth <= 0)
                 return {};
-            if(font.getTextWidth(text, scale) <= maxWidth)
+            if(font.GetTextWidth(text, scale) <= maxWidth)
                 return text;
 
             static const std::string kEllipsis = "\xE2\x80\xA6";
@@ -468,13 +468,13 @@ namespace OpenArtOfWar
                 while(cut > 0 && (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80)
                     --cut;
                 s.erase(cut);
-                if(font.getTextWidth(s + kEllipsis, scale) <= maxWidth)
+                if(font.GetTextWidth(s + kEllipsis, scale) <= maxWidth)
                     return s + kEllipsis;
             }
             return {};
         }
 
-        UiRect centeredRect(int windowW, int windowH, int w, int h, int margin)
+        UiRect CenteredRect(int windowW, int windowH, int w, int h, int margin)
         {
             w = std::min(w, windowW - 2 * margin);
             h = std::min(h, windowH - 2 * margin);

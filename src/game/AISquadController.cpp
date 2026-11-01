@@ -18,48 +18,48 @@ namespace OpenArtOfWar
         constexpr float kTickSeconds = 0.25f;
 
         // Unit position in fractional tile coordinates (tracks sub-tile movement)
-        float unitTileX(const Unit &u)
+        float UnitTileX(const Unit &u)
         {
-            return u.getWorldPixelX() / TILE_WIDTH;
+            return u.GetWorldPixelX() / TILE_WIDTH;
         }
-        float unitTileY(const Unit &u)
+        float UnitTileY(const Unit &u)
         {
-            return u.getWorldPixelY() / TILE_HEIGHT;
-        }
-
-        float distTo(const Unit &u, float x, float y)
-        {
-            return DetMath::hypot(unitTileX(u) - x, unitTileY(u) - y);
+            return u.GetWorldPixelY() / TILE_HEIGHT;
         }
 
-        bool isEngaged(const Unit &u)
+        float DistTo(const Unit &u, float x, float y)
+        {
+            return DetMath::Hypot(UnitTileX(u) - x, UnitTileY(u) - y);
+        }
+
+        bool IsEngaged(const Unit &u)
         {
             return u.targetEntityId != 0 || u.targetWallTileX >= 0 || u.state == ActionState::Attack;
         }
 
-        bool isIdleWithoutOrders(const Unit &u)
+        bool IsIdleWithoutOrders(const Unit &u)
         {
             return u.state == ActionState::Idle && u.path.empty() && !u.waitingForPath && u.targetEntityId == 0;
         }
 
         // Both factions: Fortress / Hammer / Zeus and Coyote / Armadillo / Rhino
-        bool isTank(int arch)
+        bool IsTank(int arch)
         {
             return arch == 6 || arch == 7 || arch == 8 || arch == 9 || arch == 10 || arch == 11 || arch == 18;
         }
-        bool isMelee(int arch)
+        bool IsMelee(int arch)
         {
             return arch == 5;
         } // flamethrower
         // Rocket infantry and MLRS of both factions
-        bool isRangedSupport(int arch)
+        bool IsRangedSupport(int arch)
         {
             return arch == 2 || arch == 3 || arch == 12 || arch == 13 || arch == 16;
         }
 
         // Cohesion radius for a group of n units. Big groups get a proportionally larger radius (a column of
         // 15 is naturally longer than 3 tiles), and narrow passages stretch any group into a line.
-        float effectiveLeash(const AITacticsConfig &t, size_t n, bool inCorridor)
+        float EffectiveLeash(const AITacticsConfig &t, size_t n, bool inCorridor)
         {
             const float count = static_cast<float>(n);
             float leash = t.leashTiles + t.leashPerUnit * std::max(0.0f, count - 4.0f);
@@ -71,7 +71,7 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    const char *squadStateName(AISquadState state)
+    const char *SquadStateName(AISquadState state)
     {
         switch(state)
         {
@@ -99,16 +99,16 @@ namespace OpenArtOfWar
     // Chokepoint detection
     // ---------------------------------------------------------------------------
 
-    void ChokepointMap::rebuild(const TileMap &map)
+    void ChokepointMap::Rebuild(const TileMap &map)
     {
-        m_width = map.getWidth();
-        m_height = map.getHeight();
+        m_width = map.GetWidth();
+        m_height = map.GetHeight();
         m_choke.assign(static_cast<size_t>(m_width) * m_height, 0);
         m_openWidth.assign(static_cast<size_t>(m_width) * m_height, 0);
         if(m_width <= 0 || m_height <= 0)
             return;
 
-        auto open = [&](int x, int y) { return map.isPassable(x, y) && map.getWall(x, y) == 0; };
+        auto open = [&](int x, int y) { return map.IsPassable(x, y) && map.GetWall(x, y) == 0; };
 
         // Length of the contiguous open run through every tile, horizontally and vertically
         std::vector<int> runH(m_choke.size(), 0);
@@ -158,14 +158,14 @@ namespace OpenArtOfWar
         }
     }
 
-    int ChokepointMap::openWidth(int x, int y) const
+    int ChokepointMap::OpenWidth(int x, int y) const
     {
         if(x < 0 || y < 0 || x >= m_width || y >= m_height)
             return 0;
         return m_openWidth[static_cast<size_t>(y) * m_width + x];
     }
 
-    bool ChokepointMap::isChoke(int x, int y) const
+    bool ChokepointMap::IsChoke(int x, int y) const
     {
         if(x < 0 || y < 0 || x >= m_width || y >= m_height)
             return false;
@@ -176,7 +176,7 @@ namespace OpenArtOfWar
     // Squad lifecycle
     // ---------------------------------------------------------------------------
 
-    void AISquadController::clear()
+    void AISquadController::Clear()
     {
         m_squads.clear();
         m_released.clear();
@@ -184,7 +184,7 @@ namespace OpenArtOfWar
         m_tickAccumulator = 0.0f;
     }
 
-    bool AISquadController::isSquadMember(int unitId) const
+    bool AISquadController::IsSquadMember(int unitId) const
     {
         for(const auto &sq : m_squads)
         {
@@ -194,14 +194,14 @@ namespace OpenArtOfWar
         return false;
     }
 
-    std::vector<int> AISquadController::takeReleasedUnits()
+    std::vector<int> AISquadController::TakeReleasedUnits()
     {
         std::vector<int> out;
         out.swap(m_released);
         return out;
     }
 
-    int AISquadController::createSquad(const std::vector<int> &unitIds, int targetX, int targetY, int waveNumber, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics, int viaX, int viaY)
+    int AISquadController::CreateSquad(const std::vector<int> &unitIds, int targetX, int targetY, int waveNumber, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics, int viaX, int viaY)
     {
         if(unitIds.empty())
             return 0;
@@ -215,10 +215,10 @@ namespace OpenArtOfWar
         sq.viaX = viaX;
         sq.viaY = viaY;
         sq.initialSize = static_cast<int>(unitIds.size());
-        sq.leaderId = pickLeader(sq, entities, tactics);
+        sq.leaderId = PickLeader(sq, entities, tactics);
         for(int id : unitIds)
         {
-            if(const Entity *e = entities.getEntity(id))
+            if(const Entity *e = entities.GetEntity(id))
             {
                 sq.owner = e->owner;
                 break;
@@ -227,23 +227,23 @@ namespace OpenArtOfWar
 
         if(tactics.retreatLossRatio > 0.0f)
         {
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
-                if(e.alive && e.state != ActionState::Die && e.owner < kMaxPlayers && Players::hostile(e.owner, sq.owner))
+                if(e.alive && e.state != ActionState::Die && e.owner < kMaxPlayers && Players::Hostile(e.owner, sq.owner))
                 {
                     sq.playerHpAtLaunch[e.id] = e.currentHp;
                 }
             }
         }
 
-        rebuildRoute(sq, entities, pathfinder);
+        RebuildRoute(sq, entities, pathfinder);
         sq.state = AISquadState::Marching;
         sq.orderTimer = 1e6f; // the first leg is ordered on the next tick, which has the map at hand
         m_squads.push_back(std::move(sq));
         return m_squads.back().id;
     }
 
-    void AISquadController::update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
+    void AISquadController::Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
     {
         m_tickAccumulator += deltaTime;
         if(m_tickAccumulator < kTickSeconds)
@@ -253,12 +253,12 @@ namespace OpenArtOfWar
 
         for(auto &sq : m_squads)
         {
-            tick(sq, dt, map, entities, pathfinder, chokes, tactics);
+            Tick(sq, dt, map, entities, pathfinder, chokes, tactics);
         }
         m_squads.erase(std::remove_if(m_squads.begin(), m_squads.end(), [](const AISquad &s) { return s.unitIds.empty(); }), m_squads.end());
     }
 
-    AISquad *AISquadController::findSquad(int squadId)
+    AISquad *AISquadController::FindSquad(int squadId)
     {
         for(auto &sq : m_squads)
         {
@@ -268,14 +268,14 @@ namespace OpenArtOfWar
         return nullptr;
     }
 
-    void AISquadController::releaseUnits(const std::vector<int> &unitIds, EntityManager &entities)
+    void AISquadController::ReleaseUnits(const std::vector<int> &unitIds, EntityManager &entities)
     {
         for(auto &sq : m_squads)
         {
             for(int id : unitIds)
             {
                 if(std::find(sq.unitIds.begin(), sq.unitIds.end(), id) != sq.unitIds.end())
-                    releaseUnit(sq, id, entities);
+                    ReleaseUnit(sq, id, entities);
             }
             if(!sq.unitIds.empty() && std::find(sq.unitIds.begin(), sq.unitIds.end(), sq.leaderId) == sq.unitIds.end())
             {
@@ -285,20 +285,20 @@ namespace OpenArtOfWar
         m_squads.erase(std::remove_if(m_squads.begin(), m_squads.end(), [](const AISquad &s) { return s.unitIds.empty(); }), m_squads.end());
     }
 
-    void AISquadController::orderLeg(const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder)
+    void AISquadController::OrderLeg(const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder)
     {
         if(sq.attackMove)
         {
-            entities.issueAttackMoveOrder(ids, x, y, pathfinder);
+            entities.IssueAttackMoveOrder(ids, x, y, pathfinder);
         }
         else
         {
-            entities.issueMoveOrder(ids, x, y, pathfinder, false);
+            entities.IssueMoveOrder(ids, x, y, pathfinder, false);
         }
-        capDetours(sq, entities, pathfinder.getMap());
+        CapDetours(sq, entities, pathfinder.GetMap());
     }
 
-    void AISquadController::capDetours(const AISquad &sq, EntityManager &entities, const TileMap *map)
+    void AISquadController::CapDetours(const AISquad &sq, EntityManager &entities, const TileMap *map)
     {
         // A hostile wall within a few tiles of the unit: worth breaching instead of the detour
         auto hostileWallNear = [&](const Unit &u)
@@ -306,17 +306,17 @@ namespace OpenArtOfWar
             if(!map || !sq.attackMove)
                 return false;
             constexpr int r = 6;
-            for(int y = std::max(0, u.tileY - r); y <= std::min(map->getHeight() - 1, u.tileY + r); ++y)
+            for(int y = std::max(0, u.tileY - r); y <= std::min(map->GetHeight() - 1, u.tileY + r); ++y)
             {
-                for(int x = std::max(0, u.tileX - r); x <= std::min(map->getWidth() - 1, u.tileX + r); ++x)
+                for(int x = std::max(0, u.tileX - r); x <= std::min(map->GetWidth() - 1, u.tileX + r); ++x)
                 {
-                    if(map->getWall(x, y) > 0 && Players::hostile(map->getWallOwner(x, y), u.owner))
+                    if(map->GetWall(x, y) > 0 && Players::Hostile(map->GetWallOwner(x, y), u.owner))
                         return true;
                 }
             }
             return false;
         };
-        const Unit *leader = entities.getUnit(sq.leaderId);
+        const Unit *leader = entities.GetUnit(sq.leaderId);
         if(!leader)
             return;
         const float leash = std::max(3.0f, sq.leashRadius);
@@ -325,23 +325,23 @@ namespace OpenArtOfWar
         {
             if(id == sq.leaderId)
                 continue;
-            const Unit *u = entities.getUnit(id);
+            const Unit *u = entities.GetUnit(id);
             if(!u || u->path.size() <= u->pathIndex)
                 continue;
             const PathNode &goal = u->path.back();
-            const float straight = DetMath::hypot(static_cast<float>(goal.x - u->tileX), static_cast<float>(goal.y - u->tileY));
+            const float straight = DetMath::Hypot(static_cast<float>(goal.x - u->tileX), static_cast<float>(goal.y - u->tileY));
             const float pathLen = static_cast<float>(u->path.size() - u->pathIndex);
             // Allowed: the straight way, some slack for small obstacles, plus the group's leash
             const float limit = std::max(6.0f, straight * 1.8f + leash * 1.5f);
             // Only units already with the group: a straggler far away must still be allowed to come back
-            const float toLeader = distTo(*u, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
+            const float toLeader = DistTo(*u, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
             if(pathLen > limit && toLeader <= leash * 2.0f)
             {
                 if(hostileWallNear(*u))
                 {
                     // Keep the goal, drop the long route: the unit's own breach check picks a wall next tick
-                    Unit *mu = entities.getUnit(id);
-                    mu->clearPathState();
+                    Unit *mu = entities.GetUnit(id);
+                    mu->ClearPathState();
                     if(mu->state == ActionState::Move)
                         mu->state = ActionState::Idle;
                     mu->waitingForPath = true;
@@ -352,22 +352,22 @@ namespace OpenArtOfWar
             }
         }
         if(!hold.empty())
-            holdUnits(hold, entities);
+            HoldUnits(hold, entities);
     }
 
-    void AISquadController::setState(AISquad &sq, AISquadState state)
+    void AISquadController::SetState(AISquad &sq, AISquadState state)
     {
         sq.state = state;
         sq.stateTimer = 0.0f;
         sq.quietTimer = 0.0f;
     }
 
-    void AISquadController::releaseUnit(AISquad &sq, int unitId, EntityManager &entities)
+    void AISquadController::ReleaseUnit(AISquad &sq, int unitId, EntityManager &entities)
     {
         sq.unitIds.erase(std::remove(sq.unitIds.begin(), sq.unitIds.end(), unitId), sq.unitIds.end());
         sq.stragglerBest.erase(unitId);
         sq.stragglerTimer.erase(unitId);
-        if(Unit *u = entities.getUnit(unitId))
+        if(Unit *u = entities.GetUnit(unitId))
         {
             u->flowMode = false;
             u->paceScale = 1.0f;
@@ -375,25 +375,25 @@ namespace OpenArtOfWar
         }
     }
 
-    int AISquadController::pickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const
+    int AISquadController::PickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const
     {
         int best = 0;
         float bestScore = 1e9f;
         for(int id : sq.unitIds)
         {
-            const Unit *u = entities.getUnit(id);
+            const Unit *u = entities.GetUnit(id);
             if(!u || !u->alive || u->state == ActionState::Die)
                 continue;
             float score;
             if(tactics.syncToSlowest)
             {
                 // Slowest unit sets the pace; prefer armor on ties so the column is led by a tank
-                score = u->moveSpeed - (isTank(u->archetypeId) ? 0.01f : 0.0f);
+                score = u->moveSpeed - (IsTank(u->archetypeId) ? 0.01f : 0.0f);
             }
             else
             {
                 // Head of the column: the unit closest to the objective
-                score = distTo(*u, static_cast<float>(sq.targetX), static_cast<float>(sq.targetY));
+                score = DistTo(*u, static_cast<float>(sq.targetX), static_cast<float>(sq.targetY));
             }
             if(score < bestScore)
             {
@@ -404,17 +404,17 @@ namespace OpenArtOfWar
         return best;
     }
 
-    void AISquadController::rebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder)
+    void AISquadController::RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder)
     {
         sq.route.clear();
         sq.progress = 0;
         sq.marchIndex = 0;
-        const Unit *leader = entities.getUnit(sq.leaderId);
+        const Unit *leader = entities.GetUnit(sq.leaderId);
         if(!leader)
             return;
 
         // A flank point that is still ahead splits the route in two legs; once reached it is forgotten
-        if(sq.viaX >= 0 && distTo(*leader, static_cast<float>(sq.viaX), static_cast<float>(sq.viaY)) <= 3.0f)
+        if(sq.viaX >= 0 && DistTo(*leader, static_cast<float>(sq.viaX), static_cast<float>(sq.viaY)) <= 3.0f)
         {
             sq.viaX = sq.viaY = -1;
         }
@@ -426,8 +426,8 @@ namespace OpenArtOfWar
         if(sq.viaX >= 0)
         {
             // Strategic route over terrain only: the group's own idle units must not wall the leader in
-            pathfinder.setIgnoreUnitsOnce();
-            if(pathfinder.findPath(fromX, fromY, sq.viaX, sq.viaY, path, leader->id, &partial) && !path.empty())
+            pathfinder.SetIgnoreUnitsOnce();
+            if(pathfinder.FindPath(fromX, fromY, sq.viaX, sq.viaY, path, leader->id, &partial) && !path.empty())
             {
                 sq.route.insert(sq.route.end(), path.begin(), path.end());
                 fromX = path.back().x;
@@ -435,27 +435,27 @@ namespace OpenArtOfWar
             }
             path.clear();
         }
-        pathfinder.setIgnoreUnitsOnce();
-        pathfinder.findPath(fromX, fromY, sq.targetX, sq.targetY, path, leader->id, &partial);
+        pathfinder.SetIgnoreUnitsOnce();
+        pathfinder.FindPath(fromX, fromY, sq.targetX, sq.targetY, path, leader->id, &partial);
         sq.route.insert(sq.route.end(), path.begin(), path.end());
     }
 
-    void AISquadController::holdUnits(const std::vector<int> &ids, EntityManager &entities)
+    void AISquadController::HoldUnits(const std::vector<int> &ids, EntityManager &entities)
     {
         for(int id : ids)
         {
-            Unit *u = entities.getUnit(id);
-            if(!u || isEngaged(*u))
+            Unit *u = entities.GetUnit(id);
+            if(!u || IsEngaged(*u))
                 continue;
-            u->clearPathState();
-            u->clearMoveTarget();
+            u->ClearPathState();
+            u->ClearMoveTarget();
             u->isAttackMoving = false;
             if(u->state == ActionState::Move)
                 u->state = ActionState::Idle;
         }
     }
 
-    void AISquadController::orderMarch(AISquad &sq, int routeIndex, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics)
+    void AISquadController::OrderMarch(AISquad &sq, int routeIndex, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const AITacticsConfig &tactics)
     {
         if(sq.route.empty())
             return;
@@ -466,7 +466,7 @@ namespace OpenArtOfWar
         const PathNode &prev = sq.route[std::max(0, routeIndex - 3)];
         float dx = static_cast<float>(p.x - prev.x);
         float dy = static_cast<float>(p.y - prev.y);
-        float len = DetMath::hypot(dx, dy);
+        float len = DetMath::Hypot(dx, dy);
         if(len > 0.001f)
         {
             dx /= len;
@@ -476,18 +476,18 @@ namespace OpenArtOfWar
         std::vector<int> front, middle, back;
         for(int id : sq.unitIds)
         {
-            Unit *u = entities.getUnit(id);
+            Unit *u = entities.GetUnit(id);
             if(!u)
                 continue;
             u->flowMode = false;
-            if(isEngaged(*u))
+            if(IsEngaged(*u))
                 continue; // never pull a unit out of a fight
             int arch = u->archetypeId;
-            if((tactics.armorFront && isTank(arch)) || (tactics.meleeRangedPairs && isMelee(arch)))
+            if((tactics.armorFront && IsTank(arch)) || (tactics.meleeRangedPairs && IsMelee(arch)))
             {
                 front.push_back(id);
             }
-            else if((tactics.meleeRangedPairs || tactics.armorFront) && isRangedSupport(arch))
+            else if((tactics.meleeRangedPairs || tactics.armorFront) && IsRangedSupport(arch))
             {
                 back.push_back(id);
             }
@@ -499,9 +499,9 @@ namespace OpenArtOfWar
 
         auto pointAt = [&](float offset) -> PathNode
         {
-            int x = std::clamp(static_cast<int>(std::lround(p.x + dx * offset)), 0, map.getWidth() - 1);
-            int y = std::clamp(static_cast<int>(std::lround(p.y + dy * offset)), 0, map.getHeight() - 1);
-            if(!map.isPassable(x, y) || map.getWall(x, y) > 0)
+            int x = std::clamp(static_cast<int>(std::lround(p.x + dx * offset)), 0, map.GetWidth() - 1);
+            int y = std::clamp(static_cast<int>(std::lround(p.y + dy * offset)), 0, map.GetHeight() - 1);
+            if(!map.IsPassable(x, y) || map.GetWall(x, y) > 0)
                 return p;
             return {x, y};
         };
@@ -511,7 +511,7 @@ namespace OpenArtOfWar
             if(ids.empty())
                 return;
             PathNode t = pointAt(offset);
-            orderLeg(sq, ids, t.x, t.y, entities, pathfinder);
+            OrderLeg(sq, ids, t.x, t.y, entities, pathfinder);
         };
         issue(front, 2.0f);
         issue(middle, 0.0f);
@@ -519,25 +519,25 @@ namespace OpenArtOfWar
         sq.orderTimer = 0.0f;
     }
 
-    void AISquadController::advanceMarch(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
+    void AISquadController::AdvanceMarch(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
     {
         int last = static_cast<int>(sq.route.size()) - 1;
         if(last <= 0 || sq.progress >= last)
         {
-            orderLeg(sq, sq.unitIds, sq.targetX, sq.targetY, entities, pathfinder);
+            OrderLeg(sq, sq.unitIds, sq.targetX, sq.targetY, entities, pathfinder);
             for(int id : sq.unitIds)
             {
-                if(Unit *u = entities.getUnit(id))
+                if(Unit *u = entities.GetUnit(id))
                     u->flowMode = false;
             }
-            setState(sq, AISquadState::Assault);
+            SetState(sq, AISquadState::Assault);
             sq.orderTimer = 0.0f;
             if(sq.playerSquad)
             {
                 // The player's group has arrived: the units finish the move on their own
                 std::vector<int> all = sq.unitIds;
                 for(int id : all)
-                    releaseUnit(sq, id, entities);
+                    ReleaseUnit(sq, id, entities);
             }
             return;
         }
@@ -548,7 +548,7 @@ namespace OpenArtOfWar
         int chokeAt = -1;
         for(int i = sq.progress; i <= std::min(next + 2, last); ++i)
         {
-            if(chokes.isChoke(sq.route[i].x, sq.route[i].y))
+            if(chokes.IsChoke(sq.route[i].x, sq.route[i].y))
             {
                 chokeAt = i;
                 break;
@@ -562,24 +562,24 @@ namespace OpenArtOfWar
             {
                 sq.marchIndex = rally;
                 sq.deployIndex = chokeAt; // remembered entry; the real deploy point is set by beginTransit
-                orderMarch(sq, rally, map, entities, pathfinder, tactics);
-                setState(sq, AISquadState::ChokeApproach);
+                OrderMarch(sq, rally, map, entities, pathfinder, tactics);
+                SetState(sq, AISquadState::ChokeApproach);
                 return;
             }
-            beginTransit(sq, chokeAt, entities, pathfinder, chokes);
+            BeginTransit(sq, chokeAt, entities, pathfinder, chokes);
             return;
         }
 
         sq.marchIndex = next;
-        orderMarch(sq, next, map, entities, pathfinder, tactics);
-        setState(sq, AISquadState::Marching);
+        OrderMarch(sq, next, map, entities, pathfinder, tactics);
+        SetState(sq, AISquadState::Marching);
     }
 
-    void AISquadController::beginTransit(AISquad &sq, int chokeIndex, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes)
+    void AISquadController::BeginTransit(AISquad &sq, int chokeIndex, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes)
     {
         int last = static_cast<int>(sq.route.size()) - 1;
         int exit = chokeIndex;
-        while(exit <= last && chokes.isChoke(sq.route[exit].x, sq.route[exit].y))
+        while(exit <= last && chokes.IsChoke(sq.route[exit].x, sq.route[exit].y))
             ++exit;
         int deploy = std::min(exit + 4, last);
 
@@ -589,21 +589,21 @@ namespace OpenArtOfWar
         // Single file: one shared destination, no sidesteps; reservations make the column queue up
         for(int id : sq.unitIds)
         {
-            if(Unit *u = entities.getUnit(id))
+            if(Unit *u = entities.GetUnit(id))
                 u->flowMode = true;
         }
         const PathNode &d = sq.route[deploy];
-        orderLeg(sq, sq.unitIds, d.x, d.y, entities, pathfinder);
-        setState(sq, AISquadState::ChokeTransit);
+        OrderLeg(sq, sq.unitIds, d.x, d.y, entities, pathfinder);
+        SetState(sq, AISquadState::ChokeTransit);
         sq.orderTimer = 0.0f;
     }
 
-    int AISquadController::damageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const
+    int AISquadController::DamageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const
     {
         int dealt = 0;
         for(const auto &[id, hp] : sq.playerHpAtLaunch)
         {
-            const Entity *e = entities.getEntity(id);
+            const Entity *e = entities.GetEntity(id);
             if(!e || !e->alive || e->state == ActionState::Die)
             {
                 dealt += hp;
@@ -619,12 +619,12 @@ namespace OpenArtOfWar
     // The column moves at the pace of its slowest member. Whoever is ahead of the group's centre (along the
     // way to the waypoint) slows down a bit more, whoever is behind walks at full speed: the group closes up
     // smoothly instead of stopping and starting again.
-    void AISquadController::paceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active)
+    void AISquadController::PaceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active)
     {
         float slowest = 1e9f;
         for(int id : sq.unitIds)
         {
-            const Unit *u = entities.getUnit(id);
+            const Unit *u = entities.GetUnit(id);
             if(u->moveSpeed > 0.0f)
                 slowest = std::min(slowest, u->moveSpeed);
         }
@@ -634,7 +634,7 @@ namespace OpenArtOfWar
             const PathNode &wp = sq.route[std::clamp(sq.marchIndex, 0, static_cast<int>(sq.route.size()) - 1)];
             dirX = static_cast<float>(wp.x) - cx;
             dirY = static_cast<float>(wp.y) - cy;
-            const float len = DetMath::hypot(dirX, dirY);
+            const float len = DetMath::Hypot(dirX, dirY);
             if(len > 0.5f)
             {
                 dirX /= len;
@@ -647,13 +647,13 @@ namespace OpenArtOfWar
         }
         for(int id : sq.unitIds)
         {
-            Unit *u = entities.getUnit(id);
+            Unit *u = entities.GetUnit(id);
             if(!active || u->moveSpeed <= 0.0f || slowest >= 1e8f)
             {
                 u->paceScale = 1.0f;
                 continue;
             }
-            const float along = (unitTileX(*u) - cx) * dirX + (unitTileY(*u) - cy) * dirY;
+            const float along = (UnitTileX(*u) - cx) * dirX + (UnitTileY(*u) - cy) * dirY;
             float scale = slowest / u->moveSpeed;
             if(along < -0.5f * leash)
             {
@@ -672,7 +672,7 @@ namespace OpenArtOfWar
     // Per-squad state machine (runs every kTickSeconds)
     // ---------------------------------------------------------------------------
 
-    void AISquadController::tick(AISquad &sq, float dt, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
+    void AISquadController::Tick(AISquad &sq, float dt, TileMap &map, EntityManager &entities, Pathfinder &pathfinder, const ChokepointMap &chokes, const AITacticsConfig &tactics)
     {
         // Drop the dead
         sq.unitIds.erase(
@@ -681,25 +681,28 @@ namespace OpenArtOfWar
                 sq.unitIds.end(),
                 [&](int id)
                 {
-                    const Unit *u = entities.getUnit(id);
+                    const Unit *u = entities.GetUnit(id);
                     return !u || !u->alive || u->state == ActionState::Die;
                 }),
             sq.unitIds.end());
         if(sq.unitIds.empty())
             return;
 
-        if(!entities.getUnit(sq.leaderId) || std::find(sq.unitIds.begin(), sq.unitIds.end(), sq.leaderId) == sq.unitIds.end())
+        if(!entities.GetUnit(sq.leaderId) || std::find(sq.unitIds.begin(), sq.unitIds.end(), sq.leaderId) == sq.unitIds.end())
         {
-            sq.leaderId = pickLeader(sq, entities, tactics);
+            sq.leaderId = PickLeader(sq, entities, tactics);
         }
-        const Unit *leader = entities.getUnit(sq.leaderId);
+        const Unit *leader = entities.GetUnit(sq.leaderId);
         if(!leader)
             return;
 
-        const int localWidth = chokes.openWidth(leader->tileX, leader->tileY);
-        const float leash = effectiveLeash(tactics, sq.unitIds.size(), localWidth > 0 && localWidth <= 4);
+        const int localWidth = chokes.OpenWidth(leader->tileX, leader->tileY);
+        const float leash = EffectiveLeash(tactics, sq.unitIds.size(), localWidth > 0 && localWidth <= 4);
         sq.leashRadius = leash;
-        capDetours(sq, entities, &map); // also catches re-paths the units made on their own (blocked by the crowd)
+        // Also catches re-paths the units made on their own (blocked by the crowd). Not while falling back: the
+        // way home may be long and winding, and a held unit would never get there
+        if(sq.state != AISquadState::Retreating)
+            CapDetours(sq, entities, &map);
 
         // Cohesion metrics: centroid of the group core and the farthest unit from it (Dmax).
         // The core is everyone within two leash radii of the leader, so one far straggler
@@ -708,11 +711,11 @@ namespace OpenArtOfWar
         int coreCount = 0;
         for(int id : sq.unitIds)
         {
-            const Unit *u = entities.getUnit(id);
-            if(distTo(*u, unitTileX(*leader), unitTileY(*leader)) > 2.0f * leash)
+            const Unit *u = entities.GetUnit(id);
+            if(DistTo(*u, UnitTileX(*leader), UnitTileY(*leader)) > 2.0f * leash)
                 continue;
-            cx += unitTileX(*u);
-            cy += unitTileY(*u);
+            cx += UnitTileX(*u);
+            cy += UnitTileY(*u);
             ++coreCount;
         }
         cx /= static_cast<float>(std::max(1, coreCount));
@@ -721,9 +724,9 @@ namespace OpenArtOfWar
         bool engaged = false;
         for(int id : sq.unitIds)
         {
-            const Unit *u = entities.getUnit(id);
-            dmax = std::max(dmax, distTo(*u, cx, cy));
-            engaged = engaged || isEngaged(*u);
+            const Unit *u = entities.GetUnit(id);
+            dmax = std::max(dmax, DistTo(*u, cx, cy));
+            engaged = engaged || IsEngaged(*u);
         }
         sq.centroidX = cx;
         sq.centroidY = cy;
@@ -733,14 +736,14 @@ namespace OpenArtOfWar
         int outsideStop = 0, outsideResume = 0;
         for(int id : sq.unitIds)
         {
-            const float d = distTo(*entities.getUnit(id), cx, cy);
+            const float d = DistTo(*entities.GetUnit(id), cx, cy);
             if(d > leash * 1.2f)
                 ++outsideStop;
             if(d > leash)
                 ++outsideResume;
         }
         const int tolerated = std::max(1, static_cast<int>(sq.unitIds.size()) / 4);
-        paceGroup(sq, entities, cx, cy, leash, sq.state == AISquadState::Marching || sq.state == AISquadState::ChokeApproach);
+        PaceGroup(sq, entities, cx, cy, leash, sq.state == AISquadState::Marching || sq.state == AISquadState::ChokeApproach);
 
         sq.stateTimer += dt;
         sq.orderTimer += dt;
@@ -748,7 +751,7 @@ namespace OpenArtOfWar
         // First leg after launch
         if(sq.state == AISquadState::Marching && sq.orderTimer > 1e5f)
         {
-            advanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+            AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
             return;
         }
 
@@ -756,18 +759,18 @@ namespace OpenArtOfWar
         if(tactics.retreatLossRatio > 0.0f && sq.state != AISquadState::Retreating && sq.state != AISquadState::Assault)
         {
             float lost = 1.0f - static_cast<float>(sq.unitIds.size()) / static_cast<float>(std::max(1, sq.initialSize));
-            if(lost >= tactics.retreatLossRatio && damageDealtSinceLaunch(sq, entities) < 100)
+            if(lost >= tactics.retreatLossRatio && DamageDealtSinceLaunch(sq, entities) < 100)
             {
                 for(int id : sq.unitIds)
                 {
-                    if(Unit *u = entities.getUnit(id))
+                    if(Unit *u = entities.GetUnit(id))
                     {
                         u->flowMode = false;
                         u->targetEntityId = 0;
                     }
                 }
-                entities.issueMoveOrder(sq.unitIds, m_stagingX, m_stagingY, pathfinder, false);
-                setState(sq, AISquadState::Retreating);
+                entities.IssueMoveOrder(sq.unitIds, m_stagingX, m_stagingY, pathfinder, false);
+                SetState(sq, AISquadState::Retreating);
                 return;
             }
         }
@@ -777,7 +780,7 @@ namespace OpenArtOfWar
         {
             for(int id : sq.unitIds)
             {
-                Unit *u = entities.getUnit(id);
+                Unit *u = entities.GetUnit(id);
                 if(u->targetEntityId != 0 || u->targetWallTileX >= 0)
                 {
                     u->targetEntityId = 0;
@@ -786,7 +789,7 @@ namespace OpenArtOfWar
                         u->state = ActionState::Idle;
                     if(sq.state == AISquadState::Marching && id != sq.leaderId)
                     {
-                        orderLeg(sq, {id}, leader->tileX, leader->tileY, entities, pathfinder);
+                        OrderLeg(sq, {id}, leader->tileX, leader->tileY, entities, pathfinder);
                     }
                 }
             }
@@ -797,7 +800,7 @@ namespace OpenArtOfWar
         if(engaged && (sq.state == AISquadState::Marching || sq.state == AISquadState::Regrouping || sq.state == AISquadState::ChokeApproach || sq.state == AISquadState::Deploying))
         {
             sq.resumeState = sq.state;
-            setState(sq, AISquadState::Engaged);
+            SetState(sq, AISquadState::Engaged);
             return;
         }
 
@@ -808,8 +811,8 @@ namespace OpenArtOfWar
             bool progress = false;
             for(int id : sq.unitIds)
             {
-                Unit *u = entities.getUnit(id);
-                float d = distTo(*u, cxRef, cyRef);
+                Unit *u = entities.GetUnit(id);
+                float d = DistTo(*u, cxRef, cyRef);
                 if(d <= radius)
                 {
                     sq.stragglerBest.erase(id);
@@ -832,17 +835,17 @@ namespace OpenArtOfWar
                         drop.push_back(id);
                 }
                 // Highest priority for the straggler: walk straight to the leader
-                if(isIdleWithoutOrders(*u) && id != sq.leaderId)
+                if(IsIdleWithoutOrders(*u) && id != sq.leaderId)
                 {
-                    orderLeg(sq, {id}, leader->tileX, leader->tileY, entities, pathfinder);
+                    OrderLeg(sq, {id}, leader->tileX, leader->tileY, entities, pathfinder);
                 }
             }
             for(int id : drop)
             {
-                releaseUnit(sq, id, entities);
+                ReleaseUnit(sq, id, entities);
                 // The player's unit is not left standing: it goes on to the destination on its own
                 if(sq.playerSquad)
-                    orderLeg(sq, {id}, sq.targetX, sq.targetY, entities, pathfinder);
+                    OrderLeg(sq, {id}, sq.targetX, sq.targetY, entities, pathfinder);
             }
             return progress;
         };
@@ -865,13 +868,13 @@ namespace OpenArtOfWar
                     std::vector<int> inside;
                     for(int id : sq.unitIds)
                     {
-                        if(distTo(*entities.getUnit(id), cx, cy) <= leash)
+                        if(DistTo(*entities.GetUnit(id), cx, cy) <= leash)
                             inside.push_back(id);
                     }
-                    holdUnits(inside, entities);
+                    HoldUnits(inside, entities);
                     sq.stragglerBest.clear();
                     sq.stragglerTimer.clear();
-                    setState(sq, AISquadState::Regrouping);
+                    SetState(sq, AISquadState::Regrouping);
                     break;
                 }
 
@@ -883,8 +886,8 @@ namespace OpenArtOfWar
                 // A unit that stopped at its formation slot around the waypoint has arrived as well
                 auto arrived = [&](const Unit &u, float radius)
                 {
-                    float d = distTo(u, static_cast<float>(wp.x), static_cast<float>(wp.y));
-                    return d <= radius || (isIdleWithoutOrders(u) && d <= std::max(radius, leash) * 1.5f);
+                    float d = DistTo(u, static_cast<float>(wp.x), static_cast<float>(wp.y));
+                    return d <= radius || (IsIdleWithoutOrders(u) && d <= std::max(radius, leash) * 1.5f);
                 };
                 if(tactics.syncToSlowest)
                 {
@@ -893,7 +896,7 @@ namespace OpenArtOfWar
                     {
                         if(!reached)
                             break;
-                        reached = arrived(*entities.getUnit(id), leash);
+                        reached = arrived(*entities.GetUnit(id), leash);
                     }
                 }
                 else
@@ -901,7 +904,7 @@ namespace OpenArtOfWar
                     reached = arrived(*leader, 2.5f);
                 }
                 // Nobody makes headway any more (crowd settled around the waypoint): good enough
-                if(DetMath::hypot(cx - sq.stallX, cy - sq.stallY) > 0.5f)
+                if(DetMath::Hypot(cx - sq.stallX, cy - sq.stallY) > 0.5f)
                 {
                     sq.stallX = cx;
                     sq.stallY = cy;
@@ -911,7 +914,7 @@ namespace OpenArtOfWar
                 {
                     sq.stallTimer += dt;
                 }
-                if(!reached && sq.stallTimer > 2.0f && distTo(*leader, static_cast<float>(wp.x), static_cast<float>(wp.y)) <= std::max(2.5f, leash))
+                if(!reached && sq.stallTimer > 2.0f && DistTo(*leader, static_cast<float>(wp.x), static_cast<float>(wp.y)) <= std::max(2.5f, leash))
                 {
                     reached = true;
                 }
@@ -921,18 +924,18 @@ namespace OpenArtOfWar
                 if(reached)
                 {
                     sq.progress = sq.marchIndex;
-                    advanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+                    AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
                 }
                 else if(sq.stateTimer > 25.0f)
                 {
                     // Waypoint unreachable (blocked by new structures): plan again from the leader
-                    rebuildRoute(sq, entities, pathfinder);
-                    advanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+                    RebuildRoute(sq, entities, pathfinder);
+                    AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
                 }
-                else if(sq.orderTimer > 4.0f && isIdleWithoutOrders(*leader))
+                else if(sq.orderTimer > 4.0f && IsIdleWithoutOrders(*leader))
                 {
                     // Orders were overridden elsewhere (base defense, call for help): re-issue the leg
-                    orderMarch(sq, sq.marchIndex, map, entities, pathfinder, tactics);
+                    OrderMarch(sq, sq.marchIndex, map, entities, pathfinder, tactics);
                 }
                 break;
             }
@@ -945,8 +948,8 @@ namespace OpenArtOfWar
                 {
                     sq.stragglerBest.clear();
                     sq.stragglerTimer.clear();
-                    orderMarch(sq, sq.marchIndex, map, entities, pathfinder, tactics);
-                    setState(sq, AISquadState::Marching);
+                    OrderMarch(sq, sq.marchIndex, map, entities, pathfinder, tactics);
+                    SetState(sq, AISquadState::Marching);
                     break;
                 }
                 sq.quietTimer = trackStragglers(leash, cx, cy) ? 0.0f : sq.quietTimer + dt;
@@ -956,13 +959,13 @@ namespace OpenArtOfWar
             case AISquadState::ChokeApproach:
             {
                 const PathNode &rally = sq.route[sq.marchIndex];
-                bool leaderAtRally = distTo(*leader, static_cast<float>(rally.x), static_cast<float>(rally.y)) <= 2.5f;
+                bool leaderAtRally = DistTo(*leader, static_cast<float>(rally.x), static_cast<float>(rally.y)) <= 2.5f;
                 sq.quietTimer = leaderAtRally ? sq.quietTimer + dt : 0.0f; // hold time at the rally point
                 bool gathered = dmax <= leash;
                 if((leaderAtRally && sq.quietTimer >= tactics.preChokeHoldSeconds && gathered) || sq.stateTimer > 12.0f)
                 {
                     sq.progress = sq.marchIndex;
-                    beginTransit(sq, sq.deployIndex, entities, pathfinder, chokes);
+                    BeginTransit(sq, sq.deployIndex, entities, pathfinder, chokes);
                     break;
                 }
                 if(leaderAtRally && !gathered)
@@ -976,8 +979,8 @@ namespace OpenArtOfWar
                 bool allOut = true;
                 for(int id : sq.unitIds)
                 {
-                    const Unit *u = entities.getUnit(id);
-                    if(chokes.isChoke(u->tileX, u->tileY) || distTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > leash + 1.5f)
+                    const Unit *u = entities.GetUnit(id);
+                    if(chokes.IsChoke(u->tileX, u->tileY) || DistTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > leash + 1.5f)
                     {
                         allOut = false;
                     }
@@ -991,19 +994,19 @@ namespace OpenArtOfWar
                         std::vector<int> stuck;
                         for(int id : sq.unitIds)
                         {
-                            const Unit *u = entities.getUnit(id);
-                            if(distTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > leash + 1.5f)
+                            const Unit *u = entities.GetUnit(id);
+                            if(DistTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > leash + 1.5f)
                                 stuck.push_back(id);
                         }
                         for(int id : stuck)
-                            releaseUnit(sq, id, entities);
+                            ReleaseUnit(sq, id, entities);
                     }
                     for(int id : sq.unitIds)
                     {
-                        if(Unit *u = entities.getUnit(id))
+                        if(Unit *u = entities.GetUnit(id))
                             u->flowMode = false;
                     }
-                    setState(sq, AISquadState::Deploying);
+                    SetState(sq, AISquadState::Deploying);
                     break;
                 }
                 if(sq.orderTimer > 3.0f)
@@ -1011,14 +1014,14 @@ namespace OpenArtOfWar
                     std::vector<int> lost;
                     for(int id : sq.unitIds)
                     {
-                        const Unit *u = entities.getUnit(id);
-                        if(isIdleWithoutOrders(*u) && distTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > 2.0f)
+                        const Unit *u = entities.GetUnit(id);
+                        if(IsIdleWithoutOrders(*u) && DistTo(*u, static_cast<float>(d.x), static_cast<float>(d.y)) > 2.0f)
                         {
                             lost.push_back(id);
                         }
                     }
                     if(!lost.empty())
-                        orderLeg(sq, lost, d.x, d.y, entities, pathfinder);
+                        OrderLeg(sq, lost, d.x, d.y, entities, pathfinder);
                     sq.orderTimer = 0.0f;
                 }
                 break;
@@ -1029,7 +1032,7 @@ namespace OpenArtOfWar
                 if(!tactics.waitAtChokepoints || dmax <= leash || sq.stateTimer > 6.0f)
                 {
                     sq.progress = sq.deployIndex;
-                    advanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+                    AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
                 }
                 break;
             }
@@ -1046,8 +1049,8 @@ namespace OpenArtOfWar
                         int fx = leader->tileX, fy = leader->tileY;
                         for(int id : sq.unitIds)
                         {
-                            const Unit *u = entities.getUnit(id);
-                            if(isEngaged(*u))
+                            const Unit *u = entities.GetUnit(id);
+                            if(IsEngaged(*u))
                             {
                                 fx = u->tileX;
                                 fy = u->tileY;
@@ -1055,12 +1058,12 @@ namespace OpenArtOfWar
                         }
                         for(int id : sq.unitIds)
                         {
-                            const Unit *u = entities.getUnit(id);
-                            if(isIdleWithoutOrders(*u))
+                            const Unit *u = entities.GetUnit(id);
+                            if(IsIdleWithoutOrders(*u))
                                 idle.push_back(id);
                         }
                         if(!idle.empty())
-                            orderLeg(sq, idle, fx, fy, entities, pathfinder);
+                            OrderLeg(sq, idle, fx, fy, entities, pathfinder);
                         sq.orderTimer = 0.0f;
                     }
                 }
@@ -1069,9 +1072,9 @@ namespace OpenArtOfWar
                     sq.quietTimer += dt;
                     if(sq.quietTimer >= 2.0f)
                     {
-                        sq.leaderId = pickLeader(sq, entities, tactics);
-                        rebuildRoute(sq, entities, pathfinder);
-                        advanceMarch(sq, map, entities, pathfinder, chokes, tactics);
+                        sq.leaderId = PickLeader(sq, entities, tactics);
+                        RebuildRoute(sq, entities, pathfinder);
+                        AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
                     }
                 }
                 break;
@@ -1085,8 +1088,8 @@ namespace OpenArtOfWar
                 std::vector<int> idle;
                 for(int id : sq.unitIds)
                 {
-                    const Unit *u = entities.getUnit(id);
-                    if(isIdleWithoutOrders(*u))
+                    const Unit *u = entities.GetUnit(id);
+                    if(IsIdleWithoutOrders(*u))
                         idle.push_back(id);
                 }
                 if(idle.empty())
@@ -1095,13 +1098,13 @@ namespace OpenArtOfWar
                 // Objective gone: move on to the nearest remaining player structure
                 int bestX = -1, bestY = -1;
                 float bestD = 1e9f;
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
-                    if(!e.alive || e.state == ActionState::Die || !e.isBuilding || e.owner >= kMaxPlayers || !Players::hostile(e.owner, sq.owner))
+                    if(!e.alive || e.state == ActionState::Die || !e.isBuilding || e.owner >= kMaxPlayers || !Players::Hostile(e.owner, sq.owner))
                     {
                         continue;
                     }
-                    float d = DetMath::hypot(e.tileX - cx, e.tileY - cy);
+                    float d = DetMath::Hypot(e.tileX - cx, e.tileY - cy);
                     if(d < bestD)
                     {
                         bestD = d;
@@ -1111,13 +1114,13 @@ namespace OpenArtOfWar
                 }
                 if(bestX >= 0)
                 {
-                    orderLeg(sq, idle, bestX, bestY, entities, pathfinder);
+                    OrderLeg(sq, idle, bestX, bestY, entities, pathfinder);
                 }
                 else if(idle.size() == sq.unitIds.size())
                 {
                     std::vector<int> all = sq.unitIds;
                     for(int id : all)
-                        releaseUnit(sq, id, entities);
+                        ReleaseUnit(sq, id, entities);
                 }
                 break;
             }
@@ -1127,7 +1130,7 @@ namespace OpenArtOfWar
                 bool home = true;
                 for(int id : sq.unitIds)
                 {
-                    if(distTo(*entities.getUnit(id), static_cast<float>(m_stagingX), static_cast<float>(m_stagingY)) > 6.0f)
+                    if(DistTo(*entities.GetUnit(id), static_cast<float>(m_stagingX), static_cast<float>(m_stagingY)) > 6.0f)
                     {
                         home = false;
                         break;
@@ -1137,7 +1140,7 @@ namespace OpenArtOfWar
                 {
                     std::vector<int> all = sq.unitIds;
                     for(int id : all)
-                        releaseUnit(sq, id, entities); // they join the next wave
+                        ReleaseUnit(sq, id, entities); // they join the next wave
                 }
                 break;
             }
@@ -1148,25 +1151,25 @@ namespace OpenArtOfWar
     // Debug visualization
     // ---------------------------------------------------------------------------
 
-    void AISquadController::renderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities, float leashTiles) const
+    void AISquadController::RenderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities, float leashTiles) const
     {
         for(const auto &sq : m_squads)
         {
-            const Entity *leader = entities.getEntity(sq.leaderId);
+            const Entity *leader = entities.GetEntity(sq.leaderId);
             if(!leader)
                 continue;
-            float lx = leader->getUnitCenterPixelX();
-            float ly = leader->getUnitCenterPixelY();
+            float lx = leader->GetUnitCenterPixelX();
+            float ly = leader->GetUnitCenterPixelY();
 
             // Leash lines: green = in formation, yellow = at the limit, red = straggling
             for(int id : sq.unitIds)
             {
-                const Entity *u = entities.getEntity(id);
+                const Entity *u = entities.GetEntity(id);
                 if(!u || id == sq.leaderId)
                     continue;
-                float d = DetMath::hypot(u->getUnitCenterPixelX() - lx, u->getUnitCenterPixelY() - ly) / TILE_WIDTH;
+                float d = DetMath::Hypot(u->GetUnitCenterPixelX() - lx, u->GetUnitCenterPixelY() - ly) / TILE_WIDTH;
                 SDL_Color c = (d <= 2.0f) ? SDL_Color {60, 230, 90, 220} : (d <= std::max(leashTiles, sq.leashRadius)) ? SDL_Color {240, 210, 60, 220} : SDL_Color {240, 60, 50, 230};
-                renderer.drawLineWorld(u->getUnitCenterPixelX(), u->getUnitCenterPixelY(), lx, ly, camera, c);
+                renderer.DrawLineWorld(u->GetUnitCenterPixelX(), u->GetUnitCenterPixelY(), lx, ly, camera, c);
             }
 
             // Centroid and the allowed cohesion radius
@@ -1174,25 +1177,25 @@ namespace OpenArtOfWar
             float cyp = sq.centroidY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
             float radius = sq.leashRadius;
             RenderUtility::DrawTileRadius(renderer, camera, cxp, cyp, radius, SDL_Color {255, 255, 255, 120}, 1.5f);
-            renderer.fillRectWorld(cxp - 3, cyp - 3, 6, 6, camera, {255, 255, 255, 230});
+            renderer.FillRectWorld(cxp - 3, cyp - 3, 6, 6, camera, {255, 255, 255, 230});
 
             // Current waypoint
             if(!sq.route.empty())
             {
                 const PathNode &wp = sq.route[std::clamp(sq.marchIndex, 0, static_cast<int>(sq.route.size()) - 1)];
-                renderer.drawRectWorld(wp.x * TILE_WIDTH + 4.0f, wp.y * TILE_HEIGHT + 4.0f, TILE_WIDTH - 8.0f, TILE_HEIGHT - 8.0f, camera, {120, 200, 255, 220});
+                renderer.DrawRectWorld(wp.x * TILE_WIDTH + 4.0f, wp.y * TILE_HEIGHT + 4.0f, TILE_WIDTH - 8.0f, TILE_HEIGHT - 8.0f, camera, {120, 200, 255, 220});
             }
 
             // "G<n>" label above the leader with the current state
             float sx, sy;
-            camera.worldToScreen(lx, ly - TILE_HEIGHT * 1.2f, sx, sy);
+            camera.WorldToScreen(lx, ly - TILE_HEIGHT * 1.2f, sx, sy);
             std::string label = "G" + std::to_string(sq.id);
-            int w = font.getTextWidth(label, 6) + 10;
-            renderer.fillRectScreen(static_cast<int>(sx) - w / 2, static_cast<int>(sy) - 10, w, 20, {12, 14, 20, 210});
-            renderer.drawRectScreen(static_cast<int>(sx) - w / 2, static_cast<int>(sy) - 10, w, 20, {232, 176, 74, 255});
-            font.drawString(label, static_cast<int>(sx), static_cast<int>(sy), 6, {232, 176, 74, 255}, false, Anchor::HCENTER | Anchor::VCENTER);
-            std::string info = std::string(squadStateName(sq.state)) + "  " + std::to_string(sq.unitIds.size()) + "/" + std::to_string(sq.initialSize);
-            font.drawString(info, static_cast<int>(sx), static_cast<int>(sy) + 18, 1, {226, 231, 238, 255}, true, Anchor::HCENTER | Anchor::VCENTER);
+            int w = font.GetTextWidth(label, 6) + 10;
+            renderer.FillRectScreen(static_cast<int>(sx) - w / 2, static_cast<int>(sy) - 10, w, 20, {12, 14, 20, 210});
+            renderer.DrawRectScreen(static_cast<int>(sx) - w / 2, static_cast<int>(sy) - 10, w, 20, {232, 176, 74, 255});
+            font.DrawString(label, static_cast<int>(sx), static_cast<int>(sy), 6, {232, 176, 74, 255}, false, Anchor::HCENTER | Anchor::VCENTER);
+            std::string info = std::string(SquadStateName(sq.state)) + "  " + std::to_string(sq.unitIds.size()) + "/" + std::to_string(sq.initialSize);
+            font.DrawString(info, static_cast<int>(sx), static_cast<int>(sy) + 18, 1, {226, 231, 238, 255}, true, Anchor::HCENTER | Anchor::VCENTER);
         }
     }
 

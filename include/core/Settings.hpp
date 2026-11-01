@@ -67,13 +67,13 @@ namespace OpenArtOfWar
         static constexpr int kMinWindowH = 480;
 
         // Brings every value into its valid range
-        void clamp();
+        void Clamp();
 
         bool load(const std::string &path);
-        bool save(const std::string &path) const;
+        bool Save(const std::string &path) const;
 
         // settings.json in the per-user directory
-        static std::string defaultPath();
+        static std::string DefaultPath();
     };
 
 } // namespace OpenArtOfWar

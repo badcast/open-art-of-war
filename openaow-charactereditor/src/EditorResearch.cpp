@@ -20,22 +20,22 @@ constexpr float kNodeH = 52.0f;
 constexpr float kGapX = 56.0f;
 constexpr float kGapY = 14.0f;
 
-int needsOf(const YAML::Node& list, int index) {
-    return yamlInt(list[static_cast<size_t>(index)], "needs", -1);
+int NeedsOf(const YAML::Node& list, int index) {
+    return YamlInt(list[static_cast<size_t>(index)], "needs", -1);
 }
 
 // `candidate` already depends on `index` (directly or through its chain): making `index` need it would loop
-bool dependsOn(const YAML::Node& list, int candidate, int index) {
+bool DependsOn(const YAML::Node& list, int candidate, int index) {
     for (int guard = 0; candidate >= 0 && guard < 64; ++guard) {
         if (candidate == index) return true;
-        candidate = needsOf(list, candidate);
+        candidate = NeedsOf(list, candidate);
     }
     return false;
 }
 
 } // namespace
 
-bool CharacterEditor::loadResearch(int faction) {
+bool CharacterEditor::LoadResearch(int faction) {
     faction = std::clamp(faction, 0, 1);
     try {
         researchPath[faction] = charactersDir / kFactionFiles[faction];
@@ -56,15 +56,15 @@ bool CharacterEditor::loadResearch(int faction) {
     }
 }
 
-bool CharacterEditor::saveResearch() {
+bool CharacterEditor::SaveResearch() {
     const int f = researchFaction;
     if (!researchDoc[f].IsMap()) return false;
     try {
         // Only the editor's changes on top of the file as it is now (keys it does not know stay)
-        const YAML::Node disk = readYamlFile(researchPath[f]);
-        YAML::Node merged = disk.IsMap() ? mergeYamlEdits(researchBase[f], researchDoc[f], disk) : YAML::Clone(researchDoc[f]);
+        const YAML::Node disk = ReadYamlFile(researchPath[f]);
+        YAML::Node merged = disk.IsMap() ? MergeYamlEdits(researchBase[f], researchDoc[f], disk) : YAML::Clone(researchDoc[f]);
         std::string error;
-        if (!writeFileAtomic(researchPath[f], yamlText(merged), error)) {
+        if (!WriteFileAtomic(researchPath[f], YamlText(merged), error)) {
             status = error;
             return false;
         }
@@ -79,23 +79,23 @@ bool CharacterEditor::saveResearch() {
     }
 }
 
-void CharacterEditor::drawResearchTree() {
+void CharacterEditor::DrawResearchTree() {
     for (int f = 0; f < 2; ++f) {
-        if (researchPath[f].empty()) loadResearch(f);
+        if (researchPath[f].empty()) LoadResearch(f);
     }
 
     const char* factions[2] = {_("Confederation"), _("Resistance")};
     for (int f = 0; f < 2; ++f) {
         if (f) ImGui::SameLine();
-        if (hinted(ImGui::RadioButton(factions[f], researchFaction == f), f == 0 ? "Confederation" : "Resistance")) {
+        if (Hinted(ImGui::RadioButton(factions[f], researchFaction == f), f == 0 ? "Confederation" : "Resistance")) {
             researchFaction = f;
             researchSelected = 0;
         }
     }
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Save research")), "Save research")) saveResearch();
+    if (Hinted(ImGui::Button(_("Save research")), "Save research")) SaveResearch();
     ImGui::SameLine();
-    if (hinted(ImGui::Button(_("Reload")), "Reload")) loadResearch(researchFaction);
+    if (Hinted(ImGui::Button(_("Reload")), "Reload")) LoadResearch(researchFaction);
     if (researchDirty[researchFaction]) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
@@ -115,8 +115,8 @@ void CharacterEditor::drawResearchTree() {
     std::vector<std::vector<int>> children(count);
     std::vector<int> roots;
     for (int i = 0; i < count; ++i) {
-        int need = needsOf(list, i);
-        if (need < 0 || need >= count || need == i || dependsOn(list, need, i)) need = -1;
+        int need = NeedsOf(list, i);
+        if (need < 0 || need >= count || need == i || DependsOn(list, need, i)) need = -1;
         parent[i] = need;
         if (need < 0) roots.push_back(i);
         else children[need].push_back(i);
@@ -177,12 +177,12 @@ void CharacterEditor::drawResearchTree() {
         dl->AddRect(p, ImVec2(p.x + kNodeW, p.y + kNodeH),
                     selected ? IM_COL32(240, 170, 60, 255) : IM_COL32(90, 130, 120, 255), 4.0f, 0, selected ? 2.0f : 1.0f);
 
-        const int icon = yamlInt(n, "icon", 0);
-        if (SDL_Texture* thumb = compositeThumbnail(icon, false)) {
+        const int icon = YamlInt(n, "icon", 0);
+        if (SDL_Texture* thumb = CompositeThumbnail(icon, false)) {
             dl->AddImage(reinterpret_cast<ImTextureID>(thumb), ImVec2(p.x + 4, p.y + 7), ImVec2(p.x + 4 + 60, p.y + 7 + 38));
         }
-        const std::string name = yamlString(n, "name", "?");
-        const std::string line2 = "#" + std::to_string(i) + "  " + std::to_string(yamlInt(n, "cost", 0)) + " cr";
+        const std::string name = YamlString(n, "name", "?");
+        const std::string line2 = "#" + std::to_string(i) + "  " + std::to_string(YamlInt(n, "cost", 0)) + " cr";
         dl->PushClipRect(ImVec2(p.x + 68, p.y), ImVec2(p.x + kNodeW - 2, p.y + kNodeH), true);
         dl->AddText(ImVec2(p.x + 68, p.y + 8), IM_COL32(230, 235, 232, 255), _(name.c_str()));
         dl->AddText(ImVec2(p.x + 68, p.y + 28), IM_COL32(150, 175, 168, 255), line2.c_str());
@@ -195,9 +195,9 @@ void CharacterEditor::drawResearchTree() {
     ImGui::EndChild();
 }
 
-void CharacterEditor::drawResearchProperties() {
+void CharacterEditor::DrawResearchProperties() {
     const int f = researchFaction;
-    if (researchPath[f].empty()) loadResearch(f);
+    if (researchPath[f].empty()) LoadResearch(f);
     YAML::Node list = researchDoc[f].IsMap() ? researchDoc[f]["research"] : YAML::Node();
     if (!list || !list.IsSequence() || list.size() == 0) {
         ImGui::TextWrapped("%s", _("The research file could not be loaded."));
@@ -214,15 +214,15 @@ void CharacterEditor::drawResearchProperties() {
     ImGui::Separator();
 
     const std::string scope = "research/" + std::to_string(f) + "/" + std::to_string(i);
-    changed |= editString(n, "name", "Technology name", scope);
-    changed |= editString(n, "description", "Technology description", scope, true);
-    changed |= editInt(n, "cost", "Research cost (credits)", 0);
+    changed |= EditString(n, "name", "Technology name", scope);
+    changed |= EditString(n, "description", "Technology description", scope, true);
+    changed |= EditInt(n, "cost", "Research cost (credits)", 0);
 
     // Icon
-    const int icon = yamlInt(n, "icon", 0);
+    const int icon = YamlInt(n, "icon", 0);
     ImGui::Text(_("Icon: %d"), icon);
     const int perRow = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / 70.0f));
-    fieldHint("Icon");
+    FieldHint("Icon");
     ImGui::BeginChild("research-icons", ImVec2(0.0f, 150.0f), true);
     int k = 0;
     for (int comp = OpenArtOfWar::kResearchIconFirst; comp <= OpenArtOfWar::kResearchIconLast; ++comp) {
@@ -230,7 +230,7 @@ void CharacterEditor::drawResearchProperties() {
         ImGui::PushID(comp);
         const bool selected = comp == icon;
         if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
-        SDL_Texture* thumb = compositeThumbnail(comp, false);
+        SDL_Texture* thumb = CompositeThumbnail(comp, false);
         const bool clicked = thumb ? ImGui::ImageButton("icon", reinterpret_cast<ImTextureID>(thumb), ImVec2(60, 38))
                                    : ImGui::Button(std::to_string(comp).c_str(), ImVec2(60, 38));
         if (selected) ImGui::PopStyleColor();
@@ -245,10 +245,10 @@ void CharacterEditor::drawResearchProperties() {
     // Effect
     using OpenArtOfWar::ResearchEffect;
     ResearchEffect effect = ResearchEffect::InfantryArmor;
-    OpenArtOfWar::parseResearchEffect(yamlString(n, "effect"), effect);
-    if (hinted(ImGui::BeginCombo(_("Effect"), OpenArtOfWar::researchEffectName(effect)), "Effect")) {
+    OpenArtOfWar::ParseResearchEffect(YamlString(n, "effect"), effect);
+    if (Hinted(ImGui::BeginCombo(_("Effect"), OpenArtOfWar::ResearchEffectName(effect)), "Effect")) {
         for (int e = 0; e < static_cast<int>(ResearchEffect::Count); ++e) {
-            const char* label = OpenArtOfWar::researchEffectName(static_cast<ResearchEffect>(e));
+            const char* label = OpenArtOfWar::ResearchEffectName(static_cast<ResearchEffect>(e));
             if (ImGui::Selectable(label, e == static_cast<int>(effect))) {
                 n["effect"] = std::string(label);
                 changed = true;
@@ -256,16 +256,16 @@ void CharacterEditor::drawResearchProperties() {
         }
         ImGui::EndCombo();
     }
-    changed |= editInt(n, "value", "Value", 0);
-    changed |= editInt(n, "value2", "Second value", 0);
+    changed |= EditInt(n, "value", "Value", 0);
+    changed |= EditInt(n, "value2", "Second value", 0);
     ImGui::TextDisabled("%s", _("Value / second value: see the effect list in game/Research.hpp"));
 
     // Units the effect is about
     auto archPicker = [&](const char* key, const char* label) {
-        const int current = yamlInt(n, key, -1);
+        const int current = YamlInt(n, key, -1);
         const auto* info = OpenArtOfWar::Utility::archetypeInfo(current);
         const std::string preview = info ? "#" + std::to_string(current) + " " + _(info->name) : std::string(_("(none)"));
-        if (hinted(ImGui::BeginCombo(_(label), preview.c_str()), label)) {
+        if (Hinted(ImGui::BeginCombo(_(label), preview.c_str()), label)) {
             if (ImGui::Selectable(_("(none)"), current < 0)) {
                 n[key] = -1;
                 changed = true;
@@ -274,7 +274,7 @@ void CharacterEditor::drawResearchProperties() {
                 const auto* ai = OpenArtOfWar::Utility::archetypeInfo(a);
                 if (!ai || ai->baseFormId >= 0) continue; // siege / baseline forms count as their base unit
                 const std::string text = "#" + std::to_string(a) + " " + _(ai->name) + " - " +
-                                         _(OpenArtOfWar::Utility::factionName(ai->faction));
+                                         _(OpenArtOfWar::Utility::FactionName(ai->faction));
                 if (ImGui::Selectable(text.c_str(), a == current)) {
                     n[key] = a;
                     changed = true;
@@ -287,18 +287,18 @@ void CharacterEditor::drawResearchProperties() {
     archPicker("arch_b", "Unit B");
 
     // Requirement: the tree is built from it
-    const int need = yamlInt(n, "needs", -1);
+    const int need = YamlInt(n, "needs", -1);
     auto techLabel = [&](int t) {
-        return "#" + std::to_string(t) + " " + _(yamlString(list[static_cast<size_t>(t)], "name", "?").c_str());
+        return "#" + std::to_string(t) + " " + _(YamlString(list[static_cast<size_t>(t)], "name", "?").c_str());
     };
     const std::string needPreview = (need >= 0 && need < count) ? techLabel(need) : std::string(_("(none)"));
-    if (hinted(ImGui::BeginCombo(_("Requires"), needPreview.c_str()), "Requires")) {
+    if (Hinted(ImGui::BeginCombo(_("Requires"), needPreview.c_str()), "Requires")) {
         if (ImGui::Selectable(_("(none)"), need < 0)) {
             n["needs"] = -1;
             changed = true;
         }
         for (int t = 0; t < count; ++t) {
-            if (t == i || dependsOn(list, t, i)) continue; // would make a loop
+            if (t == i || DependsOn(list, t, i)) continue; // would make a loop
             if (ImGui::Selectable(techLabel(t).c_str(), t == need)) {
                 n["needs"] = t;
                 changed = true;
@@ -306,12 +306,12 @@ void CharacterEditor::drawResearchProperties() {
         }
         ImGui::EndCombo();
     }
-    changed |= editBool(n, "player_only", "Player only", false);
+    changed |= EditBool(n, "player_only", "Player only", false);
 
     if (changed) researchDirty[f] = true;
     if (researchDirty[f]) {
         ImGui::Separator();
-        if (ImGui::Button(_("Save research"))) saveResearch();
+        if (ImGui::Button(_("Save research"))) SaveResearch();
     }
 }
 

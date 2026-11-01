@@ -66,49 +66,49 @@ namespace OpenArtOfWar
     constexpr int kResearchCount = 24; // technologies per faction
 
     // YAML name of an effect (assets/characters/research_<faction>.yaml): `infantry_armor`, `fire_rate`, ...
-    const char *researchEffectName(ResearchEffect effect);
-    bool parseResearchEffect(const std::string &name, ResearchEffect &out);
+    const char *ResearchEffectName(ResearchEffect effect);
+    bool ParseResearchEffect(const std::string &name, ResearchEffect &out);
     // Cameo composites the research icon can be picked from
     constexpr int kResearchIconFirst = 2064;
     constexpr int kResearchIconLast = 2132;
     // File of the faction's tree, relative to the asset root
-    const char *researchFile(Faction faction);
+    const char *ResearchFile(Faction faction);
 
     // The catalog is read from the faction's research YAML; entries it lacks keep the built-in values
     const ResearchDef &researchDef(Faction faction, int index);
 
     // Research is only possible while the player owns a finished Tech Center / Laboratory
-    bool hasResearchBuilding(PlayerId player, const EntityManager &entities);
+    bool HasResearchBuilding(PlayerId player, const EntityManager &entities);
 
     // Completed technologies per player (reset when a mission starts). The technologies on offer are those
     // of the player's faction (researchDef(Players::factionOf(player), i)).
-    void resetResearch();
-    void resetResearch(PlayerId player);
-    bool isResearched(PlayerId player, int index);
+    void ResetResearch();
+    void ResetResearch(PlayerId player);
+    bool IsResearched(PlayerId player, int index);
     // The technology's own requirement is done
-    bool isResearchAvailable(PlayerId player, int index);
+    bool IsResearchAvailable(PlayerId player, int index);
 
     // Marks the technology done and applies it to every unit of the player plus its global effects
-    void completeResearch(PlayerId player, int index, EntityManager &entities);
+    void CompleteResearch(PlayerId player, int index, EntityManager &entities);
 
     // Gives a freshly trained unit every technology its owner has completed
-    void applyCompletedResearch(Unit &unit);
+    void ApplyCompletedResearch(Unit &unit);
     // Firing range of a unit form after the completed range technologies (Hornet-10, Grad-10, ...)
-    float researchedAttackRange(PlayerId player, int archetypeId, float range);
+    float ResearchedAttackRange(PlayerId player, int archetypeId, float range);
 
     // Player-wide numbers of the completed technologies: the sum of `value` of every one with that effect
-    int researchTotal(PlayerId player, ResearchEffect effect);
+    int ResearchTotal(PlayerId player, ResearchEffect effect);
     // A completed technology with that effect exists
-    bool isEffectResearched(PlayerId player, ResearchEffect effect);
+    bool IsEffectResearched(PlayerId player, ResearchEffect effect);
     // Units that need a technology (flamethrower, sniper, Grad, Porcupine) can only be trained once it is done
-    bool isUnitUnlocked(PlayerId player, int archetype);
+    bool IsUnitUnlocked(PlayerId player, int archetype);
     // Index of the technology that unlocks the unit, -1 when it needs none
-    int unitUnlockResearch(Faction faction, int archetype);
-    bool isRadarUnlocked(PlayerId player);
+    int UnitUnlockResearch(Faction faction, int archetype);
+    bool IsRadarUnlocked(PlayerId player);
 
     // Armor: damage taken by `target` after the armor of its owner's technologies (at least 1)
-    int reduceDamageByArmor(int damage, const class Entity &target);
+    int ReduceDamageByArmor(int damage, const class Entity &target);
     // A wall of `player` takes this much of `damage`
-    int reduceWallDamage(int damage, PlayerId player);
+    int ReduceWallDamage(int damage, PlayerId player);
 
 } // namespace OpenArtOfWar

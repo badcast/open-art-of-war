@@ -38,7 +38,7 @@ namespace OpenArtOfWar::Assets
             return s;
         }
 
-        std::vector<fs::path> candidateRoots()
+        std::vector<fs::path> CandidateRoots()
         {
             std::vector<fs::path> roots {fs::path(".")};
             if(const char *base = SDL_GetBasePath())
@@ -51,7 +51,7 @@ namespace OpenArtOfWar::Assets
         }
 
         // "assets/maps/m0.json", "./assets/x", "../assets/x" -> "maps/m0.json"; false for non-asset paths
-        bool assetKey(const std::string &path, std::string &key)
+        bool AssetKey(const std::string &path, std::string &key)
         {
             fs::path normal = fs::path(path).lexically_normal();
             auto it = normal.begin();
@@ -67,7 +67,7 @@ namespace OpenArtOfWar::Assets
             return true;
         }
 
-        std::string userDirLocked(State &s)
+        std::string UserDirLocked(State &s)
         {
             if(s.userDir.empty())
             {
@@ -86,7 +86,7 @@ namespace OpenArtOfWar::Assets
             return s.userDir;
         }
 
-        bool readFile(const fs::path &p, std::vector<uint8_t> &out)
+        bool ReadFile(const fs::path &p, std::vector<uint8_t> &out)
         {
             std::ifstream f(p, std::ios::binary);
             if(!f)
@@ -96,7 +96,7 @@ namespace OpenArtOfWar::Assets
         }
 
         // Unpacks every regular file of the tar.zst blob into memory (a tar stream has no random access)
-        bool loadBlob(const fs::path &blob, std::map<std::string, std::vector<uint8_t>> &files)
+        bool LoadBlob(const fs::path &blob, std::map<std::string, std::vector<uint8_t>> &files)
         {
             archive *a = archive_read_new();
             archive_read_support_filter_all(a);
@@ -136,7 +136,7 @@ namespace OpenArtOfWar::Assets
         }
 
         // Blob lookups; the caller holds the lock
-        bool blobRead(State &s, const std::string &key, std::vector<uint8_t> &out)
+        bool BlobRead(State &s, const std::string &key, std::vector<uint8_t> &out)
         {
             const auto it = s.blobFiles.find(key);
             if(key.empty() || it == s.blobFiles.end())
@@ -145,14 +145,14 @@ namespace OpenArtOfWar::Assets
             return true;
         }
 
-        bool blobHas(State &s, const std::string &key)
+        bool BlobHas(State &s, const std::string &key)
         {
             return !key.empty() && s.blobFiles.count(key) != 0;
         }
 
     } // namespace
 
-    bool init()
+    bool Init()
     {
         State &s = state();
         std::lock_guard<std::mutex> guard(s.lock);
@@ -160,7 +160,7 @@ namespace OpenArtOfWar::Assets
             return true;
 
         std::error_code ec;
-        const std::vector<fs::path> roots = candidateRoots();
+        const std::vector<fs::path> roots = CandidateRoots();
 
         // 1. A real "assets" directory
         for(const fs::path &root : roots)
@@ -181,7 +181,7 @@ namespace OpenArtOfWar::Assets
             const fs::path blob = root / MainAssetBlobName;
             if(!fs::is_regular_file(blob, ec))
                 continue;
-            if(!loadBlob(blob, s.blobFiles))
+            if(!LoadBlob(blob, s.blobFiles))
             {
                 s.blobFiles.clear();
                 continue;
@@ -200,52 +200,52 @@ namespace OpenArtOfWar::Assets
         return state().mode;
     }
 
-    std::string describe()
+    std::string Describe()
     {
         return state().description;
     }
 
-    bool exists(const std::string &path)
+    bool Exists(const std::string &path)
     {
         State &s = state();
         std::string key;
-        if(s.mode != Mode::Blob || !assetKey(path, key))
+        if(s.mode != Mode::Blob || !AssetKey(path, key))
         {
             std::error_code ec;
             return fs::exists(path, ec);
         }
         std::lock_guard<std::mutex> guard(s.lock);
         std::error_code ec;
-        return fs::exists(fs::path(userDirLocked(s)) / key, ec) || blobHas(s, key);
+        return fs::exists(fs::path(UserDirLocked(s)) / key, ec) || BlobHas(s, key);
     }
 
-    bool readBytes(const std::string &path, std::vector<uint8_t> &out)
+    bool ReadBytes(const std::string &path, std::vector<uint8_t> &out)
     {
         State &s = state();
         std::string key;
-        if(s.mode != Mode::Blob || !assetKey(path, key))
-            return readFile(path, out);
+        if(s.mode != Mode::Blob || !AssetKey(path, key))
+            return ReadFile(path, out);
         std::lock_guard<std::mutex> guard(s.lock);
-        if(readFile(fs::path(userDirLocked(s)) / key, out))
+        if(ReadFile(fs::path(UserDirLocked(s)) / key, out))
             return true;
-        return blobRead(s, key, out);
+        return BlobRead(s, key, out);
     }
 
-    bool readText(const std::string &path, std::string &out)
+    bool ReadText(const std::string &path, std::string &out)
     {
         std::vector<uint8_t> bytes;
-        if(!readBytes(path, bytes))
+        if(!ReadBytes(path, bytes))
             return false;
         out.assign(bytes.begin(), bytes.end());
         return true;
     }
 
-    std::vector<std::string> list(const std::string &dir, const std::string &extension)
+    std::vector<std::string> List(const std::string &dir, const std::string &extension)
     {
         State &s = state();
         std::set<std::string> names;
         std::string key;
-        const bool inBlob = s.mode == Mode::Blob && assetKey(dir, key);
+        const bool inBlob = s.mode == Mode::Blob && AssetKey(dir, key);
         std::error_code ec;
 
         auto scanDirectory = [&](const fs::path &p)
@@ -264,7 +264,7 @@ namespace OpenArtOfWar::Assets
         else
         {
             std::lock_guard<std::mutex> guard(s.lock);
-            scanDirectory(fs::path(userDirLocked(s)) / key);
+            scanDirectory(fs::path(UserDirLocked(s)) / key);
             const std::string prefix = key.empty() ? "" : key + "/";
             for(const auto &[full, data] : s.blobFiles)
             {
@@ -286,7 +286,7 @@ namespace OpenArtOfWar::Assets
         return result;
     }
 
-    std::string writablePath(const std::string &path)
+    std::string WritablePath(const std::string &path)
     {
         State &s = state();
         std::string target = path;
@@ -294,7 +294,7 @@ namespace OpenArtOfWar::Assets
         {
             std::string key;
             std::lock_guard<std::mutex> guard(s.lock);
-            target = (fs::path(userDirLocked(s)) / (assetKey(path, key) ? key : fs::path(path).lexically_normal().generic_string())).string();
+            target = (fs::path(UserDirLocked(s)) / (AssetKey(path, key) ? key : fs::path(path).lexically_normal().generic_string())).string();
         }
         std::error_code ec;
         const fs::path parent = fs::path(target).parent_path();
@@ -303,15 +303,15 @@ namespace OpenArtOfWar::Assets
         return target;
     }
 
-    std::string realDirectory(const std::string &dir)
+    std::string RealDirectory(const std::string &dir)
     {
         State &s = state();
         std::string key;
-        if(s.mode != Mode::Blob || !assetKey(dir, key))
+        if(s.mode != Mode::Blob || !AssetKey(dir, key))
             return dir;
 
         std::lock_guard<std::mutex> guard(s.lock);
-        const fs::path out = fs::path(userDirLocked(s)) / "cache" / key;
+        const fs::path out = fs::path(UserDirLocked(s)) / "cache" / key;
         std::error_code ec;
         fs::create_directories(out, ec);
         const std::string prefix = key.empty() ? "" : key + "/";
@@ -327,14 +327,14 @@ namespace OpenArtOfWar::Assets
         return out.string();
     }
 
-    std::string userDataDir()
+    std::string UserDataDir()
     {
         State &s = state();
         std::lock_guard<std::mutex> guard(s.lock);
-        return userDirLocked(s);
+        return UserDirLocked(s);
     }
 
-    void setUserDataDir(const std::string &dir)
+    void SetUserDataDir(const std::string &dir)
     {
         State &s = state();
         std::lock_guard<std::mutex> guard(s.lock);

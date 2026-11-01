@@ -58,15 +58,15 @@ namespace OpenArtOfWar
         int rallyTileX {-1}; // where fresh units walk to; -1 = stay at the exit
         int rallyTileY {-1};
 
-        bool hasRallyPoint() const
+        bool HasRallyPoint() const
         {
             return rallyTileX >= 0 && rallyTileY >= 0;
         }
-        bool isUnitProducer() const
+        bool IsUnitProducer() const
         {
             return type == UnitType::Barracks || type == UnitType::Factory;
         }
-        float currentProductionProgress() const
+        float CurrentProductionProgress() const
         {
             if(productionQueue.empty())
                 return 0.0f;
@@ -77,35 +77,35 @@ namespace OpenArtOfWar
         Building();
         ~Building() override = default;
 
-        bool isBuildingEntity() const override
+        bool IsBuildingEntity() const override
         {
             return true;
         }
-        Building *asBuilding() override
+        Building *AsBuilding() override
         {
             return this;
         }
-        const Building *asBuilding() const override
+        const Building *AsBuilding() const override
         {
             return this;
         }
 
-        float getUnitCenterPixelX() const override
+        float GetUnitCenterPixelX() const override
         {
             return (tileX + buildWidth * 0.5f) * TILE_WIDTH;
         }
-        float getUnitCenterPixelY() const override
+        float GetUnitCenterPixelY() const override
         {
             return (tileY + buildHeight * 0.5f) * TILE_HEIGHT;
         }
 
-        void getMuzzlePoint(float &outX, float &outY) const override;
-        int getPowerOutput() const;
+        void GetMuzzlePoint(float &outX, float &outY) const override;
+        int GetPowerOutput() const;
 
-        void update(float deltaTime, TileMap &map, const BuildingDelegates &delegates);
-        void updateConstruction(float deltaTime);
-        void updateProduction(float deltaTime);
-        void updateDefenseCombat(float deltaTime, TileMap &map, const BuildingDelegates &delegates);
+        void Update(float deltaTime, TileMap &map, const BuildingDelegates &delegates);
+        void UpdateConstruction(float deltaTime);
+        void UpdateProduction(float deltaTime);
+        void UpdateDefenseCombat(float deltaTime, TileMap &map, const BuildingDelegates &delegates);
     };
 
 } // namespace OpenArtOfWar

@@ -38,7 +38,7 @@ namespace OpenArtOfWar
         ImGui::DestroyContext();
     }
 
-    void DebugOverlay::processEvent(const SDL_Event &event)
+    void DebugOverlay::ProcessEvent(const SDL_Event &event)
     {
         if(m_visible)
         {
@@ -58,27 +58,27 @@ namespace OpenArtOfWar
         ImGui::SetNextWindowSize(ImVec2(480, 520), ImGuiCond_FirstUseEver);
         if(ImGui::Begin("Open Art Of War - RTS Engine Debug Inspector", &m_visible))
         {
-            ImGui::Text("Engine Status: FPS: %.1f | Camera: (%.1f, %.1f) Zoom: %.2fx", fps, camera.getX(), camera.getY(), camera.getZoom());
+            ImGui::Text("Engine Status: FPS: %.1f | Camera: (%.1f, %.1f) Zoom: %.2fx", fps, camera.GetX(), camera.GetY(), camera.GetZoom());
             ImGui::Separator();
 
             // 1. Cheats & Resources
             if(ImGui::CollapsingHeader("Economy & Cheats", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::Text("Credits: $%d | Power: %d / %d (Net: %d)", economy.getCredits(), economy.getPowerConsumed(), economy.getPowerProduced(), economy.getPowerProduced() - economy.getPowerConsumed());
+                ImGui::Text("Credits: $%d | Power: %d / %d (Net: %d)", economy.GetCredits(), economy.GetPowerConsumed(), economy.GetPowerProduced(), economy.GetPowerProduced() - economy.GetPowerConsumed());
 
                 if(ImGui::Button("+10,000 Credits"))
                 {
-                    economy.addCredits(10000);
+                    economy.AddCredits(10000);
                 }
                 ImGui::SameLine();
                 if(ImGui::Button("Spawn Player Tank"))
                 {
-                    entities.spawnUnitByArchetype(8, 10, 10, Faction::Resistance);
+                    entities.SpawnUnitByArchetype(8, 10, 10, Faction::Resistance);
                 }
                 ImGui::SameLine();
                 if(ImGui::Button("Spawn Enemy Tank"))
                 {
-                    entities.spawnUnitByArchetype(18, 12, 12, Faction::Confederation);
+                    entities.SpawnUnitByArchetype(18, 12, 12, Faction::Confederation);
                 }
 
                 ImGui::Checkbox("Disable Fog of War (Reveal All)", &m_disableFog);
@@ -87,7 +87,7 @@ namespace OpenArtOfWar
             // 2. AI Director: runtime difficulty override and visualization
             if(ImGui::CollapsingHeader("AI Director", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                AIDebugConfig cfg = ai.getDebugConfig();
+                AIDebugConfig cfg = ai.GetDebugConfig();
                 bool changed = false;
                 changed |= ImGui::Checkbox("Override difficulty", &cfg.forceDebugOverride);
                 ImGui::SameLine();
@@ -101,38 +101,38 @@ namespace OpenArtOfWar
                 ImGui::SetNextItemWidth(200);
                 changed |= ImGui::SliderFloat("Wave size multiplier", &cfg.waveSpawnMultiplier, 0.25f, 4.0f, "%.2fx");
                 if(changed)
-                    ai.setDebugConfig(cfg);
+                    ai.SetDebugConfig(cfg);
 
-                const AITacticsConfig &t = ai.getTactics();
+                const AITacticsConfig &t = ai.GetTactics();
                 ImGui::Text(
-                    "In effect: %s | leash %.1f tiles | chokepoint gather: %s | slowest leads: %s | retreat: %s", difficultyToString(ai.getEffectiveDifficulty()).c_str(), t.leashTiles, t.waitAtChokepoints ? "yes" : "no", t.syncToSlowest ? "yes" : "no", t.retreatLossRatio > 0.0f ? "yes" : "no");
-                ImGui::Text("Credits: %d | Waves sent: %d | Next wave: %d units, ready %d, cooldown %.0fs", ai.getEnemyCredits(), ai.getWaveCount(), static_cast<int>(ai.getCurrentWavePlan().archetypes.size()), ai.getReadyUnitCount(), std::max(0.0f, ai.getWaveCooldown()));
-                if(ai.getResearchIndex() < kResearchCount)
+                    "In effect: %s | leash %.1f tiles | chokepoint gather: %s | slowest leads: %s | retreat: %s", DifficultyToString(ai.GetEffectiveDifficulty()).c_str(), t.leashTiles, t.waitAtChokepoints ? "yes" : "no", t.syncToSlowest ? "yes" : "no", t.retreatLossRatio > 0.0f ? "yes" : "no");
+                ImGui::Text("Credits: %d | Waves sent: %d | Next wave: %d units, ready %d, cooldown %.0fs", ai.GetEnemyCredits(), ai.GetWaveCount(), static_cast<int>(ai.GetCurrentWavePlan().archetypes.size()), ai.GetReadyUnitCount(), std::max(0.0f, ai.GetWaveCooldown()));
+                if(ai.GetResearchIndex() < kResearchCount)
                 {
-                    ImGui::Text("Research %d/%d: %s %s", ai.getResearchIndex() + 1, kResearchCount, researchDef(aiFaction(), ai.getResearchIndex()).name, ai.isResearchActive() ? "(in progress)" : "(waiting for lab / credits)");
+                    ImGui::Text("Research %d/%d: %s %s", ai.GetResearchIndex() + 1, kResearchCount, researchDef(AiFaction(), ai.GetResearchIndex()).name, ai.IsResearchActive() ? "(in progress)" : "(waiting for lab / credits)");
                 }
                 else
                 {
                     ImGui::Text("Research: all technologies complete");
                 }
-                for(const auto &sq : ai.getSquadController().getSquads())
+                for(const auto &sq : ai.GetSquadController().GetSquads())
                 {
-                    ImGui::BulletText("G%d (wave %d): %s, %zu/%d units, route %d/%zu, spread %.1f", sq.id, sq.waveNumber, squadStateName(sq.state), sq.unitIds.size(), sq.initialSize, sq.progress, sq.route.size(), sq.maxSpread);
+                    ImGui::BulletText("G%d (wave %d): %s, %zu/%d units, route %d/%zu, spread %.1f", sq.id, sq.waveNumber, SquadStateName(sq.state), sq.unitIds.size(), sq.initialSize, sq.progress, sq.route.size(), sq.maxSpread);
                 }
             }
 
             // 2b. AI control: treasury, research, reasoning log
             if(ImGui::CollapsingHeader("AI Control & Thoughts", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                renderAiPanel(ai, entities);
+                RenderAiPanel(ai, entities);
             }
 
             // 3. Mission & Levels
             if(ImGui::CollapsingHeader("Mission Controller", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::Text("Current Mission: %d (Map: m%d)", mission.getCurrentMissionId(), map.getWidth());
-                ImGui::Text("Objective: %s", mission.getObjectiveText().c_str());
-                ImGui::Text("Player Kills: %d", entities.getPlayerKillCount());
+                ImGui::Text("Current Mission: %d (Map: m%d)", mission.GetCurrentMissionId(), map.GetWidth());
+                ImGui::Text("Objective: %s", mission.GetObjectiveText().c_str());
+                ImGui::Text("Player Kills: %d", entities.GetPlayerKillCount());
 
                 for(int m = 0; m <= 7; ++m)
                 {
@@ -150,35 +150,35 @@ namespace OpenArtOfWar
             // 4. Audio & Music
             if(ImGui::CollapsingHeader("Sound & Audio Tracks"))
             {
-                ImGui::Text("Current Music Track: %d", sound.getCurrentTrack());
+                ImGui::Text("Current Music Track: %d", sound.GetCurrentTrack());
                 if(ImGui::Button("Menu Theme"))
                 {
-                    sound.playMenuMusic();
+                    sound.PlayMenuMusic();
                 }
                 ImGui::SameLine();
                 if(ImGui::Button("Random Game Track"))
                 {
-                    sound.playRandomGameTrack();
+                    sound.PlayRandomGameTrack();
                 }
                 ImGui::SameLine();
-                if(ImGui::Button(sound.isMuted() ? "Unmute" : "Mute"))
+                if(ImGui::Button(sound.IsMuted() ? "Unmute" : "Mute"))
                 {
-                    sound.toggleMute();
+                    sound.ToggleMute();
                 }
             }
 
             // 5. Entity Inspector
             if(ImGui::CollapsingHeader("Entity Inspector"))
             {
-                ImGui::Text("Alive Entities Count: %zu", entities.getAllEntities().size());
+                ImGui::Text("Alive Entities Count: %zu", entities.GetAllEntities().size());
                 ImGui::BeginChild("EntitiesList", ImVec2(0, 160), true);
-                for(auto &e : entities.getAllEntities())
+                for(auto &e : entities.GetAllEntities())
                 {
                     if(!e.alive)
                         continue;
                     const char *factionStr = (e.faction == Faction::Resistance) ? "[Red/Res]" : "[Blue/Conf]";
                     const char *typeStr = e.isBuilding ? "Building" : "Unit";
-                    int arch = e.asUnit() ? e.asUnit()->archetypeId : -1;
+                    int arch = e.AsUnit() ? e.AsUnit()->archetypeId : -1;
                     ImGui::Text("#%d %s %s (arch:%d) HP: %d/%d Pos:(%d,%d)", e.id, factionStr, typeStr, arch, e.currentHp, e.maxHp, e.tileX, e.tileY);
                 }
                 ImGui::EndChild();
@@ -190,13 +190,13 @@ namespace OpenArtOfWar
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
     }
 
-    void DebugOverlay::renderAiPanel(AIController &ai, EntityManager &entities)
+    void DebugOverlay::RenderAiPanel(AIController &ai, EntityManager &entities)
     {
         (void) entities;
         // --- Treasury: free edit field plus quick buttons ---
         if(!m_aiCreditsEditing)
-            m_aiCreditsEdit = ai.getEnemyCredits();
-        ImGui::Text("AI credits: %d", ai.getEnemyCredits());
+            m_aiCreditsEdit = ai.GetEnemyCredits();
+        ImGui::Text("AI credits: %d", ai.GetEnemyCredits());
         ImGui::SetNextItemWidth(160);
         // InputInt with step buttons does not support EnterReturnsTrue: take Enter from the deactivation instead
         ImGui::InputInt("##aiCredits", &m_aiCreditsEdit, 100, 1000);
@@ -205,22 +205,22 @@ namespace OpenArtOfWar
         ImGui::SameLine();
         if(ImGui::Button("Set") || entered)
         {
-            ai.setEnemyCredits(std::max(0, m_aiCreditsEdit));
+            ai.SetEnemyCredits(std::max(0, m_aiCreditsEdit));
             m_aiCreditsEditing = false;
         }
         ImGui::SameLine();
         if(ImGui::Button("+500"))
-            ai.setEnemyCredits(ai.getEnemyCredits() + 500);
+            ai.SetEnemyCredits(ai.GetEnemyCredits() + 500);
         ImGui::SameLine();
         if(ImGui::Button("+2000"))
-            ai.setEnemyCredits(ai.getEnemyCredits() + 2000);
+            ai.SetEnemyCredits(ai.GetEnemyCredits() + 2000);
         ImGui::SameLine();
         if(ImGui::Button("Bankrupt (0)"))
-            ai.setEnemyCredits(0);
+            ai.SetEnemyCredits(0);
 
         // --- Research: what the AI has, what it is on, what comes next ---
         ImGui::Separator();
-        ImGui::Text("Research (%s, %s):", aiFaction() == Faction::Confederation ? "Confederation / Tech Center" : "Resistance / Laboratory", hasResearchBuilding(Players::ownerOf(aiFaction()), entities) ? "building ready" : "NO BUILDING - paused");
+        ImGui::Text("Research (%s, %s):", AiFaction() == Faction::Confederation ? "Confederation / Tech Center" : "Resistance / Laboratory", HasResearchBuilding(Players::OwnerOf(AiFaction()), entities) ? "building ready" : "NO BUILDING - paused");
         if(ImGui::BeginTable("aiResearch", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit))
         {
             ImGui::TableSetupColumn("#");
@@ -230,7 +230,7 @@ namespace OpenArtOfWar
             ImGui::TableHeadersRow();
             for(int i = 0; i < kResearchCount; ++i)
             {
-                const ResearchDef &r = researchDef(aiFaction(), i);
+                const ResearchDef &r = researchDef(AiFaction(), i);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", i + 1);
@@ -243,15 +243,15 @@ namespace OpenArtOfWar
                 {
                     ImGui::TextDisabled("player only");
                 }
-                else if(ai.isTechnologyResearched(i))
+                else if(ai.IsTechnologyResearched(i))
                 {
                     ImGui::TextColored(ImVec4(0.4f, 0.85f, 0.45f, 1.0f), "researched");
                 }
-                else if(i == ai.getResearchIndex() && ai.isResearchActive())
+                else if(i == ai.GetResearchIndex() && ai.IsResearchActive())
                 {
-                    ImGui::ProgressBar(ai.getResearchProgress(), ImVec2(120, 0));
+                    ImGui::ProgressBar(ai.GetResearchProgress(), ImVec2(120, 0));
                 }
-                else if(i == ai.getResearchIndex())
+                else if(i == ai.GetResearchIndex())
                 {
                     ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.3f, 1.0f), "next (waiting)");
                 }
@@ -266,7 +266,7 @@ namespace OpenArtOfWar
         // --- What the AI is doing right now ---
         ImGui::Separator();
         ImGui::TextUnformatted("Right now:");
-        for(const std::string &line : ai.currentIntentions())
+        for(const std::string &line : ai.CurrentIntentions())
             ImGui::BulletText("%s", line.c_str());
 
         // --- Reasoning log ---
@@ -280,7 +280,7 @@ namespace OpenArtOfWar
         ImGui::Checkbox("Auto-scroll", &m_thoughtAutoScroll);
         ImGui::SameLine();
         if(ImGui::Button("Clear"))
-            ai.clearThoughts();
+            ai.ClearThoughts();
 
         auto categoryColor = [](const std::string &c)
         {
@@ -296,7 +296,7 @@ namespace OpenArtOfWar
                 return ImVec4(0.95f, 0.85f, 0.4f, 1.0f);
             return ImVec4(0.8f, 0.8f, 0.85f, 1.0f); // WAVE
         };
-        const auto &thoughts = ai.getThoughts();
+        const auto &thoughts = ai.GetThoughts();
         if(ImGui::BeginChild("aiThoughts", ImVec2(0, 220), ImGuiChildFlags_Borders))
         {
             for(const AIThought &t : thoughts)
@@ -311,11 +311,11 @@ namespace OpenArtOfWar
                 ImGui::TextWrapped("%s", t.text.c_str());
             }
             // Follow new lines while the user has not scrolled up
-            if(m_thoughtAutoScroll && ai.getThoughtSerial() != m_thoughtsSeen && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 40.0f)
+            if(m_thoughtAutoScroll && ai.GetThoughtSerial() != m_thoughtsSeen && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 40.0f)
             {
                 ImGui::SetScrollHereY(1.0f);
             }
-            m_thoughtsSeen = ai.getThoughtSerial();
+            m_thoughtsSeen = ai.GetThoughtSerial();
         }
         ImGui::EndChild();
     }

@@ -21,49 +21,73 @@ namespace OpenArtOfWar
     {
         if(m_map)
         {
-            syncMap();
+            SyncMap();
         }
     }
 
     Pathfinder::~Pathfinder() = default;
 
-    void Pathfinder::setMap(const TileMap *map)
+    void Pathfinder::SetMap(const TileMap *map)
     {
         m_map = map;
-        syncMap();
+        SyncMap();
     }
 
-    void Pathfinder::ensureBrainMapSize(int width, int height)
+    namespace
+    {
+        // The game's step costs are 10 (straight) and 14 (diagonal, ~10 * sqrt(2)); the heuristics use the same scale
+        constexpr int kStraightCost = 10;
+        constexpr int kDiagonalCost = 14;
+
+        // Exact admissible estimate for 8-way movement: 10 * max + 4 * min
+        brain::weight_t OctileHeuristic(brain::weight_t dx, brain::weight_t dy)
+        {
+            dx = std::abs(dx);
+            dy = std::abs(dy);
+            return 10 * std::max(dx, dy) + 4 * std::min(dx, dy);
+        }
+
+        // Exact admissible estimate for 4-way movement
+        brain::weight_t ManhattanHeuristic(brain::weight_t dx, brain::weight_t dy)
+        {
+            return (std::abs(dx) + std::abs(dy)) * 10;
+        }
+    } // namespace
+
+    void Pathfinder::EnsureBrainMapSize(int width, int height)
     {
         if(width <= 0 || height <= 0)
             return;
         if(!m_brainMap || m_lastWidth != width || m_lastHeight != height)
         {
             m_brainMap = std::make_unique<brain::brain_map>(width, height);
+            m_brainMap->set_custom_weights(kStraightCost, kDiagonalCost);
+            // Units walk diagonally between two locked tiles that only touch at their corners
+            m_brainMap->set_custom_corner_cutting(true);
             m_brainMap->set_identity(brain::MatrixIdentity::DiagonalMethod);
-            m_brainMap->set_heuristic(brain::HeuristicMethod::Octile);
+            m_brainMap->set_custom_heuristic(OctileHeuristic);
             m_lastWidth = width;
             m_lastHeight = height;
         }
     }
 
-    void Pathfinder::syncMap(int ignoreEntityId, bool lockUnits)
+    void Pathfinder::SyncMap(int ignoreEntityId, bool lockUnits)
     {
         if(!m_map)
             return;
-        int w = m_map->getWidth();
-        int h = m_map->getHeight();
+        int w = m_map->GetWidth();
+        int h = m_map->GetHeight();
         if(w <= 0 || h <= 0)
             return;
 
-        ensureBrainMapSize(w, h);
+        EnsureBrainMapSize(w, h);
 
         // Sync impassable obstacles (terrain, water, buildings, walls) to brain_map locks
         for(int y = 0; y < h; ++y)
         {
             for(int x = 0; x < w; ++x)
             {
-                bool blocked = !m_map->isPassable(x, y) || (m_map->getWall(x, y) > 0);
+                bool blocked = !m_map->IsPassable(x, y) || (m_map->GetWall(x, y) > 0);
                 m_brainMap->set_lock(brain::the_site {x, y}, blocked);
             }
         }
@@ -77,7 +101,7 @@ namespace OpenArtOfWar
             Faction moverFaction = Faction::Neutral;
             if(ignoreEntityId != 0)
             {
-                if(const Unit *mu = m_entities->getUnit(ignoreEntityId))
+                if(const Unit *mu = m_entities->GetUnit(ignoreEntityId))
                 {
                     moverFaction = mu->faction;
                 }
@@ -91,14 +115,14 @@ namespace OpenArtOfWar
                 }
             };
 
-            for(const auto &e : m_entities->getAllEntities())
+            for(const auto &e : m_entities->GetAllEntities())
             {
                 if(!e.alive || e.state == ActionState::Die || e.isBuilding)
                     continue;
                 if(e.id == ignoreEntityId)
                     continue;
 
-                const Unit *u = e.asUnit();
+                const Unit *u = e.AsUnit();
                 if(u && u->faction == moverFaction && u->state == ActionState::Move)
                 {
                     continue;
@@ -111,7 +135,7 @@ namespace OpenArtOfWar
                 }
 
                 lockTile(e.tileX, e.tileY);
-                if(e.hasReservation())
+                if(e.HasReservation())
                     lockTile(e.resTileX, e.resTileY);
             }
         }
@@ -126,7 +150,7 @@ namespace OpenArtOfWar
         }
     }
 
-    bool Pathfinder::findPath(int startX, int startY, int targetX, int targetY, std::vector<PathNode> &outPath, int ignoreEntityId, bool *outIsPartial, bool allowDiagonal)
+    bool Pathfinder::FindPath(int startX, int startY, int targetX, int targetY, std::vector<PathNode> &outPath, int ignoreEntityId, bool *outIsPartial, bool allowDiagonal)
     {
         // Take ownership of the one-shot avoid list so early returns never leak it into the next query
         std::vector<PathNode> avoidTiles;
@@ -142,8 +166,8 @@ namespace OpenArtOfWar
         if(startX == targetX && startY == targetY)
             return true;
 
-        int mapW = m_map->getWidth();
-        int mapH = m_map->getHeight();
+        int mapW = m_map->GetWidth();
+        int mapH = m_map->GetHeight();
 
         if(startX < 0 || startX >= mapW || startY < 0 || startY >= mapH)
             return false;
@@ -159,11 +183,11 @@ namespace OpenArtOfWar
         int origTargetX = targetX;
         int origTargetY = targetY;
 
-        ensureBrainMapSize(mapW, mapH);
+        EnsureBrainMapSize(mapW, mapH);
         m_brainMap->set_identity(allowDiagonal ? brain::MatrixIdentity::DiagonalMethod : brain::MatrixIdentity::PlusMethod);
-        m_brainMap->set_heuristic(allowDiagonal ? brain::HeuristicMethod::Octile : brain::HeuristicMethod::Manhattan);
+        m_brainMap->set_custom_heuristic(allowDiagonal ? OctileHeuristic : ManhattanHeuristic);
         m_avoidTiles.swap(avoidTiles);
-        syncMap(ignoreEntityId, !ignoreUnits);
+        SyncMap(ignoreEntityId, !ignoreUnits);
         m_avoidTiles.clear(); // avoid list is valid for a single query only
 
         // Ensure starting tile is unlocked for A* exploration
@@ -180,11 +204,11 @@ namespace OpenArtOfWar
 
             if(m_entities)
             {
-                for(const auto &e : m_entities->getAllEntities())
+                for(const auto &e : m_entities->GetAllEntities())
                 {
                     if(!e.alive || e.state == ActionState::Die || !e.isBuilding)
                         continue;
-                    const Building *b = e.asBuilding();
+                    const Building *b = e.AsBuilding();
                     if(!b)
                         continue;
                     if(targetX >= b->tileX && targetX < b->tileX + b->buildWidth && targetY >= b->tileY && targetY < b->tileY + b->buildHeight)
@@ -278,9 +302,9 @@ namespace OpenArtOfWar
                     int c1x = node.x, c1y = prevY;
                     int c2x = prevX, c2y = node.y;
 
-                    bool c1Valid = (c1x >= 0 && c1x < mapW && c1y >= 0 && c1y < mapH) && m_map->isPassable(c1x, c1y) && m_map->getWall(c1x, c1y) == 0 && !m_brainMap->has_lock(brain::the_site {c1x, c1y});
+                    bool c1Valid = (c1x >= 0 && c1x < mapW && c1y >= 0 && c1y < mapH) && m_map->IsPassable(c1x, c1y) && m_map->GetWall(c1x, c1y) == 0 && !m_brainMap->has_lock(brain::the_site {c1x, c1y});
 
-                    bool c2Valid = (c2x >= 0 && c2x < mapW && c2y >= 0 && c2y < mapH) && m_map->isPassable(c2x, c2y) && m_map->getWall(c2x, c2y) == 0 && !m_brainMap->has_lock(brain::the_site {c2x, c2y});
+                    bool c2Valid = (c2x >= 0 && c2x < mapW && c2y >= 0 && c2y < mapH) && m_map->IsPassable(c2x, c2y) && m_map->GetWall(c2x, c2y) == 0 && !m_brainMap->has_lock(brain::the_site {c2x, c2y});
 
                     if(c1Valid)
                     {
@@ -311,7 +335,7 @@ namespace OpenArtOfWar
         // turn in place before every step, so a staircase means stop-turn-go on every tile (worst for the
         // Fortress, which only turns by 90 degrees). Reorder the steps into long straight runs: same tiles
         // count, same length, far fewer turns. A swap is only made when the new corner tile is free.
-        auto freeTile = [&](int x, int y) { return x >= 0 && x < mapW && y >= 0 && y < mapH && m_map->isPassable(x, y) && m_map->getWall(x, y) == 0 && !m_brainMap->has_lock(brain::the_site {x, y}); };
+        auto freeTile = [&](int x, int y) { return x >= 0 && x < mapW && y >= 0 && y < mapH && m_map->IsPassable(x, y) && m_map->GetWall(x, y) == 0 && !m_brainMap->has_lock(brain::the_site {x, y}); };
         // (a diagonal step needs only its own tile: corners may be cut, as everywhere else)
         auto stepOk = [&](int fromX, int fromY, int dx, int dy) { return freeTile(fromX + dx, fromY + dy); };
         auto straighten = [&](std::vector<PathNode> &pathVec) -> bool
@@ -488,20 +512,20 @@ namespace OpenArtOfWar
      * occupancy by other units, and valid reachable connectivity.
      *
      * Caveat prevention (Bridge / Chasm Detour Protection):
-     * "ее основной недостаток это если есть разрыв между путями он может выдать
-     *  юниту идти через мост (если такой есть, а не стоять рядом ближе) учитывай это"
+     * "its main drawback is that when there is a gap between paths it may make
+     *  the unit walk across the bridge (if there is one, instead of standing next to it) take this into account"
      * To prevent selecting slots across rivers/canyons that require large bridge
      * detours, we verify local direct reachability within a bounded Manhattan distance.
      */
-    std::vector<StormcastSlot> AINavigataionStormcastView::computeGroupSlots(int targetTileX, int targetTileY, int count, const TileMap &map, const EntityManager *entities, const std::vector<int> &movingUnitIds)
+    std::vector<StormcastSlot> AINavigataionStormcastView::ComputeGroupSlots(int targetTileX, int targetTileY, int count, const TileMap &map, const EntityManager *entities, const std::vector<int> &movingUnitIds)
     {
         std::vector<StormcastSlot> result;
         if(count <= 0)
             return result;
         result.reserve(count);
 
-        int mapW = map.getWidth();
-        int mapH = map.getHeight();
+        int mapW = map.GetWidth();
+        int mapH = map.GetHeight();
         if(mapW <= 0 || mapH <= 0)
             return result;
 
@@ -518,7 +542,7 @@ namespace OpenArtOfWar
             float sumX = 0.0f, sumY = 0.0f;
             for(int uid : movingUnitIds)
             {
-                if(const Entity *e = entities->getEntity(uid))
+                if(const Entity *e = entities->GetEntity(uid))
                 {
                     sumX += static_cast<float>(e->tileX);
                     sumY += static_cast<float>(e->tileY);
@@ -538,11 +562,11 @@ namespace OpenArtOfWar
         {
             if(!entities)
                 return false;
-            for(const auto &other : entities->getAllEntities())
+            for(const auto &other : entities->GetAllEntities())
             {
                 if(!other.alive || other.state == ActionState::Die || !other.isBuilding)
                     continue;
-                if(const Building *b = other.asBuilding())
+                if(const Building *b = other.AsBuilding())
                 {
                     if(x >= b->tileX && x < b->tileX + b->buildWidth && y >= b->tileY && y < b->tileY + b->buildHeight)
                     {
@@ -557,9 +581,9 @@ namespace OpenArtOfWar
         {
             if(x < 0 || x >= mapW || y < 0 || y >= mapH)
                 return false;
-            if(!map.isPassable(x, y))
+            if(!map.IsPassable(x, y))
                 return false;
-            if(map.getWall(x, y) > 0)
+            if(map.GetWall(x, y) > 0)
                 return false;
             if(isTileBlockedByBuilding(x, y))
                 return false;
@@ -573,7 +597,7 @@ namespace OpenArtOfWar
             // Check if occupied by a stationary unit not in movingUnitIds
             if(entities)
             {
-                for(const auto &other : entities->getAllEntities())
+                for(const auto &other : entities->GetAllEntities())
                 {
                     if(!other.alive || other.state == ActionState::Die || other.isBuilding)
                         continue;

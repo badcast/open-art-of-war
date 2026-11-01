@@ -9,6 +9,7 @@
 #include <map>
 #include <unordered_set>
 #include <deque>
+#include <set>
 
 namespace OpenArtOfWar
 {
@@ -58,8 +59,8 @@ namespace OpenArtOfWar
         AITacticsConfig tactics;
     };
 
-    std::string difficultyToString(AIDifficulty diff);
-    AIDifficulty stringToDifficulty(const std::string &str);
+    std::string DifficultyToString(AIDifficulty diff);
+    AIDifficulty StringToDifficulty(const std::string &str);
 
     struct AIStructurePlan
     {
@@ -108,6 +109,7 @@ namespace OpenArtOfWar
         int tileX {0};
         int tileY {0};
         bool done {false};
+        int attempts {0}; // build steps the spot was taken by units (they move on; terrain and buildings do not)
     };
 
     class AIController
@@ -119,191 +121,195 @@ namespace OpenArtOfWar
         ~AIController() = default;
 
         // enemyHq: this AI's own base (the player's enemy), playerHq: the base it goes for
-        void init(int enemyHqX, int enemyHqY, int playerHqX, int playerHqY);
+        void Init(int enemyHqX, int enemyHqY, int playerHqX, int playerHqY);
         // The player slot this AI commands (single player: set by init from the factions)
-        void setPlayer(PlayerId player);
+        void SetPlayer(PlayerId player);
         PlayerId player() const
         {
             return m_player;
         }
         Faction side() const
         {
-            return Players::factionOf(m_player);
+            return Players::FactionOf(m_player);
         }
         // A living thing of a player hostile to this AI
-        bool isFoe(const Entity &e) const;
-        void reset();
+        bool IsFoe(const Entity &e) const;
+        void Reset();
 
         // Skirmish: the AI also fortifies and extends its base (walls, towers, bunkers, lab)
-        void setSkirmish(bool skirmish)
+        void SetSkirmish(bool skirmish)
         {
             m_skirmish = skirmish;
         }
-        bool isSkirmish() const
+        bool IsSkirmish() const
         {
             return m_skirmish;
         }
-        const std::vector<AIDefenseSite> &getDefensePlan() const
+        const std::vector<AIDefenseSite> &GetDefensePlan() const
         {
             return m_defensePlan;
         }
         // Number of groups a wave of readyUnits splits into (money, map size, difficulty)
-        int attackGroupCount(int readyUnits, const TileMap &map) const;
+        int AttackGroupCount(int readyUnits, const TileMap &map) const;
 
-        void update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+        void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
 
         // Callbacks for combat reactions
-        void onEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
-        void onStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
+        void OnEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
+        void OnStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
 
         // Configuration
-        void setAggressiveness(float aggro)
+        void SetAggressiveness(float aggro)
         {
             m_aggressiveness = aggro;
         }
-        void setEconomyBonus(int creditsPerSec)
+        void SetEconomyBonus(int creditsPerSec)
         {
             m_creditsPerSec = creditsPerSec;
         }
 
         // Difficulty system
-        bool loadDifficultyConfig(const std::string &path); // LoaderResources::aiDifficulty()
-        void setDifficulty(AIDifficulty difficulty);
-        AIDifficulty getDifficulty() const
+        bool LoadDifficultyConfig(const std::string &path); // LoaderResources::aiDifficulty()
+        void SetDifficulty(AIDifficulty difficulty);
+        AIDifficulty GetDifficulty() const
         {
             return m_difficulty;
         }
         // Difficulty actually in effect (the debug override wins over the menu setting)
-        AIDifficulty getEffectiveDifficulty() const;
-        const AITacticsConfig &getTactics() const
+        AIDifficulty GetEffectiveDifficulty() const;
+        const AITacticsConfig &GetTactics() const
         {
             return m_currentDifficultyConfig.tactics;
         }
 
         // Debug-mode runtime settings
-        const AIDebugConfig &getDebugConfig() const
+        const AIDebugConfig &GetDebugConfig() const
         {
             return m_debugConfig;
         }
-        void setDebugConfig(const AIDebugConfig &config);
-        const AIDifficultyConfig &getDifficultyConfig() const
+        void SetDebugConfig(const AIDebugConfig &config);
+        const AIDifficultyConfig &GetDifficultyConfig() const
         {
             return m_currentDifficultyConfig;
         }
-        const std::map<AIDifficulty, AIDifficultyConfig> &getAllDifficultyConfigs() const
+        const std::map<AIDifficulty, AIDifficultyConfig> &GetAllDifficultyConfigs() const
         {
             return m_difficultyConfigs;
         }
 
-        int getEnemyCredits() const
+        int GetEnemyCredits() const
         {
             return m_credits;
         }
         // Debug: set the AI treasury to any value (0 bankrupts it)
-        void setEnemyCredits(int credits);
+        void SetEnemyCredits(int credits);
 
         // Reasoning log, newest last (bounded); current intentions recomputed every frame
-        const std::deque<AIThought> &getThoughts() const
+        const std::deque<AIThought> &GetThoughts() const
         {
             return m_thoughts;
         }
-        void clearThoughts()
+        void ClearThoughts()
         {
             m_thoughts.clear();
             m_lastThoughtByKey.clear();
         }
-        size_t getThoughtSerial() const
+        size_t GetThoughtSerial() const
         {
             return m_thoughtSerial;
         } // grows with every new thought
-        std::vector<std::string> currentIntentions() const;
-        int getWaveCount() const
+        std::vector<std::string> CurrentIntentions() const;
+        int GetWaveCount() const
         {
             return m_waveCount;
         }
-        bool isInitialized() const
+        bool IsInitialized() const
         {
             return m_initialized;
         }
-        void recordStartingBase(const EntityManager &entities, const TileMap &map);
+        void RecordStartingBase(const EntityManager &entities, const TileMap &map);
 
         // Director: wave planning and escalation
-        AIWavePlan planWave(int waveNumber, bool hasFactory, bool hasFactoryPlan) const;
-        const AIWavePlan &getCurrentWavePlan() const
+        AIWavePlan PlanWave(int waveNumber, bool hasFactory, bool hasFactoryPlan) const;
+        const AIWavePlan &GetCurrentWavePlan() const
         {
             return m_currentPlan;
         }
-        const std::vector<int> &getInfantryQueue() const
+        const std::vector<int> &GetInfantryQueue() const
         {
             return m_infantryQueue;
         }
-        const std::vector<int> &getVehicleQueue() const
+        const std::vector<int> &GetVehicleQueue() const
         {
             return m_vehicleQueue;
         }
-        int getReadyUnitCount() const
+        int GetReadyUnitCount() const
         {
             return m_readyUnits;
         }
-        float getWaveCooldown() const
+        float GetWaveCooldown() const
         {
             return m_waveCooldown;
         }
-        int getStagingX() const
+        int GetStagingX() const
         {
             return m_stagingX;
         }
-        int getStagingY() const
+        int GetStagingY() const
         {
             return m_stagingY;
         }
 
         // Research Lab: technologies are researched one by one from the first to the last
-        int getResearchIndex() const
+        int GetResearchIndex() const
         {
             return m_researchIndex;
         }
-        bool isResearchActive() const
+        bool IsResearchActive() const
         {
             return m_researchActive;
         }
-        float getResearchProgress() const;
-        bool isTechnologyResearched(int index) const;
+        float GetResearchProgress() const;
+        bool IsTechnologyResearched(int index) const;
 
-        const AISquadController &getSquadController() const
+        const AISquadController &GetSquadController() const
         {
             return m_squadController;
         }
-        const ChokepointMap &getChokepoints() const
+        const ChokepointMap &GetChokepoints() const
         {
             return m_chokes;
         }
 
-        void renderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities) const;
+        void RenderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities) const;
 
     private:
-        void refreshDifficulty();
-        void preparePlan(int waveNumber, bool hasFactory, bool hasFactoryPlan);
-        void updateEconomyAndProduction(float deltaTime, TileMap &map, EntityManager &entities);
-        void updateResearch(float deltaTime, EntityManager &entities);
-        void updateBaseDefense(EntityManager &entities, Pathfinder &pathfinder);
-        void updateWaveLaunch(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-        void updateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-        void updateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime);
-        bool isReserveUnit(const Unit &u) const;
-        bool aiSees(const Entity &e, const EntityManager &entities) const;
-        void findAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const;
-        void updateIdleUnits(EntityManager &entities, Pathfinder &pathfinder);
-        void updateRebuilding(float deltaTime, TileMap &map, EntityManager &entities);
-        void planBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
-        void updateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-        bool buildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities);
-        bool findSiteNear(int &x, int &y, int w, int h, int searchRadius, const TileMap &map, const EntityManager &entities) const;
-        void flankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const;
+        void RefreshDifficulty();
+        void PreparePlan(int waveNumber, bool hasFactory, bool hasFactoryPlan);
+        void UpdateEconomyAndProduction(float deltaTime, TileMap &map, EntityManager &entities);
+        void UpdateResearch(float deltaTime, EntityManager &entities);
+        void UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfinder);
+        void UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+        void UpdateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+        void UpdateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime);
+        bool IsReserveUnit(const Unit &u) const;
+        bool AiSees(const Entity &e, const EntityManager &entities) const;
+        void FindAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const;
+        void UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder);
+        void UpdateRebuilding(float deltaTime, TileMap &map, EntityManager &entities);
+        void PlanBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
+        void UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+        bool BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities);
+        // unitBlocked (optional): set when only units stood on the free spots, so a later try may succeed
+        bool FindSiteNear(int &x, int &y, int w, int h, int searchRadius, const TileMap &map, const EntityManager &entities, bool *unitBlocked = nullptr) const;
+        // Units a squad let go far from the base (stragglers, stuck in a passage, retreat timeout, assault over)
+        // walk back to the staging area and rejoin the reserve
+        void RecallReleasedUnits(EntityManager &entities);
+        void FlankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const;
         // Adds a line to the reasoning log (and the console)
-        void think(const std::string &category, const std::string &text);
+        void Think(const std::string &category, const std::string &text);
         // Same, but only when the text for that key changed (state transitions, not every tick)
-        void thinkOnce(const std::string &key, const std::string &category, const std::string &text);
+        void ThinkOnce(const std::string &key, const std::string &category, const std::string &text);
 
         PlayerId m_player {1};
         bool m_playerFixed {false};
@@ -342,6 +348,7 @@ namespace OpenArtOfWar
         // Units placed by the mission (base garrison) never join the waves
         std::unordered_set<int> m_garrison;
         bool m_garrisonRecorded {false};
+        std::set<int> m_recalled; // released squad members on their way back to the reserve
         float m_researchTimer {0.0f};
 
         // Squad Controller + chokepoints
@@ -371,7 +378,7 @@ namespace OpenArtOfWar
         size_t m_thoughtSerial {0};
         std::map<std::string, std::string> m_lastThoughtByKey;
 
-        void initDifficultyDefaults();
+        void InitDifficultyDefaults();
         AIDifficulty m_difficulty {AIDifficulty::Medium};
         AIDifficultyConfig m_currentDifficultyConfig;
         std::map<AIDifficulty, AIDifficultyConfig> m_difficultyConfigs;

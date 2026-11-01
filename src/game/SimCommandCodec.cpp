@@ -44,12 +44,12 @@ namespace OpenArtOfWar::SimCommandCodec
         // World coordinates and indices stay far below this: anything bigger is a broken or hostile packet
         constexpr int64_t kValueLimit = 1 << 24;
 
-        void writeValue(Net::BitWriter &w, int32_t v)
+        void WriteValue(Net::BitWriter &w, int32_t v)
         {
             w.writeVarInt(v);
         }
 
-        bool readValue(Net::BitReader &r, int32_t &v)
+        bool ReadValue(Net::BitReader &r, int32_t &v)
         {
             const int64_t raw = r.readVarInt();
             if(raw <= -kValueLimit || raw >= kValueLimit)
@@ -63,7 +63,7 @@ namespace OpenArtOfWar::SimCommandCodec
 
     } // namespace
 
-    std::vector<uint8_t> encode(const std::vector<SimCommand> &commands)
+    std::vector<uint8_t> Encode(const std::vector<SimCommand> &commands)
     {
         // Worst case: every id a 5-byte varint
         size_t capacity = 16;
@@ -85,23 +85,23 @@ namespace OpenArtOfWar::SimCommandCodec
                 w.writeIdList(ids);
             }
             if(schema & X)
-                writeValue(w, c.x);
+                WriteValue(w, c.x);
             if(schema & Y)
-                writeValue(w, c.y);
+                WriteValue(w, c.y);
             if(schema & A)
-                writeValue(w, c.a);
+                WriteValue(w, c.a);
             if(schema & B)
-                writeValue(w, c.b);
+                WriteValue(w, c.b);
             if(schema & C)
-                writeValue(w, c.c);
+                WriteValue(w, c.c);
             if(schema & D)
-                writeValue(w, c.d);
+                WriteValue(w, c.d);
         }
         buf.resize(w.finish());
         return buf;
     }
 
-    bool decode(const uint8_t *data, size_t size, PlayerId player, std::vector<SimCommand> &out)
+    bool Decode(const uint8_t *data, size_t size, PlayerId player, std::vector<SimCommand> &out)
     {
         out.clear();
         Net::BitReader r(data, size);
@@ -121,17 +121,17 @@ namespace OpenArtOfWar::SimCommandCodec
             const uint8_t schema = kSchema[type];
             if((schema & Ids) && !r.readIdList(c.ids, kMaxIdsPerCommand))
                 return false;
-            if((schema & X) && !readValue(r, c.x))
+            if((schema & X) && !ReadValue(r, c.x))
                 return false;
-            if((schema & Y) && !readValue(r, c.y))
+            if((schema & Y) && !ReadValue(r, c.y))
                 return false;
-            if((schema & A) && !readValue(r, c.a))
+            if((schema & A) && !ReadValue(r, c.a))
                 return false;
-            if((schema & B) && !readValue(r, c.b))
+            if((schema & B) && !ReadValue(r, c.b))
                 return false;
-            if((schema & C) && !readValue(r, c.c))
+            if((schema & C) && !ReadValue(r, c.c))
                 return false;
-            if((schema & D) && !readValue(r, c.d))
+            if((schema & D) && !ReadValue(r, c.d))
                 return false;
             if(r.failed())
                 return false;

@@ -28,21 +28,21 @@ namespace OpenArtOfWar
     {
 
         // Single player: slot 0 the person with `human`, slot 1 the computer with the other faction
-        void setupSinglePlayer(Faction human);
+        void SetupSinglePlayer(Faction human);
         // A network / custom match with the given slots; `local` is the slot of this computer
         void setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId local);
 
-        const PlayerSlot &slot(PlayerId id);
-        bool isActive(PlayerId id);
-        PlayerId local();
+        const PlayerSlot &Slot(PlayerId id);
+        bool IsActive(PlayerId id);
+        PlayerId Local();
         int count(); // active slots
 
-        Faction factionOf(PlayerId id);
-        uint8_t teamOf(PlayerId id);
+        Faction FactionOf(PlayerId id);
+        uint8_t TeamOf(PlayerId id);
         // The first active player of a faction (single player: one each); kNoPlayer for Neutral
-        PlayerId ownerOf(Faction faction);
+        PlayerId OwnerOf(Faction faction);
         // Different teams. Nobody's things count as hostile to everybody, as a third faction did before.
-        bool hostile(PlayerId a, PlayerId b);
+        bool Hostile(PlayerId a, PlayerId b);
 
     } // namespace Players
 } // namespace OpenArtOfWar

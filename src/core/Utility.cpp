@@ -13,35 +13,32 @@ namespace OpenArtOfWar::Utility
         return s_rng;
     }
 
-    const float kDir8X[8] = {1.0f, 0.7071f, 0.0f, -0.7071f, -1.0f, -0.7071f, 0.0f, 0.7071f};
-    const float kDir8Y[8] = {0.0f, 0.7071f, 1.0f, 0.7071f, 0.0f, -0.7071f, -1.0f, -0.7071f};
-
-    int dir8FromVector(float dx, float dy)
+    int Dir8FromVector(float dx, float dy)
     {
         constexpr float kPi = static_cast<float>(M_PI);
-        float a = DetMath::atan2(dy, dx);
+        float a = DetMath::Atan2(dy, dx);
         if(a < 0.0f)
             a += 2.0f * kPi;
         return static_cast<int>(std::floor((a + kPi / 8.0f) / (kPi / 4.0f))) % 8;
     }
 
-    int dirFromNorth(float dx, float dy, int steps)
+    int DirFromNorth(float dx, float dy, int steps)
     {
         constexpr float kPi = static_cast<float>(M_PI);
-        float a = DetMath::atan2(dx, -dy);
+        float a = DetMath::Atan2(dx, -dy);
         if(a < 0.0f)
             a += 2.0f * kPi;
         const float sector = 2.0f * kPi / static_cast<float>(steps);
         return static_cast<int>(std::floor((a + sector * 0.5f) / sector)) % steps;
     }
 
-    int turnStep8(int from, int to)
+    int TurnStep8(int from, int to)
     {
         from = ((from % 8) + 8) % 8;
         to = ((to % 8) + 8) % 8;
         // Turning around (180 degrees), a vehicle always swings through "down" (south, facing 2): moving left
         // and ordered right it first turns down, then right - the same for every vehicle
-        if(dir8Distance(from, to) == 4)
+        if(Dir8Distance(from, to) == 4)
         {
             for(int k = 1; k <= 3; ++k)
             {
@@ -56,13 +53,13 @@ namespace OpenArtOfWar::Utility
         return kTurn[7 + (to - from)];
     }
 
-    int dir8Distance(int a, int b)
+    int Dir8Distance(int a, int b)
     {
         const int d = ((a - b) % 8 + 8) % 8;
         return std::min(d, 8 - d);
     }
 
-    bool isInfantryArchetype(int archetypeId)
+    bool IsInfantryArchetype(int archetypeId)
     {
         return archetypeId >= 0 && archetypeId < 31 && (16447 & (1 << archetypeId)) != 0;
     }
@@ -118,19 +115,19 @@ namespace OpenArtOfWar::Utility
         return (archetypeId >= 0 && archetypeId < kArchetypeCount) ? &kArchetypes[archetypeId] : nullptr;
     }
 
-    const char *unitClassName(int archetypeId)
+    const char *UnitClassName(int archetypeId)
     {
-        return isInfantryArchetype(archetypeId) ? "infantry" : "vehicle";
+        return IsInfantryArchetype(archetypeId) ? "infantry" : "vehicle";
     }
 
-    const char *producedIn(int archetypeId)
+    const char *ProducedIn(int archetypeId)
     {
-        return isInfantryArchetype(archetypeId) ? "barracks" : "factory";
+        return IsInfantryArchetype(archetypeId) ? "barracks" : "factory";
     }
 
-    float defaultTurnStepDelay(int archetypeId)
+    float DefaultTurnStepDelay(int archetypeId)
     {
-        if(isInfantryArchetype(archetypeId))
+        if(IsInfantryArchetype(archetypeId))
             return 0.0f;
         switch(archetypeId)
         {
@@ -152,9 +149,9 @@ namespace OpenArtOfWar::Utility
         }
     }
 
-    float defaultTurretTurnStepDelay(int archetypeId)
+    float DefaultTurretTurnStepDelay(int archetypeId)
     {
-        if(isInfantryArchetype(archetypeId))
+        if(IsInfantryArchetype(archetypeId))
             return 0.0f;
         switch(archetypeId)
         {
@@ -175,7 +172,7 @@ namespace OpenArtOfWar::Utility
             case 16:
                 return 0.24f;
             default:
-                return defaultTurnStepDelay(archetypeId);
+                return DefaultTurnStepDelay(archetypeId);
         }
     }
 
@@ -189,12 +186,12 @@ namespace OpenArtOfWar::Utility
         return nullptr;
     }
 
-    const std::vector<BuildingKindInfo> &buildingKinds()
+    const std::vector<BuildingKindInfo> &BuildingKinds()
     {
         return kBuildingKinds;
     }
 
-    const char *unitTypeName(UnitType type)
+    const char *UnitTypeName(UnitType type)
     {
         switch(type)
         {
@@ -249,9 +246,9 @@ namespace OpenArtOfWar::Utility
         }
     }
 
-    Faction parseFaction(std::string_view text, Faction fallback)
+    Faction ParseFaction(std::string_view text, Faction fallback)
     {
-        const std::string s = toLower(text);
+        const std::string s = ToLower(text);
         if(s == "resistance" || s == "res" || s == "red")
             return Faction::Resistance;
         if(s == "confederation" || s == "confederacy" || s == "conf" || s == "blue")
@@ -261,7 +258,7 @@ namespace OpenArtOfWar::Utility
         return fallback;
     }
 
-    const char *factionName(Faction faction)
+    const char *FactionName(Faction faction)
     {
         switch(faction)
         {
@@ -274,7 +271,7 @@ namespace OpenArtOfWar::Utility
         }
     }
 
-    const char *factionKey(Faction faction)
+    const char *FactionKey(Faction faction)
     {
         switch(faction)
         {
@@ -287,7 +284,7 @@ namespace OpenArtOfWar::Utility
         }
     }
 
-    std::string toLower(std::string_view text)
+    std::string ToLower(std::string_view text)
     {
         std::string out(text);
         std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });

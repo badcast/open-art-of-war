@@ -30,54 +30,54 @@ class EditorUI {
 public:
     EditorUI();
 
-    void init();
+    void Init();
     void render(MapDocument& doc, Camera& camera, TextureManager& texManager, Renderer& renderer);
 
-    EditorTool getActiveTool() const { return m_activeTool; }
-    void setActiveTool(EditorTool tool) { m_activeTool = tool; }
+    EditorTool GetActiveTool() const { return m_activeTool; }
+    void SetActiveTool(EditorTool tool) { m_activeTool = tool; }
 
-    int getSelectedTile() const { return m_selectedTile; }
-    int getBrushSize() const { return m_brushSize; }
-    int getSelectedDecorType() const { return m_selectedDecorType; }
-    Faction getSelectedWallFaction() const { return m_selectedWallFaction; }
-    int getSelectedBuildingType() const { return m_selectedBuildingType; }
-    Faction getSelectedBuildingFaction() const { return m_selectedBuildingFaction; }
-    int getSelectedUnitArchetype() const { return m_selectedUnitArchetype; }
-    Faction getSelectedUnitFaction() const { return m_selectedUnitFaction; }
-    int getSelectedUnitFacing() const { return m_selectedUnitFacing; }
+    int GetSelectedTile() const { return m_selectedTile; }
+    int GetBrushSize() const { return m_brushSize; }
+    int GetSelectedDecorType() const { return m_selectedDecorType; }
+    Faction GetSelectedWallFaction() const { return m_selectedWallFaction; }
+    int GetSelectedBuildingType() const { return m_selectedBuildingType; }
+    Faction GetSelectedBuildingFaction() const { return m_selectedBuildingFaction; }
+    int GetSelectedUnitArchetype() const { return m_selectedUnitArchetype; }
+    Faction GetSelectedUnitFaction() const { return m_selectedUnitFaction; }
+    int GetSelectedUnitFacing() const { return m_selectedUnitFacing; }
 
-    bool isShowGrid() const { return m_showGrid; }
-    bool isShowPassability() const { return m_showPassability; }
-    bool isShowMiniMap() const { return m_showMiniMap; }
+    bool IsShowGrid() const { return m_showGrid; }
+    bool IsShowPassability() const { return m_showPassability; }
+    bool IsShowMiniMap() const { return m_showMiniMap; }
 
-    void setHoveredTile(int tx, int ty) { m_hoverTileX = tx; m_hoverTileY = ty; }
-    void selectTileFromEyedropper(int tile) { m_selectedTile = tile; m_activeTool = EditorTool::TileBrush; }
-    void showToast(const std::string& message, float duration = 3.5f);
+    void SetHoveredTile(int tx, int ty) { m_hoverTileX = tx; m_hoverTileY = ty; }
+    void SelectTileFromEyedropper(int tile) { m_selectedTile = tile; m_activeTool = EditorTool::TileBrush; }
+    void ShowToast(const std::string& message, float duration = 3.5f);
 
     // Dialog controls
-    void openSaveAsDialog(const MapDocument& doc);
-    void openOpenDialog();
-    void openNewMapDialog();
-    void openGeneratorDialog();
-    void requestClose(const MapDocument& doc);
-    bool shouldClose() const { return m_shouldClose; }
+    void OpenSaveAsDialog(const MapDocument& doc);
+    void OpenOpenDialog();
+    void OpenNewMapDialog();
+    void OpenGeneratorDialog();
+    void RequestClose(const MapDocument& doc);
+    bool ShouldClose() const { return m_shouldClose; }
 
 private:
-    void renderMenuBar(MapDocument& doc, Camera& camera);
-    void renderToolbar(MapDocument& doc, TextureManager& texManager);
-    void renderPalettePanel(MapDocument& doc, TextureManager& texManager);
-    void renderMiniMapWindow(MapDocument& doc, Camera& camera);
-    void renderStatusBar(const MapDocument& doc, const Camera& camera);
-    void renderToastNotification();
+    void RenderMenuBar(MapDocument& doc, Camera& camera);
+    void RenderToolbar(MapDocument& doc, TextureManager& texManager);
+    void RenderPalettePanel(MapDocument& doc, TextureManager& texManager);
+    void RenderMiniMapWindow(MapDocument& doc, Camera& camera);
+    void RenderStatusBar(const MapDocument& doc, const Camera& camera);
+    void RenderToastNotification();
 
     // Modals
-    void renderSaveAsModal(MapDocument& doc);
-    void renderOpenModal(MapDocument& doc);
-    void renderNewMapModal(MapDocument& doc);
-    void renderGeneratorModal(MapDocument& doc);
-    void renderCloseConfirmation(MapDocument& doc);
+    void RenderSaveAsModal(MapDocument& doc);
+    void RenderOpenModal(MapDocument& doc);
+    void RenderNewMapModal(MapDocument& doc);
+    void RenderGeneratorModal(MapDocument& doc);
+    void RenderCloseConfirmation(MapDocument& doc);
 
-    void scanAvailableMaps();
+    void ScanAvailableMaps();
 
     // Editor state
     EditorTool m_activeTool{EditorTool::TileBrush};

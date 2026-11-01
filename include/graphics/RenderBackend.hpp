@@ -40,19 +40,19 @@ namespace OpenArtOfWar
     {
 
         // Drivers compiled into SDL, in the order of preference of this platform
-        std::vector<std::string> candidates();
-        std::string label(const std::string &name);
+        std::vector<std::string> Candidates();
+        std::string Label(const std::string &name);
 
         // Creates the renderer for `window`: `forced` (command line, not stored) or the configured API first,
         // then the fallback and the rest in order of preference, software last. Failed attempts are logged,
         // marked in `env` and skipped; `env` gets the API that came up and the next working one. Saves `env`.
-        SDL_Renderer *create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced = "");
+        SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced = "");
 
         // The first frame of the new renderer is on the screen: the API is safe, clear init_pending
-        void confirmFirstFrame(EnvironmentConfig &env);
+        void ConfirmFirstFrame(EnvironmentConfig &env);
 
         // Brings `name` up on a hidden throw-away window and tears it down again
-        bool probe(const std::string &name);
+        bool Probe(const std::string &name);
 
         // The options for the settings screen: every candidate with what is known about it.
         // `probeUnknown` tries the not yet probed ones now (and stores the results in `env`).
@@ -60,7 +60,7 @@ namespace OpenArtOfWar
 
         // The API to use from the next start (or the next renderer recreation) on
         void select(EnvironmentConfig &env, const std::string &name);
-        std::string configured(const EnvironmentConfig &env);
+        std::string Configured(const EnvironmentConfig &env);
 
     } // namespace RenderBackend
 } // namespace OpenArtOfWar

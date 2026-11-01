@@ -95,6 +95,9 @@ set(IMGUI_SOURCES
 # Engine sources (everything except the executables' own main files)
 set(ENGINE_SOURCES
     src/core/Application.cpp
+    src/core/ApplicationSettings.cpp
+    src/core/ApplicationNetwork.cpp
+    src/core/ApplicationOverlays.cpp
     src/core/Localization.cpp
     src/core/AssetStore.cpp
     src/core/LoaderResources.cpp
@@ -235,6 +238,10 @@ set_target_properties(openaow-core PROPERTIES
 )
 if(WIN32)
     set_target_properties(openaow-core PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    if(MINGW)
+        # Do not re-export the static libgcc/libstdc++ (_Unwind_Resume) from the DLL: it clashes with the exe
+        target_link_options(openaow-core PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
 endif()
 target_include_directories(openaow-core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

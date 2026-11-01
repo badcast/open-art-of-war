@@ -3,14 +3,14 @@
 namespace OpenArtOfWar
 {
 
-    const std::vector<MissionDef> &Missions::campaign(Faction faction)
+    const std::vector<MissionDef> &Missions::Campaign(Faction faction)
     {
         return faction == Faction::Confederation ? confederation() : resistance();
     }
 
-    const MissionDef *Missions::find(Faction faction, int missionId)
+    const MissionDef *Missions::Find(Faction faction, int missionId)
     {
-        const auto &list = campaign(faction);
+        const auto &list = Campaign(faction);
         return missionId >= 0 && missionId < static_cast<int>(list.size()) ? &list[missionId] : nullptr;
     }
 

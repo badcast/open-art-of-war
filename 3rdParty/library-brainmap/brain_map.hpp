@@ -44,13 +44,23 @@ namespace brain
         CrossMethod = 2
     };
 
+    enum class SearchMode
+    {
+        UniDirectional = 0,
+        BiDirectional = 1
+    };
+
     enum class HeuristicMethod
     {
         Invalid = -1,
         Pythagorean = 0,
+        Euclidean = 0,
         Manhattan = 1,
         Chebyshev = 2,
-        Octile = 3
+        Octile = 3,
+        Hypot = 4,
+        // A heuristic supplied by the user with set_custom_heuristic()
+        Custom = 5
     };
 
     enum class MazeAlgorithm
@@ -72,6 +82,9 @@ namespace brain
     };
 
     typedef int weight_t;
+
+    // heuristic cost estimate from the (dx, dy) distance to the goal
+    typedef weight_t (*heuristic_function)(weight_t dx, weight_t dy);
 
     struct the_neuron
     {
@@ -235,6 +248,30 @@ namespace brain
         inline MatrixIdentity get_identity();
 
         /**
+         * @brief use own step costs instead of the built-in ones of the matrix identity
+         * @param orthogonal cost of a horizontal/vertical step (0 together with diagonal = built-in costs again)
+         * @param diagonal cost of a diagonal step
+         * @note the costs are applied to the current and to every later identity; keep the heuristic in the same scale
+         */
+        inline void set_custom_weights(weight_t orthogonal, weight_t diagonal);
+
+        /**
+         * @brief use an own heuristic function (get_heuristic() then returns HeuristicMethod::Custom)
+         * @return false when the function is null
+         */
+        inline bool set_custom_heuristic(heuristic_function heuristic);
+
+        /**
+         * @brief allow (true) or forbid (false, default) a diagonal step between two locked cells touching at their corner
+         */
+        inline void set_custom_corner_cutting(bool allow);
+
+        /**
+         * @brief get the corner cutting rule
+         */
+        inline bool get_custom_corner_cutting() const;
+
+        /**
          * @brief set the heuristic method
          * @see HeuristicMethod
          * @return accepted heuristic method value
@@ -346,6 +383,9 @@ namespace brain
         template <typename list_type = result_site>
         bool find(navigate_result<list_type> &navResult, INeuron *firstNeuron, INeuron *lastNeuron);
 
+        template <typename list_type = result_site>
+        bool find(navigate_result<list_type> &navResult, INeuron *firstNeuron, INeuron *lastNeuron, SearchMode mode);
+
         /**
          * @brief find locations for selects
          * @param navResult the result of the selected (for the site result type or the neurons)
@@ -355,6 +395,19 @@ namespace brain
          */
         template <typename list_type = result_site>
         bool find(navigate_result<list_type> &navResult, const ISite &first, const ISite &last);
+
+        template <typename list_type = result_site>
+        bool find(navigate_result<list_type> &navResult, const ISite &first, const ISite &last, SearchMode mode);
+
+        /**
+         * @brief set search mode (UniDirectional or BiDirectional)
+         */
+        inline void set_search_mode(SearchMode mode);
+
+        /**
+         * @brief get current search mode
+         */
+        inline SearchMode get_search_mode() const;
 
         /**
          * @brief load breakfast
@@ -392,10 +445,24 @@ namespace brain
     protected:
         INeuron *neurons = nullptr;
         randomize_function _rand_ = std::rand;
-        weight_t (*__heuristic__)(weight_t dx, weight_t dy);
+        heuristic_function __heuristic__;
         std::uint32_t _seg_off;
         std::uint32_t _xsize, _ysize;
         brain_identity identity;
+        SearchMode _search_mode = SearchMode::UniDirectional;
+        // set_custom_*: own step costs (indexed like the identity directions), corner cutting rule
+        bool _custom_weights = false;
+        weight_t _custom_orthogonal = 0, _custom_diagonal = 0;
+        std::int8_t _custom_g_weight[8] {};
+        bool _corner_cutting = false;
+
+        void _apply_custom_weights();
+
+        template <typename list_type = result_site>
+        bool _find_unidirectional(navigate_result<list_type> &navResult, INeuron *firstNeuron, INeuron *lastNeuron);
+
+        template <typename list_type = result_site>
+        bool _find_bidirectional(navigate_result<list_type> &navResult, INeuron *firstNeuron, INeuron *lastNeuron);
 
         void _internal_realloc();
     };

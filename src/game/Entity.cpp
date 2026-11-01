@@ -9,15 +9,15 @@ namespace OpenArtOfWar
     {
     }
 
-    float Entity::nextCooldown() const
+    float Entity::NextCooldown() const
     {
-        return attackCooldownMax > attackCooldown ? Utility::randomFloat(attackCooldown, attackCooldownMax) : attackCooldown;
+        return attackCooldownMax > attackCooldown ? Utility::RandomFloat(attackCooldown, attackCooldownMax) : attackCooldown;
     }
 
-    void Entity::getMuzzlePoint(float &outX, float &outY) const
+    void Entity::GetMuzzlePoint(float &outX, float &outY) const
     {
-        float cx = getUnitCenterPixelX();
-        float cy = getUnitCenterPixelY();
+        float cx = GetUnitCenterPixelX();
+        float cy = GetUnitCenterPixelY();
         int tf = (turretFacing % 8 + 8) % 8;
         const float *s_dirDx = Utility::kDir8X;
         const float *s_dirDy = Utility::kDir8Y;

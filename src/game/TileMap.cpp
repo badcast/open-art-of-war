@@ -25,10 +25,10 @@ namespace OpenArtOfWar
         }
     }
 
-    bool TileMap::loadMap(const std::string &jsonPath)
+    bool TileMap::LoadMap(const std::string &jsonPath)
     {
         std::string text;
-        if(!Assets::readText(jsonPath, text))
+        if(!Assets::ReadText(jsonPath, text))
         {
             std::cerr << "[TileMap] Failed to open map file: " << jsonPath << std::endl;
             return false;
@@ -85,7 +85,7 @@ namespace OpenArtOfWar
                         }
                     }
                     m_baseTiles[curY][curX] = static_cast<uint8_t>(finalTile);
-                    if(TileCollision::isBlocked(m_tilesetId, finalTile))
+                    if(TileCollision::IsBlocked(m_tilesetId, finalTile))
                     {
                         m_passable[curY][curX] = false; // The sprite of this tile blocks movement
                     }
@@ -131,7 +131,7 @@ namespace OpenArtOfWar
                     int x = chunkIdx * 32 + bit;
                     if(x < m_width)
                     {
-                        bool blocked = (mask & (1u << (31 - bit))) != 0 || TileCollision::isBlocked(m_tilesetId, m_baseTiles[y][x]);
+                        bool blocked = (mask & (1u << (31 - bit))) != 0 || TileCollision::IsBlocked(m_tilesetId, m_baseTiles[y][x]);
                         m_passable[y][x] = !blocked;
                     }
                 }
@@ -157,7 +157,7 @@ namespace OpenArtOfWar
                         if(w["faction"].is_string())
                         {
                             std::string fstr = w["faction"].get<std::string>();
-                            fac = (fstr == "1") ? Faction::Resistance : Utility::parseFaction(fstr, Faction::Confederation);
+                            fac = (fstr == "1") ? Faction::Resistance : Utility::ParseFaction(fstr, Faction::Confederation);
                         }
                         else if(w["faction"].is_number_integer())
                         {
@@ -169,7 +169,7 @@ namespace OpenArtOfWar
                     {
                         for(int tx = wx; tx < wx + ww; ++tx)
                         {
-                            setWall(tx, ty, fac, hp);
+                            SetWall(tx, ty, fac, hp);
                         }
                     }
                 }
@@ -187,13 +187,13 @@ namespace OpenArtOfWar
                         {
                             for(int tx = wx; tx < wx + ww; ++tx)
                             {
-                                setWall(tx, ty, fac, hp);
+                                SetWall(tx, ty, fac, hp);
                             }
                         }
                     }
                     else if(w.size() >= 2)
                     {
-                        setWall(w[0].get<int>(), w[1].get<int>(), Faction::Confederation, 100);
+                        SetWall(w[0].get<int>(), w[1].get<int>(), Faction::Confederation, 100);
                     }
                 }
             }
@@ -216,7 +216,7 @@ namespace OpenArtOfWar
                             {
                                 for(int tx = wx; tx < wx + ww; ++tx)
                                 {
-                                    setWall(tx, ty, Faction::Confederation, 100);
+                                    SetWall(tx, ty, Faction::Confederation, 100);
                                 }
                             }
                         }
@@ -256,7 +256,7 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void TileMap::initBlankArena(int width, int height, int tilesetId)
+    void TileMap::InitBlankArena(int width, int height, int tilesetId)
     {
         m_width = std::clamp(width, 16, MAX_MAP_SIZE);
         m_height = std::clamp(height, 16, MAX_MAP_SIZE);
@@ -281,7 +281,7 @@ namespace OpenArtOfWar
         std::cout << "[TileMap] Initialized Blank Test Arena (" << m_width << "x" << m_height << ")" << std::endl;
     }
 
-    bool TileMap::isPassable(int tileX, int tileY) const
+    bool TileMap::IsPassable(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
         {
@@ -290,7 +290,7 @@ namespace OpenArtOfWar
         return m_passable[tileY][tileX];
     }
 
-    void TileMap::setPassable(int tileX, int tileY, bool passable)
+    void TileMap::SetPassable(int tileX, int tileY, bool passable)
     {
         if(tileX >= 0 && tileX < m_width && tileY >= 0 && tileY < m_height)
         {
@@ -298,7 +298,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::clearWalls()
+    void TileMap::ClearWalls()
     {
         for(int y = 0; y < m_height; ++y)
         {
@@ -313,7 +313,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::setWall(int tileX, int tileY, Faction faction, int hpPercent, PlayerId owner)
+    void TileMap::SetWall(int tileX, int tileY, Faction faction, int hpPercent, PlayerId owner)
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return;
@@ -328,33 +328,33 @@ namespace OpenArtOfWar
         int base = (faction == Faction::Resistance) ? 1101 : 1001;
         m_wallGrid[tileY][tileX] = static_cast<uint16_t>(base + damageTier * 20);
         m_wallHp[tileY][tileX] = static_cast<int16_t>((150 * std::clamp(hpPercent, 1, 100)) / 100);
-        m_wallOwner[tileY][tileX] = owner == kNoPlayer ? Players::ownerOf(faction) : owner;
+        m_wallOwner[tileY][tileX] = owner == kNoPlayer ? Players::OwnerOf(faction) : owner;
         m_wallRubbleGrid[tileY][tileX] = 0; // Clear any old ruins when a new wall is erected!
         m_passable[tileY][tileX] = false;
     }
 
-    uint16_t TileMap::getWall(int tileX, int tileY) const
+    uint16_t TileMap::GetWall(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return 0;
         return m_wallGrid[tileY][tileX];
     }
 
-    int TileMap::getWallHp(int tileX, int tileY) const
+    int TileMap::GetWallHp(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return 0;
         return m_wallHp[tileY][tileX];
     }
 
-    PlayerId TileMap::getWallOwner(int tileX, int tileY) const
+    PlayerId TileMap::GetWallOwner(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height || m_wallGrid[tileY][tileX] == 0)
             return kNoPlayer;
         return m_wallOwner[tileY][tileX];
     }
 
-    Faction TileMap::getWallFaction(int tileX, int tileY) const
+    Faction TileMap::GetWallFaction(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return Faction::Neutral;
@@ -366,14 +366,14 @@ namespace OpenArtOfWar
         return Faction::Neutral;
     }
 
-    uint16_t TileMap::getWallRubble(int tileX, int tileY) const
+    uint16_t TileMap::GetWallRubble(int tileX, int tileY) const
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return 0;
         return m_wallRubbleGrid[tileY][tileX];
     }
 
-    void TileMap::destroyWall(int tileX, int tileY)
+    void TileMap::DestroyWall(int tileX, int tileY)
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height || m_wallGrid[tileY][tileX] == 0)
             return;
@@ -383,7 +383,7 @@ namespace OpenArtOfWar
         m_passable[tileY][tileX] = true;
     }
 
-    void TileMap::damageWall(int tileX, int tileY, int damage)
+    void TileMap::DamageWall(int tileX, int tileY, int damage)
     {
         if(tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
             return;
@@ -395,7 +395,7 @@ namespace OpenArtOfWar
             m_wallHp[tileY][tileX] = 150;
         }
 
-        damage = reduceWallDamage(damage, m_wallOwner[tileY][tileX]);
+        damage = ReduceWallDamage(damage, m_wallOwner[tileY][tileX]);
         m_wallHp[tileY][tileX] -= damage;
         if(m_wallHp[tileY][tileX] <= 0)
         {
@@ -416,13 +416,13 @@ namespace OpenArtOfWar
 
     namespace
     {
-        inline uint8_t teamBit(uint8_t team)
+        inline uint8_t TeamBit(uint8_t team)
         {
             return static_cast<uint8_t>(1u << (team & 7));
         }
     } // namespace
 
-    void TileMap::resetVisibility()
+    void TileMap::ResetVisibility()
     {
         for(int y = 0; y < m_height; ++y)
         {
@@ -437,16 +437,16 @@ namespace OpenArtOfWar
         }
     }
 
-    bool TileMap::isVisibleTo(int tileX, int tileY, uint8_t team) const
+    bool TileMap::IsVisibleTo(int tileX, int tileY, uint8_t team) const
     {
         if(!m_hasFog)
             return true;
         if(tileX < 0 || tileY < 0 || tileX >= m_width || tileY >= m_height)
             return false;
-        return (m_sight[tileY][tileX] & teamBit(team)) != 0;
+        return (m_sight[tileY][tileX] & TeamBit(team)) != 0;
     }
 
-    void TileMap::resetAllFog(FogState state)
+    void TileMap::ResetAllFog(FogState state)
     {
         for(int y = 0; y < m_height; ++y)
         {
@@ -458,9 +458,9 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::revealArea(int centerTileX, int centerTileY, int radius, uint8_t team)
+    void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, uint8_t team)
     {
-        const uint8_t bit = teamBit(team);
+        const uint8_t bit = TeamBit(team);
         const bool viewer = (team & 7) == m_viewerTeam;
         int r2 = radius * radius;
         int minX = std::max(0, centerTileX - radius);
@@ -484,9 +484,9 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::revealRect(int tileX, int tileY, int width, int height, uint8_t team)
+    void TileMap::RevealRect(int tileX, int tileY, int width, int height, uint8_t team)
     {
-        const uint8_t bit = teamBit(team);
+        const uint8_t bit = TeamBit(team);
         const bool viewer = (team & 7) == m_viewerTeam;
         for(int y = std::max(0, tileY); y < std::min(m_height, tileY + height); ++y)
         {
@@ -499,7 +499,7 @@ namespace OpenArtOfWar
         }
     }
 
-    FogState TileMap::getFogState(int tileX, int tileY) const
+    FogState TileMap::GetFogState(int tileX, int tileY) const
     {
         if(!m_hasFog)
         {
@@ -515,20 +515,20 @@ namespace OpenArtOfWar
     void TileMap::render(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick)
     {
         bool useFog = fogEnabled && m_hasFog;
-        renderTerrain(renderer, camera, useFog, globalAnimTick);
-        renderWallRubble(renderer, camera, useFog);
-        renderDecorations(renderer, camera, useFog, globalAnimTick);
+        RenderTerrain(renderer, camera, useFog, globalAnimTick);
+        RenderWallRubble(renderer, camera, useFog);
+        RenderDecorations(renderer, camera, useFog, globalAnimTick);
         if(useFog)
         {
-            renderFog(renderer, camera);
+            RenderFog(renderer, camera);
         }
     }
 
-    void TileMap::renderTerrain(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
+    void TileMap::RenderTerrain(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
     {
         float startWorldX, startWorldY, endWorldX, endWorldY;
-        camera.screenToWorld(0, 0, startWorldX, startWorldY);
-        camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+        camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+        camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
         int startTileX = std::clamp(static_cast<int>(startWorldX / TILE_WIDTH) - 1, 0, m_width - 1);
         int endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
@@ -554,22 +554,22 @@ namespace OpenArtOfWar
                     }
                     if(!border)
                     {
-                        renderer.fillRectWorld(tx * TILE_WIDTH, ty * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, camera, m_fogStyle.color);
+                        renderer.FillRectWorld(tx * TILE_WIDTH, ty * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, camera, m_fogStyle.color);
                         continue;
                     }
                 }
 
                 int tileIdx = m_baseTiles[ty][tx];
-                renderer.drawTileWorld(m_tilesetId, tileIdx, tx * TILE_WIDTH, ty * TILE_HEIGHT, camera, globalAnimTick);
+                renderer.DrawTileWorld(m_tilesetId, tileIdx, tx * TILE_WIDTH, ty * TILE_HEIGHT, camera, globalAnimTick);
             }
         }
     }
 
-    void TileMap::renderWallRubble(Renderer &renderer, const Camera &camera, bool fogEnabled) const
+    void TileMap::RenderWallRubble(Renderer &renderer, const Camera &camera, bool fogEnabled) const
     {
         float startWorldX, startWorldY, endWorldX, endWorldY;
-        camera.screenToWorld(0, 0, startWorldX, startWorldY);
-        camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+        camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+        camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
         int startTileX = std::clamp(static_cast<int>(startWorldX / TILE_WIDTH) - 1, 0, m_width - 1);
         int endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
@@ -585,17 +585,17 @@ namespace OpenArtOfWar
                 uint16_t rubble = m_wallRubbleGrid[ty][tx];
                 if(rubble > 0)
                 {
-                    renderer.drawCompositeWorld(rubble, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
+                    renderer.DrawCompositeWorld(rubble, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
                 }
             }
         }
     }
 
-    void TileMap::renderDecorations(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
+    void TileMap::RenderDecorations(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
     {
         float startWorldX, startWorldY, endWorldX, endWorldY;
-        camera.screenToWorld(0, 0, startWorldX, startWorldY);
-        camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+        camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+        camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
         int startTileX = std::clamp(static_cast<int>(startWorldX / TILE_WIDTH) - 1, 0, m_width - 1);
         int endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
@@ -614,13 +614,13 @@ namespace OpenArtOfWar
                 continue;
             }
 
-            renderer.drawDecorWorld(m_tilesetId, dec.type, dec.x * TILE_WIDTH, dec.y * TILE_HEIGHT, camera, globalAnimTick);
+            renderer.DrawDecorWorld(m_tilesetId, dec.type, dec.x * TILE_WIDTH, dec.y * TILE_HEIGHT, camera, globalAnimTick);
         }
     }
 
-    void TileMap::loadEnvironment(const EnvironmentConfig &env)
+    void TileMap::LoadEnvironment(const EnvironmentConfig &env)
     {
-        const nlohmann::json &j = env.root();
+        const nlohmann::json &j = env.Root();
         if(j.contains("construction") && j["construction"].is_object())
         {
             const auto &c = j["construction"];
@@ -643,7 +643,7 @@ namespace OpenArtOfWar
     {
 
         // Separable box blur, run twice (close to a Gaussian): rounds off the staircase of tile edges
-        void blurMask(std::vector<uint8_t> &img, std::vector<uint8_t> &tmp, int w, int h, int radius)
+        void BlurMask(std::vector<uint8_t> &img, std::vector<uint8_t> &tmp, int w, int h, int radius)
         {
             if(radius <= 0)
                 return;
@@ -679,14 +679,14 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    void TileMap::renderFog(Renderer &renderer, const Camera &camera, bool smooth) const
+    void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) const
     {
         if(!m_hasFog)
             return;
 
         float startWorldX, startWorldY, endWorldX, endWorldY;
-        camera.screenToWorld(0, 0, startWorldX, startWorldY);
-        camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+        camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+        camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
         // Visible window plus a margin, so the blur near the screen border sees the real neighbours
         const int s = smooth ? m_fogStyle.texelsPerTile : 1;
@@ -720,16 +720,16 @@ namespace OpenArtOfWar
                 }
             }
         }
-        blurMask(m_fogMask, m_fogScratch, w, h, radius);
+        BlurMask(m_fogMask, m_fogScratch, w, h, radius);
 
-        renderer.drawAlphaMaskWorld(m_fogMask, w, h, static_cast<float>(x0 * TILE_WIDTH), static_cast<float>(y0 * TILE_HEIGHT), static_cast<float>(tilesW * TILE_WIDTH), static_cast<float>(tilesH * TILE_HEIGHT), camera, m_fogStyle.color, smooth);
+        renderer.DrawAlphaMaskWorld(m_fogMask, w, h, static_cast<float>(x0 * TILE_WIDTH), static_cast<float>(y0 * TILE_HEIGHT), static_cast<float>(tilesW * TILE_WIDTH), static_cast<float>(tilesH * TILE_HEIGHT), camera, m_fogStyle.color, smooth);
     }
 
-    void TileMap::renderWalls(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
+    void TileMap::RenderWalls(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick) const
     {
         float startWorldX, startWorldY, endWorldX, endWorldY;
-        camera.screenToWorld(0, 0, startWorldX, startWorldY);
-        camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+        camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+        camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
         int startTileX = std::clamp(static_cast<int>(startWorldX / TILE_WIDTH) - 1, 0, m_width - 1);
         int endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
@@ -738,11 +738,11 @@ namespace OpenArtOfWar
 
         for(int ty = startTileY; ty < endTileY; ++ty)
         {
-            renderWallRow(ty, renderer, camera, fogEnabled, globalAnimTick, startTileX, endTileX);
+            RenderWallRow(ty, renderer, camera, fogEnabled, globalAnimTick, startTileX, endTileX);
         }
     }
 
-    void TileMap::renderWallRow(int ty, Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick, int startTileX, int endTileX) const
+    void TileMap::RenderWallRow(int ty, Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick, int startTileX, int endTileX) const
     {
         if(ty < 0 || ty >= m_height)
             return;
@@ -750,8 +750,8 @@ namespace OpenArtOfWar
         if(startTileX < 0 || endTileX < 0)
         {
             float startWorldX, startWorldY, endWorldX, endWorldY;
-            camera.screenToWorld(0, 0, startWorldX, startWorldY);
-            camera.screenToWorld(camera.getViewportWidth(), camera.getViewportHeight(), endWorldX, endWorldY);
+            camera.ScreenToWorld(0, 0, startWorldX, startWorldY);
+            camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
             startTileX = std::clamp(static_cast<int>(startWorldX / TILE_WIDTH) - 1, 0, m_width - 1);
             endTileX = std::clamp(static_cast<int>(endWorldX / TILE_WIDTH) + 2, 0, m_width);
         }
@@ -775,29 +775,29 @@ namespace OpenArtOfWar
                 if(wallBase == 15 && owner < kMaxPlayers)
                 {
                     if(reinforced[owner] < 0)
-                        reinforced[owner] = isEffectResearched(owner, ResearchEffect::WallStrength) ? 1 : 0;
+                        reinforced[owner] = IsEffectResearched(owner, ResearchEffect::WallStrength) ? 1 : 0;
                     if(reinforced[owner] == 1)
                         wallBase = 20;
                 }
                 int damageStep = std::clamp(((wval - 1001) % 100) / 20, 0, 4);
                 int wallBuildingId = wallBase + damageStep;
                 Faction wallFaction = (wval >= 1101) ? Faction::Resistance : Faction::Confederation;
-                renderer.setDrawOwner(owner); // the wall wears its owner's army colour
-                renderer.drawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
-                renderer.drawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
+                renderer.SetDrawOwner(owner); // the wall wears its owner's army colour
+                renderer.DrawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
+                renderer.DrawBuildingWorld(wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
             }
         }
-        renderer.setDrawOwner(kNoPlayer);
+        renderer.SetDrawOwner(kNoPlayer);
     }
 
-    uint8_t TileMap::getBaseTile(int x, int y) const
+    uint8_t TileMap::GetBaseTile(int x, int y) const
     {
         if(x < 0 || x >= m_width || y < 0 || y >= m_height)
             return 0;
         return m_baseTiles[y][x];
     }
 
-    void TileMap::setBaseTile(int x, int y, uint8_t tile)
+    void TileMap::SetBaseTile(int x, int y, uint8_t tile)
     {
         if(x >= 0 && x < m_width && y >= 0 && y < m_height)
         {
@@ -805,13 +805,13 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::setSize(int width, int height)
+    void TileMap::SetSize(int width, int height)
     {
         m_width = std::clamp(width, 1, MAX_MAP_SIZE);
         m_height = std::clamp(height, 1, MAX_MAP_SIZE);
     }
 
-    void TileMap::clearDecorations()
+    void TileMap::ClearDecorations()
     {
         m_decorations.clear();
         for(int y = 0; y < m_height; ++y)
@@ -823,11 +823,11 @@ namespace OpenArtOfWar
         }
     }
 
-    void TileMap::addDecoration(int type, int x, int y)
+    void TileMap::AddDecoration(int type, int x, int y)
     {
         if(x < 0 || x >= m_width || y < 0 || y >= m_height)
             return;
-        removeDecorationAt(x, y);
+        RemoveDecorationAt(x, y);
         MapDecoration dec;
         dec.type = type;
         dec.x = x;
@@ -837,7 +837,7 @@ namespace OpenArtOfWar
         m_passable[y][x] = false;
     }
 
-    void TileMap::removeDecorationAt(int x, int y)
+    void TileMap::RemoveDecorationAt(int x, int y)
     {
         if(x < 0 || x >= m_width || y < 0 || y >= m_height)
             return;
@@ -855,7 +855,7 @@ namespace OpenArtOfWar
         }
     }
 
-    uint16_t TileMap::getDecorGrid(int x, int y) const
+    uint16_t TileMap::GetDecorGrid(int x, int y) const
     {
         if(x < 0 || x >= m_width || y < 0 || y >= m_height)
             return 0;

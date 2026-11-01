@@ -42,7 +42,7 @@ namespace OpenArtOfWar
     public:
         GameplayController() = default;
 
-        void update(
+        void Update(
             float deltaTime,
             InputManager &input,
             Camera &camera,
@@ -59,61 +59,61 @@ namespace OpenArtOfWar
             int windowW,
             int windowH);
 
-        void renderSelectionBox(Renderer &renderer, const Camera &camera, const InputManager &input);
+        void RenderSelectionBox(Renderer &renderer, const Camera &camera, const InputManager &input);
 
         // Order lines: from every selected own unit to its attack target and to where it walks (white); with `showAll`
         // (Alt held) from every own and allied unit (never an enemy's). Look (color #hex, width, opacity) from the "overlay" section of
         // assets/data/game_environment.json
-        void loadOverlayStyle(const EnvironmentConfig &env);
-        void renderOrderLines(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map, bool showAll) const;
-        void renderDebugNavigation(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map);
-        void renderDebugGrid(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map);
-        void renderDebugToolbar(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW);
-        void renderDebugSpawnDropdown(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowH);
-        void renderDebugSpawnGhost(Renderer &renderer, const Camera &camera, const InputManager &input, const TileMap &map, BitmapFontRenderer &fontRenderer);
+        void LoadOverlayStyle(const EnvironmentConfig &env);
+        void RenderOrderLines(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map, bool showAll) const;
+        void RenderDebugNavigation(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map);
+        void RenderDebugGrid(Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map);
+        void RenderDebugToolbar(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW);
+        void RenderDebugSpawnDropdown(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowH);
+        void RenderDebugSpawnGhost(Renderer &renderer, const Camera &camera, const InputManager &input, const TileMap &map, BitmapFontRenderer &fontRenderer);
 
-        void setDebugMode(bool enabled);
-        bool isDebugMode() const
+        void SetDebugMode(bool enabled);
+        bool IsDebugMode() const
         {
             return m_debugMode;
         }
-        bool isRevealFog() const
+        bool IsRevealFog() const
         {
             return m_debugMode && m_revealFog;
         }
-        bool isSpawnMode() const
+        bool IsSpawnMode() const
         {
             return m_debugMode && m_spawnMode;
         }
-        bool isShowDebugGrid() const
+        bool IsShowDebugGrid() const
         {
             return m_debugMode && m_showDebugGrid;
         }
-        void setShowDebugGrid(bool show)
+        void SetShowDebugGrid(bool show)
         {
             m_showDebugGrid = show;
         }
 
-        const std::vector<int> &getSelectedUnits() const
+        const std::vector<int> &GetSelectedUnits() const
         {
             return m_selectedUnits;
         }
-        std::vector<int> &getSelectedUnits()
+        std::vector<int> &GetSelectedUnits()
         {
             return m_selectedUnits;
         }
-        void clearSelection()
+        void ClearSelection()
         {
             m_selectedUnits.clear();
         }
 
-        const std::array<ControlGroup, 10> &getControlGroups() const
+        const std::array<ControlGroup, 10> &GetControlGroups() const
         {
             return m_groups;
         }
         // A mission / match was just loaded: fresh simulation, selection and groups (also done by update when
         // it notices; a network match calls it at once, before the first turn's commands are scheduled)
-        void resetForMission(const MissionController &mission, HUDController &hud, EntityManager &entities, TileMap &map);
+        void ResetForMission(const MissionController &mission, HUDController &hud, EntityManager &entities, TileMap &map);
         // Commands, marching groups and research of the match (the interface only issues and reads)
         Simulation &simulation()
         {
@@ -124,12 +124,12 @@ namespace OpenArtOfWar
             return m_sim;
         }
         // Bar of the non-empty control groups at the bottom of the map view
-        void renderGroupBar(Renderer &renderer, BitmapFontRenderer &font, const EntityManager &entities, int mapViewW, int windowH, int mx, int my) const;
+        void RenderGroupBar(Renderer &renderer, BitmapFontRenderer &font, const EntityManager &entities, int mapViewW, int windowH, int mx, int my) const;
         // Leader marker of the selected groups and, while marching, lines from the members to the leader
-        void renderGroupLeaders(Renderer &renderer, const Camera &camera, const EntityManager &entities) const;
+        void RenderGroupLeaders(Renderer &renderer, const Camera &camera, const EntityManager &entities) const;
 
         // True once after the debug toolbar's IMGUI button was clicked
-        bool consumeDebugOverlayToggle()
+        bool ConsumeDebugOverlayToggle()
         {
             bool v = m_debugOverlayToggleRequested;
             m_debugOverlayToggleRequested = false;
@@ -151,25 +151,25 @@ namespace OpenArtOfWar
         };
         OverlayStyle m_overlay;
 
-        void pruneGroups(const EntityManager &entities);
-        void selectGroup(int index, EntityManager &entities);
-        void handleControlGroupKeys(InputManager &input, EntityManager &entities, Camera &camera);
-        int groupBarHit(int mx, int my, int mapViewW, int windowH) const;
-        int groupOfUnits(const std::vector<int> &unitIds) const;
+        void PruneGroups(const EntityManager &entities);
+        void SelectGroup(int index, EntityManager &entities);
+        void HandleControlGroupKeys(InputManager &input, EntityManager &entities, Camera &camera);
+        int GroupBarHit(int mx, int my, int mapViewW, int windowH) const;
+        int GroupOfUnits(const std::vector<int> &unitIds) const;
         // Order for the selected units at a world point: a whole control group marches as one squad
         // (leash, chokepoints), anything else gets a plain order
         void orderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind);
         // Command of the local player (debug: may command any faction)
-        SimCommand command(CommandType type) const;
+        SimCommand Command(CommandType type) const;
 
         std::vector<int> m_selectedUnits;
         std::array<ControlGroup, 10> m_groups;
         Simulation m_sim;
         // The computer players of a match, in slot order (every peer runs them alike)
         std::vector<std::unique_ptr<AIController>> m_matchAis;
-        void createMatchAis(const MissionController &mission, EntityManager &entities, TileMap &map);
+        void CreateMatchAis(const MissionController &mission, EntityManager &entities, TileMap &map);
         // One tick of the world (after the input): commands, research, entities, economies, AI, mission
-        void simulationStep(float deltaTime, TileMap &map, Pathfinder &pathfinder, EntityManager &entities, Economy &economy, AIController &aiController, MissionController &mission, HUDController &hud, AppState &appState);
+        void SimulationStep(float deltaTime, TileMap &map, Pathfinder &pathfinder, EntityManager &entities, Economy &economy, AIController &aiController, MissionController &mission, HUDController &hud, AppState &appState);
         int m_missionSerial {-1};
         int m_lastGroupKey {-1};
         std::uint64_t m_lastGroupTicks {0};
@@ -178,7 +178,7 @@ namespace OpenArtOfWar
         int m_lastClickX {-100}; // screen position of the last click (a double click on empty ground)
         int m_lastClickY {-100};
         // Selects the player's own living units for which `pick` is true; `onScreen`: only those inside the view
-        void selectOwnUnits(EntityManager &entities, const Camera &camera, bool onScreen, const std::function<bool(const Unit &)> &pick);
+        void SelectOwnUnits(EntityManager &entities, const Camera &camera, bool onScreen, const std::function<bool(const Unit &)> &pick);
 
         bool m_debugMode {false};
         bool m_showNavLines {true};

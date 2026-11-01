@@ -24,10 +24,10 @@ namespace OpenArtOfWar
         // directory's saves folder) is copied over the first time when the new file does not exist yet.
         explicit SaveManager(const std::string &saveFilePath = "");
 
-        bool save(const SaveData &data);
+        bool Save(const SaveData &data);
         bool load(SaveData &outData);
-        bool hasSave() const;
-        const std::string &path() const
+        bool HasSave() const;
+        const std::string &Path() const
         {
             return m_savePath;
         }

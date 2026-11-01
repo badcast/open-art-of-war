@@ -256,7 +256,7 @@ const Hint kHints[] = {
 
 } // namespace
 
-void fieldHint(const char* key) {
+void FieldHint(const char* key) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) return;
     for (const Hint& h : kHints) {
         if (std::strcmp(h.key, key) != 0) continue;

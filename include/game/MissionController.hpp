@@ -29,7 +29,7 @@ namespace OpenArtOfWar
         int tilesetId {0};
         bool hasPrebuilt {false}; // the map has buildings or units of its own (the start can be "prebuilt" or "from scratch")
 
-        std::string displayName() const
+        std::string DisplayName() const
         {
             return title.empty() ? name : _(title);
         }
@@ -52,19 +52,19 @@ namespace OpenArtOfWar
     public:
         MissionController();
 
-        bool loadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+        bool LoadMission(int missionId, const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
         // Custom game on any map of assets/maps: both sides get a starting base next to the open
         // ground nearest to their corner (or to the map's playerPos / enemyPos), the AI builds the rest.
         // `usePrebuilt`: the map's own buildings/units/walls if it has them, or the full starting base (HQ, power
         // plant, barracks and 4 units); false = from scratch (only HQ and power plant, no units, no walls)
-        bool loadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt = true);
+        bool LoadSkirmish(const std::string &mapPath, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, bool usePrebuilt = true);
 
         // Match of several players (network game): every active slot gets the starting base of its faction at
         // its start position; Players is set up from the slots. No AI: every slot is a person.
-        bool loadMatch(const MatchSetup &setup, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+        bool LoadMatch(const MatchSetup &setup, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
         static constexpr int kMatchMissionId = 8;
-        bool isMatch() const
+        bool IsMatch() const
         {
             return m_currentMissionId == kMatchMissionId;
         }
@@ -74,99 +74,99 @@ namespace OpenArtOfWar
         }
         // Where the bases of a map go (up to 8): its "start_positions" (the number of players the map is made for);
         // a map without them has the two classic spots (playerPos / enemyPos)
-        static std::vector<std::pair<int, int>> startPositions(const std::string &mapPath);
+        static std::vector<std::pair<int, int>> StartPositions(const std::string &mapPath);
 
         // Starts the current mission or custom game map over
-        bool restart(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+        bool Restart(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
-        bool loadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+        bool LoadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
-        bool loadTestMap(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+        bool LoadTestMap(const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
-        void update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+        void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
 
-        void setOnLoaded(MissionLoadedFn fn)
+        void SetOnLoaded(MissionLoadedFn fn)
         {
             m_onLoaded = std::move(fn);
         }
         // Defense missions: when the enemy's squads come and how big they are (AI difficulty tactics)
-        void setDefensePacing(float firstWaveSeconds, float waveGapSeconds, int squadPercent, float timeScale);
-        bool isDefenseMission() const
+        void SetDefensePacing(float firstWaveSeconds, float waveGapSeconds, int squadPercent, float timeScale);
+        bool IsDefenseMission() const
         {
             return m_defenseMission;
         }
-        void setUseBuiltinWaves(bool use)
+        void SetUseBuiltinWaves(bool use)
         {
             m_useBuiltinWaves = use;
         }
-        bool getUseBuiltinWaves() const
+        bool GetUseBuiltinWaves() const
         {
             return m_useBuiltinWaves;
         }
 
-        int getCurrentMissionId() const
+        int GetCurrentMissionId() const
         {
             return m_currentMissionId;
         }
         // Changes on every loadMission (entity ids from the previous game are stale afterwards)
-        int getLoadSerial() const
+        int GetLoadSerial() const
         {
             return m_loadSerial;
         }
         // Open skirmish (main menu "Custom game"): the AI builds and fortifies its base
         static constexpr int kSkirmishMissionId = 7;
-        bool isSkirmish() const
+        bool IsSkirmish() const
         {
             return m_currentMissionId == kSkirmishMissionId;
         }
-        int getPlayerHqX() const
+        int GetPlayerHqX() const
         {
             return m_playerHqTileX;
         }
-        int getPlayerHqY() const
+        int GetPlayerHqY() const
         {
             return m_playerHqTileY;
         }
-        int getEnemyHqX() const
+        int GetEnemyHqX() const
         {
             return m_enemyHqTileX;
         }
-        int getEnemyHqY() const
+        int GetEnemyHqY() const
         {
             return m_enemyHqTileY;
         }
-        const std::string &getMissionName() const
+        const std::string &GetMissionName() const
         {
             return m_missionName;
         }
-        const std::string &getBriefingText() const
+        const std::string &GetBriefingText() const
         {
             return m_briefingText;
         }
-        const std::string &getObjectiveText() const
+        const std::string &GetObjectiveText() const
         {
             return m_objectiveText;
         }
 
-        bool isVictory() const
+        bool IsVictory() const
         {
             return m_isVictory;
         }
-        bool isDefeat() const
+        bool IsDefeat() const
         {
             return m_isDefeat;
         }
 
         // The missions of the campaign of the side the player commands (Resistance: Liberation of Peru,
         // Confederation: Global Confederation); ids index this list
-        static const std::vector<MissionInfo> &getAvailableMissions();
+        static const std::vector<MissionInfo> &GetAvailableMissions();
         // The campaign is the first kCampaignMissionCount entries of getAvailableMissions()
         static constexpr int kCampaignMissionCount = 7;
         // Every map of assets/maps, ordered by name (m*, then map_mission_*, then map_skirmish_*, then the rest)
-        static std::vector<SkirmishMapInfo> listSkirmishMaps();
+        static std::vector<SkirmishMapInfo> ListSkirmishMaps();
 
     private:
-        void spawnSquadFromCmd27(int group, int x, int y, int val, TileMap &map, EntityManager &entities, Pathfinder *pathfinder = nullptr);
+        void SpawnSquadFromCmd27(int group, int x, int y, int val, TileMap &map, EntityManager &entities, Pathfinder *pathfinder = nullptr);
 
         int m_loadSerial {0};
         MatchSetup m_matchSetup;

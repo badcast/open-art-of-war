@@ -13,7 +13,7 @@
 namespace OpenArtOfWar
 {
 
-    SfxPlacement placeSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx)
+    SfxPlacement PlaceSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx)
     {
         SfxPlacement p;
         // Distance from the view rectangle (0 inside)
@@ -32,7 +32,7 @@ namespace OpenArtOfWar
 
     namespace
     {
-        SfxMixer::Category parseCategory(const std::string &s)
+        SfxMixer::Category ParseCategory(const std::string &s)
         {
             if(s == "weapon")
                 return SfxMixer::Category::Weapon;
@@ -48,7 +48,7 @@ namespace OpenArtOfWar
         }
 
         // "fire_rifle_2.ogg" -> "fire_rifle"; empty when the name has no _<number>.ogg ending
-        std::string eventOfFile(const std::string &path)
+        std::string EventOfFile(const std::string &path)
         {
             std::string name = path.substr(path.find_last_of("/\\") + 1);
             if(name.size() < 5 || name.compare(name.size() - 4, 4, ".ogg") != 0)
@@ -66,7 +66,7 @@ namespace OpenArtOfWar
         }
 
         // Ogg Vorbis -> mono int16 at SfxMixer::kRate
-        bool decodeOgg(const std::vector<uint8_t> &data, std::vector<int16_t> &out)
+        bool DecodeOgg(const std::vector<uint8_t> &data, std::vector<int16_t> &out)
         {
             int channels = 0, rate = 0;
             short *pcm = nullptr;
@@ -100,50 +100,50 @@ namespace OpenArtOfWar
         }
     } // namespace
 
-    bool SfxMixer::loadBank(const std::string &configPath, const std::string &dir)
+    bool SfxMixer::LoadBank(const std::string &configPath, const std::string &dir)
     {
         std::string text;
-        if(Assets::readText(configPath, text))
-            configure(JsonFile::readFromString(text));
+        if(Assets::ReadText(configPath, text))
+            Configure(JsonFile::ReadFromString(text));
         else
             std::cerr << "[SfxMixer] " << configPath << " not found: sounds play with default settings" << std::endl;
-        const int loaded = loadClips(dir);
-        std::cout << "[SfxMixer] " << loaded << " sound clips for " << eventCount() << " events" << std::endl;
+        const int loaded = LoadClips(dir);
+        std::cout << "[SfxMixer] " << loaded << " sound clips for " << EventCount() << " events" << std::endl;
         return loaded > 0;
     }
 
-    int SfxMixer::loadClips(const std::string &dir, bool onlyMissing)
+    int SfxMixer::LoadClips(const std::string &dir, bool onlyMissing)
     {
         int loaded = 0;
         // onlyMissing: decided once per event before its first clip of this folder (all its variants come along)
         std::map<std::string, bool> take;
-        for(const std::string &file : Assets::list(dir, ".ogg"))
+        for(const std::string &file : Assets::List(dir, ".ogg"))
         {
-            const std::string event = eventOfFile(file);
+            const std::string event = EventOfFile(file);
             if(event.empty())
                 continue;
             if(onlyMissing)
             {
                 auto it = take.find(event);
                 if(it == take.end())
-                    it = take.emplace(event, !has(event)).first;
+                    it = take.emplace(event, !Has(event)).first;
                 if(!it->second)
                     continue;
             }
             std::vector<uint8_t> bytes;
             std::vector<int16_t> pcm;
-            if(!Assets::readBytes(file, bytes) || !decodeOgg(bytes, pcm))
+            if(!Assets::ReadBytes(file, bytes) || !DecodeOgg(bytes, pcm))
             {
                 std::cerr << "[SfxMixer] could not decode " << file << std::endl;
                 continue;
             }
-            addClip(event, std::move(pcm));
+            AddClip(event, std::move(pcm));
             ++loaded;
         }
         return loaded;
     }
 
-    void SfxMixer::configure(const nlohmann::json &doc)
+    void SfxMixer::Configure(const nlohmann::json &doc)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         if(!doc.is_object())
@@ -169,7 +169,7 @@ namespace OpenArtOfWar
                 m_eventIndex[it.key()] = idx;
             }
             EventConfig &c = m_events[static_cast<size_t>(idx)].cfg;
-            c.category = parseCategory(e.value("category", std::string("ui")));
+            c.category = ParseCategory(e.value("category", std::string("ui")));
             c.volume = std::clamp(e.value("volume", 1.0f), 0.0f, 2.0f);
             c.pitchJitter = std::clamp(e.value("pitch_jitter", 0.0f), 0.0f, 12.0f);
             c.maxInstances = std::clamp(e.value("max_instances", 4), 1, 64);
@@ -181,7 +181,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void SfxMixer::addClip(const std::string &event, std::vector<int16_t> pcm)
+    void SfxMixer::AddClip(const std::string &event, std::vector<int16_t> pcm)
     {
         if(pcm.size() < 2)
             return;
@@ -201,33 +201,33 @@ namespace OpenArtOfWar
         m_events[static_cast<size_t>(idx)].cfg.clips.push_back(static_cast<int>(m_clips.size()) - 1);
     }
 
-    int SfxMixer::eventIndex(const std::string &event) const
+    int SfxMixer::EventIndex(const std::string &event) const
     {
         auto it = m_eventIndex.find(event);
         return it == m_eventIndex.end() ? -1 : it->second;
     }
 
-    bool SfxMixer::has(const std::string &event) const
+    bool SfxMixer::Has(const std::string &event) const
     {
         std::lock_guard<std::mutex> guard(m_lock);
-        const int idx = eventIndex(event);
+        const int idx = EventIndex(event);
         return idx >= 0 && !m_events[static_cast<size_t>(idx)].cfg.clips.empty();
     }
 
-    const SfxMixer::EventConfig *SfxMixer::config(const std::string &event) const
+    const SfxMixer::EventConfig *SfxMixer::Config(const std::string &event) const
     {
         std::lock_guard<std::mutex> guard(m_lock);
-        const int idx = eventIndex(event);
+        const int idx = EventIndex(event);
         return idx < 0 ? nullptr : &m_events[static_cast<size_t>(idx)].cfg;
     }
 
-    size_t SfxMixer::eventCount() const
+    size_t SfxMixer::EventCount() const
     {
         std::lock_guard<std::mutex> guard(m_lock);
         return m_events.size();
     }
 
-    int SfxMixer::instancesLocked(int eventIdx) const
+    int SfxMixer::InstancesLocked(int eventIdx) const
     {
         int n = 0;
         for(const Voice &v : m_voices)
@@ -235,7 +235,7 @@ namespace OpenArtOfWar
         return n;
     }
 
-    bool SfxMixer::startLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer)
+    bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer)
     {
         EventState &ev = m_events[static_cast<size_t>(eventIdx)];
         const EventConfig &c = ev.cfg;
@@ -245,7 +245,7 @@ namespace OpenArtOfWar
         {
             if(ev.played && c.minIntervalMs > 0 && nowMs - ev.lastPlayMs < static_cast<uint64_t>(c.minIntervalMs))
                 return false;
-            if(instancesLocked(eventIdx) >= c.maxInstances)
+            if(InstancesLocked(eventIdx) >= c.maxInstances)
                 return false;
         }
         // A full mixer gives up its least important voice (the oldest of them), never a more important one
@@ -288,25 +288,25 @@ namespace OpenArtOfWar
         return true;
     }
 
-    bool SfxMixer::play(const std::string &event, float gain, float pan, uint64_t nowMs)
+    bool SfxMixer::Play(const std::string &event, float gain, float pan, uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_lock);
-        const int idx = eventIndex(event);
+        const int idx = EventIndex(event);
         if(idx < 0)
             return false;
         if(m_events[static_cast<size_t>(idx)].cfg.category == Category::Announcer)
-            return announceLocked(idx, nowMs); // announcer lines always go through the queue
-        return startLocked(idx, gain, pan, nowMs, false);
+            return AnnounceLocked(idx, nowMs); // announcer lines always go through the queue
+        return StartLocked(idx, gain, pan, nowMs, false);
     }
 
-    bool SfxMixer::announce(const std::string &event, uint64_t nowMs)
+    bool SfxMixer::Announce(const std::string &event, uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_lock);
-        const int idx = eventIndex(event);
-        return idx >= 0 && announceLocked(idx, nowMs);
+        const int idx = EventIndex(event);
+        return idx >= 0 && AnnounceLocked(idx, nowMs);
     }
 
-    bool SfxMixer::announceLocked(int idx, uint64_t nowMs)
+    bool SfxMixer::AnnounceLocked(int idx, uint64_t nowMs)
     {
         if(m_events[static_cast<size_t>(idx)].cfg.clips.empty())
             return false;
@@ -326,7 +326,7 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void SfxMixer::update(uint64_t nowMs)
+    void SfxMixer::Update(uint64_t nowMs)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         for(const Voice &v : m_voices)
@@ -338,12 +338,12 @@ namespace OpenArtOfWar
         {
             const int idx = m_announcerQueue.front();
             m_announcerQueue.pop_front();
-            if(startLocked(idx, 1.0f, 0.0f, nowMs, true))
+            if(StartLocked(idx, 1.0f, 0.0f, nowMs, true))
                 return;
         }
     }
 
-    void SfxMixer::mix(int16_t *out, int frames)
+    void SfxMixer::Mix(int16_t *out, int frames)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         if(frames <= 0)
@@ -375,38 +375,38 @@ namespace OpenArtOfWar
         }
     }
 
-    void SfxMixer::stopAll()
+    void SfxMixer::StopAll()
     {
         std::lock_guard<std::mutex> guard(m_lock);
         m_voices.clear();
         m_announcerQueue.clear();
     }
 
-    void SfxMixer::setFxVolume(int volume)
+    void SfxMixer::SetFxVolume(int volume)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         m_fxGain = std::clamp(volume, 0, 128) / 128.0f;
     }
 
-    void SfxMixer::setVoiceVolume(int volume)
+    void SfxMixer::SetVoiceVolume(int volume)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         m_voiceGain = std::clamp(volume, 0, 128) / 128.0f;
     }
 
-    void SfxMixer::setMuted(bool muted)
+    void SfxMixer::SetMuted(bool muted)
     {
         std::lock_guard<std::mutex> guard(m_lock);
         m_muted = muted;
     }
 
-    int SfxMixer::activeVoices() const
+    int SfxMixer::ActiveVoices() const
     {
         std::lock_guard<std::mutex> guard(m_lock);
         return static_cast<int>(m_voices.size());
     }
 
-    bool SfxMixer::announcerBusy() const
+    bool SfxMixer::AnnouncerBusy() const
     {
         std::lock_guard<std::mutex> guard(m_lock);
         for(const Voice &v : m_voices)
@@ -417,7 +417,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    size_t SfxMixer::announcerQueued() const
+    size_t SfxMixer::AnnouncerQueued() const
     {
         std::lock_guard<std::mutex> guard(m_lock);
         return m_announcerQueue.size();

@@ -61,7 +61,7 @@ namespace OpenArtOfWar
         RadarAlertConfig config;
 
         // Once per radar frame: is an enemy on the radar now, and where (map tiles)
-        void update(uint64_t nowMs, bool enemyOnRadar, float tileX, float tileY)
+        void Update(uint64_t nowMs, bool enemyOnRadar, float tileX, float tileY)
         {
             if(enemyOnRadar)
             {
@@ -76,14 +76,14 @@ namespace OpenArtOfWar
                 m_lastEnemyMs = nowMs;
                 m_seenEnemy = true;
             }
-            if(m_active && elapsed(nowMs) >= duration())
+            if(m_active && Elapsed(nowMs) >= Duration())
                 m_active = false;
             // Quiet long enough (and the last alarm is over): the next contact sets it off again
             if(!m_armed && !m_active && (!m_seenEnemy || static_cast<float>(nowMs - m_lastEnemyMs) >= config.rearmDelaySeconds * 1000.0f))
                 m_armed = true;
         }
 
-        void reset()
+        void Reset()
         {
             m_active = false;
             m_armed = true;
@@ -91,52 +91,52 @@ namespace OpenArtOfWar
         }
 
         // When the current / last alarm went off (0: never)
-        uint64_t startMs() const
+        uint64_t StartMs() const
         {
             return m_startMs;
         }
-        bool active() const
+        bool Active() const
         {
             return m_active;
         }
-        bool armed() const
+        bool Armed() const
         {
             return m_armed;
         }
-        float tileX() const
+        float TileX() const
         {
             return m_tileX;
         }
-        float tileY() const
+        float TileY() const
         {
             return m_tileY;
         }
         // Seconds since the alarm went off
-        float elapsed(uint64_t nowMs) const
+        float Elapsed(uint64_t nowMs) const
         {
             return static_cast<float>(nowMs - m_startMs) / 1000.0f;
         }
         // The alarm lasts while it flashes and until the last wave has spread
-        float duration() const
+        float Duration() const
         {
             const float waves = config.waveCount > 0 ? (config.waveCount - 1) * config.waveIntervalSeconds + config.waveSeconds : 0.0f;
             return std::max(config.blinkSeconds, waves);
         }
         // Flash phase: true in the "on" half of each blink, while the radar flashes
-        bool blinkOn(uint64_t nowMs) const
+        bool BlinkOn(uint64_t nowMs) const
         {
-            const float t = elapsed(nowMs);
+            const float t = Elapsed(nowMs);
             if(!m_active || t >= config.blinkSeconds)
                 return false;
             const float cycles = t * config.blinkHz;
             return cycles - static_cast<float>(static_cast<int>(cycles)) < 0.5f;
         }
         // Wave `i`: false when it has not started yet or is over; else its radius and opacity (0..1)
-        bool wave(int i, uint64_t nowMs, float &radiusPx, float &opacity) const
+        bool Wave(int i, uint64_t nowMs, float &radiusPx, float &opacity) const
         {
             if(!m_active || i < 0 || i >= config.waveCount)
                 return false;
-            const float t = elapsed(nowMs) - static_cast<float>(i) * config.waveIntervalSeconds;
+            const float t = Elapsed(nowMs) - static_cast<float>(i) * config.waveIntervalSeconds;
             if(t < 0.0f || t >= config.waveSeconds)
                 return false;
             const float k = t / config.waveSeconds;

@@ -12,13 +12,13 @@ namespace OpenArtOfWar
     {
 
         // Where earlier versions kept the save: next to the game, or below the user directory in blob mode
-        void migrateLegacySave(const std::filesystem::path &target)
+        void MigrateLegacySave(const std::filesystem::path &target)
         {
             namespace fs = std::filesystem;
             std::error_code ec;
             if(fs::exists(target, ec))
                 return;
-            const fs::path candidates[] = {fs::path("saves") / "savegame.json", fs::path(Assets::userDataDir()) / "saves" / "savegame.json"};
+            const fs::path candidates[] = {fs::path("saves") / "savegame.json", fs::path(Assets::UserDataDir()) / "saves" / "savegame.json"};
             for(const fs::path &old : candidates)
             {
                 if(fs::exists(old, ec) && fs::copy_file(old, target, ec))
@@ -38,19 +38,19 @@ namespace OpenArtOfWar
             m_savePath = saveFilePath;
             return;
         }
-        const std::filesystem::path target = std::filesystem::path(Assets::userDataDir()) / "savegame.json";
+        const std::filesystem::path target = std::filesystem::path(Assets::UserDataDir()) / "savegame.json";
         std::error_code ec;
         std::filesystem::create_directories(target.parent_path(), ec);
-        migrateLegacySave(target);
+        MigrateLegacySave(target);
         m_savePath = target.string();
     }
 
-    bool SaveManager::hasSave() const
+    bool SaveManager::HasSave() const
     {
         return std::filesystem::exists(m_savePath);
     }
 
-    bool SaveManager::save(const SaveData &data)
+    bool SaveManager::Save(const SaveData &data)
     {
         try
         {
@@ -84,7 +84,7 @@ namespace OpenArtOfWar
 
     bool SaveManager::load(SaveData &outData)
     {
-        if(!hasSave())
+        if(!HasSave())
             return false;
         try
         {

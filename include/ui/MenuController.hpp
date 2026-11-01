@@ -48,97 +48,97 @@ namespace OpenArtOfWar
 
         // The player's options the settings screen edits; onChanged applies (and stores) one group of them
         // The application shows its loading screen (the map's picture, at least three seconds) around the loading of a game
-        void bindLoading(std::function<void(const std::string &, const std::string &)> begin, std::function<void()> end)
+        void BindLoading(std::function<void(const std::string &, const std::string &)> begin, std::function<void()> end)
         {
             m_beginLoading = std::move(begin);
             m_endLoading = std::move(end);
         }
-        void bindSettings(Settings &settings, std::function<void(SettingsArea)> onChanged, std::function<const std::vector<Resolution> &()> resolutions);
-        void bindRenderApi(RenderApiBinding binding)
+        void BindSettings(Settings &settings, std::function<void(SettingsArea)> onChanged, std::function<const std::vector<Resolution> &()> resolutions);
+        void BindRenderApi(RenderApiBinding binding)
         {
             m_renderApi = std::move(binding);
         }
         // Opens the settings screen on `tab` (0 video, 1 graphics, 2 audio, 3 game)
-        void showSettingsTab(int tab)
+        void ShowSettingsTab(int tab)
         {
             m_settingsTab = tab;
             m_settingsSelected = 0;
         }
 
         // Menu States
-        bool isInGameMenuOpen() const
+        bool IsInGameMenuOpen() const
         {
             return m_inGameMenuOpen;
         }
-        void setInGameMenuOpen(bool open)
+        void SetInGameMenuOpen(bool open)
         {
             m_inGameMenuOpen = open;
         }
 
-        bool isInGameSettingsOpen() const
+        bool IsInGameSettingsOpen() const
         {
             return m_inGameSettingsOpen;
         }
-        bool isObjectivesDialogOpen() const
+        bool IsObjectivesDialogOpen() const
         {
             return m_objectivesDialogOpen;
         }
-        void setObjectivesDialogOpen(bool open)
+        void SetObjectivesDialogOpen(bool open)
         {
             m_objectivesDialogOpen = open;
         }
 
-        bool isCampaignSelectOpen() const
+        bool IsCampaignSelectOpen() const
         {
             return m_campaignSelectOpen;
         }
-        void setCampaignSelectOpen(bool open)
+        void SetCampaignSelectOpen(bool open)
         {
             m_campaignSelectOpen = open;
         }
 
-        int getSelectedMenuItem() const
+        int GetSelectedMenuItem() const
         {
             return m_selectedMenuItem;
         }
-        void setSelectedMenuItem(int item)
+        void SetSelectedMenuItem(int item)
         {
             m_selectedMenuItem = item;
         }
 
         // Update / Event Handlers
-        bool updateInGameMenu(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AppState &state);
+        bool UpdateInGameMenu(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AppState &state);
 
-        bool updateObjectivesDialog(InputManager &input, bool leftClicked);
+        bool UpdateObjectivesDialog(InputManager &input, bool leftClicked);
 
-        bool updateCampaignSelect(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AppState &state, AIController &ai);
+        bool UpdateCampaignSelect(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AppState &state, AIController &ai);
 
-        void updateMainMenu(InputManager &input, int windowW, int windowH, AppState &state, bool &running, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AIController &ai);
+        void UpdateMainMenu(InputManager &input, int windowW, int windowH, AppState &state, bool &running, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera, AIController &ai);
 
-        void updateSettings(InputManager &input, int windowW, int windowH, AppState &state);
+        void UpdateSettings(InputManager &input, int windowW, int windowH, AppState &state);
 
         // Help / About: any click, ESC or ENTER returns to the main menu
-        void updateInfoScreen(InputManager &input, AppState &state);
+        void UpdateInfoScreen(InputManager &input, AppState &state);
 
-        void activateMenuItem(int index, AppState &state, bool &running, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera);
+        void ActivateMenuItem(int index, AppState &state, bool &running, SoundEngine &sound, MissionController &mission, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder, Camera &camera);
 
         // Renderers
-        void renderSplashLogo(Renderer &renderer, Camera &camera, TextureManager &texManager, int windowW, int windowH);
-        void renderSplashTitle(Renderer &renderer, Camera &camera, TextureManager &texManager, int windowW, int windowH);
-        void renderMainMenu(Renderer &renderer, TextureManager &texManager, BitmapFontRenderer &fontRenderer, const SoundEngine &sound, int windowW, int windowH);
-        void renderMenuHelp(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
-        void renderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
-        void renderMenuSettings(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
-        void renderBriefing(Renderer &renderer, BitmapFontRenderer &fontRenderer, const MissionController &mission, int windowW, int windowH);
-        void renderInGamePauseMenu(Renderer &renderer, BitmapFontRenderer &fontRenderer, const SoundEngine &sound, int windowW, int windowH);
-        void renderObjectivesDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, const MissionController &mission, int windowW, int windowH);
-        void renderCampaignMissionSelect(Renderer &renderer, TextureManager &texManager, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
+        void RenderSplashLogo(Renderer &renderer, Camera &camera, TextureManager &texManager, int windowW, int windowH);
+        void RenderSplashTitle(Renderer &renderer, Camera &camera, TextureManager &texManager, int windowW, int windowH);
+        void RenderMainMenu(Renderer &renderer, TextureManager &texManager, BitmapFontRenderer &fontRenderer, const SoundEngine &sound, int windowW, int windowH);
+        void RenderMenuHelp(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
+        void RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
+        void RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
+        void RenderBriefing(Renderer &renderer, BitmapFontRenderer &fontRenderer, const MissionController &mission, int windowW, int windowH);
+        void RenderInGamePauseMenu(Renderer &renderer, BitmapFontRenderer &fontRenderer, const SoundEngine &sound, int windowW, int windowH);
+        void RenderObjectivesDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, const MissionController &mission, int windowW, int windowH);
+        void RenderCampaignMissionSelect(Renderer &renderer, TextureManager &texManager, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
 
     private:
         MenuBackdropFx m_backdropFx; // soft explosions behind the main menu
-        void updateSettingsScreen(InputManager &input, int mx, int my, bool clicked, int windowW, int windowH, AppState &state);
+        void UpdateSettingsScreen(InputManager &input, int mx, int my, bool clicked, int windowW, int windowH, AppState &state);
 
-        void renderInfoDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH, const std::string &title, const std::vector<std::string> &lines);
+        void RenderInfoDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH, const std::string &title, const std::vector<std::string> &lines);
 
         std::string m_editorNotice; // why the map editor did not start, shown in the selection dialog
         MapPreview m_mapPreview;    // pictures of the maps in the selection dialog
@@ -158,9 +158,9 @@ namespace OpenArtOfWar
         int m_settingsSelected {0};
         // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
         static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102;
-        std::vector<std::string> campaignComboOptions(int id) const;
-        int campaignComboCurrent(int id) const;
-        void campaignComboApply(int id, int index);
+        std::vector<std::string> CampaignComboOptions(int id) const;
+        int CampaignComboCurrent(int id) const;
+        void CampaignComboApply(int id, int index);
         std::function<void(const std::string &, const std::string &)> m_beginLoading; // loading screen with a map's picture
         std::function<void()> m_endLoading;
         ui::ConfirmState m_confirm;        // the open question of the pause menu (leave / restart)

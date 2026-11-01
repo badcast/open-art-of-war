@@ -47,41 +47,41 @@ class MapDocument {
 public:
     MapDocument();
 
-    void newMap(int width, int height, int tilesetId, uint8_t fillTile = 0);
-    bool loadMap(const std::string& path);
-    bool saveMap(const std::string& path);
+    void NewMap(int width, int height, int tilesetId, uint8_t fillTile = 0);
+    bool LoadMap(const std::string& path);
+    bool SaveMap(const std::string& path);
 
     // Decoration footprints come from the sprite data; without it every decoration covers one tile
-    void setTextureManager(const TextureManager* textures) { m_textures = textures; }
+    void SetTextureManager(const TextureManager* textures) { m_textures = textures; }
 
     // Getters
-    TileMap& getTileMap() { return m_map; }
-    const TileMap& getTileMap() const { return m_map; }
+    TileMap& GetTileMap() { return m_map; }
+    const TileMap& GetTileMap() const { return m_map; }
 
-    int getWidth() const { return m_map.getWidth(); }
-    int getHeight() const { return m_map.getHeight(); }
-    int getTilesetId() const { return m_map.getTilesetId(); }
-    const std::string& getName() const { return m_name; }
-    void setName(const std::string& name) { m_name = name; m_modified = true; }
+    int GetWidth() const { return m_map.GetWidth(); }
+    int GetHeight() const { return m_map.GetHeight(); }
+    int GetTilesetId() const { return m_map.GetTilesetId(); }
+    const std::string& GetName() const { return m_name; }
+    void SetName(const std::string& name) { m_name = name; m_modified = true; }
     // In-game title of the map ("title" key of the map file), empty when it has none
-    std::string getTitle() const { return m_mapData.is_object() ? m_mapData.value("title", std::string()) : std::string(); }
-    const std::string& getFilePath() const { return m_filePath; }
-    bool isModified() const { return m_modified; }
-    void setModified(bool mod) { m_modified = mod; }
+    std::string GetTitle() const { return m_mapData.is_object() ? m_mapData.value("title", std::string()) : std::string(); }
+    const std::string& GetFilePath() const { return m_filePath; }
+    bool IsModified() const { return m_modified; }
+    void SetModified(bool mod) { m_modified = mod; }
 
-    int getPlayerStartX() const { return m_playerStartX; }
-    int getPlayerStartY() const { return m_playerStartY; }
+    int GetPlayerStartX() const { return m_playerStartX; }
+    int GetPlayerStartY() const { return m_playerStartY; }
     void setPlayerStart(int x, int y) { m_playerStartX = x; m_playerStartY = y; m_modified = true; }
 
-    int getEnemyStartX() const { return m_enemyStartX; }
-    int getEnemyStartY() const { return m_enemyStartY; }
+    int GetEnemyStartX() const { return m_enemyStartX; }
+    int GetEnemyStartY() const { return m_enemyStartY; }
     void setEnemyStart(int x, int y) { m_enemyStartX = x; m_enemyStartY = y; m_modified = true; }
 
     // More start positions (players 3..8 of a network game): a click on a free tile adds one, a click on an existing
     // one takes it away. The map holds as many players as it has start positions (the two above plus these).
     static constexpr size_t kMaxExtraStarts = 6;
     enum class StartToggle { Added, Removed, Full };
-    StartToggle toggleExtraStart(int x, int y) {
+    StartToggle ToggleExtraStart(int x, int y) {
         for (size_t i = 0; i < m_extraStarts.size(); ++i) {
             if (m_extraStarts[i].first == x && m_extraStarts[i].second == y) {
                 m_extraStarts.erase(m_extraStarts.begin() + static_cast<std::ptrdiff_t>(i));
@@ -94,56 +94,56 @@ public:
         m_modified = true;
         return StartToggle::Added;
     }
-    const std::vector<std::pair<int, int>>& getExtraStarts() const { return m_extraStarts; }
+    const std::vector<std::pair<int, int>>& GetExtraStarts() const { return m_extraStarts; }
 
-    const std::vector<EditorEntity>& getEntities() const { return m_entities; }
-    std::vector<EditorEntity>& getEntities() { return m_entities; }
+    const std::vector<EditorEntity>& GetEntities() const { return m_entities; }
+    std::vector<EditorEntity>& GetEntities() { return m_entities; }
 
     // Map Editing Tools
-    void setTile(int x, int y, uint8_t tile);
-    void setTileBrush(int x, int y, uint8_t tile, int brushSize = 1);
-    void floodFill(int startX, int startY, uint8_t newTile);
-    void fillAll(uint8_t tile);
+    void SetTile(int x, int y, uint8_t tile);
+    void SetTileBrush(int x, int y, uint8_t tile, int brushSize = 1);
+    void FloodFill(int startX, int startY, uint8_t newTile);
+    void FillAll(uint8_t tile);
 
-    void addDecoration(int type, int x, int y);
-    void removeDecoration(int x, int y);
+    void AddDecoration(int type, int x, int y);
+    void RemoveDecoration(int x, int y);
 
-    void setWall(int x, int y, Faction faction, int hp = 150);
-    bool canPlaceWallBrush(int x, int y, Faction faction, int brushSize) const;
-    bool setWallBrush(int x, int y, Faction faction, int brushSize);
-    void removeWall(int x, int y);
+    void SetWall(int x, int y, Faction faction, int hp = 150);
+    bool CanPlaceWallBrush(int x, int y, Faction faction, int brushSize) const;
+    bool SetWallBrush(int x, int y, Faction faction, int brushSize);
+    void RemoveWall(int x, int y);
 
-    bool canPlaceEntity(int type, bool isBuilding, int x, int y) const;
-    int addEntity(int type, bool isBuilding, Faction faction, int x, int y, int facing = 0);
-    bool hasObjectsInBrush(int x, int y, int brushSize) const;
-    bool removeObjectsBrush(int x, int y, int brushSize);
-    bool selectEntityAt(int x, int y, bool additive);
-    void clearEntitySelection();
-    int countSelectedUnits() const;
-    int setSelectedUnitFacing(int facing);
-    void removeEntityAt(int x, int y);
-    const EditorEntity* getEntityAt(int x, int y) const;
-    EditorEntity* getEntityAt(int x, int y);
+    bool CanPlaceEntity(int type, bool isBuilding, int x, int y) const;
+    int AddEntity(int type, bool isBuilding, Faction faction, int x, int y, int facing = 0);
+    bool HasObjectsInBrush(int x, int y, int brushSize) const;
+    bool RemoveObjectsBrush(int x, int y, int brushSize);
+    bool SelectEntityAt(int x, int y, bool additive);
+    void ClearEntitySelection();
+    int CountSelectedUnits() const;
+    int SetSelectedUnitFacing(int facing);
+    void RemoveEntityAt(int x, int y);
+    const EditorEntity* GetEntityAt(int x, int y) const;
+    EditorEntity* GetEntityAt(int x, int y);
 
-    void setPassable(int x, int y, bool passable);
-    void togglePassable(int x, int y);
-    void autoRecalculatePassability();
+    void SetPassable(int x, int y, bool passable);
+    void TogglePassable(int x, int y);
+    void AutoRecalculatePassability();
 
     // Undo / Redo
-    void pushUndoSnapshot();
-    bool undo();
-    bool redo();
-    bool canUndo() const { return !m_undoStack.empty(); }
-    bool canRedo() const { return !m_redoStack.empty(); }
+    void PushUndoSnapshot();
+    bool Undo();
+    bool Redo();
+    bool CanUndo() const { return !m_undoStack.empty(); }
+    bool CanRedo() const { return !m_redoStack.empty(); }
 
-    void clearAll();
+    void ClearAll();
 
 private:
-    void refreshPassability(int x, int y);
-    std::pair<int, int> decorationSize(int type) const;
-    bool coveredByDecoration(int x, int y) const;
-    MapSnapshot createSnapshot() const;
-    void restoreSnapshot(const MapSnapshot& snap);
+    void RefreshPassability(int x, int y);
+    std::pair<int, int> DecorationSize(int type) const;
+    bool CoveredByDecoration(int x, int y) const;
+    MapSnapshot CreateSnapshot() const;
+    void RestoreSnapshot(const MapSnapshot& snap);
 
     const TextureManager* m_textures{nullptr};
     TileMap m_map;

@@ -16,7 +16,7 @@ namespace OpenArtOfWar
             return {x, y};
         }
 
-        std::vector<MissionDef> buildConfederation()
+        std::vector<MissionDef> BuildConfederation()
         {
             std::vector<MissionDef> missions;
             {
@@ -205,7 +205,7 @@ namespace OpenArtOfWar
 
     const std::vector<MissionDef> &Missions::confederation()
     {
-        static const std::vector<MissionDef> s_missions = buildConfederation();
+        static const std::vector<MissionDef> s_missions = BuildConfederation();
         return s_missions;
     }
 

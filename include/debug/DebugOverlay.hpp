@@ -23,19 +23,19 @@ namespace OpenArtOfWar
         DebugOverlay(SDL_Window *window, SDL_Renderer *renderer);
         ~DebugOverlay();
 
-        void processEvent(const SDL_Event &event);
-        void toggle()
+        void ProcessEvent(const SDL_Event &event);
+        void Toggle()
         {
             m_visible = !m_visible;
         }
-        bool isVisible() const
+        bool IsVisible() const
         {
             return m_visible;
         }
 
         void render(TileMap &map, EntityManager &entities, Economy &economy, MissionController &mission, SoundEngine &sound, Camera &camera, AIController &ai, float fps);
 
-        bool isFogDisabled() const
+        bool IsFogDisabled() const
         {
             return m_disableFog;
         }
@@ -47,7 +47,7 @@ namespace OpenArtOfWar
         bool m_disableFog {false};
 
         // AI control panel
-        void renderAiPanel(AIController &ai, EntityManager &entities);
+        void RenderAiPanel(AIController &ai, EntityManager &entities);
         int m_aiCreditsEdit {0};
         bool m_aiCreditsEditing {false};
         int m_thoughtFilter {0}; // 0 = all categories

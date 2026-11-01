@@ -12,7 +12,7 @@ namespace OpenArtOfWar
     namespace
     {
 
-        std::vector<int> range(int first, int last)
+        std::vector<int> Range(int first, int last)
         {
             std::vector<int> v;
             for(int i = first; i <= last; ++i)
@@ -21,7 +21,7 @@ namespace OpenArtOfWar
         }
 
         // The game's own values (index = ProjectileType)
-        std::array<ProjectileSpec, Projectiles::kCount> defaults()
+        std::array<ProjectileSpec, Projectiles::kCount> Defaults()
         {
             std::array<ProjectileSpec, Projectiles::kCount> d;
             ProjectileSpec &bullet = d[static_cast<int>(ProjectileType::Bullet)];
@@ -35,7 +35,7 @@ namespace OpenArtOfWar
             shell.speed = 13.5f;
             shell.spread = 0.035f;
             shell.impact = {15, 16, 17};
-            shell.groundMarks = range(1789, 1794);
+            shell.groundMarks = Range(1789, 1794);
 
             ProjectileSpec &rocket = d[static_cast<int>(ProjectileType::Rocket)];
             rocket.key = "rocket";
@@ -46,7 +46,7 @@ namespace OpenArtOfWar
             rocket.spread = 0.08f;
             rocket.impact = {18, 19, 20};
             rocket.smokeTrail = true;
-            rocket.groundMarks = range(1795, 1800);
+            rocket.groundMarks = Range(1795, 1800);
 
             ProjectileSpec &flame = d[static_cast<int>(ProjectileType::Flame)];
             flame.key = "flame";
@@ -66,11 +66,11 @@ namespace OpenArtOfWar
             return d;
         }
 
-        std::array<ProjectileSpec, Projectiles::kCount> &specs()
+        std::array<ProjectileSpec, Projectiles::kCount> &Specs()
         {
             static std::array<ProjectileSpec, Projectiles::kCount> s = []
             {
-                auto d = defaults();
+                auto d = Defaults();
                 return d;
             }();
             static bool loaded = false;
@@ -78,14 +78,14 @@ namespace OpenArtOfWar
             {
                 loaded = true;
                 std::string text;
-                if(Assets::readText(LoaderResources::projectiles(), text))
-                    Projectiles::loadText(text);
+                if(Assets::ReadText(LoaderResources::projectiles(), text))
+                    Projectiles::LoadText(text);
             }
             return s;
         }
 
         template <typename T>
-        void read(const YAML::Node &n, const char *key, T &out)
+        void Read(const YAML::Node &n, const char *key, T &out)
         {
             try
             {
@@ -97,7 +97,7 @@ namespace OpenArtOfWar
             }
         }
 
-        void readList(const YAML::Node &n, const char *key, std::vector<int> &out)
+        void ReadList(const YAML::Node &n, const char *key, std::vector<int> &out)
         {
             try
             {
@@ -122,7 +122,7 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    int ProjectileSpec::pickImpact(int seed) const
+    int ProjectileSpec::PickImpact(int seed) const
     {
         if(impact.empty())
             return -1;
@@ -130,7 +130,7 @@ namespace OpenArtOfWar
         return impact[static_cast<size_t>(((seed % n) + n) % n)];
     }
 
-    int ProjectileSpec::pickGroundMark(int seed) const
+    int ProjectileSpec::PickGroundMark(int seed) const
     {
         if(groundMarks.empty())
             return -1;
@@ -144,25 +144,25 @@ namespace OpenArtOfWar
         const ProjectileSpec &of(ProjectileType type)
         {
             const int i = static_cast<int>(type);
-            return specs()[static_cast<size_t>(i >= 0 && i < kCount ? i : 0)];
+            return Specs()[static_cast<size_t>(i >= 0 && i < kCount ? i : 0)];
         }
 
-        const char *keyOf(ProjectileType type)
+        const char *KeyOf(ProjectileType type)
         {
             return of(type).key;
         }
 
-        ProjectileType fromKey(const std::string &key)
+        ProjectileType FromKey(const std::string &key)
         {
             for(int i = 0; i < kCount; ++i)
             {
-                if(key == specs()[static_cast<size_t>(i)].key)
+                if(key == Specs()[static_cast<size_t>(i)].key)
                     return static_cast<ProjectileType>(i);
             }
             return ProjectileType::Bullet;
         }
 
-        bool loadText(const std::string &yamlText)
+        bool LoadText(const std::string &yamlText)
         {
             try
             {
@@ -170,24 +170,24 @@ namespace OpenArtOfWar
                 const YAML::Node all = root["projectiles"];
                 if(!all || !all.IsMap())
                     return false;
-                for(ProjectileSpec &s : specs())
+                for(ProjectileSpec &s : Specs())
                 {
                     const YAML::Node n = all[s.key];
                     if(!n || !n.IsMap())
                         continue;
-                    read(n, "hitscan", s.hitscan);
-                    read(n, "sprite", s.sprite);
-                    read(n, "directions", s.directions);
+                    Read(n, "hitscan", s.hitscan);
+                    Read(n, "sprite", s.sprite);
+                    Read(n, "directions", s.directions);
                     s.directions = s.directions <= 16 ? 16 : 32;
-                    read(n, "speed", s.speed);
+                    Read(n, "speed", s.speed);
                     s.speed = std::max(0.5f, s.speed);
-                    read(n, "spread", s.spread);
-                    readList(n, "impact", s.impact);
-                    read(n, "impact_wall", s.impactWall);
-                    read(n, "wall_destroyed", s.wallDestroyed);
-                    read(n, "smoke_trail", s.smokeTrail);
-                    readList(n, "ground_marks", s.groundMarks);
-                    read(n, "ground_mark_seconds", s.groundMarkSeconds);
+                    Read(n, "spread", s.spread);
+                    ReadList(n, "impact", s.impact);
+                    Read(n, "impact_wall", s.impactWall);
+                    Read(n, "wall_destroyed", s.wallDestroyed);
+                    Read(n, "smoke_trail", s.smokeTrail);
+                    ReadList(n, "ground_marks", s.groundMarks);
+                    Read(n, "ground_mark_seconds", s.groundMarkSeconds);
                 }
                 return true;
             }
@@ -200,16 +200,16 @@ namespace OpenArtOfWar
 
         void reload()
         {
-            specs() = defaults();
+            Specs() = Defaults();
             std::string text;
-            if(Assets::readText(LoaderResources::projectiles(), text))
-                loadText(text);
+            if(Assets::ReadText(LoaderResources::projectiles(), text))
+                LoadText(text);
         }
 
-        void apply(const std::string &yamlText)
+        void Apply(const std::string &yamlText)
         {
-            specs() = defaults();
-            loadText(yamlText);
+            Specs() = Defaults();
+            LoadText(yamlText);
         }
 
     } // namespace Projectiles

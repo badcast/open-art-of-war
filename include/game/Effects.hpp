@@ -45,20 +45,20 @@ namespace OpenArtOfWar
         Wreck buildingLarge {1753, 6};  // 4x4 and bigger
 
         // Wreck of a vehicle archetype
-        Wreck wreckOfVehicle(int archetype) const;
+        Wreck WreckOfVehicle(int archetype) const;
         // Rubble of a building of the given footprint
-        Wreck wreckOfBuilding(int width, int height) const;
+        Wreck WreckOfBuilding(int width, int height) const;
 
         // Reads effects.yaml text over the current values; false when it cannot be parsed
-        bool loadText(const std::string &yamlText);
+        bool LoadText(const std::string &yamlText);
         // The shared instance (read from assets/characters/effects.yaml on first use)
-        static EffectsConfig &get();
+        static EffectsConfig &Get();
         static void reload();
         // Replaces the shared instance by the defaults overlaid with this text (the editor shows changes at once)
-        static void apply(const std::string &yamlText);
+        static void Apply(const std::string &yamlText);
     };
 
     // Where the picture of an explosion / impact animation sits relative to the point it is spawned at
-    void explosionCentering(int animId, float &outOx, float &outOy);
+    void ExplosionCentering(int animId, float &outOx, float &outOy);
 
 } // namespace OpenArtOfWar

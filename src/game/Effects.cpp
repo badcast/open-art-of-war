@@ -14,7 +14,7 @@ namespace OpenArtOfWar
     {
 
         template <typename T>
-        void read(const YAML::Node &n, const char *key, T &out)
+        void Read(const YAML::Node &n, const char *key, T &out)
         {
             try
             {
@@ -26,7 +26,7 @@ namespace OpenArtOfWar
             }
         }
 
-        void readList(const YAML::Node &n, const char *key, std::vector<int> &out)
+        void ReadList(const YAML::Node &n, const char *key, std::vector<int> &out)
         {
             try
             {
@@ -42,7 +42,7 @@ namespace OpenArtOfWar
             }
         }
 
-        void readPair(const YAML::Node &n, const char *key, float &a, float &b)
+        void ReadPair(const YAML::Node &n, const char *key, float &a, float &b)
         {
             try
             {
@@ -57,31 +57,31 @@ namespace OpenArtOfWar
             }
         }
 
-        void readWreck(const YAML::Node &n, const char *key, EffectsConfig::Wreck &w)
+        void ReadWreck(const YAML::Node &n, const char *key, EffectsConfig::Wreck &w)
         {
             const YAML::Node s = n ? n[key] : YAML::Node();
-            read(s, "composite", w.composite);
-            read(s, "stages", w.stages);
+            Read(s, "composite", w.composite);
+            Read(s, "stages", w.stages);
             w.stages = std::max(1, w.stages);
         }
 
-        bool contains(const std::vector<int> &v, int x)
+        bool Contains(const std::vector<int> &v, int x)
         {
             return std::find(v.begin(), v.end(), x) != v.end();
         }
 
     } // namespace
 
-    EffectsConfig::Wreck EffectsConfig::wreckOfVehicle(int archetype) const
+    EffectsConfig::Wreck EffectsConfig::WreckOfVehicle(int archetype) const
     {
-        if(contains(lightArchetypes, archetype))
+        if(Contains(lightArchetypes, archetype))
             return light;
-        if(contains(heavyArchetypes, archetype))
+        if(Contains(heavyArchetypes, archetype))
             return heavy;
         return vehicle;
     }
 
-    EffectsConfig::Wreck EffectsConfig::wreckOfBuilding(int width, int height) const
+    EffectsConfig::Wreck EffectsConfig::WreckOfBuilding(int width, int height) const
     {
         if(width >= 4 || height >= 4)
             return buildingLarge;
@@ -90,7 +90,7 @@ namespace OpenArtOfWar
         return buildingSmall;
     }
 
-    void explosionCentering(int animId, float &outOx, float &outOy)
+    void ExplosionCentering(int animId, float &outOx, float &outOy)
     {
         if(animId >= 48 && animId <= 50)
         {
@@ -135,7 +135,7 @@ namespace OpenArtOfWar
         }
     }
 
-    bool EffectsConfig::loadText(const std::string &yamlText)
+    bool EffectsConfig::LoadText(const std::string &yamlText)
     {
         try
         {
@@ -143,40 +143,40 @@ namespace OpenArtOfWar
             if(!root.IsMap())
                 return false;
             const YAML::Node ex = root["explosions"];
-            read(ex, "frame_time", frameTime);
+            Read(ex, "frame_time", frameTime);
             frameTime = std::max(0.005f, frameTime);
             const YAML::Node veh = ex ? ex["vehicle"] : YAML::Node();
-            readList(veh, "main", vehicleMain);
-            readList(veh, "second", vehicleSecond);
-            readPair(veh, "second_delay", vehicleSecondDelayMin, vehicleSecondDelayMax);
-            read(veh, "second_spread_x", vehicleSecondSpreadX);
-            readPair(veh, "second_spread_y", vehicleSecondSpreadYMin, vehicleSecondSpreadYMax);
+            ReadList(veh, "main", vehicleMain);
+            ReadList(veh, "second", vehicleSecond);
+            ReadPair(veh, "second_delay", vehicleSecondDelayMin, vehicleSecondDelayMax);
+            Read(veh, "second_spread_x", vehicleSecondSpreadX);
+            ReadPair(veh, "second_spread_y", vehicleSecondSpreadYMin, vehicleSecondSpreadYMax);
             const YAML::Node b = ex ? ex["building"] : YAML::Node();
-            read(b, "small", buildingSmallMain);
-            read(b, "power", buildingPowerMain);
-            read(b, "large", buildingLargeMain);
-            read(b, "extra_min", buildingExtraMin);
-            read(b, "extra_max", buildingExtraMax);
+            Read(b, "small", buildingSmallMain);
+            Read(b, "power", buildingPowerMain);
+            Read(b, "large", buildingLargeMain);
+            Read(b, "extra_min", buildingExtraMin);
+            Read(b, "extra_max", buildingExtraMax);
             buildingExtraMax = std::max(buildingExtraMax, buildingExtraMin);
-            readList(b, "extra_anims", buildingExtraAnims);
-            read(b, "big_anim", buildingBigAnim);
-            read(b, "big_every", buildingBigEvery);
+            ReadList(b, "extra_anims", buildingExtraAnims);
+            Read(b, "big_anim", buildingBigAnim);
+            Read(b, "big_every", buildingBigEvery);
             buildingBigEvery = std::max(1, buildingBigEvery);
-            read(b, "delay_start", buildingDelayStart);
-            read(b, "delay_step", buildingDelayStep);
-            read(b, "delay_jitter", buildingDelayJitter);
+            Read(b, "delay_start", buildingDelayStart);
+            Read(b, "delay_step", buildingDelayStep);
+            Read(b, "delay_jitter", buildingDelayJitter);
 
             const YAML::Node w = root["wrecks"];
-            read(w, "burial_seconds", burialSeconds);
+            Read(w, "burial_seconds", burialSeconds);
             burialSeconds = std::max(1.0f, burialSeconds);
-            readWreck(w, "vehicle", vehicle);
-            readWreck(w, "light", light);
-            readWreck(w, "heavy", heavy);
-            readList(w, "light_archetypes", lightArchetypes);
-            readList(w, "heavy_archetypes", heavyArchetypes);
-            readWreck(w, "building_small", buildingSmall);
-            readWreck(w, "building_medium", buildingMedium);
-            readWreck(w, "building_large", buildingLarge);
+            ReadWreck(w, "vehicle", vehicle);
+            ReadWreck(w, "light", light);
+            ReadWreck(w, "heavy", heavy);
+            ReadList(w, "light_archetypes", lightArchetypes);
+            ReadList(w, "heavy_archetypes", heavyArchetypes);
+            ReadWreck(w, "building_small", buildingSmall);
+            ReadWreck(w, "building_medium", buildingMedium);
+            ReadWreck(w, "building_large", buildingLarge);
             return true;
         }
         catch(const std::exception &e)
@@ -186,33 +186,33 @@ namespace OpenArtOfWar
         }
     }
 
-    EffectsConfig &EffectsConfig::get()
+    EffectsConfig &EffectsConfig::Get()
     {
         static EffectsConfig cfg = []
         {
             EffectsConfig c;
             std::string text;
-            if(Assets::readText(LoaderResources::effects(), text))
-                c.loadText(text);
+            if(Assets::ReadText(LoaderResources::Effects(), text))
+                c.LoadText(text);
             return c;
         }();
         return cfg;
     }
 
-    void EffectsConfig::apply(const std::string &yamlText)
+    void EffectsConfig::Apply(const std::string &yamlText)
     {
         EffectsConfig fresh;
-        fresh.loadText(yamlText);
-        get() = fresh;
+        fresh.LoadText(yamlText);
+        Get() = fresh;
     }
 
     void EffectsConfig::reload()
     {
         EffectsConfig fresh;
         std::string text;
-        if(Assets::readText(LoaderResources::effects(), text))
-            fresh.loadText(text);
-        get() = fresh;
+        if(Assets::ReadText(LoaderResources::Effects(), text))
+            fresh.LoadText(text);
+        Get() = fresh;
     }
 
 } // namespace OpenArtOfWar

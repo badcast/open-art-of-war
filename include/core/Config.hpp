@@ -30,8 +30,8 @@ namespace OpenArtOfWar
     // Factions
     enum class Faction : uint8_t
     {
-        Resistance = 0,    // Red (Сопротивление — партизаны Перу, красная палитра Sheet 9 / Sheets 12..13)
-        Confederation = 1, // Blue (Конфедерация — регулярная армия, синяя палитра Sheet 8 / Sheets 10..11)
+        Resistance = 0,    // Red (Resistance - Peruvian guerrillas, red palette Sheet 9 / Sheets 12..13)
+        Confederation = 1, // Blue (Confederation - regular army, blue palette Sheet 8 / Sheets 10..11)
         Neutral = 2        // Green / Neutral
     };
 

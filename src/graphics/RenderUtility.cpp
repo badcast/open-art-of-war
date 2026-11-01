@@ -13,12 +13,12 @@ namespace OpenArtOfWar::RenderUtility
     void DrawRadius(Renderer &renderer, const Camera &camera, float worldX, float worldY, float radiusX, float radiusY, SDL_Color color, float thickness)
     {
         float sx = 0.0f, sy = 0.0f;
-        camera.worldToScreen(worldX, worldY, sx, sy);
-        const float zoom = camera.getZoom();
+        camera.WorldToScreen(worldX, worldY, sx, sy);
+        const float zoom = camera.GetZoom();
         const float rx = radiusX * zoom, ry = radiusY * zoom;
         // A segment about 5 px long keeps even a screen-wide ring round
         const int segments = static_cast<int>(std::ceil(2.0f * static_cast<float>(M_PI) * std::max(rx, ry) / 5.0f));
-        renderer.drawRingScreen(sx, sy, rx, ry, thickness, color, std::clamp(segments, 48, 720));
+        renderer.DrawRingScreen(sx, sy, rx, ry, thickness, color, std::clamp(segments, 48, 720));
     }
 
     void DrawRadius(Renderer &renderer, const Camera &camera, float worldX, float worldY, float radius, SDL_Color color, float thickness)
@@ -34,9 +34,9 @@ namespace OpenArtOfWar::RenderUtility
     void DrawLine(Renderer &renderer, const Camera &camera, float x0, float y0, float x1, float y1, SDL_Color color, float widthPx)
     {
         float ax = 0.0f, ay = 0.0f, bx = 0.0f, by = 0.0f;
-        camera.worldToScreen(x0, y0, ax, ay);
-        camera.worldToScreen(x1, y1, bx, by);
-        renderer.drawThickLineScreen(ax, ay, bx, by, widthPx, color);
+        camera.WorldToScreen(x0, y0, ax, ay);
+        camera.WorldToScreen(x1, y1, bx, by);
+        renderer.DrawThickLineScreen(ax, ay, bx, by, widthPx, color);
     }
 
     SDL_Color ParseHexColor(const std::string &text, SDL_Color fallback)

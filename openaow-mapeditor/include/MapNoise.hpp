@@ -6,11 +6,11 @@
 namespace OpenArtOfWar::MapNoise {
 
 // Lightweight coherent gradient noise
-inline float fade(float t) {
+inline float Fade(float t) {
     return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
 }
 
-inline float lerp(float a, float b, float t) {
+inline float Lerp(float a, float b, float t) {
     return a + t * (b - a);
 }
 
@@ -21,15 +21,15 @@ inline float grad(int hash, float x, float y) {
     return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
 }
 
-inline float sampleNoise2D(float x, float y, uint32_t seed) {
+inline float SampleNoise2D(float x, float y, uint32_t seed) {
     int X = static_cast<int>(std::floor(x)) & 255;
     int Y = static_cast<int>(std::floor(y)) & 255;
 
     x -= std::floor(x);
     y -= std::floor(y);
 
-    float u = fade(x);
-    float v = fade(y);
+    float u = Fade(x);
+    float v = Fade(y);
 
     auto hash = [seed](int ix, int iy) -> int {
         uint32_t n = static_cast<uint32_t>(ix + iy * 57) + seed * 1337u;
@@ -42,19 +42,19 @@ inline float sampleNoise2D(float x, float y, uint32_t seed) {
     int ba = hash(X + 1, Y);
     int bb = hash(X + 1, Y + 1);
 
-    float res = lerp(lerp(grad(aa, x, y), grad(ba, x - 1, y), u),
-                     lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u), v);
+    float res = Lerp(Lerp(grad(aa, x, y), grad(ba, x - 1, y), u),
+                     Lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u), v);
     return (res + 1.0f) * 0.5f; // Normalize to [0, 1]
 }
 
-inline float octaveNoise2D(float x, float y, int octaves, float persistence, uint32_t seed) {
+inline float OctaveNoise2D(float x, float y, int octaves, float persistence, uint32_t seed) {
     float total = 0.0f;
     float frequency = 1.0f;
     float amplitude = 1.0f;
     float maxValue = 0.0f;
 
     for (int i = 0; i < octaves; ++i) {
-        total += sampleNoise2D(x * frequency, y * frequency, seed + i * 31) * amplitude;
+        total += SampleNoise2D(x * frequency, y * frequency, seed + i * 31) * amplitude;
         maxValue += amplitude;
         amplitude *= persistence;
         frequency *= 2.0f;

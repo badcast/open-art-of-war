@@ -13,10 +13,10 @@ namespace OpenArtOfWar::Players
 
             Table()
             {
-                singlePlayer(Faction::Resistance);
+                SinglePlayer(Faction::Resistance);
             }
 
-            void singlePlayer(Faction human)
+            void SinglePlayer(Faction human)
             {
                 slots = {};
                 slots[0] = {true, human, 0, 0, true};
@@ -35,9 +35,9 @@ namespace OpenArtOfWar::Players
 
     } // namespace
 
-    void setupSinglePlayer(Faction human)
+    void SetupSinglePlayer(Faction human)
     {
-        table().singlePlayer(human);
+        table().SinglePlayer(human);
     }
 
     void setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId localId)
@@ -46,15 +46,15 @@ namespace OpenArtOfWar::Players
         table().local = localId < kMaxPlayers ? localId : 0;
     }
 
-    const PlayerSlot &slot(PlayerId id)
+    const PlayerSlot &Slot(PlayerId id)
     {
         return id < kMaxPlayers ? table().slots[id] : kNobody;
     }
-    bool isActive(PlayerId id)
+    bool IsActive(PlayerId id)
     {
         return id < kMaxPlayers && table().slots[id].active;
     }
-    PlayerId local()
+    PlayerId Local()
     {
         return table().local;
     }
@@ -67,16 +67,16 @@ namespace OpenArtOfWar::Players
         return n;
     }
 
-    Faction factionOf(PlayerId id)
+    Faction FactionOf(PlayerId id)
     {
         return id < kMaxPlayers ? table().slots[id].faction : Faction::Neutral;
     }
-    uint8_t teamOf(PlayerId id)
+    uint8_t TeamOf(PlayerId id)
     {
         return id < kMaxPlayers ? table().slots[id].team : 0xFF;
     }
 
-    PlayerId ownerOf(Faction faction)
+    PlayerId OwnerOf(Faction faction)
     {
         if(faction == Faction::Neutral)
             return kNoPlayer;
@@ -89,7 +89,7 @@ namespace OpenArtOfWar::Players
         return kNoPlayer;
     }
 
-    bool hostile(PlayerId a, PlayerId b)
+    bool Hostile(PlayerId a, PlayerId b)
     {
         if(a == b)
             return false;

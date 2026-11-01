@@ -36,17 +36,17 @@ namespace OpenArtOfWar
 
         // Wave plans use the Confederation archetypes (odd ids); each Resistance unit with the same role
         // has the even id right below (rifleman 0, grenadier 2, sniper 4, Coyote 6, Armadillo 8, Rhino 10, Porcupine 12)
-        int sideArchetype(int confederationArch, Faction side)
+        int SideArchetype(int confederationArch, Faction side)
         {
             return side == Faction::Confederation ? confederationArch : confederationArch - 1;
         }
 
-        bool isVehicleArchetype(int arch)
+        bool IsVehicleArchetype(int arch)
         {
             return arch == kFortress || arch == kHammer || arch == kZeus || arch == kGrad;
         }
 
-        int fallbackArchetypeCost(int arch)
+        int FallbackArchetypeCost(int arch)
         {
             switch(arch)
             {
@@ -69,7 +69,7 @@ namespace OpenArtOfWar
             }
         }
 
-        const char *tierName(AIWaveTier tier)
+        const char *TierName(AIWaveTier tier)
         {
             switch(tier)
             {
@@ -85,7 +85,7 @@ namespace OpenArtOfWar
             return "?";
         }
 
-        void parseTactics(const YAML::Node &node, AITacticsConfig &t)
+        void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
         {
             if(!node || !node.IsMap())
                 return;
@@ -134,7 +134,7 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    std::string difficultyToString(AIDifficulty diff)
+    std::string DifficultyToString(AIDifficulty diff)
     {
         switch(diff)
         {
@@ -150,7 +150,7 @@ namespace OpenArtOfWar
         return "medium";
     }
 
-    AIDifficulty stringToDifficulty(const std::string &str)
+    AIDifficulty StringToDifficulty(const std::string &str)
     {
         if(str == "easy" || str == "Easy")
             return AIDifficulty::Easy;
@@ -161,7 +161,7 @@ namespace OpenArtOfWar
         return AIDifficulty::Medium;
     }
 
-    void AIController::initDifficultyDefaults()
+    void AIController::InitDifficultyDefaults()
     {
         m_difficultyConfigs.clear();
 
@@ -245,16 +245,16 @@ namespace OpenArtOfWar
         m_difficultyConfigs[AIDifficulty::Hardcore] = hardcore;
 
         m_difficulty = AIDifficulty::Medium;
-        refreshDifficulty();
+        RefreshDifficulty();
         m_credits = m_currentDifficultyConfig.startingCredits;
     }
 
-    bool AIController::loadDifficultyConfig(const std::string &path)
+    bool AIController::LoadDifficultyConfig(const std::string &path)
     {
         try
         {
             std::string text;
-            if(!Assets::readText(path, text))
+            if(!Assets::ReadText(path, text))
                 return false;
             YAML::Node root = YAML::Load(text);
             if(!root.IsDefined() || !root.IsMap())
@@ -280,7 +280,7 @@ namespace OpenArtOfWar
                     cfg.resourceMultiplier = node["resource_multiplier"].as<float>();
                 if(node["production_speed_multiplier"])
                     cfg.productionSpeedMultiplier = node["production_speed_multiplier"].as<float>();
-                parseTactics(node["tactics"], cfg.tactics);
+                ParseTactics(node["tactics"], cfg.tactics);
             };
 
             parseMode("easy", AIDifficulty::Easy);
@@ -291,11 +291,11 @@ namespace OpenArtOfWar
             if(root["default_difficulty"])
             {
                 std::string defDiff = root["default_difficulty"].as<std::string>();
-                setDifficulty(stringToDifficulty(defDiff));
+                SetDifficulty(StringToDifficulty(defDiff));
             }
             else
             {
-                setDifficulty(m_difficulty);
+                SetDifficulty(m_difficulty);
             }
             std::cout << "[AIController] Loaded difficulty configuration from " << path << std::endl;
             return true;
@@ -307,7 +307,7 @@ namespace OpenArtOfWar
         }
     }
 
-    AIDifficulty AIController::getEffectiveDifficulty() const
+    AIDifficulty AIController::GetEffectiveDifficulty() const
     {
         if(m_debugConfig.forceDebugOverride)
         {
@@ -316,9 +316,9 @@ namespace OpenArtOfWar
         return m_difficulty;
     }
 
-    void AIController::refreshDifficulty()
+    void AIController::RefreshDifficulty()
     {
-        auto it = m_difficultyConfigs.find(getEffectiveDifficulty());
+        auto it = m_difficultyConfigs.find(GetEffectiveDifficulty());
         if(it != m_difficultyConfigs.end())
         {
             m_currentDifficultyConfig = it->second;
@@ -326,13 +326,13 @@ namespace OpenArtOfWar
         m_creditsPerSec = m_currentDifficultyConfig.creditsPerSec;
     }
 
-    void AIController::setDifficulty(AIDifficulty difficulty)
+    void AIController::SetDifficulty(AIDifficulty difficulty)
     {
         m_difficulty = difficulty;
-        refreshDifficulty();
+        RefreshDifficulty();
     }
 
-    void AIController::setDebugConfig(const AIDebugConfig &config)
+    void AIController::SetDebugConfig(const AIDebugConfig &config)
     {
         bool difficultyChanged = config.forceDebugOverride != m_debugConfig.forceDebugOverride || config.debugDifficultyLevel != m_debugConfig.debugDifficultyLevel;
         bool sizeChanged = config.waveSpawnMultiplier != m_debugConfig.waveSpawnMultiplier;
@@ -340,8 +340,8 @@ namespace OpenArtOfWar
         m_debugConfig.waveSpawnMultiplier = std::clamp(m_debugConfig.waveSpawnMultiplier, 0.25f, 4.0f);
         if(difficultyChanged)
         {
-            refreshDifficulty();
-            std::cout << "[AIController] Debug difficulty -> " << difficultyToString(getEffectiveDifficulty()) << std::endl;
+            RefreshDifficulty();
+            std::cout << "[AIController] Debug difficulty -> " << DifficultyToString(GetEffectiveDifficulty()) << std::endl;
         }
         if(difficultyChanged || sizeChanged)
         {
@@ -352,7 +352,7 @@ namespace OpenArtOfWar
         }
     }
 
-    void AIController::think(const std::string &category, const std::string &text)
+    void AIController::Think(const std::string &category, const std::string &text)
     {
         m_thoughts.push_back({m_gameTime, category, text});
         ++m_thoughtSerial;
@@ -361,30 +361,30 @@ namespace OpenArtOfWar
         std::cout << "[AIController] " << text << std::endl;
     }
 
-    void AIController::thinkOnce(const std::string &key, const std::string &category, const std::string &text)
+    void AIController::ThinkOnce(const std::string &key, const std::string &category, const std::string &text)
     {
         auto it = m_lastThoughtByKey.find(key);
         if(it != m_lastThoughtByKey.end() && it->second == text)
             return;
         m_lastThoughtByKey[key] = text;
-        think(category, text);
+        Think(category, text);
     }
 
-    void AIController::setEnemyCredits(int credits)
+    void AIController::SetEnemyCredits(int credits)
     {
         const int before = m_credits;
         m_credits = std::max(0, credits);
-        think("ECONOMY", "Treasury set by debug: " + std::to_string(before) + " -> " + std::to_string(m_credits));
+        Think("ECONOMY", "Treasury set by debug: " + std::to_string(before) + " -> " + std::to_string(m_credits));
     }
 
-    std::vector<std::string> AIController::currentIntentions() const
+    std::vector<std::string> AIController::CurrentIntentions() const
     {
         std::vector<std::string> out;
         const int required = static_cast<int>(m_currentPlan.archetypes.size());
         if(required > 0)
         {
             std::ostringstream w;
-            w << "Assembling wave " << (m_waveCount + 1) << " (" << tierName(m_currentPlan.tier) << "): " << m_readyUnits << "/" << required << " ready";
+            w << "Assembling wave " << (m_waveCount + 1) << " (" << TierName(m_currentPlan.tier) << "): " << m_readyUnits << "/" << required << " ready";
             if(m_waveCooldown > 0.0f)
                 w << ", may launch in " << static_cast<int>(m_waveCooldown) << " s";
             if(!m_hasProduction)
@@ -394,10 +394,10 @@ namespace OpenArtOfWar
             q << "Training queue: " << m_infantryQueue.size() << " infantry, " << m_vehicleQueue.size() << " vehicles";
             out.push_back(q.str());
         }
-        if(!m_squadController.getSquads().empty())
+        if(!m_squadController.GetSquads().empty())
         {
             std::ostringstream g;
-            g << m_squadController.getSquads().size() << " group(s) on the march";
+            g << m_squadController.GetSquads().size() << " group(s) on the march";
             out.push_back(g.str());
         }
         if(m_researchIndex < kResearchCount)
@@ -407,7 +407,7 @@ namespace OpenArtOfWar
             if(!m_hasLab)
                 t << "Research paused: no Tech Center / Laboratory (next: " << r.name << ")";
             else if(m_researchActive)
-                t << "Researching " << r.name << " " << static_cast<int>(getResearchProgress() * 100.0f) << "%";
+                t << "Researching " << r.name << " " << static_cast<int>(GetResearchProgress() * 100.0f) << "%";
             else
                 t << "Saving " << r.cost << " credits for " << r.name;
             out.push_back(t.str());
@@ -433,35 +433,35 @@ namespace OpenArtOfWar
 
     AIController::AIController()
     {
-        initDifficultyDefaults();
-        loadDifficultyConfig(LoaderResources::aiDifficulty());
+        InitDifficultyDefaults();
+        LoadDifficultyConfig(LoaderResources::aiDifficulty());
     }
 
-    bool AIController::isFoe(const Entity &e) const
+    bool AIController::IsFoe(const Entity &e) const
     {
-        return e.owner < kMaxPlayers && Players::hostile(e.owner, m_player);
+        return e.owner < kMaxPlayers && Players::Hostile(e.owner, m_player);
     }
 
-    void AIController::setPlayer(PlayerId player)
+    void AIController::SetPlayer(PlayerId player)
     {
         m_player = player;
         m_playerFixed = true;
     }
 
-    void AIController::init(int enemyHqX, int enemyHqY, int playerHqX, int playerHqY)
+    void AIController::Init(int enemyHqX, int enemyHqY, int playerHqX, int playerHqY)
     {
         // Single player: the computer is the slot of the other faction (a match sets its slot with setPlayer)
         if(!m_playerFixed)
-            m_player = Players::ownerOf(aiFaction());
+            m_player = Players::OwnerOf(AiFaction());
         m_enemyHqX = enemyHqX;
         m_enemyHqY = enemyHqY;
         m_playerHqX = playerHqX;
         m_playerHqY = playerHqY;
         m_initialized = true;
-        reset();
+        Reset();
     }
 
-    void AIController::reset()
+    void AIController::Reset()
     {
         m_credits = m_currentDifficultyConfig.startingCredits;
         m_creditsPerSec = m_currentDifficultyConfig.creditsPerSec;
@@ -484,12 +484,13 @@ namespace OpenArtOfWar
         m_researchIndex = 0;
         m_researchActive = false;
         m_researchTimer = 0.0f;
-        resetResearch(m_player);
+        ResetResearch(m_player);
 
-        m_squadController.clear();
+        m_squadController.Clear();
         m_chokeRebuildTimer = 1e6f; // rebuild on the first update
         m_garrison.clear();
         m_garrisonRecorded = false;
+        m_recalled.clear();
         m_hasLab = false;
 
         m_defensePlanned = false;
@@ -501,14 +502,14 @@ namespace OpenArtOfWar
         m_stagingTimer = 0.0f;
         m_lastThreatX = m_lastThreatY = -1;
         m_lastThreatId = 0;
-        clearThoughts();
+        ClearThoughts();
     }
 
     // ---------------------------------------------------------------------------
     // Director: wave planning
     // ---------------------------------------------------------------------------
 
-    AIWavePlan AIController::planWave(int waveNumber, bool hasFactory, bool hasFactoryPlan) const
+    AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFactoryPlan) const
     {
         const AITacticsConfig &t = m_currentDifficultyConfig.tactics;
         AIWavePlan plan;
@@ -599,28 +600,28 @@ namespace OpenArtOfWar
         return plan;
     }
 
-    void AIController::preparePlan(int waveNumber, bool hasFactory, bool hasFactoryPlan)
+    void AIController::PreparePlan(int waveNumber, bool hasFactory, bool hasFactoryPlan)
     {
-        m_currentPlan = planWave(waveNumber, hasFactory, hasFactoryPlan);
+        m_currentPlan = PlanWave(waveNumber, hasFactory, hasFactoryPlan);
         m_infantryQueue.clear();
         m_vehicleQueue.clear();
         for(int arch : m_currentPlan.archetypes)
         {
-            (isVehicleArchetype(arch) ? m_vehicleQueue : m_infantryQueue).push_back(arch);
+            (IsVehicleArchetype(arch) ? m_vehicleQueue : m_infantryQueue).push_back(arch);
         }
         std::ostringstream msg;
-        msg << "Planning wave " << m_currentPlan.waveNumber << " (" << tierName(m_currentPlan.tier) << "): " << m_infantryQueue.size() << " infantry + " << m_vehicleQueue.size() << " vehicles";
+        msg << "Planning wave " << m_currentPlan.waveNumber << " (" << TierName(m_currentPlan.tier) << "): " << m_infantryQueue.size() << " infantry + " << m_vehicleQueue.size() << " vehicles";
         if(!hasFactory && !hasFactoryPlan)
             msg << " (no factory: heavy slots become infantry)";
-        think("WAVE", msg.str());
+        Think("WAVE", msg.str());
     }
 
-    bool AIController::isTechnologyResearched(int index) const
+    bool AIController::IsTechnologyResearched(int index) const
     {
-        return isResearched(m_player, index);
+        return IsResearched(m_player, index);
     }
 
-    float AIController::getResearchProgress() const
+    float AIController::GetResearchProgress() const
     {
         if(!m_researchActive)
             return 0.0f;
@@ -628,30 +629,33 @@ namespace OpenArtOfWar
         return std::clamp(m_researchTimer / duration, 0.0f, 1.0f);
     }
 
-    bool AIController::aiSees(const Entity &e, const EntityManager &entities) const
+    bool AIController::AiSees(const Entity &e, const EntityManager &entities) const
     {
-        return m_debugConfig.disableFogOfWarForAi || entities.isEntityVisibleToAi(e, m_player);
+        return m_debugConfig.disableFogOfWarForAi || entities.IsEntityVisibleToAi(e, m_player);
     }
 
-    bool AIController::isReserveUnit(const Unit &u) const
+    bool AIController::IsReserveUnit(const Unit &u) const
     {
         if(!u.alive || u.state == ActionState::Die || u.owner != m_player)
             return false;
         if(u.moveSpeed <= 0.0f || u.isSiegeMode)
             return false;
-        if(m_squadController.isSquadMember(u.id))
+        if(m_squadController.IsSquadMember(u.id))
             return false;
         if(m_garrison.count(u.id))
             return false;
+        // Troops a squad let go anywhere on the map walk back and belong to the reserve as well
+        if(m_recalled.count(u.id))
+            return true;
         // Only troops around the home base belong to the reserve (pre-placed outposts stay where they are)
-        return DetMath::hypot(static_cast<float>(u.tileX - m_enemyHqX), static_cast<float>(u.tileY - m_enemyHqY)) <= 18.0f;
+        return DetMath::Hypot(static_cast<float>(u.tileX - m_enemyHqX), static_cast<float>(u.tileY - m_enemyHqY)) <= 18.0f;
     }
 
     // ---------------------------------------------------------------------------
     // Main update
     // ---------------------------------------------------------------------------
 
-    void AIController::update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
     {
         m_gameTime += deltaTime;
         m_waveAssemblyTimer += deltaTime;
@@ -661,11 +665,11 @@ namespace OpenArtOfWar
         {
             bool foundEnemyHq = false;
             bool foundPlayerHq = false;
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
                 if(!e.alive || e.state == ActionState::Die)
                     continue;
-                if(const Building *b = e.asBuilding())
+                if(const Building *b = e.AsBuilding())
                 {
                     int cx = b->tileX + b->buildWidth / 2;
                     int cy = b->tileY + b->buildHeight / 2;
@@ -679,7 +683,7 @@ namespace OpenArtOfWar
                                 foundEnemyHq = true;
                         }
                     }
-                    else if(isFoe(*b))
+                    else if(IsFoe(*b))
                     {
                         if(m_playerHqX <= 0 || m_playerHqY <= 0 || (b->type == UnitType::Headquarters && !foundPlayerHq))
                         {
@@ -693,9 +697,9 @@ namespace OpenArtOfWar
             }
             if(m_playerHqX <= 0 || m_playerHqY <= 0)
             {
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
-                    if(e.alive && e.state != ActionState::Die && isFoe(e))
+                    if(e.alive && e.state != ActionState::Die && IsFoe(e))
                     {
                         m_playerHqX = e.tileX;
                         m_playerHqY = e.tileY;
@@ -705,7 +709,7 @@ namespace OpenArtOfWar
             }
             if(m_enemyHqX <= 0 || m_enemyHqY <= 0)
             {
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
                     if(e.alive && e.state != ActionState::Die && e.owner == m_player)
                     {
@@ -720,7 +724,7 @@ namespace OpenArtOfWar
         if(!m_garrisonRecorded)
         {
             m_garrisonRecorded = true;
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
                 if(e.alive && !e.isBuilding && e.owner == m_player)
                     m_garrison.insert(e.id);
@@ -732,42 +736,62 @@ namespace OpenArtOfWar
         if(m_chokeRebuildTimer >= 5.0f)
         {
             m_chokeRebuildTimer = 0.0f;
-            m_chokes.rebuild(map);
+            m_chokes.Rebuild(map);
         }
 
-        updateStagingPoint(map, pathfinder, deltaTime);
-        m_squadController.setStagingPoint(m_stagingX, m_stagingY);
+        UpdateStagingPoint(map, pathfinder, deltaTime);
+        m_squadController.SetStagingPoint(m_stagingX, m_stagingY);
 
         // Rebuild starting base structures & walls if destroyed
-        updateRebuilding(deltaTime, map, entities);
-        if(m_skirmish && (m_currentDifficultyConfig.tactics.buildDefenses || !entities.hasBuildingType(UnitType::Barracks, m_player, false)))
+        UpdateRebuilding(deltaTime, map, entities);
+        if(m_skirmish && (m_currentDifficultyConfig.tactics.buildDefenses || !entities.HasBuildingType(UnitType::Barracks, m_player, false)))
         {
-            updateBaseBuilder(deltaTime, map, entities, pathfinder);
+            UpdateBaseBuilder(deltaTime, map, entities, pathfinder);
         }
 
         m_economyTimer += deltaTime;
         while(m_economyTimer >= 1.0f)
         {
             m_economyTimer -= 1.0f;
-            updateEconomyAndProduction(1.0f, map, entities);
-            updateResearch(1.0f, entities);
+            UpdateEconomyAndProduction(1.0f, map, entities);
+            UpdateResearch(1.0f, entities);
         }
 
         m_defenseCheckTimer += deltaTime;
         if(m_defenseCheckTimer >= 2.0f)
         {
             m_defenseCheckTimer = 0.0f;
-            updateBaseDefense(entities, pathfinder);
+            UpdateBaseDefense(entities, pathfinder);
         }
 
-        updateStaging(map, entities, pathfinder);
-        updateWaveLaunch(deltaTime, map, entities, pathfinder);
-        m_squadController.update(deltaTime, map, entities, pathfinder, m_chokes, m_currentDifficultyConfig.tactics);
-        m_squadController.takeReleasedUnits(); // released units rejoin the reserve through updateStaging
-        updateIdleUnits(entities, pathfinder);
+        UpdateStaging(map, entities, pathfinder);
+        UpdateWaveLaunch(deltaTime, map, entities, pathfinder);
+        m_squadController.Update(deltaTime, map, entities, pathfinder, m_chokes, m_currentDifficultyConfig.tactics);
+        RecallReleasedUnits(entities); // released units rejoin the reserve through UpdateStaging
+        UpdateIdleUnits(entities, pathfinder);
     }
 
-    void AIController::updateEconomyAndProduction(float /*deltaTime*/, TileMap &map, EntityManager &entities)
+    void AIController::RecallReleasedUnits(EntityManager &entities)
+    {
+        for(int id : m_squadController.TakeReleasedUnits())
+        {
+            const Unit *u = entities.GetUnit(id);
+            if(u && u->alive && u->owner == m_player && !m_garrison.count(id) && !m_squadController.IsSquadMember(id))
+                m_recalled.insert(id);
+        }
+        // Back home (the reserve radius holds them now), dead, or taken into a new squad: forgotten
+        for(auto it = m_recalled.begin(); it != m_recalled.end();)
+        {
+            const Unit *u = entities.GetUnit(*it);
+            const bool home = u && DetMath::Hypot(static_cast<float>(u->tileX - m_enemyHqX), static_cast<float>(u->tileY - m_enemyHqY)) <= 18.0f;
+            if(!u || !u->alive || u->state == ActionState::Die || home || m_squadController.IsSquadMember(*it))
+                it = m_recalled.erase(it);
+            else
+                ++it;
+        }
+    }
+
+    void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map, EntityManager &entities)
     {
         bool hasHq = false;
         bool hasBarracks = false;
@@ -783,11 +807,11 @@ namespace OpenArtOfWar
 
         int enemyUnitCount = 0;
         int reserveCount = 0;
-        for(auto &e : entities.getAllEntities())
+        for(auto &e : entities.GetAllEntities())
         {
             if(!e.alive || e.state == ActionState::Die || e.owner != m_player)
                 continue;
-            if(Building *b = e.asBuilding())
+            if(Building *b = e.AsBuilding())
             {
                 if(b->type == UnitType::Headquarters)
                 {
@@ -809,7 +833,7 @@ namespace OpenArtOfWar
             else
             {
                 enemyUnitCount++;
-                if(const Unit *u = e.asUnit(); u && isReserveUnit(*u))
+                if(const Unit *u = e.AsUnit(); u && IsReserveUnit(*u))
                     reserveCount++;
             }
         }
@@ -817,7 +841,7 @@ namespace OpenArtOfWar
 
         if(m_currentPlan.archetypes.empty())
         {
-            preparePlan(m_waveCount + 1, hasFactory, hasFactoryPlan);
+            PreparePlan(m_waveCount + 1, hasFactory, hasFactoryPlan);
         }
 
         if(!hasHq && !hasBarracks && !hasFactory)
@@ -848,8 +872,8 @@ namespace OpenArtOfWar
 
         auto costOf = [&](int arch)
         {
-            const UnitConfig *cfg = entities.getUnitConfig(sideArchetype(arch, side()));
-            return cfg ? cfg->creditCost : fallbackArchetypeCost(arch);
+            const UnitConfig *cfg = entities.GetUnitConfig(SideArchetype(arch, side()));
+            return cfg ? cfg->creditCost : FallbackArchetypeCost(arch);
         };
 
         // While the lab waits for its next technology, the army only spends what exceeds that budget,
@@ -864,20 +888,20 @@ namespace OpenArtOfWar
             int cost = costOf(arch);
             if(m_credits - cost < researchReserve)
             {
-                thinkOnce("economy", "ECONOMY", researchReserve > 0 ? "Holding back unit production to afford the next technology" : "Not enough credits to train the next unit");
+                ThinkOnce("economy", "ECONOMY", researchReserve > 0 ? "Holding back unit production to afford the next technology" : "Not enough credits to train the next unit");
                 return;
             }
-            thinkOnce("economy", "ECONOMY", "Training troops for the next wave");
+            ThinkOnce("economy", "ECONOMY", "Training troops for the next wave");
             int sx = building->tileX;
             int sy = building->tileY;
-            if(!entities.getBuildingSpawnPoint(building->id, map, sx, sy))
+            if(!entities.GetBuildingSpawnPoint(building->id, map, sx, sy))
                 return;
             m_credits -= cost;
             queue.erase(queue.begin());
-            int id = entities.spawnUnitByArchetype(sideArchetype(arch, side()), sx, sy, side(), m_player);
+            int id = entities.SpawnUnitByArchetype(SideArchetype(arch, side()), sx, sy, side(), m_player);
             // New troops get every technology the AI has already researched
-            if(Unit *u = entities.getUnit(id))
-                applyCompletedResearch(*u);
+            if(Unit *u = entities.GetUnit(id))
+                ApplyCompletedResearch(*u);
             building->isProducing = true;
             building->productionTimer = buildTime;
         };
@@ -888,7 +912,7 @@ namespace OpenArtOfWar
             produce(availableFactory, m_vehicleQueue, factoryBuildTime);
     }
 
-    void AIController::updateResearch(float deltaTime, EntityManager &entities)
+    void AIController::UpdateResearch(float deltaTime, EntityManager &entities)
     {
         const Faction faction = side();
         // Skip technologies that only make sense for the player
@@ -900,11 +924,11 @@ namespace OpenArtOfWar
             return;
 
         // Research needs the Tech Center / Laboratory; it pauses while there is none
-        m_hasLab = hasResearchBuilding(m_player, entities);
+        m_hasLab = HasResearchBuilding(m_player, entities);
         const ResearchDef &def = researchDef(faction, m_researchIndex);
         if(!m_hasLab)
         {
-            thinkOnce("research", "RESEARCH", std::string("No Tech Center / Laboratory: research paused before ") + def.name);
+            ThinkOnce("research", "RESEARCH", std::string("No Tech Center / Laboratory: research paused before ") + def.name);
             return;
         }
 
@@ -915,11 +939,11 @@ namespace OpenArtOfWar
                 m_credits -= def.cost;
                 m_researchActive = true;
                 m_researchTimer = 0.0f;
-                thinkOnce("research", "RESEARCH", std::string("Research started: ") + def.name + " ($" + std::to_string(def.cost) + ")");
+                ThinkOnce("research", "RESEARCH", std::string("Research started: ") + def.name + " ($" + std::to_string(def.cost) + ")");
             }
             else
             {
-                thinkOnce("research", "RESEARCH", std::string("Saving credits for ") + def.name + " ($" + std::to_string(def.cost) + ")");
+                ThinkOnce("research", "RESEARCH", std::string("Saving credits for ") + def.name + " ($" + std::to_string(def.cost) + ")");
             }
             return;
         }
@@ -927,28 +951,28 @@ namespace OpenArtOfWar
         m_researchTimer += deltaTime;
         if(m_researchTimer >= std::max(1.0f, m_currentDifficultyConfig.tactics.researchSeconds))
         {
-            completeResearch(m_player, m_researchIndex, entities);
+            CompleteResearch(m_player, m_researchIndex, entities);
             m_researchActive = false;
             m_researchTimer = 0.0f;
-            thinkOnce("research", "RESEARCH", std::string("Research completed: ") + def.name);
+            ThinkOnce("research", "RESEARCH", std::string("Research completed: ") + def.name);
             ++m_researchIndex;
         }
     }
 
-    void AIController::updateBaseDefense(EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfinder)
     {
         // Find all player units trespassing within 18 tiles of enemy base
         int threatEntityId = 0;
         float closestDist = 18.0f * TILE_WIDTH;
 
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            if(!e.alive || e.state == ActionState::Die || !isFoe(e))
+            if(!e.alive || e.state == ActionState::Die || !IsFoe(e))
                 continue;
-            if(!aiSees(e, entities))
+            if(!AiSees(e, entities))
                 continue; // AI only detects threats it actually sees!
-            float dx = e.getUnitCenterPixelX() - (m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f);
-            float dy = e.getUnitCenterPixelY() - (m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
+            float dx = e.GetUnitCenterPixelX() - (m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f);
+            float dy = e.GetUnitCenterPixelY() - (m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
             float d = std::sqrt(dx * dx + dy * dy);
             if(d < closestDist)
             {
@@ -960,7 +984,7 @@ namespace OpenArtOfWar
         if(threatEntityId == 0)
             return;
 
-        Entity *threat = entities.getEntity(threatEntityId);
+        Entity *threat = entities.GetEntity(threatEntityId);
         if(!threat)
             return;
         m_lastThreatX = threat->tileX; // the base builder reinforces this side
@@ -968,21 +992,21 @@ namespace OpenArtOfWar
         if(threat->id != m_lastThreatId)
         {
             m_lastThreatId = threat->id;
-            think("DEFENSE", "Enemy spotted near the base at (" + std::to_string(threat->tileX) + ", " + std::to_string(threat->tileY) + "): sending idle troops to intercept");
+            Think("DEFENSE", "Enemy spotted near the base at (" + std::to_string(threat->tileX) + ", " + std::to_string(threat->tileY) + "): sending idle troops to intercept");
         }
 
         // Rally nearby idle reserve units to intercept the threat (marching groups keep their own orders)
         std::vector<int> defenders;
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
             if(!e.alive || e.state == ActionState::Die || e.isBuilding || e.owner != m_player)
                 continue;
-            if(m_squadController.isSquadMember(e.id))
+            if(m_squadController.IsSquadMember(e.id))
                 continue;
             if(e.state == ActionState::Idle && e.targetEntityId == 0)
             {
-                float dx = e.getUnitCenterPixelX() - threat->getUnitCenterPixelX();
-                float dy = e.getUnitCenterPixelY() - threat->getUnitCenterPixelY();
+                float dx = e.GetUnitCenterPixelX() - threat->GetUnitCenterPixelX();
+                float dy = e.GetUnitCenterPixelY() - threat->GetUnitCenterPixelY();
                 float d = std::sqrt(dx * dx + dy * dy);
                 if(d <= 22.0f * TILE_WIDTH)
                 {
@@ -993,11 +1017,11 @@ namespace OpenArtOfWar
 
         if(!defenders.empty())
         {
-            entities.issueAttackMoveOrder(defenders, threat->tileX, threat->tileY, pathfinder);
+            entities.IssueAttackMoveOrder(defenders, threat->tileX, threat->tileY, pathfinder);
         }
     }
 
-    void AIController::updateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime)
+    void AIController::UpdateStagingPoint(const TileMap &map, Pathfinder &pathfinder, float deltaTime)
     {
         m_stagingTimer -= deltaTime;
         if(m_stagingTimer > 0.0f)
@@ -1007,11 +1031,11 @@ namespace OpenArtOfWar
         // Fallback: 6 tiles from the enemy HQ straight toward the player
         float dxToPlayer = static_cast<float>(m_playerHqX - m_enemyHqX);
         float dyToPlayer = static_cast<float>(m_playerHqY - m_enemyHqY);
-        float len = DetMath::hypot(dxToPlayer, dyToPlayer);
+        float len = DetMath::Hypot(dxToPlayer, dyToPlayer);
         int stepX = (len > 0.001f) ? static_cast<int>(std::round((dxToPlayer / len) * 6.0f)) : -6;
         int stepY = (len > 0.001f) ? static_cast<int>(std::round((dyToPlayer / len) * 6.0f)) : 0;
-        m_stagingX = std::clamp(m_enemyHqX + stepX, 3, std::max(3, map.getWidth() - 4));
-        m_stagingY = std::clamp(m_enemyHqY + stepY, 3, std::max(3, map.getHeight() - 4));
+        m_stagingX = std::clamp(m_enemyHqX + stepX, 3, std::max(3, map.GetWidth() - 4));
+        m_stagingY = std::clamp(m_enemyHqY + stepY, 3, std::max(3, map.GetHeight() - 4));
         if(m_playerHqX <= 0 && m_playerHqY <= 0)
             return;
 
@@ -1022,8 +1046,8 @@ namespace OpenArtOfWar
         constexpr int kAlongRoad = 9;
         std::vector<PathNode> road;
         bool partial = false;
-        pathfinder.setIgnoreUnitsOnce();
-        if(!pathfinder.findPath(m_enemyHqX, m_enemyHqY, m_playerHqX, m_playerHqY, road, 0, &partial) || road.empty())
+        pathfinder.SetIgnoreUnitsOnce();
+        if(!pathfinder.FindPath(m_enemyHqX, m_enemyHqY, m_playerHqX, m_playerHqY, road, 0, &partial) || road.empty())
             return;
         int pick = std::min(static_cast<int>(road.size()) - 1, kAlongRoad);
         for(int i = 0; i < static_cast<int>(road.size()) && i <= 24; ++i)
@@ -1041,24 +1065,24 @@ namespace OpenArtOfWar
             }
         }
         // Stay where the reserve lives (isReserveUnit: within 18 tiles of the HQ)
-        while(pick > 0 && DetMath::hypot(static_cast<float>(road[pick].x - m_enemyHqX), static_cast<float>(road[pick].y - m_enemyHqY)) > 12.0f)
+        while(pick > 0 && DetMath::Hypot(static_cast<float>(road[pick].x - m_enemyHqX), static_cast<float>(road[pick].y - m_enemyHqY)) > 12.0f)
             --pick;
-        m_stagingX = std::clamp(road[pick].x, 3, std::max(3, map.getWidth() - 4));
-        m_stagingY = std::clamp(road[pick].y, 3, std::max(3, map.getHeight() - 4));
+        m_stagingX = std::clamp(road[pick].x, 3, std::max(3, map.GetWidth() - 4));
+        m_stagingY = std::clamp(road[pick].y, 3, std::max(3, map.GetHeight() - 4));
     }
 
-    void AIController::updateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
     {
         if(m_enemyHqX <= 0 && m_enemyHqY <= 0)
             return;
-        pathfinder.setEntityManager(&entities);
+        pathfinder.SetEntityManager(&entities);
 
         // Fresh troops (and units that fell back) gather at the staging area instead of attacking piecemeal
         std::vector<int> toStage;
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Unit *u = e.asUnit();
-            if(!u || !isReserveUnit(*u))
+            const Unit *u = e.AsUnit();
+            if(!u || !IsReserveUnit(*u))
                 continue;
             if(u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
             {
@@ -1071,11 +1095,11 @@ namespace OpenArtOfWar
         if(toStage.empty())
             return;
 
-        std::vector<StormcastSlot> slots = AINavigataionStormcastView::computeGroupSlots(m_stagingX, m_stagingY, static_cast<int>(toStage.size()), map, &entities, toStage);
+        std::vector<StormcastSlot> slots = AINavigataionStormcastView::ComputeGroupSlots(m_stagingX, m_stagingY, static_cast<int>(toStage.size()), map, &entities, toStage);
 
         for(size_t i = 0; i < toStage.size() && i < slots.size(); ++i)
         {
-            Unit *u = entities.getUnit(toStage[i]);
+            Unit *u = entities.GetUnit(toStage[i]);
             if(!u)
                 continue;
             int slotX = slots[i].x;
@@ -1083,7 +1107,7 @@ namespace OpenArtOfWar
             if(std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1)
             {
                 bool isPartial = false;
-                if(pathfinder.findPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial))
+                if(pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial))
                 {
                     u->pathIndex = 0;
                     u->targetTileX = slotX;
@@ -1095,18 +1119,18 @@ namespace OpenArtOfWar
         }
     }
 
-    void AIController::findAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const
+    void AIController::FindAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const
     {
         outX = -1;
         outY = -1;
         float bestBldgDist = 1e9f;
 
         // Player HQ first, otherwise the closest player structure, otherwise the closest player unit
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            if(!e.alive || e.state == ActionState::Die || !isFoe(e) || !e.isBuilding)
+            if(!e.alive || e.state == ActionState::Die || !IsFoe(e) || !e.isBuilding)
                 continue;
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(!b)
                 continue;
             int cx = b->tileX + b->buildWidth / 2;
@@ -1117,7 +1141,7 @@ namespace OpenArtOfWar
                 outY = cy;
                 break;
             }
-            float d = DetMath::hypot(static_cast<float>(cx - m_enemyHqX), static_cast<float>(cy - m_enemyHqY));
+            float d = DetMath::Hypot(static_cast<float>(cx - m_enemyHqX), static_cast<float>(cy - m_enemyHqY));
             if(d < bestBldgDist)
             {
                 bestBldgDist = d;
@@ -1129,11 +1153,11 @@ namespace OpenArtOfWar
         if(outX < 0)
         {
             float bestDist = 1e9f;
-            for(const auto &e : entities.getAllEntities())
+            for(const auto &e : entities.GetAllEntities())
             {
-                if(!e.alive || e.state == ActionState::Die || !isFoe(e))
+                if(!e.alive || e.state == ActionState::Die || !IsFoe(e))
                     continue;
-                float d = DetMath::hypot(static_cast<float>(e.tileX - m_enemyHqX), static_cast<float>(e.tileY - m_enemyHqY));
+                float d = DetMath::Hypot(static_cast<float>(e.tileX - m_enemyHqX), static_cast<float>(e.tileY - m_enemyHqY));
                 if(d < bestDist)
                 {
                     bestDist = d;
@@ -1150,21 +1174,21 @@ namespace OpenArtOfWar
         }
         if(outX >= 0)
         {
-            outX = std::clamp(outX, 1, map.getWidth() - 2);
-            outY = std::clamp(outY, 1, map.getHeight() - 2);
+            outX = std::clamp(outX, 1, map.GetWidth() - 2);
+            outY = std::clamp(outY, 1, map.GetHeight() - 2);
         }
     }
 
-    void AIController::updateWaveLaunch(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
     {
         m_waveCooldown -= deltaTime;
 
         // Troops assembled at the staging area and ready to march
         std::vector<int> ready;
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Unit *u = e.asUnit();
-            if(!u || !isReserveUnit(*u))
+            const Unit *u = e.AsUnit();
+            if(!u || !IsReserveUnit(*u))
                 continue;
             if(u->targetEntityId != 0 || u->isAttackMoving)
                 continue;
@@ -1187,7 +1211,7 @@ namespace OpenArtOfWar
             return;
 
         int targetX, targetY;
-        findAttackObjective(entities, map, targetX, targetY);
+        FindAttackObjective(entities, map, targetX, targetY);
         if(targetX < 0)
             return;
 
@@ -1197,15 +1221,15 @@ namespace OpenArtOfWar
         m_waveCount++;
         {
             std::ostringstream why;
-            why << "Wave " << m_waveCount << " is " << (full ? "complete" : "all that is left") << ", treasury $" << m_credits << " -> splitting into " << attackGroupCount(static_cast<int>(ready.size()), map) << " group(s)";
-            think("ATTACK", why.str());
+            why << "Wave " << m_waveCount << " is " << (full ? "complete" : "all that is left") << ", treasury $" << m_credits << " -> splitting into " << AttackGroupCount(static_cast<int>(ready.size()), map) << " group(s)";
+            Think("ATTACK", why.str());
         }
 
         // The wave splits into 1..5 groups: the first goes straight, the others take flank routes
         // (through the second base exit when there is one) so the player is hit from several sides
-        const int groups = attackGroupCount(static_cast<int>(ready.size()), map);
+        const int groups = AttackGroupCount(static_cast<int>(ready.size()), map);
         std::vector<int> byType = ready;
-        std::stable_sort(byType.begin(), byType.end(), [&](int a, int b) { return entities.getUnit(a)->archetypeId < entities.getUnit(b)->archetypeId; });
+        std::stable_sort(byType.begin(), byType.end(), [&](int a, int b) { return entities.GetUnit(a)->archetypeId < entities.GetUnit(b)->archetypeId; });
         std::vector<std::vector<int>> members(static_cast<size_t>(groups));
         for(size_t i = 0; i < byType.size(); ++i)
             members[i % groups].push_back(byType[i]); // mixed groups
@@ -1213,13 +1237,13 @@ namespace OpenArtOfWar
         {
             int viaX = -1, viaY = -1;
             if(g > 0)
-                flankPoint(g, targetX, targetY, map, viaX, viaY);
-            int squadId = m_squadController.createSquad(members[g], targetX, targetY, m_waveCount, entities, pathfinder, m_currentDifficultyConfig.tactics, viaX, viaY);
+                FlankPoint(g, targetX, targetY, map, viaX, viaY);
+            int squadId = m_squadController.CreateSquad(members[g], targetX, targetY, m_waveCount, entities, pathfinder, m_currentDifficultyConfig.tactics, viaX, viaY);
             std::ostringstream msg;
-            msg << "Wave " << m_waveCount << " (" << tierName(m_currentPlan.tier) << ", " << difficultyToString(getEffectiveDifficulty()) << ") group G" << squadId << " " << (g + 1) << "/" << groups << " with " << members[g].size() << " units toward (" << targetX << ", " << targetY << ")";
+            msg << "Wave " << m_waveCount << " (" << TierName(m_currentPlan.tier) << ", " << DifficultyToString(GetEffectiveDifficulty()) << ") group G" << squadId << " " << (g + 1) << "/" << groups << " with " << members[g].size() << " units toward (" << targetX << ", " << targetY << ")";
             if(viaX >= 0)
                 msg << " via flank (" << viaX << ", " << viaY << ")";
-            think("ATTACK", msg.str());
+            Think("ATTACK", msg.str());
         }
 
         m_waveCooldown = m_currentDifficultyConfig.tactics.waveIntervalSeconds;
@@ -1229,11 +1253,11 @@ namespace OpenArtOfWar
         m_vehicleQueue.clear();
     }
 
-    int AIController::attackGroupCount(int readyUnits, const TileMap &map) const
+    int AIController::AttackGroupCount(int readyUnits, const TileMap &map) const
     {
         const AITacticsConfig &t = m_currentDifficultyConfig.tactics;
         int groups = 1 + m_credits / std::max(1, t.creditsPerExtraGroup); // richer AI fields more groups
-        if(std::sqrt(static_cast<float>(map.getWidth() * map.getHeight())) >= 80.0f)
+        if(std::sqrt(static_cast<float>(map.GetWidth() * map.GetHeight())) >= 80.0f)
             ++groups; // room to flank
         if(m_gateX[1] >= 0)
             groups = std::max(groups, 2); // a second exit is used every time
@@ -1242,7 +1266,7 @@ namespace OpenArtOfWar
         return std::max(1, groups);
     }
 
-    void AIController::flankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const
+    void AIController::FlankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const
     {
         outX = outY = -1;
         // Group 1 leaves through the second exit of the base wall when it has one
@@ -1255,13 +1279,13 @@ namespace OpenArtOfWar
         // Otherwise a point beside the straight line base -> target: left, right, wide left, wide right
         const float dx = static_cast<float>(targetX - m_enemyHqX);
         const float dy = static_cast<float>(targetY - m_enemyHqY);
-        const float len = std::max(1.0f, DetMath::hypot(dx, dy));
+        const float len = std::max(1.0f, DetMath::Hypot(dx, dy));
         const float side = (group % 2 == 1) ? -1.0f : 1.0f;
         const float spread = std::clamp(len * (group >= 3 ? 0.45f : 0.3f), 6.0f, 24.0f);
         const float mx = m_enemyHqX + dx * 0.55f + (-dy / len) * spread * side;
         const float my = m_enemyHqY + dy * 0.55f + (dx / len) * spread * side;
-        const int cx = std::clamp(static_cast<int>(std::lround(mx)), 1, map.getWidth() - 2);
-        const int cy = std::clamp(static_cast<int>(std::lround(my)), 1, map.getHeight() - 2);
+        const int cx = std::clamp(static_cast<int>(std::lround(mx)), 1, map.GetWidth() - 2);
+        const int cy = std::clamp(static_cast<int>(std::lround(my)), 1, map.GetHeight() - 2);
         // Nearest open tile around that point
         for(int r = 0; r <= 6; ++r)
         {
@@ -1272,9 +1296,9 @@ namespace OpenArtOfWar
                     if(std::max(std::abs(ox), std::abs(oy)) != r)
                         continue;
                     const int x = cx + ox, y = cy + oy;
-                    if(x < 1 || y < 1 || x >= map.getWidth() - 1 || y >= map.getHeight() - 1)
+                    if(x < 1 || y < 1 || x >= map.GetWidth() - 1 || y >= map.GetHeight() - 1)
                         continue;
-                    if(map.isPassable(x, y) && map.getWall(x, y) == 0)
+                    if(map.IsPassable(x, y) && map.GetWall(x, y) == 0)
                     {
                         outX = x;
                         outY = y;
@@ -1293,7 +1317,7 @@ namespace OpenArtOfWar
     namespace
     {
 
-        int factionBuildingIndex(AIDefenseSite::Kind kind, Faction side)
+        int FactionBuildingIndex(AIDefenseSite::Kind kind, Faction side)
         {
             const bool conf = (side == Faction::Confederation);
             switch(kind)
@@ -1314,7 +1338,7 @@ namespace OpenArtOfWar
             return -1;
         }
 
-        int defenseCost(AIDefenseSite::Kind kind)
+        int DefenseCost(AIDefenseSite::Kind kind)
         {
             switch(kind)
             {
@@ -1336,8 +1360,10 @@ namespace OpenArtOfWar
 
     } // namespace
 
-    bool AIController::findSiteNear(int &x, int &y, int w, int h, int searchRadius, const TileMap &map, const EntityManager &entities) const
+    bool AIController::FindSiteNear(int &x, int &y, int w, int h, int searchRadius, const TileMap &map, const EntityManager &entities, bool *unitBlocked) const
     {
+        if(unitBlocked)
+            *unitBlocked = false;
         auto clearOfGates = [&](int px, int py)
         {
             for(int g = 0; g < 2; ++g)
@@ -1361,16 +1387,20 @@ namespace OpenArtOfWar
                     const int px = x + ox, py = y + oy;
                     if(!clearOfGates(px, py))
                         continue;
-                    if(!entities.canPlaceBuilding(px, py, w, h, map, m_player))
+                    if(!entities.CanPlaceBuilding(px, py, w, h, map, m_player))
                         continue;
                     bool unitInside = false;
                     for(int ty = py; ty < py + h && !unitInside; ++ty)
                     {
                         for(int tx = px; tx < px + w && !unitInside; ++tx)
-                            unitInside = entities.isTileOccupiedByUnit(tx, ty);
+                            unitInside = entities.IsTileOccupiedByUnit(tx, ty);
                     }
                     if(unitInside)
+                    {
+                        if(unitBlocked)
+                            *unitBlocked = true;
                         continue;
+                    }
                     x = px;
                     y = py;
                     return true;
@@ -1380,7 +1410,7 @@ namespace OpenArtOfWar
         return false;
     }
 
-    void AIController::planBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder)
     {
         m_defensePlan.clear();
         m_defensePlanned = true;
@@ -1388,9 +1418,9 @@ namespace OpenArtOfWar
         // Base centre: the AI headquarters; threat direction: toward the player's base
         int cx = m_enemyHqX, cy = m_enemyHqY;
         int hqRadius = 2;
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(b && b->alive && b->owner == m_player && b->type == UnitType::Headquarters)
             {
                 cx = b->tileX + b->buildWidth / 2;
@@ -1401,26 +1431,26 @@ namespace OpenArtOfWar
         }
         float tdx = static_cast<float>(m_playerHqX - cx);
         float tdy = static_cast<float>(m_playerHqY - cy);
-        const float tlen = std::max(1.0f, DetMath::hypot(tdx, tdy));
+        const float tlen = std::max(1.0f, DetMath::Hypot(tdx, tdy));
         tdx /= tlen;
         tdy /= tlen;
-        const float threatAngle = DetMath::atan2(tdy, tdx);
+        const float threatAngle = DetMath::Atan2(tdy, tdx);
         const float wallRadius = static_cast<float>(hqRadius + 8);
         auto ringTile = [&](float radius, float angleOffsetDeg, int &x, int &y)
         {
             const float a = threatAngle + angleOffsetDeg * static_cast<float>(M_PI) / 180.0f;
-            x = std::clamp(static_cast<int>(std::lround(cx + DetMath::cos(a) * radius)), 1, map.getWidth() - 2);
-            y = std::clamp(static_cast<int>(std::lround(cy + DetMath::sin(a) * radius)), 1, map.getHeight() - 2);
+            x = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * radius)), 1, map.GetWidth() - 2);
+            y = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * radius)), 1, map.GetHeight() - 2);
         };
 
         // Exit 1: where the road to the player crosses the wall ring; exit 2: 60 degrees to one side
         std::vector<PathNode> road;
         bool partial = false;
-        pathfinder.setIgnoreUnitsOnce();
-        pathfinder.findPath(cx, cy + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
+        pathfinder.SetIgnoreUnitsOnce();
+        pathfinder.FindPath(cx, cy + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
         for(const auto &n : road)
         {
-            if(DetMath::hypot(static_cast<float>(n.x - cx), static_cast<float>(n.y - cy)) >= wallRadius - 0.5f)
+            if(DetMath::Hypot(static_cast<float>(n.x - cx), static_cast<float>(n.y - cy)) >= wallRadius - 0.5f)
             {
                 m_gateX[0] = n.x;
                 m_gateY[0] = n.y;
@@ -1429,7 +1459,7 @@ namespace OpenArtOfWar
         }
         if(m_gateX[0] < 0)
             ringTile(wallRadius, 0.0f, m_gateX[0], m_gateY[0]);
-        const float gateAngle = DetMath::atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
+        const float gateAngle = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
         // The second exit goes to the side of the first one that still faces the player
         auto angleDiff = [](float a, float b) { return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI))); };
         const float rad60 = 60.0f * static_cast<float>(M_PI) / 180.0f;
@@ -1438,9 +1468,9 @@ namespace OpenArtOfWar
         {
             int gx = 0, gy = 0;
             const float a = gateAngle + side * 60.0f * static_cast<float>(M_PI) / 180.0f;
-            gx = std::clamp(static_cast<int>(std::lround(cx + DetMath::cos(a) * wallRadius)), 1, map.getWidth() - 2);
-            gy = std::clamp(static_cast<int>(std::lround(cy + DetMath::sin(a) * wallRadius)), 1, map.getHeight() - 2);
-            if(map.isPassable(gx, gy))
+            gx = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
+            gy = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
+            if(map.IsPassable(gx, gy))
             {
                 m_gateX[1] = gx;
                 m_gateY[1] = gy;
@@ -1451,7 +1481,7 @@ namespace OpenArtOfWar
         auto add = [&](AIDefenseSite::Kind kind, int x, int y) { m_defensePlan.push_back({kind, x, y, false}); };
 
         // 0. Starting from scratch (HQ + power plant only): raise a barracks first so troop training can begin
-        if(!entities.hasBuildingType(UnitType::Barracks, m_player, false))
+        if(!entities.HasBuildingType(UnitType::Barracks, m_player, false))
             add(AIDefenseSite::Barracks, cx - 1, cy - 1);
 
         // 1. First tower right behind the main exit, then a bunker covering the second one
@@ -1467,9 +1497,9 @@ namespace OpenArtOfWar
         const float step = 0.45f / wallRadius;
         for(float a = -80.0f * static_cast<float>(M_PI) / 180.0f; a <= 80.0f * static_cast<float>(M_PI) / 180.0f; a += step)
         {
-            const int wx = static_cast<int>(std::lround(cx + DetMath::cos(threatAngle + a) * wallRadius));
-            const int wy = static_cast<int>(std::lround(cy + DetMath::sin(threatAngle + a) * wallRadius));
-            if(wx < 1 || wy < 1 || wx >= map.getWidth() - 1 || wy >= map.getHeight() - 1)
+            const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(threatAngle + a) * wallRadius));
+            const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(threatAngle + a) * wallRadius));
+            if(wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
                 continue;
             if(std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
                 continue;
@@ -1491,7 +1521,7 @@ namespace OpenArtOfWar
         add(AIDefenseSite::Tower, x - 1, y - 1);
 
         // 4. Fragile buildings go behind the headquarters, away from the attack side
-        if(!entities.hasBuildingType(UnitType::ResearchLab, m_player, false))
+        if(!entities.HasBuildingType(UnitType::ResearchLab, m_player, false))
         {
             ringTile(static_cast<float>(hqRadius + 4), 180.0f, x, y);
             add(AIDefenseSite::Lab, x - 1, y - 1);
@@ -1507,53 +1537,63 @@ namespace OpenArtOfWar
 
         std::ostringstream plan;
         plan << "Base plan: " << m_defensePlan.size() << " items, " << wallTiles.size() << " wall tiles facing the enemy, exits (" << m_gateX[0] << "," << m_gateY[0] << ") and (" << m_gateX[1] << "," << m_gateY[1] << ")";
-        think("BUILD", plan.str());
+        Think("BUILD", plan.str());
     }
 
-    bool AIController::buildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities)
+    bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities)
     {
-        const int cost = defenseCost(site.kind);
+        const int cost = DefenseCost(site.kind);
+        // A unit on the spot only delays the work; after this many build steps (3 s each) the spot is given up
+        constexpr int kMaxUnitWaits = 20;
         if(site.kind == AIDefenseSite::Wall)
         {
             const int x = site.tileX, y = site.tileY;
-            if(!map.isPassable(x, y) || map.getWall(x, y) > 0 || entities.isTileOccupiedByUnit(x, y) || !entities.canPlaceBuilding(x, y, 1, 1, map, m_player))
+            // Checked first: a unit also makes the tile impassable and fails canPlaceBuilding
+            if(entities.IsTileOccupiedByUnit(x, y))
+            {
+                site.done = ++site.attempts >= kMaxUnitWaits; // a unit stands there: try again next step
+                return false;
+            }
+            if(!map.IsPassable(x, y) || map.GetWall(x, y) > 0 || !entities.CanPlaceBuilding(x, y, 1, 1, map, m_player))
             {
                 site.done = true; // blocked for good (terrain / building): skip this segment
                 return false;
             }
             m_credits -= cost;
-            map.setWall(x, y, side(), 100, m_player);
+            map.SetWall(x, y, side(), 100, m_player);
             m_startingWalls.push_back({x, y, side(), cost, false, 0.0f}); // rebuilt when destroyed
             site.done = true;
             return true;
         }
 
-        const int index = factionBuildingIndex(site.kind, side());
-        const BuildingConfig *cfg = entities.getBuildingConfig(index);
+        const int index = FactionBuildingIndex(site.kind, side());
+        const BuildingConfig *cfg = entities.GetBuildingConfig(index);
         const int w = cfg ? cfg->width : 2;
         const int h = cfg ? cfg->height : 2;
         int x = site.tileX, y = site.tileY;
         const int searchRadius = site.kind == AIDefenseSite::Barracks ? 8 : 3;
-        if(!findSiteNear(x, y, w, h, searchRadius, map, entities))
+        bool unitBlocked = false;
+        if(!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked))
         {
-            site.done = true; // no room around the planned spot
+            // No room around the planned spot; when only units were in the way, try again later
+            site.done = !unitBlocked || ++site.attempts >= kMaxUnitWaits;
             return false;
         }
-        const int id = entities.spawnBuildingByIndex(index, x, y, side(), 0.0f, m_player);
+        const int id = entities.SpawnBuildingByIndex(index, x, y, side(), 0.0f, m_player);
         if(id <= 0)
         {
             site.done = true;
             return false;
         }
         m_credits -= cost;
-        for(int ty = y; ty < y + h && ty < map.getHeight(); ++ty)
+        for(int ty = y; ty < y + h && ty < map.GetHeight(); ++ty)
         {
-            for(int tx = x; tx < x + w && tx < map.getWidth(); ++tx)
-                map.setPassable(tx, ty, false);
+            for(int tx = x; tx < x + w && tx < map.GetWidth(); ++tx)
+                map.SetPassable(tx, ty, false);
         }
         static const char *const kKindNames[] = {"tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks"};
-        think("BUILD", std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y) + ") for $" + std::to_string(cost));
-        if(const Building *b = entities.getBuilding(id))
+        Think("BUILD", std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y) + ") for $" + std::to_string(cost));
+        if(const Building *b = entities.GetBuilding(id))
         {
             AIStructurePlan plan;
             plan.type = b->type;
@@ -1571,14 +1611,14 @@ namespace OpenArtOfWar
         return true;
     }
 
-    void AIController::updateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
     {
         if(!m_startingBaseRecorded)
             return;
-        if(!entities.hasBuildingType(UnitType::Headquarters, m_player, false))
+        if(!entities.HasBuildingType(UnitType::Headquarters, m_player, false))
             return; // no HQ, no construction
         if(!m_defensePlanned)
-            planBaseDefenses(map, entities, pathfinder);
+            PlanBaseDefenses(map, entities, pathfinder);
 
         m_buildTimer += deltaTime;
         if(m_buildTimer < 3.0f)
@@ -1591,19 +1631,19 @@ namespace OpenArtOfWar
         {
             if(site.done)
                 continue;
-            const int cost = defenseCost(site.kind);
+            const int cost = DefenseCost(site.kind);
             const int reserve = site.kind == AIDefenseSite::Barracks ? 0 : 300;
             if(m_credits - cost < reserve)
             {
-                thinkOnce("build", "BUILD", "Fortification waits: troops come first (keeping $" + std::to_string(reserve) + " in reserve)");
+                ThinkOnce("build", "BUILD", "Fortification waits: troops come first (keeping $" + std::to_string(reserve) + " in reserve)");
                 return;
             }
-            const bool built = buildDefenseSite(site, map, entities);
+            const bool built = BuildDefenseSite(site, map, entities);
             if(site.kind == AIDefenseSite::Wall)
             {
                 if(built && ++wallsThisTick >= 6)
                 {
-                    think("BUILD", "Raised 6 wall segments on the side facing the enemy");
+                    Think("BUILD", "Raised 6 wall segments on the side facing the enemy");
                     return; // a few wall segments per step
                 }
                 continue;
@@ -1621,26 +1661,26 @@ namespace OpenArtOfWar
         int ay = m_lastThreatY >= 0 ? m_lastThreatY : m_playerHqY;
         const float dx = static_cast<float>(ax - m_enemyHqX);
         const float dy = static_cast<float>(ay - m_enemyHqY);
-        const float len = std::max(1.0f, DetMath::hypot(dx, dy));
+        const float len = std::max(1.0f, DetMath::Hypot(dx, dy));
         const float radius = std::min(len - 2.0f, 9.0f + 2.0f * static_cast<float>(m_expansions % 3));
         const float sideways = (m_expansions % 2 == 0 ? 1.0f : -1.0f) * 2.0f * static_cast<float>(m_expansions / 2);
         AIDefenseSite extra;
         extra.kind = (m_expansions % 3 == 2) ? AIDefenseSite::Bunker : AIDefenseSite::Tower;
         extra.tileX = static_cast<int>(std::lround(m_enemyHqX + dx / len * radius - dy / len * sideways)) - 1;
         extra.tileY = static_cast<int>(std::lround(m_enemyHqY + dy / len * radius + dx / len * sideways)) - 1;
-        if(buildDefenseSite(extra, map, entities))
+        if(BuildDefenseSite(extra, map, entities))
         {
             ++m_expansions;
             m_defensePlan.push_back(extra);
-            think("BUILD", "Attacks keep coming from (" + std::to_string(ax) + ", " + std::to_string(ay) + "): extra " + (extra.kind == AIDefenseSite::Bunker ? "bunker" : "tower") + " on that side");
+            Think("BUILD", "Attacks keep coming from (" + std::to_string(ax) + ", " + std::to_string(ay) + "): extra " + (extra.kind == AIDefenseSite::Bunker ? "bunker" : "tower") + " on that side");
         }
     }
 
-    void AIController::updateIdleUnits(EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder)
     {
-        for(auto &e : entities.getAllEntities())
+        for(auto &e : entities.GetAllEntities())
         {
-            Unit *u = e.asUnit();
+            Unit *u = e.AsUnit();
             if(!u || !u->alive || u->state == ActionState::Die || u->owner != m_player)
                 continue;
             if(u->state == ActionState::Idle && u->targetEntityId == 0 && !u->waitingForPath && !u->isAttackMoving)
@@ -1648,15 +1688,15 @@ namespace OpenArtOfWar
                 float closestDist = u->sightRadius * TILE_WIDTH;
                 int targetId = 0;
 
-                for(const auto &other : entities.getAllEntities())
+                for(const auto &other : entities.GetAllEntities())
                 {
-                    if(!other.alive || other.state == ActionState::Die || !isFoe(other))
+                    if(!other.alive || other.state == ActionState::Die || !IsFoe(other))
                         continue;
-                    if(!aiSees(other, entities))
+                    if(!AiSees(other, entities))
                         continue; // AI only engages units visible to Confederation!
-                    float dx = other.getUnitCenterPixelX() - u->getUnitCenterPixelX();
-                    float dy = other.getUnitCenterPixelY() - u->getUnitCenterPixelY();
-                    float d = DetMath::hypot(dx, dy);
+                    float dx = other.GetUnitCenterPixelX() - u->GetUnitCenterPixelX();
+                    float dy = other.GetUnitCenterPixelY() - u->GetUnitCenterPixelY();
+                    float d = DetMath::Hypot(dx, dy);
                     if(d < closestDist)
                     {
                         closestDist = d;
@@ -1666,7 +1706,7 @@ namespace OpenArtOfWar
 
                 if(targetId != 0)
                 {
-                    entities.issueAttackOrder({u->id}, targetId, &pathfinder);
+                    entities.IssueAttackOrder({u->id}, targetId, &pathfinder);
                 }
             }
         }
@@ -1676,24 +1716,24 @@ namespace OpenArtOfWar
     // Debug visualization (--debug mode)
     // ---------------------------------------------------------------------------
 
-    void AIController::renderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities) const
+    void AIController::RenderDebug(Renderer &renderer, BitmapFontRenderer &font, const Camera &camera, const EntityManager &entities) const
     {
-        if(m_debugConfig.visualizeChokepoints && m_chokes.width() > 0)
+        if(m_debugConfig.visualizeChokepoints && m_chokes.Width() > 0)
         {
             float x0, y0, x1, y1;
-            camera.screenToWorld(0.0f, 0.0f, x0, y0);
-            camera.screenToWorld(static_cast<float>(camera.getViewportWidth()), static_cast<float>(camera.getViewportHeight()), x1, y1);
+            camera.ScreenToWorld(0.0f, 0.0f, x0, y0);
+            camera.ScreenToWorld(static_cast<float>(camera.GetViewportWidth()), static_cast<float>(camera.GetViewportHeight()), x1, y1);
             int tx0 = std::max(0, static_cast<int>(x0 / TILE_WIDTH));
             int ty0 = std::max(0, static_cast<int>(y0 / TILE_HEIGHT));
-            int tx1 = std::min(m_chokes.width() - 1, static_cast<int>(x1 / TILE_WIDTH) + 1);
-            int ty1 = std::min(m_chokes.height() - 1, static_cast<int>(y1 / TILE_HEIGHT) + 1);
+            int tx1 = std::min(m_chokes.Width() - 1, static_cast<int>(x1 / TILE_WIDTH) + 1);
+            int ty1 = std::min(m_chokes.Height() - 1, static_cast<int>(y1 / TILE_HEIGHT) + 1);
             for(int ty = ty0; ty <= ty1; ++ty)
             {
                 for(int tx = tx0; tx <= tx1; ++tx)
                 {
-                    if(!m_chokes.isChoke(tx, ty))
+                    if(!m_chokes.IsChoke(tx, ty))
                         continue;
-                    renderer.fillRectWorld(tx * TILE_WIDTH + 1.0f, ty * TILE_HEIGHT + 1.0f, TILE_WIDTH - 2.0f, TILE_HEIGHT - 2.0f, camera, {255, 140, 30, 70});
+                    renderer.FillRectWorld(tx * TILE_WIDTH + 1.0f, ty * TILE_HEIGHT + 1.0f, TILE_WIDTH - 2.0f, TILE_HEIGHT - 2.0f, camera, {255, 140, 30, 70});
                 }
             }
         }
@@ -1702,13 +1742,13 @@ namespace OpenArtOfWar
         {
             // Staging area marker
             RenderUtility::DrawTileRadius(renderer, camera, m_stagingX * TILE_WIDTH + TILE_WIDTH * 0.5f, m_stagingY * TILE_HEIGHT + TILE_HEIGHT * 0.5f, 7.0f, SDL_Color {120, 200, 255, 90}, 1.5f);
-            m_squadController.renderDebug(renderer, font, camera, entities, m_currentDifficultyConfig.tactics.leashTiles);
+            m_squadController.RenderDebug(renderer, font, camera, entities, m_currentDifficultyConfig.tactics.leashTiles);
         }
 
         // Director summary in the top-left corner of the map view
-        std::string line1 = "AI " + difficultyToString(getEffectiveDifficulty()) + (m_debugConfig.forceDebugOverride ? " (debug override)" : "") + "  |  credits " + std::to_string(m_credits);
-        std::string line2 = "Wave " + std::to_string(m_currentPlan.waveNumber) + " " + tierName(m_currentPlan.tier) + ": ready " + std::to_string(m_readyUnits) + "/" + std::to_string(m_currentPlan.archetypes.size()) +
-            (m_waveCooldown > 0.0f ? "  next in " + std::to_string(static_cast<int>(m_waveCooldown)) + "s" : "") + "  |  groups " + std::to_string(m_squadController.getSquads().size());
+        std::string line1 = "AI " + DifficultyToString(GetEffectiveDifficulty()) + (m_debugConfig.forceDebugOverride ? " (debug override)" : "") + "  |  credits " + std::to_string(m_credits);
+        std::string line2 = "Wave " + std::to_string(m_currentPlan.waveNumber) + " " + TierName(m_currentPlan.tier) + ": ready " + std::to_string(m_readyUnits) + "/" + std::to_string(m_currentPlan.archetypes.size()) +
+            (m_waveCooldown > 0.0f ? "  next in " + std::to_string(static_cast<int>(m_waveCooldown)) + "s" : "") + "  |  groups " + std::to_string(m_squadController.GetSquads().size());
         std::string line3 = "Research: ";
         if(m_researchIndex >= kResearchCount)
         {
@@ -1716,22 +1756,22 @@ namespace OpenArtOfWar
         }
         else
         {
-            line3 += std::string(researchDef(side(), m_researchIndex).name) + (m_researchActive ? " " + std::to_string(static_cast<int>(getResearchProgress() * 100.0f)) + "%" : (m_hasLab ? " (saving credits)" : " (no lab)"));
+            line3 += std::string(researchDef(side(), m_researchIndex).name) + (m_researchActive ? " " + std::to_string(static_cast<int>(GetResearchProgress() * 100.0f)) + "%" : (m_hasLab ? " (saving credits)" : " (no lab)"));
         }
         int y = 40;
         for(const std::string *l : {&line1, &line2, &line3})
         {
-            int w = font.getTextWidth(*l, 1) + 12;
-            renderer.fillRectScreen(6, y, w, 18, {10, 12, 16, 200});
-            font.drawString(*l, 12, y + 2, 1, {226, 231, 238, 255}, false);
+            int w = font.GetTextWidth(*l, 1) + 12;
+            renderer.FillRectScreen(6, y, w, 18, {10, 12, 16, 200});
+            font.DrawString(*l, 12, y + 2, 1, {226, 231, 238, 255}, false);
             y += 20;
         }
     }
 
-    void AIController::onEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::OnEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
     {
-        Entity *victim = entities.getEntity(victimId);
-        Entity *attacker = entities.getEntity(attackerId);
+        Entity *victim = entities.GetEntity(victimId);
+        Entity *attacker = entities.GetEntity(attackerId);
         if(!victim || !attacker || victim->owner != m_player)
             return;
 
@@ -1742,14 +1782,14 @@ namespace OpenArtOfWar
 
         // Call for help: alert nearby allies within 14 tiles
         std::vector<int> allies;
-        for(auto &ally : entities.getAllEntities())
+        for(auto &ally : entities.GetAllEntities())
         {
             if(!ally.alive || ally.state == ActionState::Die || ally.isBuilding || ally.owner != m_player)
                 continue;
             if(ally.state == ActionState::Idle && ally.targetEntityId == 0)
             {
-                float dx = ally.getUnitCenterPixelX() - victim->getUnitCenterPixelX();
-                float dy = ally.getUnitCenterPixelY() - victim->getUnitCenterPixelY();
+                float dx = ally.GetUnitCenterPixelX() - victim->GetUnitCenterPixelX();
+                float dy = ally.GetUnitCenterPixelY() - victim->GetUnitCenterPixelY();
                 if(std::sqrt(dx * dx + dy * dy) <= 14.0f * TILE_WIDTH)
                 {
                     allies.push_back(ally.id);
@@ -1758,23 +1798,23 @@ namespace OpenArtOfWar
         }
         if(!allies.empty())
         {
-            entities.issueAttackMoveOrder(allies, attacker->tileX, attacker->tileY, pathfinder);
+            entities.IssueAttackMoveOrder(allies, attacker->tileX, attacker->tileY, pathfinder);
         }
     }
 
-    void AIController::onStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
+    void AIController::OnStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
     {
-        onEntityAttacked(structureId, attackerId, entities, pathfinder);
+        OnEntityAttacked(structureId, attackerId, entities, pathfinder);
     }
 
-    void AIController::recordStartingBase(const EntityManager &entities, const TileMap &map)
+    void AIController::RecordStartingBase(const EntityManager &entities, const TileMap &map)
     {
         m_startingBuildings.clear();
         m_startingWalls.clear();
 
-        for(const auto &e : entities.getAllEntities())
+        for(const auto &e : entities.GetAllEntities())
         {
-            const Building *b = e.asBuilding();
+            const Building *b = e.AsBuilding();
             if(!b || !b->alive || b->owner != m_player)
                 continue;
 
@@ -1814,11 +1854,11 @@ namespace OpenArtOfWar
         }
 
         // Record all walls of the AI side
-        for(int y = 0; y < map.getHeight(); ++y)
+        for(int y = 0; y < map.GetHeight(); ++y)
         {
-            for(int x = 0; x < map.getWidth(); ++x)
+            for(int x = 0; x < map.GetWidth(); ++x)
             {
-                if(map.getWall(x, y) > 0 && map.getWallOwner(x, y) == m_player)
+                if(map.GetWall(x, y) > 0 && map.GetWallOwner(x, y) == m_player)
                 {
                     AIWallPlan wp;
                     wp.tileX = x;
@@ -1836,11 +1876,11 @@ namespace OpenArtOfWar
         std::cout << "[AIController] Recorded starting base: " << m_startingBuildings.size() << " structures, " << m_startingWalls.size() << " walls for rebuilding memory." << std::endl;
     }
 
-    void AIController::updateRebuilding(float deltaTime, TileMap &map, EntityManager &entities)
+    void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager &entities)
     {
         if(!m_startingBaseRecorded)
         {
-            recordStartingBase(entities, map);
+            RecordStartingBase(entities, map);
             return;
         }
 
@@ -1850,7 +1890,7 @@ namespace OpenArtOfWar
             if(!plan.destroyed)
             {
                 bool stillAlive = false;
-                for(const auto &e : entities.getAllEntities())
+                for(const auto &e : entities.GetAllEntities())
                 {
                     if(e.alive && e.state != ActionState::Die && e.isBuilding && e.owner == m_player && e.tileX == plan.tileX && e.tileY == plan.tileY)
                     {
@@ -1862,7 +1902,7 @@ namespace OpenArtOfWar
                 {
                     plan.destroyed = true;
                     plan.rebuildTimer = 0.0f;
-                    think("BUILD", "Structure at (" + std::to_string(plan.tileX) + ", " + std::to_string(plan.tileY) + ") destroyed: queued for reconstruction");
+                    Think("BUILD", "Structure at (" + std::to_string(plan.tileX) + ", " + std::to_string(plan.tileY) + ") destroyed: queued for reconstruction");
                 }
             }
             else
@@ -1870,23 +1910,23 @@ namespace OpenArtOfWar
                 plan.rebuildTimer += deltaTime;
                 if(plan.rebuildTimer >= 6.0f && m_credits >= plan.creditCost)
                 {
-                    bool siteClear = entities.canPlaceBuilding(plan.tileX, plan.tileY, plan.width, plan.height, map, m_player);
+                    bool siteClear = entities.CanPlaceBuilding(plan.tileX, plan.tileY, plan.width, plan.height, map, m_player);
                     if(siteClear)
                     {
                         m_credits -= plan.creditCost;
-                        int newId = entities.spawnBuildingByIndex(plan.rawBuildingType, plan.tileX, plan.tileY, side(), 0.0f, m_player);
+                        int newId = entities.SpawnBuildingByIndex(plan.rawBuildingType, plan.tileX, plan.tileY, side(), 0.0f, m_player);
                         if(newId > 0)
                         {
-                            for(int ty = plan.tileY; ty < plan.tileY + plan.height && ty < map.getHeight(); ++ty)
+                            for(int ty = plan.tileY; ty < plan.tileY + plan.height && ty < map.GetHeight(); ++ty)
                             {
-                                for(int tx = plan.tileX; tx < plan.tileX + plan.width && tx < map.getWidth(); ++tx)
+                                for(int tx = plan.tileX; tx < plan.tileX + plan.width && tx < map.GetWidth(); ++tx)
                                 {
-                                    map.setPassable(tx, ty, false);
+                                    map.SetPassable(tx, ty, false);
                                 }
                             }
                             plan.destroyed = false;
                             plan.rebuildTimer = 0.0f;
-                            think("BUILD", "Rebuilt the structure at (" + std::to_string(plan.tileX) + ", " + std::to_string(plan.tileY) + ") for $" + std::to_string(plan.creditCost));
+                            Think("BUILD", "Rebuilt the structure at (" + std::to_string(plan.tileX) + ", " + std::to_string(plan.tileY) + ") for $" + std::to_string(plan.creditCost));
                         }
                     }
                 }
@@ -1898,7 +1938,7 @@ namespace OpenArtOfWar
         {
             if(!wp.destroyed)
             {
-                if(map.getWall(wp.tileX, wp.tileY) == 0)
+                if(map.GetWall(wp.tileX, wp.tileY) == 0)
                 {
                     wp.destroyed = true;
                     wp.rebuildTimer = 0.0f;
@@ -1909,14 +1949,14 @@ namespace OpenArtOfWar
                 wp.rebuildTimer += deltaTime;
                 if(wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost)
                 {
-                    int occupantId = entities.getUnitAt(wp.tileX * TILE_WIDTH + 12, wp.tileY * TILE_HEIGHT + 12);
-                    if(occupantId <= 0)
+                    // Not on a unit that stands even partly on the tile (it would be walled in)
+                    if(!entities.IsTileOccupiedByUnit(wp.tileX, wp.tileY))
                     {
                         m_credits -= wp.creditCost;
-                        map.setWall(wp.tileX, wp.tileY, wp.faction, 100, m_player);
+                        map.SetWall(wp.tileX, wp.tileY, wp.faction, 100, m_player);
                         wp.destroyed = false;
                         wp.rebuildTimer = 0.0f;
-                        thinkOnce("wall", "BUILD", "Patching the wall at (" + std::to_string(wp.tileX) + ", " + std::to_string(wp.tileY) + ")");
+                        ThinkOnce("wall", "BUILD", "Patching the wall at (" + std::to_string(wp.tileX) + ", " + std::to_string(wp.tileY) + ")");
                     }
                 }
             }

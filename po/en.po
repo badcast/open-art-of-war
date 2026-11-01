@@ -32,24 +32,6 @@ msgstr "About"
 msgid "EXIT"
 msgstr "Exit"
 
-msgid "[ SELECT ]"
-msgstr "[ Select ]"
-
-msgid "[ EXIT ]"
-msgstr "[ Exit ]"
-
-msgid "Select"
-msgstr "Select"
-
-msgid "Exit"
-msgstr "Exit"
-
-msgid "Back"
-msgstr "Back"
-
-msgid "Toggle"
-msgstr "Toggle"
-
 msgid "GAME PAUSED"
 msgstr "Game Paused"
 
@@ -59,41 +41,8 @@ msgstr "Continue"
 msgid "OBJECTIVES"
 msgstr "Objectives"
 
-msgid "CONSTRUCTION"
-msgstr "Construction"
-
-msgid "SOUND & MUSIC"
-msgstr "Sound & Music"
-
 msgid "RESTART MISSION"
 msgstr "Restart Mission"
-
-msgid "1. CONTINUE"
-msgstr "1. Continue"
-
-msgid "2. OBJECTIVES"
-msgstr "2. Objectives"
-
-msgid "3. BASE CONSTRUCTION"
-msgstr "3. Base Construction"
-
-msgid "4. SOUND & MUSIC"
-msgstr "4. Sound & Music"
-
-msgid "5. RESTART MISSION"
-msgstr "5. Restart Mission"
-
-msgid "6. MAIN MENU"
-msgstr "6. Main Menu"
-
-msgid "[ SELECT / ENTER ]"
-msgstr "[ Select / Enter ]"
-
-msgid "[ BACK / ESC ]"
-msgstr "[ Back / ESC ]"
-
-msgid "MISSION OBJECTIVES"
-msgstr "Mission Objectives"
 
 msgid " - OBJECTIVES"
 msgstr " - Objectives"
@@ -103,30 +52,6 @@ msgstr "Primary Objectives:"
 
 msgid "OPERATION BRIEFING:"
 msgstr "Operation Briefing:"
-
-msgid "CONTINUE (ESC)"
-msgstr "Continue (ESC)"
-
-msgid "Press SPACE, ENTER or Click to return"
-msgstr "Press SPACE, ENTER or Click to return"
-
-msgid "BASE CONSTRUCTION (RESISTANCE)"
-msgstr "Base Construction (Resistance)"
-
-msgid "BASE CONSTRUCTION"
-msgstr "Base Construction"
-
-msgid "[ SELECT & PLACE ]"
-msgstr "[ Select & Place ]"
-
-msgid "[ CANCEL / ESC ]"
-msgstr "[ Cancel / ESC ]"
-
-msgid "Cost: $"
-msgstr "Cost: $"
-
-msgid "Power: "
-msgstr "Power: "
 
 msgid " kW"
 msgstr " kW"
@@ -146,26 +71,8 @@ msgstr "Start Mission"
 msgid "BACK"
 msgstr "Back"
 
-msgid "MISSION BRIEFING - FREEDOM FOR LIBERTY"
-msgstr "Mission Briefing - Freedom for Liberty"
-
-msgid "START MISSION [ENTER]"
-msgstr "Start Mission [Enter]"
-
 msgid "MISSION BRIEFING"
 msgstr "Mission Briefing"
-
-msgid "RESISTANCE HIGH COMMAND - SECTOR REPORT"
-msgstr "Resistance High Command - Sector Report"
-
-msgid "OPERATIONAL OBJECTIVES:"
-msgstr "Operational Objectives:"
-
-msgid "PRESS [SPACE] OR [ENTER] TO BEGIN MISSION"
-msgstr "Press [Space] or [Enter] to Begin Mission"
-
-msgid "AUDIO & SYSTEM SETTINGS"
-msgstr "Audio & System Settings"
 
 msgid "Sound & Music"
 msgstr "Sound & Music"
@@ -185,47 +92,8 @@ msgstr "ON"
 msgid "OFF"
 msgstr "OFF"
 
-msgid "Synthesizer"
-msgstr "Synthesizer"
-
-msgid "Graphics"
-msgstr "Graphics"
-
-msgid "Pixel-Perfect High-Res"
-msgstr "Pixel-Perfect High-Res"
-
-msgid "Press [1] to toggle Sound, [2] to toggle Language"
-msgstr "Press [1] to toggle Sound, [2] to toggle Language"
-
-msgid "BACK (ESC / ENTER)"
-msgstr "Back (ESC / ENTER)"
-
 msgid "HELP & CONTROLS"
 msgstr "Help & Controls"
-
-msgid "- Mouse: LMB - select unit / box selection."
-msgstr "- Mouse: LMB - select unit / box selection."
-
-msgid "- Orders: RMB on ground - move, RMB on enemy - attack."
-msgstr "- Orders: RMB on ground - move, RMB on enemy - attack."
-
-msgid "- Camera: Arrow keys, WASD, or move mouse to screen edges."
-msgstr "- Camera: Arrow keys, WASD, or move mouse to screen edges."
-
-msgid "- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets."
-msgstr "- Construction (B): HQ, Power Plant, Barracks, Factory, Lab, Turrets."
-
-msgid "- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS."
-msgstr "- Production (1..7): Rifleman, Grenadier, Sniper, Coyote, Armadillo, Rhino, MLRS."
-
-msgid "- Siege mode (G): Deploy Sniper and Rhino heavy tank."
-msgstr "- Siege mode (G): Deploy Sniper and Rhino heavy tank."
-
-msgid "- Hotkeys: F12 - debug overlay, Space / ESC - pause."
-msgstr "- Hotkeys: F12 - debug overlay, Space / ESC - pause."
-
-msgid "ABOUT OPEN ART OF WAR"
-msgstr "About Open Art Of War"
 
 msgid "ABOUT GAME"
 msgstr "About Game"
@@ -254,9 +122,6 @@ msgstr "Infantry"
 msgid "VEHICLES"
 msgstr "Vehicles"
 
-msgid "BASE"
-msgstr "Base"
-
 msgid "ORDERS"
 msgstr "Orders"
 
@@ -269,71 +134,11 @@ msgstr "Ready"
 msgid "LOCK"
 msgstr "Lock"
 
-msgid "BUILDING PLACEMENT: "
-msgstr "Building Placement: "
-
-msgid " (LMB - build, RMB - cancel)"
-msgstr " (LMB - build, RMB - cancel)"
-
 msgid "Select building to construct"
 msgstr "Select building to construct"
 
-msgid "BODY ARMOR"
-msgstr "Body Armor"
-
-msgid "+30% armor and HP for infantry"
-msgstr "+30% armor and HP for infantry"
-
-msgid "SPECIAL TRAINING"
-msgstr "Special Training"
-
-msgid "+25% movement speed for infantry"
-msgstr "+25% movement speed for infantry"
-
-msgid "OPTICS"
-msgstr "Optics"
-
-msgid "+1.5 range and +25% infantry damage"
-msgstr "+1.5 range and +25% infantry damage"
-
-msgid "MEDIC STATION"
-msgstr "Medic Station"
-
-msgid "+40 max HP and healing for infantry"
-msgstr "+40 max HP and healing for infantry"
-
-msgid "TANK ARMOR"
-msgstr "Tank Armor"
-
-msgid "+25% durability for all vehicles"
-msgstr "+25% durability for all vehicles"
-
-msgid "AFTERBURNER"
-msgstr "Afterburner"
-
-msgid "+25% vehicle movement speed"
-msgstr "+25% vehicle movement speed"
-
-msgid "SIEGE CANNONS"
-msgstr "Siege Cannons"
-
-msgid "+25% heavy firepower"
-msgstr "+25% heavy firepower"
-
-msgid "LOGISTICS"
-msgstr "Logistics"
-
-msgid "Emergency supply +$600 credits"
-msgstr "Emergency supply +$600 credits"
-
-msgid "[LAB REQUIRED] Construct Research Lab to unlock"
-msgstr "[Lab Required] Construct Research Lab to unlock"
-
 msgid "[RESEARCHED] "
 msgstr "[Researched] "
-
-msgid "Researching: "
-msgstr "Researching: "
 
 msgid "Select technology to research"
 msgstr "Select technology to research"
@@ -368,32 +173,8 @@ msgstr "Sniper"
 msgid "Long-range sniper (Camouflage mode [G])"
 msgstr "Long-range sniper (Camouflage mode [G])"
 
-msgid "ASSAULT TROOPER"
-msgstr "Assault Trooper"
-
-msgid "Heavy assault infantryman"
-msgstr "Heavy assault infantryman"
-
 msgid "[BARRACKS REQUIRED] Construct Barracks to recruit "
 msgstr "[Barracks Required] Construct Barracks to recruit "
-
-msgid "ACTIVE BARRACKS: #"
-msgstr "Active Barracks: #"
-
-msgid " [PRIMARY RALLY POINT]"
-msgstr " [Primary Rally Point]"
-
-msgid "TRAINING: "
-msgstr "Training: "
-
-msgid " (QUEUE: "
-msgstr " (Queue: "
-
-msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO RECRUIT"
-msgstr "Production queue empty. Press [1..4] to recruit"
-
-msgid "BARRACKS NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
-msgstr "Barracks not built. Click in Construction tab to place"
 
 msgid "BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"
 msgstr "Barracks required for infantry recruitment!"
@@ -425,50 +206,8 @@ msgstr "Multiple Launch Rocket System (MLRS)"
 msgid "[FACTORY REQUIRED] Construct Factory to build "
 msgstr "[Factory Required] Construct Factory to build "
 
-msgid "ACTIVE FACTORY: #"
-msgstr "Active Factory: #"
-
-msgid "PRODUCTION: "
-msgstr "Production: "
-
-msgid "PRODUCTION QUEUE EMPTY. PRESS [1..4] TO BUILD VEHICLES"
-msgstr "Production queue empty. Press [1..4] to build vehicles"
-
-msgid "FACTORY NOT BUILT. CLICK IN CONSTRUCTION TAB TO PLACE"
-msgstr "Factory not built. Click in Construction tab to place"
-
 msgid "VEHICLE FACTORY REQUIRED FOR PRODUCTION!"
 msgstr "Vehicle Factory required for production!"
-
-msgid "BARRACKS (CLICK: SET PRIMARY)"
-msgstr "Barracks (Click: Set Primary)"
-
-msgid "NO BARRACKS"
-msgstr "No Barracks"
-
-msgid "BARRACKS #"
-msgstr "Barracks #"
-
-msgid " [PRIMARY]"
-msgstr " [Primary]"
-
-msgid "FACTORIES (CLICK: SET PRIMARY)"
-msgstr "Factories (Click: Set Primary)"
-
-msgid "NO FACTORIES"
-msgstr "No Factories"
-
-msgid "FACTORY #"
-msgstr "Factory #"
-
-msgid "Base grouping: Click Barracks or Factory to set primary rally point."
-msgstr "Base grouping: Click Barracks or Factory to set primary rally point."
-
-msgid "Assigned primary Barracks #"
-msgstr "Assigned primary Barracks #"
-
-msgid "Assigned primary Factory #"
-msgstr "Assigned primary Factory #"
 
 msgid "ATTACK-MOVE"
 msgstr "Attack-Move"
@@ -494,35 +233,11 @@ msgstr "Defend"
 msgid "Hold current position and engage enemies in range"
 msgstr "Hold current position and engage enemies in range"
 
-msgid "TACTICAL ORDERS: Select units and issue a command"
-msgstr "Tactical Orders: Select units and issue a command"
-
-msgid "Attack-Move [A] is the primary offensive tactic for Resistance forces!"
-msgstr "Attack-Move [A] is the primary offensive tactic for Resistance forces!"
-
-msgid "ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)"
-msgstr "ATTACK-MOVE [A]: select target (LMB to confirm, RMB/ESC to cancel)"
-
-msgid "GAME SAVED (F5)"
-msgstr "Game Saved (F5)"
-
-msgid "GAME LOADED (F9)"
-msgstr "Game Loaded (F9)"
-
-msgid "TEST MAP: Test passages, wall destruction and AI!"
-msgstr "Test Map: Test passages, wall destruction and AI!"
-
 msgid "MISSION ACCOMPLISHED!"
 msgstr "Mission Accomplished!"
 
-msgid "Press SPACE / ENTER to return to menu"
-msgstr "Press SPACE / ENTER to return to menu"
-
 msgid "MISSION FAILED!"
 msgstr "Mission Failed!"
-
-msgid "Press SPACE / ENTER to retry"
-msgstr "Press SPACE / ENTER to retry"
 
 msgid "HEADQUARTERS"
 msgstr "Headquarters"
@@ -748,32 +463,11 @@ msgstr ""
 msgid "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
 msgstr "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
 
-msgid "Test Map (Polygon)"
-msgstr "Test Map (Polygon)"
-
-msgid "Map: AI & Pathfinding Polygon"
-msgstr "Map: AI & Pathfinding Polygon"
-
-msgid ""
-"- Verify pathfinding in narrow and closed passages.\n"
-"- Test wall destruction and AI rebuilding.\n"
-"- Test Attack-Move [A]."
-msgstr ""
-"- Verify pathfinding in narrow and closed passages.\n"
-"- Test wall destruction and AI rebuilding.\n"
-"- Test Attack-Move [A]."
-
-msgid "Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls."
-msgstr "Tactical test polygon: 1) Closed walls passage sector, 2) Narrow bottleneck corridor, 3) Obstacle labyrinth, 4) Fortified AI base with automatic reconstruction of structures and defensive walls."
-
 msgid "Open Art Of War Character Archetype Editor"
 msgstr "Open Art Of War Character Archetype Editor"
 
 msgid "SDL error: "
 msgstr "SDL error: "
-
-msgid "SDL_image error: "
-msgstr "SDL_image error: "
 
 msgid "SDL window error: "
 msgstr "SDL window error: "
@@ -829,12 +523,6 @@ msgstr "Refresh list"
 msgid "Archetypes"
 msgstr "Archetypes"
 
-msgid "%zu archetypes"
-msgstr "%zu archetypes"
-
-msgid "Search by name or ID"
-msgstr "Search by name or ID"
-
 msgid "Properties"
 msgstr "Properties"
 
@@ -853,26 +541,8 @@ msgstr "General"
 msgid "Name"
 msgstr "Name"
 
-msgid "Description"
-msgstr "Description"
-
 msgid "Faction"
 msgstr "Faction"
-
-msgid "Category (unit/building)"
-msgstr "Category (unit/building)"
-
-msgid "Internal type"
-msgstr "Internal type"
-
-msgid "Class"
-msgstr "Class"
-
-msgid "Archetype ID"
-msgstr "Archetype ID"
-
-msgid "Building index"
-msgstr "Building index"
 
 msgid "Size and stats"
 msgstr "Size and stats"
@@ -898,23 +568,11 @@ msgstr "Production"
 msgid "Cost"
 msgstr "Cost"
 
-msgid "Credit cost"
-msgstr "Credit cost"
-
 msgid "Power (+/-)"
 msgstr "Power (+/-)"
 
 msgid "Build time"
 msgstr "Build time"
-
-msgid "Produced in"
-msgstr "Produced in"
-
-msgid "Icon composite ID"
-msgstr "Icon composite ID"
-
-msgid "Prerequisites (one per line)"
-msgstr "Prerequisites (one per line)"
 
 msgid "Combat"
 msgstr "Combat"
@@ -925,17 +583,11 @@ msgstr "Can attack"
 msgid "Damage"
 msgstr "Damage"
 
-msgid "Range (tiles)"
-msgstr "Range (tiles)"
-
 msgid "Cooldown (seconds)"
 msgstr "Cooldown (seconds)"
 
 msgid "Shots per burst"
 msgstr "Shots per burst"
-
-msgid "Burst interval (seconds)"
-msgstr "Burst interval (seconds)"
 
 msgid "Projectile"
 msgstr "Projectile"
@@ -949,44 +601,14 @@ msgstr "Rotating radar"
 msgid "Animation"
 msgstr "Animation"
 
-msgid "Sprite sheet"
-msgstr "Sprite sheet"
-
-msgid "Base sequence"
-msgstr "Base sequence"
-
-msgid "Composite ID"
-msgstr "Composite ID"
-
-msgid "Rubble composite base"
-msgstr "Rubble composite base"
-
-msgid "Attack offset"
-msgstr "Attack offset"
-
-msgid "Walk frames"
-msgstr "Walk frames"
-
-msgid "Idle frames"
-msgstr "Idle frames"
-
-msgid "Death frames"
-msgstr "Death frames"
-
 msgid "Abilities"
 msgstr "Abilities"
-
-msgid "Siege mode"
-msgstr "Siege mode"
 
 msgid "Siege archetype ID"
 msgstr "Siege archetype ID"
 
 msgid "Parent archetype ID"
 msgstr "Parent archetype ID"
-
-msgid "Independent turret"
-msgstr "Independent turret"
 
 msgid "Filename for Save As"
 msgstr "Filename for Save As"
@@ -1030,12 +652,6 @@ msgstr "Health"
 msgid "Powered"
 msgstr "Powered"
 
-msgid "Preview zoom"
-msgstr "Preview zoom"
-
-msgid "Game sprites and animation sequences from assets/data"
-msgstr "Game sprites and animation sequences from assets/data"
-
 msgid "Open Art Of War Map Editor - [openaow-mapeditor]"
 msgstr "Open Art Of War Map Editor - [openaow-mapeditor]"
 
@@ -1060,9 +676,6 @@ msgstr "Eyedropper: selected tile #"
 msgid "+30% Resources, +10% Speed"
 msgstr "+30% Resources, +10% Speed"
 
-msgid "+5 tiles HQ build radius for buildings and walls"
-msgstr "+5 tiles HQ build radius for buildings and walls"
-
 msgid "-20% AI Resources"
 msgstr "-20% AI Resources"
 
@@ -1075,14 +688,8 @@ msgstr "AI Difficulty"
 msgid "ATTACK-MOVE [Q]: select target (LMB to confirm, RMB/ESC to cancel)"
 msgstr "Attack-move [Q]: pick a target (LMB to confirm, RMB / Esc to cancel)"
 
-msgid "Arrow keys - navigate, Enter - select"
-msgstr "Arrow keys - navigate, Enter - select"
-
 msgid "Attack-move: units engage every enemy on the way"
 msgstr "Attack-move: units engage every enemy on the way"
-
-msgid "BASE EXPANSION"
-msgstr "Base Expansion"
 
 msgid "BUILD"
 msgstr "Build"
@@ -1090,14 +697,8 @@ msgstr "Build"
 msgid "Barracks"
 msgstr "Barracks"
 
-msgid "Build vehicles at the primary Factory"
-msgstr "Build vehicles at the primary Factory"
-
 msgid "Cancel / game menu"
 msgstr "Cancel / game menu"
-
-msgid "Click a row to change the value"
-msgstr "Click a row to change the value"
 
 msgid "Click or press Enter to begin"
 msgstr "Click or press Enter to begin"
@@ -1111,9 +712,6 @@ msgstr "Drag the map"
 msgid "Easy"
 msgstr "Easy"
 
-msgid "FORTRESS FLAMETHROWER"
-msgstr "Fortress Flamethrower"
-
 msgid "FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"
 msgstr "Fortress flamethrower upgrade unlocked!"
 
@@ -1122,9 +720,6 @@ msgstr "Factory"
 
 msgid "Fair AI, No Handicap"
 msgstr "Fair AI, No Handicap"
-
-msgid "HQ BUILD RADIUS INCREASED (+5 TILES)!"
-msgstr "HQ build radius increased (+5 tiles)!"
 
 msgid "Hard"
 msgstr "Hard"
@@ -1162,9 +757,6 @@ msgstr "Power"
 msgid "RMB"
 msgstr "RMB"
 
-msgid "Recruit infantry at the primary Barracks"
-msgstr "Recruit infantry at the primary Barracks"
-
 msgid "Scroll the camera"
 msgstr "Scroll the camera"
 
@@ -1182,9 +774,6 @@ msgstr "Siege mode for Sniper and Rhino"
 
 msgid "TECH"
 msgstr "Tech"
-
-msgid "Upgrades Fortress with auxiliary flamethrower (targets <= 1 tile)"
-msgstr "Upgrades Fortress with auxiliary flamethrower (targets <= 1 tile)"
 
 msgid "W A S D / Arrows"
 msgstr "W A S D / Arrows"
@@ -1371,17 +960,11 @@ msgstr "current values, unsaved edits included"
 msgid "(RMB - cancel one)"
 msgstr "(RMB - cancel one)"
 
-msgid "+20% damage for all vehicles"
-msgstr "+20% damage for all vehicles"
-
 msgid "Armored machine-gun carrier"
 msgstr "Armored machine-gun carrier"
 
 msgid "Build vehicles at the selected or primary Factory (RMB - cancel)"
 msgstr "Build vehicles at the selected or primary Factory (RMB - cancel)"
-
-msgid "COMBAT STIMULANTS"
-msgstr "COMBAT STIMULANTS"
 
 msgid "CONFEDERACY"
 msgstr "CONFEDERACY"
@@ -1445,12 +1028,6 @@ msgstr "[LAB REQUIRED] Research is paused until a Laboratory is built"
 
 msgid "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
 msgstr "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
-
-msgid "SIEGE ARTILLERY"
-msgstr "SIEGE ARTILLERY"
-
-msgid "+20% vehicle damage, unlocks the Rhino siege mode"
-msgstr "+20% vehicle damage, unlocks the Rhino siege mode"
 
 msgid " (default)"
 msgstr " (default)"
@@ -1523,9 +1100,6 @@ msgstr "Wreck"
 msgid "Wreck composite %d, %d stage(s)%s"
 msgstr "Wreck composite %d, %d stage(s)%s"
 
-msgid "Infantry leaves a corpse instead of a wreck: the last frame of its death sequence (death_sequences / flame_death_sequences in Animation)."
-msgstr "Infantry leaves a corpse instead of a wreck: the last frame of its death sequence (death_sequences / flame_death_sequences in Animation)."
-
 msgid "(unknown)"
 msgstr "(unknown)"
 
@@ -1546,10 +1120,6 @@ msgstr "Faction: %s   Class: %s   Internal type: %s"
 #, c-format
 msgid "Faction: %s   Structure type: %s"
 msgstr "Faction: %s   Structure type: %s"
-
-#, c-format
-msgid "Hull turn: %.2f s per 45 degrees"
-msgstr "Hull turn: %.2f s per 45 degrees"
 
 #, c-format
 msgid "Produced in: %s (follows from the archetype)"
@@ -1804,9 +1374,6 @@ msgstr "Frame counter in the corner of the screen"
 msgid "Graphics quality"
 msgstr "Graphics quality"
 
-msgid "Fog of war detail and smooth sprite scaling"
-msgstr "Fog of war detail and smooth sprite scaling"
-
 msgid "Low"
 msgstr "Low"
 
@@ -1846,9 +1413,6 @@ msgstr "Volume of the sound effects"
 msgid "DEFAULTS"
 msgstr "Defaults"
 
-msgid "Arrows change the value, Tab switches the page"
-msgstr "Arrows change the value, Tab switches the page"
-
 msgid "KEEP THESE DISPLAY SETTINGS?"
 msgstr "Keep these display settings?"
 
@@ -1864,20 +1428,11 @@ msgstr "Keep"
 msgid "REVERT"
 msgstr "Revert"
 
-msgid "Ultra"
-msgstr "Ultra"
-
-msgid "Preset: fog of war detail and sprite scaling"
-msgstr "Preset: fog of war detail and sprite scaling"
-
 msgid "Sprites at 1/3 of the resolution"
 msgstr "Sprites at 1/3 of the resolution"
 
 msgid "Sprites at 1/2 of the resolution"
 msgstr "Sprites at 1/2 of the resolution"
-
-msgid "Original resolution with smoothing"
-msgstr "Original resolution with smoothing"
 
 msgid "Smoothing"
 msgstr "Smoothing"
@@ -1887,58 +1442,6 @@ msgstr "Smooth scaling of the sprites instead of hard pixels"
 
 msgid "Original resolution"
 msgstr "Original resolution"
-
-# Map titles (the "title" key of assets/maps/*.json is the msgid)
-msgid "Pukalpa"
-msgstr "Pukalpa"
-
-msgid "Ukayali Shore"
-msgstr "Ukayali Shore"
-
-msgid "Capture of Miguel"
-msgstr "Capture of Miguel"
-
-msgid "Outpost / Meat Grinder"
-msgstr "Outpost / Meat Grinder"
-
-msgid "Outpost"
-msgstr "Outpost"
-
-msgid "Meat Grinder"
-msgstr "Meat Grinder"
-
-msgid "Gorge Assault"
-msgstr "Gorge Assault"
-
-msgid "Last Stand"
-msgstr "Last Stand"
-
-msgid "Demo Map"
-msgstr "Demo Map"
-
-msgid "Matter of Seconds"
-msgstr "Matter of Seconds"
-
-msgid "Radio Station"
-msgstr "Radio Station"
-
-msgid "The Return"
-msgstr "The Return"
-
-msgid "Jungle"
-msgstr "Jungle"
-
-msgid "Sabotage"
-msgstr "Sabotage"
-
-msgid "The Gorge"
-msgstr "The Gorge"
-
-msgid "Lima"
-msgstr "Lima"
-
-msgid "Sabotage / The Gorge"
-msgstr "Sabotage / The Gorge"
 
 msgid "MAP EDITOR"
 msgstr "MAP EDITOR"
@@ -2345,9 +1848,6 @@ msgstr "Standard"
 msgid "Army color"
 msgstr "Army color"
 
-msgid "Color of your units (classic: the original sheets)"
-msgstr "Color of your units (classic: the original sheets)"
-
 msgid "Classic"
 msgstr "Classic"
 
@@ -2428,12 +1928,6 @@ msgstr "Internet"
 
 msgid "Looking for games on the local network..."
 msgstr "Looking for games on the local network..."
-
-msgid "Address of the host (host or host:port, port 38100 by default)"
-msgstr "Address of the host (host or host:port, port 38100 by default)"
-
-msgid "To be reachable from the internet the host forwards UDP port 38100 on its router. A server list and room codes through openaow.imister.tech come with the dedicated server."
-msgstr "To be reachable from the internet the host forwards UDP port 38100 on its router. A server list and room codes through openaow.imister.tech come with the dedicated server."
 
 msgid "CREATE GAME"
 msgstr "Create game"
@@ -2527,33 +2021,6 @@ msgstr "P to go on"
 
 msgid "code"
 msgstr "code"
-
-msgid "MILITARY RANK"
-msgstr "Military Rank"
-
-msgid "RANK & SERVICE RECORD"
-msgstr "Rank & Service Record"
-
-msgid "Commander of Peru Resistance Forces"
-msgstr "Commander of Peru Resistance Forces"
-
-msgid "Military Rank: Lieutenant-General"
-msgstr "Military Rank: Lieutenant-General"
-
-msgid "Faction: Resistance (Red)"
-msgstr "Faction: Resistance (Red)"
-
-msgid "Campaign Victories: 8 of 8"
-msgstr "Campaign Victories: 8 of 8"
-
-msgid "Confederation Bases Destroyed: 24"
-msgstr "Confederation Bases Destroyed: 24"
-
-msgid "Medals: Liberator Star, Medal of Courage"
-msgstr "Medals: Liberator Star, Medal of Courage"
-
-msgid "Combat Readiness: 100%"
-msgstr "Combat Readiness: 100%"
 
 msgid "Technology name"
 msgstr "Technology name"
@@ -3218,9 +2685,6 @@ msgstr "Loading units and buildings..."
 msgid "Preparing the interface..."
 msgstr "Preparing the interface..."
 
-msgid "Loading the match..."
-msgstr "Loading the match..."
-
 msgid "No other map has a start position for everybody in the room."
 msgstr "No other map has a start position for everybody in the room."
 
@@ -3245,14 +2709,8 @@ msgstr "PREBUILT BASES"
 msgid "FROM SCRATCH"
 msgstr "FROM SCRATCH"
 
-msgid "SIDE"
-msgstr "SIDE"
-
 msgid "Color"
 msgstr "Color"
-
-msgid "Click a value to pick from the list, arrows step through it, Tab switches the page"
-msgstr "Click a value to pick from the list, arrows step through it, Tab switches the page"
 
 msgid "Click: pick from a list. Arrows: step. Tab: next page"
 msgstr "Click: pick from a list. Arrows: step. Tab: next page"

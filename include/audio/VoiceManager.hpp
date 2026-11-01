@@ -21,26 +21,26 @@ namespace OpenArtOfWar
         // Loads the lines of `language` (with the fallback ones); false when no line could be loaded
         bool load(const std::string &language, const std::string &assetRoot);
         // Loads another language when it differs from the current one
-        void setLanguage(const std::string &language);
-        const std::string &language() const
+        void SetLanguage(const std::string &language);
+        const std::string &Language() const
         {
             return m_language;
         }
 
         // A unit reply (category voice); false when unknown or held back by its limits
-        bool play(const std::string &event, uint64_t nowMs);
+        bool Play(const std::string &event, uint64_t nowMs);
         // An announcer line: queued, one at a time, each with its own cooldown
-        bool announce(const std::string &event, uint64_t nowMs);
+        bool Announce(const std::string &event, uint64_t nowMs);
         // Starts the next announcer line when the current one is over; once per frame
-        void update(uint64_t nowMs);
+        void Update(uint64_t nowMs);
         // Adds `frames` stereo frames (interleaved int16) of the voices speaking
-        void mix(int16_t *out, int frames);
-        void stopAll();
+        void Mix(int16_t *out, int frames);
+        void StopAll();
 
-        void setVolume(int volume); // 0..128
-        void setMuted(bool muted);
-        bool has(const std::string &event) const;
-        size_t lineCount() const
+        void SetVolume(int volume); // 0..128
+        void SetMuted(bool muted);
+        bool Has(const std::string &event) const;
+        size_t LineCount() const
         {
             return m_lines;
         }

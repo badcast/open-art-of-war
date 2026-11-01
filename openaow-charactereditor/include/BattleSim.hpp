@@ -40,45 +40,45 @@ public:
     bool start(const Setup& setup, const fs::path& assetsRoot, OpenArtOfWar::TextureManager* textures,
                YAML::Node docA, YAML::Node docB, std::string& error);
 
-    void update(float dt);
+    void Update(float dt);
 
     // Runs the battle to the end without rendering (batch statistics)
-    void runToEnd();
+    void RunToEnd();
 
     void render(OpenArtOfWar::Renderer& renderer, const OpenArtOfWar::Camera& camera, int animTick);
 
     void stop() { m_active = false; }
 
-    bool active() const { return m_active; }
+    bool Active() const { return m_active; }
 
-    bool finished() const { return m_finished; }
+    bool Finished() const { return m_finished; }
 
-    int winner() const { return m_winner; }
+    int Winner() const { return m_winner; }
 
     // 0 running, 1 A, 2 B, 3 draw
-    float time() const { return m_time; }
+    float Time() const { return m_time; }
 
-    const Side& sideA() const { return m_a; }
+    const Side& SideA() const { return m_a; }
 
-    const Side& sideB() const { return m_b; }
+    const Side& SideB() const { return m_b; }
 
-    float arenaWidthPx() const { return static_cast<float>(m_width * OpenArtOfWar::TILE_WIDTH); }
+    float ArenaWidthPx() const { return static_cast<float>(m_width * OpenArtOfWar::TILE_WIDTH); }
 
-    float arenaHeightPx() const { return static_cast<float>(m_height * OpenArtOfWar::TILE_HEIGHT); }
+    float ArenaHeightPx() const { return static_cast<float>(m_height * OpenArtOfWar::TILE_HEIGHT); }
 
     // World rectangle around both starting groups (camera framing)
-    SDL_FRect battleAreaPx() const { return m_battleArea; }
+    SDL_FRect BattleAreaPx() const { return m_battleArea; }
 
 private:
-    void spawnSide(YAML::Node doc, int count, OpenArtOfWar::Faction faction, int startX, int midY, int facing, Side& side);
+    void SpawnSide(YAML::Node doc, int count, OpenArtOfWar::Faction faction, int startX, int midY, int facing, Side& side);
 
     // Each side attack-moves toward the other one; repeated so idle units never stall the fight
-    void issueOrders(bool initial);
+    void IssueOrders(bool initial);
 
     // Alive counts, remaining HP and damage dealt (HP lost by the other side since the last tick)
-    void refreshStats();
+    void RefreshStats();
 
-    void checkFinished();
+    void CheckFinished();
     Setup m_setup;
     std::unique_ptr<OpenArtOfWar::TileMap> m_map;
     std::unique_ptr<OpenArtOfWar::EntityManager> m_entities;
