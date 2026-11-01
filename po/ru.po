@@ -2610,11 +2610,11 @@ msgstr "Сначала выберите каталог вывода."
 msgid "IMPORT SPRITES"
 msgstr "ИМПОРТ СПРАЙТОВ"
 
-msgid "WARNING: the import writes into assets/sprites and assets/data/graphics_data.json. Your data there may be overwritten."
-msgstr "ВНИМАНИЕ: импорт пишет в assets/sprites и assets/data/graphics_data.json. Ваши данные там могут быть перезаписаны."
+msgid "WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."
+msgstr "ВНИМАНИЕ: импорт пишет в assets/sprites и assets/data/sprites_graphics.json. Ваши данные там могут быть перезаписаны."
 
-msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to graphics_data.json."
-msgstr "Читает экспортированные файлы объектов и спрайтов из каталога: пиксели изменённых спрайтов возвращаются в листы, изменённые строки таблиц — в graphics_data.json."
+msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."
+msgstr "Читает экспортированные файлы объектов и спрайтов из каталога: пиксели изменённых спрайтов возвращаются в листы, изменённые строки таблиц — в sprites_graphics.json."
 
 msgid "Import folder"
 msgstr "Каталог импорта"
@@ -2628,8 +2628,8 @@ msgstr "Импорт спрайтов"
 msgid "Overwrite assets?"
 msgstr "Перезаписать assets?"
 
-msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/graphics_data.json with what is in the folder. Your data there may be lost."
-msgstr "Импорт перезапишет листы спрайтов в assets/sprites и таблицы в assets/data/graphics_data.json тем, что лежит в каталоге. Ваши данные там могут быть потеряны."
+msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."
+msgstr "Импорт перезапишет листы спрайтов в assets/sprites и таблицы в assets/data/sprites_graphics.json тем, что лежит в каталоге. Ваши данные там могут быть потеряны."
 
 msgid "Import and overwrite"
 msgstr "Импортировать и перезаписать"
@@ -2658,8 +2658,8 @@ msgstr "Каталог с файлами прежнего экспорта (.jso
 msgid "Opens the system dialog to pick the folder to import from."
 msgstr "Открывает системный диалог выбора каталога, откуда импортировать."
 
-msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/graphics_data.json, you are asked first."
-msgstr "Записывает изменённые спрайты и строки таблиц обратно в assets. Перезаписывает assets/sprites и assets/data/graphics_data.json, сначала спросит подтверждения."
+msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
+msgstr "Записывает изменённые спрайты и строки таблиц обратно в assets. Перезаписывает assets/sprites и assets/data/sprites_graphics.json, сначала спросит подтверждения."
 
 msgid "Packed atlas"
 msgstr "Упакованный атлас"
@@ -3436,3 +3436,423 @@ msgstr "Громкость голоса"
 
 msgid "Volume of the unit replies and the announcer"
 msgstr "Громкость ответов бойцов и диктора"
+
+#. Campaign mission dialogue (MissionDialogs.cpp): dialog.<res|conf>.<mission>.title / <line>.speaker / <line>.text
+msgid "dialog.res.1.title"
+msgstr "Возвращение"
+
+msgid "dialog.res.1.1.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.1.1.text"
+msgstr "Три месяца назад мы ушли из долин с одними винтовками. Конфедерация назвала это бегством. Сегодня мы спускаемся по старой контрабандной тропе, а они всё ещё думают, что джунгли пусты."
+
+msgid "dialog.res.1.2.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.1.2.text"
+msgstr "Разведчики докладывают о заставе Конфедерации у реки. Свежий бетон, два бункера, площадка снабжения. Они строятся всерьёз и надолго."
+
+msgid "dialog.res.1.3.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.1.3.text"
+msgstr "Значит, мы будем строиться быстрее. Поставьте лагерь на гребне, соберите добровольцев из деревень и сожгите заставу до прихода их колонны. Пусть долины узнают, что мы дома."
+
+msgid "dialog.res.1.4.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.1.4.text"
+msgstr "Понял. Флаг поднимем этой ночью."
+
+msgid "dialog.res.2.title"
+msgstr "Джунгли"
+
+msgid "dialog.res.2.1.speaker"
+msgstr "Капитан Пас"
+
+msgid "dialog.res.2.1.text"
+msgstr "Командир, их инженеры прорубили дорогу через сельву. Тяжёлые колонны уже идут к нашему лагерю."
+
+msgid "dialog.res.2.2.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.2.2.text"
+msgstr "Хорошо. Дорога через болото — ловушка, которую они построили сами себе. Их танки увязнут по гусеницы, а наши люди пройдут между деревьями."
+
+msgid "dialog.res.2.3.speaker"
+msgstr "Капитан Пас"
+
+msgid "dialog.res.2.3.text"
+msgstr "У нас не хватит орудий, чтобы остановить их всех."
+
+msgid "dialog.res.2.4.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.2.4.text"
+msgstr "Нам не нужно останавливать всех — нужно их пережить. Окапывайтесь, перекройте подходы стенами, заминируйте поляны и держите лагерь, пока их волны не разобьются."
+
+msgid "dialog.res.3.title"
+msgstr "Диверсия"
+
+msgid "dialog.res.3.1.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.3.1.text"
+msgstr "Наша первая группа так и не дошла до топливного склада. Выбралась только радистка — и она принесла с собой график караулов."
+
+msgid "dialog.res.3.2.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.3.2.text"
+msgstr "Значит, их жертва открыла нам дверь. Склад питает всю технику Конфедерации в провинции. Без него их броня — металлолом."
+
+msgid "dialog.res.3.3.speaker"
+msgstr "Инженер Бенито"
+
+msgid "dialog.res.3.3.text"
+msgstr "Заряды готовы, но детонатор бьёт только вблизи. Кому-то придётся подойти к самому их забору."
+
+msgid "dialog.res.3.4.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.3.4.text"
+msgstr "Вторую группу поведу я сама. Тихо через их тыл, а когда склад взлетит, атакуют все."
+
+msgid "dialog.res.4.title"
+msgstr "Ущелье"
+
+msgid "dialog.res.4.1.speaker"
+msgstr "Капитан Пас"
+
+msgid "dialog.res.4.1.text"
+msgstr "Пожар на складе ещё горит. Конфедерация гонит через горное ущелье колонну помощи: грузовики, танки и подвижный штаб."
+
+msgid "dialog.res.4.2.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.4.2.text"
+msgstr "Ущелье узкое, развернуться там негде. Кто держит его склоны, тот и решает, кто из него выйдет."
+
+msgid "dialog.res.4.3.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.4.3.text"
+msgstr "В подвижном штабе карты всех гарнизонов Перу. Если он прорвётся, они будут знать, куда бить дальше."
+
+msgid "dialog.res.4.4.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.4.4.text"
+msgstr "Значит, не прорвётся никто. Занимайте позиции над дорогой и пусть колонна сама идёт к нам."
+
+msgid "dialog.res.5.title"
+msgstr "Дело секунд"
+
+msgid "dialog.res.5.1.speaker"
+msgstr "Капитан Пас"
+
+msgid "dialog.res.5.1.text"
+msgstr "Станция связи Конфедерации стоит в 50 километрах к северо-востоку от ближайшего гарнизона. Их инженеры прямо сейчас собирают антенну."
+
+msgid "dialog.res.5.2.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.5.2.text"
+msgstr "Как только она заработает, они вызовут все вертолёты континента. Мы ударим раньше, чем с мачты уйдёт первое сообщение."
+
+msgid "dialog.res.5.3.speaker"
+msgstr "Инженер Бенито"
+
+msgid "dialog.res.5.3.text"
+msgstr "Прошлой ночью я перерезал им кабель. Это даст немного времени, но совсем немного."
+
+msgid "dialog.res.5.4.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.5.4.text"
+msgstr "Значит, на счету каждая секунда. Вперёд!"
+
+msgid "dialog.res.6.title"
+msgstr "Радиостанция"
+
+msgid "dialog.res.6.1.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.6.1.text"
+msgstr "Из развалин станции мы вытащили рабочую рацию с их ключами шифрования. С ней мы сможем читать каждый приказ Конфедерации."
+
+msgid "dialog.res.6.2.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.6.2.text"
+msgstr "Только если она доберётся до нашей базы. Капитан Пас везёт её в бронетранспортёре через открытую местность."
+
+msgid "dialog.res.6.3.speaker"
+msgstr "Капитан Пас"
+
+msgid "dialog.res.6.3.text"
+msgstr "Они знают, что мы везём. За нами охотятся все патрули в округе."
+
+msgid "dialog.res.6.4.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.6.4.text"
+msgstr "Тогда мы оттянем их на себя. Держите базу, капитан, и доставьте эту рацию домой целой."
+
+msgid "dialog.res.7.title"
+msgstr "Лима"
+
+msgid "dialog.res.7.1.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.7.1.text"
+msgstr "Двадцать лет назад Конфедерация подняла свой флаг над Лимой и назвала это миром. Этой ночью мы приносим войну к её порогу."
+
+msgid "dialog.res.7.2.speaker"
+msgstr "Полковник Майта"
+
+msgid "dialog.res.7.2.text"
+msgstr "Перехваченные приказы это подтверждают: все уцелевшие гарнизоны отошли на защиту столицы."
+
+msgid "dialog.res.7.3.speaker"
+msgstr "Командир Киспе"
+
+msgid "dialog.res.7.3.text"
+msgstr "Значит, они все в одном месте. За всех, кого мы потеряли в джунглях, за всех, кто ещё ждёт в деревнях: стройтесь, вооружайтесь и берите город."
+
+msgid "dialog.res.7.4.speaker"
+msgstr "Все"
+
+msgid "dialog.res.7.4.text"
+msgstr "За свободное Перу!"
+
+msgid "dialog.conf.1.title"
+msgstr "Пукальпа"
+
+msgid "dialog.conf.1.1.speaker"
+msgstr "Рассказчик"
+
+msgid "dialog.conf.1.1.text"
+msgstr "2038 год. Двадцать лет Всемирная Конфедерация поддерживает порядок на всех континентах. На востоке Перу, у города Пукальпа, этот порядок дал трещину."
+
+msgid "dialog.conf.1.2.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.1.2.text"
+msgstr "Генерал Хейл, вы должны были выйти на связь час назад. Сенат хочет погасить эту вспышку раньше, чем о ней узнает пресса."
+
+msgid "dialog.conf.1.3.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.1.3.text"
+msgstr "Дожди размыли дороги, сенатор. Мы разворачиваемся. Без спутников придётся смотреть на эти джунгли собственными глазами."
+
+msgid "dialog.conf.1.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.1.4.text"
+msgstr "Лейтенант Кейд, стройте базу, держите периметр и ждите разведку. Повстанцы проверят нас раньше, чем мы будем готовы."
+
+msgid "dialog.conf.2.title"
+msgstr "Берег Укаяли"
+
+msgid "dialog.conf.2.1.speaker"
+msgstr "Лейтенант Кейд"
+
+msgid "dialog.conf.2.1.text"
+msgstr "Генерал, разведка нашла лагерь повстанцев на берегу Укаяли, в 20 километрах к северу от Пукальпы. Каждую ночь лодки привозят им еду и топливо."
+
+msgid "dialog.conf.2.2.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.2.2.text"
+msgstr "Можем перекрыть реку?"
+
+msgid "dialog.conf.2.3.speaker"
+msgstr "Лейтенант Кейд"
+
+msgid "dialog.conf.2.3.text"
+msgstr "Отсюда — нет. Берег сплошь в джунглях. Либо идём прямо на лагерь, либо даём им вырасти."
+
+msgid "dialog.conf.2.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.2.4.text"
+msgstr "Тогда идём сейчас, пока они ещё пересчитывают винтовки. Подходы наверняка заминированы — пустите сапёров первыми."
+
+msgid "dialog.conf.3.title"
+msgstr "Захват Мигеля"
+
+msgid "dialog.conf.3.1.speaker"
+msgstr "Связистка Яра"
+
+msgid "dialog.conf.3.1.text"
+msgstr "Генерал, пленные из речного лагеря говорят, что лидер повстанцев скрывается в штабе выше по реке."
+
+msgid "dialog.conf.3.2.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.3.2.text"
+msgstr "Пленные много чего говорят. Это может быть приманка, чтобы затянуть нас глубже в лес."
+
+msgid "dialog.conf.3.3.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.3.3.text"
+msgstr "Приманка или нет, Сенату нужен пленник с именем. Пойманный лидер заканчивает восстание быстрее сотни сражений."
+
+msgid "dialog.conf.3.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.3.4.text"
+msgstr "Понял. Кейд, завод и центр технологий в вашем распоряжении. Тяжёлая техника по этим тропам не пройдёт — берите их штаб тем, что пройдёт."
+
+msgid "dialog.conf.4.title"
+msgstr "Застава"
+
+msgid "dialog.conf.4.1.speaker"
+msgstr "Лейтенант Кейд"
+
+msgid "dialog.conf.4.1.text"
+msgstr "Штаб был пуст, генерал. Он ушёл по реке, пока мы ломали ворота."
+
+msgid "dialog.conf.4.2.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.4.2.text"
+msgstr "Значит, он бежит к горам. Яра, вызовите передовой отряд."
+
+msgid "dialog.conf.4.3.speaker"
+msgstr "Связистка Яра"
+
+msgid "dialog.conf.4.3.text"
+msgstr "На секунду была связь... стрельба, потом что-то про минное поле. Канал молчит."
+
+msgid "dialog.conf.4.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.4.4.text"
+msgstr "Значит, нас ждут у перевала. Всем подразделениям — к бою: уничтожить заставу и открыть дорогу."
+
+msgid "dialog.conf.5.title"
+msgstr "Мясорубка"
+
+msgid "dialog.conf.5.1.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.5.1.text"
+msgstr "Сенатор, заставу взяли по графику. Окапываемся."
+
+msgid "dialog.conf.5.2.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.5.2.text"
+msgstr "Новые снимки со спутников плохие, генерал. К вашей позиции с юга стягиваются отряды повстанцев. Гораздо больше, чем мы насчитали."
+
+msgid "dialog.conf.5.3.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.5.3.text"
+msgstr "Сколько ждать подкрепление?"
+
+msgid "dialog.conf.5.4.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.5.4.text"
+msgstr "Они идут через горы. Держитесь до их прихода, чего бы это ни стоило."
+
+msgid "dialog.conf.6.title"
+msgstr "Штурм ущелья"
+
+msgid "dialog.conf.6.1.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.6.1.text"
+msgstr "Вы выстояли, генерал. Сенат это оценил. Мы нашли главную крепость повстанцев в конце ущелья."
+
+msgid "dialog.conf.6.2.speaker"
+msgstr "Лейтенант Кейд"
+
+msgid "dialog.conf.6.2.text"
+msgstr "Подступы обнесены стенами и заминированы. Лобовой штурм будет стоить нам всей бригады."
+
+msgid "dialog.conf.6.3.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.6.3.text"
+msgstr "Значит, пешком не пойдём. Центр технологий даст нам РСЗО «Град» — в осадном режиме они достанут через любую стену."
+
+msgid "dialog.conf.6.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.6.4.text"
+msgstr "Сначала надёжная оборона, потом ломаем крепость издалека."
+
+msgid "dialog.conf.7.title"
+msgstr "Последний рубеж"
+
+msgid "dialog.conf.7.1.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.7.1.text"
+msgstr "Час настал, генерал. Повстанцы стянули всех до последнего бойца на свою последнюю базу. К вам идёт группа подкрепления."
+
+msgid "dialog.conf.7.2.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.7.2.text"
+msgstr "Мы готовы, сенатор. Двадцать лет порядка не закончатся в этих джунглях."
+
+msgid "dialog.conf.7.3.speaker"
+msgstr "Сенатор Брандт"
+
+msgid "dialog.conf.7.3.text"
+msgstr "Закончите это, и дальше за дело возьмётся основная миротворческая армия."
+
+msgid "dialog.conf.7.4.speaker"
+msgstr "Генерал Хейл"
+
+msgid "dialog.conf.7.4.text"
+msgstr "Служу Конфедерации. Всем подразделениям — вперёд!"
+
+msgid "ACKNOWLEDGED"
+msgstr "ПРИНЯЛ"
+
+#. Network screen
+msgid "Type a message"
+msgstr "Введите сообщение"
+
+msgid "Your name in the game"
+msgstr "Ваше имя в игре"
+
+msgid "Optional"
+msgstr "Необязательно"
+
+msgid "Direct connection (the host forwards UDP port 38100)"
+msgstr "Прямое подключение (хост открывает UDP-порт 38100)"
+
+msgid "Address or address:port, e.g. 192.168.1.10"
+msgstr "Адрес или адрес:порт, например 192.168.1.10"
+
+msgid "6 characters"
+msgstr "6 символов"
+
+msgid "CREATE"
+msgstr "СОЗДАТЬ"
+
+msgid "Pick a game in the list first"
+msgstr "Сначала выберите игру в списке"
+
+msgid "the game through the server"
+msgstr "игре через сервер"
+
+msgid "Connecting to"
+msgstr "Подключение к"
+
+msgid "No answer: check the address, and that the host forwards UDP port 38100"
+msgstr "Нет ответа: проверьте адрес и что хост открыл UDP-порт 38100"
+
+
+msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
+msgstr "Файлы шрифтов задаются в assets/main.json (fonts.regular, fonts.bold); здесь задаются размеры."

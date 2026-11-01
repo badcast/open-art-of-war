@@ -19,7 +19,7 @@ struct SingleExportOptions {
 
 // Puts what the exports above wrote back into the assets: the pixels of every sprite into assets/sprites/sheet_NN.png
 // and the edited rows of the graphics tables (composites, animations, bodies, sequences, buildings) into
-// assets/data/graphics_data.json. This OVERWRITES those files (only the sheets and tables that really differ).
+// assets/data/sprites_graphics.json. This OVERWRITES those files (only the sheets and tables that really differ).
 // Reads the object files (<NNN>_*.json + atlas) and the single sprite files (sprites_*.json + grid) of `inDir`.
 bool ImportSpriteFolder(const fs::path& assetsRoot, const fs::path& inDir, std::string& report);
 

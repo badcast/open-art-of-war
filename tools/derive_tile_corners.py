@@ -32,7 +32,7 @@ PURE = {0: {'G': (0, 9), 'D': (10, 17), 'E': (19, 25), 'W': (26, 33)},
 BASE_SHEET_WIDTH = [240, 179, 206, 229, 200, 274, 268, 240, 77, 77, 107, 153, 91, 112, 223, 154, 193, 158, 135, 73,
                     65, 121, 91, 94, 106, 169, 68, 78, 126, 231, 272, 45, 166, 123, 122, 1, 61, 88, 50, 63, 98, 33]
 
-graphics = json.load(open(os.path.join(ASSETS, 'data', 'graphics_data.json')))
+graphics = json.load(open(os.path.join(ASSETS, 'data', 'sprites_graphics.json')))
 sprites = {s['id']: s for s in json.load(open(os.path.join(ASSETS, 'characters', 'sprites.json')))}
 sheets = {}
 

@@ -11,18 +11,8 @@ Makefile
 compile_commands.json
 CMakeUserPresets.json
 view/*.png
+assets
 assets/*
-# The resource manifest is source, not extracted data (see core/LoaderResources.hpp)
-!assets/main.json
-# Sound effects are ours (tools/prepare_sfx.py from CC0 sources), not extracted from the original game
-!assets/audio/
-assets/audio/*
-!assets/audio/sfx/
-!assets/audio/voices/
-!assets/data/
-assets/data/*
-!assets/data/sfx.json
-!assets/data/voices.json
 
 CLAUDE.md
 

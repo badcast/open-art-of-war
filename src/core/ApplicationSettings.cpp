@@ -43,258 +43,289 @@
 #include <algorithm>
 #include <cmath>
 
-// Application: applying settings (audio, graphics, window), the "keep these display settings?" dialog and the render API switch
+// Application: applying settings (audio, graphics, window), the "keep these display settings?" dialog and the render
+// API switch
 
 namespace OpenArtOfWar
 {
 
-    void Application::SaveSettings()
-    {
-        m_settings.Save(Settings::DefaultPath());
-    }
+void Application::SaveSettings()
+{
+    m_settings.Save(Settings::DefaultPath());
+}
 
-    void Application::ApplyAudio()
-    {
-        if(!m_sound)
-            return;
-        m_sound->SetMusicVolume(m_settings.musicVolume);
-        m_sound->SetFxVolume(m_settings.fxVolume);
-        m_sound->SetVoiceVolume(m_settings.voiceVolume);
-        m_sound->SetVoiceLanguage(m_settings.language); // voices speak the language of the game
-        if(m_sound->IsMuted() != m_settings.muted)
-            m_sound->ToggleMute();
-    }
+void Application::ApplyAudio()
+{
+    if (!m_sound)
+        return;
+    m_sound->SetMusicVolume(m_settings.musicVolume);
+    m_sound->SetFxVolume(m_settings.fxVolume);
+    m_sound->SetVoiceVolume(m_settings.voiceVolume);
+    m_sound->SetVoiceLanguage(m_settings.language); // voices speak the language of the game
+    if (m_sound->IsMuted() != m_settings.muted)
+        m_sound->ToggleMute();
+}
 
-    // Graphics quality presets, only about the picture of the game world:
-    //   low     sprites at 1/3 of the resolution (chunky pixels)
-    //   medium  sprites at 1/2 of the resolution
-    //   high    the original resolution
-    // Smoothing (a separate option) scales the sprites, and the reduced picture back up, smoothly instead of in hard pixels.
-    int Application::RenderDivisor() const
-    {
-        static const int kDivisors[3] = {3, 2, 1};
-        return kDivisors[std::clamp(m_settings.graphicsQuality, 0, 2)];
-    }
+// Graphics quality presets, only about the picture of the game world:
+//   low     sprites at 1/3 of the resolution (chunky pixels)
+//   medium  sprites at 1/2 of the resolution
+//   high    the original resolution
+// Smoothing (a separate option) scales the sprites, and the reduced picture back up, smoothly instead of in hard
+// pixels.
+int Application::RenderDivisor() const
+{
+    static const int kDivisors[3] = {3, 2, 1};
+    return kDivisors[std::clamp(m_settings.graphicsQuality, 0, 2)];
+}
 
-    void Application::ApplyGraphics()
-    {
-        if(m_camera)
-            m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
-        const bool effects = m_effects && m_effects->Available();
-        if(m_effects)
-            m_effects->Configure(static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
-        // The pixel-art filter blends texel edges itself and needs linear samples to do it
-        if(m_texManager)
-            m_texManager->SetSpriteFiltering(m_settings.smoothing, effects && m_settings.sharpPixels);
-    }
+void Application::ApplyGraphics()
+{
+    if (m_camera)
+        m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
+    const bool effects = m_effects && m_effects->Available();
+    if (m_effects)
+        m_effects->Configure(static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
+    // The pixel-art filter blends texel edges itself and needs linear samples to do it
+    if (m_texManager)
+        m_texManager->SetSpriteFiltering(m_settings.smoothing, effects && m_settings.sharpPixels);
+}
 
-    void Application::ApplySettings(SettingsArea area)
+void Application::ApplySettings(SettingsArea area)
+{
+    m_settings.Clamp();
+    switch (area)
     {
-        m_settings.Clamp();
-        switch(area)
+        case SettingsArea::Video:
         {
-            case SettingsArea::Video:
+            const Settings before = m_confirmedVideo;
+            VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
+            SyncWindowSize();
+            const bool windowChanged = before.windowMode != m_settings.windowMode
+                                       || before.windowW != m_settings.windowW || before.windowH != m_settings.windowH
+                                       || before.fullscreenW != m_settings.fullscreenW
+                                       || before.fullscreenH != m_settings.fullscreenH;
+            if (windowChanged && !m_videoConfirmActive)
             {
-                const Settings before = m_confirmedVideo;
-                VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
-                SyncWindowSize();
-                const bool windowChanged = before.windowMode != m_settings.windowMode || before.windowW != m_settings.windowW || before.windowH != m_settings.windowH || before.fullscreenW != m_settings.fullscreenW || before.fullscreenH != m_settings.fullscreenH;
-                if(windowChanged && !m_videoConfirmActive)
-                {
-                    BeginVideoConfirm(before);
-                }
-                else if(!windowChanged)
-                {
-                    m_confirmedVideo = m_settings;
-                }
-                break;
+                BeginVideoConfirm(before);
             }
-            case SettingsArea::Graphics:
-                ApplyGraphics();
-                break;
-            case SettingsArea::Audio:
-                ApplyAudio();
-                break;
-            case SettingsArea::Game:
-                Localization::SetLanguage(m_settings.language);
-                if(m_sound)
-                    m_sound->SetVoiceLanguage(m_settings.language);
-                if(m_aiController)
-                    m_aiController->SetDifficulty(static_cast<AIDifficulty>(m_settings.difficulty));
-                break;
+            else if (!windowChanged)
+            {
+                m_confirmedVideo = m_settings;
+            }
+            break;
         }
+        case SettingsArea::Graphics:
+            ApplyGraphics();
+            break;
+        case SettingsArea::Audio:
+            ApplyAudio();
+            break;
+        case SettingsArea::Game:
+            Localization::SetLanguage(m_settings.language);
+            if (m_sound)
+                m_sound->SetVoiceLanguage(m_settings.language);
+            if (m_aiController)
+                m_aiController->SetDifficulty(static_cast<AIDifficulty>(m_settings.difficulty));
+            break;
+    }
+    SaveSettings();
+}
+
+// F11 / Alt+Enter: windowed <-> borderless fullscreen
+void Application::ToggleFullscreen()
+{
+    if (m_videoConfirmActive)
+        return;
+    m_settings.windowMode
+        = m_settings.windowMode == WindowMode::Windowed ? WindowMode::Borderless : WindowMode::Windowed;
+    VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
+    SyncWindowSize();
+    m_confirmedVideo = m_settings;
+    SaveSettings();
+}
+
+void Application::SyncWindowSize(int w, int h)
+{
+    if (!m_window)
+        return;
+    int pw = 0, ph = 0;
+    SDL_GetWindowSizeInPixels(m_window, &pw, &ph);
+    if (pw <= 0 || ph <= 0)
+    {
+        pw = w;
+        ph = h;
+    }
+    if (pw <= 0 || ph <= 0)
+    {
+        SDL_GetWindowSize(m_window, &pw, &ph);
+    }
+    if (pw <= 0 || ph <= 0)
+        return;
+
+    if (m_windowW == pw && m_windowH == ph)
+        return;
+
+    m_windowW = pw;
+    m_windowH = ph;
+    if (m_camera)
+    {
+        m_camera->SetViewport(m_windowW - HUDController::kSidebarWidth, m_windowH);
+        if (m_map)
+            m_camera->ClampToBounds(m_map->GetWidth(), m_map->GetHeight());
+    }
+    if (!m_videoConfirmActive)
+    {
+        if (m_settings.windowMode == WindowMode::Windowed)
+        {
+            m_settings.windowW = m_windowW;
+            m_settings.windowH = m_windowH;
+            m_confirmedVideo.windowW = m_windowW;
+            m_confirmedVideo.windowH = m_windowH;
+        }
+    }
+}
+
+void Application::BeginVideoConfirm(const Settings &previous)
+{
+    m_videoConfirmActive = true;
+    m_videoConfirmTimer = 10.0f;
+    m_confirmedVideo = previous;
+}
+
+namespace
+{
+
+struct VideoConfirmLayout
+{
+    ui::UiRect dialog;
+    ui::UiRect keepBtn;
+    ui::UiRect revertBtn;
+};
+
+VideoConfirmLayout videoConfirmLayout(int windowW, int windowH)
+{
+    VideoConfirmLayout l;
+    l.dialog = ui::CenteredRect(windowW, windowH, 520, 220);
+    l.keepBtn = {l.dialog.x + 24, l.dialog.Bottom() - 64, 220, 40};
+    l.revertBtn = {l.dialog.Right() - 24 - 220, l.dialog.Bottom() - 64, 220, 40};
+    return l;
+}
+
+} // namespace
+
+void Application::UpdateVideoConfirm(float deltaTime)
+{
+    m_videoConfirmTimer -= deltaTime;
+    const VideoConfirmLayout l = videoConfirmLayout(m_windowW, m_windowH);
+    float lx, ly;
+    const bool clicked = m_input->WasLeftClickIssued(lx, ly);
+    const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
+
+    if (m_renderConfirm)
+    {
+        if ((clicked && l.keepBtn.Contains(mx, my)) || m_input->IsConfirmJustPressed())
+        {
+            KeepRenderApi();
+        }
+        else if (
+            (clicked && l.revertBtn.Contains(mx, my)) || m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE)
+            || m_videoConfirmTimer <= 0.0f)
+        {
+            RevertRenderApi();
+        }
+        return;
+    }
+
+    if ((clicked && l.keepBtn.Contains(mx, my)) || m_input->IsConfirmJustPressed())
+    {
+        m_videoConfirmActive = false;
+        m_confirmedVideo = m_settings;
         SaveSettings();
     }
-
-    // F11 / Alt+Enter: windowed <-> borderless fullscreen
-    void Application::ToggleFullscreen()
+    else if (
+        (clicked && l.revertBtn.Contains(mx, my)) || m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE)
+        || m_videoConfirmTimer <= 0.0f)
     {
-        if(m_videoConfirmActive)
-            return;
-        m_settings.windowMode = m_settings.windowMode == WindowMode::Windowed ? WindowMode::Borderless : WindowMode::Windowed;
+        m_videoConfirmActive = false;
+        // Back to the previous window setup, the other video options stay as chosen
+        m_settings.windowMode = m_confirmedVideo.windowMode;
+        m_settings.windowW = m_confirmedVideo.windowW;
+        m_settings.windowH = m_confirmedVideo.windowH;
+        m_settings.fullscreenW = m_confirmedVideo.fullscreenW;
+        m_settings.fullscreenH = m_confirmedVideo.fullscreenH;
         VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
         SyncWindowSize();
         m_confirmedVideo = m_settings;
         SaveSettings();
     }
+}
 
-    void Application::SyncWindowSize(int w, int h)
-    {
-        if(!m_window)
-            return;
-        int pw = 0, ph = 0;
-        SDL_GetWindowSizeInPixels(m_window, &pw, &ph);
-        if(pw <= 0 || ph <= 0)
-        {
-            pw = w;
-            ph = h;
-        }
-        if(pw <= 0 || ph <= 0)
-        {
-            SDL_GetWindowSize(m_window, &pw, &ph);
-        }
-        if(pw <= 0 || ph <= 0)
-            return;
+void Application::RenderVideoConfirm()
+{
+    const VideoConfirmLayout l = videoConfirmLayout(m_windowW, m_windowH);
+    m_renderer->FillRectScreen(0, 0, m_windowW, m_windowH, ui::color::Scrim);
+    ui::UiRect content = ui::DrawDialog(
+        *m_renderer,
+        *m_fontRenderer,
+        m_windowW,
+        m_windowH,
+        l.dialog,
+        m_renderConfirm ? _("KEEP THIS RENDER API?") : _("KEEP THESE DISPLAY SETTINGS?"));
+    const int seconds = std::max(0, static_cast<int>(std::ceil(m_videoConfirmTimer)));
+    m_fontRenderer->DrawString(
+        _("The previous settings come back automatically in") + std::string(" ") + std::to_string(seconds) + " "
+            + _("s"),
+        content.CenterX(),
+        content.y + 24,
+        ui::FONT_BODY,
+        ui::color::TextDim,
+        false,
+        Anchor::HCENTER | Anchor::VCENTER);
+    const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
+    ui::DrawButton(
+        *m_renderer, *m_fontRenderer, l.keepBtn, _("KEEP"), ui::ButtonStyle::Primary, l.keepBtn.Contains(mx, my));
+    ui::DrawButton(
+        *m_renderer,
+        *m_fontRenderer,
+        l.revertBtn,
+        _("REVERT"),
+        ui::ButtonStyle::Secondary,
+        l.revertBtn.Contains(mx, my));
+}
 
-        if(m_windowW == pw && m_windowH == ph)
-            return;
+void Application::RequestRestart()
+{
+    m_restartRequested = true;
+    m_running = false;
+}
 
-        m_windowW = pw;
-        m_windowH = ph;
-        if(m_camera)
-        {
-            m_camera->SetViewport(m_windowW - HUDController::kSidebarWidth, m_windowH);
-            if(m_map)
-                m_camera->ClampToBounds(m_map->GetWidth(), m_map->GetHeight());
-        }
-        if(!m_videoConfirmActive)
-        {
-            if(m_settings.windowMode == WindowMode::Windowed)
-            {
-                m_settings.windowW = m_windowW;
-                m_settings.windowH = m_windowH;
-                m_confirmedVideo.windowW = m_windowW;
-                m_confirmedVideo.windowH = m_windowH;
-            }
-        }
-    }
+void Application::SwitchRenderApi()
+{
+    const char *active = SDL_GetRendererName(m_sdlRenderer);
+    if (!active || RenderBackend::Configured(m_env) == active)
+        return;
+    m_env.Edit("render")["confirm_from"] = active;
+    m_env.Save();
+    RequestRestart();
+}
 
-    void Application::BeginVideoConfirm(const Settings &previous)
-    {
-        m_videoConfirmActive = true;
-        m_videoConfirmTimer = 10.0f;
-        m_confirmedVideo = previous;
-    }
+void Application::KeepRenderApi()
+{
+    m_renderConfirm = false;
+    m_videoConfirmActive = false;
+    m_env.Edit("render").erase("confirm_from");
+    m_env.Save();
+}
 
-    namespace
-    {
-
-        struct VideoConfirmLayout
-        {
-            ui::UiRect dialog;
-            ui::UiRect keepBtn;
-            ui::UiRect revertBtn;
-        };
-
-        VideoConfirmLayout videoConfirmLayout(int windowW, int windowH)
-        {
-            VideoConfirmLayout l;
-            l.dialog = ui::CenteredRect(windowW, windowH, 520, 220);
-            l.keepBtn = {l.dialog.x + 24, l.dialog.Bottom() - 64, 220, 40};
-            l.revertBtn = {l.dialog.Right() - 24 - 220, l.dialog.Bottom() - 64, 220, 40};
-            return l;
-        }
-
-    } // namespace
-
-    void Application::UpdateVideoConfirm(float deltaTime)
-    {
-        m_videoConfirmTimer -= deltaTime;
-        const VideoConfirmLayout l = videoConfirmLayout(m_windowW, m_windowH);
-        float lx, ly;
-        const bool clicked = m_input->WasLeftClickIssued(lx, ly);
-        const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
-
-        if(m_renderConfirm)
-        {
-            if((clicked && l.keepBtn.Contains(mx, my)) || m_input->IsConfirmJustPressed())
-            {
-                KeepRenderApi();
-            }
-            else if((clicked && l.revertBtn.Contains(mx, my)) || m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || m_videoConfirmTimer <= 0.0f)
-            {
-                RevertRenderApi();
-            }
-            return;
-        }
-
-        if((clicked && l.keepBtn.Contains(mx, my)) || m_input->IsConfirmJustPressed())
-        {
-            m_videoConfirmActive = false;
-            m_confirmedVideo = m_settings;
-            SaveSettings();
-        }
-        else if((clicked && l.revertBtn.Contains(mx, my)) || m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || m_videoConfirmTimer <= 0.0f)
-        {
-            m_videoConfirmActive = false;
-            // Back to the previous window setup, the other video options stay as chosen
-            m_settings.windowMode = m_confirmedVideo.windowMode;
-            m_settings.windowW = m_confirmedVideo.windowW;
-            m_settings.windowH = m_confirmedVideo.windowH;
-            m_settings.fullscreenW = m_confirmedVideo.fullscreenW;
-            m_settings.fullscreenH = m_confirmedVideo.fullscreenH;
-            VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
-            SyncWindowSize();
-            m_confirmedVideo = m_settings;
-            SaveSettings();
-        }
-    }
-
-    void Application::RenderVideoConfirm()
-    {
-        const VideoConfirmLayout l = videoConfirmLayout(m_windowW, m_windowH);
-        m_renderer->FillRectScreen(0, 0, m_windowW, m_windowH, ui::color::Scrim);
-        ui::UiRect content = ui::DrawDialog(*m_renderer, *m_fontRenderer, m_windowW, m_windowH, l.dialog, m_renderConfirm ? _("KEEP THIS RENDER API?") : _("KEEP THESE DISPLAY SETTINGS?"));
-        const int seconds = std::max(0, static_cast<int>(std::ceil(m_videoConfirmTimer)));
-        m_fontRenderer->DrawString(_("The previous settings come back automatically in") + std::string(" ") + std::to_string(seconds) + " " + _("s"), content.CenterX(), content.y + 24, ui::FONT_BODY, ui::color::TextDim, false, Anchor::HCENTER | Anchor::VCENTER);
-        const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
-        ui::DrawButton(*m_renderer, *m_fontRenderer, l.keepBtn, _("KEEP"), ui::ButtonStyle::Primary, l.keepBtn.Contains(mx, my));
-        ui::DrawButton(*m_renderer, *m_fontRenderer, l.revertBtn, _("REVERT"), ui::ButtonStyle::Secondary, l.revertBtn.Contains(mx, my));
-    }
-
-    void Application::RequestRestart()
-    {
-        m_restartRequested = true;
-        m_running = false;
-    }
-
-    void Application::SwitchRenderApi()
-    {
-        const char *active = SDL_GetRendererName(m_sdlRenderer);
-        if(!active || RenderBackend::Configured(m_env) == active)
-            return;
-        m_env.Edit("render")["confirm_from"] = active;
-        m_env.Save();
+void Application::RevertRenderApi()
+{
+    const std::string previous = m_env.Section("render").value("confirm_from", std::string());
+    m_renderConfirm = false;
+    m_videoConfirmActive = false;
+    m_env.Edit("render").erase("confirm_from");
+    RenderBackend::select(m_env, previous); // saves
+    if (!previous.empty())
         RequestRestart();
-    }
-
-    void Application::KeepRenderApi()
-    {
-        m_renderConfirm = false;
-        m_videoConfirmActive = false;
-        m_env.Edit("render").erase("confirm_from");
-        m_env.Save();
-    }
-
-    void Application::RevertRenderApi()
-    {
-        const std::string previous = m_env.Section("render").value("confirm_from", std::string());
-        m_renderConfirm = false;
-        m_videoConfirmActive = false;
-        m_env.Edit("render").erase("confirm_from");
-        RenderBackend::select(m_env, previous); // saves
-        if(!previous.empty())
-            RequestRestart();
-    }
+}
 
 } // namespace OpenArtOfWar

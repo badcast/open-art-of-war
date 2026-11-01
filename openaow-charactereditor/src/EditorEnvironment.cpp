@@ -1,3 +1,4 @@
+#include "core/LoaderResources.hpp"
 #include "CharacterEditor.hpp"
 #include "ConfigMerge.hpp"
 
@@ -237,42 +238,13 @@ void CharacterEditor::DrawEnvironment() {
     if (!font.is_object()) font = Json::object();
     ImGui::TextUnformatted(_("Game font"));
     FieldHint("Game font");
-    ImGui::TextWrapped("%s", _("The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."));
+    ImGui::TextWrapped("%s", _("The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."));
     bool changed = false;
-    static const char* const kKeys[2] = {"regular", "bold"};
-    static const char* const kLabels[2] = {"Regular font file", "Bold font file"};
-    for (int i = 0; i < 2; ++i) {
-        FolderPick& pick = fontPick[i];
-        {
-            std::lock_guard<std::mutex> lock(pick.mutex);
-            if (pick.ready) {
-                font[kKeys[i]] = pick.path;
-                pick.ready = false;
-                changed = true;
-            }
-        }
-        const std::string cur = font.value(kKeys[i], std::string());
-        auto& buf = envTextBuffers[std::string("font.") + kKeys[i]];
-        if (!ImGui::IsAnyItemActive()) std::snprintf(buf.data(), buf.size(), "%s", cur.c_str());
-        ImGui::PushID(i);
-        ImGui::SetNextItemWidth(std::max(200.0f, ImGui::GetContentRegionAvail().x - 190.0f));
-        if (Hinted(ImGui::InputText(_(kLabels[i]), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue), kLabels[i])) {
-            font[kKeys[i]] = std::string(buf.data());
-            changed = true;
-        }
-        ImGui::SameLine();
-        if (Hinted(ImGui::Button(_("Choose...")), "Choose font file")) {
-            static const SDL_DialogFileFilter filters[] = {{"Fonts", "ttf;otf;ttc"}};
-            SDL_ShowOpenFileDialog(OnFontChosen, &pick, window, filters, 1, nullptr, false);
-        }
-        fs::path resolved(cur);
-        if (resolved.is_relative()) resolved = assetsRoot.parent_path() / resolved;
-        std::error_code ec;
-        if (!fs::is_regular_file(resolved, ec)) {
-            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s", _("File not found: a system font is used instead."));
-        }
-        ImGui::PopID();
-    }
+    const std::string root = assetsRoot.string();
+    const std::string regular = OpenArtOfWar::LoaderResources::FontRegular(root);
+    const std::string bold = OpenArtOfWar::LoaderResources::FontBold(root);
+    ImGui::TextDisabled("%s", regular.c_str());
+    ImGui::TextDisabled("%s", bold.c_str());
     struct SizeRow {
         const char* key;
         const char* label;
@@ -282,7 +254,6 @@ void CharacterEditor::DrawEnvironment() {
     static const SizeRow kSizes[] = {{"size_small", "Small text", 13, false}, {"size_medium", "Body text", 16, false},
                                      {"size_large", "Heading", 22, true},     {"size_title", "Title", 30, true},
                                      {"size_hero", "Big title", 48, true}};
-    const std::string regular = font.value("regular", std::string()), bold = font.value("bold", std::string());
     for (const SizeRow& row : kSizes) {
         int size = font.value(row.key, row.def);
         ImGui::PushID(row.key);

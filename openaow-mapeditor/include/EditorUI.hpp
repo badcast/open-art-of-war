@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MapDocument.hpp"
-#include "MapAutoGenerator.hpp"
+#include "MapGenerator.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/TextureManager.hpp"
@@ -145,7 +145,6 @@ private:
 
     // Generator modal data
     GeneratorParams m_genParams;
-    int m_genMode{0};                   // 0 = classic generator, 1 = SmartGenerator
 };
 
 } // namespace OpenArtOfWar

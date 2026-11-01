@@ -1,7 +1,6 @@
 #include "MapEditorApp.hpp"
 #include "MapDocument.hpp"
-#include "MapAutoGenerator.hpp"
-#include "SmartGenerator.hpp"
+#include "MapGenerator.hpp"
 #include "TileCorners.hpp"
 #include "core/AssetStore.hpp"
 #include "game/TileCollision.hpp"
@@ -11,8 +10,8 @@
 #include <string>
 #include <filesystem>
 
-// 3b. SmartGenerator: every symmetry on both tilesets, reproducible, seamless ground, bases joined by open ground
-static bool RunSmartGeneratorTest() {
+// 3b. MapGenerator: every symmetry on both tilesets, reproducible, seamless ground, bases joined by open ground
+static bool RunMapGeneratorTest() {
     using namespace OpenArtOfWar;
     const GeneratorSymmetry symmetries[] = {GeneratorSymmetry::None, GeneratorSymmetry::Rotational180,
                                             GeneratorSymmetry::Diagonal, GeneratorSymmetry::Horizontal,
@@ -23,15 +22,15 @@ static bool RunSmartGeneratorTest() {
             params.width = 72;
             params.height = 56;
             params.tilesetId = tileset;
-            SmartGenerator::OriginalDefaults(params, tileset);
+            MapGenerator::OriginalDefaults(params, tileset);
             params.symmetry = symmetry;
             params.randomSeed = false;
             params.seed = 4242;
 
             MapDocument doc;
             MapDocument again;
-            SmartGenerator::Generate(doc, params);
-            SmartGenerator::Generate(again, params);
+            MapGenerator::Generate(doc, params);
+            MapGenerator::Generate(again, params);
             const TileMap& map = doc.GetTileMap();
             const std::string label = "tileset " + std::to_string(tileset) + ", symmetry " +
                                       std::to_string(static_cast<int>(symmetry));
@@ -46,7 +45,7 @@ static bool RunSmartGeneratorTest() {
                 }
             }
             if (!same) {
-                std::cerr << "[MapEditor-Test] FAILED: SmartGenerator is not reproducible (" << label << ")." << std::endl;
+                std::cerr << "[MapEditor-Test] FAILED: MapGenerator is not reproducible (" << label << ")." << std::endl;
                 return false;
             }
             // Neighbouring ground tiles share their corners (no seams between grass, earth and water)
@@ -68,14 +67,14 @@ static bool RunSmartGeneratorTest() {
                 }
             }
             if (seams > 0) {
-                std::cerr << "[MapEditor-Test] FAILED: SmartGenerator left " << seams << " ground seams (" << label << ")."
+                std::cerr << "[MapEditor-Test] FAILED: MapGenerator left " << seams << " ground seams (" << label << ")."
                           << std::endl;
                 return false;
             }
 
             const float openShare = static_cast<float>(open) / (map.GetWidth() * map.GetHeight());
             if (openShare < 0.3f || openShare > 0.9f) {
-                std::cerr << "[MapEditor-Test] FAILED: SmartGenerator open ground share " << openShare
+                std::cerr << "[MapEditor-Test] FAILED: MapGenerator open ground share " << openShare
                           << " out of range (" << label << ")." << std::endl;
                 return false;
             }
@@ -115,12 +114,12 @@ static bool RunSmartGeneratorTest() {
                 }
             }
             if (!reached) {
-                std::cerr << "[MapEditor-Test] FAILED: SmartGenerator bases are not connected (" << label << ")." << std::endl;
+                std::cerr << "[MapEditor-Test] FAILED: MapGenerator bases are not connected (" << label << ")." << std::endl;
                 return false;
             }
         }
     }
-    std::cout << "  - SmartGenerator: 10 maps reproducible, seamless, bases connected OK" << std::endl;
+    std::cout << "  - MapGenerator: 10 maps reproducible, seamless, bases connected OK" << std::endl;
     return true;
 }
 
@@ -395,31 +394,27 @@ static bool RunEditorSelfTest() {
     }
     std::cout << "  - Undo / Redo history stack OK" << std::endl;
 
-    // 3. Test MapAutoGenerator
-    std::cout << "  - Testing procedural MapAutoGenerator (River Valley, 180-deg symmetry, bases, bridges)..." << std::endl;
+    // 3. Test MapGenerator
+    std::cout << "  - Testing MapGenerator (180-deg symmetry, original shares)..." << std::endl;
     OpenArtOfWar::GeneratorParams params;
     params.width = 64;
     params.height = 48;
     params.tilesetId = 0;
-    params.biome = OpenArtOfWar::GeneratorBiome::RiverValley;
     params.symmetry = OpenArtOfWar::GeneratorSymmetry::Rotational180;
-    params.addRiver = true;
-    params.riverBridges = 3;
-    params.generateBases = true;
-    params.decorDensity = 1;
     params.seed = 4242;
     params.randomSeed = false;
+    OpenArtOfWar::MapGenerator::OriginalDefaults(params, params.tilesetId);
 
-    OpenArtOfWar::MapAutoGenerator::Generate(doc, params);
+    OpenArtOfWar::MapGenerator::Generate(doc, params);
 
     if (doc.GetWidth() != 64 || doc.GetHeight() != 48) {
         std::cerr << "[MapEditor-Test] FAILED: Generated map dimensions mismatch!" << std::endl;
         return false;
     }
-    std::cout << "  - Procedural map generated with " << doc.GetTileMap().GetDecorations().size() << " decorations OK" << std::endl;
+    std::cout << "  - Map generated with " << doc.GetTileMap().GetDecorations().size() << " decorations OK" << std::endl;
 
     if (!RunTileCollisionTest()) return false;
-    if (!RunSmartGeneratorTest()) return false;
+    if (!RunMapGeneratorTest()) return false;
 
     // 4. Test Saving Map to assets/maps/ and verification with Game Engine TileMap
     std::string testOutMap = "assets/maps/test_generated_map.json";
@@ -465,8 +460,8 @@ int main(int argc, char* argv[]) {
                       << "  -h, --help       Show this help message\n"
                       << "  --test           Run automated headless self-tests and exit\n"
                       << "  --test-collision Run only the tile collision self-test\n"
-                      << "  --test-smart     Run only the SmartGenerator self-test\n"
-                      << "  --smart-map FILE [SEED] [TILESET]  Generate a SmartGenerator map to FILE and exit\n"
+                      << "  --test-generator Run only the map generator self-test\n"
+                      << "  --generate-map FILE [SEED] [TILESET]  Generate a map to FILE and exit\n"
                       << "  path_to_map.json Initial map file to open on startup\n"
                       << "\nHotkeys:\n"
                       << "  Ctrl+N           Create new map\n"
@@ -474,7 +469,7 @@ int main(int argc, char* argv[]) {
                       << "  Ctrl+S           Save current map\n"
                       << "  Ctrl+Shift+S     Save map as...\n"
                       << "  Ctrl+Z / Ctrl+Y  Undo / Redo\n"
-                      << "  Ctrl+G           Open procedural map generator\n"
+                      << "  Ctrl+G           Open the map generator\n"
                       << "  G                Toggle grid\n"
                       << "  C                Toggle passability/collision view\n"
                       << "  M                Toggle minimap\n"
@@ -484,21 +479,21 @@ int main(int argc, char* argv[]) {
                       << "  Mouse Wheel      Zoom in/out\n"
                       << std::endl;
             return 0;
-        } else if (arg == "--smart-map" && i + 1 < argc) {
+        } else if (arg == "--generate-map" && i + 1 < argc) {
             OpenArtOfWar::GeneratorParams params;
             params.randomSeed = i + 2 >= argc;
             if (i + 2 < argc) params.seed = static_cast<uint32_t>(std::stoul(argv[i + 2]));
             if (i + 3 < argc) params.tilesetId = std::stoi(argv[i + 3]);
-            OpenArtOfWar::SmartGenerator::OriginalDefaults(params, params.tilesetId);
+            OpenArtOfWar::MapGenerator::OriginalDefaults(params, params.tilesetId);
             params.width = 80;
             params.height = 60;
             OpenArtOfWar::MapDocument doc;
-            OpenArtOfWar::SmartGenerator::Generate(doc, params);
+            OpenArtOfWar::MapGenerator::Generate(doc, params);
             return doc.SaveMap(argv[i + 1]) ? 0 : 1;
         } else if (arg == "--test-collision") {
             return RunTileCollisionTest() ? 0 : 1;
-        } else if (arg == "--test-smart") {
-            return RunSmartGeneratorTest() ? 0 : 1;
+        } else if (arg == "--test-generator") {
+            return RunMapGeneratorTest() ? 0 : 1;
         } else if (arg == "--test") {
             return RunEditorSelfTest() ? 0 : 1;
         } else if (!arg.empty() && arg[0] != '-') {

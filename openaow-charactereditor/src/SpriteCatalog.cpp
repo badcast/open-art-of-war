@@ -164,7 +164,7 @@ bool SpriteCatalog::load(const fs::path& assetsRoot, std::string& error) {
     spriteGroup.clear();
     try {
         const nlohmann::json sp = ReadJson(assetsRoot / "characters" / "sprites.json");
-        gd = ReadJson(assetsRoot / "data" / "graphics_data.json");
+        gd = ReadJson(assetsRoot / "data" / "sprites_graphics.json");
         rawSprites.reserve(sp.size());
         for (const auto& s : sp) {
             RawSprite r;

@@ -13,110 +13,111 @@ extern "C" int _nl_msg_cat_cntr;
 namespace OpenArtOfWar
 {
 
-    std::string Localization::s_currentLanguage = "en";
-    std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
-    bool Localization::s_initialized = false;
+std::string Localization::s_currentLanguage = "en";
+std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
+bool Localization::s_initialized = false;
 
-    void Localization::Init(const std::string &localeDir, const std::string &defaultLang)
+void Localization::Init(const std::string &localeDir, const std::string &defaultLang)
+{
+    std::filesystem::path dir(Assets::RealDirectory(localeDir));
+    if (!std::filesystem::exists(dir))
     {
-        std::filesystem::path dir(Assets::RealDirectory(localeDir));
-        if(!std::filesystem::exists(dir))
+        if (std::filesystem::exists("../" + localeDir))
         {
-            if(std::filesystem::exists("../" + localeDir))
-            {
-                dir = "../" + localeDir;
-            }
-            else if(std::filesystem::exists("locale"))
-            {
-                dir = "locale";
-            }
+            dir = "../" + localeDir;
         }
-
-        try
+        else if (std::filesystem::exists("locale"))
         {
-            if(std::filesystem::exists(dir))
-            {
-                s_localeDir = std::filesystem::absolute(dir).string();
-            }
-            else
-            {
-                s_localeDir = localeDir;
-            }
+            dir = "locale";
         }
-        catch(...)
-        {
-            s_localeDir = localeDir;
-        }
-
-        setlocale(LC_ALL, "");
-#if defined(LC_MESSAGES)
-        setlocale(LC_MESSAGES, "");
-#endif
-
-        bindtextdomain("openaow", s_localeDir.c_str());
-        bind_textdomain_codeset("openaow", "UTF-8");
-        textdomain("openaow");
-
-        s_initialized = true;
-        SetLanguage(defaultLang.empty() ? "en" : defaultLang);
-        std::cout << "[Localization] Initialized gettext domain 'openaow' at " << s_localeDir << ", default language: " << s_currentLanguage << std::endl;
     }
 
-    void Localization::SetLanguage(const std::string &langCode)
+    try
     {
-        s_currentLanguage = (langCode == "ru") ? "ru" : "en";
-#if defined(_WIN32)
-        _putenv_s("LANGUAGE", s_currentLanguage.c_str());
-#else
-        setenv("LANGUAGE", s_currentLanguage.c_str(), 1);
-#endif
-
-#if defined(__GLIBC__)
-        ++_nl_msg_cat_cntr; // Invalidate glibc gettext cache
-#endif
-
-        const char *localeStr = (s_currentLanguage == "ru") ? "ru_RU.UTF-8" : "en_US.UTF-8";
-#if defined(LC_MESSAGES)
-        setlocale(LC_MESSAGES, localeStr);
-#else
-        (void) localeStr; // gettext reads LANGUAGE on platforms without LC_MESSAGES
-#endif
-    }
-
-    const std::string &Localization::GetLanguage()
-    {
-        return s_currentLanguage;
-    }
-
-    void Localization::ToggleLanguage()
-    {
-        if(s_currentLanguage == "en")
+        if (std::filesystem::exists(dir))
         {
-            SetLanguage("ru");
+            s_localeDir = std::filesystem::absolute(dir).string();
         }
         else
         {
-            SetLanguage("en");
+            s_localeDir = localeDir;
         }
     }
-
-    bool Localization::IsRussian()
+    catch (...)
     {
-        return s_currentLanguage == "ru";
+        s_localeDir = localeDir;
     }
 
-    const char *Localization::Tr(const char *msgid)
-    {
-        if(!msgid || !msgid[0])
-            return "";
-        return gettext(msgid);
-    }
+    setlocale(LC_ALL, "");
+#if defined(LC_MESSAGES)
+    setlocale(LC_MESSAGES, "");
+#endif
 
-    std::string Localization::Tr(const std::string &msgid)
+    bindtextdomain("openaow", s_localeDir.c_str());
+    bind_textdomain_codeset("openaow", "UTF-8");
+    textdomain("openaow");
+
+    s_initialized = true;
+    SetLanguage(defaultLang.empty() ? "en" : defaultLang);
+    std::cout << "[Localization] Initialized gettext domain 'openaow' at " << s_localeDir
+              << ", default language: " << s_currentLanguage << std::endl;
+}
+
+void Localization::SetLanguage(const std::string &langCode)
+{
+    s_currentLanguage = (langCode == "ru") ? "ru" : "en";
+#if defined(_WIN32)
+    _putenv_s("LANGUAGE", s_currentLanguage.c_str());
+#else
+    setenv("LANGUAGE", s_currentLanguage.c_str(), 1);
+#endif
+
+#if defined(__GLIBC__)
+    ++_nl_msg_cat_cntr; // Invalidate glibc gettext cache
+#endif
+
+    const char *localeStr = (s_currentLanguage == "ru") ? "ru_RU.UTF-8" : "en_US.UTF-8";
+#if defined(LC_MESSAGES)
+    setlocale(LC_MESSAGES, localeStr);
+#else
+    (void) localeStr; // gettext reads LANGUAGE on platforms without LC_MESSAGES
+#endif
+}
+
+const std::string &Localization::GetLanguage()
+{
+    return s_currentLanguage;
+}
+
+void Localization::ToggleLanguage()
+{
+    if (s_currentLanguage == "en")
     {
-        if(msgid.empty())
-            return "";
-        return std::string(gettext(msgid.c_str()));
+        SetLanguage("ru");
     }
+    else
+    {
+        SetLanguage("en");
+    }
+}
+
+bool Localization::IsRussian()
+{
+    return s_currentLanguage == "ru";
+}
+
+const char *Localization::Tr(const char *msgid)
+{
+    if (!msgid || !msgid[0])
+        return "";
+    return gettext(msgid);
+}
+
+std::string Localization::Tr(const std::string &msgid)
+{
+    if (msgid.empty())
+        return "";
+    return std::string(gettext(msgid.c_str()));
+}
 
 } // namespace OpenArtOfWar

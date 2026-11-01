@@ -2610,11 +2610,11 @@ msgstr "Choose an output folder first."
 msgid "IMPORT SPRITES"
 msgstr "IMPORT SPRITES"
 
-msgid "WARNING: the import writes into assets/sprites and assets/data/graphics_data.json. Your data there may be overwritten."
-msgstr "WARNING: the import writes into assets/sprites and assets/data/graphics_data.json. Your data there may be overwritten."
+msgid "WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."
+msgstr "WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."
 
-msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to graphics_data.json."
-msgstr "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to graphics_data.json."
+msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."
+msgstr "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."
 
 msgid "Import folder"
 msgstr "Import folder"
@@ -2628,8 +2628,8 @@ msgstr "Import sprites"
 msgid "Overwrite assets?"
 msgstr "Overwrite assets?"
 
-msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/graphics_data.json with what is in the folder. Your data there may be lost."
-msgstr "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/graphics_data.json with what is in the folder. Your data there may be lost."
+msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."
+msgstr "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."
 
 msgid "Import and overwrite"
 msgstr "Import and overwrite"
@@ -2658,8 +2658,8 @@ msgstr "Folder with the files of a previous export (the object .json files and t
 msgid "Opens the system dialog to pick the folder to import from."
 msgstr "Opens the system dialog to pick the folder to import from."
 
-msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/graphics_data.json, you are asked first."
-msgstr "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/graphics_data.json, you are asked first."
+msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
+msgstr "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
 
 msgid "Packed atlas"
 msgstr "Packed atlas"
@@ -3436,3 +3436,423 @@ msgstr "Voice volume"
 
 msgid "Volume of the unit replies and the announcer"
 msgstr "Volume of the unit replies and the announcer"
+
+#. Campaign mission dialogue (MissionDialogs.cpp): dialog.<res|conf>.<mission>.title / <line>.speaker / <line>.text
+msgid "dialog.res.1.title"
+msgstr "The Return"
+
+msgid "dialog.res.1.1.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.1.1.text"
+msgstr "Three months ago we left the valleys with nothing but our rifles. The Confederation called it a rout. Today we come back down the old smugglers' trail, and they still think the jungle is empty."
+
+msgid "dialog.res.1.2.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.1.2.text"
+msgstr "Scouts report a Confederation outpost by the river. Fresh concrete, two bunkers, a supply pad. They are building to stay."
+
+msgid "dialog.res.1.3.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.1.3.text"
+msgstr "Then we build faster. Raise a camp on the ridge, gather the volunteers from the villages and burn that outpost before their convoy arrives. Let the valleys hear that we are home."
+
+msgid "dialog.res.1.4.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.1.4.text"
+msgstr "Understood. The flag goes up tonight."
+
+msgid "dialog.res.2.title"
+msgstr "Jungle"
+
+msgid "dialog.res.2.1.speaker"
+msgstr "Captain Paz"
+
+msgid "dialog.res.2.1.text"
+msgstr "Commander, their engineers have cut a road through the rainforest. Heavy columns are already rolling toward our camp."
+
+msgid "dialog.res.2.2.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.2.2.text"
+msgstr "Good. A road through the swamp is a trap they built for themselves. Their tanks will sink to the tracks while our people move between the trees."
+
+msgid "dialog.res.2.3.speaker"
+msgstr "Captain Paz"
+
+msgid "dialog.res.2.3.text"
+msgstr "We do not have the guns to stop all of them."
+
+msgid "dialog.res.2.4.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.2.4.text"
+msgstr "We do not need to stop all of them, only to outlast them. Dig in, wall the approaches, mine the clearings and hold the camp until their waves break."
+
+msgid "dialog.res.3.title"
+msgstr "Sabotage"
+
+msgid "dialog.res.3.1.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.3.1.text"
+msgstr "Our first team never reached the fuel depot. Only their radio operator got out, and she brought the guard schedule with her."
+
+msgid "dialog.res.3.2.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.3.2.text"
+msgstr "Then their sacrifice bought us a door. The depot feeds every Confederation vehicle in the province. Without it their armour is scrap metal."
+
+msgid "dialog.res.3.3.speaker"
+msgstr "Engineer Benito"
+
+msgid "dialog.res.3.3.text"
+msgstr "The charges are ready, but the detonator only works at short range. Someone has to walk right up to their fence."
+
+msgid "dialog.res.3.4.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.3.4.text"
+msgstr "I will lead the second team myself. Quietly through their rear, and when the depot goes up, everyone attacks."
+
+msgid "dialog.res.4.title"
+msgstr "The Gorge"
+
+msgid "dialog.res.4.1.speaker"
+msgstr "Captain Paz"
+
+msgid "dialog.res.4.1.text"
+msgstr "The fuel fire is still burning. The Confederation is pulling a relief column through the mountain gorge: trucks, tanks and a mobile command post."
+
+msgid "dialog.res.4.2.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.4.2.text"
+msgstr "The gorge is narrow and they cannot turn around in it. Whoever holds the walls of that gorge decides who leaves it."
+
+msgid "dialog.res.4.3.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.4.3.text"
+msgstr "Their command post carries the maps of every garrison in Peru. If it gets through, they will know where to hit us next."
+
+msgid "dialog.res.4.4.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.4.4.text"
+msgstr "Then nothing gets through. Take positions above the road and let the column come to us."
+
+msgid "dialog.res.5.title"
+msgstr "Matter of Seconds"
+
+msgid "dialog.res.5.1.speaker"
+msgstr "Captain Paz"
+
+msgid "dialog.res.5.1.text"
+msgstr "A Confederation signal station sits 50 kilometres to the northeast of the nearest garrison. Their engineers are assembling the antenna right now."
+
+msgid "dialog.res.5.2.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.5.2.text"
+msgstr "Once it is up, they will call in every gunship on the continent. We strike before the first message leaves the mast."
+
+msgid "dialog.res.5.3.speaker"
+msgstr "Engineer Benito"
+
+msgid "dialog.res.5.3.text"
+msgstr "I cut their cable last night. That buys us a little time, but not much."
+
+msgid "dialog.res.5.4.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.5.4.text"
+msgstr "Then every second counts. Move!"
+
+msgid "dialog.res.6.title"
+msgstr "Radio Station"
+
+msgid "dialog.res.6.1.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.6.1.text"
+msgstr "We pulled a working radio set with their cipher keys out of the station ruins. With it we could read every Confederation order."
+
+msgid "dialog.res.6.2.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.6.2.text"
+msgstr "Only if it reaches our base. Captain Paz is bringing it in an armoured carrier across open ground."
+
+msgid "dialog.res.6.3.speaker"
+msgstr "Captain Paz"
+
+msgid "dialog.res.6.3.text"
+msgstr "They know what we carry. Every patrol in the region is hunting us."
+
+msgid "dialog.res.6.4.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.6.4.text"
+msgstr "Then we will draw them onto us. Hold the base, Captain, and bring that radio home in one piece."
+
+msgid "dialog.res.7.title"
+msgstr "Lima"
+
+msgid "dialog.res.7.1.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.7.1.text"
+msgstr "Twenty years ago the Confederation raised its flag over Lima and called it peace. Tonight we bring the war back to its doorstep."
+
+msgid "dialog.res.7.2.speaker"
+msgstr "Colonel Mayta"
+
+msgid "dialog.res.7.2.text"
+msgstr "The intercepted orders confirm it: every remaining garrison has fallen back to defend the capital."
+
+msgid "dialog.res.7.3.speaker"
+msgstr "Commander Quispe"
+
+msgid "dialog.res.7.3.text"
+msgstr "So they are all in one place. For everyone we lost in the jungle, for everyone still waiting in the villages: build, arm and take the city."
+
+msgid "dialog.res.7.4.speaker"
+msgstr "All"
+
+msgid "dialog.res.7.4.text"
+msgstr "For a free Peru!"
+
+msgid "dialog.conf.1.title"
+msgstr "Pukalpa"
+
+msgid "dialog.conf.1.1.speaker"
+msgstr "Narrator"
+
+msgid "dialog.conf.1.1.text"
+msgstr "2038. For twenty years the World Confederation has kept order on every continent. In the east of Peru, near the town of Pukalpa, that order has started to crack."
+
+msgid "dialog.conf.1.2.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.1.2.text"
+msgstr "General Hale, you were due to report an hour ago. The Senate wants this flare-up gone before the press hears about it."
+
+msgid "dialog.conf.1.3.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.1.3.text"
+msgstr "The rains washed out the roads, Senator. We are deploying now. Without satellite cover we will have to see this jungle with our own eyes."
+
+msgid "dialog.conf.1.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.1.4.text"
+msgstr "Lieutenant Kade, build the base, keep the perimeter tight and wait for the scouts. The rebels will test us before we are ready."
+
+msgid "dialog.conf.2.title"
+msgstr "Ukayali Shore"
+
+msgid "dialog.conf.2.1.speaker"
+msgstr "Lieutenant Kade"
+
+msgid "dialog.conf.2.1.text"
+msgstr "General, the scouts found a rebel camp on the Ukayali shore, 20 kilometres north of Pukalpa. Boats bring them food and fuel every night."
+
+msgid "dialog.conf.2.2.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.2.2.text"
+msgstr "Can we cut the river off?"
+
+msgid "dialog.conf.2.3.speaker"
+msgstr "Lieutenant Kade"
+
+msgid "dialog.conf.2.3.text"
+msgstr "Not from here. The bank is solid jungle. We go straight at the camp, or we let them grow."
+
+msgid "dialog.conf.2.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.2.4.text"
+msgstr "Then we go now, while they are still counting rifles. Their approaches will be mined: send the engineers first."
+
+msgid "dialog.conf.3.title"
+msgstr "Capture of Miguel"
+
+msgid "dialog.conf.3.1.speaker"
+msgstr "Operator Yara"
+
+msgid "dialog.conf.3.1.text"
+msgstr "General, prisoners from the river camp say the rebel leader is hiding at a jungle headquarters upstream."
+
+msgid "dialog.conf.3.2.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.3.2.text"
+msgstr "Prisoners say a lot of things. It could be bait to pull us deeper into the forest."
+
+msgid "dialog.conf.3.3.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.3.3.text"
+msgstr "Bait or not, the Senate wants a name in custody. A captured leader ends a rebellion faster than a hundred battles."
+
+msgid "dialog.conf.3.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.3.4.text"
+msgstr "Understood. Kade, the factory and the tech centre are yours. Heavy armour will not pass these trails: take their headquarters with what can."
+
+msgid "dialog.conf.4.title"
+msgstr "Outpost"
+
+msgid "dialog.conf.4.1.speaker"
+msgstr "Lieutenant Kade"
+
+msgid "dialog.conf.4.1.text"
+msgstr "The headquarters was empty, General. He got away by the river while we were breaking the gates."
+
+msgid "dialog.conf.4.2.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.4.2.text"
+msgstr "Then he is running toward the mountains. Yara, raise the forward squad."
+
+msgid "dialog.conf.4.3.speaker"
+msgstr "Operator Yara"
+
+msgid "dialog.conf.4.3.text"
+msgstr "Contact for a moment... gunfire, then something about a minefield. The channel is dead."
+
+msgid "dialog.conf.4.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.4.4.text"
+msgstr "So they are waiting for us at the pass. All units, battle order: wipe out that outpost and open the road."
+
+msgid "dialog.conf.5.title"
+msgstr "Meat Grinder"
+
+msgid "dialog.conf.5.1.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.5.1.text"
+msgstr "Senator, we took the outpost on schedule. We are digging in."
+
+msgid "dialog.conf.5.2.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.5.2.text"
+msgstr "The new satellite pictures are bad, General. Rebel units from the south are converging on your position. Many more than we counted."
+
+msgid "dialog.conf.5.3.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.5.3.text"
+msgstr "How long until reinforcements?"
+
+msgid "dialog.conf.5.4.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.5.4.text"
+msgstr "They are coming over the mountains. Hold until they arrive, whatever it costs."
+
+msgid "dialog.conf.6.title"
+msgstr "Gorge Assault"
+
+msgid "dialog.conf.6.1.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.6.1.text"
+msgstr "You held, General. The Senate has noticed. We have located the rebels' main fortress at the end of the gorge."
+
+msgid "dialog.conf.6.2.speaker"
+msgstr "Lieutenant Kade"
+
+msgid "dialog.conf.6.2.text"
+msgstr "The approaches are walled and mined. A frontal assault would cost us the whole brigade."
+
+msgid "dialog.conf.6.3.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.6.3.text"
+msgstr "Then we will not walk in. The tech centre can give us the Grad rocket launchers: in siege mode they reach over any wall."
+
+msgid "dialog.conf.6.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.6.4.text"
+msgstr "Build a solid defence first, then break the fortress from range."
+
+msgid "dialog.conf.7.title"
+msgstr "Last Stand"
+
+msgid "dialog.conf.7.1.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.7.1.text"
+msgstr "This is the hour, General. The rebels have pulled every last fighter into their final base. A reinforcement group is on its way to you."
+
+msgid "dialog.conf.7.2.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.7.2.text"
+msgstr "We are ready, Senator. Twenty years of order are not going to end in this jungle."
+
+msgid "dialog.conf.7.3.speaker"
+msgstr "Senator Brandt"
+
+msgid "dialog.conf.7.3.text"
+msgstr "Finish it, and the main peacekeeping army will take over from you."
+
+msgid "dialog.conf.7.4.speaker"
+msgstr "General Hale"
+
+msgid "dialog.conf.7.4.text"
+msgstr "For the Confederation. All units, advance!"
+
+msgid "ACKNOWLEDGED"
+msgstr "ACKNOWLEDGED"
+
+#. Network screen
+msgid "Type a message"
+msgstr "Type a message"
+
+msgid "Your name in the game"
+msgstr "Your name in the game"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Direct connection (the host forwards UDP port 38100)"
+msgstr "Direct connection (the host forwards UDP port 38100)"
+
+msgid "Address or address:port, e.g. 192.168.1.10"
+msgstr "Address or address:port, e.g. 192.168.1.10"
+
+msgid "6 characters"
+msgstr "6 characters"
+
+msgid "CREATE"
+msgstr "CREATE"
+
+msgid "Pick a game in the list first"
+msgstr "Pick a game in the list first"
+
+msgid "the game through the server"
+msgstr "the game through the server"
+
+msgid "Connecting to"
+msgstr "Connecting to"
+
+msgid "No answer: check the address, and that the host forwards UDP port 38100"
+msgstr "No answer: check the address, and that the host forwards UDP port 38100"
+
+
+msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
+msgstr "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."

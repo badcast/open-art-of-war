@@ -13,527 +13,636 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <map>
+#include <tuple>
 
 namespace OpenArtOfWar
 {
 
-    namespace
+namespace
+{
+
+bool Alive(const Entity *e)
+{
+    return e && e->alive && e->state != ActionState::Die;
+}
+
+// FNV-1a, 64 bit
+struct Hasher
+{
+    uint64_t h {0xcbf29ce484222325ull};
+    void Bytes(const void *p, size_t n)
     {
-
-        bool Alive(const Entity *e)
+        const auto *b = static_cast<const uint8_t *>(p);
+        for (size_t i = 0; i < n; ++i)
         {
-            return e && e->alive && e->state != ActionState::Die;
-        }
-
-        // FNV-1a, 64 bit
-        struct Hasher
-        {
-            uint64_t h {0xcbf29ce484222325ull};
-            void Bytes(const void *p, size_t n)
-            {
-                const auto *b = static_cast<const uint8_t *>(p);
-                for(size_t i = 0; i < n; ++i)
-                {
-                    h ^= b[i];
-                    h *= 0x100000001b3ull;
-                }
-            }
-            void I32(int32_t v)
-            {
-                Bytes(&v, sizeof v);
-            }
-            void F32(float v)
-            { // the exact bits: peers in sync have bit-identical floats
-                uint32_t u;
-                std::memcpy(&u, &v, sizeof u);
-                Bytes(&u, sizeof u);
-            }
-        };
-
-    } // namespace
-
-    const AITacticsConfig &Simulation::GroupTactics()
-    {
-        // Cohesion rules for player control groups: the column keeps within the leash and gathers at
-        // chokepoints, but never retreats on its own
-        static const AITacticsConfig t = []
-        {
-            AITacticsConfig c;
-            c.leashTiles = 3.0f;
-            c.leashPerUnit = 0.35f;
-            c.corridorLeashFactor = 1.6f;
-            c.waitAtChokepoints = true;
-            c.preChokeHoldSeconds = 1.0f;
-            c.syncToSlowest = false;
-            c.armorFront = false;
-            c.meleeRangedPairs = false;
-            c.retreatLossRatio = 0.0f;
-            c.stragglerTimeoutSeconds = 6.0f;
-            c.marchStrideTiles = 5;
-            return c;
-        }();
-        return t;
-    }
-
-    void Simulation::Reset(uint32_t seed)
-    {
-        Utility::rng().Reseed(seed);
-        m_tick = 0;
-        m_economyMask = 0;
-        m_pending.clear();
-        m_log.clear();
-        for(auto &s : m_squads)
-            s.Clear();
-        for(auto &r : m_research)
-            r = ResearchProgress {};
-        m_events.clear();
-    }
-
-    void Simulation::startMatch(const MatchSetup &setup)
-    {
-        Reset(setup.seed);
-        for(PlayerId p = 0; p < kMaxPlayers; ++p)
-        {
-            if(!setup.slots[p].active || p == setup.local)
-                continue;
-            m_economies[p].Reset(setup.startingCredits);
-            m_economies[p].SetPlayer(p);
-            m_economyMask |= 1u << p;
+            h ^= b[i];
+            h *= 0x100000001b3ull;
         }
     }
-
-    Economy &Simulation::EconomyOf(PlayerId player, SimContext &ctx)
+    void I32(int32_t v)
     {
-        if(player < kMaxPlayers && (m_economyMask >> player) & 1u)
-            return m_economies[player];
-        return ctx.economy;
+        Bytes(&v, sizeof v);
     }
+    void F32(float v)
+    { // the exact bits: peers in sync have bit-identical floats
+        uint32_t u;
+        std::memcpy(&u, &v, sizeof u);
+        Bytes(&u, sizeof u);
+    }
+};
 
-    void Simulation::UpdateEconomies(float dt, SimContext &ctx)
+} // namespace
+
+const AITacticsConfig &Simulation::GroupTactics()
+{
+    // Cohesion rules for player control groups: the column keeps within the leash and gathers at
+    // chokepoints, but never retreats on its own
+    static const AITacticsConfig t = [] {
+        AITacticsConfig c;
+        c.leashTiles = 3.0f;
+        c.leashPerUnit = 0.35f;
+        c.corridorLeashFactor = 1.6f;
+        c.waitAtChokepoints = true;
+        c.preChokeHoldSeconds = 1.0f;
+        c.syncToSlowest = false;
+        c.armorFront = false;
+        c.meleeRangedPairs = false;
+        c.retreatLossRatio = 0.0f;
+        c.stragglerTimeoutSeconds = 6.0f;
+        c.marchStrideTiles = 5;
+        return c;
+    }();
+    return t;
+}
+
+void Simulation::Reset(uint32_t seed)
+{
+    Utility::rng().Reseed(seed);
+    m_tick = 0;
+    m_economyMask = 0;
+    m_pending.clear();
+    m_log.clear();
+    for (auto &s : m_squads)
+        s.Clear();
+    for (auto &r : m_research)
+        r = ResearchProgress {};
+    m_events.clear();
+}
+
+void Simulation::startMatch(const MatchSetup &setup)
+{
+    Reset(setup.seed);
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
     {
-        // Every economy in slot order, the local one (SimContext::economy) at its own slot. Economies create
-        // units: updating the local one first gave the new units other ids on every computer (desync, and the
-        // owner's later commands no longer reached its units)
-        bool localDone = false;
-        for(PlayerId p = 0; p < kMaxPlayers; ++p)
+        if (!setup.slots[p].active || p == setup.local)
+            continue;
+        m_economies[p].Reset(setup.startingCredits);
+        m_economies[p].SetPlayer(p);
+        m_economyMask |= 1u << p;
+    }
+}
+
+Economy &Simulation::EconomyOf(PlayerId player, SimContext &ctx)
+{
+    if (player < kMaxPlayers && (m_economyMask >> player) & 1u)
+        return m_economies[player];
+    return ctx.economy;
+}
+
+void Simulation::UpdateEconomies(float dt, SimContext &ctx)
+{
+    // Every economy in slot order, the local one (SimContext::economy) at its own slot. Economies create
+    // units: updating the local one first gave the new units other ids on every computer (desync, and the
+    // owner's later commands no longer reached its units)
+    bool localDone = false;
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if ((m_economyMask >> p) & 1u)
+            m_economies[p].Update(dt, ctx.entities, ctx.map, ctx.pathfinder);
+        else if (!localDone && p == ctx.economy.player())
         {
-            if((m_economyMask >> p) & 1u)
-                m_economies[p].Update(dt, ctx.entities, ctx.map, ctx.pathfinder);
-            else if(!localDone && p == ctx.economy.player())
-            {
-                ctx.economy.Update(dt, ctx.entities, ctx.map, ctx.pathfinder);
-                localDone = true;
-            }
-        }
-        if(!localDone)
             ctx.economy.Update(dt, ctx.entities, ctx.map, ctx.pathfinder);
-    }
-
-    void Simulation::Issue(SimCommand command)
-    {
-        if(m_sink)
-        {
-            m_sink(std::move(command));
-            return;
+            localDone = true;
         }
-        Schedule(m_tick, std::move(command));
     }
+    if (!localDone)
+        ctx.economy.Update(dt, ctx.entities, ctx.map, ctx.pathfinder);
+}
 
-    void Simulation::Schedule(uint32_t tick, SimCommand command)
+void Simulation::Issue(SimCommand command)
+{
+    if (m_sink)
     {
-        std::sort(command.ids.begin(), command.ids.end());
-        command.ids.erase(std::unique(command.ids.begin(), command.ids.end()), command.ids.end());
-        m_pending.push_back({tick, std::move(command)});
+        m_sink(std::move(command));
+        return;
     }
+    Schedule(m_tick, std::move(command));
+}
 
-    void Simulation::ApplyCommands(SimContext &ctx)
+void Simulation::Schedule(uint32_t tick, SimCommand command)
+{
+    std::sort(command.ids.begin(), command.ids.end());
+    command.ids.erase(std::unique(command.ids.begin(), command.ids.end()), command.ids.end());
+    m_pending.push_back({tick, std::move(command)});
+}
+
+void Simulation::ApplyCommands(SimContext &ctx)
+{
+    // Due commands in a fixed order: by tick, then by player; issue order within a player (stable sort)
+    std::vector<TimedCommand> due;
+    auto split = std::stable_partition(
+        m_pending.begin(), m_pending.end(), [this](const TimedCommand &t) { return t.tick > m_tick; });
+    due.assign(std::make_move_iterator(split), std::make_move_iterator(m_pending.end()));
+    m_pending.erase(split, m_pending.end());
+    std::stable_sort(due.begin(), due.end(), [](const TimedCommand &l, const TimedCommand &r) {
+        if (l.tick != r.tick)
+            return l.tick < r.tick;
+        return l.command.player < r.command.player;
+    });
+    for (TimedCommand &t : due)
     {
-        // Due commands in a fixed order: by tick, then by player; issue order within a player (stable sort)
-        std::vector<TimedCommand> due;
-        auto split = std::stable_partition(m_pending.begin(), m_pending.end(), [this](const TimedCommand &t) { return t.tick > m_tick; });
-        due.assign(std::make_move_iterator(split), std::make_move_iterator(m_pending.end()));
-        m_pending.erase(split, m_pending.end());
-        std::stable_sort(
-            due.begin(),
-            due.end(),
-            [](const TimedCommand &l, const TimedCommand &r)
+        Apply(t.command, ctx);
+        if (m_recording)
+            m_log.push_back({m_tick, std::move(t.command)});
+    }
+}
+
+std::vector<int> Simulation::OwnUnits(const SimCommand &cmd, const SimContext &ctx) const
+{
+    std::vector<int> out;
+    for (uint32_t id : cmd.ids)
+    {
+        const Entity *e = ctx.entities.GetEntity(static_cast<int>(id));
+        if (e && e->alive && !e->isBuilding && (cmd.debug || e->owner == cmd.player))
+            out.push_back(static_cast<int>(id));
+    }
+    return out;
+}
+
+bool Simulation::MarchAsGroup(
+    PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx)
+{
+    if (unitIds.size() < 2 || player >= kMaxPlayers)
+        return false;
+    AISquadController &squads = m_squads[player];
+    const int squadId = squads.CreateSquad(unitIds, tileX, tileY, 0, ctx.entities, ctx.pathfinder, GroupTactics());
+    AISquad *sq = squads.FindSquad(squadId);
+    if (!sq)
+        return false;
+    sq->attackMove = attackMove;
+    sq->playerSquad = true;
+    // Units stop what they were doing; the squad orders the first leg on its next tick
+    for (int id : unitIds)
+    {
+        if (Unit *u = ctx.entities.GetUnit(id))
+        {
+            u->ClearPathState();
+            u->ClearMoveTarget();
+            u->targetEntityId = 0;
+        }
+    }
+    return true;
+}
+
+void Simulation::OrderUnitsAt(
+    PlayerId player, const std::vector<int> &units, int kind, int x, int y, bool asGroup, SimContext &ctx)
+{
+    EntityManager &entities = ctx.entities;
+    TileMap &map = ctx.map;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    const float wx = static_cast<float>(x), wy = static_cast<float>(y);
+    const int clickedId = entities.GetUnitAt(wx, wy);
+    const int destX = x / TILE_WIDTH, destY = y / TILE_HEIGHT;
+    if (static_cast<OrderKind>(kind) == OrderKind::AttackMove)
+    {
+        if (clickedId > 0)
+        {
+            const Entity *target = entities.GetEntity(clickedId);
+            if (target && Players::Hostile(target->owner, player)
+                && entities.IsEntityVisibleToPlayer(*target, player, map))
             {
-                if(l.tick != r.tick)
-                    return l.tick < r.tick;
-                return l.command.player < r.command.player;
-            });
-        for(TimedCommand &t : due)
-        {
-            Apply(t.command, ctx);
-            if(m_recording)
-                m_log.push_back({m_tick, std::move(t.command)});
-        }
-    }
-
-    std::vector<int> Simulation::OwnUnits(const SimCommand &cmd, const SimContext &ctx) const
-    {
-        std::vector<int> out;
-        for(uint32_t id : cmd.ids)
-        {
-            const Entity *e = ctx.entities.GetEntity(static_cast<int>(id));
-            if(e && e->alive && !e->isBuilding && (cmd.debug || e->owner == cmd.player))
-                out.push_back(static_cast<int>(id));
-        }
-        return out;
-    }
-
-    bool Simulation::MarchAsGroup(PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx)
-    {
-        if(unitIds.size() < 2 || player >= kMaxPlayers)
-            return false;
-        AISquadController &squads = m_squads[player];
-        const int squadId = squads.CreateSquad(unitIds, tileX, tileY, 0, ctx.entities, ctx.pathfinder, GroupTactics());
-        AISquad *sq = squads.FindSquad(squadId);
-        if(!sq)
-            return false;
-        sq->attackMove = attackMove;
-        sq->playerSquad = true;
-        // Units stop what they were doing; the squad orders the first leg on its next tick
-        for(int id : unitIds)
-        {
-            if(Unit *u = ctx.entities.GetUnit(id))
+                entities.IssueAttackOrder(units, clickedId, &pathfinder);
+            }
+            else
             {
-                u->ClearPathState();
-                u->ClearMoveTarget();
-                u->targetEntityId = 0;
+                entities.IssueAttackMoveOrder(units, destX, destY, pathfinder);
             }
         }
-        return true;
-    }
-
-    void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
-    {
-        EntityManager &entities = ctx.entities;
-        TileMap &map = ctx.map;
-        Pathfinder &pathfinder = ctx.pathfinder;
-        if(cmd.player >= kMaxPlayers)
-            return;
-        Economy &economy = EconomyOf(cmd.player, ctx);
-        const Faction faction = Players::FactionOf(cmd.player);
-
-        switch(cmd.type)
+        else if (map.GetWall(destX, destY) > 0 && Players::Hostile(map.GetWallOwner(destX, destY), player))
         {
-            case CommandType::OrderAt:
+            entities.IssueAttackWallOrder(units, destX, destY, pathfinder);
+        }
+        else if (!(asGroup && MarchAsGroup(player, units, destX, destY, true, ctx)))
+        {
+            entities.IssueAttackMoveOrder(units, destX, destY, pathfinder);
+        }
+    }
+    else
+    {
+        if (clickedId > 0)
+        {
+            const Entity *target = entities.GetEntity(clickedId);
+            const Entity *first = entities.GetEntity(units[0]);
+            if (target && Players::Hostile(target->owner, first->owner)
+                && entities.IsEntityVisibleToPlayer(*target, first->owner, map))
             {
-                const std::vector<int> units = OwnUnits(cmd, ctx);
-                m_squads[cmd.player].ReleaseUnits(units, entities);
-                if(units.empty())
-                    return;
-                const float wx = static_cast<float>(cmd.x), wy = static_cast<float>(cmd.y);
-                const int clickedId = entities.GetUnitAt(wx, wy);
-                const int destX = cmd.x / TILE_WIDTH, destY = cmd.y / TILE_HEIGHT;
-                const bool asGroup = cmd.b != 0;
-                if(static_cast<OrderKind>(cmd.a) == OrderKind::AttackMove)
-                {
-                    if(clickedId > 0)
-                    {
-                        const Entity *target = entities.GetEntity(clickedId);
-                        if(target && Players::Hostile(target->owner, cmd.player) && entities.IsEntityVisibleToPlayer(*target, cmd.player, map))
-                        {
-                            entities.IssueAttackOrder(units, clickedId, &pathfinder);
-                        }
-                        else
-                        {
-                            entities.IssueAttackMoveOrder(units, destX, destY, pathfinder);
-                        }
-                    }
-                    else if(map.GetWall(destX, destY) > 0 && Players::Hostile(map.GetWallOwner(destX, destY), cmd.player))
-                    {
-                        entities.IssueAttackWallOrder(units, destX, destY, pathfinder);
-                    }
-                    else if(!(asGroup && MarchAsGroup(cmd.player, units, destX, destY, true, ctx)))
-                    {
-                        entities.IssueAttackMoveOrder(units, destX, destY, pathfinder);
-                    }
-                }
-                else
-                {
-                    if(clickedId > 0)
-                    {
-                        const Entity *target = entities.GetEntity(clickedId);
-                        const Entity *first = entities.GetEntity(units[0]);
-                        if(target && Players::Hostile(target->owner, first->owner) && entities.IsEntityVisibleToPlayer(*target, first->owner, map))
-                        {
-                            entities.IssueAttackOrder(units, clickedId, &pathfinder);
-                        }
-                        else
-                        {
-                            entities.IssueMoveOrder(units, destX, destY, pathfinder, false);
-                        }
-                    }
-                    else if(map.GetWall(destX, destY) > 0)
-                    {
-                        // Clicked right on a wall: attack it (even an own one, when ordered so)
-                        entities.IssueAttackWallOrder(units, destX, destY, pathfinder);
-                    }
-                    else if(!(asGroup && MarchAsGroup(cmd.player, units, destX, destY, true, ctx)))
-                    {
-                        // (a control group marches like an AI wave: it fights whatever it meets on the way)
-                        entities.IssueMoveOrder(units, destX, destY, pathfinder, false);
-                    }
-                }
-                break;
+                entities.IssueAttackOrder(units, clickedId, &pathfinder);
             }
-            case CommandType::AttackWall:
+            else
             {
-                const std::vector<int> units = OwnUnits(cmd, ctx);
-                m_squads[cmd.player].ReleaseUnits(units, entities);
-                if(!units.empty())
-                    entities.IssueAttackWallOrder(units, cmd.x, cmd.y, pathfinder);
-                break;
+                entities.IssueMoveOrder(units, destX, destY, pathfinder, false);
             }
-            case CommandType::SetRally:
-                for(uint32_t id : cmd.ids)
-                {
-                    Building *b = entities.GetBuilding(static_cast<int>(id));
-                    if(b && b->alive && b->IsUnitProducer() && b->owner == cmd.player)
-                    {
-                        b->rallyTileX = std::clamp(cmd.x / TILE_WIDTH, 0, map.GetWidth() - 1);
-                        b->rallyTileY = std::clamp(cmd.y / TILE_HEIGHT, 0, map.GetHeight() - 1);
-                    }
-                }
-                break;
-            case CommandType::ToggleSiege:
-                entities.ToggleSiegeMode(OwnUnits(cmd, ctx));
-                break;
-            case CommandType::Stop:
-                for(int id : OwnUnits(cmd, ctx))
+        }
+        else if (map.GetWall(destX, destY) > 0)
+        {
+            // Clicked right on a wall: attack it (even an own one, when ordered so)
+            entities.IssueAttackWallOrder(units, destX, destY, pathfinder);
+        }
+        else if (!(asGroup && MarchAsGroup(player, units, destX, destY, true, ctx)))
+        {
+            // (a control group marches like an AI wave: it fights whatever it meets on the way)
+            entities.IssueMoveOrder(units, destX, destY, pathfinder, false);
+        }
+    }
+    // The order line ends at the clicked point
+    for (int id : units)
+    {
+        if (Unit *u = entities.GetUnit(id))
+        {
+            u->orderX = x;
+            u->orderY = y;
+        }
+    }
+}
+
+void Simulation::ClearOrders(const std::vector<int> &units, EntityManager &entities)
+{
+    for (int id : units)
+    {
+        if (Unit *u = entities.GetUnit(id))
+        {
+            u->orderQueue.clear();
+            u->orderX = u->orderY = -1;
+        }
+    }
+}
+
+void Simulation::UpdateOrderQueues(SimContext &ctx)
+{
+    // Units whose order is done take the next queued one; units of a player that start the same order this tick go
+    // together (one formation). Entity order and the ordered map keep it the same on every peer.
+    std::map<std::tuple<PlayerId, int, int, int>, std::vector<int>> starting;
+    for (auto &e : ctx.entities.GetAllEntities())
+    {
+        Unit *u = e.AsUnit();
+        if (!u || !u->alive || u->state == ActionState::Die)
+            continue;
+        if (u->orderQueue.empty())
+        {
+            if (u->orderX >= 0 && u->OrderFinished())
+                u->orderX = u->orderY = -1; // arrived: no line any more
+            continue;
+        }
+        if (u->owner >= kMaxPlayers || !u->OrderFinished() || m_squads[u->owner].IsSquadMember(u->id))
+            continue;
+        const Unit::QueuedOrder next = u->orderQueue.front();
+        u->orderQueue.erase(u->orderQueue.begin());
+        starting[{u->owner, next.kind, next.x, next.y}].push_back(u->id);
+    }
+    for (auto &[key, ids] : starting)
+    {
+        std::sort(ids.begin(), ids.end());
+        OrderUnitsAt(std::get<0>(key), ids, std::get<1>(key), std::get<2>(key), std::get<3>(key), false, ctx);
+    }
+}
+
+void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
+{
+    EntityManager &entities = ctx.entities;
+    TileMap &map = ctx.map;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    if (cmd.player >= kMaxPlayers)
+        return;
+    Economy &economy = EconomyOf(cmd.player, ctx);
+    const Faction faction = Players::FactionOf(cmd.player);
+
+    switch (cmd.type)
+    {
+        case CommandType::OrderAt:
+        {
+            std::vector<int> units = OwnUnits(cmd, ctx);
+            const bool queued = (cmd.b & 2) != 0; // Shift: after the orders the units already have
+            const bool asGroup = (cmd.b & 1) != 0;
+            if (queued)
+            {
+                // Busy units keep their order and line this one up; idle ones start it now (alone, no march)
+                std::vector<int> now;
+                for (int id : units)
                 {
                     Unit *u = entities.GetUnit(id);
-                    if(!u)
+                    if (!u)
                         continue;
-                    u->path.clear();
-                    u->pathIndex = 0;
-                    u->targetEntityId = 0;
-                    u->targetWallTileX = -1;
-                    u->targetWallTileY = -1;
-                    u->isAttackMoving = false;
-                    u->groupOrder = false;
-                    u->holdPosition = false;
-                    u->waitingForPath = false;
-                    u->state = ActionState::Idle;
+                    if (u->orderQueue.empty() && u->OrderFinished() && !m_squads[cmd.player].IsSquadMember(id))
+                        now.push_back(id);
+                    else if (u->orderQueue.size() < kMaxQueuedOrders)
+                        u->orderQueue.push_back({cmd.a, cmd.x, cmd.y});
                 }
-                break;
-            case CommandType::HoldPosition:
-                for(int id : OwnUnits(cmd, ctx))
-                {
-                    Unit *u = ctx.entities.GetUnit(id);
-                    if(!u)
-                        continue;
-                    u->path.clear();
-                    u->pathIndex = 0;
-                    u->isAttackMoving = false;
-                    u->groupOrder = false;
-                    u->holdPosition = true;
-                    u->ClearMoveTarget();
-                    u->waitingForPath = false;
-                    u->state = ActionState::Idle;
-                }
-                break;
-            case CommandType::PlaceBuilding:
-            {
-                // cmd.a is the canonical blueprint slot; the building is the one of the ordering player's faction
-                // (looking it up in the local player's menu gave the other side's buildings)
-                const BuildingBlueprint *found = EntityManager::FindBlueprint(faction, cmd.a);
-                if(!found)
-                    return;
-                const auto &bp = *found;
-                if(!entities.CanPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
-                    return;
-                if(!economy.CanAfford(bp.creditCost))
-                    return;
-                economy.SpendCredits(bp.creditCost);
-                if(bp.isWall)
-                {
-                    map.SetWall(cmd.x, cmd.y, faction, 100, cmd.player);
-                }
-                else if(entities.SpawnBuildingByIndex(bp.buildingIndex, cmd.x, cmd.y, faction, 0.0f, cmd.player) > 0)
-                {
-                    for(int ty = cmd.y; ty < cmd.y + bp.height && ty < map.GetHeight(); ++ty)
-                    {
-                        for(int tx = cmd.x; tx < cmd.x + bp.width && tx < map.GetWidth(); ++tx)
-                            map.SetPassable(tx, ty, false);
-                    }
-                }
+                if (!now.empty())
+                    OrderUnitsAt(cmd.player, now, cmd.a, cmd.x, cmd.y, false, ctx);
                 break;
             }
-            case CommandType::Produce:
-            {
-                const Building *b = entities.GetBuilding(cmd.b);
-                if(!Alive(b) || b->owner != cmd.player || !b->IsUnitProducer() || b->buildProgress < 1.0f)
-                    return;
-                const auto *cfg = entities.GetUnitConfig(cmd.a);
-                economy.QueueUnit(cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities);
-                break;
-            }
-            case CommandType::CancelProduce:
-            {
-                const Building *b = entities.GetBuilding(cmd.b);
-                if(!b || b->owner != cmd.player)
-                    return;
-                economy.CancelUnit(cmd.a, cmd.b, entities);
-                break;
-            }
-            case CommandType::StartResearch:
-            {
-                ResearchProgress &r = m_research[cmd.player];
-                if(cmd.a < 0 || cmd.a >= kResearchCount || r.active >= 0)
-                    return;
-                if(!HasResearchBuilding(cmd.player, entities) || IsResearched(cmd.player, cmd.a) || !IsResearchAvailable(cmd.player, cmd.a))
-                {
-                    return;
-                }
-                const ResearchDef &def = researchDef(faction, cmd.a);
-                if(!economy.CanAfford(def.cost))
-                    return;
-                economy.SpendCredits(def.cost);
-                r.active = cmd.a;
-                r.timer = 0.0f;
-                break;
-            }
-            case CommandType::Demolish:
-            {
-                int refund = 0;
-                for(uint32_t id : cmd.ids)
-                {
-                    const Building *b = entities.GetBuilding(static_cast<int>(id));
-                    if(Alive(b) && b->owner == cmd.player)
-                        refund += entities.DemolishBuilding(b->id, map);
-                }
-                if(refund > 0)
-                    economy.AddCredits(refund);
-                break;
-            }
-            case CommandType::DebugCredits:
-                if(cmd.debug)
-                    economy.AddCredits(cmd.a);
-                break;
-            case CommandType::DebugSpawn:
-            {
-                if(!cmd.debug)
-                    return;
-                switch(static_cast<DebugSpawnKind>(cmd.b))
-                {
-                    case DebugSpawnKind::Wall:
-                        map.SetWall(cmd.x, cmd.y, faction, 100, cmd.player);
-                        break;
-                    case DebugSpawnKind::Building:
-                        if(entities.SpawnBuildingByIndex(cmd.a, cmd.x, cmd.y, faction, 1.0f, cmd.player) > 0)
-                        {
-                            for(int ty = cmd.y; ty < cmd.y + cmd.d && ty < map.GetHeight(); ++ty)
-                            {
-                                for(int tx = cmd.x; tx < cmd.x + cmd.c && tx < map.GetWidth(); ++tx)
-                                    map.SetPassable(tx, ty, false);
-                            }
-                        }
-                        break;
-                    case DebugSpawnKind::Unit:
-                        entities.SpawnUnitByArchetype(cmd.a, cmd.x, cmd.y, faction, cmd.player);
-                        break;
-                }
-                break;
-            }
-            case CommandType::PlayerLeft:
-                // Gone from the match: nothing of the player stays to be fought over (or left standing in the way)
-                entities.DestroyPlayer(cmd.player, map);
-                std::cout << "[Simulation] Player " << int(cmd.player) << " left the match: its forces are destroyed" << std::endl;
-                break;
-            case CommandType::Count:
-                break;
+            m_squads[cmd.player].ReleaseUnits(units, entities);
+            ClearOrders(units, entities);
+            if (!units.empty())
+                OrderUnitsAt(cmd.player, units, cmd.a, cmd.x, cmd.y, asGroup, ctx);
+            break;
         }
-    }
-
-    void Simulation::UpdateResearch(float dt, SimContext &ctx)
-    {
-        for(PlayerId p = 0; p < kMaxPlayers; ++p)
+        case CommandType::AttackWall:
         {
-            ResearchProgress &r = m_research[p];
-            // Research pauses while the Tech Center / Laboratory is down
-            if(r.active < 0 || r.active >= kResearchCount || !HasResearchBuilding(p, ctx.entities))
-                continue;
-            r.timer += dt;
-            if(r.timer < r.duration)
-                continue;
-            CompleteResearch(p, r.active, ctx.entities);
-            m_events.push_back({SimEvent::Type::ResearchCompleted, p, r.active});
-            r.active = -1;
+            const std::vector<int> units = OwnUnits(cmd, ctx);
+            m_squads[cmd.player].ReleaseUnits(units, entities);
+            ClearOrders(units, entities);
+            if (!units.empty())
+                entities.IssueAttackWallOrder(units, cmd.x, cmd.y, pathfinder);
+            break;
+        }
+        case CommandType::SetRally:
+            for (uint32_t id : cmd.ids)
+            {
+                Building *b = entities.GetBuilding(static_cast<int>(id));
+                if (b && b->alive && b->IsUnitProducer() && b->owner == cmd.player)
+                {
+                    b->rallyTileX = std::clamp(cmd.x / TILE_WIDTH, 0, map.GetWidth() - 1);
+                    b->rallyTileY = std::clamp(cmd.y / TILE_HEIGHT, 0, map.GetHeight() - 1);
+                }
+            }
+            break;
+        case CommandType::ToggleSiege:
+            entities.ToggleSiegeMode(OwnUnits(cmd, ctx));
+            break;
+        case CommandType::Stop:
+            ClearOrders(OwnUnits(cmd, ctx), entities);
+            for (int id : OwnUnits(cmd, ctx))
+            {
+                Unit *u = entities.GetUnit(id);
+                if (!u)
+                    continue;
+                u->path.clear();
+                u->pathIndex = 0;
+                u->targetEntityId = 0;
+                u->targetWallTileX = -1;
+                u->targetWallTileY = -1;
+                u->isAttackMoving = false;
+                u->groupOrder = false;
+                u->holdPosition = false;
+                u->waitingForPath = false;
+                u->state = ActionState::Idle;
+            }
+            break;
+        case CommandType::HoldPosition:
+            ClearOrders(OwnUnits(cmd, ctx), entities);
+            for (int id : OwnUnits(cmd, ctx))
+            {
+                Unit *u = ctx.entities.GetUnit(id);
+                if (!u)
+                    continue;
+                u->path.clear();
+                u->pathIndex = 0;
+                u->isAttackMoving = false;
+                u->groupOrder = false;
+                u->holdPosition = true;
+                u->ClearMoveTarget();
+                u->waitingForPath = false;
+                u->state = ActionState::Idle;
+            }
+            break;
+        case CommandType::PlaceBuilding:
+        {
+            // cmd.a is the canonical blueprint slot; the building is the one of the ordering player's faction
+            // (looking it up in the local player's menu gave the other side's buildings)
+            const BuildingBlueprint *found = EntityManager::FindBlueprint(faction, cmd.a);
+            if (!found)
+                return;
+            const auto &bp = *found;
+            if (!entities.CanPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
+                return;
+            if (!economy.CanAfford(bp.creditCost))
+                return;
+            economy.SpendCredits(bp.creditCost);
+            if (bp.isWall)
+            {
+                map.SetWall(cmd.x, cmd.y, faction, 100, cmd.player);
+            }
+            else if (entities.SpawnBuildingByIndex(bp.buildingIndex, cmd.x, cmd.y, faction, 0.0f, cmd.player) > 0)
+            {
+                for (int ty = cmd.y; ty < cmd.y + bp.height && ty < map.GetHeight(); ++ty)
+                {
+                    for (int tx = cmd.x; tx < cmd.x + bp.width && tx < map.GetWidth(); ++tx)
+                        map.SetPassable(tx, ty, false);
+                }
+            }
+            break;
+        }
+        case CommandType::Produce:
+        {
+            const Building *b = entities.GetBuilding(cmd.b);
+            if (!Alive(b) || b->owner != cmd.player || !b->IsUnitProducer() || b->buildProgress < 1.0f)
+                return;
+            const auto *cfg = entities.GetUnitConfig(cmd.a);
+            economy.QueueUnit(cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities);
+            break;
+        }
+        case CommandType::CancelProduce:
+        {
+            const Building *b = entities.GetBuilding(cmd.b);
+            if (!b || b->owner != cmd.player)
+                return;
+            economy.CancelUnit(cmd.a, cmd.b, entities);
+            break;
+        }
+        case CommandType::StartResearch:
+        {
+            ResearchProgress &r = m_research[cmd.player];
+            if (cmd.a < 0 || cmd.a >= kResearchCount || r.active >= 0)
+                return;
+            if (!HasResearchBuilding(cmd.player, entities) || IsResearched(cmd.player, cmd.a)
+                || !IsResearchAvailable(cmd.player, cmd.a))
+            {
+                return;
+            }
+            const ResearchDef &def = researchDef(faction, cmd.a);
+            if (!economy.CanAfford(def.cost))
+                return;
+            economy.SpendCredits(def.cost);
+            r.active = cmd.a;
             r.timer = 0.0f;
+            break;
         }
-    }
-
-    void Simulation::UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints)
-    {
-        for(auto &squads : m_squads)
+        case CommandType::Demolish:
         {
-            squads.Update(dt, ctx.map, ctx.entities, ctx.pathfinder, chokepoints, GroupTactics());
-            squads.TakeReleasedUnits();
-        }
-    }
-
-    std::vector<SimEvent> Simulation::TakeEvents()
-    {
-        std::vector<SimEvent> out;
-        out.swap(m_events);
-        return out;
-    }
-
-    uint64_t Simulation::Checksum(const SimContext &ctx) const
-    {
-        Hasher h;
-        h.I32(static_cast<int32_t>(m_tick));
-        for(const Entity &e : ctx.entities.GetAllEntities())
-        {
-            h.I32(e.id);
-            h.I32(static_cast<int32_t>(e.type));
-            h.I32(static_cast<int32_t>(e.faction));
-            h.I32(e.owner);
-            h.I32(e.alive ? 1 : 0);
-            h.I32(static_cast<int32_t>(e.state));
-            h.I32(e.tileX);
-            h.I32(e.tileY);
-            h.F32(e.subX);
-            h.F32(e.subY);
-            h.I32(e.currentHp);
-            h.I32(e.targetEntityId);
-            h.I32(e.targetWallTileX);
-            h.I32(e.targetWallTileY);
-            h.I32(e.lastAttackerId);
-        }
-        // Credits in player order (the local player's economy is SimContext::economy on every peer, so the
-        // order must not depend on it)
-        for(PlayerId p = 0; p < kMaxPlayers; ++p)
-        {
-            if((m_economyMask >> p) & 1u)
-                h.I32(m_economies[p].GetCredits());
-            else if(p == ctx.economy.player())
-                h.I32(ctx.economy.GetCredits());
-        }
-        const TileMap &map = ctx.map;
-        for(int y = 0; y < map.GetHeight(); ++y)
-        {
-            for(int x = 0; x < map.GetWidth(); ++x)
+            int refund = 0;
+            for (uint32_t id : cmd.ids)
             {
-                const int wall = map.GetWall(x, y);
-                if(wall > 0)
-                {
-                    h.I32(x);
-                    h.I32(y);
-                    h.I32(wall);
-                    h.I32(map.GetWallOwner(x, y));
-                }
+                const Building *b = entities.GetBuilding(static_cast<int>(id));
+                if (Alive(b) && b->owner == cmd.player)
+                    refund += entities.DemolishBuilding(b->id, map);
+            }
+            if (refund > 0)
+                economy.AddCredits(refund);
+            break;
+        }
+        case CommandType::DebugCredits:
+            if (cmd.debug)
+                economy.AddCredits(cmd.a);
+            break;
+        case CommandType::DebugSpawn:
+        {
+            if (!cmd.debug)
+                return;
+            switch (static_cast<DebugSpawnKind>(cmd.b))
+            {
+                case DebugSpawnKind::Wall:
+                    map.SetWall(cmd.x, cmd.y, faction, 100, cmd.player);
+                    break;
+                case DebugSpawnKind::Building:
+                    if (entities.SpawnBuildingByIndex(cmd.a, cmd.x, cmd.y, faction, 1.0f, cmd.player) > 0)
+                    {
+                        for (int ty = cmd.y; ty < cmd.y + cmd.d && ty < map.GetHeight(); ++ty)
+                        {
+                            for (int tx = cmd.x; tx < cmd.x + cmd.c && tx < map.GetWidth(); ++tx)
+                                map.SetPassable(tx, ty, false);
+                        }
+                    }
+                    break;
+                case DebugSpawnKind::Unit:
+                    entities.SpawnUnitByArchetype(cmd.a, cmd.x, cmd.y, faction, cmd.player);
+                    break;
+            }
+            break;
+        }
+        case CommandType::PlayerLeft:
+            // Gone from the match: nothing of the player stays to be fought over (or left standing in the way)
+            entities.DestroyPlayer(cmd.player, map);
+            std::cout << "[Simulation] Player " << int(cmd.player) << " left the match: its forces are destroyed"
+                      << std::endl;
+            break;
+        case CommandType::Count:
+            break;
+    }
+}
+
+void Simulation::UpdateResearch(float dt, SimContext &ctx)
+{
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        ResearchProgress &r = m_research[p];
+        // Research pauses while the Tech Center / Laboratory is down
+        if (r.active < 0 || r.active >= kResearchCount || !HasResearchBuilding(p, ctx.entities))
+            continue;
+        r.timer += dt;
+        if (r.timer < r.duration)
+            continue;
+        CompleteResearch(p, r.active, ctx.entities);
+        m_events.push_back({SimEvent::Type::ResearchCompleted, p, r.active});
+        r.active = -1;
+        r.timer = 0.0f;
+    }
+    // The labs of a researching player animate (the computer players set theirs in AIController::Update, after this)
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+        SetResearchAnimation(p, m_research[p].active >= 0, ctx.entities);
+}
+
+void Simulation::UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints)
+{
+    for (auto &squads : m_squads)
+    {
+        squads.Update(dt, ctx.map, ctx.entities, ctx.pathfinder, chokepoints, GroupTactics());
+        squads.TakeReleasedUnits();
+    }
+}
+
+std::vector<SimEvent> Simulation::TakeEvents()
+{
+    std::vector<SimEvent> out;
+    out.swap(m_events);
+    return out;
+}
+
+uint64_t Simulation::Checksum(const SimContext &ctx) const
+{
+    uint64_t sections[kChecksumSections];
+    return ChecksumSections(ctx, sections);
+}
+
+uint64_t Simulation::ChecksumSections(const SimContext &ctx, uint64_t (&sections)[kChecksumSections]) const
+{
+    Hasher h;
+    h.I32(static_cast<int32_t>(m_tick));
+    for (const Entity &e : ctx.entities.GetAllEntities())
+    {
+        h.I32(e.id);
+        h.I32(static_cast<int32_t>(e.type));
+        h.I32(static_cast<int32_t>(e.faction));
+        h.I32(e.owner);
+        h.I32(e.alive ? 1 : 0);
+        h.I32(static_cast<int32_t>(e.state));
+        h.I32(e.tileX);
+        h.I32(e.tileY);
+        h.F32(e.subX);
+        h.F32(e.subY);
+        h.I32(e.currentHp);
+        h.I32(e.targetEntityId);
+        h.I32(e.targetWallTileX);
+        h.I32(e.targetWallTileY);
+        h.I32(e.lastAttackerId);
+        if (const Unit *u = e.AsUnit())
+        {
+            h.I32(u->orderX);
+            h.I32(u->orderY);
+            h.I32(static_cast<int32_t>(u->orderQueue.size()));
+            for (const Unit::QueuedOrder &q : u->orderQueue)
+            {
+                h.I32(q.kind);
+                h.I32(q.x);
+                h.I32(q.y);
             }
         }
-        for(PlayerId p = 0; p < kMaxPlayers; ++p)
-        {
-            for(int i = 0; i < kResearchCount; ++i)
-                h.I32(IsResearched(p, i) ? 1 : 0);
-        }
-        return h.h;
     }
+    sections[0] = h.h;
+    // Credits in player order (the local player's economy is SimContext::economy on every peer, so the
+    // order must not depend on it)
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if ((m_economyMask >> p) & 1u)
+            h.I32(m_economies[p].GetCredits());
+        else if (p == ctx.economy.player())
+            h.I32(ctx.economy.GetCredits());
+    }
+    sections[1] = h.h;
+    const TileMap &map = ctx.map;
+    for (int y = 0; y < map.GetHeight(); ++y)
+    {
+        for (int x = 0; x < map.GetWidth(); ++x)
+        {
+            const int wall = map.GetWall(x, y);
+            if (wall > 0)
+            {
+                h.I32(x);
+                h.I32(y);
+                h.I32(wall);
+                h.I32(map.GetWallOwner(x, y));
+            }
+        }
+    }
+    sections[2] = h.h;
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        for (int i = 0; i < kResearchCount; ++i)
+            h.I32(IsResearched(p, i) ? 1 : 0);
+    }
+    sections[3] = h.h;
+    return h.h;
+}
 
 } // namespace OpenArtOfWar

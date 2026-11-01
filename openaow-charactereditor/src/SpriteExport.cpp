@@ -763,7 +763,7 @@ bool ImportSpriteFolder(const fs::path& assetsRoot, const fs::path& inDir, std::
     TableEdit tables;
     json gd, gdOriginal;
     bool haveGd = false, gdChanged = false;
-    const fs::path gdPath = assetsRoot / "data" / "graphics_data.json";
+    const fs::path gdPath = assetsRoot / "data" / "sprites_graphics.json";
 
     auto loadGd = [&]() {
         if (haveGd) return true;
