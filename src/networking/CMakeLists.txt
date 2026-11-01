@@ -60,6 +60,7 @@ add_library(OpenAOWNetworking STATIC
     src/server/StatusPage.cpp
     src/server/MasterClient.cpp
     src/server/Rendezvous.cpp
+    src/replay/ReplayFile.cpp
 )
 target_include_directories(OpenAOWNetworking
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -70,6 +71,9 @@ set_target_properties(OpenAOWNetworking PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(OpenAOWNetworking PUBLIC cxx_std_17)
 # ENet stays an implementation detail: callers never see its headers
 target_link_libraries(OpenAOWNetworking PRIVATE oaow-enet)
+# Replays are tar archives compressed with zstd (libarchive); the dedicated server writes them too
+target_link_libraries(OpenAOWNetworking PUBLIC PkgConfig::LIBARCHIVE)
+target_link_libraries(OpenAOWNetworking PRIVATE nlohmann_json::nlohmann_json)
 if(WIN32)
     target_link_libraries(OpenAOWNetworking INTERFACE ws2_32 winmm)
 endif()

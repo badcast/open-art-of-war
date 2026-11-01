@@ -55,6 +55,16 @@ private:
     int m_lastDeletedTileX{-1};
     int m_lastDeletedTileY{-1};
 
+    bool m_isDraggingPlayer{false};
+    int m_draggingPlayerIndex{-1};
+    int m_draggedTileX{-1};
+    int m_draggedTileY{-1};
+    int m_selectedPlayerIndex{-1};
+
+    float m_rightClickStartX{0.0f};
+    float m_rightClickStartY{0.0f};
+    bool m_rightClickMoved{false};
+
     float m_globalAnimTimer{0.0f};
 };
 

@@ -21,8 +21,9 @@ struct MatchSetup
     PlayerId local {0};                               // this computer's slot
     int startingCredits {1500};
     bool fogOfWar {true};
-    bool prebuilt {true}; // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
-                          // (HQ + power only)
+    bool localOnly {false}; // custom game on this computer (not sent anywhere): menus pause it, it can restart
+    bool prebuilt {true};   // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
+                            // (HQ + power only)
 };
 
 } // namespace OpenArtOfWar

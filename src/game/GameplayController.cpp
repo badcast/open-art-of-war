@@ -581,7 +581,8 @@ void GameplayController::Update(
     // Wheel steps of this frame: over the map they zoom (below, only when no window covers the map); steps that
     // arrive while a window is open are dropped so nothing jumps when it closes
     const int mapWheel = input.ConsumeMapWheel();
-    const bool windowOpen = menu.IsObjectivesDialogOpen() || menu.IsMissionDialogOpen() || menu.IsInGameMenuOpen();
+    const bool windowOpen = menu.IsAnyMenuOpen();
+    input.SetMenuOpen(windowOpen);
     if (windowOpen)
         input.ConsumeUiWheel();
     else
@@ -600,7 +601,7 @@ void GameplayController::Update(
         if (menu.UpdateObjectivesDialog(input, leftClicked))
         {
             // A network match goes on while a player reads its menus
-            if (mission.IsMatch())
+            if (mission.IsOnlineMatch())
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -629,7 +630,7 @@ void GameplayController::Update(
                 camera,
                 appState))
         {
-            if (mission.IsMatch() && appState == AppState::SkirmishPlaying)
+            if (mission.IsOnlineMatch() && appState == AppState::SkirmishPlaying)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -897,6 +898,13 @@ void GameplayController::Update(
         }
     }
 
+    // Dragging a selection box ends the attack-move mode: the box then selects as usual
+    {
+        const auto &dragBox = input.GetSelectionBox();
+        if (hud.IsAttackMoveMode() && dragBox.active && dragBox.HasSignificantArea())
+            hud.SetAttackMoveMode(false);
+    }
+
     // 6. Attack-Move targeting mode active (triggered by 'Q' key, game does NOT pause!)
     if (!mapInputConsumed && hud.IsAttackMoveMode())
     {
@@ -962,11 +970,40 @@ void GameplayController::Update(
             m_sim.Issue(std::move(c));
         }
 
+        // Z / X / C - stances: guard (chase and return), hold ground, pursue
+        {
+            static const SDL_Scancode kStanceKeys[] = {SDL_SCANCODE_Z, SDL_SCANCODE_X, SDL_SCANCODE_C};
+            for (int i = 0; i < 3; ++i)
+            {
+                if (!input.IsKeyJustPressed(kStanceKeys[i]) || m_selectedUnits.empty())
+                    continue;
+                SimCommand c = Command(CommandType::SetStance);
+                c.a = i;
+                c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
+                m_sim.Issue(std::move(c));
+                SoundRequests::Play("@hold");
+            }
+        }
+
+        // R - repair on / off for the selected own buildings
+        if (input.IsKeyJustPressed(SDL_SCANCODE_R))
+        {
+            SimCommand c = Command(CommandType::ToggleRepair);
+            for (int id : m_selectedUnits)
+            {
+                const Building *b = entities.GetBuilding(id);
+                if (b && b->owner == Players::Local())
+                    c.ids.push_back(static_cast<uint32_t>(id));
+            }
+            if (!c.ids.empty())
+                m_sim.Issue(std::move(c));
+        }
+
         // ESC - In-game Pause Menu
         if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
         {
             menu.SetInGameMenuOpen(true);
-            if (mission.IsMatch())
+            if (mission.IsOnlineMatch())
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -1129,7 +1166,8 @@ void GameplayController::Update(
         }
     }
 
-    SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+    if (!m_simHold)
+        SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
 }
 
 void GameplayController::SimulationStep(

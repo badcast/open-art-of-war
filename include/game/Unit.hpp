@@ -3,6 +3,8 @@
 #include "game/Entity.hpp"
 #include "core/Utility.hpp"
 #include "game/Pathfinder.hpp"
+#include <algorithm>
+#include <cstdint>
 #include <vector>
 #include <functional>
 #include <cmath>
@@ -36,6 +38,23 @@ struct UnitDelegates
     std::function<void(const Unit &u, int &outWallX, int &outWallY)> findWallTarget;
     std::function<int(const Unit &u, int &outTargetEnemyId)> findSupportAlly;
 };
+
+// What a unit without orders does about enemies (the player sets it per unit, the computer by the unit's role)
+enum class UnitStance : uint8_t
+{
+    PursueAndReturn = 0, // engages what it sees, chases a limited distance, then walks back to where it stood
+    HoldGround = 1,      // fires only at what is in range and never walks off by itself
+    Pursue = 2,          // engages what it sees and chases it until it dies or is lost (default)
+    Count
+};
+
+// Target preference: 0 armed units, 1 other units and armed buildings, 2 other buildings (lower comes first)
+inline int TargetPriorityTier(const Entity &e)
+{
+    if (!e.isBuilding)
+        return e.attackDamage > 0 ? 0 : 1;
+    return e.attackDamage > 0 ? 1 : 2;
+}
 
 /**
  * @brief Dynamic entity: walks, attacks, transforms, animates.
@@ -78,6 +97,29 @@ public:
     bool groupOrder {false};
     // Hold position: the unit fires from where it stands and never walks off by itself (not even after an attacker)
     bool holdPosition {false};
+    // Stance (see UnitStance) and, for PursueAndReturn, the tile it walks back to after a chase
+    UnitStance stance {UnitStance::Pursue};
+    int stanceHomeX {-1};
+    int stanceHomeY {-1};
+    bool stanceReturning {false};
+    int orderedTargetId {0};       // target of the player's explicit attack order: a stance never drops it
+    // Where the current target was last in sight of the team (tiles): an ordered target that drops out of sight
+    // (the rest of the group died, the enemy moved off) is looked for there instead of being forgotten
+    int lastSeenTargetX {-1};
+    int lastSeenTargetY {-1};
+    float retargetCooldown {0.0f}; // throttles the look for a more dangerous enemy while fighting
+    // Holding ground right now: the hold order, or the HoldGround stance outside attack-moves and ordered attacks
+    bool HoldsGround() const noexcept
+    {
+        return holdPosition
+               || (stance == UnitStance::HoldGround && !isAttackMoving
+                   && (targetEntityId == 0 || targetEntityId != orderedTargetId));
+    }
+    // How far (tiles, from home) a PursueAndReturn unit chases before it turns back
+    int StanceLeashTiles() const noexcept
+    {
+        return std::max(sightRadius, static_cast<int>(attackRange)) + 3;
+    }
     // Time spent with a move goal without leaving the current tile (queueing at a gap, stuck behind allies)
     float blockedTimer {0.0f};
     int blockedTileX {-1};
@@ -89,6 +131,18 @@ public:
     int burstShotsRemaining {0};
     float burstTimer {0.0f};
 
+    // A second gun that fires on its own beside the main one (the Zeus rocket launcher, weapons[1] of the character
+    // file): own projectile, damage, range and reload, at the same target
+    bool hasSecondary {false};
+    ProjectileType secondaryProjectile {ProjectileType::Rocket};
+    int secondaryDamage {0};
+    float secondaryRange {0.0f};
+    float secondaryMinRange {0.0f};
+    float secondaryCooldown {2.0f};
+    int secondarySplash {0};
+    float secondaryMuzzleX {0.0f};
+    float secondaryMuzzleY {0.0f};
+
     // Multi-weapon attributes (e.g. Fortress secondary Flame Tower)
     float secondaryCooldownTimer {0.0f};
     int secondaryBurstShotsRemaining {0};
@@ -99,6 +153,14 @@ public:
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
     int wreckComposite {1764};
     int wreckStages {5};
+    // animations: block (timing of the pictures; the character editor's Animator edits it)
+    float moveFrameTime {0.09f};   // seconds per walking frame
+    float attackFrameTime {-1.0f}; // seconds per firing-pose frame (< 0: 0.07, or 0.04 for archetypes 7 and 18)
+    float attackPoseTime {
+        -1.0f};                  // how long the firing pose lasts after the first shot of a volley (< 0: by projectile)
+    float burstPoseTime {0.15f}; // the same after every later shot of a burst
+    int flashMode {0};   // muzzle flash layer: 0 loops while firing, 1 plays once per shot, 2 plays once and holds
+    int flashFrames {0}; // frames the flash lasts (0 = its whole animation)
     std::vector<int> deathSequences;
     std::vector<int> flameDeathSequences;
     int selectedDeathSeq {-1}; // Picked upon death: 247/248 for bullet, 259/260 for flame
@@ -125,6 +187,12 @@ public:
     // aside, as a chain when the first one has no free tile next to it
     float allyWaitTimer {0.0f};   // while > 0 a moving ally in the way is waited for (a chain is moving aside)
     float makeWayCooldown {0.0f}; // throttles the make-way requests of this unit
+    // A friendly crowd shuts the next tile: the same road is tried again kBlockRetries times (a short pause each)
+    // before a way around is planned, which led across half the map
+    int blockRetries {0};
+    float blockRetryTimer {0.0f};
+    static constexpr int kBlockRetries = 3;
+    static constexpr float kBlockRetryPause = 0.25f;
     int yieldHomeX {-1};          // where a unit without orders stood before it stepped aside (it walks back)
     int yieldHomeY {-1};
     float yieldHomeTimer {0.0f};
@@ -250,6 +318,10 @@ private:
     void MakeWayStep(int x, int y);
     // A unit that stepped aside without orders walks back to where it stood
     void UpdateYieldHome(float deltaTime, Pathfinder &pathfinder, const UnitDelegates &delegates);
+    // PursueAndReturn: keeps the home tile, turns back when a chase goes beyond the leash or ends far away
+    void UpdateStanceHome(Pathfinder &pathfinder);
+    // May this stance pick `candidate` on its own (PursueAndReturn: only enemies near home)?
+    bool StanceAllowsTarget(const Entity &candidate) const;
 };
 
 } // namespace OpenArtOfWar

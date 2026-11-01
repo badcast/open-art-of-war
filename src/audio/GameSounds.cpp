@@ -18,35 +18,37 @@ namespace OpenArtOfWar
 namespace
 {
 
-const char *CueEvent(EntityManager::SoundCue c)
+WorldSfx CueSound(EntityManager::SoundCue c)
 {
     using C = EntityManager::SoundCue;
     switch (c)
     {
         case C::FireRifle:
-            return "fire_rifle";
+            return WorldSfx::FireRifle;
         case C::FireMg:
-            return "fire_mg";
+            return WorldSfx::FireMg;
         case C::FireSniper:
-            return "fire_sniper";
+            return WorldSfx::FireSniper;
         case C::FireCannon:
-            return "fire_cannon";
+            return WorldSfx::FireCannon;
+        case C::FireCannonHigh:
+            return WorldSfx::FireCannonHigh;
         case C::FireRocket:
-            return "fire_rocket";
+            return WorldSfx::FireRocket;
         case C::FireMlrs:
-            return "fire_mlrs";
+            return WorldSfx::FireMlrs;
         case C::FireFlame:
-            return "fire_flame";
+            return WorldSfx::FireFlame;
         case C::HitBullet:
-            return "hit_bullet";
+            return WorldSfx::HitBullet;
         case C::HitArmor:
-            return "hit_armor";
+            return WorldSfx::HitArmor;
         case C::ExplodeSmall:
-            return "explode_small";
+            return WorldSfx::ExplodeSmall;
         case C::WallDestroyed:
-            return "wall_destroyed";
+            return WorldSfx::WallDestroyed;
     }
-    return "";
+    return WorldSfx::HitArmor;
 }
 
 bool Infantry(const Entity &e)
@@ -84,30 +86,30 @@ void GameSounds::Update(
     const RadarAlert &radar,
     uint64_t nowMs)
 {
-    SfxMixer &mixer = sound.Sfx();
     // The view in world pixels
     const float zoom = std::max(0.01f, camera.GetZoom());
     const float viewX = camera.GetX(), viewY = camera.GetY();
     const float viewW = camera.GetViewportWidth() / zoom, viewH = camera.GetViewportHeight() / zoom;
-    auto at = [&](const char *event, float x, float y) {
-        const SfxMixer::EventConfig *cfg = mixer.Config(event);
+    // Range and the rest come from the sound's settings (audio_sfx.json), not from here
+    auto at = [&](WorldSfx what, float x, float y) {
+        const SfxMixer::EventConfig *cfg = sound.SfxConfig(what);
         if (!cfg)
             return;
         if (!cfg->positional)
         {
-            sound.PlaySfx(event);
+            sound.PlaySfx(what);
             return;
         }
-        const SfxPlacement p = PlaceSfx(x, y, viewX, viewY, viewW, viewH, cfg->rangeTiles * TILE_WIDTH);
+        const SfxPlacement p = PlaceSfx(x, y, viewX, viewY, viewW, viewH, cfg->rangeTiles * TILE_WIDTH, zoom, cfg->minGain);
         if (p.audible)
-            sound.PlaySfx(event, p.gain, p.pan);
+            sound.PlaySfx(what, p.gain, p.pan, p.muffle);
     };
 
     // Shots, hits, shells landing, walls coming down
     for (const EntityManager::SoundCueEvent &c : entities.TakeSoundCues())
     {
         if (Hearable(map, fogEnabled, c.x, c.y, c.owner))
-            at(CueEvent(c.cue), c.x, c.y);
+            at(CueSound(c.cue), c.x, c.y);
     }
 
     // Deaths, finished buildings, new units, damage to the base: by comparing with the last look
@@ -139,7 +141,7 @@ void GameSounds::Update(
                         && std::abs(pb->tileX - e.tileX) <= pb->buildWidth + 3
                         && std::abs(pb->tileY - e.tileY) <= pb->buildHeight + 3)
                     {
-                        sound.Announce("ann_unit_ready");
+                        sound.Announce(Announcement::UnitReady);
                         break;
                     }
                 }
@@ -151,16 +153,16 @@ void GameSounds::Update(
         {
             const float x = e.GetUnitCenterPixelX(), y = e.GetUnitCenterPixelY();
             if (Hearable(map, fogEnabled, x, y, e.owner))
-                at(b ? "explode_large" : (Infantry(e) ? "death_infantry" : "explode_large"), x, y);
+                at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge), x, y);
             if (e.owner == me && !b)
-                sound.Announce("ann_unit_lost");
+                sound.Announce(Announcement::UnitLost);
             else if (
                 e.owner < kMaxPlayers && Players::Hostile(e.owner, me) && !Infantry(e)
                 && Hearable(map, fogEnabled, x, y, e.owner))
-                sound.PlayVoice("target_destroyed");
+                sound.PlayVoice(UnitReply::TargetDestroyed, false);
         }
         if (m_primed && !dead && b && e.owner == me && complete && !s.complete)
-            sound.Announce("ann_construction_complete");
+            sound.Announce(Announcement::ConstructionComplete);
         if (m_primed && !dead && b && e.owner == me && e.currentHp < s.hp && complete)
             baseHit = true;
         s.dead = dead;
@@ -169,14 +171,14 @@ void GameSounds::Update(
     }
     if (baseHit)
     {
-        sound.PlaySfx("alert_base");
-        sound.Announce("ann_base_attack");
+        sound.PlaySfx(WorldSfx::AlertBase);
+        sound.Announce(Announcement::BaseAttack);
     }
 
     // Power running short
     const bool low = economy.HasPowerDeficit();
     if (m_primed && low && !m_lowPower)
-        sound.Announce("ann_low_power");
+        sound.Announce(Announcement::LowPower);
     m_lowPower = low;
 
     // An enemy on the radar
@@ -184,8 +186,8 @@ void GameSounds::Update(
     {
         if (m_primed)
         {
-            sound.PlaySfx("alert_radar");
-            sound.Announce("ann_enemy_detected");
+            sound.PlaySfx(WorldSfx::AlertRadar);
+            sound.Announce(Announcement::EnemyDetected);
         }
         m_radarStart = radar.StartMs();
     }
@@ -194,21 +196,14 @@ void GameSounds::Update(
 }
 
 void GameSounds::PlayReply(
-    SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, const char *what)
+    SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, UnitReply reply)
 {
     for (int id : selected)
     {
         const Entity *e = entities.GetEntity(id);
         if (!e || !e->alive || e->isBuilding || e->owner != Players::Local())
             continue;
-        const std::string w = what;
-        if (w == "hold")
-        {
-            sound.PlayVoice("ack_hold");
-            return;
-        }
-        const std::string kind = Infantry(*e) ? "infantry" : "vehicle";
-        sound.PlayVoice("ack_" + w + "_" + kind);
+        sound.PlayVoice(reply, Infantry(*e));
         return;
     }
 }
@@ -220,7 +215,7 @@ void GameSounds::SelectionChanged(SoundEngine &sound, const EntityManager &entit
         someoneNew = someoneNew || std::find(m_selection.begin(), m_selection.end(), id) == m_selection.end();
     m_selection = selected;
     if (someoneNew)
-        PlayReply(sound, entities, selected, "select");
+        PlayReply(sound, entities, selected, UnitReply::Select);
 }
 
 } // namespace OpenArtOfWar

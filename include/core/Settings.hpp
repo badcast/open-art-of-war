@@ -51,6 +51,7 @@ struct Settings
     int fxVolume {128};    // 0..128
     int voiceVolume {128}; // 0..128: unit replies and the announcer
     bool muted {false};
+    bool reverb {true};    // reverb of explosions and heavy guns
 
     // Network game
     std::string playerName {};
@@ -58,11 +59,14 @@ struct Settings
 
     // Game
     std::string language {"en"};
-    int difficulty {1}; // 0 = easy .. 3 = hardcore
+    int difficulty {1};    // 0 = easy .. 3 = hardcore
+    int edgePanMargin {5}; // 5..30 pixels (screen border thickness for mouse scrolling)
 
     static constexpr int kArmyColors = 8;
     static constexpr float kZoomLowest = 0.5f;
     static constexpr float kZoomHighest = 4.0f;
+    static constexpr int kMinEdgePanMargin = 5;
+    static constexpr int kMaxEdgePanMargin = 30;
     static constexpr int kMinWindowW = 800;
     static constexpr int kMinWindowH = 480;
 

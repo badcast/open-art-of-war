@@ -27,6 +27,7 @@ struct SkirmishMapInfo
     int width {0};
     int height {0};
     int tilesetId {0};
+    int players {2}; // start positions of the map = the most players it takes
     bool hasPrebuilt {
         false}; // the map has buildings or units of its own (the start can be "prebuilt" or "from scratch")
 
@@ -81,6 +82,11 @@ public:
     bool IsMatch() const
     {
         return m_currentMissionId == kMatchMissionId;
+    }
+    // A match of the network (not the custom game against several computer players on this computer alone)
+    bool IsOnlineMatch() const
+    {
+        return IsMatch() && !m_matchSetup.localOnly;
     }
     const MatchSetup &matchSetup() const
     {

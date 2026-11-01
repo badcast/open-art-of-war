@@ -146,8 +146,8 @@ private:
     };
     struct LobbyLayout
     {
-        ui::UiRect dialog, players, map, mapPrev, mapNext, chatLog, chatField, chatSend, readyBtn, startBtn, leaveBtn,
-            prebuiltBtn;
+        ui::UiRect dialog, players, map, mapPrev, mapNext, mapName, chatLog, chatField, chatSend, readyBtn, startBtn,
+            leaveBtn, prebuiltBtn;
         ui::UiRect row(int i) const
         {
             return {players.x, players.y + 30 + i * 40, players.w, 36};
@@ -212,6 +212,7 @@ private:
     std::string m_chatInput;
     std::vector<std::string> m_chatLog;
     std::vector<SkirmishMapInfo> m_maps;
+    static constexpr int kMapCombo = 1001;    // id of the list of maps (the host picks one)
     static constexpr int kLayoutCombo = 1000; // id of the map layout list (the rows use row * 10 + kind)
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"
@@ -223,6 +224,7 @@ private:
     int m_mapW {0}, m_mapH {0};
     MapPreview m_preview;
     int m_mouseX {0}, m_mouseY {0};
+    bool m_wasInLobby {false};
 };
 
 } // namespace OpenArtOfWar

@@ -10,6 +10,8 @@ class TileCollision
 {
 public:
     static bool IsBlocked(int tilesetId, int tile);
+    // Reads the table again (a network game plays with the host's data)
+    static void Reload();
 };
 
 } // namespace OpenArtOfWar

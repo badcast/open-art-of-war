@@ -182,8 +182,7 @@ private:
 
     uint8_t m_baseTiles[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}};
     uint16_t m_decorGrid[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}};
-    uint16_t m_wallGrid[MAX_MAP_SIZE][MAX_MAP_SIZE] {
-        {0}}; // 1001..1100 Conf wall, 1101..1200 Res wall (f.java:2049, 6823)
+    uint16_t m_wallGrid[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}};       // 1001..1100 Conf wall, 1101..1200 Res wall
     uint16_t m_wallRubbleGrid[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}}; // Ground rubble/ruin remnant of destroyed wall
     int16_t m_wallHp[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}};          // Current wall health (0..150 HP)
     PlayerId m_wallOwner[MAX_MAP_SIZE][MAX_MAP_SIZE] {{0}};

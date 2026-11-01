@@ -122,6 +122,7 @@ bool CharacterEditor::SaveEnvironment() {
     envBase = merged;
     envDirty = false;
     status = std::string(_("Saved: ")) + envPath.filename().string();
+    ApplySaved(false);
     return true;
 }
 

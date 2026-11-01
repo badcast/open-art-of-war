@@ -343,12 +343,15 @@ void EditorUI::render(MapDocument& doc, Camera& camera, TextureManager& texManag
     RenderToolbar(doc, texManager);
 
     // Right palette panel
-    RenderPalettePanel(doc, texManager);
+    RenderPalettePanel(doc, texManager, camera);
 
     // Minimap window
     if (m_showMiniMap) {
         RenderMiniMapWindow(doc, camera);
     }
+
+    // Context Menu
+    RenderContextMenu(doc, camera);
 
     // Bottom status bar
     RenderStatusBar(doc, camera);
@@ -359,6 +362,7 @@ void EditorUI::render(MapDocument& doc, Camera& camera, TextureManager& texManag
     RenderNewMapModal(doc);
     RenderGeneratorModal(doc);
     RenderCloseConfirmation(doc);
+    RenderGeneratorConfirmation(doc);
 
     // Toast
     RenderToastNotification();
@@ -426,9 +430,7 @@ void EditorUI::RenderMenuBar(MapDocument& doc, Camera& camera) {
                 OpenGeneratorDialog();
             }
             if (ImGui::MenuItem("Generate map (1 click, modelled on the original)")) {
-                doc.PushUndoSnapshot();
-                MapGenerator::GenerateQuick(doc);
-                ShowToast("Map generated (" + std::to_string(doc.GetWidth()) + "x" + std::to_string(doc.GetHeight()) + ")");
+                RequestGenerate(doc, false);
             }
             ImGui::EndMenu();
         }
@@ -455,9 +457,7 @@ void EditorUI::RenderMenuBar(MapDocument& doc, Camera& camera) {
         const float actionGroupX = std::max(ImGui::GetCursorPosX() + 12.0f, centeredActionX);
         ImGui::SameLine(actionGroupX);
         if (ImGui::Button("Generate map")) {
-            doc.PushUndoSnapshot();
-            MapGenerator::GenerateQuick(doc);
-            ShowToast("Map generated!");
+            RequestGenerate(doc, false);
         }
         ImGui::SameLine();
         if (ImGui::Button("Save to assets/maps/")) {
@@ -543,11 +543,8 @@ void EditorUI::RenderToolbar(MapDocument& doc, TextureManager& texManager) {
         toolBtn("Walls", EditorTool::PlaceWall, "Place defensive walls");
         toolBtn("Buildings", EditorTool::PlaceBuilding, "Place base buildings");
         toolBtn("Units", EditorTool::PlaceUnit, "Place starting units");
-        toolBtn("Player start", EditorTool::SetPlayerStart, "Set the player start point (HQ)");
-        toolBtn("Enemy start", EditorTool::SetEnemyStart, "Set the enemy start point (HQ)");
-        toolBtn("More starts", EditorTool::AddStartPosition,
-                "Extra start points (players 3-8 of a network game): a click adds one, a click on a point removes it. "
-                "The map holds as many players as it has start points"),
+        toolBtn("Player starts", EditorTool::PlayerStarts,
+                "Manage and place player starting positions (HQ) for up to 8 players");
         toolBtn("Passability", EditorTool::PassabilityBrush, "Passability brush (block/pass)");
         toolBtn("Eraser", EditorTool::Eraser, "Eraser (removes an object/wall/decoration)");
         toolBtn("Eyedropper", EditorTool::Eyedropper, "Eyedropper (pick the tile under the cursor)");
@@ -563,9 +560,7 @@ void EditorUI::RenderToolbar(MapDocument& doc, TextureManager& texManager) {
 
         ImGui::Separator();
         if (ImGui::Button("Generate map", ImVec2(110, 30))) {
-            doc.PushUndoSnapshot();
-            MapGenerator::GenerateQuick(doc);
-            ShowToast("Map generated!");
+            RequestGenerate(doc, false);
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A map modelled on the original ones in 1 click (Ctrl+G: the generator with its settings)");
@@ -574,7 +569,7 @@ void EditorUI::RenderToolbar(MapDocument& doc, TextureManager& texManager) {
     ImGui::End();
 }
 
-void EditorUI::RenderPalettePanel(MapDocument& doc, TextureManager& texManager) {
+void EditorUI::RenderPalettePanel(MapDocument& doc, TextureManager& texManager, Camera& camera) {
     ImVec2 mainViewport = ImGui::GetMainViewport()->Size;
     float panelW = 410.0f;
     ImGui::SetNextWindowPos(ImVec2(std::max(158.0f, mainViewport.x - panelW - 8.0f), 30.0f), ImGuiCond_Always);
@@ -890,8 +885,117 @@ void EditorUI::RenderPalettePanel(MapDocument& doc, TextureManager& texManager) 
                 ImGui::EndTabItem();
             }
 
-            // Tab 6: Map Properties
-            const ImGuiTabItemFlags propertiesTabFlags = (m_paletteTabToSelect == 5)
+            // Tab 6: Players & Starts
+            const ImGuiTabItemFlags playersTabFlags = (m_paletteTabToSelect == 5)
+                ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem("Players", nullptr, playersTabFlags)) {
+                static const ImU32 kPlayerColors[8] = {
+                    IM_COL32(235, 40, 40, 255),    // P1: Red (Resistance)
+                    IM_COL32(40, 110, 240, 255),   // P2: Blue (Confederation)
+                    IM_COL32(40, 200, 80, 255),    // P3: Green
+                    IM_COL32(240, 200, 40, 255),   // P4: Yellow
+                    IM_COL32(180, 60, 220, 255),   // P5: Purple
+                    IM_COL32(40, 210, 220, 255),   // P6: Cyan
+                    IM_COL32(240, 130, 40, 255),   // P7: Orange
+                    IM_COL32(230, 110, 170, 255)   // P8: Pink
+                };
+                static const char* kPlayerNames[8] = {
+                    "Player 1 (Resistance HQ)", "Player 2 (Confederation HQ)",
+                    "Player 3", "Player 4", "Player 5", "Player 6", "Player 7", "Player 8"
+                };
+
+                const int playerCount = doc.GetPlayerCount();
+                ImGui::Text("Player starts on map: %d / 8", playerCount);
+                ImGui::TextDisabled("Drag markers on map, right-click tile, or edit below:");
+                ImGui::Separator();
+
+                for (int p = 0; p < playerCount; ++p) {
+                    ImGui::PushID(p);
+                    const auto [sx, sy] = doc.GetStartPos(p);
+
+                    // Color swatch
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    ImVec2 curPos = ImGui::GetCursorScreenPos();
+                    dl->AddRectFilled(curPos, ImVec2(curPos.x + 16, curPos.y + 16), kPlayerColors[p], 3.0f);
+                    dl->AddRect(curPos, ImVec2(curPos.x + 16, curPos.y + 16), IM_COL32(255, 255, 255, 220), 3.0f);
+                    ImGui::Dummy(ImVec2(20, 16));
+                    ImGui::SameLine();
+
+                    // Name and active placement indicator
+                    const bool isPicking = (m_activeTool == EditorTool::PlayerStarts && m_selectedPlayerSlot == p);
+                    if (isPicking) {
+                        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.4f, 1.0f), "%s [Placing]", kPlayerNames[p]);
+                    } else {
+                        ImGui::Text("%s", kPlayerNames[p]);
+                    }
+
+                    // Coordinates input
+                    int coords[2] = {sx, sy};
+                    ImGui::SetNextItemWidth(140.0f);
+                    if (ImGui::InputInt2("##pos", coords)) {
+                        const int newX = std::clamp(coords[0], 0, std::max(0, doc.GetWidth() - 1));
+                        const int newY = std::clamp(coords[1], 0, std::max(0, doc.GetHeight() - 1));
+                        if (newX != sx || newY != sy) {
+                            doc.PushUndoSnapshot();
+                            doc.SetStartPos(p, newX, newY);
+                        }
+                    }
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Focus")) {
+                        camera.CenterOn(sx * TILE_WIDTH + TILE_WIDTH * 0.5f,
+                                        sy * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("Center camera on this start position");
+                    }
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Place")) {
+                        m_selectedPlayerSlot = p;
+                        m_activeTool = EditorTool::PlayerStarts;
+                        ShowToast(std::string("Click on map to place ") + kPlayerNames[p]);
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("Click on map to set this player's position");
+                    }
+
+                    if (p >= 2) {
+                        ImGui::SameLine();
+                        if (ImGui::Button("X")) {
+                            doc.PushUndoSnapshot();
+                            doc.RemoveStartPos(p);
+                            ShowToast(std::string("Removed ") + kPlayerNames[p]);
+                            ImGui::PopID();
+                            break;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("Remove this player start point");
+                        }
+                    }
+
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+
+                if (playerCount < 8) {
+                    if (ImGui::Button("+ Add Player Start", ImVec2(220, 28))) {
+                        const int newX = std::clamp(doc.GetWidth() / 2 + (playerCount - 2) * 2, 0, doc.GetWidth() - 1);
+                        const int newY = std::clamp(doc.GetHeight() / 2 + (playerCount - 2) * 2, 0, doc.GetHeight() - 1);
+                        doc.PushUndoSnapshot();
+                        if (doc.AddStartPos(newX, newY)) {
+                            m_selectedPlayerSlot = playerCount;
+                            m_activeTool = EditorTool::PlayerStarts;
+                            ShowToast("Player start added! Click map or edit coordinates.");
+                        }
+                    }
+                }
+
+                ImGui::EndTabItem();
+            }
+
+            // Tab 7: Map Properties
+            const ImGuiTabItemFlags propertiesTabFlags = (m_paletteTabToSelect == 6)
                 ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
             if (ImGui::BeginTabItem("Properties", nullptr, propertiesTabFlags)) {
                 ImGui::Text("Map: %s", doc.GetName().c_str());
@@ -1239,6 +1343,12 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
             m_genParams.symmetry = static_cast<GeneratorSymmetry>(symInt);
         }
 
+        ImGui::SliderInt("Players", &m_genParams.players, 2, 8, "%d", ImGuiSliderFlags_AlwaysClamp);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Bases (start positions) of the map. 2 follows the symmetry above; more than 2 put the\n"
+                              "bases on a ring around the centre and make the terrain without symmetry.");
+        }
+
         // Every share in percent; hover a slider for the range measured on the original maps
         ImGui::SeparatorText("Shares, %");
         int settingCount = 0;
@@ -1262,16 +1372,65 @@ void EditorUI::RenderGeneratorModal(MapDocument& doc) {
 
         ImGui::Separator();
         if (ImGui::Button("Generate map", ImVec2(220, 36))) {
-            doc.PushUndoSnapshot();
-            MapGenerator::Generate(doc, m_genParams);
-            ShowToast("Map generated!");
             ImGui::CloseCurrentPopup();
+            RequestGenerate(doc, true);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
 
+        ImGui::EndPopup();
+    }
+}
+
+void EditorUI::RequestGenerate(MapDocument& doc, bool useCustomParams) {
+    if (!doc.IsModified()) {
+        doc.PushUndoSnapshot();
+        if (useCustomParams) {
+            MapGenerator::Generate(doc, m_genParams);
+        } else {
+            MapGenerator::GenerateQuick(doc);
+        }
+        ShowToast("Map generated!");
+    } else {
+        m_pendingGenWithCustomParams = useCustomParams;
+        m_openGenConfirmationReq = true;
+    }
+}
+
+void EditorUI::RenderGeneratorConfirmation(MapDocument& doc) {
+    if (m_openGenConfirmationReq) {
+        ImGui::OpenPopup("Unsaved changes##GenerateConfirmation");
+        m_openGenConfirmationReq = false;
+    }
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing,
+                            ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Unsaved changes##GenerateConfirmation", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("The map has unsaved changes that will be lost if you generate a new map.\n"
+                           "Do you want to proceed and generate a new map?");
+        ImGui::Separator();
+        if (ImGui::Button("Generate anyway", ImVec2(150, 36))) {
+            doc.PushUndoSnapshot();
+            if (m_pendingGenWithCustomParams) {
+                MapGenerator::Generate(doc, m_genParams);
+            } else {
+                MapGenerator::GenerateQuick(doc);
+            }
+            ShowToast("Map generated!");
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save first...", ImVec2(130, 36))) {
+            OpenSaveAsDialog(doc);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(100, 36))) {
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndPopup();
     }
 }
@@ -1309,6 +1468,88 @@ void EditorUI::RenderCloseConfirmation(MapDocument& doc) {
         if (ImGui::Button("Cancel", ImVec2(120, 36))) {
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndPopup();
+    }
+}
+
+void EditorUI::RenderContextMenu(MapDocument& doc, Camera& camera) {
+    if (m_openContextMenuReq) {
+        ImGui::OpenPopup("MapContextMenu");
+        m_openContextMenuReq = false;
+    }
+
+    if (ImGui::BeginPopup("MapContextMenu")) {
+        const int tx = m_contextMenuTileX;
+        const int ty = m_contextMenuTileY;
+        const int existingP = doc.FindStartPosAt(tx, ty);
+
+        static const char* kPlayerNames[8] = {
+            "Player 1 (Resistance HQ)", "Player 2 (Confederation HQ)",
+            "Player 3", "Player 4", "Player 5", "Player 6", "Player 7", "Player 8"
+        };
+
+        if (existingP >= 0) {
+            ImGui::Text("%s", kPlayerNames[existingP]);
+            ImGui::TextDisabled("Start position at (%d, %d)", tx, ty);
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Center camera here")) {
+                camera.CenterOn(tx * TILE_WIDTH + TILE_WIDTH * 0.5f,
+                                ty * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
+            }
+
+            if (existingP >= 2) {
+                if (ImGui::MenuItem("Remove this player start")) {
+                    doc.PushUndoSnapshot();
+                    doc.RemoveStartPos(existingP);
+                    ShowToast(std::string("Removed ") + kPlayerNames[existingP]);
+                }
+            }
+        } else {
+            ImGui::Text("Tile (%d, %d)", tx, ty);
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Set Player 1 Start (Resistance HQ)")) {
+                doc.PushUndoSnapshot();
+                doc.SetStartPos(0, tx, ty);
+                ShowToast("Player 1 start placed at (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+            }
+
+            if (ImGui::MenuItem("Set Player 2 Start (Confederation HQ)")) {
+                doc.PushUndoSnapshot();
+                doc.SetStartPos(1, tx, ty);
+                ShowToast("Player 2 start placed at (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+            }
+
+            if (doc.GetPlayerCount() < 8) {
+                std::string addLabel = "Add Player " + std::to_string(doc.GetPlayerCount() + 1) + " Start here";
+                if (ImGui::MenuItem(addLabel.c_str())) {
+                    doc.PushUndoSnapshot();
+                    doc.AddStartPos(tx, ty);
+                    ShowToast("Player " + std::to_string(doc.GetPlayerCount()) + " start added at (" +
+                              std::to_string(tx) + ", " + std::to_string(ty) + ")");
+                }
+            }
+
+            if (ImGui::BeginMenu("Move existing player start here...")) {
+                for (int i = 0; i < doc.GetPlayerCount(); ++i) {
+                    if (ImGui::MenuItem(kPlayerNames[i])) {
+                        doc.PushUndoSnapshot();
+                        doc.SetStartPos(i, tx, ty);
+                        ShowToast("Moved " + std::string(kPlayerNames[i]) + " to (" +
+                                  std::to_string(tx) + ", " + std::to_string(ty) + ")");
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::Separator();
+            if (ImGui::MenuItem("Center camera here")) {
+                camera.CenterOn(tx * TILE_WIDTH + TILE_WIDTH * 0.5f,
+                                ty * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
+            }
+        }
+
         ImGui::EndPopup();
     }
 }

@@ -5,6 +5,12 @@
 #include <iostream>
 #include <string>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#endif
+
 namespace
 {
 const char *const kHelp = R"(Usage: openaow [options]
@@ -15,6 +21,8 @@ Single player:
   --map=<name|path>             start a custom game on this map (a name from assets/maps or a .json path)
   --from-scratch                start from scratch (only HQ and power plant, no units)
   --testmap, --test-map, -tm    open the test polygon (assets/maps/testmap.json)
+  --replay=<file.awr>           watch a recorded network game (a bare .awr path works too; replays are saved in
+                                the user's folder replays/ after every network game)
 
 Network game (the same --map picks the match map):
   --host[=port]                 host a LAN game (default port 38100)
@@ -40,6 +48,23 @@ Debug builds only (cmake -DAOW_DEBUG=ON):
 
 int main(int argc, char *argv[])
 {
+#if defined(_WIN32)
+    if (AttachConsole(ATTACH_PARENT_PROCESS))
+    {
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut == NULL || hOut == INVALID_HANDLE_VALUE || GetFileType(hOut) == FILE_TYPE_UNKNOWN)
+        {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stdout);
+        }
+        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+        if (hErr == NULL || hErr == INVALID_HANDLE_VALUE || GetFileType(hErr) == FILE_TYPE_UNKNOWN)
+        {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stderr);
+        }
+    }
+#endif
     bool testMode = false;
     bool debugMode = false;
     bool testMapMode = false;
@@ -54,6 +79,7 @@ int main(int argc, char *argv[])
     std::string netMapName; // resolved through LoaderResources once the assets are found
     std::string netName = "Player";
     std::string netServer;
+    std::string replayFile; // --replay=<file.awr>: watch a recorded network game
     bool netServerCreate = false;
     std::string netServerCode;
     for (int i = 1; i < argc; ++i)
@@ -104,6 +130,10 @@ int main(int argc, char *argv[])
             netServerCode = arg.substr(14);
         if (arg.rfind("--map=", 0) == 0)
             netMapName = arg.substr(6);
+        if (arg.rfind("--replay=", 0) == 0)
+            replayFile = arg.substr(9);
+        else if (arg.size() > 4 && arg.compare(arg.size() - 4, 4, ".awr") == 0)
+            replayFile = arg; // a replay file given as it is (opened with the game)
         if (arg == "--from-scratch")
             fromScratch = true;
         if (arg.rfind("--name=", 0) == 0)
@@ -196,6 +226,8 @@ int main(int argc, char *argv[])
                 app.AnnounceNetworkGame(host, port);
             }
         }
+        if (!restart && !replayFile.empty())
+            app.OpenReplay(replayFile);
         if (!restart && !netJoin.empty())
             app.JoinNetworkGame(netJoin, netPort, netName);
         if (!restart && !netServer.empty() && (netServerCreate || !netServerCode.empty()))

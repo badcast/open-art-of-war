@@ -150,6 +150,10 @@ void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const U
         blockedTimer += deltaTime;
     else
         blockedTimer = 0.0f;
+    if (tileX != blockedTileX || tileY != blockedTileY)
+        blockRetries = 0; // it moved on: the next blockage gets its tries again
+    if (blockRetryTimer > 0.0f)
+        blockRetryTimer -= deltaTime;
     blockedTileX = tileX;
     blockedTileY = tileY;
     if (secondaryCooldownTimer > 0.0f)
@@ -214,7 +218,7 @@ void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const U
     if (state == ActionState::Move)
     {
         animTimer += deltaTime;
-        if (animTimer >= 0.09f)
+        if (animTimer >= moveFrameTime)
         {
             animTimer = 0.0f;
             animFrame++;
@@ -223,7 +227,8 @@ void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const U
     else if (state == ActionState::Attack)
     {
         animTimer += deltaTime;
-        float stepDelay = (archetypeId == 7 || archetypeId == 18) ? 0.04f : 0.07f;
+        float stepDelay
+            = attackFrameTime > 0.0f ? attackFrameTime : ((archetypeId == 7 || archetypeId == 18) ? 0.04f : 0.07f);
         if (animTimer >= stepDelay)
         {
             animTimer = 0.0f;
@@ -256,8 +261,18 @@ void Unit::UpdateBurst(float deltaTime, TileMap &map, const UnitDelegates &deleg
         {
             burstShotsRemaining--;
             burstTimer = burstDelay;
-            state = ActionState::Attack;
-            attackAnimTimer = 0.15f;
+            // The cooldown counts from the last shot of the burst (ticks stretch a burst, so the nominal span is not
+            // enough)
+            if (burstShotsRemaining == 0)
+                cooldownTimer = std::max(cooldownTimer, NextCooldown());
+            // Every shot of a burst plays its own firing picture (the flash starts over with the rocket)
+            if (state == ActionState::Idle || state == ActionState::Attack)
+            {
+                state = ActionState::Attack;
+                animFrame = 0;
+                animTimer = 0.0f;
+            }
+            attackAnimTimer = burstPoseTime;
 
             if (targetEntityId != 0)
             {
@@ -339,6 +354,12 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
                 sightRadius = cfg->sightRadius;
                 burstCount = cfg->burstCount;
                 burstDelay = cfg->burstDelay;
+                moveFrameTime = cfg->moveFrameTime;
+                attackFrameTime = cfg->attackFrameTime;
+                attackPoseTime = cfg->attackPoseTime;
+                burstPoseTime = cfg->burstPoseTime;
+                flashMode = cfg->flashMode;
+                flashFrames = cfg->flashFrames;
                 projectile = cfg->projectile;
                 hasRotatingTurret = cfg->hasRotatingTurret;
                 muzzleOffsetX = cfg->muzzleOffsetX;
@@ -851,6 +872,19 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
                     return true;
                 }
             }
+        }
+
+        // D0. A crowd of friends shuts the tile for the moment: ask the same road again a few times (a short pause
+        //     each) before planning a way around, which can lead the unit in a big circle
+        if (blocker && blocker->alive && blocker->state != ActionState::Die && !Players::Hostile(blocker->owner, owner)
+            && blockRetries < kBlockRetries && targetEntityId == 0) // (a unit closing in on a target keeps looking for its firing spot)
+        {
+            if (blockRetryTimer <= 0.0f)
+            {
+                ++blockRetries;
+                blockRetryTimer = kBlockRetryPause;
+            }
+            return true;
         }
 
         // D. Full Bypass Re-pathing around the blocked tile
@@ -1417,6 +1451,87 @@ bool Unit::HasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) co
     return !partial || touches(route.back().x, route.back().y);
 }
 
+bool Unit::StanceAllowsTarget(const Entity &candidate) const
+{
+    if (stance != UnitStance::PursueAndReturn || isAttackMoving || stanceHomeX < 0)
+        return true;
+    const int cx = static_cast<int>(candidate.GetUnitCenterPixelX() / TILE_WIDTH);
+    const int cy = static_cast<int>(candidate.GetUnitCenterPixelY() / TILE_HEIGHT);
+    return std::max(std::abs(cx - stanceHomeX), std::abs(cy - stanceHomeY)) <= StanceLeashTiles();
+}
+
+void Unit::UpdateStanceHome(Pathfinder &pathfinder)
+{
+    if (stance != UnitStance::PursueAndReturn || moveSpeed <= 0.0f || isSiegeMode)
+    {
+        stanceHomeX = stanceHomeY = -1;
+        stanceReturning = false;
+        return;
+    }
+    // A player order owns the unit; the home becomes the place where the order ends
+    const bool ordered = HasMoveTarget() || isAttackMoving || !orderQueue.empty() || isManualWallTarget || holdPosition
+                         || (orderedTargetId != 0 && targetEntityId == orderedTargetId);
+    if (ordered)
+    {
+        stanceHomeX = stanceHomeY = -1;
+        stanceReturning = false;
+        return;
+    }
+    const bool settled
+        = state == ActionState::Idle && targetEntityId == 0 && targetWallTileX < 0 && path.empty() && !waitingForPath;
+    if (stanceHomeX < 0)
+    {
+        if (settled)
+        {
+            stanceHomeX = tileX;
+            stanceHomeY = tileY;
+        }
+        return;
+    }
+    const int away = std::max(std::abs(tileX - stanceHomeX), std::abs(tileY - stanceHomeY));
+    if (stanceReturning)
+    {
+        if (state != ActionState::Move || path.empty())
+        {
+            // Back home, or as near as the way allows: that is where it stands now
+            stanceReturning = false;
+            stanceHomeX = tileX;
+            stanceHomeY = tileY;
+        }
+        return;
+    }
+    const bool tooFar = targetEntityId != 0 && away > StanceLeashTiles();
+    const bool chaseOver = settled && away > 1;
+    if (!tooFar && !chaseOver)
+        return;
+    targetEntityId = 0;
+    isDirectEngaged = false;
+    isSupportAssisting = false;
+    lastAttackerId = 0;
+    lastAttackedTimer = 0.0f;
+    ClearPathState();
+    bool partial = false;
+    if (pathfinder.FindPath(tileX, tileY, stanceHomeX, stanceHomeY, path, id, &partial) && !path.empty())
+    {
+        pathIndex = 0;
+        state = ActionState::Move;
+        animFrame = 0;
+        stanceReturning = true;
+    }
+    else
+    {
+        // No way back: this is the new home
+        path.clear();
+        stanceHomeX = tileX;
+        stanceHomeY = tileY;
+        if (state == ActionState::Attack || state == ActionState::Move)
+        {
+            state = ActionState::Idle;
+            animFrame = 0;
+        }
+    }
+}
+
 void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
 {
     if (state == ActionState::Transform || attackDamage <= 0 || state == ActionState::Die)
@@ -1424,6 +1539,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         isDirectEngaged = false;
         return;
     }
+    if (orderedTargetId != 0 && targetEntityId != orderedTargetId)
+        orderedTargetId = 0; // the ordered target is gone (or the unit was given something else)
+    UpdateStanceHome(pathfinder);
 
     // Pure retreat / ground move order (!isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
     // must NOT be interrupted by auto-targeting:
@@ -1604,9 +1722,10 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             }
         }
 
-        if (cooldownTimer <= 0.0f)
+        // A new volley waits for the burst in progress; the cooldown counts from the burst's last shot
+        if (cooldownTimer <= 0.0f && burstShotsRemaining == 0)
         {
-            cooldownTimer = NextCooldown();
+            cooldownTimer = NextCooldown() + burstDelay * static_cast<float>(std::max(0, burstCount - 1));
 
             if (IsFortress())
             {
@@ -1634,7 +1753,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 }
             }
 
-            attackAnimTimer = IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
+            attackAnimTimer = attackPoseTime >= 0.0f
+                                  ? attackPoseTime
+                                  : (IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f));
             animFrame = 0;
             animTimer = 0.0f;
             state = ActionState::Attack;
@@ -1702,8 +1823,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
     //     position, deployed (siege), immobile, breaching a wall, or fighting something it can hit already.
     //     A plain move order never gets here (see the early return above), so explicit moves are kept.
     if (lastAttackedTimer > 0.0f && lastAttackerId != 0 && lastAttackerId != targetEntityId
-        && !(state == ActionState::Move && !isAttackMoving) && !holdPosition && !isSiegeMode && moveSpeed > 0.0f
-        && targetWallTileX < 0 && attackDamage > 0 && state != ActionState::Transform)
+        && !(state == ActionState::Move && !isAttackMoving) && !HoldsGround() && !isSiegeMode && moveSpeed > 0.0f
+        && targetWallTileX < 0 && attackDamage > 0 && state != ActionState::Transform
+        && (targetEntityId == 0 || targetEntityId != orderedTargetId))
     {
         Entity *attacker = delegates.getEntity ? delegates.getEntity(lastAttackerId) : nullptr;
         if (attacker && attacker->alive && attacker->state != ActionState::Die
@@ -1747,12 +1869,20 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 Entity *cand = delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
                 bool validForUnit = (cand != nullptr);
-                if (validForUnit && (isSiegeMode || moveSpeed <= 0.0f))
+                if (validForUnit && (isSiegeMode || moveSpeed <= 0.0f || HoldsGround()))
                 {
-                    // Siege mode units ONLY acquire targets strictly within attackRange
+                    // Siege mode and holding units ONLY acquire targets strictly within attackRange
                     float d = ComputeDistanceToEntityPixels(*this, *cand);
                     validForUnit = (d <= attackRange * TILE_WIDTH);
+                    if (!validForUnit && HoldsGround() && delegates.findEnemyInAttackRange)
+                    {
+                        bestTargetId = delegates.findEnemyInAttackRange(*this);
+                        cand = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                        validForUnit = cand != nullptr;
+                    }
                 }
+                if (validForUnit && !StanceAllowsTarget(*cand))
+                    validForUnit = false;
                 if (validForUnit && !isManualWallTarget)
                 {
                     targetEntityId = bestTargetId;
@@ -1791,7 +1921,7 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
         // Chain Support Assist (strictly depth = 1):
         // Only mobile idle units without a target assist a directly engaged frontline ally in attackRange.
-        if (targetEntityId == 0 && state == ActionState::Idle && !isSiegeMode && !holdPosition && moveSpeed > 0.0f
+        if (targetEntityId == 0 && state == ActionState::Idle && !isSiegeMode && !HoldsGround() && moveSpeed > 0.0f
             && !waitingForPath && !isManualWallTarget)
         {
             if (delegates.findSupportAlly)
@@ -1801,7 +1931,7 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 if (supportAllyId != 0 && supportEnemyId != 0)
                 {
                     Entity *enemy = delegates.getEntity ? delegates.getEntity(supportEnemyId) : nullptr;
-                    if (enemy && enemy->alive && enemy->state != ActionState::Die)
+                    if (enemy && enemy->alive && enemy->state != ActionState::Die && StanceAllowsTarget(*enemy))
                     {
                         targetEntityId = supportEnemyId;
                         targetWallTileX = -1;
@@ -1839,8 +1969,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 if (nextTargetId != 0)
                 {
                     Entity *cand = delegates.getEntity ? delegates.getEntity(nextTargetId) : nullptr;
-                    if (cand
-                        && (!isSiegeMode || ComputeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
+                    if (cand && StanceAllowsTarget(*cand)
+                        && (!(isSiegeMode || HoldsGround())
+                            || ComputeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
                     {
                         targetEntityId = nextTargetId;
                         return;
@@ -1881,18 +2012,65 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             return;
         }
 
+        // 5a'. A more dangerous enemy in range comes before the current one (a building, an unarmed unit);
+        //      an ordered target stays
+        retargetCooldown -= deltaTime;
+        if (retargetCooldown <= 0.0f && targetEntityId != orderedTargetId && TargetPriorityTier(*target) > 0
+            && delegates.findEnemyInAttackRange)
+        {
+            retargetCooldown = 0.5f;
+            const int betterId = delegates.findEnemyInAttackRange(*this);
+            const Entity *better = betterId != 0 && delegates.getEntity ? delegates.getEntity(betterId) : nullptr;
+            if (better && betterId != targetEntityId && TargetPriorityTier(*better) < TargetPriorityTier(*target))
+            {
+                targetEntityId = betterId;
+                isSupportAssisting = false;
+                return;
+            }
+        }
+
         // 5b. Fog of War Visibility Gate (multi-tile aware via delegates.isEntityVisible)
         //     A shooter that just hit this unit is chased even unseen (the unit knows where the fire came from)
         const bool chasingAttacker = targetEntityId == lastAttackerId && lastAttackedTimer > 0.0f;
-        if (!chasingAttacker && delegates.isEntityVisible && !delegates.isEntityVisible(*target, owner))
+        const bool targetSeen = !delegates.isEntityVisible || delegates.isEntityVisible(*target, owner);
+        if (targetSeen)
         {
-            targetEntityId = 0;
-            isDirectEngaged = false;
-            isSupportAssisting = false;
-            if (state != ActionState::Move)
+            lastSeenTargetX = target->tileX;
+            lastSeenTargetY = target->tileY;
+        }
+        else if (!chasingAttacker)
+        {
+            // An ordered target and any building (it cannot move off) are not forgotten when they leave the
+            // team's sight: the unit walks on to where it last saw them and fires only once they are in sight again
+            const bool keepTarget = (targetEntityId == orderedTargetId || target->isBuilding) && moveSpeed > 0.0f
+                                    && !isSiegeMode && !HoldsGround() && lastSeenTargetX >= 0;
+            const bool reachedLastSeen
+                = !target->isBuilding && std::abs(tileX - lastSeenTargetX) <= 1 && std::abs(tileY - lastSeenTargetY) <= 1;
+            if (!keepTarget || reachedLastSeen)
             {
-                state = ActionState::Idle;
-                animFrame = 0;
+                targetEntityId = 0;
+                lastSeenTargetX = lastSeenTargetY = -1;
+                isDirectEngaged = false;
+                isSupportAssisting = false;
+                if (state != ActionState::Move)
+                {
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+                return;
+            }
+            isDirectEngaged = false;
+            if (state != ActionState::Move && !waitingForPath)
+            {
+                bool isPartial = false;
+                const int gx = target->isBuilding ? target->tileX : lastSeenTargetX;
+                const int gy = target->isBuilding ? target->tileY : lastSeenTargetY;
+                if (pathfinder.FindPath(tileX, tileY, gx, gy, path, id, &isPartial))
+                {
+                    pathIndex = 0;
+                    state = ActionState::Move;
+                }
+                waitingForPath = isPartial;
             }
             return;
         }
@@ -1905,12 +2083,37 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         float dy = dstY - srcY;
         float dist = ComputeDistanceToEntityPixels(*this, *target);
 
+        // 5b'. The second gun fires on its own beside the main one, at the same target, in its own range
+        if (hasSecondary && secondaryCooldownTimer <= 0.0f && delegates.spawnProjectile
+            && dist <= secondaryRange * TILE_WIDTH && dist >= secondaryMinRange * TILE_WIDTH)
+        {
+            secondaryCooldownTimer = secondaryCooldown;
+            const int mainDamage = attackDamage, mainSplash = splashPercent;
+            const ProjectileType mainProjectile = projectile;
+            const float mainMuzzleX = muzzleOffsetX, mainMuzzleY = muzzleOffsetY;
+            const bool mainCustomTurret = hasCustomTurretOffset;
+            attackDamage = secondaryDamage;
+            splashPercent = secondarySplash;
+            projectile = secondaryProjectile;
+            muzzleOffsetX = secondaryMuzzleX;
+            muzzleOffsetY = secondaryMuzzleY;
+            float mSrcX, mSrcY;
+            GetMuzzlePoint(mSrcX, mSrcY);
+            delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+            attackDamage = mainDamage;
+            splashPercent = mainSplash;
+            projectile = mainProjectile;
+            muzzleOffsetX = mainMuzzleX;
+            muzzleOffsetY = mainMuzzleY;
+            hasCustomTurretOffset = mainCustomTurret;
+        }
+
         // 5c. Out-of-Range Check (Crucial for Siege Mode Anti-Vibration!)
         if (dist > attackRange * TILE_WIDTH)
         {
             isDirectEngaged = false;
 
-            if (isSiegeMode || moveSpeed <= 0.0f || holdPosition)
+            if (isSiegeMode || moveSpeed <= 0.0f || HoldsGround())
             {
                 // Immobile siege unit MUST drop unreachable target immediately without rotating or flickering
                 targetEntityId = 0;
@@ -1975,7 +2178,11 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
         if (!isSiegeMode)
         {
+            // (the turn in place that aims a hull without a turret must keep counting: clearing the path state resets
+            // its timer, and a vehicle whose step takes longer than a tick then never turned to its target)
+            const float turnProgress = turnTimer;
             ClearPathState();
+            turnTimer = turnProgress;
             if (state == ActionState::Move)
             {
                 state = ActionState::Idle;
@@ -2026,9 +2233,10 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             }
         }
 
-        if (cooldownTimer <= 0.0f)
+        // A new volley waits for the burst in progress; the cooldown counts from the burst's last shot
+        if (cooldownTimer <= 0.0f && burstShotsRemaining == 0)
         {
-            cooldownTimer = NextCooldown();
+            cooldownTimer = NextCooldown() + burstDelay * static_cast<float>(std::max(0, burstCount - 1));
 
             if (IsFortress())
             {
@@ -2056,7 +2264,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 }
             }
 
-            attackAnimTimer = IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f);
+            attackAnimTimer = attackPoseTime >= 0.0f
+                                  ? attackPoseTime
+                                  : (IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f));
             animFrame = 0;
             animTimer = 0.0f;
             state = ActionState::Attack;

@@ -9,12 +9,15 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=openaow
-ExecStart=/usr/local/bin/openaow-server --name "openaow.imister.tech" --log-file /var/log/openaow-server.log
+ExecStart=/usr/local/bin/openaow-server --name "openaow.imister.tech" --log-file /var/log/openaow-server.log --dir-replay /var/lib/openaow-server/replay
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/var/log
+# The replay of every match (with the players' addresses): private, kept in the state directory
+StateDirectory=openaow-server
+StateDirectoryMode=0750
 
 [Install]
 WantedBy=multi-user.target

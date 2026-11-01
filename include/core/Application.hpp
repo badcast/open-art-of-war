@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game/Match.hpp"
+
 #include "core/Config.hpp"
 #include "core/EnvironmentConfig.hpp"
 #include "ui/MapPreview.hpp"
@@ -18,6 +20,8 @@ struct SDL_Texture;
 namespace OpenArtOfWar
 {
 class GameSounds;
+class ReplayPlayer;
+class ReplayMenu;
 
 class TextureManager;
 class Renderer;
@@ -67,6 +71,9 @@ public:
     {
         return m_debugMode;
     }
+    // Opens a recorded network game (.awr) and plays it back; false (with the reason on the replay screen) when it
+    // cannot be played
+    bool OpenReplay(const std::string &path);
     void LaunchTestMap();
     // Single-player game on a map straight from the command line (--map=<name|path>, --from-scratch):
     // the same start as a custom game picked in the menu. False when the map is unknown or fails to load.
@@ -147,6 +154,8 @@ private:
     // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat
     void UpdateSounds();
     std::unique_ptr<GameSounds> m_gameSounds;
+    float m_endScreenTimer {0.0f}; // seconds on the Victory / Defeat screen
+    static constexpr float kEndScreenInputDelay = 2.0f; // input is ignored this long after the match ends
     AppState m_soundState {AppState::SplashLogo}; // the state the last updateSounds saw
     // Draws the loading screen right now (for work that blocks the main loop: start-up, loading a match); the window
     // stays alive. `progress` 0..1, negative for an unknown length. Nothing in headless mode.
@@ -222,9 +231,40 @@ private:
     bool m_netAuto {false}; // command-line game: ready by itself, the room starts by itself
     uint32_t m_netAutoMs {0};
     void UpdateServer();
+    // --- Replay (.awr): a recorded network game played back through the simulation (ApplicationReplay.cpp)
+    std::unique_ptr<ReplayPlayer> m_replay;
+    std::unique_ptr<ReplayMenu> m_replayMenu;
+    MatchSetup m_replaySetup; // the recorded match, `local` = who is watched
+    struct ReplayUi
+    {
+        bool paused {false};
+        int speed {1}; // index into the speeds
+        int watch {-1}; // slot whose view is shown; -1: the observer sees everything
+        bool follow {false};
+        bool finished {false};
+        double accumulator {0.0};
+        float lastCamX {0.0f}, lastCamY {0.0f}, lastCamZoom {0.0f};
+        bool cameraSet {false};
+    } m_replayUi;
+    bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
+    std::string m_pendingReplay; // a file dropped on the window / given on the command line, opened when possible
+    bool StartReplay(int watchSlot);
+    void CloseReplay();
+    void ReplayWatch(int slot);
+    void UpdateReplay(double frameTime);
+    void UpdateReplayInput(double frameTime);
+    void RenderReplayBar();
+    // The observer of a replay sees the whole map (drawing only: the simulation's fog is part of the match)
+    bool ReplayShowsAll() const
+    {
+        return m_replay && m_replayUi.watch < 0;
+    }
     bool m_textInput {false};
     void UpdateNetworkMenu();
     void LeaveNetworkGame();
+    // Reads the simulation data (characters, research, projectiles, ...) again: a network game plays with the host's
+    // files
+    void ReloadGameData();
     int m_netWantedPlayers {2};
     std::string m_netMapPath;
     bool m_netMatchStarted {false};

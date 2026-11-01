@@ -509,6 +509,11 @@ void SoundEngine::SetMusicVolume(int volume)
     ApplyGain();
 }
 
+void SoundEngine::SetReverb(bool enabled)
+{
+    m_sfx.SetReverb(enabled);
+}
+
 void SoundEngine::SetFxVolume(int volume)
 {
     m_fxVolume = std::clamp(volume, 0, 128);
@@ -521,15 +526,35 @@ void SoundEngine::SetVoiceVolume(int volume)
     m_voices.SetVolume(m_voiceVolume);
 }
 
-void SoundEngine::PlaySfx(const std::string &event, float gain, float pan)
+void SoundEngine::PlaySfx(const std::string &event, float gain, float pan, float muffle)
 {
     if (!m_sfxStream)
         return;
-    const bool played = m_sfx.Play(event, gain, pan, SDL_GetTicks());
+    const bool played = m_sfx.Play(event, gain, pan, SDL_GetTicks(), muffle);
     // OAOW_SFX_TRACE=1 (debug builds): every sound that starts, to check the events without listening
     static const bool trace = DebugEnv("OAOW_SFX_TRACE") != nullptr;
     if (trace && played)
         std::cout << "[Sfx] " << event << " gain " << gain << " pan " << pan << std::endl;
+}
+
+void SoundEngine::PlaySfx(WorldSfx sound, float gain, float pan, float muffle)
+{
+    PlaySfx(std::string(SoundIds::Name(sound)), gain, pan, muffle);
+}
+
+const SfxMixer::EventConfig *SoundEngine::SfxConfig(WorldSfx sound) const
+{
+    return m_sfx.Config(SoundIds::Name(sound));
+}
+
+void SoundEngine::Announce(Announcement line)
+{
+    Announce(std::string(SoundIds::Name(line)));
+}
+
+void SoundEngine::PlayVoice(UnitReply reply, bool infantry)
+{
+    PlayVoice(std::string(SoundIds::Name(reply, infantry)));
 }
 
 void SoundEngine::Announce(const std::string &event)

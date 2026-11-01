@@ -33,9 +33,34 @@ public:
     InputManager();
 
     void Update(float deltaTime, Camera &camera);
-    void UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles);
+    void UpdateCamera(
+        float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles, bool menuOpen = false);
     void UpdateKeystates();
     bool ProcessEvent(const SDL_Event &event, Camera &camera);
+
+    void SetEdgePanMargin(int margin)
+    {
+        m_edgePanMargin = std::clamp(margin, 5, 30);
+    }
+    int GetEdgePanMargin() const
+    {
+        return m_edgePanMargin;
+    }
+
+    void SetMenuOpen(bool open)
+    {
+        m_menuOpen = open;
+    }
+    bool IsMenuOpen() const
+    {
+        return m_menuOpen;
+    }
+
+    void SetMouseScreenPosition(int x, int y)
+    {
+        m_mouseScreenX = x;
+        m_mouseScreenY = y;
+    }
 
     // Queries
     bool isKeyPressed(SDL_Scancode scancode) const;
@@ -173,6 +198,8 @@ private:
     int m_wheel {0};
     std::string m_typed;
     int m_backspaces {0};
+    int m_edgePanMargin {5};
+    bool m_menuOpen {false};
 };
 
 } // namespace OpenArtOfWar

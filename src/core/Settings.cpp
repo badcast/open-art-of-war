@@ -28,6 +28,7 @@ void Settings::Clamp()
     fxVolume = std::clamp(fxVolume, 0, 128);
     voiceVolume = std::clamp(voiceVolume, 0, 128);
     difficulty = std::clamp(difficulty, 0, 3);
+    edgePanMargin = std::clamp(edgePanMargin, kMinEdgePanMargin, kMaxEdgePanMargin);
     if (language != "en" && language != "ru")
         language = "en";
     if (playerName.empty())
@@ -76,12 +77,14 @@ bool Settings::Save(const std::string &path) const
         j["sharpPixels"] = sharpPixels;
         j["musicVolume"] = musicVolume;
         j["fxVolume"] = fxVolume;
+        j["reverb"] = reverb;
         j["voiceVolume"] = voiceVolume;
         j["muted"] = muted;
         j["language"] = language;
         j["playerName"] = playerName;
         j["lastAddress"] = lastAddress;
         j["difficulty"] = difficulty;
+        j["edgePanMargin"] = edgePanMargin;
 
         return JsonFile::WriteAtomic(path, j);
     }
@@ -122,12 +125,14 @@ bool Settings::load(const std::string &path)
         sharpPixels = j.value("sharpPixels", sharpPixels);
         musicVolume = j.value("musicVolume", musicVolume);
         fxVolume = j.value("fxVolume", fxVolume);
+        reverb = j.value("reverb", reverb);
         voiceVolume = j.value("voiceVolume", voiceVolume);
         muted = j.value("muted", muted);
         language = j.value("language", language);
         playerName = j.value("playerName", playerName);
         lastAddress = j.value("lastAddress", lastAddress);
         difficulty = j.value("difficulty", difficulty);
+        edgePanMargin = j.value("edgePanMargin", edgePanMargin);
         Clamp();
         return true;
     }

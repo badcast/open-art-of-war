@@ -239,10 +239,24 @@ bool CharacterEditor::EditYamlTree(CommentedYaml& y, const std::string& path, in
 void CharacterEditor::SaveActiveSettings() {
     switch (editorMode) {
         case EditorMode::Explosions:
-        case EditorMode::Wrecks: SaveYamlFile(effectsYaml); break;
-        case EditorMode::Projectiles: SaveYamlFile(projectilesYaml); break;
-        case EditorMode::GameUi: SaveYamlFile(uiYaml); break;
-        case EditorMode::AiDifficulty: SaveYamlFile(aiYaml); break;
+        case EditorMode::Wrecks:
+            if (SaveYamlFile(effectsYaml)) {
+                EffectsChanged();
+                ApplySaved(false);
+            }
+            break;
+        case EditorMode::Projectiles:
+            if (SaveYamlFile(projectilesYaml)) {
+                ProjectilesChanged();
+                ApplySaved(false);
+            }
+            break;
+        case EditorMode::GameUi:
+            if (SaveYamlFile(uiYaml)) ApplySaved(false);
+            break;
+        case EditorMode::AiDifficulty:
+            if (SaveYamlFile(aiYaml)) ApplySaved(false);
+            break;
         case EditorMode::Environment: SaveEnvironment(); break;
         default: break;
     }

@@ -26,24 +26,32 @@ void InputManager::UpdateKeystates()
     }
 }
 
-void InputManager::UpdateCamera(float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles)
+void InputManager::UpdateCamera(
+    float frameDeltaTime, Camera &camera, int mapWidthTiles, int mapHeightTiles, bool menuOpen)
 {
+    if (menuOpen || m_menuOpen)
+    {
+        return;
+    }
     float panSpeed = 650.0f * frameDeltaTime; // pixels/sec in world space
     float curX = camera.GetX();
     float curY = camera.GetY();
-    if (m_keystates[SDL_SCANCODE_W] || m_keystates[SDL_SCANCODE_UP])
+    const int margin = m_edgePanMargin;
+    if ((m_keystates && (m_keystates[SDL_SCANCODE_W] || m_keystates[SDL_SCANCODE_UP])) || m_mouseScreenY <= margin)
     {
         curY -= panSpeed;
     }
-    if (m_keystates[SDL_SCANCODE_S] || m_keystates[SDL_SCANCODE_DOWN])
+    if ((m_keystates && (m_keystates[SDL_SCANCODE_S] || m_keystates[SDL_SCANCODE_DOWN]))
+        || m_mouseScreenY >= camera.GetViewportHeight() - margin)
     {
         curY += panSpeed;
     }
-    if (m_keystates[SDL_SCANCODE_A] || m_keystates[SDL_SCANCODE_LEFT])
+    if ((m_keystates && (m_keystates[SDL_SCANCODE_A] || m_keystates[SDL_SCANCODE_LEFT])) || m_mouseScreenX <= margin)
     {
         curX -= panSpeed;
     }
-    if (m_keystates[SDL_SCANCODE_D] || m_keystates[SDL_SCANCODE_RIGHT])
+    if ((m_keystates && (m_keystates[SDL_SCANCODE_D] || m_keystates[SDL_SCANCODE_RIGHT]))
+        || (m_mouseScreenX >= camera.GetViewportWidth() - margin && m_mouseScreenX < camera.GetViewportWidth()))
     {
         curX += panSpeed;
     }
@@ -193,7 +201,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
 
         case SDL_EVENT_MOUSE_MOTION:
         {
-            if (m_middleMouseDown)
+            if (m_middleMouseDown && !m_menuOpen)
             {
                 float dx = static_cast<float>(m_lastMouseX - static_cast<int>(event.motion.x));
                 float dy = static_cast<float>(m_lastMouseY - static_cast<int>(event.motion.y));

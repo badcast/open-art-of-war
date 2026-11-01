@@ -150,6 +150,17 @@ public:
         return it == m_peers.end() ? 0 : it->second->roundTripTime;
     }
 
+    std::string peerAddress(PeerId peer) const override
+    {
+        auto it = m_peers.find(peer);
+        if (it == m_peers.end())
+            return {};
+        char ip[64] = {};
+        if (enet_address_get_host_ip(&it->second->address, ip, sizeof ip) != 0)
+            return {};
+        return std::string(ip) + ":" + std::to_string(it->second->address.port);
+    }
+
     LinkStats linkStats(PeerId peer) const override
     {
         LinkStats s;

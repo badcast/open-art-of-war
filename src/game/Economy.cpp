@@ -116,6 +116,22 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
     }
     m_seenKills = kills;
 
+    // Repairs of the player's buildings, paid as they go (computer players repair from their own treasury)
+    if (Players::Slot(player).human)
+    {
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Building *seen = e.AsBuilding();
+            if (!seen || seen->owner != player || !seen->repairing)
+                continue;
+            Building *b = entities.GetBuilding(e.id);
+            if (!b || !b->repairing)
+                continue;
+            const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
+            m_credits -= b->RepairStep(deltaTime, cfg ? cfg->creditCost : 0, m_credits);
+        }
+    }
+
     // 2. Count structures for power balance
     int powerProd = 0;
     int powerCons = 0;
@@ -208,7 +224,7 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
 
     for (const Spawn &sp : spawns)
     {
-        int unitId = entities.SpawnUnitByArchetype(sp.archetype, sp.x, sp.y, faction, player);
+        int unitId = entities.SpawnUnitByArchetype(ProductionForm(player, sp.archetype), sp.x, sp.y, faction, player);
         if (Unit *u = entities.GetUnit(unitId))
             ApplyCompletedResearch(*u);
         if (unitId > 0 && (sp.rallyX != sp.x || sp.rallyY != sp.y))

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,13 @@ inline constexpr const char *kCertificateName = "certificate.sha256";
 // are checked, never a per-user copy. A plain assets directory has no certificate and is not checked (true).
 // False with a readable report in `problems` (one line per file); `certificatePath` names the blob's certificate.
 bool VerifyCertificate(std::vector<std::string> &problems, std::string &certificatePath);
+
+// A session overlay: data files (key "characters/x.yaml") that win over the installed ones until it is cleared. It
+// lives in memory only (never in assets/ or the user directory), so it ends with the game; the network game uses it to
+// play with the host's simulation data. The keys are paths below assets/.
+void SetSessionOverlay(std::map<std::string, std::vector<uint8_t>> files);
+void ClearSessionOverlay();
+bool HasSessionOverlay();
 
 bool Exists(const std::string &path);
 bool ReadBytes(const std::string &path, std::vector<uint8_t> &out);

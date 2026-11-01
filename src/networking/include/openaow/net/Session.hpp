@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -42,13 +43,23 @@ struct HostConfig
     uint32_t maxPauseMs {120000};       // a pause ends by itself after this
     uint32_t reconnectWindowMs {60000}; // a player who dropped out of a running match is given up after this
     std::string password;               // joining asks for it (empty: open)
+    // The data files of the simulation this host plays with (path, hash). A client whose data differ and that can
+    // sync (Hello::canSync) is sent this list and may ask for the files; empty: such a client is turned away.
+    std::vector<DataEntry> dataManifest;
+    // Answers a file request: the file of `path` compressed (at most kMaxFileBytes) and the hash of its bytes; false
+    // when the host does not serve it. Only paths of dataManifest are asked.
+    std::function<bool(const std::string &path, std::vector<uint8_t> &packed, uint64_t &hash)> dataFile;
+    // A dedicated server's room keeps the replay of every match here (empty: no recording) and tells what happens
+    // (who connects from which address, the replay saved) to `log`
+    std::string replayDir;
+    std::function<void(const std::string &line)> log;
 };
 
 class SessionHost
 {
 public:
     explicit SessionHost(HostConfig config);
-    ~SessionHost();
+    ~SessionHost(); // saves the replay of a match still running
 
     // Players can come in through several transports (a listen server: ENet + its own loopback client)
     void addTransport(std::unique_ptr<Transport> transport);
@@ -121,7 +132,9 @@ private:
     {
         size_t transport {0};
         PeerId peer {0};
-        int slot {-1}; // -1: not through the handshake yet
+        int slot {-1};        // -1: not through the handshake yet
+        bool syncing {false}; // its data differ: it may fetch the manifest's files before saying hello again
+        uint32_t syncStartMs {0};
     };
     struct SlotState
     {
@@ -142,7 +155,7 @@ private:
     // The classic look (0) and anything else is left as it is.
     uint8_t freeColor(uint8_t slot, uint8_t preferred) const;
     void handle(size_t connection, const TransportEvent &e, uint32_t nowMs);
-    void handleHello(size_t connection, const Hello &hello);
+    void handleHello(size_t connection, const Hello &hello, uint32_t nowMs);
     void sendTo(size_t connection, Channel channel, const uint8_t *data, size_t size);
     void broadcast(Channel channel, const uint8_t *data, size_t size);
     void broadcastRoster();
@@ -173,8 +186,22 @@ private:
     std::vector<uint8_t> m_leftPending;          // slots given up in the match, announced with the next turn
     bool m_desynced {false};
     uint32_t m_desyncTick {0};
+    // Replay of the running match (see HostConfig::replayDir)
+    struct SeenPlayer
+    {
+        std::string name;
+        std::vector<std::string> addresses; // every address the slot connected from, in order
+    };
+    std::array<SeenPlayer, kMaxPlayers> m_seen {};
+    std::vector<std::pair<uint32_t, uint64_t>> m_replayChecksums; // ticks every connected player agrees on
+    std::int64_t m_replayStartedAt {0};
+    bool m_replayOpen {false};
+    void logLine(const std::string &line) const;
+    void finishReplay(const std::string &reason);
     std::vector<TransportEvent> m_events;
     std::vector<uint8_t> m_buffer;
+    static constexpr uint32_t kMaxSyncMs = 30000;
+    static constexpr int kMaxSyncing = 4;
 };
 
 struct ClientConfig
@@ -183,6 +210,7 @@ struct ClientConfig
     std::string playerName;
     SessionToken token {}; // non-zero: take back the slot of an earlier connection
     std::string password;  // of the room, when it has one
+    bool canSync {false};  // may fetch the host's data files when they differ from the own (see DataManifest)
 };
 
 class SessionClient
@@ -244,6 +272,13 @@ public:
     void uploadFile(uint64_t hash, const std::vector<uint8_t> &bytes);
     // A file that arrived (empty bytes: the room does not have it); false when none is waiting
     bool takeFile(uint64_t &hash, std::vector<uint8_t> &bytes);
+    // Data sync (joining a host whose simulation data differ): the host's list, once it arrived
+    bool takeDataManifest(std::vector<DataEntry> &files);
+    void requestDataFile(const std::string &path);
+    // A data file that arrived (empty bytes: the host does not serve it); false when none is waiting
+    bool takeDataFile(FilePathData &out);
+    // Says hello again with the data hash the client has now (after the fetched files were installed)
+    void sayHelloAgain(uint64_t assetsHash);
     void sendOwnerStart(const std::vector<uint8_t> &setup, uint32_t firstTurnDelayMs = 3000);
     void sendOwnerSetAi(const OwnerSetAi &change);
     void sendOwnerSetTeam(const OwnerSetTeam &change);
@@ -330,6 +365,9 @@ private:
     PauseState m_pause;
     std::vector<Chat> m_chat;
     std::vector<FileData> m_files;
+    bool m_manifestWaiting {false};
+    std::vector<DataEntry> m_manifest;
+    std::vector<FilePathData> m_dataFiles;
     std::vector<TransportEvent> m_events;
     std::vector<uint8_t> m_buffer;
 };

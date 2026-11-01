@@ -17,6 +17,7 @@ enum class EditorTool : int {
     PlaceWall = 3,
     PlaceBuilding = 4,
     PlaceUnit = 5,
+    PlayerStarts = 6,
     SetPlayerStart = 6,
     SetEnemyStart = 7,
     PassabilityBrush = 8,
@@ -45,6 +46,8 @@ public:
     int GetSelectedUnitArchetype() const { return m_selectedUnitArchetype; }
     Faction GetSelectedUnitFaction() const { return m_selectedUnitFaction; }
     int GetSelectedUnitFacing() const { return m_selectedUnitFacing; }
+    int GetSelectedPlayerSlot() const { return m_selectedPlayerSlot; }
+    void SetSelectedPlayerSlot(int slot) { m_selectedPlayerSlot = slot; }
 
     bool IsShowGrid() const { return m_showGrid; }
     bool IsShowPassability() const { return m_showPassability; }
@@ -53,6 +56,12 @@ public:
     void SetHoveredTile(int tx, int ty) { m_hoverTileX = tx; m_hoverTileY = ty; }
     void SelectTileFromEyedropper(int tile) { m_selectedTile = tile; m_activeTool = EditorTool::TileBrush; }
     void ShowToast(const std::string& message, float duration = 3.5f);
+
+    void OpenContextMenu(int tx, int ty) {
+        m_contextMenuTileX = tx;
+        m_contextMenuTileY = ty;
+        m_openContextMenuReq = true;
+    }
 
     // Dialog controls
     void OpenSaveAsDialog(const MapDocument& doc);
@@ -65,7 +74,7 @@ public:
 private:
     void RenderMenuBar(MapDocument& doc, Camera& camera);
     void RenderToolbar(MapDocument& doc, TextureManager& texManager);
-    void RenderPalettePanel(MapDocument& doc, TextureManager& texManager);
+    void RenderPalettePanel(MapDocument& doc, TextureManager& texManager, Camera& camera);
     void RenderMiniMapWindow(MapDocument& doc, Camera& camera);
     void RenderStatusBar(const MapDocument& doc, const Camera& camera);
     void RenderToastNotification();
@@ -76,6 +85,10 @@ private:
     void RenderNewMapModal(MapDocument& doc);
     void RenderGeneratorModal(MapDocument& doc);
     void RenderCloseConfirmation(MapDocument& doc);
+    void RenderGeneratorConfirmation(MapDocument& doc);
+    void RenderContextMenu(MapDocument& doc, Camera& camera);
+
+    void RequestGenerate(MapDocument& doc, bool useCustomParams = false);
 
     void ScanAvailableMaps();
 
@@ -93,6 +106,11 @@ private:
     int m_selectedUnitArchetype{0};
     Faction m_selectedUnitFaction{Faction::Resistance};
     int m_selectedUnitFacing{0};
+    int m_selectedPlayerSlot{0};
+
+    int m_contextMenuTileX{-1};
+    int m_contextMenuTileY{-1};
+    bool m_openContextMenuReq{false};
 
     bool m_passabilityPaintMode{false}; // false = set blocked, true = set passable
 
@@ -117,6 +135,8 @@ private:
     bool m_openNewModalReq{false};
     bool m_openGenModalReq{false};
     bool m_openCloseConfirmationReq{false};
+    bool m_openGenConfirmationReq{false};
+    bool m_pendingGenWithCustomParams{false};
     bool m_closeAfterSave{false};
     bool m_shouldClose{false};
 

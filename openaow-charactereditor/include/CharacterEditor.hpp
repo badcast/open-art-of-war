@@ -81,6 +81,9 @@ private:
 
     void SetMode(PreviewMode mode);
 
+    // Animator tab (EditorAnimator.cpp): timing of the pictures of the selected character
+    void DrawAnimatorProperties();
+
     void DrawEditor();
 
     // Move preview driven like the game: drive right, turn around on the spot (vehicles swing through
@@ -115,6 +118,7 @@ private:
 
     void DrawProperties();
 
+    void DrawTileRadius(float centerX, float centerY, float rangeTiles, SDL_Color color, float thickness = 2.0f);
     void DrawRadiusCircle2px(float centerX, float centerY, float radiusPixels, SDL_Color color);
 
     void SetEditorMode(EditorMode mode);
@@ -131,6 +135,11 @@ private:
     void FrameBattleCamera();
 
     void StartBattle();
+
+    // After any successful save the whole editor works with what is on disk now: the running battle starts over with
+    // the saved values, the Compare opponent is read again when it is the saved file, the preview values are recomputed
+    void ApplySaved(bool characterFile);
+    void RecomputePreviewDerived();
 
     void RunBattleBatch();
 
@@ -272,6 +281,8 @@ private:
     bool loopPreview{true};
     bool showAttackRange{true};
     bool showSightRange{true};
+    bool showBuildRange{true};
+    bool showRadarRange{true};
     bool showGround{true};
     bool showCombatHud{true};
     bool buildingPowered{true};

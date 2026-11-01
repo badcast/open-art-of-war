@@ -22,6 +22,7 @@
 #include "storage/SaveManager.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <random>
 #include <sstream>
 #include <filesystem>
 #include <vector>
@@ -39,11 +40,11 @@ namespace
 // Shared geometry: the same rectangles drive rendering and mouse hit-testing
 // ---------------------------------------------------------------------------
 
-constexpr int kMainMenuItems = 8;
+constexpr int kMainMenuItems = 9;
 constexpr int kPauseItems = 6;
 
 const char *const kMainMenuLabels[kMainMenuItems]
-    = {"CAMPAIGN", "CUSTOM GAME", "NETWORK GAME", "TEST MAP", "SETTINGS", "HELP", "ABOUT", "EXIT"};
+    = {"CAMPAIGN", "CUSTOM GAME", "NETWORK GAME", "OPEN REPLAY", "TEST MAP", "SETTINGS", "HELP", "ABOUT", "EXIT"};
 
 int MainMenuColumnX(int windowW)
 {
@@ -94,6 +95,38 @@ bool LaunchMapEditor(const std::string &mapPath)
     return false;
 }
 
+// Custom game: the table of players in the details panel (columns: level / name, faction, team, colour, remove)
+UiRect CustomRow(const UiRect &d, int i)
+{
+    return {d.x + 20, d.y + 104 + i * 34, d.w - 40 - 230, 30};
+}
+UiRect CustomCell(const UiRect &d, int i, int kind)
+{
+    const UiRect r = CustomRow(d, i);
+    switch (kind)
+    {
+        case 1:
+            return {r.x + 136, r.y, 118, r.h};
+        case 2:
+            return {r.x + 260, r.y, 62, r.h};
+        case 3:
+            return {r.x + 328, r.y, 54, r.h};
+        case 5:
+            return {r.Right() - 28, r.y + 3, 24, r.h - 6};
+        default:
+            return {r.x, r.y, 130, r.h};
+    }
+}
+UiRect CustomAddBtn(const UiRect &d, int rows)
+{
+    const UiRect r = CustomRow(d, rows);
+    return {r.x, r.y + 2, 190, 28};
+}
+UiRect CustomPreviewArea(const UiRect &d)
+{
+    return {d.Right() - 20 - 210, d.y + 88, 210, 210};
+}
+
 // Campaign mission select
 struct CampaignLayout
 {
@@ -106,6 +139,7 @@ struct CampaignLayout
     UiRect difficultyBtn; // combo: AI difficulty, right of the side combo
     UiRect editorBtn;     // opens the map editor with the selected map, left of Start
     UiRect layoutBtn;     // custom game: prebuilt bases or from scratch (top right of the details)
+    UiRect fogCheckbox;   // custom game: fog of war checkbox
     int itemH {40};
     int itemGap {4};
 
@@ -130,6 +164,8 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.sideBtn[0] = {l.dialog.x + 20, footerY + 10, 240, 40};
     l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
     l.layoutBtn = {l.details.Right() - 20 - 210, l.details.y + 12, 210, 32};
+    const UiRect pv = CustomPreviewArea(l.details);
+    l.fogCheckbox = {pv.x, pv.Bottom() + 66, pv.w, 28};
     l.difficultyBtn = {
         l.sideBtn[0].Right() + 12, footerY + 10, std::max(180, l.editorBtn.x - 12 - (l.sideBtn[0].Right() + 12)), 40};
     return l;
@@ -655,20 +691,6 @@ std::vector<SettingsRow> BuildSettingsRows(
                 },
                 usable.size() > 1,
                 value);
-            if (pending)
-            {
-                auto applyNow = renderApi.applyNow;
-                choice(
-                    _("Apply render API"),
-                    inGame ? _("Applied on the next start of the game")
-                           : _("Recreates the window, then asks to keep it"),
-                    std::string(_("RECREATE WINDOW")),
-                    [applyNow](int) {
-                        if (applyNow)
-                            applyNow();
-                    },
-                    !inGame);
-            }
         }
         // Shader effects: only the SDL GPU render API draws them
         const bool fx = renderApi.effectsAvailable && renderApi.effectsAvailable();
@@ -761,6 +783,10 @@ std::vector<SettingsRow> BuildSettingsRows(
                 s.voiceVolume = static_cast<int>(v);
                 notify(SettingsArea::Audio);
             }));
+        toggle(_("Sound reverb"), _("Echo of explosions and heavy guns"), s.reverb, [&s, notify](bool on) {
+            s.reverb = on;
+            notify(SettingsArea::Audio);
+        });
     }
     else
     { // GAME
@@ -809,6 +835,18 @@ std::vector<SettingsRow> BuildSettingsRows(
                 s.zoomMax = v;
                 notify(SettingsArea::Graphics);
             }));
+        rows.push_back(SliderRow(
+            _("Edge scroll margin"),
+            _("Screen border thickness in pixels for scrolling with the mouse"),
+            static_cast<float>(s.edgePanMargin),
+            static_cast<float>(Settings::kMinEdgePanMargin),
+            static_cast<float>(Settings::kMaxEdgePanMargin),
+            1.0f,
+            [](float v) { return std::to_string(static_cast<int>(v)) + " px"; },
+            [&s, notify](float v) {
+                s.edgePanMargin = static_cast<int>(v);
+                notify(SettingsArea::Game);
+            }));
     }
     return rows;
 }
@@ -842,6 +880,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.musicVolume = d.musicVolume;
         s.fxVolume = d.fxVolume;
         s.voiceVolume = d.voiceVolume;
+        s.reverb = d.reverb;
         s.muted = d.muted;
     }
     else
@@ -850,6 +889,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.zoomDefault = d.zoomDefault;
         s.zoomMin = d.zoomMin;
         s.zoomMax = d.zoomMax;
+        s.edgePanMargin = d.edgePanMargin;
     }
 }
 
@@ -946,13 +986,14 @@ bool MenuController::UpdateInGameMenu(
         if ((item == 4 || item == 5) && !confirmed)
         {
             m_confirm.open = true;
+            SoundRequests::Play("ui_show_dialog");
             m_confirm.action = item;
             if (item == 4)
             {
                 m_confirm.title = _("RESTART THE GAME?");
                 m_confirm.text = _("The mission starts over: the progress made so far is lost.");
             }
-            else if (mission.IsMatch())
+            else if (mission.IsOnlineMatch())
             {
                 m_confirm.title = _("LEAVE THE MATCH?");
                 m_confirm.text
@@ -971,11 +1012,12 @@ bool MenuController::UpdateInGameMenu(
                 m_inGameMenuOpen = false;
                 break;
             case 1: // Objectives
-                m_objectivesDialogOpen = true;
+                SetObjectivesDialogOpen(true);
                 m_inGameMenuOpen = false;
                 break;
             case 2: // Settings, same screen as in the main menu
                 m_inGameSettingsOpen = true;
+                SoundRequests::Play("ui_show_dialog");
                 m_settingsSelected = 0;
                 break;
             case 3: // Sound & Music
@@ -1115,6 +1157,19 @@ bool MenuController::UpdateCampaignSelect(
     const int rows = m_customGame ? CustomListRows(l) : mCount;
 
     auto startSelected = [&]() {
+        if (m_customGame)
+        {
+            EnsureCustomSlots();
+            bool foes = false;
+            for (const CustomSlot &cs : m_customSlots)
+                foes = foes || cs.team != m_customSlots[0].team;
+            if (!foes)
+            {
+                m_editorNotice = _("Everybody is in one team: there is nobody to fight.");
+                return;
+            }
+            m_editorNotice.clear();
+        }
         // The loading screen with the picture of the map, kept up for at least three seconds
         if (m_beginLoading)
         {
@@ -1129,10 +1184,39 @@ bool MenuController::UpdateCampaignSelect(
                 m_beginLoading(_(data.info.name), LoaderResources::MapPath(data.data.mapFile));
             }
         }
+        // A custom game is a match of this computer alone: every player at a start position of the map, the person at
+        // the first one
+        MatchSetup match;
+        if (m_customGame)
+        {
+            std::random_device rd;
+            match.mapPath = m_skirmishMaps[m_skirmishSelected].path;
+            match.seed = rd();
+            match.localOnly = true;
+            match.prebuilt = m_skirmishPrebuilt;
+            match.fogOfWar = m_skirmishFogOfWar;
+            match.local = 0;
+            for (int p = 0; p < static_cast<int>(m_customSlots.size()) && p < kMaxPlayers; ++p)
+            {
+                const CustomSlot &cs = m_customSlots[p];
+                PlayerSlot &slot = match.slots[p];
+                slot.active = true;
+                slot.human = p == 0;
+                if (p == 0)
+                    slot.faction = PlayerFaction();
+                else if (cs.faction == 0)
+                    slot.faction = (rd() & 1u) ? Faction::Confederation : Faction::Resistance;
+                else
+                    slot.faction = cs.faction == 2 ? Faction::Confederation : Faction::Resistance;
+                slot.team = static_cast<uint8_t>(cs.team);
+                slot.color = static_cast<uint8_t>(cs.color);
+                slot.aiLevel = static_cast<uint8_t>(std::clamp(cs.level, 0, 3));
+                match.startPosition[p] = static_cast<int8_t>(p);
+            }
+        }
         const bool started
             = m_customGame
-                  ? mission.LoadSkirmish(
-                        m_skirmishMaps[m_skirmishSelected].path, map, entities, economy, pathfinder, m_skirmishPrebuilt)
+                  ? mission.LoadMatch(match, map, entities, economy, pathfinder)
                   : mission.LoadMission(
                         m_campaignMissionSelected, LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
         if (m_endLoading)
@@ -1202,13 +1286,20 @@ bool MenuController::UpdateCampaignSelect(
         cycleDifficulty();
     const bool hasLayoutChoice
         = m_customGame && m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size());
-    // The drop-down lists of the footer (side, difficulty) and of the map (prebuilt bases / from scratch)
+    // The drop-down lists of the footer (side, difficulty), of the map (prebuilt bases / from scratch) and of the
+    // players
+    if (hasLayoutChoice)
+        EnsureCustomSlots();
     auto comboField = [&](int id) {
+        if (id >= kComboSlot)
+            return CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10);
         return id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn);
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
-    if (m_combo.open == kComboLayout && !hasLayoutChoice)
+    if ((m_combo.open == kComboLayout || m_combo.open >= kComboSlot) && !hasLayoutChoice)
+        m_combo.open = -1;
+    if (m_combo.open >= kComboSlot && (m_combo.open - kComboSlot) / 10 >= static_cast<int>(m_customSlots.size()))
         m_combo.open = -1;
     if (m_combo.open >= 0)
     {
@@ -1248,6 +1339,57 @@ bool MenuController::UpdateCampaignSelect(
             return openCombo(kComboDifficulty);
         if (hasLayoutChoice && l.layoutBtn.Contains(mx, my))
             return openCombo(kComboLayout);
+        if (hasLayoutChoice && l.fogCheckbox.Contains(mx, my))
+        {
+            m_skirmishFogOfWar = !m_skirmishFogOfWar;
+            SoundRequests::Play("ui_confirm");
+            return true;
+        }
+        if (hasLayoutChoice)
+        {
+            const UiRect &d = l.details;
+            for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
+            {
+                for (int kind : {1, 2, 3, 4})
+                {
+                    if ((i > 0 || kind != 4) && CustomCell(d, i, kind).Contains(mx, my))
+                        return openCombo(kComboSlot + i * 10 + kind);
+                }
+                if (i > 0 && CustomCell(d, i, 5).Contains(mx, my))
+                {
+                    m_customSlots.erase(m_customSlots.begin() + i);
+                    return true;
+                }
+            }
+            if (static_cast<int>(m_customSlots.size()) < m_skirmishMaps[m_skirmishSelected].players
+                && CustomAddBtn(d, static_cast<int>(m_customSlots.size())).Contains(mx, my))
+            {
+                CustomSlot add;
+                add.level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
+                const std::vector<bool> takenColors = CustomTakenColors(-1);
+                for (int c = 0; c < static_cast<int>(takenColors.size()); ++c)
+                {
+                    if (!takenColors[c])
+                    {
+                        add.color = c + 1;
+                        break;
+                    }
+                }
+                for (int t = 0; t < kMaxPlayers; ++t)
+                { // the first team nobody is in yet
+                    bool used = false;
+                    for (const CustomSlot &cs : m_customSlots)
+                        used = used || cs.team == t;
+                    if (!used)
+                    {
+                        add.team = t;
+                        break;
+                    }
+                }
+                m_customSlots.push_back(add);
+                return true;
+            }
+        }
         // Side the player commands in this mission
         if (l.editorBtn.Contains(mx, my))
         {
@@ -1310,35 +1452,39 @@ void MenuController::ActivateMenuItem(
     switch (index)
     {
         case 0: // Campaign: the single-player missions only
-            m_campaignSelectOpen = true;
+            SetCampaignSelectOpen(true);
             m_customGame = false;
             m_campaignMissionSelected = 0;
             break;
         case 1: // Custom game: any map of assets/maps, side picked in the dialog
             m_skirmishMaps = MissionController::ListSkirmishMaps();
-            m_campaignSelectOpen = !m_skirmishMaps.empty();
+            SetCampaignSelectOpen(!m_skirmishMaps.empty());
             m_customGame = true;
+            m_customSlots.clear();
             m_skirmishSelected = 0;
             m_skirmishTop = 0;
             break;
         case 2: // Network game: local network / internet, then the game room
             state = AppState::MenuNetwork;
             break;
-        case 3: // Test map
+        case 3: // Open replay: the recorded network games
+            state = AppState::MenuReplay;
+            break;
+        case 4: // Test map
             mission.LoadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
             state = AppState::CampaignPlaying;
             camera.CenterOn((mission.GetPlayerHqX() + 12) * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
             break;
-        case 4:
+        case 5:
             state = AppState::MenuSettings;
             break;
-        case 5:
+        case 6:
             state = AppState::MenuHelp;
             break;
-        case 6:
+        case 7:
             state = AppState::MenuAbout;
             break;
-        case 7:
+        case 8:
             running = false;
             break;
         default:
@@ -1451,15 +1597,57 @@ void MenuController::UpdateSettingsScreen(
     }
 
     static const std::vector<Resolution> kNoResolutions;
+    // Picking another render API does not switch at once: a dialog asks first (the window is recreated)
+    RenderApiBinding api = m_renderApi;
+    api.select = [this](const std::string &name) {
+        if (m_renderApi.configured && name == m_renderApi.configured())
+            return;
+        m_apiPending = name;
+        m_apiConfirm.open = true;
+        m_apiConfirm.title = std::string(_("SWITCH RENDER API?"));
+        m_apiConfirm.text
+            = m_inGameSettingsOpen
+                  ? std::string(_("The render API changes at the next start of the game: "))
+                        + RenderBackend::Label(name)
+                  : std::string(_("The window is recreated with this render API: "))
+                        + RenderBackend::Label(name)
+                        + std::string(_(". You get 15 seconds to keep it, otherwise the previous one returns."));
+    };
     auto rows = [&]() {
         return BuildSettingsRows(
             m_settingsTab,
             *m_settings,
             m_resolutions ? m_resolutions() : kNoResolutions,
             m_onSettingsChanged,
-            m_renderApi,
+            api,
             m_inGameSettingsOpen);
     };
+
+    // The question is open: nothing else reacts until it is answered
+    if (m_apiConfirm.open)
+    {
+        const int answer = ui::ConfirmUpdate(
+            m_apiConfirm,
+            windowW,
+            windowH,
+            mx,
+            my,
+            clicked,
+            input.IsConfirmJustPressed(),
+            input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE));
+        if (answer >= 0)
+        {
+            m_apiConfirm.open = false;
+            if (answer == 1 && m_renderApi.select)
+            {
+                m_renderApi.select(m_apiPending); // remembered for the next start
+                if (!m_inGameSettingsOpen && m_renderApi.applyNow)
+                    m_renderApi.applyNow();
+            }
+            m_apiPending.clear();
+        }
+        return;
+    }
 
     if (input.IsKeyJustPressed(SDL_SCANCODE_TAB))
     {
@@ -1658,7 +1846,10 @@ void MenuController::RenderSplashTitle(
     if (titleTex)
     {
         int th = std::min(windowH - 120, 600);
-        int tw = th * 240 / 323;
+        int tw = th * 240 / 323; // the original art's proportions, until the texture tells its own
+        float texW = 0.0f, texH = 0.0f;
+        if (SDL_GetTextureSize(titleTex, &texW, &texH) && texW > 0.0f && texH > 0.0f)
+            tw = static_cast<int>(th * texW / texH); // whatever size the key art has, it is not stretched
         int tx = (windowW - tw) / 2;
         int ty = (windowH - th) / 2;
         renderer.DrawTextureScreen(titleTex, tx, ty, tw, th);
@@ -1680,7 +1871,10 @@ void MenuController::RenderMainMenu(
     if (titleTex)
     {
         int th = windowH;
-        int tw = th * 240 / 323;
+        int tw = th * 240 / 323; // the original art's proportions, until the texture tells its own
+        float texW = 0.0f, texH = 0.0f;
+        if (SDL_GetTextureSize(titleTex, &texW, &texH) && texW > 0.0f && texH > 0.0f)
+            tw = static_cast<int>(th * texW / texH); // whatever size the key art has, it is not stretched
         int tx = windowW - tw;
         renderer.DrawTextureScreen(titleTex, tx, 0, tw, th);
         renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 70});
@@ -1899,18 +2093,16 @@ std::vector<std::string> MusicCredits()
 
 void MenuController::RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH)
 {
-    std::vector<std::string> lines
-        = {"Open Art Of War: Freedom for Liberty",
-           std::string(_("Version")) + ": " + OAOW_VERSION,
-           std::string(_("Author")) + ": badcast",
-           "https://github.com/badcast/open-artofwar",
-           "",
-           _("Porting: Modern C++17, SDL3, ImGui"),
-           "",
-           _("Central Peru is occupied by the army of the Confederation."),
-           _("The Resistance stands ready to strike for freedom!"),
-           "",
-           _("Music:")};
+    std::vector<std::string> lines = {
+        "Open Art Of War: Freedom for Liberty",
+        std::string(_("Version")) + ": " + OAOW_VERSION,
+        std::string(_("Author")) + ": badcast",
+        "https://github.com/badcast/open-art-of-war",
+        "",
+        _("Central Peru is occupied by the army of the Confederation."),
+        _("The Resistance stands ready to strike for freedom!"),
+        "",
+    };
     // The licence texts shipped with the music; the tracklist authors only when the file is missing
     std::string licence;
     if (Assets::ReadText(LoaderResources::AudioLicense(), licence))
@@ -2084,6 +2276,7 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
             m_mouseX,
             m_mouseY);
     }
+    ui::DrawConfirm(renderer, fontRenderer, windowW, windowH, m_apiConfirm, m_mouseX, m_mouseY);
 }
 
 void MenuController::RenderBriefing(
@@ -2255,11 +2448,8 @@ namespace
 {
 
 // The picture of a map in the bottom part of the details panel, scaled to fit and centered
-void DrawMapPreview(Renderer &renderer, SDL_Texture *tex, int texW, int texH, const UiRect &panel)
+void DrawMapPreviewIn(Renderer &renderer, SDL_Texture *tex, int texW, int texH, const UiRect &area)
 {
-    const int margin = 20;
-    const int maxH = std::min(panel.h / 2 - 12, 220);
-    const UiRect area {panel.x + margin, panel.Bottom() - margin - maxH, panel.w - 2 * margin, maxH};
     renderer.FillRectScreen(area.x, area.y, area.w, area.h, col::PanelSunken);
     renderer.DrawRectScreen(area.x, area.y, area.w, area.h, col::Border);
     if (!tex || texW <= 0 || texH <= 0)
@@ -2272,6 +2462,18 @@ void DrawMapPreview(Renderer &renderer, SDL_Texture *tex, int texW, int texH, co
         static_cast<float>(w),
         static_cast<float>(h)};
     SDL_RenderTexture(renderer.GetSdlRenderer(), tex, nullptr, &dst);
+}
+
+void DrawMapPreview(Renderer &renderer, SDL_Texture *tex, int texW, int texH, const UiRect &panel)
+{
+    const int margin = 20;
+    const int maxH = std::min(panel.h / 2 - 12, 220);
+    DrawMapPreviewIn(
+        renderer,
+        tex,
+        texW,
+        texH,
+        UiRect {panel.x + margin, panel.Bottom() - margin - maxH, panel.w - 2 * margin, maxH});
 }
 
 } // namespace
@@ -2374,23 +2576,85 @@ void MenuController::RenderCampaignMissionSelect(
             m_skirmishPrebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"),
             m_combo.open == kComboLayout,
             l.layoutBtn.Contains(m_mouseX, m_mouseY));
-        fontRenderer.DrawString(info.name + ".json", x, d.y + 50, ui::FONT_SMALL, col::TextMuted, false);
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
-        const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
-        DrawTextSection(renderer, fontRenderer, x, d.y + 90, w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
-        DrawTextSection(
-            renderer,
+        ui::DrawCaption(
             fontRenderer,
+            renderer,
             x,
-            d.y + 150,
-            w,
-            _("OBJECTIVES:"),
-            _("- Build up your base.\n- Destroy the enemy base and all enemy forces."),
-            col::TextDim,
-            ui::FONT_SMALL);
+            d.y + 82,
+            std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size()) + "/" + std::to_string(info.players)
+                + ")");
+        for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
+        {
+            const CustomSlot &cs = m_customSlots[i];
+            const UiRect row = CustomRow(d, i);
+            ui::DrawPanel(renderer, row, i == 0 ? col::Hover : col::PanelRaised, i == 0 ? col::Accent : col::Border);
+            auto combo = [&](int kind, const std::string &text, SDL_Color c = col::Text) {
+                const UiRect cell = CustomCell(d, i, kind);
+                ui::DrawComboField(
+                    renderer,
+                    fontRenderer,
+                    cell,
+                    text,
+                    m_combo.open == kComboSlot + i * 10 + kind,
+                    cell.Contains(m_mouseX, m_mouseY),
+                    true,
+                    c);
+            };
+            if (i == 0)
+            {
+                fontRenderer.DrawString(
+                    _("YOU"),
+                    row.x + 10,
+                    row.CenterY(),
+                    ui::FONT_BODY_BOLD,
+                    col::Text,
+                    false,
+                    Anchor::LEFT | Anchor::VCENTER);
+                combo(1, PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance"));
+            }
+            else
+            {
+                combo(
+                    4,
+                    std::string(_("AI")) + " (" + DifficultyName(static_cast<AIDifficulty>(std::clamp(cs.level, 0, 3)))
+                        + ")",
+                    col::Info);
+                combo(1, cs.faction == 0 ? _("Random") : (cs.faction == 1 ? _("Resistance") : _("Confederation")));
+                const UiRect x = CustomCell(d, i, 5);
+                ui::DrawButton(renderer, fontRenderer, x, "x", ui::ButtonStyle::Danger, x.Contains(m_mouseX, m_mouseY));
+            }
+            combo(2, std::to_string(cs.team + 1));
+            combo(3, "");
+            const UiRect cc = CustomCell(d, i, 3);
+            renderer.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, ArmyColor(cs.color));
+            renderer.DrawRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, col::BorderStrong);
+        }
+        if (static_cast<int>(m_customSlots.size()) < info.players)
+        {
+            const UiRect add = CustomAddBtn(d, static_cast<int>(m_customSlots.size()));
+            ui::DrawButton(
+                renderer,
+                fontRenderer,
+                add,
+                std::string("+ ") + _("COMPUTER PLAYER"),
+                ui::ButtonStyle::Secondary,
+                add.Contains(m_mouseX, m_mouseY));
+        }
+        const UiRect pv = CustomPreviewArea(d);
         int pw = 0, ph = 0;
         SDL_Texture *tex = m_mapPreview.Get(renderer.GetSdlRenderer(), texManager, info.path, info.path, {}, pw, ph);
-        DrawMapPreview(renderer, tex, pw, ph, d);
+        DrawMapPreviewIn(renderer, tex, pw, ph, pv);
+        const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
+        DrawTextSection(
+            renderer, fontRenderer, pv.x, pv.Bottom() + 12, pv.w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
+        ui::DrawCheckbox(
+            renderer,
+            fontRenderer,
+            l.fogCheckbox,
+            _("FOG OF WAR"),
+            m_skirmishFogOfWar,
+            l.fogCheckbox.Contains(m_mouseX, m_mouseY));
     }
     else if (!m_customGame && selected >= 0 && selected < count)
     {
@@ -2484,22 +2748,71 @@ void MenuController::RenderCampaignMissionSelect(
     if (m_combo.open >= kComboSide)
     { // the open list, over everything
         const int id = m_combo.open;
-        const UiRect field = id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn);
+        const UiRect field
+            = id >= kComboSlot
+                  ? CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10)
+                  : (id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn));
+        std::vector<std::string> items = CampaignComboOptions(id);
+        std::vector<bool> taken;
+        std::vector<SDL_Color> swatches;
+        const bool colors = id >= kComboSlot && (id - kComboSlot) % 10 == 3;
+        if (colors)
+        {
+            taken = CustomTakenColors((id - kComboSlot) / 10);
+            const int current = CampaignComboCurrent(id);
+            for (int i = 1; i <= Settings::kArmyColors; ++i)
+                swatches.push_back(ArmyColor(i));
+            for (size_t i = 0; i < items.size() && i < taken.size(); ++i)
+            {
+                if (taken[i] && static_cast<int>(i) != current)
+                    items[i] += std::string(" (") + _("taken") + ")";
+            }
+        }
         ui::DrawComboList(
             renderer,
             fontRenderer,
             field,
-            CampaignComboOptions(id),
+            items,
             CampaignComboCurrent(id),
             m_combo,
             windowH,
             m_mouseX,
-            m_mouseY);
+            m_mouseY,
+            colors ? &taken : nullptr,
+            colors ? &swatches : nullptr);
     }
 }
 
 std::vector<std::string> MenuController::CampaignComboOptions(int id) const
 {
+    if (id >= kComboSlot)
+    {
+        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
+        std::vector<std::string> out;
+        if (kind == 1)
+        {
+            if (row > 0)
+                out.push_back(_("Random"));
+            out.push_back(_("Resistance"));
+            out.push_back(_("Confederation"));
+        }
+        else if (kind == 2)
+        {
+            for (int i = 1; i <= kMaxPlayers; ++i)
+                out.push_back(std::string(_("Team")) + " " + std::to_string(i));
+        }
+        else if (kind == 3)
+        {
+            for (int i = 1; i <= Settings::kArmyColors; ++i)
+                out.push_back(_(ArmyColorName(i)));
+        }
+        else
+        {
+            for (int i = 0; i < 4; ++i)
+                out.push_back(DifficultyName(static_cast<AIDifficulty>(i)));
+        }
+        return out;
+    }
     if (id == kComboSide)
         return {_("RESISTANCE"), _("CONFEDERACY")};
     if (id == kComboDifficulty)
@@ -2515,6 +2828,20 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
 
 int MenuController::CampaignComboCurrent(int id) const
 {
+    if (id >= kComboSlot)
+    {
+        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
+        if (row >= static_cast<int>(m_customSlots.size()))
+            return 0;
+        const CustomSlot &cs = m_customSlots[row];
+        if (kind == 1)
+            return row == 0 ? (PlayerFaction() == Faction::Confederation ? 1 : 0) : cs.faction;
+        if (kind == 2)
+            return cs.team;
+        if (kind == 3)
+            return cs.color - 1;
+        return cs.level;
+    }
     if (id == kComboSide)
         return PlayerFaction() == Faction::Confederation ? 1 : 0;
     if (id == kComboDifficulty)
@@ -2524,6 +2851,35 @@ int MenuController::CampaignComboCurrent(int id) const
 
 void MenuController::CampaignComboApply(int id, int index)
 {
+    if (id >= kComboSlot)
+    {
+        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
+        if (row >= static_cast<int>(m_customSlots.size()))
+            return;
+        CustomSlot &cs = m_customSlots[row];
+        if (kind == 1)
+        {
+            if (row == 0)
+                SetPlayerFaction(index == 1 ? Faction::Confederation : Faction::Resistance);
+            else
+                cs.faction = index;
+        }
+        else if (kind == 2)
+        {
+            cs.team = std::clamp(index, 0, kMaxPlayers - 1);
+        }
+        else if (kind == 3)
+        {
+            const std::vector<bool> taken = CustomTakenColors(row);
+            if (index >= 0 && index < static_cast<int>(taken.size()) && !taken[index])
+                cs.color = index + 1;
+        }
+        else
+        {
+            cs.level = std::clamp(index, 0, 3);
+        }
+        return;
+    }
     if (id == kComboSide)
     {
         SetPlayerFaction(index == 1 ? Faction::Confederation : Faction::Resistance);
@@ -2541,6 +2897,37 @@ void MenuController::CampaignComboApply(int id, int index)
     {
         m_skirmishPrebuilt = index == 0;
     }
+}
+
+// Colours the other players of the custom game already wear (index 0 = colour 1)
+std::vector<bool> MenuController::CustomTakenColors(int row) const
+{
+    std::vector<bool> taken(Settings::kArmyColors, false);
+    for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
+    {
+        const int c = m_customSlots[i].color;
+        if (i != row && c >= 1 && c <= Settings::kArmyColors)
+            taken[c - 1] = true;
+    }
+    return taken;
+}
+
+// The person plus at least one computer player, never more than the map has start positions
+void MenuController::EnsureCustomSlots()
+{
+    if (m_skirmishSelected < 0 || m_skirmishSelected >= static_cast<int>(m_skirmishMaps.size()))
+        return;
+    const size_t most = static_cast<size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
+    if (m_customSlots.empty())
+    {
+        m_customSlots.resize(2);
+        m_customSlots[0].color = 1;
+        m_customSlots[1].color = 2;
+        m_customSlots[1].team = 1;
+        m_customSlots[1].level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
+    }
+    if (m_customSlots.size() > most)
+        m_customSlots.resize(most);
 }
 
 } // namespace OpenArtOfWar

@@ -29,6 +29,10 @@ enum class CommandType : uint8_t
     DebugSpawn,    // a: archetype / building index; b: DebugSpawnKind; c, d: footprint; x, y: tile
     PlayerLeft,    // the player left a network match: its buildings, walls and units are destroyed
                    // (only the network session issues it, from the host's turn stream)
+    SetStance,     // ids: units; a: UnitStance
+    ToggleRepair,  // ids: own buildings (repair on when any of them is not repairing, else off)
+    View,          // x, y: where the player's camera looks (world pixel); a: zoom x100. Changes nothing in the world:
+                   // it only travels with the turns, so a replay can follow a player's camera
     Count
 };
 

@@ -68,6 +68,18 @@ public:
     {
         m_animatedPartsVisible = visible;
     }
+    bool AnimatedPartsVisible() const
+    {
+        return m_animatedPartsVisible;
+    }
+
+    struct LastDrawnBuildingInfo
+    {
+        int buildingType {-1};
+        int animFrame {0};
+        bool animatedPartsVisible {true};
+    };
+    LastDrawnBuildingInfo lastDrawnBuilding;
     void DrawBuildingWorld(
         int buildingType,
         float worldX,
@@ -100,7 +112,10 @@ public:
         bool isFlaming = true,
         int customWreckComp = -1,
         int customWreckStages = -1,
-        int customDeathSeq = -1);
+        int customDeathSeq = -1,
+        int flashMode
+        = 0, // muzzle flash layer: 0 loops, 1 plays once (then the idle layer shows), 2 plays once and holds
+        int flashFrames = 0); // frames of the flash (0 = the whole animation)
 
     // Projectiles & FX (Authentic 32-direction shells, 16-direction rockets, flame stream & smoke)
     void DrawProjectileWorld(

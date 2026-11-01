@@ -357,14 +357,25 @@ void TextureManager::CollectTerrainPages()
     }
 }
 
+SDL_ScaleMode TextureManager::SmoothPixelScaleMode()
+{
+#if SDL_VERSION_ATLEAST(3, 4, 0)
+    return SDL_SCALEMODE_PIXELART;
+#else
+    return SDL_SCALEMODE_LINEAR;
+#endif
+}
+
 void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
 {
     if (m_terrainPages.size() != m_spriteSheets.size())
         CollectTerrainPages();
-    m_linearTerrain = linear;
-    m_linearSprites = linear || sharpPixels;
-    const SDL_ScaleMode mode = m_linearTerrain ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
-    const SDL_ScaleMode spriteMode = m_linearSprites ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+    const SDL_ScaleMode smooth = SmoothPixelScaleMode();
+    m_terrainScaleMode = linear ? smooth : SDL_SCALEMODE_NEAREST;
+    // The sharp-pixel shader does its own pixel-art filtering and needs plain linear samples
+    m_spriteScaleMode = sharpPixels ? SDL_SCALEMODE_LINEAR : m_terrainScaleMode;
+    const SDL_ScaleMode mode = m_terrainScaleMode;
+    const SDL_ScaleMode spriteMode = m_spriteScaleMode;
     for (size_t i = 0; i < m_spriteSheets.size(); ++i)
     {
         if (m_spriteSheets[i])
@@ -502,8 +513,7 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
         if (m_terrainPages.size() != m_spriteSheets.size())
             CollectTerrainPages();
         const bool terrain = page < static_cast<int>(m_terrainPages.size()) && m_terrainPages[page];
-        const bool linear = terrain ? m_linearTerrain : m_linearSprites;
-        SDL_SetTextureScaleMode(tex, linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureScaleMode(tex, terrain ? m_terrainScaleMode : m_spriteScaleMode);
     }
     m_recoloredSheets[key] = tex;
     return tex ? tex : GetSpriteSheet(page);
@@ -808,7 +818,7 @@ int TextureManager::GetUnitBaseSeq(int unitType, int actionState) const
         if (row.empty())
             return 142;
 
-        // Authentic J2ME f1130b[unitType][state] mapping (f.java:10955, i.java:5734):
+        // Unit animation sequence mapping by action state:
         // row[0] = Standing / Idle (and base for Attack)
         // row[1] = Moving / Walking
         // row[2] = Dying (231+ for infantry)

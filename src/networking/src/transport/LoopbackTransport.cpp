@@ -70,6 +70,10 @@ public:
     {
         return 0;
     }
+    std::string peerAddress(PeerId) const override
+    {
+        return "loopback";
+    }
 
 private:
     std::shared_ptr<LoopbackHub::State> m_s;
@@ -120,6 +124,10 @@ public:
     uint32_t roundTripMs(PeerId) const override
     {
         return 0;
+    }
+    std::string peerAddress(PeerId) const override
+    {
+        return "loopback";
     }
 
 private:

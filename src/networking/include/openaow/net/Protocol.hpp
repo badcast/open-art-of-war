@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 3;
+constexpr std::uint16_t kProtocolVersion = 6;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -47,14 +47,17 @@ enum class MsgType : std::uint8_t
     Welcome = 2,
     Reject = 3,
     Chat = 4,
-    Roster = 5,      // host -> clients: who is in the room
-    StartMatch = 6,  // host -> clients: the match setup (opaque, the game's own format)
-    LobbyChoice = 7, // client -> host: what the player picked in the room
-    LobbyState = 8,  // host -> clients: the room (map, everybody's picks)
-    FileRequest = 9, // client -> host: a file by its hash (a map the player does not have)
-    Leave = 11,      // client -> host: the player leaves for good (the slot is not kept for a reconnect)
-    FileData = 10,   // host -> client: the file (compressed by the game; empty: not there);
-                     // owner -> dedicated room: a file the room offers from now on
+    Roster = 5,           // host -> clients: who is in the room
+    StartMatch = 6,       // host -> clients: the match setup (opaque, the game's own format)
+    LobbyChoice = 7,      // client -> host: what the player picked in the room
+    LobbyState = 8,       // host -> clients: the room (map, everybody's picks)
+    FileRequest = 9,      // client -> host: a file by its hash (a map the player does not have)
+    Leave = 11,           // client -> host: the player leaves for good (the slot is not kept for a reconnect)
+    DataManifest = 12,    // host -> client that cannot join with its game data: the host's data files (path, hash)
+    FilePathRequest = 13, // client -> host: a data file by its path (only paths of the manifest are served)
+    FilePathData = 14,    // host -> client: the file (compressed by the game; empty: not served)
+    FileData = 10,        // host -> client: the file (compressed by the game; empty: not there);
+                          // owner -> dedicated room: a file the room offers from now on
     // Lockstep
     Commands = 16,     // client -> host: the local player's commands for a turn
     TurnBundle = 17,   // host -> clients: everybody's commands of a closed turn
@@ -112,6 +115,7 @@ struct Hello
     std::string playerName;
     SessionToken token {};
     std::string password; // of a room that has one
+    bool canSync {false}; // this client can fetch the host's data files when its own differ (see DataManifest)
 };
 
 struct Welcome
@@ -243,6 +247,33 @@ struct FileData
 {
     uint64_t hash {0};
     std::vector<uint8_t> bytes;
+};
+
+constexpr std::size_t kMaxDataFiles = 96;
+constexpr std::size_t kMaxDataPathLength = 96;
+
+// One data file of the simulation: its path below assets/ and the hash of its bytes
+struct DataEntry
+{
+    std::string path;
+    std::uint64_t hash {0};
+};
+
+struct DataManifest
+{
+    std::vector<DataEntry> files;
+};
+
+struct FilePathRequest
+{
+    std::string path;
+};
+
+struct FilePathData
+{
+    std::string path;
+    std::uint64_t hash {0};
+    std::vector<std::uint8_t> bytes;
 };
 
 struct OwnerStart
@@ -398,6 +429,9 @@ void encode(BitWriter &w, const LobbyState &m);
 void encode(BitWriter &w, const OwnerSetMap &m);
 void encode(BitWriter &w, const FileRequest &m);
 void encode(BitWriter &w, const FileData &m);
+void encode(BitWriter &w, const DataManifest &m);
+void encode(BitWriter &w, const FilePathRequest &m);
+void encode(BitWriter &w, const FilePathData &m);
 void encode(BitWriter &w, const OwnerStart &m);
 void encode(BitWriter &w, const OwnerSetAi &m);
 void encode(BitWriter &w, const OwnerSetTeam &m);
@@ -415,6 +449,9 @@ void encode(BitWriter &w, const PunchRequest &m);
 
 // Each returns false (and leaves `m` unspecified) for a truncated, oversized or otherwise invalid payload
 bool decode(BitReader &r, Hello &m);
+bool decode(BitReader &r, DataManifest &m);
+bool decode(BitReader &r, FilePathRequest &m);
+bool decode(BitReader &r, FilePathData &m);
 bool decode(BitReader &r, Welcome &m);
 bool decode(BitReader &r, Reject &m);
 bool decode(BitReader &r, Chat &m);
@@ -446,6 +483,10 @@ bool decode(BitReader &r, HostRegistered &m);
 bool decode(BitReader &r, JoinHosted &m);
 bool decode(BitReader &r, HostedEndpoint &m);
 bool decode(BitReader &r, PunchRequest &m);
+
+// A closed turn as one message (type byte included), the form the network sends and a replay keeps
+std::vector<std::uint8_t> encodeTurn(const TurnBundle &m);
+bool decodeTurn(const std::uint8_t *data, std::size_t size, TurnBundle &out);
 
 inline MsgType readType(BitReader &r)
 {

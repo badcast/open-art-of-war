@@ -73,17 +73,33 @@ std::vector<uint8_t> Packed(const std::string &path)
     return out;
 }
 
-std::string Store(const std::string &path, uint64_t hash, const std::vector<uint8_t> &packedBytes)
+bool Unpack(const std::vector<uint8_t> &packedBytes, uint64_t hash, std::vector<uint8_t> &raw, size_t maxBytes)
 {
+    raw.clear();
     if (packedBytes.empty())
-        return {};
+        return false;
     // The size it claims, bounded: a hostile file must not make us allocate gigabytes
     const unsigned long long size = ZSTD_getFrameContentSize(packedBytes.data(), packedBytes.size());
-    if (size == ZSTD_CONTENTSIZE_ERROR || size == ZSTD_CONTENTSIZE_UNKNOWN || size > 16u * 1024 * 1024)
-        return {};
-    std::vector<uint8_t> raw(static_cast<size_t>(size));
+    if (size == ZSTD_CONTENTSIZE_ERROR || size == ZSTD_CONTENTSIZE_UNKNOWN || size > maxBytes)
+        return false;
+    raw.resize(static_cast<size_t>(size));
     const size_t n = ZSTD_decompress(raw.data(), raw.size(), packedBytes.data(), packedBytes.size());
     if (ZSTD_isError(n) || n != raw.size() || HashOfBytes(raw) != hash)
+    {
+        raw.clear();
+        return false;
+    }
+    return true;
+}
+
+bool Read(const std::string &path, std::vector<uint8_t> &bytes)
+{
+    return ReadAll(path, bytes);
+}
+
+std::string StoreRaw(const std::string &path, uint64_t hash, const std::vector<uint8_t> &raw)
+{
+    if (raw.empty() || raw.size() > 16u * 1024 * 1024 || HashOfBytes(raw) != hash)
         return {};
     // It must be a map: a JSON object with a sensible size
     const nlohmann::json doc = nlohmann::json::parse(raw.begin(), raw.end(), nullptr, false);
@@ -103,6 +119,14 @@ std::string Store(const std::string &path, uint64_t hash, const std::vector<uint
     }
     fs::rename(tmp, target, ec);
     return ec ? std::string() : target;
+}
+
+std::string Store(const std::string &path, uint64_t hash, const std::vector<uint8_t> &packedBytes)
+{
+    std::vector<uint8_t> raw;
+    if (!Unpack(packedBytes, hash, raw, 16u * 1024 * 1024))
+        return {};
+    return StoreRaw(path, hash, raw);
 }
 
 } // namespace OpenArtOfWar::MapFiles

@@ -4,6 +4,12 @@
 #include <iostream>
 #include <string>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#endif
+
 // Without a window: openaow-charactereditor --export-sprites <folder>            one atlas + JSON per object
 //                   openaow-charactereditor --export-single <folder> [columns [packed]]   every sprite on one grid (or packed atlas) per group
 //                   openaow-charactereditor --import-sprites <folder> [assets]   put them back (OVERWRITES assets/sprites)
@@ -56,6 +62,20 @@ Commands without a window:
 )";
 
 int main(int argc, char** argv) {
+#if defined(_WIN32)
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut == NULL || hOut == INVALID_HANDLE_VALUE || GetFileType(hOut) == FILE_TYPE_UNKNOWN) {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stdout);
+        }
+        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+        if (hErr == NULL || hErr == INVALID_HANDLE_VALUE || GetFileType(hErr) == FILE_TYPE_UNKNOWN) {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stderr);
+        }
+    }
+#endif
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         std::cout << kHelp;
         return 0;

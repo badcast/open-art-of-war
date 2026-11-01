@@ -52,6 +52,12 @@ public:
     virtual void disconnect(PeerId peer) = 0;
     // Round trip time to the peer in ms (0 when unknown)
     virtual uint32_t roundTripMs(PeerId peer) const = 0;
+    // Where the peer connects from ("203.0.113.5:49152", "loopback" for an in-memory link; empty when unknown)
+    virtual std::string peerAddress(PeerId peer) const
+    {
+        (void) peer;
+        return {};
+    }
     // Round trip, jitter, loss and traffic (only the round trip where the transport knows no more)
     virtual LinkStats linkStats(PeerId peer) const
     {

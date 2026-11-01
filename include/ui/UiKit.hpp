@@ -122,6 +122,15 @@ void DrawButton(
     bool hovered,
     bool enabled = true);
 
+void DrawCheckbox(
+    Renderer &r,
+    BitmapFontRenderer &font,
+    const UiRect &rect,
+    const std::string &label,
+    bool checked,
+    bool hovered,
+    bool enabled = true);
+
 void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor);
 
 // A yes / no question over a dimmed screen (leaving a room or a game). Enter / click Yes confirms, Esc / click No

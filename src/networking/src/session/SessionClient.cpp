@@ -47,6 +47,7 @@ void SessionClient::handle(const TransportEvent &e)
         hello.playerName = m_config.playerName;
         hello.token = m_config.token;
         hello.password = m_config.password;
+        hello.canSync = m_config.canSync;
         BitWriter w(m_buffer.data(), m_buffer.size());
         encode(w, hello);
         send(Channel::Control, m_buffer.data(), w.finish());
@@ -68,6 +69,23 @@ void SessionClient::handle(const TransportEvent &e)
                 m_config.token = m_welcome.token;
             }
             break;
+        case MsgType::DataManifest:
+        {
+            DataManifest manifest;
+            if (decode(r, manifest))
+            {
+                m_manifest = std::move(manifest.files);
+                m_manifestWaiting = true;
+            }
+            break;
+        }
+        case MsgType::FilePathData:
+        {
+            FilePathData data;
+            if (decode(r, data))
+                m_dataFiles.push_back(std::move(data));
+            break;
+        }
         case MsgType::Reject:
             if (decode(r, m_reject))
                 m_state = State::Rejected;
@@ -186,6 +204,48 @@ void SessionClient::sendLobbyChoice(const LobbyChoice &choice)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, choice);
+    send(Channel::Control, m_buffer.data(), w.finish());
+}
+
+bool SessionClient::takeDataManifest(std::vector<DataEntry> &files)
+{
+    if (!m_manifestWaiting)
+        return false;
+    files = std::move(m_manifest);
+    m_manifest.clear();
+    m_manifestWaiting = false;
+    return true;
+}
+
+void SessionClient::requestDataFile(const std::string &path)
+{
+    BitWriter w(m_buffer.data(), m_buffer.size());
+    encode(w, FilePathRequest {path});
+    send(Channel::Control, m_buffer.data(), w.finish());
+}
+
+bool SessionClient::takeDataFile(FilePathData &out)
+{
+    if (m_dataFiles.empty())
+        return false;
+    out = std::move(m_dataFiles.front());
+    m_dataFiles.erase(m_dataFiles.begin());
+    return true;
+}
+
+void SessionClient::sayHelloAgain(uint64_t assetsHash)
+{
+    m_config.identity.assetsHash = assetsHash;
+    Hello hello;
+    hello.gameVersion = m_config.identity.gameVersion;
+    hello.simBuildId = m_config.identity.simBuildId;
+    hello.assetsHash = assetsHash;
+    hello.playerName = m_config.playerName;
+    hello.token = m_config.token;
+    hello.password = m_config.password;
+    hello.canSync = false; // one round: a second mismatch is final
+    BitWriter w(m_buffer.data(), m_buffer.size());
+    encode(w, hello);
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 

@@ -19,8 +19,23 @@ struct SfxPlacement
     bool audible {false};
     float gain {0.0f};
     float pan {0.0f}; // -1 left .. 1 right
+    // 0 = clean .. 1 = muffled: a far battle (and a camera high above it) sounds dull, like through a wall
+    float muffle {0.0f};
 };
-SfxPlacement PlaceSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx);
+SfxPlacement PlaceSfx(
+    float worldX,
+    float worldY,
+    float viewX,
+    float viewY,
+    float viewW,
+    float viewH,
+    float rangePx,
+    float zoom = 2.0f,
+    float minGain = 0.0f);
+
+// Extracts event name from audio filename ("fire_rifle_2.ogg" -> "fire_rifle", "ui_show_dialog.ogg" ->
+// "ui_show_dialog")
+std::string EventOfFile(const std::string &path);
 
 // Sound effects: short clips decoded once (mono 44.1 kHz), mixed into a stereo stream by up to `voices`
 // voices. Events (assets/data/audio_sfx.json) pick one of their clips at random and bring their own volume,
@@ -53,6 +68,8 @@ public:
         int priority {5};   // 0..10
         bool positional {false};
         float rangeTiles {12.0f};
+        float minGain {0.0f}; // positional: quietest it is heard when farther than the range (0: silent there)
+        float reverb {0.0f}; // 0..1 send into the shared room reverb (explosions, heavy guns)
         std::vector<int> clips;
     };
 
@@ -72,7 +89,8 @@ public:
 
     // Starts one of the event's clips; `gain` 0..1 (distance), `pan` -1..1. False when the event is
     // unknown, silent or held back by its limits.
-    bool Play(const std::string &event, float gain, float pan, uint64_t nowMs);
+    // `muffle` 0..1 (SfxPlacement::muffle) rolls the highs off with a low-pass filter.
+    bool Play(const std::string &event, float gain, float pan, uint64_t nowMs, float muffle = 0.0f);
     // Queues an announcer line (dropped while its cooldown runs or when it is queued already)
     bool Announce(const std::string &event, uint64_t nowMs);
     // Starts the next announcer line once the current one is over; call once per frame
@@ -84,6 +102,7 @@ public:
     void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
     void SetMuted(bool muted);
+    void SetReverb(bool enabled); // the reverb of explosions and heavy guns
 
     int ActiveVoices() const;
     bool AnnouncerBusy() const;
@@ -101,6 +120,31 @@ private:
         int event {-1};
         bool voiceVolume {false}; // Voice / Announcer category
         bool announcer {false};
+        float lpCoef {1.0f};     // one-pole low-pass coefficient, 1 = filter off
+        float reverbSend {0.0f}; // share of the voice sent into the reverb
+        float lpL {0.0f};        // filter memory
+        float lpR {0.0f};
+    };
+    // A small Freeverb: parallel comb filters into series all-pass filters, one set per ear
+    struct Reverb
+    {
+        static constexpr int kCombs = 4;
+        static constexpr int kAllpass = 2;
+        struct Comb
+        {
+            std::vector<float> buf;
+            size_t pos {0};
+            float store {0.0f};
+        };
+        struct Allpass
+        {
+            std::vector<float> buf;
+            size_t pos {0};
+        };
+        Comb comb[2][kCombs];
+        Allpass allpass[2][kAllpass];
+        Reverb();
+        void Process(const float *in, float *outL, float *outR, int frames);
     };
     struct EventState
     {
@@ -111,7 +155,7 @@ private:
     };
 
     int EventIndex(const std::string &event) const;
-    bool StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer);
+    bool StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle = 0.0f);
     bool AnnounceLocked(int eventIdx, uint64_t nowMs);
     int InstancesLocked(int eventIdx) const;
 
@@ -127,6 +171,9 @@ private:
     float m_fxGain {1.0f};
     float m_voiceGain {1.0f};
     bool m_muted {false};
+    bool m_reverbOn {true};
+    Reverb m_reverb;
+    std::vector<float> m_sendBus, m_wetL, m_wetR; // scratch buffers of Mix
 };
 
 } // namespace OpenArtOfWar

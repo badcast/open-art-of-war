@@ -13,21 +13,65 @@
 namespace OpenArtOfWar
 {
 
-SfxPlacement PlaceSfx(float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx)
+SfxPlacement PlaceSfx(
+    float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx, float zoom, float minGain)
 {
     SfxPlacement p;
     // Distance from the view rectangle (0 inside)
     const float dx = std::max({viewX - worldX, 0.0f, worldX - (viewX + viewW)});
     const float dy = std::max({viewY - worldY, 0.0f, worldY - (viewY + viewH)});
     const float d = std::sqrt(dx * dx + dy * dy);
-    if (rangePx <= 0.0f || d >= rangePx)
+    // Beyond its range a sound fades out, unless the event has a minimum volume: then a battle far from the camera
+    // is still heard, faintly and dull (the caller decides what may be heard at all, e.g. the fog of war)
+    const bool inRange = rangePx > 0.0f && d < rangePx;
+    if (!inRange && minGain <= 0.0f)
         return p;
-    const float k = 1.0f - d / rangePx;
+    const float k = inRange ? 1.0f - d / rangePx : 0.0f;
     p.audible = true;
-    p.gain = k * k;
+
+    // Camera altitude distance attenuation:
+    // Baseline is default gameplay zoom (2.0x).
+    // Zooming out (zoom < 2.0x down to 0.5x) raises the virtual camera higher above the battlefield,
+    // naturally reducing volume of unit/building sounds.
+    // Zooming in (zoom > 2.0x up to 4.0x) brings the camera closer to ground action, amplifying sound.
+    constexpr float kBaseZoom = 2.0f;
+    const float safeZoom = std::max(0.01f, zoom);
+    const float zoomRatio = std::clamp(safeZoom / kBaseZoom, 0.25f, 2.0f);
+    const float zoomGain = std::clamp(std::pow(zoomRatio, 0.6f), 0.40f, 1.25f);
+
+    p.gain = std::max((k * k) * zoomGain, minGain);
+    // Muffling: grows with the distance from the view and with the camera rising above the battlefield
+    const float farness = rangePx > 0.0f ? std::clamp(d / rangePx, 0.0f, 1.0f) : 1.0f;
+    const float highUp = std::clamp((kBaseZoom - safeZoom) / (kBaseZoom - 0.5f), 0.0f, 1.0f);
+    p.muffle = std::clamp(farness * 0.85f + highUp * 0.45f, 0.0f, 1.0f);
     const float cx = viewX + viewW * 0.5f;
     p.pan = std::clamp((worldX - cx) / std::max(1.0f, viewW * 0.6f), -1.0f, 1.0f) * 0.85f;
     return p;
+}
+
+// "fire_rifle_2.ogg" -> "fire_rifle"; clips without a trailing _<number> keep their base name
+std::string EventOfFile(const std::string &path)
+{
+    std::string name = path.substr(path.find_last_of("/\\") + 1);
+    if (name.size() < 5 || name.compare(name.size() - 4, 4, ".ogg") != 0)
+        return {};
+    name.resize(name.size() - 4);
+    const size_t us = name.find_last_of('_');
+    if (us != std::string::npos && us + 1 < name.size())
+    {
+        bool allDigits = true;
+        for (size_t i = us + 1; i < name.size(); ++i)
+        {
+            if (name[i] < '0' || name[i] > '9')
+            {
+                allDigits = false;
+                break;
+            }
+        }
+        if (allDigits)
+            return name.substr(0, us);
+    }
+    return name;
 }
 
 namespace
@@ -45,24 +89,6 @@ SfxMixer::Category ParseCategory(const std::string &s)
     if (s == "alert")
         return SfxMixer::Category::Alert;
     return SfxMixer::Category::Ui;
-}
-
-// "fire_rifle_2.ogg" -> "fire_rifle"; empty when the name has no _<number>.ogg ending
-std::string EventOfFile(const std::string &path)
-{
-    std::string name = path.substr(path.find_last_of("/\\") + 1);
-    if (name.size() < 5 || name.compare(name.size() - 4, 4, ".ogg") != 0)
-        return {};
-    name.resize(name.size() - 4);
-    const size_t us = name.find_last_of('_');
-    if (us == std::string::npos || us + 1 >= name.size())
-        return {};
-    for (size_t i = us + 1; i < name.size(); ++i)
-    {
-        if (name[i] < '0' || name[i] > '9')
-            return {};
-    }
-    return name.substr(0, us);
 }
 
 // Ogg Vorbis -> mono int16 at SfxMixer::kRate
@@ -178,6 +204,8 @@ void SfxMixer::Configure(const nlohmann::json &doc)
         c.priority = std::clamp(e.value("priority", 5), 0, 10);
         c.positional = e.value("positional", false);
         c.rangeTiles = std::max(0.0f, e.value("range_tiles", 12.0f));
+        c.minGain = std::clamp(e.value("min_gain", 0.0f), 0.0f, 1.0f);
+        c.reverb = std::clamp(e.value("reverb", 0.0f), 0.0f, 1.0f);
     }
 }
 
@@ -235,7 +263,8 @@ int SfxMixer::InstancesLocked(int eventIdx) const
     return n;
 }
 
-bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer)
+bool SfxMixer::StartLocked(
+    int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle)
 {
     EventState &ev = m_events[static_cast<size_t>(eventIdx)];
     const EventConfig &c = ev.cfg;
@@ -284,13 +313,20 @@ bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, 
     v.event = eventIdx;
     v.voiceVolume = c.category == Category::Voice || c.category == Category::Announcer;
     v.announcer = announcer;
+    v.reverbSend = c.reverb * std::clamp(gain, 0.0f, 1.0f);
+    if (muffle > 0.01f)
+    {
+        // Cut-off from 16 kHz (clean) down to 700 Hz (far away)
+        const float fc = 16000.0f * std::pow(700.0f / 16000.0f, std::clamp(muffle, 0.0f, 1.0f));
+        v.lpCoef = 1.0f - std::exp(-6.2831853f * fc / static_cast<float>(kRate));
+    }
     m_voices.push_back(v);
     ev.lastPlayMs = nowMs;
     ev.played = true;
     return true;
 }
 
-bool SfxMixer::Play(const std::string &event, float gain, float pan, uint64_t nowMs)
+bool SfxMixer::Play(const std::string &event, float gain, float pan, uint64_t nowMs, float muffle)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
@@ -298,7 +334,7 @@ bool SfxMixer::Play(const std::string &event, float gain, float pan, uint64_t no
         return false;
     if (m_events[static_cast<size_t>(idx)].cfg.category == Category::Announcer)
         return AnnounceLocked(idx, nowMs); // announcer lines always go through the queue
-    return StartLocked(idx, gain, pan, nowMs, false);
+    return StartLocked(idx, gain, pan, nowMs, false, muffle);
 }
 
 bool SfxMixer::Announce(const std::string &event, uint64_t nowMs)
@@ -345,25 +381,86 @@ void SfxMixer::Update(uint64_t nowMs)
     }
 }
 
+SfxMixer::Reverb::Reverb()
+{
+    // Freeverb delay lengths (44.1 kHz); the right ear is a little longer, which spreads the tail
+    static constexpr size_t kCombLen[kCombs] = {1116, 1188, 1277, 1356};
+    static constexpr size_t kAllpassLen[kAllpass] = {556, 441};
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        for (int i = 0; i < kCombs; ++i)
+            comb[ch][i].buf.assign(kCombLen[i] + (ch ? 23 : 0), 0.0f);
+        for (int i = 0; i < kAllpass; ++i)
+            allpass[ch][i].buf.assign(kAllpassLen[i] + (ch ? 23 : 0), 0.0f);
+    }
+}
+
+void SfxMixer::Reverb::Process(const float *in, float *outL, float *outR, int frames)
+{
+    constexpr float kFeedback = 0.80f; // room size
+    constexpr float kDamp = 0.35f;     // high-frequency damping inside the room
+    constexpr float kWet = 0.9f;
+    for (int i = 0; i < frames; ++i)
+    {
+        const float x = in[i] * 0.03f;
+        float* out[2] = {outL, outR};
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            float y = 0.0f;
+            for (Comb &c : comb[ch])
+            {
+                const float d = c.buf[c.pos];
+                c.store = d * (1.0f - kDamp) + c.store * kDamp;
+                c.buf[c.pos] = x + c.store * kFeedback;
+                if (++c.pos >= c.buf.size())
+                    c.pos = 0;
+                y += d;
+            }
+            for (Allpass &a : allpass[ch])
+            {
+                const float d = a.buf[a.pos];
+                a.buf[a.pos] = y + d * 0.5f;
+                y = d - y;
+                if (++a.pos >= a.buf.size())
+                    a.pos = 0;
+            }
+            out[ch][i] = y * kWet;
+        }
+    }
+}
+
 void SfxMixer::Mix(int16_t *out, int frames)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     if (frames <= 0)
         return;
     std::vector<float> acc(static_cast<size_t>(frames) * 2, 0.0f);
+    m_sendBus.assign(static_cast<size_t>(frames), 0.0f);
     for (Voice &v : m_voices)
     {
         const std::vector<int16_t> &clip = m_clips[static_cast<size_t>(v.clip)];
         const float vol = m_muted ? 0.0f : (v.voiceVolume ? m_voiceGain : m_fxGain);
         const float gl = v.gainL * vol, gr = v.gainR * vol;
+        const float send = m_reverbOn ? v.reverbSend * vol : 0.0f;
+        const bool filtered = v.lpCoef < 1.0f;
         const double last = static_cast<double>(clip.size() - 1);
         for (int i = 0; i < frames && v.pos < last; ++i)
         {
             const size_t a = static_cast<size_t>(v.pos);
             const float t = static_cast<float>(v.pos - static_cast<double>(a));
             const float s = clip[a] + (clip[a + 1] - clip[a]) * t;
-            acc[static_cast<size_t>(i) * 2] += s * gl;
-            acc[static_cast<size_t>(i) * 2 + 1] += s * gr;
+            float l = s * gl, r = s * gr;
+            if (filtered)
+            {
+                v.lpL += v.lpCoef * (l - v.lpL);
+                v.lpR += v.lpCoef * (r - v.lpR);
+                l = v.lpL;
+                r = v.lpR;
+            }
+            acc[static_cast<size_t>(i) * 2] += l;
+            acc[static_cast<size_t>(i) * 2 + 1] += r;
+            if (send > 0.0f)
+                m_sendBus[static_cast<size_t>(i)] += s * send;
             v.pos += v.step;
         }
     }
@@ -375,6 +472,18 @@ void SfxMixer::Mix(int16_t *out, int frames)
                 return v.pos >= static_cast<double>(m_clips[static_cast<size_t>(v.clip)].size() - 1);
             }),
         m_voices.end());
+    if (m_reverbOn)
+    {
+        // The tail goes on after the voices that fed it are gone
+        m_wetL.assign(static_cast<size_t>(frames), 0.0f);
+        m_wetR.assign(static_cast<size_t>(frames), 0.0f);
+        m_reverb.Process(m_sendBus.data(), m_wetL.data(), m_wetR.data(), frames);
+        for (int i = 0; i < frames; ++i)
+        {
+            acc[static_cast<size_t>(i) * 2] += m_wetL[static_cast<size_t>(i)];
+            acc[static_cast<size_t>(i) * 2 + 1] += m_wetR[static_cast<size_t>(i)];
+        }
+    }
     for (size_t i = 0; i < acc.size(); ++i)
     {
         // Soft limit: many explosions at once saturate gently instead of clipping hard
@@ -401,6 +510,12 @@ void SfxMixer::SetVoiceVolume(int volume)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     m_voiceGain = std::clamp(volume, 0, 128) / 128.0f;
+}
+
+void SfxMixer::SetReverb(bool enabled)
+{
+    std::lock_guard<std::mutex> guard(m_lock);
+    m_reverbOn = enabled;
 }
 
 void SfxMixer::SetMuted(bool muted)

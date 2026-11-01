@@ -12,6 +12,7 @@
 #include <csignal>
 #include <cstdio>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -64,6 +65,9 @@ Options (command line wins over --config):
   --idle-room-timeout-s <n>   a room with a running match nobody is in closes after this (default 120)
   --empty-room-timeout-s <n>  a lobby nobody is in closes after this (default 30)
   --unused-room-timeout-s <n> a room nobody entered closes after this (default 120)
+  --dir-replay <dir>          folder where the replay of every match of every room is saved, as
+                              open-art-of-war-YYYYMMDD-HHMMSS_<map>.awr (default replay/, empty = off).
+                              With the addresses of the players: keep it private
   --name <text>               server name shown to players
   --motd <text>               message of the day shown to players
   --log-level <level>         trace, debug, info, warn, error (default info)
@@ -143,7 +147,7 @@ int main(int argc, char* argv[]) {
         }
     };
 
-    static const char* const kKnown[] = {"bind", "port", "room-ports", "tcp-port", "max-rooms", "max-players", "max-clients",
+    static const char* const kKnown[] = {"bind", "port", "room-ports", "tcp-port", "max-rooms", "max-players", "max-clients", "dir-replay",
                                          "turn-ms", "input-delay-min", "input-delay-max", "idle-room-timeout-s", "empty-room-timeout-s",
                                          "unused-room-timeout-s", "name", "motd", "log-level", "log-file", "stats-interval-s"};
     for (auto it = options.begin(); it != options.end(); ++it) {
@@ -181,6 +185,16 @@ int main(int argc, char* argv[]) {
     config.idleRoomTimeoutMs = static_cast<uint32_t>(number("idle-room-timeout-s", 120) * 1000);
     config.emptyRoomTimeoutMs = static_cast<uint32_t>(number("empty-room-timeout-s", 30) * 1000);
     config.unusedRoomTimeoutMs = static_cast<uint32_t>(number("unused-room-timeout-s", 120) * 1000);
+    config.replayDir = text("dir-replay", "replay");
+    if (!config.replayDir.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(config.replayDir, ec);
+        if (ec) {
+            std::cerr << "Cannot create the replay folder " << config.replayDir << ": " << ec.message()
+                      << " (the matches are not recorded)" << std::endl;
+            config.replayDir.clear();
+        }
+    }
     config.name = text("name", "OpenAOW server");
     config.motd = text("motd", "");
     const long tcpPort = number("tcp-port", kDefaultPort);

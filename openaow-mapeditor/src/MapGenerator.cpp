@@ -31,6 +31,7 @@ using Rng = Utility::Random;
 constexpr float kPi = 3.14159265f;
 constexpr int kBaseSize = 10;      // a base occupies 10x10 tiles
 constexpr int kBaseMargin = 3;     // kept clear around a base
+constexpr float kMinBaseDistance = 18.0f;  // closest two bases of a ring may be (tiles, corner to corner)
 
 // ---- Ground ----------------------------------------------------------------------------------------------------
 enum Material : char { G = 'G', D = 'D', E = 'E', W = 'W', S = 'S' };
@@ -149,7 +150,9 @@ public:
     Builder(MapDocument& doc, const GeneratorParams& params, int w, int h, int tilesetId)
         : m_doc(doc), m_params(params), m_w(w), m_h(h), m_tilesetId(tilesetId), m_tileset(tileSet(tilesetId)),
           m_rng(params.seed), m_seed(params.seed) {
-        m_sym.kind = params.symmetry;
+        m_players = std::clamp(params.players, 2, 8);
+        // More than two bases sit on a ring: the terrain is not mirrored, the bases are alike by construction
+        m_sym.kind = m_players > 2 ? GeneratorSymmetry::None : params.symmetry;
         m_sym.w = w;
         m_sym.h = h;
         const int tiles = w * h;
@@ -248,7 +251,45 @@ private:
     }
 
     // ---- 1. bases --------------------------------------------------------------------------------------------
+    // Bases of three or more players: evenly on an ellipse around the centre, the first one at the bottom left. The
+    // number shrinks while two bases would be closer than kMinBaseDistance (a small map takes fewer players).
+    void LayoutRingBases() {
+        const int maxX = m_w - kBaseSize - kBaseMargin - 1;
+        const int maxY = m_h - kBaseSize - kBaseMargin - 1;
+        const float cx = m_w * 0.5f, cy = m_h * 0.5f;
+        const float rx = std::max(1.0f, cx - kBaseSize * 0.5f - kBaseMargin - 1.0f);
+        const float ry = std::max(1.0f, cy - kBaseSize * 0.5f - kBaseMargin - 1.0f);
+        for (; m_players >= 3; --m_players) {
+            m_bases.clear();
+            for (int i = 0; i < m_players; ++i) {
+                const float angle = kPi * 0.75f + 2.0f * kPi * i / m_players;
+                const int x = std::clamp(static_cast<int>(std::lround(cx + rx * std::cos(angle) - kBaseSize * 0.5f)),
+                                         kBaseMargin + 1, maxX);
+                const int y = std::clamp(static_cast<int>(std::lround(cy + ry * std::sin(angle) - kBaseSize * 0.5f)),
+                                         kBaseMargin + 1, maxY);
+                m_bases.push_back({x, y});
+            }
+            float nearest = 1e9f;
+            for (size_t a = 0; a < m_bases.size(); ++a) {
+                for (size_t b = a + 1; b < m_bases.size(); ++b) {
+                    nearest = std::min(nearest, std::hypot(float(m_bases[a].x - m_bases[b].x),
+                                                           float(m_bases[a].y - m_bases[b].y)));
+                }
+            }
+            if (nearest >= kMinBaseDistance) break;
+        }
+        if (m_players < 3) m_bases.clear();  // too small for a ring: the two-base layout below
+    }
+
     void LayoutBases() {
+        if (m_players > 2) LayoutRingBases();
+        if (m_bases.size() >= 3) {
+            for (const auto& b : m_bases) {
+                ReserveRect(b.x - kBaseMargin, b.y - kBaseMargin, b.x + kBaseSize + kBaseMargin - 1,
+                            b.y + kBaseSize + kBaseMargin - 1);
+            }
+            return;
+        }
         const int maxX = m_w - kBaseSize - kBaseMargin - 1;
         const int maxY = m_h - kBaseSize - kBaseMargin - 1;
         int px = 6, py = m_h - 14;
@@ -310,7 +351,24 @@ private:
         }
     }
 
+    // Bases of three or more players: every base gets a winding road to the centre
+    void CarveRingRoads() {
+        const float cx = m_w * 0.5f, cy = m_h * 0.5f;
+        for (const auto& b : m_bases) {
+            const float bx = b.x + kBaseSize * 0.5f, by = b.y + kBaseSize * 0.5f;
+            const float wx = std::clamp((bx + cx) * 0.5f + m_rng.SignedUnit() * m_w * 0.08f, 8.0f, m_w - 8.0f);
+            const float wy = std::clamp((by + cy) * 0.5f + m_rng.SignedUnit() * m_h * 0.08f, 8.0f, m_h - 8.0f);
+            Walk(bx, by, wx, wy, 2.0f);
+            Walk(wx, wy, cx, cy, 2.0f);
+        }
+        CarveClearings(cx, cy);
+    }
+
     void CarveRoads() {
+        if (m_bases.size() >= 3) {
+            CarveRingRoads();
+            return;
+        }
         const float p0x = m_bases[0].x + kBaseSize * 0.5f, p0y = m_bases[0].y + kBaseSize * 0.5f;
         const float p1x = m_bases[1].x + kBaseSize * 0.5f, p1y = m_bases[1].y + kBaseSize * 0.5f;
         const float cx = m_w * 0.5f, cy = m_h * 0.5f;
@@ -325,7 +383,11 @@ private:
             Walk(w2x, w2y, p1x, p1y, 2.0f);
         }
 
-        // A few open clearings (room for expansions and flanking) joined to the road
+        CarveClearings(cx, cy);
+    }
+
+    // A few open clearings (room for expansions and flanking) joined to the road
+    void CarveClearings(float cx, float cy) {
         const int clearings = std::clamp(m_w * m_h / 1500, 1, 6);
         std::vector<Point> placed;
         for (int attempt = 0; attempt < clearings * 12 && static_cast<int>(placed.size()) < clearings; ++attempt) {
@@ -383,6 +445,53 @@ private:
         for (int i = 0; i < m_w * m_h; ++i) if (label[i] >= 0 && size[label[i]] < 3) m_island[i] = 0;
 
         ConnectPockets();
+        ConnectBases();
+    }
+
+    // Every base must be reachable from the first one: while another base's open ground is cut off, a passage
+    // (two tiles wide) is cut through the islands to it
+    void ConnectBases() {
+        if (m_bases.size() < 2) return;
+        std::vector<int> label;
+        for (int pass = 0; pass < 32; ++pass) {
+            Components([&](int x, int y) { return m_island[Idx(x, y)] == 0; }, label);
+            auto labelOf = [&](const Point& b) {
+                return label[Idx(b.x + kBaseSize / 2, b.y + kBaseSize / 2)];
+            };
+            const int home = labelOf(m_bases[0]);
+            int lost = -1;
+            for (size_t i = 1; i < m_bases.size() && lost < 0; ++i) {
+                if (labelOf(m_bases[i]) != home) lost = labelOf(m_bases[i]);
+            }
+            if (lost < 0) return;
+            // Shortest way from the first base's ground to the cut-off ground, through islands too
+            std::vector<int> from(m_w * m_h, -2);
+            std::vector<int> queue;
+            for (int i = 0; i < m_w * m_h; ++i) {
+                if (label[i] == home) { from[i] = -1; queue.push_back(i); }
+            }
+            int reached = -1;
+            for (size_t head = 0; head < queue.size() && reached < 0; ++head) {
+                const int cur = queue[head];
+                static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                for (const auto& st : kStep) {
+                    const int nx = cur % m_w + st[0], ny = cur / m_w + st[1];
+                    if (!Inside(nx, ny) || from[Idx(nx, ny)] != -2) continue;
+                    from[Idx(nx, ny)] = cur;
+                    if (label[Idx(nx, ny)] == lost) { reached = Idx(nx, ny); break; }
+                    queue.push_back(Idx(nx, ny));
+                }
+            }
+            if (reached < 0) return;
+            for (int cur = from[reached]; cur >= 0; cur = from[cur]) {
+                const int x = cur % m_w, y = cur / m_w;
+                for (int dy = 0; dy <= 1; ++dy) {
+                    for (int dx = 0; dx <= 1; ++dx) {
+                        if (Inside(x + dx, y + dy)) m_island[Idx(x + dx, y + dy)] = 0;
+                    }
+                }
+            }
+        }
     }
 
     // Open ground cut off from both bases: small pockets join the islands, larger ones get a passage
@@ -694,6 +803,7 @@ private:
     void SetStartPositions() {
         m_doc.setPlayerStart(m_bases[0].x + 1, m_bases[0].y + 2);
         m_doc.setEnemyStart(m_bases[1].x + 1, m_bases[1].y + 2);
+        for (size_t i = 2; i < m_bases.size(); ++i) m_doc.AddStartPos(m_bases[i].x + 1, m_bases[i].y + 2);
     }
 
     // ---- 6. decorations: every island tile ends up under a footprint -----------------------------------------
@@ -853,6 +963,7 @@ private:
     Symmetry m_sym;
 
     std::vector<Point> m_bases;
+    int m_players{2};
     std::vector<FPoint> m_roadPoints;
     std::vector<uint8_t> m_reserved;   // kept free: bases, roads, clearings
     std::vector<uint8_t> m_island;     // impassable island
@@ -874,6 +985,7 @@ void MapGenerator::Generate(MapDocument& doc, GeneratorParams params) {
     const int w = std::clamp(params.width, 40, MAX_MAP_SIZE);
     const int h = std::clamp(params.height, 40, MAX_MAP_SIZE);
     const int tilesetId = std::clamp(params.tilesetId, 0, 1);
+    params.players = std::clamp(params.players, 2, 8);
 
     doc.NewMap(w, h, tilesetId, 0);
     doc.SetName("generated_map_" + std::to_string(params.seed % 10000));

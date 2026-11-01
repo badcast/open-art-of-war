@@ -233,6 +233,30 @@ msgstr ""
 msgid "Hold current position and engage enemies in range"
 msgstr ""
 
+msgid "GUARD"
+msgstr ""
+
+msgid "Stance: engage enemies in sight, chase them a short way, then return"
+msgstr ""
+
+msgid "HOLD GROUND"
+msgstr ""
+
+msgid "Stance: fire only at enemies in range, never leave the position"
+msgstr ""
+
+msgid "PURSUE"
+msgstr ""
+
+msgid "Stance: engage enemies in sight and chase them to the end (default)"
+msgstr ""
+
+msgid "REPAIR [R]"
+msgstr ""
+
+msgid "REPAIRING"
+msgstr ""
+
 msgid "MISSION ACCOMPLISHED!"
 msgstr ""
 
@@ -532,6 +556,9 @@ msgid "Height (tiles)"
 msgstr ""
 
 msgid "Maximum health"
+msgstr ""
+
+msgid "Build radius (tiles)"
 msgstr ""
 
 msgid "Sight radius (tiles)"
@@ -1715,10 +1742,280 @@ msgstr ""
 msgid "Structure"
 msgstr ""
 
+msgid "Render API"
+msgstr ""
+
+msgid "Takes effect after the window is recreated"
+msgstr ""
+
+msgid "Graphics interface that draws the game"
+msgstr ""
+
+msgid "Applied on the next start of the game"
+msgstr ""
+
+msgid "SWITCH RENDER API?"
+msgstr ""
+
+msgid "The render API changes at the next start of the game: "
+msgstr ""
+
+msgid "The window is recreated with this render API: "
+msgstr ""
+
+msgid ". You get 15 seconds to keep it, otherwise the previous one returns."
+msgstr ""
+
+msgid "KEEP THIS RENDER API?"
+msgstr ""
+
+msgid "Needs the SDL GPU render API"
+msgstr ""
+
+msgid "Color grading"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "Natural"
+msgstr ""
+
+msgid "Vivid"
+msgstr ""
+
+msgid "Cinematic"
+msgstr ""
+
+msgid "Dusk"
+msgstr ""
+
+msgid "Night"
+msgstr ""
+
+msgid "The picture as drawn"
+msgstr ""
+
+msgid "A little more contrast and colour"
+msgstr ""
+
+msgid "Strong colours"
+msgstr ""
+
+msgid "Muted colours, warm light, dark corners"
+msgstr ""
+
+msgid "Evening light"
+msgstr ""
+
+msgid "Night: explosions light up the dark"
+msgstr ""
+
+msgid "Glow"
+msgstr ""
+
+msgid "Explosions, shots and projectiles glow"
+msgstr ""
+
+msgid "Pixel filter"
+msgstr ""
+
+msgid "Crisp pixels with smooth edges when zoomed"
+msgstr ""
+
+msgid "Sharp"
+msgstr ""
+
+msgid "Standard"
+msgstr ""
+
+msgid "Army color"
+msgstr ""
+
+msgid "Classic"
+msgstr ""
+
+msgid "Blue"
+msgstr ""
+
+msgid "Red"
+msgstr ""
+
+msgid "Green"
+msgstr ""
+
+msgid "Yellow"
+msgstr ""
+
+msgid "Purple"
+msgstr ""
+
+msgid "Orange"
+msgstr ""
+
+msgid "Cyan"
+msgstr ""
+
+msgid "White"
+msgstr ""
+
+msgid "NETWORK GAME"
+msgstr ""
+
+msgid "Random"
+msgstr ""
+
+msgid "Team"
+msgstr ""
+
+msgid "YOUR GAME"
+msgstr ""
+
+msgid "GAME ROOM"
+msgstr ""
+
+msgid "PLAYERS"
+msgstr ""
+
+msgid "NOT READY"
+msgstr ""
+
+msgid "START"
+msgstr ""
+
+msgid "LEAVE"
+msgstr ""
+
+msgid "The host starts the game"
+msgstr ""
+
+msgid "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
+msgstr ""
+
+msgid "Enter: chat"
+msgstr ""
+
+msgid "Connecting..."
+msgstr ""
+
+msgid "CANCEL"
+msgstr ""
+
+msgid "Your name"
+msgstr ""
+
+msgid "LOCAL NETWORK"
+msgstr ""
+
+msgid "INTERNET"
+msgstr ""
+
+msgid "Looking for games on the local network..."
+msgstr ""
+
+msgid "CREATE GAME"
+msgstr ""
+
+msgid "JOIN"
+msgstr ""
+
+msgid "Enter an address: host or host:port"
+msgstr ""
+
+msgid "Cannot create the game: "
+msgstr ""
+
+msgid "Cannot connect: "
+msgstr ""
+
+msgid "The connection was lost"
+msgstr ""
+
+msgid "Not admitted: "
+msgstr ""
+
+msgid "Resistance"
+msgstr ""
+
+msgid "Confederation"
+msgstr ""
+
+msgid "CONNECT"
+msgstr ""
+
+msgid "SERVER"
+msgstr ""
+
+msgid "REFRESH"
+msgstr ""
+
+msgid "No open rooms: create one, or join by code"
+msgstr ""
+
+msgid "Room code"
+msgstr ""
+
+msgid "JOIN BY CODE"
+msgstr ""
+
+msgid "CREATE ON SERVER"
+msgstr ""
+
+msgid "Direct connection: host or host:port (port 38100 by default; the host forwards UDP 38100)"
+msgstr ""
+
+msgid "A room code has six characters"
+msgstr ""
+
+msgid "Server: "
+msgstr ""
+
+msgid "connecting..."
+msgstr ""
+
+msgid "OUT OF SYNC at tick "
+msgstr ""
+
+msgid ": the players' games differ, the result is not reliable"
+msgstr ""
+
+msgid "Connection lost: reconnecting..."
+msgstr ""
+
+msgid "Catching up with the match: "
+msgstr ""
+
+msgid "Waiting for the host..."
+msgstr ""
+
+msgid "Downloading the map..."
+msgstr ""
+
+msgid "AI"
+msgstr ""
+
+msgid "+ AI PLAYER"
+msgstr ""
+
+msgid "PAUSED by "
+msgstr ""
+
+msgid "P to go on"
+msgstr ""
+
+msgid "code"
+msgstr ""
+
 msgid "Technology name"
 msgstr ""
 
 msgid "Technology description"
+msgstr ""
+
+msgid "Research time (seconds)"
+msgstr ""
+
+msgid "How long the technology takes to research."
 msgstr ""
 
 msgid "Research cost (credits)"
@@ -1920,6 +2217,9 @@ msgid "Height of the building on the map in tiles."
 msgstr ""
 
 msgid "Health points of the unit or building."
+msgstr ""
+
+msgid "How far from this finished building new structures may be placed, in tiles."
 msgstr ""
 
 msgid "How far it sees, in tiles."
@@ -2300,6 +2600,561 @@ msgstr ""
 msgid "Choose an output folder first."
 msgstr ""
 
+msgid "IMPORT SPRITES"
+msgstr ""
+
+msgid "WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."
+msgstr ""
+
+msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."
+msgstr ""
+
+msgid "Import folder"
+msgstr ""
+
+msgid "Choose import folder..."
+msgstr ""
+
+msgid "Import sprites"
+msgstr ""
+
+msgid "Overwrite assets?"
+msgstr ""
+
+msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."
+msgstr ""
+
+msgid "Import and overwrite"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Select all shown"
+msgstr ""
+
+msgid "Clear selection"
+msgstr ""
+
+msgid "Selected: %zu (Ctrl+click: add, Shift+click: range)"
+msgstr ""
+
+msgid "Selected: %zu"
+msgstr ""
+
+msgid "Compress sprites"
+msgstr ""
+
+msgid "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."
+msgstr ""
+
+msgid "Opens the system dialog to pick the folder to import from."
+msgstr ""
+
+msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
+msgstr ""
+
+msgid "Packed atlas"
+msgstr ""
+
+msgid "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."
+msgstr ""
+
+msgid "Starting the game..."
+msgstr ""
+
+msgid "Loading graphics..."
+msgstr ""
+
+msgid "Preparing the renderer..."
+msgstr ""
+
+msgid "Loading sound and music..."
+msgstr ""
+
+msgid "Loading units and buildings..."
+msgstr ""
+
+msgid "Preparing the interface..."
+msgstr ""
+
+msgid "No other map has a start position for everybody in the room."
+msgstr ""
+
+msgid "Players on this map: "
+msgstr ""
+
+msgid "A map holds 8 players at most: no more start positions"
+msgstr ""
+
+msgid "Start position added: "
+msgstr ""
+
+msgid "Start position removed: "
+msgstr ""
+
+msgid "players"
+msgstr ""
+
+msgid "PREBUILT BASES"
+msgstr ""
+
+msgid "FROM SCRATCH"
+msgstr ""
+
+msgid "Color"
+msgstr ""
+
+msgid "Click: pick from a list. Arrows: step. Tab: next page"
+msgstr ""
+
+msgid "RESTART THE GAME?"
+msgstr ""
+
+msgid "The mission starts over: the progress made so far is lost."
+msgstr ""
+
+msgid "LEAVE THE MATCH?"
+msgstr ""
+
+msgid "You leave the match and return to the main menu. The other players go on without you."
+msgstr ""
+
+msgid "LEAVE THE GAME?"
+msgstr ""
+
+msgid "You return to the main menu: the progress of this game is lost."
+msgstr ""
+
+msgid "YES"
+msgstr ""
+
+msgid "NO"
+msgstr ""
+
+msgid "LEAVE THE ROOM?"
+msgstr ""
+
+msgid "You are the room owner. If you leave, the game may end for everybody in it."
+msgstr ""
+
+msgid "You leave the room. You can join it again while it is open."
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "optional"
+msgstr ""
+
+msgid "Loading the map..."
+msgstr ""
+
+msgid "A player who is silent for this long (milliseconds) is dropped."
+msgstr ""
+
+msgid "A player who lost the connection can come back during this time (seconds)."
+msgstr ""
+
+msgid "AI level chosen when the game starts."
+msgstr ""
+
+msgid "API used when the preferred one does not work."
+msgstr ""
+
+msgid "Address of the server that lists the public games."
+msgstr ""
+
+msgid "All animations of the game. Click one to play it on the canvas, or to put it into a field after pressing Pick."
+msgstr ""
+
+msgid "Animation %d: %d frames"
+msgstr ""
+
+msgid "Animations"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Building death"
+msgstr ""
+
+msgid "Burial seconds"
+msgstr ""
+
+msgid "Choose..."
+msgstr ""
+
+msgid "Click an animation to put it in the chosen field"
+msgstr ""
+
+msgid "Color of the fog."
+msgstr ""
+
+msgid "Color of the line (#RRGGBB)."
+msgstr ""
+
+msgid "Colors of all themes"
+msgstr ""
+
+msgid "Composite"
+msgstr ""
+
+msgid "Credits %.0f, +%.0f / s"
+msgstr ""
+
+msgid "Credits earned by minute"
+msgstr ""
+
+msgid "Darkness (0..255) of the places you have already seen but cannot see now."
+msgstr ""
+
+msgid "Darkness (0..255) of the places you have never seen."
+msgstr ""
+
+msgid "Default difficulty"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Edits assets/data/game_environment.json: font, fog, construction, network, order lines."
+msgstr ""
+
+msgid "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). The canvas plays the result."
+msgstr ""
+
+msgid "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare the levels."
+msgstr ""
+
+msgid "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the screens."
+msgstr ""
+
+msgid "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time (assets/characters/effects.yaml)."
+msgstr ""
+
+msgid "Environment"
+msgstr ""
+
+msgid "Every %.0f s, tier %.0f"
+msgstr ""
+
+msgid "Every this many game ticks the players compare their game state to detect a desync."
+msgstr ""
+
+msgid "Explosions"
+msgstr ""
+
+msgid "Families"
+msgstr ""
+
+msgid "File not found: a system font is used instead."
+msgstr ""
+
+msgid "Font files and sizes the game uses (section font of game_environment.json)."
+msgstr ""
+
+msgid "Frame time"
+msgstr ""
+
+msgid "Game UI"
+msgstr ""
+
+msgid "Game font"
+msgstr ""
+
+msgid "Groups up to %.0f, research %.0f s"
+msgstr ""
+
+msgid "Hints and disabled items"
+msgstr ""
+
+msgid "Hovered"
+msgstr ""
+
+msgid "How long (milliseconds) the game tries to connect two players directly."
+msgstr ""
+
+msgid "How long the preview of the whole burial takes (the game uses 'Burial seconds')."
+msgstr ""
+
+msgid "How many ports after the first one are searched for games in the local network."
+msgstr ""
+
+msgid "How many tiles around an enemy structure stay closed for building."
+msgstr ""
+
+msgid "How round the edge of the fog is (0 square, 1 smooth)."
+msgstr ""
+
+msgid "In the game the burial takes the time of 'Burial seconds' (the right panel)."
+msgstr ""
+
+msgid "Known wreck pictures of the game: a click sets the composite and the number of stages."
+msgstr ""
+
+msgid "Length of a network turn in milliseconds."
+msgstr ""
+
+msgid "Line of the wall being built."
+msgstr ""
+
+msgid "Line to the place a unit is moving to."
+msgstr ""
+
+msgid "Line to the target a unit attacks."
+msgstr ""
+
+msgid "Look of the fog of war."
+msgstr ""
+
+msgid "Menus"
+msgstr ""
+
+msgid "Moment of the burial to show."
+msgstr ""
+
+msgid "Network game settings."
+msgstr ""
+
+msgid "No power"
+msgstr ""
+
+msgid "Not a list of numbers: "
+msgstr ""
+
+msgid "Opacity of the order lines (0..1)."
+msgstr ""
+
+msgid "Opens the system dialog to pick a font file."
+msgstr ""
+
+msgid "Order lines and bars shown while Alt is held."
+msgstr ""
+
+msgid "Pause between waves (seconds)"
+msgstr ""
+
+msgid "Pick"
+msgstr ""
+
+msgid "Pick: click an animation"
+msgstr ""
+
+msgid "Play burial"
+msgstr ""
+
+msgid "Plays the blast again and again."
+msgstr ""
+
+msgid "Plays the blast again."
+msgstr ""
+
+msgid "Port of that server."
+msgstr ""
+
+msgid "Preferred graphics API (vulkan, opengl, opengles2, software)."
+msgstr ""
+
+msgid "Preview of a big building blowing up."
+msgstr ""
+
+msgid "Preview of a building up to 2x2 tiles blowing up."
+msgstr ""
+
+msgid "Preview of a dying vehicle: the blast and the second blast with the wreck."
+msgstr ""
+
+msgid "Preview of a power plant or tech center blowing up."
+msgstr ""
+
+msgid "Preview of the game interface with the colors of the file. Pick a theme on the right panel."
+msgstr ""
+
+msgid "Radar"
+msgstr ""
+
+msgid "Replay"
+msgstr ""
+
+msgid "Researching"
+msgstr ""
+
+msgid "Resolution of the fog picture: pixels per map tile."
+msgstr ""
+
+msgid "Rules of placing buildings."
+msgstr ""
+
+msgid "Secondary text"
+msgstr ""
+
+msgid "Seconds"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Size in pixels of headings."
+msgstr ""
+
+msgid "Size in pixels of normal text."
+msgstr ""
+
+msgid "Size in pixels of screen titles."
+msgstr ""
+
+msgid "Size in pixels of small text."
+msgstr ""
+
+msgid "Size in pixels of the big title on the main menu."
+msgstr ""
+
+msgid "Speed"
+msgstr ""
+
+msgid "Speed of the preview; the game always plays at normal speed."
+msgstr ""
+
+msgid "TCP port of the game."
+msgstr ""
+
+msgid "TTF/OTF file of headings and titles."
+msgstr ""
+
+msgid "TTF/OTF file of the normal text. A path inside the game folder or a full path."
+msgstr ""
+
+msgid "The biggest map (in kilobytes) a host sends to the players."
+msgstr ""
+
+msgid "The difficulty file could not be loaded."
+msgstr ""
+
+msgid "The effects file could not be loaded."
+msgstr ""
+
+msgid "The environment file could not be loaded."
+msgstr ""
+
+msgid "The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."
+msgstr ""
+
+msgid "The interface file could not be loaded."
+msgstr ""
+
+msgid "The largest delay (in turns) between giving an order and carrying it out."
+msgstr ""
+
+msgid "The look of menus and of the game screen for each faction."
+msgstr ""
+
+msgid "The smallest delay (in turns) between giving an order and carrying it out."
+msgstr ""
+
+msgid "The wreck sinks stage by stage; uncheck to pick the moment by hand."
+msgstr ""
+
+msgid "Theme"
+msgstr ""
+
+msgid "Then click an animation in the list below to put its number into this field (lists get it added)."
+msgstr ""
+
+msgid "Thickness of the line in pixels."
+msgstr ""
+
+msgid "UDP port of the game."
+msgstr ""
+
+msgid "Units in wave N"
+msgstr ""
+
+msgid "Vehicle death"
+msgstr ""
+
+msgid "Waves %.0f..%.0f units"
+msgstr ""
+
+msgid "Which graphics API the game starts with."
+msgstr ""
+
+msgid "Wreck of each vehicle"
+msgstr ""
+
+msgid "Wrecks"
+msgstr ""
+
+msgid "Writes the file of this tab (Ctrl+S). Comments in the file are kept."
+msgstr ""
+
+msgid "minutes"
+msgstr ""
+
+msgid "wave number"
+msgstr ""
+
+msgid "Small building"
+msgstr ""
+
+msgid "Power building"
+msgstr ""
+
+msgid "Large building"
+msgstr ""
+
+msgid "Regular font file"
+msgstr ""
+
+msgid "Bold font file"
+msgstr ""
+
+msgid "Small text"
+msgstr ""
+
+msgid "Body text"
+msgstr ""
+
+msgid "Heading"
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "Big title"
+msgstr ""
+
+msgid "Save settings"
+msgstr ""
+
+msgid "Pick animation"
+msgstr ""
+
+msgid "Loop effect"
+msgstr ""
+
+msgid "Playback speed"
+msgstr ""
+
+msgid "Burial preview seconds"
+msgstr ""
+
+msgid "Burial time"
+msgstr ""
+
+msgid "UI theme"
+msgstr ""
+
+msgid "Choose font file"
+msgstr ""
+
+msgid "Needs the SDL GPU renderer (shader effects)"
+msgstr ""
+
+msgid "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
+msgstr ""
+
 msgid "Network statistics"
 msgstr ""
 
@@ -2567,6 +3422,12 @@ msgstr ""
 
 #, c-format
 msgid "Animation %d"
+msgstr ""
+
+msgid "Sound reverb"
+msgstr ""
+
+msgid "Echo of explosions and heavy guns"
 msgstr ""
 
 msgid "Voice volume"
@@ -2970,7 +3831,7 @@ msgstr ""
 msgid "Direct connection (the host forwards UDP port 38100)"
 msgstr ""
 
-msgid "IP address or hostname"
+msgid "Address or address:port, e.g. 192.168.1.10"
 msgstr ""
 
 msgid "6 characters"
@@ -2991,6 +3852,366 @@ msgstr ""
 msgid "No answer: check the address, and that the host forwards UDP port 38100"
 msgstr ""
 
-
 msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
 msgstr ""
+
+msgid "Gage Crossing"
+msgstr ""
+
+msgid "Kings Ridge"
+msgstr ""
+
+msgid "Dry Runs"
+msgstr ""
+
+msgid "The Ford"
+msgstr ""
+
+msgid "Generated Map 7142"
+msgstr ""
+
+msgid "Skirmish 10"
+msgstr ""
+
+msgid "Skirmish 11"
+msgstr ""
+
+msgid "Skirmish 12"
+msgstr ""
+
+msgid "Skirmish 13"
+msgstr ""
+
+msgid "Skirmish 14"
+msgstr ""
+
+msgid "Skirmish 15"
+msgstr ""
+
+msgid "Skirmish 2"
+msgstr ""
+
+msgid "Skirmish 3"
+msgstr ""
+
+msgid "Skirmish 4"
+msgstr ""
+
+msgid "Skirmish 5"
+msgstr ""
+
+msgid "Skirmish 6"
+msgstr ""
+
+msgid "Skirmish 7"
+msgstr ""
+
+msgid "Skirmish 9"
+msgstr ""
+
+msgid "Test Polygon"
+msgstr ""
+
+msgid "YOU"
+msgstr ""
+
+msgid "COMPUTER PLAYER"
+msgstr ""
+
+msgid "Everybody is in one team: there is nobody to fight."
+msgstr ""
+
+msgid "This map has no start position for everybody in the room."
+msgstr ""
+
+msgid "IP address or hostname"
+msgstr ""
+
+msgid "Edge scroll margin"
+msgstr ""
+
+msgid "Screen border thickness in pixels for scrolling with the mouse"
+msgstr ""
+
+msgid "Animator"
+msgstr ""
+
+msgid "Firing frame time"
+msgstr ""
+
+msgid "Pose after the first shot"
+msgstr ""
+
+msgid "The canvas shows the character; the values below change how the game plays its pictures. Ctrl+S writes them to the file."
+msgstr ""
+
+msgid "Buildings flash for a fixed time after a shot; their pictures have no timing in the file yet."
+msgstr ""
+
+msgid "(default %.3f s)"
+msgstr ""
+
+msgid "1. Idle"
+msgstr ""
+
+msgid "A still picture: nothing to time."
+msgstr ""
+
+msgid "2. Move"
+msgstr ""
+
+msgid "Walking frame time"
+msgstr ""
+
+msgid "Preview##animmove"
+msgstr ""
+
+msgid "3. Attack"
+msgstr ""
+
+msgid "This character does not attack."
+msgstr ""
+
+msgid "Pose after each next shot"
+msgstr ""
+
+msgid "Loop while firing"
+msgstr ""
+
+msgid "Once per shot"
+msgstr ""
+
+msgid "Once, hold the last frame"
+msgstr ""
+
+msgid "Muzzle flash"
+msgstr ""
+
+msgid "Flash frames (0 = all)"
+msgstr ""
+
+msgid "Preview##animattack"
+msgstr ""
+
+msgid "Reset timing"
+msgstr ""
+
+msgid "Volley"
+msgstr ""
+
+msgid "shot"
+msgstr ""
+
+msgid "pose"
+msgstr ""
+
+msgid "flash"
+msgstr ""
+
+msgid "cooldown"
+msgstr ""
+
+msgid "The pose (%.2f s) ends before the next shot (%.2f s): the animation stops between shots."
+msgstr ""
+
+msgid "The first pose (%.2f s) ends before the second shot (%.2f s)."
+msgstr ""
+
+msgid "Infantry keeps firing while it has a target: with the looping flash the muzzle burns all the time. Use \"Once per shot\"."
+msgstr ""
+
+msgid "One volley: %d shot(s) over %.2f s, then %.2f s of cooldown."
+msgstr ""
+
+msgid "4. Die"
+msgstr ""
+
+msgid "Death sequences and the wreck are set in the Preview tab (Animation)."
+msgstr ""
+
+msgid "Preview##animdie"
+msgstr ""
+
+msgid "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."
+msgstr ""
+
+msgid "Seconds per frame of the walking animation (default 0.09)."
+msgstr ""
+
+msgid "Seconds per frame of the firing pose (default 0.07, some units 0.04). Off = the default."
+msgstr ""
+
+msgid "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others 0.22 s)."
+msgstr ""
+
+msgid "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as the burst delay, or the animation stops between shots."
+msgstr ""
+
+msgid "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer shows until the next shot. Once, hold: plays once and stays on its last frame."
+msgstr ""
+
+msgid "How many frames of the flash animation play (0 = the whole animation)."
+msgstr ""
+
+msgid "Shows the walking animation on the canvas."
+msgstr ""
+
+msgid "Shows the firing animation on the canvas, volley after volley."
+msgstr ""
+
+msgid "Shows the death animation on the canvas."
+msgstr ""
+
+msgid "Removes the timing values from the animations: block: the game uses its defaults again."
+msgstr ""
+
+msgid "The other side uses another network protocol: both need the same version of the game."
+msgstr ""
+
+msgid "Different game version"
+msgstr ""
+
+msgid "the host plays"
+msgstr ""
+
+msgid "you have"
+msgstr ""
+
+msgid "Different game data: they still differ after the sync."
+msgstr ""
+
+msgid "Different game data: the host cannot send its files (ask it to update, or join a game of the same version)."
+msgstr ""
+
+msgid "The room is full"
+msgstr ""
+
+msgid "The match has already started"
+msgstr ""
+
+msgid "Not allowed to join"
+msgstr ""
+
+msgid "Wrong password"
+msgstr ""
+
+msgid "No such room"
+msgstr ""
+
+msgid "The server has no free room"
+msgstr ""
+
+msgid "Not ready yet"
+msgstr ""
+
+msgid "Your game data differ from the host's and could not be synced: "
+msgstr ""
+
+msgid "(the game's file lists differ)"
+msgstr ""
+
+msgid "Downloading game data"
+msgstr ""
+
+msgid "(the data still differ after the sync)"
+msgstr ""
+
+msgid "FOG OF WAR"
+msgstr ""
+
+msgid "OPEN REPLAY"
+msgstr ""
+
+msgid "This replay was made by a newer version of the game"
+msgstr ""
+
+msgid "The replay is damaged"
+msgstr ""
+
+msgid "The replay is empty"
+msgstr ""
+
+msgid "Not a readable replay"
+msgstr ""
+
+msgid "The map of this replay is missing"
+msgstr ""
+
+msgid "Computer"
+msgstr ""
+
+msgid "REPLAYS"
+msgstr ""
+
+msgid "No replays yet. Every network game you play is saved here."
+msgstr ""
+
+msgid "Victory"
+msgstr ""
+
+msgid "Defeat"
+msgstr ""
+
+msgid "Recorded by the server"
+msgstr ""
+
+msgid "Recorded by you"
+msgstr ""
+
+msgid "Game version"
+msgstr ""
+
+msgid "team"
+msgstr ""
+
+msgid "computer"
+msgstr ""
+
+msgid "The map of this replay is not on this computer"
+msgstr ""
+
+msgid "WATCH"
+msgstr ""
+
+msgid "The map of this replay could not be set up"
+msgstr ""
+
+msgid "AGAIN"
+msgstr ""
+
+msgid "PLAY"
+msgstr ""
+
+msgid "PAUSE"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Observer (all)"
+msgstr ""
+
+msgid "FOLLOW: ON"
+msgstr ""
+
+msgid "FOLLOW: OFF"
+msgstr ""
+
+msgid "This replay does not play back the same here (differs at tick"
+msgstr ""
+
+msgid "REPLAY FINISHED"
+msgstr ""
+
+msgid "Radar range (tiles)"
+msgstr ""
+
+msgid "How many tiles beyond its sight radius the finished locator sees."
+msgstr ""
+
+msgid "Radar range (Cyan)"
+msgstr ""
+
+msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
+msgstr ""
+

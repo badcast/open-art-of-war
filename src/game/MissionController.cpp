@@ -90,7 +90,7 @@ void MissionController::SpawnSquadFromCmd27(
         {
             if (N == 0)
             {
-                // Infantry squad (i.java:3955-3970)
+                // Infantry squad
                 int cnt = squadSize((i2 == 0) ? 3 : (i2 == 1 ? 6 : 10));
                 for (int k = 0; k < cnt; ++k)
                 {
@@ -117,7 +117,7 @@ void MissionController::SpawnSquadFromCmd27(
             }
             else
             {
-                // Vehicle squad (i.java:3971-3984)
+                // Vehicle squad
                 int cnt = squadSize((i2 == 0) ? 2 : (i2 == 1 ? 4 : 6));
                 for (int k = 0; k < cnt; ++k)
                 {
@@ -336,8 +336,7 @@ bool MissionController::LoadMission(
     // 4. Process authentic mission scripts (credits, wall zones, initial squads, scheduled waves, objectives)
     int defenseWaves = 0;
     m_defenseMission = jmi.defense;
-    // The original runs the commands one after another: each delay counts from the previous command
-    // (i.java:3848), so a squad's time is the sum of all delays before it, not its own delay
+    // Each delay counts from the previous command, so a squad's time is the sum of all prior delays.
     float scriptClock = 0.0f;
     if (!jmi.scripts.empty())
     {
@@ -350,13 +349,13 @@ bool MissionController::LoadMission(
 
             if (cmd == 25)
             {
-                // Starting credits (i.java:3938)
+                // Starting credits
                 int startCreds = std::max(1000, sy * 10);
                 economy.Reset(startCreds);
             }
             else if (cmd == 33 && val == 1)
             {
-                // Activate wall zone (i.java:3996)
+                // Activate wall zone
                 if (group >= 0 && group < static_cast<int>(jmi.wallZones.size()))
                 {
                     for (const auto &r : jmi.wallZones[group])
@@ -365,7 +364,7 @@ bool MissionController::LoadMission(
             }
             else if (cmd == 40 && group >= 3)
             {
-                // Destination zone objective for player units (i.java:4030)
+                // Destination zone objective for player units
                 m_hasDestObjective = true;
                 m_destX = sx;
                 m_destY = sy;
@@ -373,7 +372,7 @@ bool MissionController::LoadMission(
             }
             else if (cmd == 27)
             {
-                // Unit squad spawn (i.java:3945-3985)
+                // Unit squad spawn
                 // Defense missions: the enemy's starting squads arrive as waves from their spawn points
                 const bool atStart = scriptClock <= 0.0f;
                 if (atStart)
@@ -650,6 +649,11 @@ bool MissionController::LoadTestPolygon(TileMap &map, EntityManager &entities, E
     return LoadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
 }
 
+namespace
+{
+std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &doc, int w, int h);
+}
+
 std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
 {
     std::vector<SkirmishMapInfo> maps;
@@ -671,6 +675,7 @@ std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
         info.width = doc["width"].get<int>();
         info.height = doc["height"].get<int>();
         info.tilesetId = doc.value("tilesetId", 0);
+        info.players = std::max<int>(2, static_cast<int>(StartPositionsOf(doc, info.width, info.height).size()));
         info.hasPrebuilt = (doc.contains("buildings") && doc["buildings"].is_array() && !doc["buildings"].empty())
                            || (doc.contains("units") && doc["units"].is_array() && !doc["units"].empty());
         maps.push_back(std::move(info));
@@ -1217,7 +1222,7 @@ bool MissionController::LoadMatch(
     std::string title = mapName;
     if (doc.is_object() && doc.contains("title") && doc["title"].is_string())
         title = _(doc["title"].get<std::string>());
-    m_missionName = "Match: " + title;
+    m_missionName = (setup.localOnly ? "Custom game: " : "Match: ") + title;
     m_objectiveText = "- Destroy every base and force of the enemy teams.";
     m_briefingText = "Multiplayer match on the map '" + title + "'.";
     m_missionTime = 0.0f;
@@ -1233,6 +1238,10 @@ bool MissionController::LoadMatch(
     economy.Reset(setup.startingCredits);
     economy.SetPlayer(setup.local);
     map.SetFogEnabled(setup.fogOfWar);
+    if (!setup.fogOfWar)
+    {
+        map.ResetAllFog(FogState::Visible);
+    }
     pathfinder.SetMap(&map);
     pathfinder.SetEntityManager(&entities);
 
@@ -1373,6 +1382,11 @@ bool MissionController::LoadMatch(
 bool MissionController::Restart(
     const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
+    if (IsMatch() && m_matchSetup.localOnly)
+    {
+        const MatchSetup again = m_matchSetup;
+        return LoadMatch(again, map, entities, economy, pathfinder);
+    }
     if (!m_customMapPath.empty())
     {
         return LoadSkirmish(m_customMapPath, map, entities, economy, pathfinder, m_customPrebuilt);

@@ -172,15 +172,40 @@ std::string LoaderResources::SpriteFrames(const std::string &root)
     return join(root, Str("sprites", "frames"));
 }
 
+// The sheets by page number: the page of a sprite (characters/sprites.json) is the number in the file name
+// ("sprites/sheet_07.png" is page 7), not the place in the list, so a sheet that is not listed (page 0 is unused)
+// leaves a gap instead of moving every later page by one. Names without a number keep their place in the list.
+std::vector<std::string> LoaderResources::SheetsByPage()
+{
+    const std::vector<std::string> listed = List("sprites", "sheets");
+    std::vector<std::string> byPage;
+    for (size_t i = 0; i < listed.size(); ++i)
+    {
+        size_t page = i;
+        const std::string &name = listed[i];
+        const size_t us = name.rfind('_'), dot = name.rfind('.');
+        if (us != std::string::npos && dot != std::string::npos && dot > us + 1)
+        {
+            const std::string digits = name.substr(us + 1, dot - us - 1);
+            if (!digits.empty() && digits.find_first_not_of("0123456789") == std::string::npos && digits.size() < 5)
+                page = static_cast<size_t>(std::stoul(digits));
+        }
+        if (page >= byPage.size())
+            byPage.resize(page + 1);
+        byPage[page] = name;
+    }
+    return byPage;
+}
+
 int LoaderResources::SpriteSheetCount()
 {
-    return static_cast<int>(List("sprites", "sheets").size());
+    return static_cast<int>(SheetsByPage().size());
 }
 
 std::string LoaderResources::SpriteSheet(int index, const std::string &root)
 {
-    const std::vector<std::string> sheets = List("sprites", "sheets");
-    if (index < 0 || index >= static_cast<int>(sheets.size()))
+    const std::vector<std::string> sheets = SheetsByPage();
+    if (index < 0 || index >= static_cast<int>(sheets.size()) || sheets[static_cast<size_t>(index)].empty())
         return std::string();
     return join(root, sheets[static_cast<size_t>(index)]);
 }
@@ -276,6 +301,11 @@ std::string LoaderResources::projectiles(const std::string &root)
     return join(root, Str(nullptr, "projectiles"));
 }
 
+std::string LoaderResources::weaponBalance(const std::string &root)
+{
+    return join(root, Str(nullptr, "weapon_balance"));
+}
+
 std::string LoaderResources::research(const std::string &faction, const std::string &root)
 {
     return join(root, Str("research", faction.c_str()));
@@ -337,8 +367,41 @@ std::vector<std::string> LoaderResources::ListMaps(const std::string &root)
 
 std::vector<std::string> LoaderResources::NetHashFiles(const std::string &root)
 {
-    // Sound and voice settings are not listed: different ones must not keep players apart
+    // Only what the simulation reads: sound, voice and picture files are not listed (see NetVisualFiles), different
+    // ones must not keep players apart
     return Joined(root, List(nullptr, "net_hash"));
+}
+
+std::string LoaderResources::NetManifestText()
+{
+    // The parts of the manifest the simulation depends on, in a fixed order: which characters, research, maps and
+    // settings files exist. The lists of pictures, sounds and fonts are left out: they are a player's own business.
+    static const char *const kKeys[]
+        = {"characters",
+           "ai_difficulty",
+           "effects",
+           "projectiles",
+           "weapon_balance",
+           "research",
+           "tile_collision",
+           "maps",
+           "environment",
+           "net_hash"};
+    const nlohmann::json &m = Manifest();
+    nlohmann::json subset = nlohmann::json::object();
+    for (const char *key : kKeys)
+    {
+        if (m.contains(key))
+            subset[key] = m[key];
+    }
+    return subset.dump();
+}
+
+std::vector<std::string> LoaderResources::NetVisualFiles(const std::string &root)
+{
+    // Sprites, palettes, the music list, the UI colours: they never change the simulation, so players may differ in
+    // them
+    return Joined(root, List(nullptr, "net_visual"));
 }
 
 std::vector<std::string> LoaderResources::List(const char *section, const char *key)

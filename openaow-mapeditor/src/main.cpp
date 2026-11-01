@@ -7,8 +7,15 @@
 #include "game/TileMap.hpp"
 #include <fstream>
 #include <iostream>
+#include <queue>
 #include <string>
 #include <filesystem>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <cstdio>
+#endif
 
 // 3b. MapGenerator: every symmetry on both tilesets, reproducible, seamless ground, bases joined by open ground
 static bool RunMapGeneratorTest() {
@@ -16,6 +23,60 @@ static bool RunMapGeneratorTest() {
     const GeneratorSymmetry symmetries[] = {GeneratorSymmetry::None, GeneratorSymmetry::Rotational180,
                                             GeneratorSymmetry::Diagonal, GeneratorSymmetry::Horizontal,
                                             GeneratorSymmetry::Vertical};
+    // Players: a map for N players has N start positions, 2 apart or more, and all of them reach each other
+    for (int players = 2; players <= 8; ++players) {
+        GeneratorParams params;
+        params.width = 100;
+        params.height = 80;
+        MapGenerator::OriginalDefaults(params, 0);
+        params.players = players;
+        params.randomSeed = false;
+        params.seed = 9000 + players;
+        MapDocument doc;
+        MapGenerator::Generate(doc, params);
+        const TileMap& map = doc.GetTileMap();
+        if (doc.GetPlayerCount() != players) {
+            std::cerr << "[MapEditor-Test] FAILED: " << players << " players asked, map has " << doc.GetPlayerCount()
+                      << " start positions." << std::endl;
+            return false;
+        }
+        const auto first = doc.GetStartPos(0);
+        std::vector<char> seen(static_cast<size_t>(map.GetWidth()) * map.GetHeight(), 0);
+        std::queue<std::pair<int, int>> todo;
+        todo.push(first);
+        seen[first.second * map.GetWidth() + first.first] = 1;
+        while (!todo.empty()) {
+            const auto [x, y] = todo.front();
+            todo.pop();
+            const int steps[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (const auto& st : steps) {
+                const int nx = x + st[0], ny = y + st[1];
+                if (nx < 0 || ny < 0 || nx >= map.GetWidth() || ny >= map.GetHeight() ||
+                    seen[ny * map.GetWidth() + nx] || !map.IsPassable(nx, ny)) {
+                    continue;
+                }
+                seen[ny * map.GetWidth() + nx] = 1;
+                todo.push({nx, ny});
+            }
+        }
+        for (int i = 0; i < players; ++i) {
+            const auto p = doc.GetStartPos(i);
+            if (!seen[p.second * map.GetWidth() + p.first]) {
+                std::cerr << "[MapEditor-Test] FAILED: with " << players << " players, start " << i
+                          << " cannot be reached from start 0." << std::endl;
+                return false;
+            }
+            for (int j = i + 1; j < players; ++j) {
+                const auto q = doc.GetStartPos(j);
+                if (std::abs(p.first - q.first) < 6 && std::abs(p.second - q.second) < 6) {
+                    std::cerr << "[MapEditor-Test] FAILED: starts " << i << " and " << j << " are too close." << std::endl;
+                    return false;
+                }
+            }
+        }
+        std::cout << "  - Generated map for " << players << " players OK" << std::endl;
+    }
+
     for (int tileset = 0; tileset < 2; ++tileset) {
         for (GeneratorSymmetry symmetry : symmetries) {
             GeneratorParams params;
@@ -266,6 +327,24 @@ static bool RunEditorSelfTest() {
         std::cerr << "[MapEditor-Test] FAILED: Entity placement ignored blocked tiles or occupied footprints." << std::endl;
         return false;
     }
+
+    // Test uniform player start management (Players 1..8)
+    if (toolsDoc.GetPlayerCount() != 2 ||
+        !toolsDoc.SetStartPos(0, 3, 4) || toolsDoc.GetPlayerStartX() != 3 || toolsDoc.GetPlayerStartY() != 4 ||
+        !toolsDoc.SetStartPos(1, 10, 11) || toolsDoc.GetEnemyStartX() != 10 || toolsDoc.GetEnemyStartY() != 11 ||
+        toolsDoc.FindStartPosAt(3, 4) != 0 || toolsDoc.FindStartPosAt(10, 11) != 1 ||
+        toolsDoc.FindStartPosAt(0, 0) != -1) {
+        std::cerr << "[MapEditor-Test] FAILED: Player 1/2 start management failed." << std::endl;
+        return false;
+    }
+    if (!toolsDoc.AddStartPos(7, 7) || toolsDoc.GetPlayerCount() != 3 ||
+        toolsDoc.FindStartPosAt(7, 7) != 2 || toolsDoc.GetStartPos(2) != std::pair<int, int>{7, 7} ||
+        !toolsDoc.MoveStartPos(2, 8, 9) || toolsDoc.FindStartPosAt(8, 9) != 2 ||
+        !toolsDoc.RemoveStartPos(2) || toolsDoc.GetPlayerCount() != 2) {
+        std::cerr << "[MapEditor-Test] FAILED: Extra player starts (3..8) add/move/remove failed." << std::endl;
+        return false;
+    }
+
     toolsDoc.SetWall(9, 9, OpenArtOfWar::Faction::Confederation);
     if (toolsDoc.CanPlaceWallBrush(8, 8, OpenArtOfWar::Faction::Resistance, 2) ||
         toolsDoc.SetWallBrush(8, 8, OpenArtOfWar::Faction::Resistance, 2) ||
@@ -300,7 +379,7 @@ static bool RunEditorSelfTest() {
     nlohmann::json originalGameMap = nlohmann::json::parse(gameMapText);
     const size_t expectedEntities = originalGameMap.value("buildings", nlohmann::json::array()).size() +
                                     originalGameMap.value("units", nlohmann::json::array()).size();
-    const auto* playerHq = gameMapDoc.GetEntityAt(4, 17);
+    const auto* playerHq = gameMapDoc.GetEntityAt(4, 21);
     const auto* enemyHq = gameMapDoc.GetEntityAt(46, 18);
     if (gameMapDoc.GetWidth() != 56 || gameMapDoc.GetHeight() != 44 ||
         gameMapDoc.GetEntities().size() != expectedEntities ||
@@ -445,6 +524,20 @@ static bool RunEditorSelfTest() {
 }
 
 int main(int argc, char* argv[]) {
+#if defined(_WIN32)
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut == NULL || hOut == INVALID_HANDLE_VALUE || GetFileType(hOut) == FILE_TYPE_UNKNOWN) {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stdout);
+        }
+        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+        if (hErr == NULL || hErr == INVALID_HANDLE_VALUE || GetFileType(hErr) == FILE_TYPE_UNKNOWN) {
+            FILE *fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stderr);
+        }
+    }
+#endif
     OpenArtOfWar::Assets::Init();
     std::cout << "========================================================\n"
               << "Open Art Of War Map Editor — openaow-mapeditor\n"
@@ -461,7 +554,7 @@ int main(int argc, char* argv[]) {
                       << "  --test           Run automated headless self-tests and exit\n"
                       << "  --test-collision Run only the tile collision self-test\n"
                       << "  --test-generator Run only the map generator self-test\n"
-                      << "  --generate-map FILE [SEED] [TILESET]  Generate a map to FILE and exit\n"
+                      << "  --generate-map FILE [SEED] [TILESET] [PLAYERS]  Generate a map to FILE and exit\n"
                       << "  path_to_map.json Initial map file to open on startup\n"
                       << "\nHotkeys:\n"
                       << "  Ctrl+N           Create new map\n"
@@ -484,6 +577,7 @@ int main(int argc, char* argv[]) {
             params.randomSeed = i + 2 >= argc;
             if (i + 2 < argc) params.seed = static_cast<uint32_t>(std::stoul(argv[i + 2]));
             if (i + 3 < argc) params.tilesetId = std::stoi(argv[i + 3]);
+            if (i + 4 < argc) params.players = std::stoi(argv[i + 4]);
             OpenArtOfWar::MapGenerator::OriginalDefaults(params, params.tilesetId);
             params.width = 80;
             params.height = 60;

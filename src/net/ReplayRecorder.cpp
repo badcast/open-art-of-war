@@ -1,0 +1,141 @@
+#include "net/ReplayRecorder.hpp"
+#include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
+#include "net/MapFiles.hpp"
+#include "net/NetMatch.hpp"
+#include "openaow/net/ReplayFile.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <ctime>
+#include <filesystem>
+#include <iostream>
+
+namespace OpenArtOfWar
+{
+
+std::string ReplayRecorder::Directory()
+{
+    return (std::filesystem::path(Assets::UserDataDir()) / "replays").string();
+}
+
+void ReplayRecorder::Begin(Info info)
+{
+    if (m_active)
+        return; // a reconnect: the same match goes on
+    m_info = std::move(info);
+    m_turns.clear();
+    m_checksums.clear();
+    m_startedAt = static_cast<int64_t>(std::time(nullptr));
+    m_active = true;
+}
+
+void ReplayRecorder::OnBundle(const Net::TurnBundle &bundle)
+{
+    if (!m_active || m_turns.count(bundle.turn))
+        return;
+    std::vector<uint8_t> bytes = Net::encodeTurn(bundle);
+    if (!bytes.empty())
+        m_turns[bundle.turn] = std::move(bytes);
+}
+
+void ReplayRecorder::OnChecksum(uint32_t tick, uint64_t hash)
+{
+    if (m_active)
+        m_checksums[tick] = hash;
+}
+
+std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
+{
+    if (!m_active)
+        return {};
+    m_active = false;
+    if (m_turns.empty())
+        return {}; // nothing was played
+    // The turns must follow each other from 0; a gap (a bug) would make the file unplayable
+    Net::ReplayData data;
+    uint32_t expected = 0;
+    for (const auto &[turn, bytes] : m_turns)
+    {
+        if (turn != expected)
+            break;
+        data.turns.push_back(bytes);
+        ++expected;
+    }
+    data.setup = m_info.setupBytes;
+    for (const auto &[t, h] : m_checksums)
+        data.checksums.emplace_back(t, h);
+
+    const MatchSetup &s = m_info.setup;
+    // The room's own names for the map: the path of the setup bytes, before it was resolved to a file
+    MatchSetup raw;
+    NetMatch::DecodeSetup(m_info.setupBytes, raw);
+    nlohmann::json players = nlohmann::json::array();
+    for (int i = 0; i < kMaxPlayers; ++i)
+    {
+        const PlayerSlot &p = s.slots[i];
+        if (!p.active)
+            continue;
+        players.push_back(
+            {{"slot", i},
+             {"name", i < static_cast<int>(m_info.names.size()) ? m_info.names[i] : std::string()},
+             {"faction", static_cast<int>(p.faction)},
+             {"team", p.team},
+             {"color", p.color},
+             {"human", p.human},
+             {"ai_level", p.aiLevel},
+             {"spawn", s.startPosition[i]}});
+    }
+    const uint32_t ticks = static_cast<uint32_t>(data.turns.size()) * m_info.ticksPerTurn;
+    nlohmann::json meta = {
+        {"format", 1},
+        {"game_version", OAOW_VERSION},
+        {"protocol", Net::kProtocolVersion},
+        {"source", "client"},
+        {"recorded_at", m_startedAt},
+        {"map", raw.mapPath},
+        {"map_hash", raw.mapHash},
+        {"assets_hash", m_info.assetsHash},
+        {"seed", raw.seed},
+        {"turn_ms", m_info.turnMs},
+        {"ticks_per_turn", m_info.ticksPerTurn},
+        {"turns", data.turns.size()},
+        {"ticks", ticks},
+        {"players", players},
+        {"starting_credits", raw.startingCredits},
+        {"fog", raw.fogOfWar},
+        {"prebuilt", raw.prebuilt},
+        {"local_slot", s.local},
+        {"result", {{"outcome", outcome}, {"tick", tick}}},
+        {"checksum_interval", NetMatch::kHashIntervalTicks}};
+    data.meta = meta.dump(2);
+
+    // The map and the simulation data this match was played with: the file plays on its own
+    std::vector<uint8_t> bytes;
+    const std::string mapFile = MapFiles::Resolve(raw.mapPath, raw.mapHash);
+    if (!mapFile.empty() && MapFiles::Read(mapFile, bytes))
+        data.files["maps/" + std::filesystem::path(raw.mapPath).filename().string()] = bytes;
+    for (const std::string &f : LoaderResources::NetHashFiles())
+    {
+        if (Net::validReplayFileName("data/" + f) && Assets::ReadBytes(f, bytes))
+            data.files["data/" + f] = bytes;
+    }
+    {
+        const std::string manifest = LoaderResources::NetManifestText();
+        data.files["data/" + std::string(LoaderResources::kManifestPath)]
+            = std::vector<uint8_t>(manifest.begin(), manifest.end());
+    }
+
+    const std::string path
+        = (std::filesystem::path(Directory()) / Net::replayFileName(raw.mapPath, m_startedAt)).string();
+    std::string error;
+    if (!Net::writeReplay(path, data, error))
+    {
+        std::cerr << "[Replay] cannot save " << path << ": " << error << std::endl;
+        return {};
+    }
+    std::cout << "[Replay] saved " << path << " (" << data.turns.size() << " turns)" << std::endl;
+    return path;
+}
+
+} // namespace OpenArtOfWar

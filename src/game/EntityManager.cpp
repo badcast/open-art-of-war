@@ -1,5 +1,6 @@
 #include "game/EntityManager.hpp"
 #include "game/Projectiles.hpp"
+#include "game/WeaponBalance.hpp"
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
@@ -44,10 +45,11 @@ inline ProjectileType StringToProjectileType(const std::string &str)
     return Projectiles::FromKey(str);
 }
 
-int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target)
+int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target, ProjectileType kind)
 {
     if (!target || baseDamage <= 0)
         return baseDamage;
+    baseDamage = WeaponBalance::Scale(baseDamage, kind, WeaponBalance::ClassOf(*target));
     const Unit *u = target->AsUnit();
     if (u && (u->state == ActionState::Move || (!u->path.empty() && u->pathIndex < u->path.size())))
     {
@@ -389,6 +391,8 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     float range = primary.range;
     float cooldown = primary.cooldown;
     float cooldownMax = primary.cooldownMax;
+    // Flight speed of rockets and shells, px/s (editor: Bullet / Projectile Speed)
+    const float bulletSpeedPxPerSec = std::max(0.0f, getFloat(combatNode, "bullet_speed", getFloat(combatNode, "projectile_speed", 0.0f)));
     int burstCount = primary.burstCount;
     float burstDelay = primary.burstDelay;
     int splashPercent = primary.splashPercent;
@@ -473,6 +477,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         cfg.attackCooldownMax = cooldownMax;
         cfg.burstCount = burstCount;
         cfg.burstDelay = burstDelay;
+        cfg.bulletSpeed = bulletSpeedPxPerSec;
         cfg.splashPercent = splashPercent;
         cfg.projectile = projectile;
         cfg.creditCost = creditCost;
@@ -505,6 +510,16 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         const int defaultWreckStages = defaultWreck.stages;
         cfg.wreckComposite = getInt(animNode, "wreck_composite", defaultWreckComp);
         cfg.wreckStages = getInt(animNode, "wreck_stages", defaultWreckStages);
+        cfg.moveFrameTime = std::clamp(getFloat(animNode, "move_frame_time", cfg.moveFrameTime), 0.02f, 1.0f);
+        cfg.attackFrameTime = getFloat(animNode, "attack_frame_time", cfg.attackFrameTime);
+        cfg.attackPoseTime = getFloat(animNode, "attack_pose_time", cfg.attackPoseTime);
+        cfg.burstPoseTime = std::clamp(getFloat(animNode, "burst_pose_time", cfg.burstPoseTime), 0.02f, 5.0f);
+        {
+            const std::string mode
+                = animNode && animNode["flash_mode"] ? animNode["flash_mode"].as<std::string>("loop") : "loop";
+            cfg.flashMode = mode == "once" ? 1 : (mode == "hold" ? 2 : 0);
+        }
+        cfg.flashFrames = std::max(0, getInt(animNode, "flash_frames", 0));
 
         if (animNode["death_sequences"] && animNode["death_sequences"].IsSequence())
         {
@@ -642,6 +657,17 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
                 {
                     applyForm(baseCfg, upNode["combat"]);
                 }
+                // The base form without a weapon list of its own has the main form's guns, except those that come
+                // with the technology (requires_research): the Zeus without its rocket launcher
+                if (!(upNode["combat"] && upNode["combat"]["weapons"]))
+                {
+                    baseCfg.weapons.erase(
+                        std::remove_if(
+                            baseCfg.weapons.begin(),
+                            baseCfg.weapons.end(),
+                            [](const WeaponConfig &w) { return w.requiresResearch; }),
+                        baseCfg.weapons.end());
+                }
                 m_unitConfigs[baseCfg.archetypeId] = baseCfg;
             }
         }
@@ -660,11 +686,15 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         cfg.height = height;
         cfg.maxHp = maxHp;
         cfg.sightRadius = sightRadius;
+        cfg.radarRange = std::max(0, getInt(statsNode, "radar_range", 0));
         cfg.creditCost = creditCost;
         cfg.powerCost = powerCost;
         cfg.buildTime = buildTime;
         cfg.iconCompId = iconComp;
         cfg.canAttack = canAttack;
+        cfg.burstCount = std::max(1, primary.burstCount);
+        cfg.burstDelay = std::max(0.02f, primary.burstDelay);
+        cfg.bulletSpeed = bulletSpeedPxPerSec;
         cfg.attackDamage = damage;
         cfg.attackRange = range;
         cfg.attackCooldown = cooldown;
@@ -685,9 +715,9 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
             bRadius = getInt(root["stats"], "build_radius", bRadius);
         }
         cfg.buildRadius = bRadius;
-        if (cfg.type == UnitType::Headquarters && faction == Faction::Resistance)
+        if (cfg.type == UnitType::Headquarters && faction != Faction::Neutral)
         {
-            m_baseBuildRadius = bRadius;
+            m_factionBuildRadius[static_cast<size_t>(faction)] = bRadius;
             m_buildRadiusExtra = {};
         }
         cfg.wreckComposite = getInt(animNode, "wreck_composite", 0);
@@ -812,6 +842,8 @@ void EntityManager::Clear()
     m_flameBursts.clear();
     m_groundMarks.clear();
     m_soundCues.clear();
+    // Muzzle-flash reveals name entity ids: the next game reuses them from 1, so old pings would show its units
+    m_revealPings.clear();
     ++m_generation;
     m_nextId = 1;
     m_kills = {};
@@ -946,6 +978,61 @@ int EntityManager::SpawnUnit(UnitType type, int tileX, int tileY, Faction factio
     return SpawnUnitByArchetype(arch, tileX, tileY, faction);
 }
 
+// The stats and looks a unit takes from the character file of its archetype
+static void CopyUnitConfig(Unit &u, const UnitConfig &cfg)
+{
+    u.type = cfg.type;
+    u.maxHp = cfg.maxHp;
+    u.attackDamage = cfg.attackDamage;
+    u.attackRange = cfg.attackRange;
+    u.attackCooldown = cfg.attackCooldown;
+    u.attackCooldownMax = cfg.attackCooldownMax;
+    u.burstCount = cfg.burstCount;
+    u.burstDelay = cfg.burstDelay;
+    u.splashPercent = cfg.splashPercent;
+    u.projectile = cfg.projectile;
+    u.moveSpeed = cfg.moveSpeed;
+    u.sightRadius = cfg.sightRadius;
+    u.hasRotatingTurret = cfg.hasRotatingTurret;
+    u.muzzleOffsetX = cfg.muzzleOffsetX;
+    u.muzzleOffsetY = cfg.muzzleOffsetY;
+    u.turretOffsetX = cfg.turretOffsetX;
+    u.turretOffsetY = cfg.turretOffsetY;
+    u.hasCustomTurretOffset = cfg.hasCustomTurretOffset;
+    u.spreadAngle = cfg.spreadAngle;
+    u.turnStepDelay = cfg.turnStepDelay;
+    u.turnTimer = 0.0f;
+    u.turretTurnStepDelay = cfg.turretTurnStepDelay;
+    u.turretTurnTimer = 0.0f;
+    u.wreckType = cfg.wreckType;
+    u.wreckComposite = cfg.wreckComposite;
+    u.wreckStages = cfg.wreckStages;
+    u.moveFrameTime = cfg.moveFrameTime;
+    u.attackFrameTime = cfg.attackFrameTime;
+    u.attackPoseTime = cfg.attackPoseTime;
+    u.burstPoseTime = cfg.burstPoseTime;
+    u.flashMode = cfg.flashMode;
+    u.flashFrames = cfg.flashFrames;
+    u.deathSequences = cfg.deathSequences;
+    u.flameDeathSequences = cfg.flameDeathSequences;
+    u.bulletSpeed = cfg.bulletSpeed;
+    // weapons[1]: a second gun beside the main one
+    u.hasSecondary = false;
+    if (cfg.weapons.size() > 1 && cfg.weapons[1].enabled && cfg.weapons[1].damage > 0)
+    {
+        const WeaponConfig &w = cfg.weapons[1];
+        u.hasSecondary = true;
+        u.secondaryProjectile = w.projectile;
+        u.secondaryDamage = w.damage;
+        u.secondaryRange = w.range;
+        u.secondaryMinRange = w.minRange;
+        u.secondaryCooldown = std::max(0.1f, w.cooldown);
+        u.secondarySplash = w.splashPercent;
+        u.secondaryMuzzleX = w.muzzleOffsetX;
+        u.secondaryMuzzleY = w.muzzleOffsetY;
+    }
+}
+
 int EntityManager::SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, Faction faction, PlayerId owner)
 {
     if (m_entities.size() >= MAX_UNITS)
@@ -970,34 +1057,7 @@ int EntityManager::SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, F
     const UnitConfig *cfg = GetUnitConfig(archetypeId);
     if (cfg)
     {
-        u->type = cfg->type;
-        u->maxHp = cfg->maxHp;
-        u->attackDamage = cfg->attackDamage;
-        u->attackRange = cfg->attackRange;
-        u->attackCooldown = cfg->attackCooldown;
-        u->attackCooldownMax = cfg->attackCooldownMax;
-        u->burstCount = cfg->burstCount;
-        u->burstDelay = cfg->burstDelay;
-        u->splashPercent = cfg->splashPercent;
-        u->projectile = cfg->projectile;
-        u->moveSpeed = cfg->moveSpeed;
-        u->sightRadius = cfg->sightRadius;
-        u->hasRotatingTurret = cfg->hasRotatingTurret;
-        u->muzzleOffsetX = cfg->muzzleOffsetX;
-        u->muzzleOffsetY = cfg->muzzleOffsetY;
-        u->turretOffsetX = cfg->turretOffsetX;
-        u->turretOffsetY = cfg->turretOffsetY;
-        u->hasCustomTurretOffset = cfg->hasCustomTurretOffset;
-        u->spreadAngle = cfg->spreadAngle;
-        u->turnStepDelay = cfg->turnStepDelay;
-        u->turnTimer = 0.0f;
-        u->turretTurnStepDelay = cfg->turretTurnStepDelay;
-        u->turretTurnTimer = 0.0f;
-        u->wreckType = cfg->wreckType;
-        u->wreckComposite = cfg->wreckComposite;
-        u->wreckStages = cfg->wreckStages;
-        u->deathSequences = cfg->deathSequences;
-        u->flameDeathSequences = cfg->flameDeathSequences;
+        CopyUnitConfig(*u, *cfg);
     }
     else
     {
@@ -1187,6 +1247,23 @@ int EntityManager::SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, F
     return newId;
 }
 
+bool EntityManager::UpgradeUnitForm(int unitId, int newArchetype)
+{
+    Unit *u = GetUnit(unitId);
+    const UnitConfig *cfg = GetUnitConfig(newArchetype);
+    if (!u || !u->alive || !cfg || u->archetypeId == newArchetype)
+        return false;
+    const int oldMax = std::max(1, u->maxHp);
+    const int oldHp = u->currentHp;
+    u->archetypeId = newArchetype;
+    CopyUnitConfig(*u, *cfg);
+    u->currentHp = std::max(1, static_cast<int>(static_cast<int64_t>(oldHp) * u->maxHp / oldMax));
+    u->turnTimer = 0.0f;
+    u->turretTurnTimer = 0.0f;
+    ApplyCompletedResearch(*u); // the technologies of the player apply to the new form too
+    return true;
+}
+
 int EntityManager::SpawnBuilding(UnitType type, int tileX, int tileY, Faction faction)
 {
     int bIdx = 0;
@@ -1254,10 +1331,14 @@ int EntityManager::SpawnBuildingByIndex(
         b->type = bcfg->type;
         b->maxHp = bcfg->maxHp;
         b->sightRadius = bcfg->sightRadius;
+        b->radarRange = bcfg->radarRange;
         b->attackDamage = bcfg->attackDamage;
         b->attackRange = bcfg->attackRange;
         b->attackCooldown = bcfg->attackCooldown;
         b->attackCooldownMax = bcfg->attackCooldownMax;
+        b->burstCount = bcfg->burstCount;
+        b->burstDelay = bcfg->burstDelay;
+        b->bulletSpeed = bcfg->bulletSpeed;
         b->splashPercent = bcfg->splashPercent;
         b->projectile = bcfg->projectile;
         b->buildWidth = bcfg->width;
@@ -1419,7 +1500,8 @@ bool EntityManager::CanPlaceBuilding(
         if (!e.alive || e.state == ActionState::Die || !e.isBuilding || e.owner != player)
             continue;
         const Building *b = e.AsBuilding();
-        if (b && b->type == UnitType::Headquarters)
+        // A headquarters still under construction opens no building zone yet
+        if (b && b->type == UnitType::Headquarters && b->buildProgress >= 1.0f)
         {
             hasFriendlyHQ = true;
             float hqCenterX = b->tileX + b->buildWidth * 0.5f;
@@ -2064,6 +2146,7 @@ void EntityManager::IssueMoveOrder(
         // Several units ordered together may breach hostile walls instead of queueing at one gap
         u->groupOrder = validUnits.size() >= 2;
         u->holdPosition = false;
+        u->orderedTargetId = 0;
         u->blockedTimer = 0.0f;
 
         if (u->tileX == destX && u->tileY == destY && std::abs(u->subX) <= 0.001f && std::abs(u->subY) <= 0.001f)
@@ -2159,6 +2242,7 @@ void EntityManager::IssueAttackOrder(const std::vector<int> &unitIds, int target
         if (!Players::Hostile(u->owner, target->owner))
             continue;
         u->holdPosition = false; // an explicit attack order ends a hold
+        u->orderedTargetId = targetEntityId;
 
         // 1. If already targeting this exact entity, do NOT reset state or animation frame!
         if (u->targetEntityId == targetEntityId && !u->isManualWallTarget)
@@ -2317,16 +2401,23 @@ void EntityManager::IssueAttackWallOrder(
     }
 }
 
+int EntityManager::BaseBuildRadius(PlayerId player) const
+{
+    const Faction f = player < kMaxPlayers ? Players::Slot(player).faction : Faction::Resistance;
+    return m_factionBuildRadius[f == Faction::Confederation ? 1 : 0];
+}
+
 int EntityManager::GetBuildRadius(PlayerId player) const
 {
-    return m_baseBuildRadius + (player < kMaxPlayers ? m_buildRadiusExtra[player] : 0);
+    return BaseBuildRadius(player) + (player < kMaxPlayers ? m_buildRadiusExtra[player] : 0);
 }
 
 void EntityManager::SetBuildRadiusPercent(PlayerId player, int percent)
 {
     if (player >= kMaxPlayers || !Players::Slot(player).human)
         return;
-    m_buildRadiusExtra[player] = m_baseBuildRadius * (100 + percent) / 100 - m_baseBuildRadius;
+    const int base = BaseBuildRadius(player);
+    m_buildRadiusExtra[player] = base * (100 + percent) / 100 - base;
 }
 
 bool EntityManager::CanDeploySiege(const Unit &u) const
@@ -2571,6 +2662,9 @@ void EntityManager::UpdateFogOfWar(TileMap &map)
         int sight = entity.sightRadius;
         if (sight <= 0)
             sight = 4;
+        // A finished Radar Locator sees far beyond its sight radius
+        if (const Building *rb = entity.AsBuilding(); rb && rb->radarRange > 0 && rb->buildProgress >= 1.0f)
+            sight += rb->radarRange;
 
         if (const Building *b = entity.AsBuilding())
         {
@@ -2717,42 +2811,42 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
     uDelegates.isEntityVisible = [this, &map](const Entity &entity, PlayerId observer) {
         return IsEntityVisibleToPlayer(entity, observer, map);
     };
-    uDelegates.findEnemyInAttackRange = [this, &map](const Unit &u) -> int {
-        float atkRangePixels = u.attackRange * TILE_WIDTH;
-        for (const auto &other : m_entities)
-        {
-            if (!other.alive || other.state == ActionState::Die || !Players::Hostile(other.owner, u.owner))
-                continue;
-            if (!IsEntityVisibleToPlayer(other, u.owner, map))
-                continue;
-            if (ComputeDistanceToEntityPixels(u, other) <= atkRangePixels)
-            {
-                return other.id;
-            }
-        }
-        return 0;
-    };
-    uDelegates.findTarget = [this, &map](const Unit &u) -> int {
-        float scanDist = ((u.isAttackMoving || u.waitingForPath) && !u.isSiegeMode && u.moveSpeed > 0.0f
-                              ? std::max(static_cast<float>(u.sightRadius), u.attackRange)
-                              : u.attackRange)
-                         * TILE_WIDTH;
-        float closestDist = scanDist;
+    // Both pick by priority first (armed units, then other units and armed buildings, then the rest), then by
+    // distance; m_entities is a vector, so the order (and the result) is the same on every peer
+    auto bestTargetWithin = [this, &map](const Unit &u, float rangePixels) -> int {
         int bestId = 0;
+        int bestTier = 3;
+        float bestDist = rangePixels;
         for (const auto &other : m_entities)
         {
             if (!other.alive || other.state == ActionState::Die || !Players::Hostile(other.owner, u.owner))
                 continue;
+            const float d = ComputeDistanceToEntityPixels(u, other);
+            if (d > rangePixels)
+                continue;
+            const int tier = TargetPriorityTier(other);
+            if (tier > bestTier || (tier == bestTier && d > bestDist))
+                continue;
             if (!IsEntityVisibleToPlayer(other, u.owner, map))
                 continue;
-            float d = ComputeDistanceToEntityPixels(u, other);
-            if (d <= closestDist)
-            {
-                closestDist = d;
-                bestId = other.id;
-            }
+            bestTier = tier;
+            bestDist = d;
+            bestId = other.id;
         }
         return bestId;
+    };
+    uDelegates.findEnemyInAttackRange = [bestTargetWithin](const Unit &u) -> int {
+        return bestTargetWithin(u, u.attackRange * TILE_WIDTH);
+    };
+    uDelegates.findTarget = [bestTargetWithin](const Unit &u) -> int {
+        // Moving units on an attack-move look as far as they see; so do idle units whose stance chases
+        const bool mobile = !u.isSiegeMode && u.moveSpeed > 0.0f;
+        const bool scansSight = mobile
+                                && (u.isAttackMoving || u.waitingForPath
+                                    || (u.state == ActionState::Idle && !u.HoldsGround() && !u.HasMoveTarget()));
+        const float scanDist
+            = (scansSight ? std::max(static_cast<float>(u.sightRadius), u.attackRange) : u.attackRange) * TILE_WIDTH;
+        return bestTargetWithin(u, scanDist);
     };
     uDelegates.findWallTarget = [this, &map](const Unit &u, int &outWallX, int &outWallY) {
         outWallX = -1;
@@ -2993,7 +3087,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                 float hitCenterX = hitUnit ? target->GetUnitCenterPixelX() : proj.targetX;
                 float hitCenterY = hitUnit ? target->GetUnitCenterPixelY() : proj.targetY;
                 NoteEntityHit(*target, proj.shooterId);
-                target->currentHp -= ApplyMovingUnitDamage(proj.damage, target);
+                target->currentHp -= ApplyMovingUnitDamage(proj.damage, target, proj.type);
                 if (target->currentHp <= 0)
                 {
                     target->currentHp = 0;
@@ -3044,7 +3138,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                     && Players::Hostile(map.GetWallOwner(hitTileX, hitTileY), proj.owner))
                 {
                     NoteHit(map.GetWallOwner(hitTileX, hitTileY), proj.shooterId);
-                    map.DamageWall(hitTileX, hitTileY, proj.damage);
+                    map.DamageWall(hitTileX, hitTileY, WeaponBalance::Scale(proj.damage, proj.type, TargetClass::Wall));
                     if (map.GetWall(hitTileX, hitTileY) == 0)
                     {
                         SpawnExplosion(
@@ -3088,7 +3182,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                     if (distFromImpact <= maxSplashDist)
                     {
                         NoteEntityHit(other, proj.shooterId);
-                        other.currentHp -= ApplyMovingUnitDamage(splashDmg, &other);
+                        other.currentHp -= ApplyMovingUnitDamage(splashDmg, &other, proj.type);
                         if (other.currentHp <= 0)
                         {
                             other.currentHp = 0;
@@ -3138,7 +3232,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                         if (map.GetWall(wx, wy) > 0 && Players::Hostile(map.GetWallOwner(wx, wy), proj.owner))
                         {
                             NoteHit(map.GetWallOwner(wx, wy), proj.shooterId);
-                            map.DamageWall(wx, wy, splashDmg);
+                            map.DamageWall(wx, wy, WeaponBalance::Scale(splashDmg, proj.type, TargetClass::Wall));
                             if (map.GetWall(wx, wy) == 0)
                             {
                                 SpawnExplosion(
@@ -3305,8 +3399,13 @@ void EntityManager::SpawnProjectileFromEntity(
                 fire = SoundCue::FireSniper;
                 break;
             case ProjectileType::Shell:
-                fire = SoundCue::FireCannon;
+            {
+                // The heavy tanks (T-22 Zeus, Rhino, in any of their forms) have a deeper gun than the rest
+                const Utility::ArchetypeInfo *info = shooter ? Utility::archetypeInfo(shooter->archetypeId) : nullptr;
+                const int base = info && info->baseFormId >= 0 ? info->baseFormId : (shooter ? shooter->archetypeId : -1);
+                fire = (base == 10 || base == 11) ? SoundCue::FireCannonHigh : SoundCue::FireCannon;
                 break;
+            }
             case ProjectileType::Rocket:
                 fire = (shooter && shooter->burstCount >= 3) ? SoundCue::FireMlrs : SoundCue::FireRocket;
                 break;
@@ -3331,7 +3430,7 @@ void EntityManager::SpawnProjectileFromEntity(
                 Cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, finalHitX, finalHitY, entity.owner);
 
                 NoteEntityHit(*target, entity.id);
-                target->currentHp -= ApplyMovingUnitDamage(entity.attackDamage, target);
+                target->currentHp -= ApplyMovingUnitDamage(entity.attackDamage, target, entity.projectile);
                 if (target->currentHp <= 0)
                 {
                     target->currentHp = 0;
@@ -3382,7 +3481,7 @@ void EntityManager::SpawnProjectileFromEntity(
             if (map.GetWall(wx, wy) > 0)
             {
                 NoteHit(map.GetWallOwner(wx, wy), entity.id);
-                map.DamageWall(wx, wy, entity.attackDamage);
+                map.DamageWall(wx, wy, WeaponBalance::Scale(entity.attackDamage, entity.projectile, TargetClass::Wall));
                 finalHitX = wx * TILE_WIDTH + (TILE_WIDTH * 0.5f);
                 finalHitY = wy * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
                 if (map.GetWall(wx, wy) == 0)
@@ -3444,6 +3543,9 @@ void EntityManager::SpawnProjectileFromEntity(
     p.dir32 = dir32;
     p.type = entity.projectile;
     p.speed = spec.speed;
+    // A shooter with a flight speed of its own (combat.bullet_speed, px/s) sends its rockets and shells that fast
+    if (entity.bulletSpeed > 0.0f && (p.type == ProjectileType::Rocket || p.type == ProjectileType::Shell))
+        p.speed = std::max(0.5f, entity.bulletSpeed * static_cast<float>(SIMULATION_TIMESTEP));
     if (p.type == ProjectileType::Flame)
     {
         // The jet is drawn by its own effect, as long as the projectile would fly (22 px per tick) but never
@@ -3993,7 +4095,9 @@ void EntityManager::render(
                 isFlaming,
                 u->wreckComposite,
                 u->wreckStages,
-                u->selectedDeathSeq);
+                u->selectedDeathSeq,
+                u->flashMode,
+                u->flashFrames);
         }
         else if (const Building *b = it.building)
         {
@@ -4002,14 +4106,20 @@ void EntityManager::render(
             float bx = b->tileX * TILE_WIDTH;
             float by = b->tileY * TILE_HEIGHT;
             bool isProdBuilding = (btype == 2 || btype == 3 || btype == 10 || btype == 11);
-            int bAnim = (!live || (isProdBuilding && !b->isProducing)) ? 0 : (globalAnimTick + b->id);
+            bool isResearchBuilding = (btype == 4 || btype == 12);
+            int bAnim = (!live || (isProdBuilding && !b->isProducing) || (isResearchBuilding && !b->isResearching))
+                            ? 0
+                            : (globalAnimTick + b->id);
             // Work animations appear only while the building works: the Resistance Factory smokes while it builds a
-            // vehicle, the Resistance Laboratory and the Confederation Tech Center animate while their owner
-            // researches; otherwise those animated parts are not drawn at all
+            // vehicle, and the Confederation Tech Center animates screen lights while its owner researches;
+            // otherwise those animated parts are not drawn at all.
+            // Note: The Resistance Research Lab (btype == 12) radar head is a physical structure part (anim sequence 6,
+            // whose frame 0 is the resting radar dish). It must remain visible in IDLE state (bAnim == 0), stopping
+            // rotation, rather than being hidden completely.
             bool workAnimation = true;
             if (btype == 11)
                 workAnimation = live && b->isProducing && b->buildProgress >= 1.0f;
-            else if (btype == 12 || btype == 4)
+            else if (btype == 4)
                 workAnimation = live && b->isResearching;
             renderer.SetAnimatedPartsVisible(workAnimation);
             float hpRatio = (b->maxHp > 0) ? (static_cast<float>(b->currentHp) / b->maxHp) : 1.0f;

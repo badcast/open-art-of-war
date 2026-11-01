@@ -353,6 +353,7 @@ struct UnitConfig
     float attackCooldownMax {0.0f};
     int burstCount {1};
     float burstDelay {0.1f};
+    float bulletSpeed {0.0f}; // combat.bullet_speed, px/s of rockets and shells (0: the projectile kind's own)
     int splashPercent {0};
     ProjectileType projectile {ProjectileType::Bullet};
     float muzzleOffsetX {0.0f}; // localePosition X
@@ -374,6 +375,14 @@ struct UnitConfig
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
     int wreckComposite {1764};
     int wreckStages {5};
+    // animations: block (timing of the pictures; the character editor's Animator edits it)
+    float moveFrameTime {0.09f};   // seconds per walking frame
+    float attackFrameTime {-1.0f}; // seconds per firing-pose frame (< 0: 0.07, or 0.04 for archetypes 7 and 18)
+    float attackPoseTime {
+        -1.0f};                  // how long the firing pose lasts after the first shot of a volley (< 0: by projectile)
+    float burstPoseTime {0.15f}; // the same after every later shot of a burst
+    int flashMode {0};   // muzzle flash layer: 0 loops while firing, 1 plays once per shot, 2 plays once and holds
+    int flashFrames {0}; // frames the flash lasts (0 = its whole animation)
     std::vector<int> deathSequences;
     std::vector<int> flameDeathSequences;
     std::string description;
@@ -391,6 +400,10 @@ struct BuildingConfig
     int height {3};
     int maxHp {1200};
     int sightRadius {6};
+    int burstCount {1};          // shots of one volley (a Missile Turret fires 2 rockets)
+    float burstDelay {0.1f};     // seconds between them
+    float bulletSpeed {0.0f};    // combat.bullet_speed, px/s of rockets and shells (0: the projectile kind's own)
+    int radarRange {0}; // stats.radar_range: tiles the finished building sees beyond its sight radius (Radar Locator)
     int creditCost {400};
     int powerCost {0}; // >0 produces, <0 consumes
     float buildTime {12.0f};
@@ -431,6 +444,9 @@ public:
     static constexpr PlayerId kAutoOwner = 0xFE;
     int SpawnUnit(UnitType type, int tileX, int tileY, Faction faction);
     int SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, Faction faction, PlayerId owner = kAutoOwner);
+    // The unit becomes another form of itself (a Zeus gets its rocket turret): stats and looks of the new archetype,
+    // health keeps its share, orders go on
+    bool UpgradeUnitForm(int unitId, int newArchetype);
     int SpawnBuilding(UnitType type, int tileX, int tileY, Faction faction);
     int SpawnBuildingByIndex(
         int buildingIdx,
@@ -460,13 +476,14 @@ public:
     bool KeepsBaseOpen(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
     // Building radius around a player's headquarters (the mission's radius plus the player's technologies)
     int GetBuildRadius(PlayerId player) const;
+    int BaseBuildRadius(PlayerId player) const; // radius of the player's faction before research
     int GetBuildRadius() const
     {
         return GetBuildRadius(Players::Local());
     }
     void SetBuildRadius(int r)
     {
-        m_baseBuildRadius = r;
+        m_factionBuildRadius = {r, r};
         m_buildRadiusExtra = {};
     }
     void ExpandBuildRadius(int delta)
@@ -643,6 +660,7 @@ public:
         FireMg,
         FireSniper,
         FireCannon,
+        FireCannonHigh, // the heavy tanks: Zeus and Rhino
         FireRocket,
         FireMlrs,
         FireFlame,
@@ -677,7 +695,7 @@ public:
     int ValueOf(const Entity &e) const;
     void UpdateRegeneration(float deltaTime);
 
-    static int ApplyMovingUnitDamage(int baseDamage, const Entity *target);
+    static int ApplyMovingUnitDamage(int baseDamage, const Entity *target, ProjectileType kind);
 
     int GetUnitIdAtTile(int tileX, int tileY, int ignoreEntityId = 0) const;
     void ResolveUnitStacking(TileMap &map);
@@ -707,7 +725,7 @@ private:
     void NoteStats(const Entity &victim, PlayerId killer);
     // Puts a living entity into its death (state, death animation, explosions, frees a building's tiles)
     void KillEntity(Entity &e, TileMap &map);
-    int m_baseBuildRadius {16};                         // radius before Base Expansion research
+    std::array<int, 2> m_factionBuildRadius {16, 16};   // build_radius of each faction's headquarters, before research
     std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
     bool m_flamethrowerUnlocked[kMaxPlayers] {};
     mutable std::unordered_set<uint64_t>

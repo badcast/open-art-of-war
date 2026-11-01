@@ -285,22 +285,7 @@ bool CharacterEditor::loadFile(const fs::path& path) {
         savePath.back() = '\0';
         status = std::string(_("Loaded: ")) + path.filename().string();
 
-        YAML::Node combat = document["combat"];
-        float cfgBulletSpeed = YamlFloat(combat, "bullet_speed", YamlFloat(combat, "projectile_speed", 0.0f));
-        std::string proj = YamlString(MainWeapon(combat), "projectile", "bullet");
-        if (cfgBulletSpeed > 10.0f) {
-            previewBulletSpeed = cfgBulletSpeed;
-        } else {
-            previewBulletSpeed = (proj == "rocket") ? 420.0f : ((proj == "flame") ? 240.0f : 620.0f);
-        }
-        previewFxSpeed = YamlFloat(combat, "fx_speed", 1.0f);
-
-        const VisualOffsets offsets = ReadVisualOffsets(document);
-        muzzleOffsetX = offsets.muzzleX;
-        muzzleOffsetY = offsets.muzzleY;
-        turretOffsetX = offsets.turretX;
-        turretOffsetY = offsets.turretY;
-        hasCustomTurretOffset = offsets.customTurret;
+        RecomputePreviewDerived();
 
         simProjectiles.clear();
         simShotCooldown = 0.0f;
@@ -329,6 +314,25 @@ bool CharacterEditor::loadFile(const fs::path& path) {
     }
 }
 
+void CharacterEditor::RecomputePreviewDerived() {
+    YAML::Node combat = document["combat"];
+    float cfgBulletSpeed = YamlFloat(combat, "bullet_speed", YamlFloat(combat, "projectile_speed", 0.0f));
+    std::string proj = YamlString(MainWeapon(combat), "projectile", "bullet");
+    if (cfgBulletSpeed > 10.0f) {
+        previewBulletSpeed = cfgBulletSpeed;
+    } else {
+        previewBulletSpeed = (proj == "rocket") ? 420.0f : ((proj == "flame") ? 240.0f : 620.0f);
+    }
+    previewFxSpeed = YamlFloat(combat, "fx_speed", 1.0f);
+
+    const VisualOffsets offsets = ReadVisualOffsets(document);
+    muzzleOffsetX = offsets.muzzleX;
+    muzzleOffsetY = offsets.muzzleY;
+    turretOffsetX = offsets.turretX;
+    turretOffsetY = offsets.turretY;
+    hasCustomTurretOffset = offsets.customTurret;
+}
+
 bool CharacterEditor::SaveFile() {
     if (!document || activePath.empty()) return false;
     try {
@@ -347,6 +351,7 @@ bool CharacterEditor::SaveFile() {
         dirty = false;
         status = std::string(_("Saved: ")) + activePath.filename().string();
         ReloadCatalogSelection();
+        ApplySaved(true);
         return true;
     } catch (const std::exception& error) {
         status = std::string(_("YAML save error: ")) + error.what();
@@ -363,6 +368,18 @@ bool CharacterEditor::SaveFileAs() {
     if (!SaveFile()) return false;
     LoadCatalog();
     return loadFile(activePath);
+}
+
+void CharacterEditor::ApplySaved(bool characterFile) {
+    if (characterFile) {
+        RecomputePreviewDerived();
+        if (!comparePath.empty() && comparePath == activePath) LoadCompare(compareIndex);
+    }
+    if (battle.Active()) {
+        const std::string saved = status;
+        StartBattle();
+        status = saved; // the user wants to read "Saved", not "Battle started"
+    }
 }
 
 void CharacterEditor::ReloadCatalogSelection() {

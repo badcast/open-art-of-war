@@ -1,0 +1,37 @@
+#include <winver.h>
+
+// Application Icon
+1 ICON "@OAOW_ICON_PATH@"
+
+// Windows Application Manifest (RT_MANIFEST = 24, CREATEPROCESS_MANIFEST_RESOURCE_ID = 1)
+1 24 "@OAOW_MANIFEST_FILE@"
+
+// Version Information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName", "badcast"
+            VALUE "FileDescription", "@OAOW_DESCRIPTION@"
+            VALUE "FileVersion", "@OAOW_VERSION_FULL@"
+            VALUE "InternalName", "@OAOW_TARGET_NAME@"
+            VALUE "LegalCopyright", "Copyright (c) 2024-2026 badcast"
+            VALUE "OriginalFilename", "@OAOW_ORIGINAL_FILENAME@"
+            VALUE "ProductName", "Open Art Of War"
+            VALUE "ProductVersion", "@OAOW_VERSION_FULL@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END

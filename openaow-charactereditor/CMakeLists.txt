@@ -8,6 +8,7 @@ set(CHARACTER_EDITOR_SOURCES
     src/EditorGameUi.cpp
     src/EditorEnvironment.cpp
     src/EditorAi.cpp
+    src/EditorAnimator.cpp
     src/BattleSim.cpp
     src/CharacterEditor.cpp
     src/EditorCharacterDraw.cpp

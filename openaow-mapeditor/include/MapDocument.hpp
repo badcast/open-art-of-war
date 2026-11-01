@@ -96,6 +96,15 @@ public:
     }
     const std::vector<std::pair<int, int>>& GetExtraStarts() const { return m_extraStarts; }
 
+    // Uniform Player Start Management (Players 1..8)
+    int GetPlayerCount() const { return 2 + static_cast<int>(m_extraStarts.size()); }
+    std::pair<int, int> GetStartPos(int playerIndex) const;
+    bool SetStartPos(int playerIndex, int x, int y);
+    int FindStartPosAt(int x, int y) const;
+    bool AddStartPos(int x, int y);
+    bool RemoveStartPos(int playerIndex);
+    bool MoveStartPos(int playerIndex, int newX, int newY) { return SetStartPos(playerIndex, newX, newY); }
+
     const std::vector<EditorEntity>& GetEntities() const { return m_entities; }
     std::vector<EditorEntity>& GetEntities() { return m_entities; }
 

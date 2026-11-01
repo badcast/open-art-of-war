@@ -36,9 +36,12 @@ constexpr uint8_t kSchema[static_cast<int>(CommandType::Count)] = {
     A,                     // DebugCredits
     X | Y | A | B | C | D, // DebugSpawn
     0,                     // PlayerLeft
+    Ids | A,               // SetStance
+    Ids,                   // ToggleRepair
+    X | Y | A,             // View
 };
 
-constexpr int kTypeBits = 4;
+constexpr int kTypeBits = 5;
 static_assert(static_cast<int>(CommandType::Count) <= (1 << kTypeBits), "command type needs more bits");
 
 // World coordinates and indices stay far below this: anything bigger is a broken or hostile packet

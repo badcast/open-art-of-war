@@ -175,6 +175,11 @@ public:
     {
         m_radarFog = fog;
     }
+    // A replay's observer: the radar shows the whole map
+    void SetShowAll(bool on)
+    {
+        m_showAll = on;
+    }
     int GetRadarZoom() const
     {
         return m_radarZoom;
@@ -257,6 +262,7 @@ private:
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
+    bool m_showAll {false}; // a replay's observer sees the whole map
     mutable RadarAlert m_radarAlert; // updated while the radar is drawn
     int m_radarZoom {1};             // 1 = whole map, up to kRadarMaxZoom
     bool m_radarDragging {false};    // camera follows the mouse on the radar: the zoomed view holds still meanwhile

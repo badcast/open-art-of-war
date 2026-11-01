@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/SoundRequests.hpp"
 #include "game/MissionDialogs.hpp"
 #include "ui/MapPreview.hpp"
 #include "ui/MenuBackdropFx.hpp"
@@ -38,7 +39,7 @@ struct RenderApiBinding
     std::function<std::string()> active;                           // the API drawing right now
     std::function<std::string()> configured;                       // the API of the next start
     std::function<void(const std::string &)> select;
-    std::function<void()> applyNow;         // rebuild the window with the configured API
+    std::function<void()> applyNow;         // rebuild the window with the configured API (asked for by a dialog)
     std::function<bool()> effectsAvailable; // shader effects work with the running API
 };
 
@@ -70,12 +71,18 @@ public:
     }
 
     // Menu States
+    bool IsAnyMenuOpen() const
+    {
+        return m_inGameMenuOpen || m_inGameSettingsOpen || m_objectivesDialogOpen || m_missionDialogOpen;
+    }
     bool IsInGameMenuOpen() const
     {
         return m_inGameMenuOpen;
     }
     void SetInGameMenuOpen(bool open)
     {
+        if (open && !m_inGameMenuOpen)
+            SoundRequests::Play("ui_show_dialog");
         m_inGameMenuOpen = open;
     }
 
@@ -89,6 +96,8 @@ public:
     }
     void SetObjectivesDialogOpen(bool open)
     {
+        if (open && !m_objectivesDialogOpen)
+            SoundRequests::Play("ui_show_dialog");
         m_objectivesDialogOpen = open;
     }
 
@@ -97,7 +106,10 @@ public:
     void OpenMissionDialog(MissionDialog dialog)
     {
         m_missionDialog = std::move(dialog);
+        const bool wasOpen = m_missionDialogOpen;
         m_missionDialogOpen = !m_missionDialog.Empty();
+        if (m_missionDialogOpen && !wasOpen)
+            SoundRequests::Play("ui_show_dialog");
     }
     bool IsMissionDialogOpen() const
     {
@@ -112,7 +124,18 @@ public:
     }
     void SetCampaignSelectOpen(bool open)
     {
+        if (open && !m_campaignSelectOpen)
+            SoundRequests::Play("ui_show_dialog");
         m_campaignSelectOpen = open;
+    }
+
+    bool IsSkirmishFogOfWar() const
+    {
+        return m_skirmishFogOfWar;
+    }
+    void SetSkirmishFogOfWar(bool enabled)
+    {
+        m_skirmishFogOfWar = enabled;
     }
 
     int GetSelectedMenuItem() const
@@ -251,17 +274,32 @@ private:
     std::vector<SkirmishMapInfo> m_skirmishMaps;
     int m_skirmishSelected {0};
     bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
+    bool m_skirmishFogOfWar {true}; // custom game: fog of war enabled
+    // Custom game players, as the network room has them: [0] is the person, the rest are computer players
+    struct CustomSlot
+    {
+        int faction {0}; // computer players: 0 random, 1 Resistance, 2 Confederation (the person's comes from the side)
+        int team {0};
+        int color {1}; // 1..8
+        int level {1}; // computer player: 0 easy .. 3 hardcore
+    };
+    std::vector<CustomSlot> m_customSlots;
+    void EnsureCustomSlots();
+    std::vector<bool> CustomTakenColors(int row) const;
     int m_skirmishTop {0};
     AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update            //
                                                       // first visible row of the map list
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
     static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102;
+    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);
     std::function<void(const std::string &, const std::string &)> m_beginLoading; // loading screen with a map's picture
     std::function<void()> m_endLoading;
+    ui::ConfirmState m_apiConfirm;     // "switch the render API?" of the graphics settings
+    std::string m_apiPending;          // the API that question is about
     ui::ConfirmState m_confirm;        // the open question of the pause menu (leave / restart)
     ui::ComboState m_combo;            // the open drop-down list of the settings / the custom game dialog
     bool m_inGameSettingsOpen {false}; // the settings screen opened from the pause menu

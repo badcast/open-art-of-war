@@ -4,6 +4,7 @@
 #include "openaow/net/Crc32.hpp"
 #include "openaow/net/Net.hpp"
 #include "openaow/net/Protocol.hpp"
+#include "openaow/net/ReplayFile.hpp"
 #include "openaow/net/Discovery.hpp"
 #include "openaow/net/MasterClient.hpp"
 #include "openaow/net/Rendezvous.hpp"
@@ -13,6 +14,8 @@
 #include "transport/EnetSupport.hpp"
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -218,6 +221,25 @@ void testProtocol()
 {
     std::printf("[protocol]\n");
     {
+        // Data sync messages
+        DataManifest m, o;
+        m.files = {{"assets/characters/a.yaml", 0x1122334455667788ull}, {"assets/main.json", 7}};
+        CHECK(roundTrip(m, MsgType::DataManifest, o));
+        CHECK(o.files.size() == 2 && o.files[0].path == "assets/characters/a.yaml" && o.files[1].hash == 7);
+        FilePathRequest q, qo;
+        q.path = "assets/characters/a.yaml";
+        CHECK(roundTrip(q, MsgType::FilePathRequest, qo) && qo.path == q.path);
+        FilePathData d, dout;
+        d.path = q.path;
+        d.hash = 99;
+        d.bytes = {1, 2, 3, 4};
+        CHECK(roundTrip(d, MsgType::FilePathData, dout));
+        CHECK(dout.path == d.path && dout.hash == 99 && dout.bytes == d.bytes);
+        Hello h, ho;
+        h.canSync = true;
+        CHECK(roundTrip(h, MsgType::Hello, ho) && ho.canSync);
+    }
+    {
         Hello h, o;
         h.gameVersion = "0.0.1-alpha";
         h.simBuildId = 0x1122334455667788ull;
@@ -317,6 +339,65 @@ void testProtocol()
 
 // Random bytes into every decoder: they may accept or refuse, but must stay inside the buffer
 // (run under -fsanitize=address,undefined to catch the rest)
+void testReplayFile()
+{
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / "oaow-replay-test";
+    fs::remove_all(dir);
+    ReplayData data;
+    data.meta = "{\"format\":1}";
+    data.setup = {1, 2, 3, 4};
+    data.turns = {{}, {9, 8, 7}, std::vector<std::uint8_t>(5000, 0x5A)};
+    data.checksums = {{0, 0x1122334455667788ull}, {20, 42}};
+    data.files["maps/m0.json"] = {'{', '}'};
+    data.files["data/characters/a.yaml"] = {'a', ':', ' ', '1'};
+    const std::string path = (dir / "x" / replayFileName("maps/Some Map!.json", 0)).string();
+    std::string error;
+    CHECK(writeReplay(path, data, error));
+    CHECK(fs::exists(path));
+    CHECK(!fs::exists(path + ".tmp"));
+    CHECK(path.find("open-art-of-war-") != std::string::npos && path.find(".awr") != std::string::npos);
+    CHECK(path.find("Some_Map_") != std::string::npos);
+    ReplayData back;
+    CHECK(readReplay(path, back, error));
+    CHECK(back.meta == data.meta && back.setup == data.setup && back.turns == data.turns);
+    CHECK(back.checksums == data.checksums && back.files == data.files);
+    // The zstd frame magic opens the file: it really is compressed
+    {
+        std::ifstream in(path, std::ios::binary);
+        unsigned char magic[4] = {};
+        in.read(reinterpret_cast<char *>(magic), 4);
+        CHECK(magic[0] == 0x28 && magic[1] == 0xB5 && magic[2] == 0x2F && magic[3] == 0xFD);
+    }
+    // Unsafe or unknown extra files are refused on writing
+    ReplayData bad = data;
+    bad.files["../evil.json"] = {1};
+    CHECK(!writeReplay((dir / "bad.awr").string(), bad, error));
+    CHECK(!validReplayFileName("maps/../x") && !validReplayFileName("/maps/x") && !validReplayFileName("other/x"));
+    CHECK(!validReplayFileName("data/a b") && !validReplayFileName("data//x") && validReplayFileName("data/a/b-c_d.yaml"));
+    // Truncated, garbage and missing files are refused without a crash
+    {
+        std::ifstream in(path, std::ios::binary);
+        std::vector<char> all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        for (std::size_t cut : {all.size() / 2, std::size_t(10), std::size_t(0)})
+        {
+            std::ofstream out((dir / "cut.awr").string(), std::ios::binary);
+            out.write(all.data(), static_cast<std::streamsize>(cut));
+            out.close();
+            ReplayData r;
+            CHECK(!readReplay((dir / "cut.awr").string(), r, error));
+        }
+        std::ofstream out((dir / "junk.awr").string(), std::ios::binary);
+        for (int i = 0; i < 4000; ++i)
+            out.put(static_cast<char>(i * 31));
+        out.close();
+        ReplayData r;
+        CHECK(!readReplay((dir / "junk.awr").string(), r, error));
+        CHECK(!readReplay((dir / "missing.awr").string(), r, error));
+    }
+    fs::remove_all(dir);
+}
+
 void testFuzz()
 {
     std::printf("[fuzz]\n");
@@ -458,6 +539,155 @@ ClientConfig clientConfig(const std::string &name)
     c.identity = testIdentity();
     c.playerName = name;
     return c;
+}
+
+// A client whose game data differ fetches the host's files (listed in its manifest, nothing else), says hello again
+// with the hash it has then, and is admitted; a client that cannot sync, or whose data still differ, is turned away
+void testDataSync()
+{
+    std::printf("[data sync]\n");
+    LoopbackHub hub;
+    HostConfig hc;
+    hc.identity = testIdentity();
+    hc.dataManifest = {{"assets/characters/a.yaml", 111}, {"assets/data/b.json", 222}};
+    hc.dataFile = [](const std::string &path, std::vector<uint8_t> &packed, uint64_t &hash) {
+        if (path != "assets/characters/a.yaml" && path != "assets/data/b.json")
+            return false;
+        packed = {9, 8, 7};
+        hash = path == "assets/data/b.json" ? 222 : 111;
+        return true;
+    };
+    SessionHost host(hc);
+    host.addTransport(hub.server());
+    uint32_t now = 0;
+    auto pump = [&](SessionClient &c, int rounds = 4) {
+        for (int i = 0; i < rounds; ++i)
+        {
+            now += 10;
+            c.update(now);
+            host.update(now);
+            c.update(now);
+        }
+    };
+
+    // Cannot sync: the old answer
+    {
+        ClientConfig bad = clientConfig("Old");
+        bad.identity.assetsHash = 1;
+        SessionClient old(hub.client(), bad);
+        pump(old);
+        CHECK(old.state() == SessionClient::State::Rejected && old.rejectReason() == RejectReason::AssetsMismatch);
+    }
+    // Can sync: manifest, files, a second hello
+    {
+        ClientConfig cfg = clientConfig("New");
+        cfg.identity.assetsHash = 1;
+        cfg.canSync = true;
+        SessionClient c(hub.client(), cfg);
+        pump(c);
+        std::vector<DataEntry> files;
+        CHECK(c.state() == SessionClient::State::Connecting && c.takeDataManifest(files) && files.size() == 2);
+        c.requestDataFile("assets/data/b.json");
+        c.requestDataFile("assets/characters/other.yaml"); // not in the manifest: answered with nothing
+        pump(c);
+        FilePathData got, none;
+        CHECK(c.takeDataFile(got) && got.path == "assets/data/b.json" && got.hash == 222 && got.bytes.size() == 3);
+        CHECK(c.takeDataFile(none) && none.bytes.empty());
+        c.sayHelloAgain(testIdentity().assetsHash);
+        pump(c);
+        CHECK(c.state() == SessionClient::State::Joined);
+    }
+    // Still different after the sync: final
+    {
+        ClientConfig cfg = clientConfig("Still");
+        cfg.identity.assetsHash = 1;
+        cfg.canSync = true;
+        SessionClient c(hub.client(), cfg);
+        pump(c);
+        c.sayHelloAgain(2);
+        pump(c);
+        CHECK(c.state() == SessionClient::State::Rejected && c.rejectReason() == RejectReason::AssetsMismatch);
+    }
+}
+
+// A room that saves the replay of its match and logs the address of every connection
+void testServerReplay()
+{
+    std::printf("[server replay]\n");
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / "oaow-server-replay-test";
+    fs::remove_all(dir);
+    LoopbackHub hub;
+    HostConfig hc;
+    hc.identity = testIdentity();
+    hc.turnMs = 100;
+    hc.reconnectWindowMs = 500;
+    hc.replayDir = (dir / "replay").string();
+    std::vector<std::string> log;
+    hc.log = [&log](const std::string &line) { log.push_back(line); };
+    {
+        SessionHost host(hc);
+        host.addTransport(hub.server());
+        std::vector<std::unique_ptr<SessionClient>> clients;
+        for (int i = 0; i < 2; ++i)
+            clients.push_back(std::make_unique<SessionClient>(hub.client(), clientConfig("R" + std::to_string(i))));
+        uint32_t now = 0;
+        auto step = [&](uint32_t ms) {
+            for (uint32_t t = 0; t < ms; t += 10)
+            {
+                now += 10;
+                for (auto &c : clients)
+                    if (c)
+                        c->update(now);
+                host.update(now);
+            }
+        };
+        step(50);
+        host.setLobbyMap("assets/maps/m26.json", 2, 77);
+        host.startMatch(std::vector<std::uint8_t>{5, 6, 7}, now, 100);
+        step(300);
+        clients[0]->sendCommands(3, std::vector<std::uint8_t>{1, 2});
+        step(300);
+        for (auto &c : clients)
+            c->sendWorldHash(20, 0xC0FFEE);
+        step(50);
+        for (auto &c : clients)
+            c->sendLeave();
+        clients.clear();
+        step(1500); // longer than the reconnect window: the match is over
+        CHECK(!host.matchRunning());
+    }
+    std::string path;
+    for (const auto &entry : fs::directory_iterator(dir / "replay"))
+        path = entry.path().string();
+    CHECK(path.find("open-art-of-war-") != std::string::npos && path.find("m26.awr") != std::string::npos);
+    ReplayData data;
+    std::string error;
+    CHECK(readReplay(path, data, error));
+    CHECK((data.setup == std::vector<std::uint8_t>{5, 6, 7}));
+    CHECK(data.turns.size() >= 5);
+    TurnBundle first;
+    CHECK(!data.turns.empty() && decodeTurn(data.turns[0].data(), data.turns[0].size(), first) && first.turn == 0);
+    bool hasCommands = false;
+    for (const auto &t : data.turns)
+    {
+        TurnBundle b;
+        if (decodeTurn(t.data(), t.size(), b))
+            for (const auto &p : b.players)
+                hasCommands = hasCommands || (p.bytes == std::vector<std::uint8_t>{1, 2});
+    }
+    CHECK(hasCommands);
+    CHECK(data.checksums.size() == 1 && data.checksums[0].first == 20 && data.checksums[0].second == 0xC0FFEE);
+    CHECK(data.meta.find("\"source\": \"server\"") != std::string::npos);
+    CHECK(data.meta.find("loopback") != std::string::npos);
+    bool loggedAddress = false, loggedSave = false;
+    for (const std::string &line : log)
+    {
+        loggedAddress = loggedAddress || (line.find("player joined") != std::string::npos && line.find("loopback") != std::string::npos);
+        loggedSave = loggedSave || line.find("replay saved") != std::string::npos;
+    }
+    CHECK(loggedAddress && loggedSave);
+    fs::remove_all(dir);
 }
 
 // Host and three clients in memory: join, roster, start, turns with everybody's commands in the same
@@ -1195,8 +1425,11 @@ int main()
     testBitStream();
     testProtocol();
     testFuzz();
+    testReplayFile();
     testEnetLoopback();
     testLockstepSession();
+    testServerReplay();
+    testDataSync();
     testLobby();
     testPasswordAndLeave();
     testEnetSession();
