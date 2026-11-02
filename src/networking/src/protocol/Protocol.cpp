@@ -356,6 +356,7 @@ void writeChoice(BitWriter &w, const LobbyChoice &c)
     w.writeBits(c.team, 3);
     w.writeBits(c.color, 4);
     w.writeBits(c.spawn, 4);
+    w.writeBits(c.handicap, 3);
     w.writeBool(c.ready);
 }
 
@@ -365,7 +366,10 @@ void readChoice(BitReader &r, LobbyChoice &c)
     c.team = static_cast<uint8_t>(r.readBits(3));
     c.color = static_cast<uint8_t>(r.readBits(4));
     c.spawn = static_cast<uint8_t>(r.readBits(4));
+    c.handicap = static_cast<uint8_t>(r.readBits(3));
     c.ready = r.readBool();
+    if (c.handicap > 5)
+        r.fail();
     if (c.faction > 1 && c.faction != kRandom)
         r.fail();
     if (c.spawn >= kMaxPlayers && c.spawn != kRandom)
@@ -548,12 +552,16 @@ void encode(BitWriter &w, const OwnerSetTeam &m)
     writeType(w, MsgType::OwnerSetTeam);
     w.writeBits(m.slot, 3);
     w.writeBits(m.team, 3);
+    w.writeBits(m.handicap, 3);
 }
 
 bool decode(BitReader &r, OwnerSetTeam &m)
 {
     m.slot = static_cast<uint8_t>(r.readBits(3));
     m.team = static_cast<uint8_t>(r.readBits(3));
+    m.handicap = static_cast<uint8_t>(r.readBits(3));
+    if (m.handicap > 5)
+        r.fail();
     return done(r);
 }
 

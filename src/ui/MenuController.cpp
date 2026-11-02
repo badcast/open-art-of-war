@@ -95,10 +95,17 @@ bool LaunchMapEditor(const std::string &mapPath)
     return false;
 }
 
+// "-25%" ... "+100%" for a handicap index (the start credits form)
+std::string HandicapText(int index)
+{
+    const int pct = HandicapPercentOf(index) - 100;
+    return (pct > 0 ? "+" : "") + std::to_string(pct) + "%";
+}
+
 // Custom game: the table of players in the details panel (columns: level / name, faction, team, colour, remove)
 UiRect CustomRow(const UiRect &d, int i)
 {
-    return {d.x + 20, d.y + 104 + i * 34, d.w - 40 - 230, 30};
+    return {d.x + 20, d.y + 104 + i * 34, d.w - 40 - 222, 30};
 }
 UiRect CustomCell(const UiRect &d, int i, int kind)
 {
@@ -106,17 +113,19 @@ UiRect CustomCell(const UiRect &d, int i, int kind)
     switch (kind)
     {
         case 1:
-            return {r.x + 136, r.y, 118, r.h};
+            return {r.x + 110, r.y, 108, r.h};
         case 2:
-            return {r.x + 260, r.y, 56, r.h};
+            return {r.x + 224, r.y, 50, r.h};
         case 3:
-            return {r.x + 322, r.y, 50, r.h};
+            return {r.x + 280, r.y, 44, r.h};
         case 6:
-            return {r.x + 378, r.y, 42, r.h};
+            return {r.x + 330, r.y, 44, r.h};
+        case 7:
+            return {r.x + 380, r.y, 52, r.h};
         case 5:
             return {r.Right() - 28, r.y + 3, 24, r.h - 6};
         default:
-            return {r.x, r.y, 130, r.h};
+            return {r.x, r.y, 104, r.h};
     }
 }
 UiRect CustomAddBtn(const UiRect &d, int rows)
@@ -1225,6 +1234,7 @@ bool MenuController::UpdateCampaignSelect(
                     slot.faction = cs.faction == 2 ? Faction::Confederation : Faction::Resistance;
                 slot.team = static_cast<uint8_t>(cs.team);
                 slot.color = static_cast<uint8_t>(cs.color);
+                slot.handicap = static_cast<uint8_t>(std::clamp(cs.handicap, 0, kHandicapCount - 1));
                 slot.aiLevel = static_cast<uint8_t>(std::clamp(cs.level, 0, 3));
                 match.startPosition[p] = static_cast<int8_t>(cs.position);
             }
@@ -1365,7 +1375,7 @@ bool MenuController::UpdateCampaignSelect(
             const UiRect &d = l.details;
             for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
             {
-                for (int kind : {1, 2, 3, 4, 6})
+                for (int kind : {1, 2, 3, 4, 6, 7})
                 {
                     if ((i > 0 || kind != 4) && CustomCell(d, i, kind).Contains(mx, my))
                         return openCombo(kComboSlot + i * 10 + kind);
@@ -2610,6 +2620,13 @@ void MenuController::RenderCampaignMissionSelect(
             d.y + 82,
             std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size()) + "/" + std::to_string(info.players)
                 + ")");
+        // Column captions, the same order as in the network room
+        for (const auto &[kind, text] : std::initializer_list<std::pair<int, const char *>> {
+                 {1, _("Faction")}, {2, _("Team")}, {3, _("Colour")}, {6, _("Pos.")}, {7, _("Handicap")}})
+        {
+            const UiRect cell = CustomCell(d, 0, kind);
+            fontRenderer.DrawString(text, cell.x, d.y + 90, ui::FONT_SMALL, col::TextMuted, false);
+        }
         for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
         {
             const CustomSlot &cs = m_customSlots[i];
@@ -2652,6 +2669,7 @@ void MenuController::RenderCampaignMissionSelect(
             }
             combo(2, std::to_string(cs.team + 1));
             combo(6, std::to_string(cs.position + 1));
+            combo(7, cs.handicap == 0 ? std::string("-") : HandicapText(cs.handicap));
             combo(3, "");
             const UiRect cc = CustomCell(d, i, 3);
             renderer.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, ArmyColor(cs.color));
@@ -2857,6 +2875,10 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
             for (int i = 1; i <= Settings::kArmyColors; ++i)
                 out.push_back(_(ArmyColorName(i)));
         }
+        else if (kind == 7)
+        {
+            out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"};
+        }
         else if (kind == 6)
         {
             const int count = m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size())
@@ -2901,6 +2923,8 @@ int MenuController::CampaignComboCurrent(int id) const
             return cs.color - 1;
         if (kind == 6)
             return cs.position;
+        if (kind == 7)
+            return std::clamp(cs.handicap, 0, kHandicapCount - 1);
         return cs.level;
     }
     if (id == kComboSide)
@@ -2934,6 +2958,10 @@ void MenuController::CampaignComboApply(int id, int index)
             const std::vector<bool> taken = CustomTakenColors(row);
             if (index >= 0 && index < static_cast<int>(taken.size()) && !taken[index])
                 cs.color = index + 1;
+        }
+        else if (kind == 7)
+        {
+            cs.handicap = std::clamp(index, 0, kHandicapCount - 1);
         }
         else if (kind == 6)
         {

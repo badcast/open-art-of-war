@@ -42,5 +42,6 @@ file at 96 MB, 160 entries and 2 million turns, refuses names with `..`, absolut
 ## Playing
 
 Main menu -> OPEN REPLAY (list of `replays/`), a file dropped on the window, or `openaow --replay=<file.awr>`.
-Space pause, `+`/`-` speed (x0.5 ... x8), Tab next view (observer / each player), F follow the camera of the watched player,
+Space pause, `+`/`-` speed (x0.5 ... x8), the view combo box (or Tab: observer / each player), F follow the camera of the watched player,
+the "Voice the interface" check box above the controls (off by default: UI sounds, announcer, unit replies and alerts are muted),
 Home restart, Esc leave. The world can only go forward: going back restarts from the first turn.

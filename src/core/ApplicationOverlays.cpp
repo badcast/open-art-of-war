@@ -542,3 +542,149 @@ void Application::RenderNetStats()
 }
 
 } // namespace OpenArtOfWar
+
+namespace OpenArtOfWar
+{
+
+namespace
+{
+void PopUtf8Char(std::string &s)
+{
+    while (!s.empty())
+    {
+        const unsigned char c = static_cast<unsigned char>(s.back());
+        s.pop_back();
+        if ((c & 0xC0) != 0x80)
+            break;
+    }
+}
+} // namespace
+
+void Application::UpdateGameChat(uint32_t nowMs)
+{
+    const bool inMatch = m_net && !m_replay && m_mission && m_mission->IsOnlineMatch()
+                         && (m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying
+                             || m_state == AppState::Paused);
+    if (!inMatch)
+    {
+        if (m_gameChat.open)
+        {
+            m_gameChat.open = false;
+            m_gameChat.input.clear();
+            if (m_menuController)
+                m_menuController->SetChatOpen(false);
+            if (m_textInput)
+            {
+                SDL_StopTextInput(m_window);
+                m_textInput = false;
+            }
+        }
+        m_gameChat.lines.clear();
+        return;
+    }
+    // Received messages
+    for (Net::Chat &c : m_net->TakeChat())
+    {
+        std::string who = "?";
+        if (const Net::Roster *roster = m_net->roster())
+        {
+            for (const Net::RosterEntry &e : roster->players)
+                if (e.slot == c.fromSlot)
+                    who = e.name;
+        }
+        m_gameChat.lines.push_back({who + ": " + c.text, nowMs + 15000});
+        if (m_gameChat.lines.size() > 8)
+            m_gameChat.lines.erase(m_gameChat.lines.begin());
+        SoundRequests::Play("ui_click");
+    }
+    m_gameChat.lines.erase(
+        std::remove_if(
+            m_gameChat.lines.begin(),
+            m_gameChat.lines.end(),
+            [&](const Notice &n) { return nowMs >= n.untilMs; }),
+        m_gameChat.lines.end());
+
+    const bool enter = m_input->IsKeyJustPressed(SDL_SCANCODE_RETURN) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_ENTER);
+    auto close = [&]() {
+        m_gameChat.open = false;
+        m_gameChat.input.clear();
+        m_menuController->SetChatOpen(false);
+        SDL_StopTextInput(m_window);
+        m_textInput = false;
+    };
+    if (!m_gameChat.open)
+    {
+        // (not over a pause menu, a dialog or the in-game settings: Enter belongs to them there)
+        if (enter && m_state != AppState::Paused && !m_menuController->IsAnyMenuOpen())
+        {
+            m_gameChat.open = true;
+            m_gameChat.input.clear();
+            m_menuController->SetChatOpen(true);
+            m_input->TakeTypedText();
+            m_input->TakeBackspaces();
+            SDL_StartTextInput(m_window);
+            m_textInput = true;
+        }
+        return;
+    }
+    if (m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
+    {
+        close();
+        return;
+    }
+    for (int i = m_input->TakeBackspaces(); i > 0; --i)
+        PopUtf8Char(m_gameChat.input);
+    m_gameChat.input += m_input->TakeTypedText();
+    while (m_gameChat.input.size() > Net::kMaxChatLength)
+        PopUtf8Char(m_gameChat.input);
+    if (enter)
+    {
+        if (!m_gameChat.input.empty())
+            m_net->SendChat(m_gameChat.input);
+        close();
+    }
+}
+
+void Application::RenderGameChat()
+{
+    if (m_gameChat.lines.empty() && !m_gameChat.open)
+        return;
+    const uint32_t nowMs = SDL_GetTicks();
+    const int viewW = m_camera->GetViewportWidth();
+    const int boxW = std::min(560, viewW - 24);
+    int y = m_windowH - 62 - static_cast<int>(m_gameChat.lines.size()) * 22;
+    for (const Notice &n : m_gameChat.lines)
+    {
+        const uint32_t left = n.untilMs > nowMs ? n.untilMs - nowMs : 0;
+        const float alpha = m_gameChat.open ? 1.0f : std::min(1.0f, left / 1000.0f);
+        const auto fade = [&](SDL_Color c) { return ui::WithAlpha(c, static_cast<uint8_t>(c.a * alpha)); };
+        m_renderer->FillRectScreen(12, y, boxW, 20, fade(ui::WithAlpha(ui::color::Panel, 200)));
+        m_fontRenderer->DrawString(
+            ui::FitText(*m_fontRenderer, n.text, ui::FONT_SMALL_BOLD, boxW - 12),
+            18,
+            y + 10,
+            ui::FONT_SMALL_BOLD,
+            fade(ui::color::Text),
+            true,
+            Anchor::LEFT | Anchor::VCENTER);
+        y += 22;
+    }
+    if (m_gameChat.open)
+    {
+        const ui::UiRect field {12, m_windowH - 50, boxW, 32};
+        ui::DrawPanel(*m_renderer, field, ui::color::PanelSunken, ui::color::Accent);
+        std::string shown = std::string(_("Say")) + ": " + m_gameChat.input;
+        if (((nowMs / 500) & 1u) == 0)
+            shown += "|";
+        m_fontRenderer->DrawString(
+            ui::FitText(*m_fontRenderer, shown, ui::FONT_BODY, field.w - 16),
+            field.x + 8,
+            field.CenterY(),
+            ui::FONT_BODY,
+            ui::color::Text,
+            false,
+            Anchor::LEFT | Anchor::VCENTER);
+    }
+}
+
+} // namespace OpenArtOfWar

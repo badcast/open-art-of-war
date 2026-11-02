@@ -703,14 +703,14 @@ void NetMatch::SetAi(const Net::OwnerSetAi &change)
     else if (IsOwner())
         m_client->sendOwnerSetAi(change);
 }
-void NetMatch::SetTeam(uint8_t slot, uint8_t team)
+void NetMatch::SetTeam(uint8_t slot, uint8_t team, uint8_t handicap)
 {
     if (m_hasPendingChoice && slot == LocalSlot())
         m_pendingChoice[1] = team;
     if (m_host)
-        m_host->setTeam(slot, team);
+        m_host->setTeam(slot, team, handicap);
     else if (IsOwner())
-        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team});
+        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap});
 }
 void NetMatch::SendChat(const std::string &text)
 {
@@ -766,6 +766,7 @@ void NetMatch::StartFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt
         slot.faction = s.choice.faction == Net::kRandom ? static_cast<Faction>(rng() % 2)
                                                         : static_cast<Faction>(s.choice.faction);
         slot.team = s.choice.team;
+        slot.handicap = s.choice.handicap <= 5 ? s.choice.handicap : 0;
         slot.color = s.choice.color <= 8 ? s.choice.color : static_cast<uint8_t>(1 + s.slot % 8);
         int spawn = s.choice.spawn;
         if (spawn == Net::kRandom)
@@ -1036,6 +1037,7 @@ std::vector<uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
         if (!s.human)
             w.writeBits(s.aiLevel & 3u, 2);
         w.writeBits(static_cast<uint32_t>(setup.startPosition[i]) & 7u, 3);
+        w.writeBits(s.handicap, 3);
     }
     buf.resize(w.finish());
     return buf;
@@ -1069,6 +1071,9 @@ bool NetMatch::DecodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out)
         if (!s.human)
             s.aiLevel = static_cast<uint8_t>(r.readBits(2));
         out.startPosition[i] = static_cast<int8_t>(r.readBits(3));
+        s.handicap = static_cast<uint8_t>(r.readBits(3));
+        if (s.handicap >= kHandicapCount)
+            return false;
     }
     // Only maps of the game's own folder (the path comes from another computer)
     if (out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)

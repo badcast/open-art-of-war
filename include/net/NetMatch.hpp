@@ -134,7 +134,7 @@ public:
     // Host / room owner: add, change or remove a computer player
     void SetAi(const Net::OwnerSetAi &change);
     // Host / room owner: the team of a player (players cannot choose their own)
-    void SetTeam(uint8_t slot, uint8_t team);
+    void SetTeam(uint8_t slot, uint8_t team, uint8_t handicap);
     void SendChat(const std::string &text);
     std::vector<Net::Chat> TakeChat();
     // Host: everybody in the room is ready (two players at least)

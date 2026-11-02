@@ -193,7 +193,7 @@ void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64
     broadcastLobby();
 }
 
-void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice)
+void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
@@ -214,6 +214,8 @@ void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice)
     }
     choice.team &= 7;
     choice.color &= 15;
+    if (!ownerEdit || choice.handicap > 5)
+        choice.handicap = m_slots[slot].choice.handicap;
     // A colour somebody else has already picked: the player keeps the own one (two armies of one colour could not
     // be told apart)
     if (freeColor(slot, choice.color) != choice.color)
@@ -245,11 +247,13 @@ uint8_t SessionHost::freeColor(uint8_t slot, uint8_t preferred) const
     return preferred;
 }
 
-void SessionHost::setTeam(uint8_t slot, uint8_t team)
+void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
     m_slots[slot].choice.team = team & 7;
+    if (handicap <= 5)
+        m_slots[slot].choice.handicap = handicap;
     broadcastLobby();
 }
 
@@ -297,7 +301,7 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
             m_slots[slot].choice.color = choice.color;
         }
         m_slots[slot].choice.ready = true;
-        applyChoice(slot, choice);
+        applyChoice(slot, choice, true);
         return; // applyChoice broadcasts
     }
     broadcastRoster();
@@ -582,7 +586,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
         {
             OwnerSetTeam m;
             if (slot == ownerSlot() && decode(r, m))
-                setTeam(m.slot, m.team);
+                setTeam(m.slot, m.team, m.handicap);
             break;
         }
         case MsgType::OwnerStart:

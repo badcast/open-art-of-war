@@ -4250,3 +4250,18 @@ msgstr ""
 
 msgid "HEADQUARTERS REQUIRED TO BUILD!"
 msgstr ""
+
+msgid "Handicap"
+msgstr ""
+
+msgid "Pos."
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Colour"
+msgstr ""
+
+msgid "Say"
+msgstr ""
