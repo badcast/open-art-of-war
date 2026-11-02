@@ -620,6 +620,12 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
                 siegeCfg.parentArchetypeId = cfg.archetypeId;
                 cfg.siegeArchetypeId = sArch;
                 cfg.siegeRequiresResearch = getBool(sNode, "requires_research", false);
+                {
+                    const std::string mode = getStr(sNode, "auto_deploy", "far");
+                    cfg.autoSiege = mode == "off"      ? UnitConfig::AutoSiege::Off
+                                    : mode == "always" ? UnitConfig::AutoSiege::Always
+                                                       : UnitConfig::AutoSiege::Far;
+                }
 
                 if (sNode["stats"])
                 {
@@ -842,6 +848,7 @@ void EntityManager::Clear()
     m_flameBursts.clear();
     m_groundMarks.clear();
     m_soundCues.clear();
+    m_eliminated = {};
     // Muzzle-flash reveals name entity ids: the next game reuses them from 1, so old pings would show its units
     m_revealPings.clear();
     ++m_generation;
@@ -1474,7 +1481,8 @@ bool EntityManager::CanPlaceBuilding(
     }
 
     // 1. Fog of War check: building can only be placed on Visible tiles, NOT on Fog
-    if (map.IsFogEnabled() && Players::Slot(player).human)
+    // (the same for every player, human or computer)
+    if (map.IsFogEnabled())
     {
         const uint8_t team = Players::TeamOf(player);
         for (int ty = tileY; ty < tileY + height; ++ty)
@@ -1489,8 +1497,8 @@ bool EntityManager::CanPlaceBuilding(
         }
     }
 
-    // 2. Build radius check: must be within build_radius of ANY friendly Headquarters
-    bool hasFriendlyHQ = false;
+    // 2. Without a finished headquarters nothing is built (no building, no wall, no new headquarters); with one,
+    //    the place must be within build_radius of ANY friendly finished Headquarters
     bool inHQRange = false;
     float buildCenterX = tileX + width * 0.5f;
     float buildCenterY = tileY + height * 0.5f;
@@ -1503,7 +1511,6 @@ bool EntityManager::CanPlaceBuilding(
         // A headquarters still under construction opens no building zone yet
         if (b && b->type == UnitType::Headquarters && b->buildProgress >= 1.0f)
         {
-            hasFriendlyHQ = true;
             float hqCenterX = b->tileX + b->buildWidth * 0.5f;
             float hqCenterY = b->tileY + b->buildHeight * 0.5f;
             float dist = DetMath::Hypot(buildCenterX - hqCenterX, buildCenterY - hqCenterY);
@@ -1514,7 +1521,7 @@ bool EntityManager::CanPlaceBuilding(
             }
         }
     }
-    if (hasFriendlyHQ && !inHQRange)
+    if (!inHQRange)
     {
         return false;
     }
@@ -2462,7 +2469,7 @@ void EntityManager::UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime
     if (!cfg->isSiegeMode)
     {
         u.siegeQuietTimer = 0.0f;
-        if (cfg->siegeArchetypeId < 0 || !CanDeploySiege(u))
+        if (cfg->siegeArchetypeId < 0 || cfg->autoSiege == UnitConfig::AutoSiege::Off || !CanDeploySiege(u))
             return;
         if (!aiSide && !u.isAttackMoving)
             return;
@@ -2471,17 +2478,23 @@ void EntityManager::UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime
             return;
         // Both forms with the faction's range technologies (Hornet-10 alone already gives the sniper 9.5)
         const float siegeRange = ResearchedAttackRange(u.owner, siege->archetypeId, siege->attackRange);
-        if (siegeRange <= u.attackRange + 0.25f)
-            return;
-        // Something to shoot in normal range: no need to deploy
-        if (u.targetEntityId != 0)
+        if (cfg->autoSiege == UnitConfig::AutoSiege::Far)
         {
-            const Entity *t = GetEntity(u.targetEntityId);
-            if (t && ComputeDistanceToEntityPixels(u, *t) <= u.attackRange * TILE_WIDTH)
+            // Only worth it for the farther reach: an enemy beyond the normal range, within the siege range
+            if (siegeRange <= u.attackRange + 0.25f)
+                return;
+            // Something to shoot in normal range: no need to deploy
+            if (u.targetEntityId != 0)
+            {
+                const Entity *t = GetEntity(u.targetEntityId);
+                if (t && ComputeDistanceToEntityPixels(u, *t) <= u.attackRange * TILE_WIDTH)
+                    return;
+            }
+            if (closestVisibleEnemy(u.attackRange) != 0)
                 return;
         }
-        if (closestVisibleEnemy(u.attackRange) != 0)
-            return;
+        // Always: the siege form is worth having whatever the range (a salvo, concealment), so any enemy in sight
+        // within the siege range deploys it
         if (closestVisibleEnemy(siegeRange) == 0)
             return;
         // The order stays: once nothing is left to shoot the unit packs up and carries on toward it
@@ -2498,6 +2511,7 @@ void EntityManager::UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime
     // Auto-deployed and nothing visible within siege range for a while: pack up and carry on
     if (!u.autoDeployed)
         return;
+    // (u.attackRange is the siege form's: it stays deployed while an enemy is within the siege range)
     if (closestVisibleEnemy(u.attackRange) != 0)
     {
         u.siegeQuietTimer = 0.0f;
@@ -3683,6 +3697,26 @@ void EntityManager::DestroyPlayer(PlayerId player, TileMap &map)
             }
         }
     }
+}
+
+std::vector<PlayerId> EntityManager::UpdateElimination(TileMap &map)
+{
+    std::vector<PlayerId> out;
+    std::array<bool, kMaxPlayers> hasBuilding {};
+    for (const Entity &e : m_entities)
+    {
+        if (e.alive && e.state != ActionState::Die && e.isBuilding && e.owner < kMaxPlayers)
+            hasBuilding[e.owner] = true;
+    }
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if (!Players::IsActive(p) || m_eliminated[p] || hasBuilding[p])
+            continue;
+        m_eliminated[p] = true;
+        DestroyPlayer(p, map);
+        out.push_back(p);
+    }
+    return out;
 }
 
 void EntityManager::SpawnDeathExplosions(const Entity &e)

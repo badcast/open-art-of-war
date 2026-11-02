@@ -444,6 +444,11 @@ int ProductionForm(PlayerId player, int archetype)
     return archetype;
 }
 
+bool IsBuildingUnlocked(PlayerId player, int buildingIndex)
+{
+    return buildingIndex != 6 || IsRadarUnlocked(player);
+}
+
 bool IsRadarUnlocked(PlayerId player)
 {
     const Faction faction = Players::FactionOf(player);

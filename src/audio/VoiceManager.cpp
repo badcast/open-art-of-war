@@ -28,6 +28,7 @@ bool VoiceManager::load(const std::string &language, const std::string &assetRoo
     mixer->SetVoiceVolume(m_volume);
     mixer->SetFxVolume(m_volume); // whatever the category: every line of this mixer is a voice
     mixer->SetMuted(m_muted);
+    mixer->SetInterfaceMuted(m_silenced);
     {
         std::lock_guard<std::mutex> guard(m_swap);
         m_mixer = std::move(mixer);
@@ -90,6 +91,14 @@ void VoiceManager::SetVolume(int volume)
         m_mixer->SetVoiceVolume(volume);
         m_mixer->SetFxVolume(volume);
     }
+}
+
+void VoiceManager::SetSilenced(bool silenced)
+{
+    m_silenced = silenced;
+    std::lock_guard<std::mutex> guard(m_swap);
+    if (m_mixer)
+        m_mixer->SetInterfaceMuted(silenced);
 }
 
 void VoiceManager::SetMuted(bool muted)

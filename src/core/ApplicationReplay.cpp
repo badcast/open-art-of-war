@@ -16,6 +16,7 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/Renderer.hpp"
+#include "graphics/ShaderEffects.hpp"
 #include "input/InputManager.hpp"
 #include "net/NetMatch.hpp"
 #include "replay/ReplayPlayer.hpp"
@@ -45,19 +46,21 @@ namespace col = ui::color;
 
 constexpr float kSpeeds[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
 constexpr int kSpeedCount = 5;
-constexpr int kBarHeight = 38;
+constexpr int kBarHeight = 64; // a thin row for the sound check box on top, the controls under it
+constexpr int kTopRow = 26;
 
 struct BarLayout
 {
-    ui::UiRect bar, play, slower, speed, faster, restart, progress, view, follow, exit;
+    ui::UiRect bar, voice, play, slower, speed, faster, restart, progress, view, follow, exit;
 };
 
 BarLayout MakeBar(int viewW)
 {
     BarLayout l;
-    const int h = kBarHeight - 8;
-    const int y = 4;
+    const int h = kBarHeight - kTopRow - 8;
+    const int y = kTopRow + 2;
     l.bar = {0, 0, viewW, kBarHeight};
+    l.voice = {8, 3, 230, kTopRow - 5};
     int x = 8;
     auto place = [&](ui::UiRect &r, int w) {
         r = {x, y, w, h};
@@ -76,7 +79,7 @@ BarLayout MakeBar(int viewW)
     };
     placeRight(l.exit, 70);
     placeRight(l.follow, 120);
-    placeRight(l.view, 190);
+    placeRight(l.view, 210);
     l.progress = {x + 6, y + 6, std::max(60, right - x - 6), h - 12};
     return l;
 }
@@ -162,6 +165,8 @@ bool Application::StartReplay(int watchSlot)
     m_replayUi.paused = false;
     m_replayUi.cameraSet = false;
     m_replayUi.watch = setup.local;
+    if (m_sound)
+        m_sound->SetInterfaceMuted(!m_replayUi.interfaceSound); // the interface is silent unless the check box is on
     // Tests (OAOW_REPLAY_SPEED=<0..4>, debug builds): the playback speed from the start
     if (const char *speed = DebugEnv("OAOW_REPLAY_SPEED"))
         m_replayUi.speed = std::clamp(std::atoi(speed), 0, kSpeedCount - 1);
@@ -183,6 +188,8 @@ void Application::CloseReplay()
     }
     if (m_hudController)
         m_hudController->SetShowAll(false);
+    if (m_sound)
+        m_sound->SetInterfaceMuted(false);
     m_replay.reset(); // takes the recorded data away
     m_replayUi = ReplayUi {};
     if (had)
@@ -233,12 +240,35 @@ void Application::UpdateReplayInput(double frameTime)
     // The bar (a click on it is taken before the game sees it)
     const BarLayout bar = MakeBar(m_camera->GetViewportWidth());
     const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
-    if (bar.bar.Contains(mx, my))
+    // The open list of the view combo box takes the input first
+    const auto &viewPlayers = m_replay->info().players;
+    if (m_replayUi.comboOpen >= 0)
+    {
+        ui::ComboState cs;
+        cs.open = 0;
+        cs.scroll = m_replayUi.comboScroll;
+        int picked = -1;
+        float lx, ly;
+        const bool clicked = m_input->WasLeftClickIssued(lx, ly);
+        ui::ComboUpdate(cs, bar.view, static_cast<int>(viewPlayers.size()) + 1, m_windowH, mx, my, clicked, m_input->ConsumeWheel(), picked);
+        m_replayUi.comboScroll = cs.scroll;
+        if (cs.open < 0)
+            m_replayUi.comboOpen = -1;
+        if (picked >= 0)
+            ReplayWatch(picked == 0 ? -1 : viewPlayers[picked - 1].slot);
+    }
+    else if (bar.bar.Contains(mx, my))
     {
         float lx, ly;
         if (m_input->WasLeftClickIssued(lx, ly))
         {
-            if (bar.play.Contains(mx, my))
+            if (bar.voice.Contains(mx, my))
+            {
+                m_replayUi.interfaceSound = !m_replayUi.interfaceSound;
+                if (m_sound)
+                    m_sound->SetInterfaceMuted(!m_replayUi.interfaceSound);
+            }
+            else if (bar.play.Contains(mx, my))
                 togglePause = true;
             else if (bar.slower.Contains(mx, my))
                 speedStep = -1;
@@ -247,7 +277,10 @@ void Application::UpdateReplayInput(double frameTime)
             else if (bar.restart.Contains(mx, my))
                 restart = true;
             else if (bar.view.Contains(mx, my))
-                nextView = true;
+            {
+                m_replayUi.comboOpen = 0;
+                m_replayUi.comboScroll = 0;
+            }
             else if (bar.follow.Contains(mx, my))
                 toggleFollow = true;
             else if (bar.exit.Contains(mx, my))
@@ -436,13 +469,15 @@ void Application::RenderReplayBar()
     for (const auto &p : m_replay->info().players)
         if (p.slot == m_replayUi.watch)
             viewName = p.name;
-    ui::DrawButton(
+    ui::DrawComboField(
         *m_renderer,
         *m_fontRenderer,
         l.view,
-        ui::FitText(*m_fontRenderer, std::string(_("View")) + ": " + viewName, ui::FONT_SMALL_BOLD, l.view.w - 14),
-        ui::ButtonStyle::Secondary,
+        ui::FitText(*m_fontRenderer, viewName, ui::FONT_SMALL_BOLD, l.view.w - 40),
+        m_replayUi.comboOpen >= 0,
         hot(l.view));
+    ui::DrawCheckbox(
+        *m_renderer, *m_fontRenderer, l.voice, _("Voice the interface"), m_replayUi.interfaceSound, hot(l.voice));
     ui::DrawButton(
         *m_renderer,
         *m_fontRenderer,
@@ -477,6 +512,26 @@ void Application::RenderReplayBar()
             col::Accent,
             true,
             Anchor::HCENTER | Anchor::VCENTER);
+    }
+
+    // The open view list, over everything
+    if (m_replayUi.comboOpen >= 0)
+    {
+        std::vector<std::string> items {_("Observer (all)")};
+        std::vector<SDL_Color> swatches {col::TextDim};
+        int current = 0, index = 1;
+        for (const auto &p : m_replay->info().players)
+        {
+            items.push_back(p.name);
+            swatches.push_back(ArmyColor(p.color));
+            if (p.slot == m_replayUi.watch)
+                current = index;
+            ++index;
+        }
+        ui::ComboState cs;
+        cs.open = 0;
+        cs.scroll = m_replayUi.comboScroll;
+        ui::DrawComboList(*m_renderer, *m_fontRenderer, l.view, items, current, cs, m_windowH, mx, my, nullptr, &swatches);
     }
 }
 

@@ -4215,3 +4215,35 @@ msgstr ""
 msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
 msgstr ""
 
+msgid "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
+msgstr ""
+
+msgid "PLAYER "
+msgstr ""
+
+msgid "COMPUTER "
+msgstr ""
+
+msgid "IS OUT: NO BUILDINGS LEFT"
+msgstr ""
+
+msgid "RESEARCH SIEGE MODE FIRST!"
+msgstr ""
+
+msgid "Auto deploy"
+msgstr ""
+
+msgid "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
+msgstr ""
+
+msgid "Position"
+msgstr ""
+
+msgid "Voice the interface"
+msgstr ""
+
+msgid "Interface volume"
+msgstr ""
+
+msgid "Volume of the interface sounds: clicks, dialogs and alerts"
+msgstr ""

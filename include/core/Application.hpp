@@ -245,6 +245,9 @@ private:
         double accumulator {0.0};
         float lastCamX {0.0f}, lastCamY {0.0f}, lastCamZoom {0.0f};
         bool cameraSet {false};
+        bool interfaceSound {false}; // "Voice the interface": off at the start of every replay, the interface is silent
+        int comboOpen {-1};          // the view combobox: -1 closed, else it is open
+        int comboScroll {0};
     } m_replayUi;
     bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
     std::string m_pendingReplay; // a file dropped on the window / given on the command line, opened when possible

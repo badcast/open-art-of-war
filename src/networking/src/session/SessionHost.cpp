@@ -197,17 +197,20 @@ void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
-    // A start position somebody else holds (or the map does not have) stays as it was
+    // A start position the map does not have stays as it was; one somebody else holds is swapped: the holder takes
+    // the position this player leaves (a person or a computer player, the order of the players is freely changeable)
     if (choice.spawn != kRandom)
     {
-        bool taken = choice.spawn >= m_lobby.spawnCount;
-        for (uint8_t s = 0; s < kMaxPlayers; ++s)
-        {
-            if (s != slot && m_slots[s].used && m_slots[s].choice.spawn == choice.spawn)
-                taken = true;
-        }
-        if (taken)
+        if (choice.spawn >= m_lobby.spawnCount)
             choice.spawn = m_slots[slot].choice.spawn;
+        else
+        {
+            for (uint8_t s = 0; s < kMaxPlayers; ++s)
+            {
+                if (s != slot && m_slots[s].used && m_slots[s].choice.spawn == choice.spawn)
+                    m_slots[s].choice.spawn = m_slots[slot].choice.spawn;
+            }
+        }
     }
     choice.team &= 7;
     choice.color &= 15;

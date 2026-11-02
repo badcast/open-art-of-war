@@ -90,6 +90,7 @@ const Hint kHints[] = {
     {"Sight range (Green)", "Draws the sight radius as a green circle."},
     {"Radar range (tiles)", "How many tiles beyond its sight radius the finished locator sees."},
     {"Radar range (Cyan)", "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."},
+    {"Auto deploy", "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."},
     {"Build range (Purple)", "Draws the build radius of a headquarters / command center as a purple circle."},
     {"Show ground (5x5)", "Draws a 5x5 tile grid under the character."},
     {"Combat HUD", "Shows damage, DPS, range and burst figures over the canvas."},

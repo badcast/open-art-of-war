@@ -27,6 +27,7 @@ void Settings::Clamp()
     musicVolume = std::clamp(musicVolume, 0, 128);
     fxVolume = std::clamp(fxVolume, 0, 128);
     voiceVolume = std::clamp(voiceVolume, 0, 128);
+    uiVolume = std::clamp(uiVolume, 0, 128);
     difficulty = std::clamp(difficulty, 0, 3);
     edgePanMargin = std::clamp(edgePanMargin, kMinEdgePanMargin, kMaxEdgePanMargin);
     if (language != "en" && language != "ru")
@@ -79,6 +80,7 @@ bool Settings::Save(const std::string &path) const
         j["fxVolume"] = fxVolume;
         j["reverb"] = reverb;
         j["voiceVolume"] = voiceVolume;
+        j["uiVolume"] = uiVolume;
         j["muted"] = muted;
         j["language"] = language;
         j["playerName"] = playerName;
@@ -127,6 +129,7 @@ bool Settings::load(const std::string &path)
         fxVolume = j.value("fxVolume", fxVolume);
         reverb = j.value("reverb", reverb);
         voiceVolume = j.value("voiceVolume", voiceVolume);
+        uiVolume = j.value("uiVolume", uiVolume);
         muted = j.value("muted", muted);
         language = j.value("language", language);
         playerName = j.value("playerName", playerName);

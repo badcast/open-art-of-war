@@ -55,6 +55,12 @@ std::vector<std::string> ComboChoices(int kind)
     else if (kind == 4)
         for (int i = 0; i < 4; ++i)
             out.push_back(AiLevelName(static_cast<uint8_t>(i)));
+    else if (kind == 6)
+    {
+        out.push_back("?");
+        for (int i = 1; i <= kMaxPlayers; ++i)
+            out.push_back(std::string(_("Position")) + " " + std::to_string(i));
+    }
     else
         out = {_("PREBUILT BASES"), _("FROM SCRATCH")};
     return out;
@@ -510,6 +516,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         return kind == 1   ? l.FactionCell(row)
                : kind == 2 ? l.TeamCell(row)
                : kind == 3 ? l.ColorCell(row)
+               : kind == 6 ? l.SpawnCell(row)
                            : l.NameCell(row);
     };
     if (m_combo.open >= 0)
@@ -590,6 +597,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     }
                     if (kind == 4)
                         level = static_cast<uint8_t>(picked);
+                    if (kind == 6)
+                    {
+                        // 0 is "?" (random); the host swaps the places when another player holds the position
+                        choice.spawn = picked == 0 ? Net::kRandom : static_cast<uint8_t>(picked - 1);
+                        choice.ready = false;
+                    }
                     if (s.ai && net.ControlsRoom())
                     {
                         Net::OwnerSetAi change;
@@ -717,6 +730,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 net.SetAi(change);
                 return NetworkAction::None;
             }
+            if (l.SpawnCell(i).Contains(mx, my))
+                return openCombo(i * 10 + 6);
             if (l.FactionCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 1);
             if (l.TeamCell(i).Contains(mx, my))
@@ -741,6 +756,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             return openCombo(myRow * 10 + 2);
         if (l.ColorCell(myRow).Contains(mx, my))
             return openCombo(myRow * 10 + 3);
+        if (l.SpawnCell(myRow).Contains(mx, my))
+            return openCombo(myRow * 10 + 6);
     }
     // A start position on the map: take it (again: give it up)
     if (l.map.Contains(mx, my))
@@ -894,14 +911,16 @@ void NetworkMenu::render(
                 }
                 const std::string spawn
                     = choice.spawn == Net::kRandom ? std::string("?") : std::to_string(choice.spawn + 1);
-                font.DrawString(
-                    spawn,
-                    row.x + 430,
-                    row.CenterY(),
-                    ui::FONT_BODY_BOLD,
-                    col::TextDim,
-                    false,
-                    Anchor::HCENTER | Anchor::VCENTER);
+                if (editable)
+                    ui::DrawComboField(
+                        r,
+                        font,
+                        l.SpawnCell(rowIndex),
+                        spawn,
+                        m_combo.open == rowIndex * 10 + 6,
+                        l.SpawnCell(rowIndex).Contains(m_mouseX, m_mouseY));
+                else
+                    cell(l.SpawnCell(rowIndex), spawn);
                 if (!s.ai)
                 {
                     font.DrawString(
@@ -1148,10 +1167,12 @@ void NetworkMenu::render(
                 const ui::UiRect field = kind == 1   ? l.FactionCell(row)
                                          : kind == 2 ? l.TeamCell(row)
                                          : kind == 3 ? l.ColorCell(row)
+                                         : kind == 6 ? l.SpawnCell(row)
                                                      : l.NameCell(row);
                 const int current = kind == 1   ? (sc.faction == Net::kRandom ? 0 : sc.faction + 1)
                                     : kind == 2 ? sc.team
                                     : kind == 3 ? std::max(0, sc.color - 1)
+                                    : kind == 6 ? (sc.spawn == Net::kRandom ? 0 : sc.spawn + 1)
                                                 : s.aiLevel;
                 std::vector<std::string> items = ComboChoices(kind);
                 std::vector<bool> taken;

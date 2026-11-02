@@ -50,6 +50,7 @@ struct Settings
     int musicVolume {96};  // 0..128
     int fxVolume {128};    // 0..128
     int voiceVolume {128}; // 0..128: unit replies and the announcer
+    int uiVolume {128};    // 0..128: interface clicks, dialogs and alerts
     bool muted {false};
     bool reverb {true};    // reverb of explosions and heavy guns
 

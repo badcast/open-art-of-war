@@ -876,6 +876,17 @@ void CharacterEditor::DrawProperties() {
                         changed = true;
                     }
                     changed |= EditInt(abilities["siege"], "archetype_id", "Siege Form Archetype ID", 15);
+                    {
+                        // When the unit goes into siege mode by itself (the computer always; a person's units on attack-move)
+                        static const char *const kModes[] = {"off", "far", "always"};
+                        const std::string cur = YamlString(abilities["siege"], "auto_deploy", "far");
+                        int idx = cur == "off" ? 0 : (cur == "always" ? 2 : 1);
+                        const char *labels = "Off (by hand only)\0Far (enemy beyond the normal range)\0Always (any enemy in siege range)\0";
+                        if (Hinted(ImGui::Combo(_("Auto deploy"), &idx, labels), "Auto deploy")) {
+                            abilities["siege"]["auto_deploy"] = kModes[idx];
+                            changed = true;
+                        }
+                    }
                     changed |= EditString(abilities["siege"], "name", "Siege Name", "abilities/siege");
                     {
                         const std::string key = OpenArtOfWar::EntityManager::DescriptionKey(YamlString(document, "id") + "_siege");

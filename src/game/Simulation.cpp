@@ -439,7 +439,7 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
                 return;
             const auto &bp = *found;
             // The Radar Locator is built only once its technology is researched (the interface says so too)
-            if (bp.buildingIndex == 6 && !IsRadarUnlocked(cmd.player))
+            if (!IsBuildingUnlocked(cmd.player, bp.buildingIndex))
                 return;
             if (!entities.CanPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
                 return;

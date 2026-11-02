@@ -968,8 +968,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         if (p.type == UnitType::Factory)
             hasFactoryPlan = true;
     }
-    Building *availableBarracks = nullptr;
-    Building *availableFactory = nullptr;
+    std::vector<Building *> availableBarracks, availableFactories; // up to three of each
 
     int enemyUnitCount = 0;
     int reserveCount = 0;
@@ -986,14 +985,14 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             else if (b->type == UnitType::Barracks)
             {
                 hasBarracks = true;
-                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f && !availableBarracks)
-                    availableBarracks = b;
+                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f)
+                    availableBarracks.push_back(b);
             }
             else if (b->type == UnitType::Factory)
             {
                 hasFactory = true;
-                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f && !availableFactory)
-                    availableFactory = b;
+                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f)
+                    availableFactories.push_back(b);
             }
         }
         else
@@ -1105,7 +1104,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     // would eat every credit before a tank (220-420) could ever be paid. Not for ever: if the vehicle cannot be
     // trained (its exit is blocked), the barracks go on after a while.
     constexpr float kVehicleHoldMax = 25.0f;
-    const bool vehicleWaits = availableFactory && !m_vehicleQueue.empty();
+    const bool vehicleWaits = !availableFactories.empty() && !m_vehicleQueue.empty();
     int savingFor = 0;
     if (vehicleWaits && m_vehicleHoldSeconds < kVehicleHoldMax)
         savingFor = costOf(m_vehicleQueue.front());
@@ -1113,12 +1112,12 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         m_vehicleHoldSeconds += 1.0f;
     else
         m_vehicleHoldSeconds = 0.0f;
-    if (hasBarracks)
-        produce(availableBarracks, m_infantryQueue, barracksBuildTime, savingFor);
-    if (hasFactory)
+    for (Building *barracks : availableBarracks)
+        produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
+    for (Building *factory : availableFactories)
     {
         const size_t before = m_vehicleQueue.size();
-        produce(availableFactory, m_vehicleQueue, factoryBuildTime);
+        produce(factory, m_vehicleQueue, factoryBuildTime);
         if (m_vehicleQueue.size() != before)
             m_vehicleHoldSeconds = 0.0f; // a vehicle went out
     }
@@ -1701,8 +1700,15 @@ int FactionBuildingIndex(AIDefenseSite::Kind kind, Faction side)
     return -1;
 }
 
-int DefenseCost(AIDefenseSite::Kind kind)
+// What a structure costs the computer: the cost of the building in its character file, the same price the player
+// pays (no handicap and no bonus of a difficulty in prices). The old fixed numbers only stand in when there is no
+// character file for it.
+int DefenseCost(AIDefenseSite::Kind kind, const EntityManager &entities, Faction side)
 {
+    const int wallIndex = side == Faction::Confederation ? 15 : 25;
+    const int index = kind == AIDefenseSite::Wall ? wallIndex : FactionBuildingIndex(kind, side);
+    if (const BuildingConfig *cfg = entities.GetBuildingConfig(index))
+        return cfg->creditCost;
     switch (kind)
     {
         case AIDefenseSite::Tower:
@@ -2008,7 +2014,9 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
 
 bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities)
 {
-    const int cost = DefenseCost(site.kind);
+    if (!entities.HasBuildingType(UnitType::Headquarters, m_player, true))
+        return false; // no finished HQ, no construction (the spot stays planned)
+    const int cost = DefenseCost(site.kind, entities, side());
     // A unit on the spot only delays the work; after this many build steps (3 s each) the spot is given up
     constexpr int kMaxUnitWaits = 20;
     if (site.kind == AIDefenseSite::Wall)
@@ -2181,7 +2189,7 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     m_scoutId = bestId;
     m_scoutIdleTimer = 0.0f;
     ++m_scoutTrips;
-    entities.IssueMoveOrder({bestId}, tx, ty, pathfinder, false);
+    entities.IssueAttackMoveOrder({bestId}, tx, ty, pathfinder);
     m_scoutX = tx;
     m_scoutY = ty;
     const float interval = difficulty == AIDifficulty::Easy     ? 180.0f
@@ -2337,7 +2345,8 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
 {
     // Power as planned: buildings under construction count already, so one shortage starts one plant
     int produced = 0, consumed = 0;
-    bool hasBarracks = false, hasFactory = false;
+    int barracksCount = 0, factoryCount = 0; // the AI may keep up to three of each
+    constexpr int kMaxProduction = 3;
     const Building *hq = nullptr;
     for (const auto &e : entities.GetAllEntities())
     {
@@ -2346,13 +2355,13 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
             continue;
         const int pwr = b->GetPowerOutput();
         (pwr > 0 ? produced : consumed) += std::abs(pwr);
-        hasBarracks = hasBarracks || b->type == UnitType::Barracks;
-        hasFactory = hasFactory || b->type == UnitType::Factory;
+        barracksCount += b->type == UnitType::Barracks;
+        factoryCount += b->type == UnitType::Factory;
         if (b->type == UnitType::Headquarters && !hq)
             hq = b;
     }
-    if (!hq)
-        return false;
+    if (!hq || hq->buildProgress < 1.0f)
+        return false; // no finished HQ, no construction
     constexpr int kSparePower = 40; // what the next consumer (a factory) needs
     constexpr int kTroopReserve = 300;
 
@@ -2364,27 +2373,40 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
         kind = AIDefenseSite::PowerPlant;
         why = "Power is short: a power plant comes first";
     }
-    else if (!hasBarracks)
+    else if (barracksCount == 0)
     {
         kind = AIDefenseSite::Barracks;
         why = "No barracks: raising one to start training troops";
     }
-    else if (produced - consumed < kSparePower && m_credits >= DefenseCost(AIDefenseSite::PowerPlant) + kTroopReserve)
+    else if (produced - consumed < kSparePower && m_credits >= DefenseCost(AIDefenseSite::PowerPlant, entities, side()) + kTroopReserve)
     {
         kind = AIDefenseSite::PowerPlant;
         reserve = kTroopReserve;
         why = "Credits to spare: an extra power plant for the next buildings";
     }
-    else if (!hasFactory)
+    else if (factoryCount == 0)
     {
         kind = AIDefenseSite::Factory;
         reserve = kTroopReserve / 2;
         why = "No factory: building one for vehicles";
     }
+    else if (barracksCount < kMaxProduction && barracksCount <= factoryCount)
+    {
+        kind = AIDefenseSite::Barracks;
+        reserve = kTroopReserve;
+        why = "Credits to spare: another barracks to raise the army faster";
+    }
+    else if (factoryCount < kMaxProduction)
+    {
+        kind = AIDefenseSite::Factory;
+        reserve = kTroopReserve;
+        why = "Credits to spare: another factory for more vehicles";
+    }
     else
         return false;
+    const int existing = kind == AIDefenseSite::Barracks ? barracksCount : (kind == AIDefenseSite::Factory ? factoryCount : 0);
 
-    const int cost = DefenseCost(kind);
+    const int cost = DefenseCost(kind, entities, side());
     if (m_credits - cost < reserve)
     {
         ThinkOnce("core", "BUILD", std::string(why) + " (waiting for credits)");
@@ -2408,6 +2430,14 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
         ox = tdy;
         oy = -tdx;
     }
+    if (existing > 0)
+    { // the next ones turn towards the back of the base, away from the enemy, so they do not stand in each other's way
+        ox += -tdx * 0.8f * existing;
+        oy += -tdy * 0.8f * existing;
+        const float olen = std::max(0.001f, DetMath::Hypot(ox, oy));
+        ox /= olen;
+        oy /= olen;
+    }
     AIDefenseSite site;
     site.kind = kind;
     site.tileX = static_cast<int>(std::lround(cx + ox * radius)) - 1;
@@ -2422,8 +2452,8 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
 {
     if (!m_startingBaseRecorded)
         return;
-    if (!entities.HasBuildingType(UnitType::Headquarters, m_player, false))
-        return; // no HQ, no construction
+    if (!entities.HasBuildingType(UnitType::Headquarters, m_player, true))
+        return; // no finished HQ, no construction
     if (!m_defensePlanned)
         PlanBaseDefenses(map, entities, pathfinder);
 
@@ -2441,7 +2471,7 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
     {
         if (site.done)
             continue;
-        const int cost = DefenseCost(site.kind);
+        const int cost = DefenseCost(site.kind, entities, side());
         const int reserve = site.kind == AIDefenseSite::Barracks ? 0 : 300;
         if (m_credits - cost < reserve)
         {
@@ -2673,27 +2703,9 @@ void AIController::RecordStartingBase(const EntityManager &entities, const TileM
         plan.destroyed = false;
         plan.rebuildTimer = 0.0f;
 
-        switch (b->type)
-        {
-            case UnitType::Headquarters:
-                plan.creditCost = 1000;
-                break;
-            case UnitType::PowerPlant:
-                plan.creditCost = 200;
-                break;
-            case UnitType::Barracks:
-                plan.creditCost = 350;
-                break;
-            case UnitType::Factory:
-                plan.creditCost = 600;
-                break;
-            case UnitType::ResearchLab:
-                plan.creditCost = 450;
-                break;
-            default:
-                plan.creditCost = (b->rawBuildingType == 6) ? 400 : 250;
-                break; // radar / turrets & bunkers
-        }
+        // The price is the one in the character file of the building
+        const BuildingConfig *bcfg = entities.GetBuildingConfig(b->rawBuildingType);
+        plan.creditCost = bcfg ? bcfg->creditCost : 250;
 
         m_startingBuildings.push_back(plan);
     }
@@ -2709,7 +2721,10 @@ void AIController::RecordStartingBase(const EntityManager &entities, const TileM
                 wp.tileX = x;
                 wp.tileY = y;
                 wp.faction = side();
-                wp.creditCost = 25;
+                {
+                    const BuildingConfig *wcfg = entities.GetBuildingConfig(side() == Faction::Confederation ? 15 : 25);
+                    wp.creditCost = wcfg ? wcfg->creditCost : 25;
+                }
                 wp.destroyed = false;
                 wp.rebuildTimer = 0.0f;
                 m_startingWalls.push_back(wp);
@@ -2729,6 +2744,9 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         RecordStartingBase(entities, map);
         return;
     }
+
+    // Without a finished headquarters nothing is built, exactly as for a person (CanPlaceBuilding says so too)
+    const bool canBuild = entities.HasBuildingType(UnitType::Headquarters, m_player, true);
 
     // 1. Check building status & rebuild destroyed ones in the exact same location
     for (auto &plan : m_startingBuildings)
@@ -2758,7 +2776,8 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         else
         {
             plan.rebuildTimer += deltaTime;
-            if (plan.rebuildTimer >= 6.0f && m_credits >= plan.creditCost)
+            if (canBuild && plan.rebuildTimer >= 6.0f && m_credits >= plan.creditCost
+                && IsBuildingUnlocked(m_player, plan.rawBuildingType))
             {
                 bool siteClear
                     = entities.CanPlaceBuilding(plan.tileX, plan.tileY, plan.width, plan.height, map, m_player);
@@ -2802,7 +2821,7 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         else
         {
             wp.rebuildTimer += deltaTime;
-            if (wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost)
+            if (canBuild && wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost)
             {
                 // Not on a unit that stands even partly on the tile (it would be walled in)
                 if (!entities.IsTileOccupiedByUnit(wp.tileX, wp.tileY))

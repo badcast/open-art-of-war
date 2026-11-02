@@ -354,6 +354,10 @@ function(openaow_executable target output)
                 @ONLY
             )
             target_sources(${target} PRIVATE "${OAOW_RC_FILE}")
+            if(MSVC)
+                # The .rc already embeds the manifest: the linker's own one would be a second RT_MANIFEST (CVT1100)
+                target_link_options(${target} PRIVATE /MANIFEST:NO)
+            endif()
         endif()
 
         # In Release mode, hide console window for desktop GUI applications

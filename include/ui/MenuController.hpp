@@ -47,6 +47,11 @@ class MenuController
 {
 public:
     MenuController() = default;
+    // Test hook: the swap rule of the position boxes
+    static void SwapPositions(std::vector<int> &positions, int row, int position)
+    {
+        ApplyCustomPosition(positions, row, position);
+    }
 
     // The player's options the settings screen edits; onChanged applies (and stores) one group of them
     // The application shows its loading screen (the map's picture, at least three seconds) around the loading of a game
@@ -282,9 +287,14 @@ private:
         int team {0};
         int color {1}; // 1..8
         int level {1}; // computer player: 0 easy .. 3 hardcore
+        int position {0}; // start position of the map (0-based), never shared by two players
     };
     std::vector<CustomSlot> m_customSlots;
     void EnsureCustomSlots();
+    // Gives player `row` start position `position`; the player who held it takes the position `row` had (a swap)
+    static void ApplyCustomPosition(std::vector<int> &positions, int row, int position);
+    std::string m_spotsPath;                         // map whose start positions m_spots holds
+    std::vector<std::pair<int, int>> m_spots;        // start positions of that map (tiles), for the numbers on its picture
     std::vector<bool> CustomTakenColors(int row) const;
     int m_skirmishTop {0};
     AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update            //
@@ -292,7 +302,7 @@ private:
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
     static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102;
-    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level)
+    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);

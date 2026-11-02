@@ -331,14 +331,9 @@ void AISquadController::ReleaseUnits(const std::vector<int> &unitIds, EntityMana
 void AISquadController::OrderLeg(
     const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder)
 {
-    if (sq.attackMove)
-    {
-        entities.IssueAttackMoveOrder(ids, x, y, pathfinder);
-    }
-    else
-    {
-        entities.IssueMoveOrder(ids, x, y, pathfinder, false);
-    }
+    // The computer always goes by auto-attack (units answer fire on the way); a plain Move is only for a retreat
+    (void)sq;
+    entities.IssueAttackMoveOrder(ids, x, y, pathfinder);
     CapDetours(sq, entities, pathfinder.GetMap());
 }
 
@@ -346,7 +341,7 @@ void AISquadController::CapDetours(const AISquad &sq, EntityManager &entities, c
 {
     // A hostile wall within a few tiles of the unit: worth breaching instead of the detour
     auto hostileWallNear = [&](const Unit &u) {
-        if (!map || !sq.attackMove)
+        if (!map)
             return false;
         constexpr int r = 6;
         for (int y = std::max(0, u.tileY - r); y <= std::min(map->GetHeight() - 1, u.tileY + r); ++y)

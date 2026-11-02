@@ -4261,3 +4261,35 @@ msgstr "Radar range (Cyan)"
 msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
 msgstr "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
 
+msgid "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
+msgstr "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
+
+msgid "PLAYER "
+msgstr "PLAYER "
+
+msgid "COMPUTER "
+msgstr "COMPUTER "
+
+msgid "IS OUT: NO BUILDINGS LEFT"
+msgstr "IS OUT: NO BUILDINGS LEFT"
+
+msgid "RESEARCH SIEGE MODE FIRST!"
+msgstr "RESEARCH SIEGE MODE FIRST!"
+
+msgid "Auto deploy"
+msgstr "Auto deploy"
+
+msgid "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
+msgstr "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
+
+msgid "Position"
+msgstr "Position"
+
+msgid "Voice the interface"
+msgstr "Voice the interface"
+
+msgid "Interface volume"
+msgstr "Interface volume"
+
+msgid "Volume of the interface sounds: clicks, dialogs and alerts"
+msgstr "Volume of the interface sounds: clicks, dialogs and alerts"

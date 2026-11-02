@@ -25,6 +25,7 @@ public:
     static bool RunTechTest(Application &app);
     static bool RunAiVehicleTest(Application &app);
     static bool RunFogBlockTest(Application &app);
+    static bool RunBuildRulesTest(Application &app);
     // A match with computer players in slots: they build and train, and do it alike every time
     static bool RunMatchAiTest(Application &app);
     static bool RunBurstTest(Application &app);

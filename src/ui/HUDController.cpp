@@ -498,6 +498,10 @@ void HUDController::Update(
     {
         if (e.type == SimEvent::Type::ResearchCompleted && e.player == Players::Local())
             AnnounceResearch(e.value);
+        else if (e.type == SimEvent::Type::PlayerEliminated)
+            SetNotification(
+                std::string(Players::Slot(e.player).human ? _("PLAYER ") : _("COMPUTER ")) + std::to_string(e.player + 1)
+                + " " + _("IS OUT: NO BUILDINGS LEFT"));
     }
 
     // Validate & auto-assign primary barracks and factory if needed
@@ -2040,6 +2044,23 @@ void HUDController::RenderBuildGhost(
 
     bool canPlace = entities.CanPlaceBuilding(mouseTileX, mouseTileY, bp.width, bp.height, map, Players::Local());
     bool canAfford = economy.CanAfford(bp.creditCost);
+
+    // While a building is picked, the line of the build zone of every finished headquarters shows where it may stand
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *hq = e.AsBuilding();
+        if (!hq || !hq->alive || hq->state == ActionState::Die || hq->owner != Players::Local()
+            || hq->type != UnitType::Headquarters || hq->buildProgress < 1.0f)
+            continue;
+        RenderUtility::DrawTileRadius(
+            renderer,
+            camera,
+            (hq->tileX + hq->buildWidth * 0.5f) * TILE_WIDTH,
+            (hq->tileY + hq->buildHeight * 0.5f) * TILE_HEIGHT,
+            static_cast<float>(entities.GetBuildRadius()),
+            kBuildRadiusColor,
+            2.0f);
+    }
 
     SDL_Color boxColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 80} : SDL_Color {255, 0, 0, 80};
     SDL_Color borderColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 220} : SDL_Color {255, 0, 0, 220};

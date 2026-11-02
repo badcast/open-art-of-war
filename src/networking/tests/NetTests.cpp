@@ -913,11 +913,16 @@ void testLobby()
     LobbyChoice cb;
     cb.faction = 1;
     cb.team = 1;
-    cb.spawn = 2; // A holds it already
+    cb.spawn = 2; // A holds it: swapped, A is left with B's (random) position
     b->sendLobbyChoice(cb);
     pump();
-    CHECK(a->lobby().slots[0].choice.spawn == 2 && a->lobby().slots[1].choice.spawn == kRandom);
+    CHECK(a->lobby().slots[1].choice.spawn == 2 && a->lobby().slots[0].choice.spawn == kRandom);
     CHECK(a->lobby().slots[1].choice.faction == 1);
+    ca.spawn = 2; // and back: A takes it again
+    a->sendLobbyChoice(ca);
+    cb.spawn = kRandom;
+    pump();
+    CHECK(a->lobby().slots[0].choice.spawn == 2 && a->lobby().slots[1].choice.spawn == kRandom);
     // Colours are one per player: a colour somebody has is refused, the player keeps the own one
     ca.color = 5;
     a->sendLobbyChoice(ca);
@@ -957,6 +962,18 @@ void testLobby()
     b->sendLobbyChoice(cb);
     pump();
     CHECK(host.everyoneReady(2) && !host.everyoneReady(3));
+    // A start position another player holds is swapped: the holder takes the one that was left, nobody shares one
+    {
+        const uint8_t aSpawn = a->lobby().slots[0].choice.spawn;
+        cb.spawn = aSpawn;
+        b->sendLobbyChoice(cb);
+        pump();
+        CHECK(a->lobby().slots[1].choice.spawn == aSpawn && a->lobby().slots[0].choice.spawn == 3);
+        cb.spawn = 3; // back again
+        b->sendLobbyChoice(cb);
+        pump();
+        CHECK(a->lobby().slots[1].choice.spawn == 3 && a->lobby().slots[0].choice.spawn == aSpawn);
+    }
     // A file the host offers comes to whoever asks; an unknown one comes back empty
     host.offerFile(0xABCDEF, std::vector<uint8_t>(300000, 7));
     a->requestFile(0xABCDEF);
