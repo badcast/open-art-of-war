@@ -2938,6 +2938,65 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
     return true;
 }
 
+bool HeadlessTest::RunSquadFocusTest(Application &app)
+{
+    std::cout << "[Test] Validating that a computer player's group fires at one common target..." << std::endl;
+    const float dt = 1.0f / 30.0f;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    AIController &ai = *app.m_aiController;
+    auto fail_ = [&](const std::string &msg) {
+        std::cerr << "[Test] Error: " << msg << std::endl;
+        entities.Clear();
+        return false;
+    };
+    entities.Clear();
+    map.InitBlankArena(50, 30, 0);
+    map.SetFogEnabled(false);
+    pf.SetMap(&map);
+    pf.SetEntityManager(&entities);
+    ai.m_squadController.Clear();
+    std::vector<int> group;
+    for (int i = 0; i < 5; ++i)
+        group.push_back(entities.SpawnUnitByArchetype(1, 8 + i % 2, 12 + i, Faction::Confederation));
+    // Enemies spread over the field ahead, each nearest to a different member
+    for (int i = 0; i < 4; ++i)
+        entities.SpawnUnitByArchetype(1, 24 + i % 2, 9 + i * 4, Faction::Resistance);
+    ai.m_chokes.Rebuild(map);
+    ai.m_squadController.CreateSquad(group, 44, 15, 1, entities, pf, ai.GetTactics());
+    int samples = 0, common = 0, focusSeen = 0;
+    for (float t = 0.0f; t < 40.0f; t += dt)
+    {
+        entities.Update(dt, map, pf);
+        ai.m_squadController.Update(dt, map, entities, pf, ai.m_chokes, ai.GetTactics());
+        const auto &squads = ai.m_squadController.GetSquads();
+        if (squads.empty())
+            break;
+        const AISquad &sq = squads.front();
+        if (sq.focusTargetId == 0)
+            continue;
+        ++focusSeen;
+        std::set<int> targets;
+        for (int id : sq.unitIds)
+            if (const Unit *u = entities.GetUnit(id); u && u->alive && u->targetEntityId != 0)
+                targets.insert(u->targetEntityId);
+        if (targets.empty())
+            continue;
+        ++samples;
+        if (targets.size() == 1)
+            ++common;
+    }
+    std::cout << "  - focus seen on " << focusSeen << " ticks, one common target on " << common << "/" << samples
+              << " samples" << std::endl;
+    if (focusSeen == 0)
+        return fail_("the group never chose a common target");
+    if (samples == 0 || common * 10 < samples * 7)
+        return fail_("the members of a group must fire at one target, not each at its own");
+    entities.Clear();
+    return true;
+}
+
 bool HeadlessTest::RunMakeWayTest(Application &app)
 {
     std::cout << "[Test] Validating allies making way in narrow passages..." << std::endl;
@@ -3536,6 +3595,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "combat")
     {
         return RunCombatBehaviourTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "squadfocus")
+    {
+        return RunSquadFocusTest(app);
     }
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "makeway")
     {

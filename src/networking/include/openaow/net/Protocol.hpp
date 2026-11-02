@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 7;
+constexpr std::uint16_t kProtocolVersion = 8;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -70,6 +70,7 @@ enum class MsgType : std::uint8_t
     OwnerStart = 25,   // client -> room: the resolved match setup to start with
     OwnerSetAi = 26,   // client -> room: add, change or remove a computer player
     OwnerSetTeam = 27, // client -> room: the team of a player (only the host / room owner decides teams)
+    OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits)
     // Realtime
     Heartbeat = 32,
     // Master server (openaow-server's main port)
@@ -228,7 +229,17 @@ struct LobbyState
     std::string map;        // the game's map path
     uint64_t mapHash {0};   // of the map file: everybody must have exactly this one
     uint8_t spawnCount {2}; // start positions of the map
+    bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
+    bool prebuilt {true};
+    uint8_t credits {1};    // index into the game's list of starting credits (0..4)
     std::vector<LobbySlot> slots;
+};
+
+struct OwnerSetOptions
+{
+    bool fogOfWar {true};
+    bool prebuilt {true};
+    uint8_t credits {1}; // 0..4
 };
 
 struct OwnerSetMap
@@ -437,6 +448,7 @@ void encode(BitWriter &w, const FilePathData &m);
 void encode(BitWriter &w, const OwnerStart &m);
 void encode(BitWriter &w, const OwnerSetAi &m);
 void encode(BitWriter &w, const OwnerSetTeam &m);
+void encode(BitWriter &w, const OwnerSetOptions &m);
 void encode(BitWriter &w, const ListRooms &m);
 void encode(BitWriter &w, const RoomList &m);
 void encode(BitWriter &w, const CreateRoom &m);
@@ -474,6 +486,7 @@ bool decode(BitReader &r, FileData &m);
 bool decode(BitReader &r, OwnerStart &m);
 bool decode(BitReader &r, OwnerSetAi &m);
 bool decode(BitReader &r, OwnerSetTeam &m);
+bool decode(BitReader &r, OwnerSetOptions &m);
 bool decode(BitReader &r, ListRooms &m);
 bool decode(BitReader &r, RoomList &m);
 bool decode(BitReader &r, CreateRoom &m);

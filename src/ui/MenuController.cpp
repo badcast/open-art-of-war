@@ -1,4 +1,5 @@
 #include "ui/MenuController.hpp"
+#include "ui/MatchOptions.hpp"
 #include "audio/SoundRequests.hpp"
 #include <nlohmann/json.hpp>
 #include "core/AssetStore.hpp"
@@ -151,6 +152,7 @@ struct CampaignLayout
     UiRect editorBtn;     // opens the map editor with the selected map, left of Start
     UiRect layoutBtn;     // custom game: prebuilt bases or from scratch (top right of the details)
     UiRect fogCheckbox;   // custom game: fog of war checkbox
+    UiRect creditsBtn;    // custom game: starting credits (left of the layout box)
     int itemH {40};
     int itemGap {4};
 
@@ -174,7 +176,8 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.startBtn = {l.backBtn.x - 12 - 200, footerY + 10, 200, 40};
     l.sideBtn[0] = {l.dialog.x + 20, footerY + 10, 240, 40};
     l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
-    l.layoutBtn = {l.details.Right() - 20 - 210, l.details.y + 12, 210, 32};
+    l.layoutBtn = {l.details.Right() - 20 - 190, l.details.y + 12, 190, 32};
+    l.creditsBtn = {l.layoutBtn.x - 8 - 110, l.details.y + 12, 110, 32};
     const UiRect pv = CustomPreviewArea(l.details);
     l.fogCheckbox = {pv.x, pv.Bottom() + 66, pv.w, 28};
     l.difficultyBtn = {
@@ -1219,6 +1222,7 @@ bool MenuController::UpdateCampaignSelect(
             match.localOnly = true;
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
+            match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
             match.local = 0;
             for (int p = 0; p < static_cast<int>(m_customSlots.size()) && p < kMaxPlayers; ++p)
             {
@@ -1318,11 +1322,14 @@ bool MenuController::UpdateCampaignSelect(
     auto comboField = [&](int id) {
         if (id >= kComboSlot)
             return CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10);
-        return id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn);
+        return id == kComboSide ? l.sideBtn[0]
+               : id == kComboCredits ? l.creditsBtn
+               : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn);
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
-    if ((m_combo.open == kComboLayout || m_combo.open >= kComboSlot) && !hasLayoutChoice)
+    if ((m_combo.open == kComboLayout || m_combo.open == kComboCredits || m_combo.open >= kComboSlot)
+        && !hasLayoutChoice)
         m_combo.open = -1;
     if (m_combo.open >= kComboSlot && (m_combo.open - kComboSlot) / 10 >= static_cast<int>(m_customSlots.size()))
         m_combo.open = -1;
@@ -1364,6 +1371,8 @@ bool MenuController::UpdateCampaignSelect(
             return openCombo(kComboDifficulty);
         if (hasLayoutChoice && l.layoutBtn.Contains(mx, my))
             return openCombo(kComboLayout);
+        if (hasLayoutChoice && l.creditsBtn.Contains(mx, my))
+            return openCombo(kComboCredits);
         if (hasLayoutChoice && l.fogCheckbox.Contains(mx, my))
         {
             m_skirmishFogOfWar = !m_skirmishFogOfWar;
@@ -2597,7 +2606,7 @@ void MenuController::RenderCampaignMissionSelect(
 
         int x = d.x + 20;
         int w = d.w - 40;
-        const int titleW = w - 220;
+        const int titleW = w - 220 - 118;
         fontRenderer.DrawString(
             ui::FitText(fontRenderer, info.DisplayName(), ui::FONT_H2, titleW),
             x,
@@ -2612,6 +2621,13 @@ void MenuController::RenderCampaignMissionSelect(
             m_skirmishPrebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"),
             m_combo.open == kComboLayout,
             l.layoutBtn.Contains(m_mouseX, m_mouseY));
+        ui::DrawComboField(
+            renderer,
+            fontRenderer,
+            l.creditsBtn,
+            ui::CreditsLabel(m_skirmishCredits),
+            m_combo.open == kComboCredits,
+            l.creditsBtn.Contains(m_mouseX, m_mouseY));
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
         ui::DrawCaption(
             fontRenderer,
@@ -2820,7 +2836,9 @@ void MenuController::RenderCampaignMissionSelect(
         const UiRect field
             = id >= kComboSlot
                   ? CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10)
-                  : (id == kComboSide ? l.sideBtn[0] : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn));
+                  : (id == kComboSide ? l.sideBtn[0]
+                     : id == kComboCredits ? l.creditsBtn
+                     : (id == kComboDifficulty ? l.difficultyBtn : l.layoutBtn));
         std::vector<std::string> items = CampaignComboOptions(id);
         std::vector<bool> taken;
         std::vector<SDL_Color> swatches;
@@ -2904,7 +2922,9 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
             DifficultyName(AIDifficulty::Hard),
             DifficultyName(AIDifficulty::Hardcore)};
     }
-    return {_("PREBUILT BASES"), _("FROM SCRATCH")};
+    if (id == kComboCredits)
+        return ui::CreditsChoices();
+    return ui::LayoutChoices();
 }
 
 int MenuController::CampaignComboCurrent(int id) const
@@ -2931,6 +2951,8 @@ int MenuController::CampaignComboCurrent(int id) const
         return PlayerFaction() == Faction::Confederation ? 1 : 0;
     if (id == kComboDifficulty)
         return std::clamp(static_cast<int>(m_difficulty), 0, 3);
+    if (id == kComboCredits)
+        return std::clamp(m_skirmishCredits, 0, 4);
     return m_skirmishPrebuilt ? 0 : 1;
 }
 
@@ -2990,6 +3012,10 @@ void MenuController::CampaignComboApply(int id, int index)
         m_difficulty = static_cast<AIDifficulty>(m_settings->difficulty);
         if (m_onSettingsChanged)
             m_onSettingsChanged(SettingsArea::Game);
+    }
+    else if (id == kComboCredits)
+    {
+        m_skirmishCredits = std::clamp(index, 0, 4);
     }
     else
     {

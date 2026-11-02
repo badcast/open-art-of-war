@@ -18,6 +18,8 @@ Renderer::~Renderer()
 {
     if (m_maskTexture)
         SDL_DestroyTexture(m_maskTexture);
+    if (m_glowTexture)
+        SDL_DestroyTexture(m_glowTexture);
 }
 
 void Renderer::DrawAlphaMaskWorld(
@@ -851,6 +853,61 @@ void Renderer::FillRectWorld(float wx, float wy, float ww, float wh, const Camer
     SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
     SDL_RenderFillRect(m_renderer, &rect);
+}
+
+void Renderer::DrawSelectionBubble(
+    float centerX, float centerY, float halfW, float halfH, const Camera &camera, SDL_Color color, float brighten)
+{
+    PlainState();
+    if (!m_glowTexture)
+    {
+        constexpr int kSize = 128;
+        std::vector<uint32_t> px(static_cast<size_t>(kSize) * kSize);
+        for (int y = 0; y < kSize; ++y)
+        {
+            for (int x = 0; x < kSize; ++x)
+            {
+                const float dx = (x + 0.5f) / kSize * 2.0f - 1.0f, dy = (y + 0.5f) / kSize * 2.0f - 1.0f;
+                const float r = std::sqrt(dx * dx + dy * dy);
+                float a = 0.0f;
+                if (r < 1.0f)
+                {
+                    a = std::pow(r, 2.2f) * 0.30f + 0.04f;        // clear in the middle, denser toward the rim
+                    const float rim = (r - 0.90f) / 0.06f;
+                    a += std::exp(-rim * rim) * 0.75f;            // the glowing rim
+                    a *= std::clamp((1.0f - r) / 0.10f, 0.0f, 1.0f); // soft outer edge
+                }
+                const uint8_t v = static_cast<uint8_t>(std::clamp(a, 0.0f, 1.0f) * 255.0f);
+                px[static_cast<size_t>(y) * kSize + x] = (static_cast<uint32_t>(v) << 24) | 0x00FFFFFFu;
+            }
+        }
+        m_glowTexture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, kSize, kSize);
+        if (!m_glowTexture)
+            return;
+        SDL_UpdateTexture(m_glowTexture, nullptr, px.data(), kSize * static_cast<int>(sizeof(uint32_t)));
+        SDL_SetTextureScaleMode(m_glowTexture, SDL_SCALEMODE_LINEAR);
+    }
+    // ~1.1 pulses per second
+    const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(SDL_GetTicks() % 100000) * 0.00691f);
+    float sx = 0.0f, sy = 0.0f;
+    camera.WorldToScreen(centerX, centerY, sx, sy);
+    const float zoom = camera.GetZoom();
+    const float k = 1.0f + 0.05f * pulse;
+    const SDL_FRect dst {sx - halfW * zoom * k, sy - halfH * zoom * k, halfW * 2.0f * zoom * k, halfH * 2.0f * zoom * k};
+    SDL_SetTextureColorMod(m_glowTexture, color.r, color.g, color.b);
+    SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(m_glowTexture, static_cast<Uint8>(150.0f + 90.0f * pulse));
+    SDL_RenderTexture(m_renderer, m_glowTexture, nullptr, &dst);
+    if (brighten > 0.0f)
+    {
+        // A light veil over the object itself: the sprite below seems to shine, breathing with the bubble
+        SDL_SetTextureColorMod(m_glowTexture, 255, 255, 255);
+        SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_ADD);
+        SDL_SetTextureAlphaMod(m_glowTexture, static_cast<Uint8>(std::clamp(brighten * (60.0f + 110.0f * pulse), 0.0f, 255.0f)));
+        const SDL_FRect veil {sx - halfW * zoom * 0.95f, sy - halfH * zoom * 0.95f, halfW * 1.9f * zoom, halfH * 1.9f * zoom};
+        SDL_RenderTexture(m_renderer, m_glowTexture, nullptr, &veil);
+        SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_BLEND);
+    }
 }
 
 void Renderer::DrawRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)

@@ -144,6 +144,7 @@ struct AISquad
     PlayerId owner {kNoPlayer}; // whose units (the owner of the first one); its enemies are the targets
     bool attackMove {true};     // legs are attack-move orders (false: plain moves that ignore enemies)
     bool playerSquad {false};   // player control group: dissolves once the destination is reached
+    int focusTargetId {0};      // the one target the whole group fires at (0 = none in sight)
     bool formedUp {false};      // lined up in front of the objective's defenses already (once per march)
 };
 
@@ -260,6 +261,8 @@ private:
     // instead, everyone else waits (`map` may be null: then nobody breaches)
     void CapDetours(const AISquad &sq, EntityManager &entities, const TileMap *map = nullptr);
     void ReleaseUnit(AISquad &sq, int unitId, EntityManager &entities);
+    // The group picks one target (priority tier, then nearest to the leader) and every member that can reach it fires at it
+    void UpdateFocusTarget(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     void SetState(AISquad &sq, AISquadState state);
     void RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);
     int PickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const;

@@ -8,6 +8,7 @@
 #include "graphics/TextureManager.hpp"
 #include "input/InputManager.hpp"
 #include "net/NetMatch.hpp"
+#include "ui/MatchOptions.hpp"
 #include "openaow/net/Protocol.hpp"
 
 #include <algorithm>
@@ -131,8 +132,14 @@ void DrawField(
 
 } // namespace
 
+void NetworkMenu::PushOptions(NetMatch &net)
+{
+    net.SetOptions(m_fog, m_prebuilt, static_cast<uint8_t>(std::clamp(m_credits, 0, 4)));
+}
+
 void NetworkMenu::Reset()
 {
+    m_optionsSent = false;
     m_focus = Field::None;
     m_combo = ui::ComboState {};
     m_confirm.open = false;
@@ -185,7 +192,11 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     l.chatLog = {x, l.players.Bottom() + 10, 600, l.dialog.Bottom() - 70 - (l.players.Bottom() + 10) - 44};
     l.chatField = {x, l.chatLog.Bottom() + 6, 600 - 52, 36};
     l.chatSend = {l.chatField.Right() + 8, l.chatField.y, 44, 36};
-    l.prebuiltBtn = {l.map.Right() - 8 - 190, l.map.Bottom() - 8 - 28, 190, 28};
+    // Match options under the map, the same three the custom game window has: bases, starting credits, fog of war
+    const int half = (l.map.w - 8) / 2;
+    l.prebuiltBtn = {l.map.x, l.map.Bottom() + 8, half, 28};
+    l.creditsBtn = {l.map.x + half + 8, l.map.Bottom() + 8, l.map.w - half - 8, 28};
+    l.fogCheckbox = {l.map.x, l.map.Bottom() + 42, l.map.w, 26};
     // Bottom row: Leave on the left (under the chat), Ready and Start on the right - never on top of each other
     l.leaveBtn = {x, l.dialog.Bottom() - 60, 140, 40};
     l.startBtn = {l.dialog.Right() - 20 - 150, l.leaveBtn.y, 150, 40};
@@ -459,6 +470,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         if (!m_maps.empty())
             net.SetLobbyMap(m_maps[std::clamp(m_mapIndex, 0, static_cast<int>(m_maps.size()) - 1)].path);
     }
+    if (!m_optionsSent && net.ControlsRoom() && lobby)
+    {
+        m_optionsSent = true;
+        PushOptions(net); // the room shows the owner's options from the start
+    }
     // Start positions from the room's map as this computer has it (the own file or the downloaded copy)
     if (net.LobbyMapFile() != m_spotsMap)
     {
@@ -514,6 +530,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     auto comboField = [&](int id) -> ui::UiRect {
         if (id == kLayoutCombo)
             return l.prebuiltBtn;
+        if (id == kCreditsCombo)
+            return l.creditsBtn;
         if (id == kMapCombo)
             return l.mapName;
         const int row = id / 10, kind = id % 10;
@@ -526,9 +544,10 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     };
     if (m_combo.open >= 0)
     {
-        const int id = m_combo.open, row = id / 10, kind = id == kLayoutCombo ? 5 : id % 10;
+        const bool optionList = IsOptionCombo(m_combo.open);
+        const int id = m_combo.open, row = id / 10, kind = optionList ? 5 : id % 10;
         const bool isMapList = id == kMapCombo;
-        const bool valid = id == kLayoutCombo || isMapList ? net.ControlsRoom()
+        const bool valid = optionList || isMapList ? net.ControlsRoom()
                                                            : (lobby && row < static_cast<int>(lobby->slots.size()));
         if (!valid)
         {
@@ -568,6 +587,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 else if (picked >= 0 && id == kLayoutCombo)
                 {
                     m_prebuilt = picked == 0;
+                    PushOptions(net);
+                }
+                else if (picked >= 0 && id == kCreditsCombo)
+                {
+                    m_credits = std::clamp(picked, 0, 4);
+                    PushOptions(net);
                 }
                 else if (picked >= 0)
                 {
@@ -691,6 +716,15 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         return NetworkAction::Start;
     if (net.ControlsRoom() && l.prebuiltBtn.Contains(mx, my))
         return openCombo(kLayoutCombo);
+    if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
+        return openCombo(kCreditsCombo);
+    if (net.ControlsRoom() && l.fogCheckbox.Contains(mx, my))
+    {
+        m_fog = !m_fog;
+        SoundRequests::Play("ui_confirm");
+        PushOptions(net);
+        return NetworkAction::None;
+    }
     if (net.ControlsRoom() && !m_maps.empty() && l.mapName.Contains(mx, my))
         return openCombo(kMapCombo);
     if (net.ControlsRoom() && !m_maps.empty() && (l.mapPrev.Contains(mx, my) || l.mapNext.Contains(mx, my)))
@@ -1064,15 +1098,30 @@ void NetworkMenu::render(
                     Anchor::HCENTER | Anchor::VCENTER);
             }
         }
-        if (net->ControlsRoom())
         {
+            // The owner edits the options, everybody sees them (the room's values)
+            const bool owner = net->ControlsRoom();
+            const bool prebuilt = owner ? m_prebuilt : (lobby ? lobby->prebuilt : true);
+            const int credits = owner ? m_credits : (lobby ? lobby->credits : kDefaultCreditsIndex);
+            const bool fog = owner ? m_fog : (lobby ? lobby->fogOfWar : true);
             ui::DrawComboField(
                 r,
                 font,
                 l.prebuiltBtn,
-                m_prebuilt ? _("PREBUILT BASES") : _("FROM SCRATCH"),
+                ui::LayoutChoices()[prebuilt ? 0 : 1],
                 m_combo.open == kLayoutCombo,
-                l.prebuiltBtn.Contains(m_mouseX, m_mouseY));
+                owner && l.prebuiltBtn.Contains(m_mouseX, m_mouseY),
+                owner);
+            ui::DrawComboField(
+                r,
+                font,
+                l.creditsBtn,
+                ui::CreditsLabel(credits),
+                m_combo.open == kCreditsCombo,
+                owner && l.creditsBtn.Contains(m_mouseX, m_mouseY),
+                owner);
+            ui::DrawCheckbox(
+                r, font, l.fogCheckbox, _("FOG OF WAR"), fog, owner && l.fogCheckbox.Contains(m_mouseX, m_mouseY), owner);
         }
         if (lobby && !lobby->map.empty())
         {
@@ -1089,7 +1138,7 @@ void NetworkMenu::render(
             _("Click a number on the map to start there, again to leave it to chance. Click your faction and colour to "
               "change them; the host sets the teams."),
             l.map.x,
-            l.map.Bottom() + 10,
+            l.fogCheckbox.Bottom() + 8,
             l.map.w,
             ui::FONT_SMALL,
             col::TextDim,
@@ -1168,7 +1217,7 @@ void NetworkMenu::render(
         // The open drop-down list, over everything
         if (m_combo.open >= 0)
         {
-            const int id = m_combo.open, row = id / 10, kind = id == kLayoutCombo ? 5 : id % 10;
+            const int id = m_combo.open, row = id / 10, kind = IsOptionCombo(id) ? 5 : id % 10;
             if (id == kMapCombo)
             {
                 std::vector<std::string> names;
@@ -1187,7 +1236,11 @@ void NetworkMenu::render(
             else if (id == kLayoutCombo)
             {
                 ui::DrawComboList(
-                    r, font, l.prebuiltBtn, ComboChoices(5), m_prebuilt ? 0 : 1, m_combo, h, m_mouseX, m_mouseY);
+                    r, font, l.prebuiltBtn, ui::LayoutChoices(), m_prebuilt ? 0 : 1, m_combo, h, m_mouseX, m_mouseY);
+            }
+            else if (id == kCreditsCombo)
+            {
+                ui::DrawComboList(r, font, l.creditsBtn, ui::CreditsChoices(), m_credits, m_combo, h, m_mouseX, m_mouseY);
             }
             else if (lobby && row < static_cast<int>(lobby->slots.size()))
             {

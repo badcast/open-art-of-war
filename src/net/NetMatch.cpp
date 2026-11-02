@@ -712,6 +712,13 @@ void NetMatch::SetTeam(uint8_t slot, uint8_t team, uint8_t handicap)
     else if (IsOwner())
         m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap});
 }
+void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits)
+{
+    if (m_host)
+        m_host->setOptions(fogOfWar, prebuilt, credits);
+    else if (IsOwner())
+        m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits});
+}
 void NetMatch::SendChat(const std::string &text)
 {
     if (m_client && !text.empty())
@@ -734,7 +741,7 @@ bool NetMatch::CanStart() const
     return std::all_of(lobby.slots.begin(), lobby.slots.end(), [](const Net::LobbySlot &s) { return s.choice.ready; });
 }
 
-void NetMatch::StartFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt)
+void NetMatch::StartFromLobby(uint32_t nowMs)
 {
     if (!ControlsRoom())
         return;
@@ -743,8 +750,9 @@ void NetMatch::StartFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt
     setup.mapPath = lobby.map;
     setup.mapHash = lobby.mapHash;
     setup.seed = static_cast<uint32_t>(std::random_device {}()) ^ nowMs;
-    setup.startingCredits = startingCredits;
-    setup.prebuilt = prebuilt;
+    setup.startingCredits = kStartingCredits[lobby.credits <= 4 ? lobby.credits : kDefaultCreditsIndex];
+    setup.prebuilt = lobby.prebuilt;
+    setup.fogOfWar = lobby.fogOfWar;
     std::mt19937 rng(setup.seed);
     // Start positions picked by the players first, the random ones get the free spots left
     std::vector<int> free;

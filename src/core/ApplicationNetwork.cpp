@@ -438,7 +438,8 @@ void Application::UpdateNetworkMenu()
         case NetworkAction::Start:
             if (m_net)
             {
-                m_net->StartFromLobby(SDL_GetTicks(), 1500, m_networkMenu->Prebuilt());
+                m_networkMenu->PushOptions(*m_net);
+                m_net->StartFromLobby(SDL_GetTicks());
                 m_netMatchStarted = true;
             }
             break;
@@ -592,7 +593,8 @@ void Application::UpdateNetwork(uint32_t nowMs)
         }
         if (m_net->ControlsRoom() && m_net->CanStart() && m_net->PlayerCount() >= m_netWantedPlayers)
         {
-            m_net->StartFromLobby(nowMs, 1500, m_networkMenu->Prebuilt());
+            m_networkMenu->PushOptions(*m_net);
+            m_net->StartFromLobby(nowMs);
             std::cout << "[Net] Starting the match on " << m_netMapPath << " for " << m_net->PlayerCount() << " players"
                       << std::endl;
             m_netMatchStarted = true;

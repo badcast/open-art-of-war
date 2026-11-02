@@ -11,6 +11,10 @@ namespace OpenArtOfWar
 // Everything a match of several players starts from. A network host decides it (random factions and
 // start positions already resolved with the match seed) and sends it to every peer, so all of them
 // build the same world.
+// Starting credits the match options offer (index 1 is the default)
+constexpr int kStartingCredits[5] = {1000, 1500, 3000, 5000, 10000};
+constexpr int kDefaultCreditsIndex = 1;
+
 struct MatchSetup
 {
     std::string mapPath;                              // assets/maps/<name>.json

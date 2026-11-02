@@ -257,6 +257,16 @@ void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap)
     broadcastLobby();
 }
 
+void SessionHost::setOptions(bool fogOfWar, bool prebuilt, uint8_t credits)
+{
+    if (m_running || credits > 4)
+        return;
+    m_lobby.fogOfWar = fogOfWar;
+    m_lobby.prebuilt = prebuilt;
+    m_lobby.credits = credits;
+    broadcastLobby();
+}
+
 void SessionHost::setAiSlot(const OwnerSetAi &change)
 {
     if (m_running)
@@ -587,6 +597,13 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
             OwnerSetTeam m;
             if (slot == ownerSlot() && decode(r, m))
                 setTeam(m.slot, m.team, m.handicap);
+            break;
+        }
+        case MsgType::OwnerSetOptions:
+        {
+            OwnerSetOptions m;
+            if (slot == ownerSlot() && decode(r, m))
+                setOptions(m.fogOfWar, m.prebuilt, m.credits);
             break;
         }
         case MsgType::OwnerStart:

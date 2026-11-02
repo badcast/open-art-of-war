@@ -131,6 +131,10 @@ public:
     // Geometric Primitives (World Space)
     void FillRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color);
     void DrawRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color);
+    // Selection effect: a soft glowing bubble (an ellipse of half sizes `halfW` x `halfH` world pixels around the centre
+    // point) in `color`, pulsing; `brighten` > 0 adds a light veil over the object (additive), so a building glows
+    void DrawSelectionBubble(
+        float centerX, float centerY, float halfW, float halfH, const Camera &camera, SDL_Color color, float brighten);
     void DrawLineWorld(float wx1, float wy1, float wx2, float wy2, const Camera &camera, SDL_Color color);
 
     // Smooth outlines in screen space, each one blended geometry draw (no doubled alpha where segments meet):
@@ -234,6 +238,7 @@ private:
     SDL_Renderer *m_renderer {nullptr};
     TextureManager *m_texManager {nullptr};
     SDL_Texture *m_maskTexture {nullptr};
+    SDL_Texture *m_glowTexture {nullptr}; // white radial falloff with a soft rim (selection bubble)
     int m_maskW {0};
     int m_maskH {0};
     std::vector<uint32_t> m_maskPixels;

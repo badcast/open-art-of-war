@@ -17,6 +17,7 @@ public:
     // Allies let each other through: a gap in an own wall packed with idle units, two units head-on in a corridor;
     // diagonal steps cut corners (a diagonal wall line can be crossed)
     static bool RunMakeWayTest(Application &app);
+    static bool RunSquadFocusTest(Application &app);
     // The same commands on the same world give the same world, tick for tick (lockstep needs this)
     static bool RunDeterminismTest(Application &app);
     // A match of four players in two mixed teams: bases, owners, teams, sight, economies, determinism

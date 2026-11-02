@@ -88,6 +88,8 @@ public:
     {
         m_prebuilt = prebuilt;
     }
+    // Sends the owner's match options (fog of war, bases, credits) to the room
+    void PushOptions(NetMatch &net);
     // The room password: set for a game created here, sent when joining a room that asks for it (empty: none)
     const std::string &password() const
     {
@@ -147,7 +149,7 @@ private:
     struct LobbyLayout
     {
         ui::UiRect dialog, players, map, mapPrev, mapNext, mapName, chatLog, chatField, chatSend, readyBtn, startBtn,
-            leaveBtn, prebuiltBtn;
+            leaveBtn, prebuiltBtn, creditsBtn, fogCheckbox;
         ui::UiRect row(int i) const
         {
             return {players.x, players.y + 30 + i * 40, players.w, 36};
@@ -223,10 +225,18 @@ private:
     std::vector<std::string> m_chatLog;
     std::vector<SkirmishMapInfo> m_maps;
     static constexpr int kMapCombo = 1001;    // id of the list of maps (the host picks one)
+    static bool IsOptionCombo(int id)
+    {
+        return id == 1000 || id == 1002; // kLayoutCombo, kCreditsCombo
+    }
+    static constexpr int kCreditsCombo = 1002; // starting credits list
     static constexpr int kLayoutCombo = 1000; // id of the map layout list (the rows use row * 10 + kind)
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"
     ui::ComboState m_combo;     // the open drop-down list of the room
+    bool m_fog {true};          // host: fog of war
+    int m_credits {1};          // host: index of the starting credits (kStartingCredits)
+    bool m_optionsSent {false}; // the options of this room went to the room already
     bool m_prebuilt {true};     // host: prebuilt bases (else from scratch: HQ + power plant only)
     int m_mapIndex {0};
     std::string m_spotsMap; // map the start positions below belong to

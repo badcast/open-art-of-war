@@ -207,7 +207,7 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
             ApplyCompletedResearch(*u);
         if (unitId > 0 && (sp.rallyX != sp.x || sp.rallyY != sp.y))
         {
-            entities.IssueMoveOrder({unitId}, sp.rallyX, sp.rallyY, pathfinder);
+            entities.IssueAttackMoveOrder({unitId}, sp.rallyX, sp.rallyY, pathfinder); // answers fire on the way
         }
     }
 }

@@ -403,6 +403,63 @@ void AISquadController::SetState(AISquad &sq, AISquadState state)
     sq.quietTimer = 0.0f;
 }
 
+void AISquadController::UpdateFocusTarget(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+{
+    const Unit *leader = entities.GetUnit(sq.leaderId);
+    if (!leader || !leader->alive)
+        return;
+    const float zone = std::max(static_cast<float>(leader->sightRadius), leader->attackRange);
+    auto distToLeader = [&](const Entity &e) {
+        return DetMath::Hypot(
+            static_cast<float>(e.tileX - leader->tileX), static_cast<float>(e.tileY - leader->tileY));
+    };
+    auto usable = [&](const Entity &e) {
+        return e.alive && e.state != ActionState::Die && e.faction != Faction::Neutral
+               && Players::Hostile(e.owner, sq.owner) && distToLeader(e) <= zone
+               && entities.IsEntityVisibleToPlayer(e, sq.owner, map);
+    };
+    // The target stays while it lives and is in sight
+    const Entity *focus = sq.focusTargetId != 0 ? entities.GetEntity(sq.focusTargetId) : nullptr;
+    if (!focus || !usable(*focus))
+    {
+        focus = nullptr;
+        int bestTier = 99;
+        float bestDist = 1e9f;
+        for (const Entity &e : entities.GetAllEntities())
+        {
+            if (!usable(e))
+                continue;
+            const int tier = TargetPriorityTier(e);
+            const float d = distToLeader(e);
+            if (tier < bestTier || (tier == bestTier && d < bestDist))
+            {
+                bestTier = tier;
+                bestDist = d;
+                focus = &e;
+            }
+        }
+        sq.focusTargetId = focus ? focus->id : 0;
+    }
+    if (!focus)
+        return;
+    // Members that move and can get there fire at the group's target; siege and immobile units, and those with no way
+    // to it, keep to their own
+    std::vector<int> order;
+    for (int id : sq.unitIds)
+    {
+        const Unit *u = entities.GetUnit(id);
+        if (!u || !u->alive || u->state == ActionState::Die || u->targetEntityId == sq.focusTargetId)
+            continue;
+        if (u->isSiegeMode || u->moveSpeed <= 0.0f || u->HoldsGround() || u->attackDamage <= 0)
+            continue;
+        if (!u->HasOpenRouteToEntity(*focus, pathfinder))
+            continue;
+        order.push_back(id);
+    }
+    if (!order.empty())
+        entities.IssueAttackOrder(order, sq.focusTargetId, &pathfinder);
+}
+
 void AISquadController::ReleaseUnit(AISquad &sq, int unitId, EntityManager &entities)
 {
     sq.unitIds.erase(std::remove(sq.unitIds.begin(), sq.unitIds.end(), unitId), sq.unitIds.end());
@@ -410,6 +467,8 @@ void AISquadController::ReleaseUnit(AISquad &sq, int unitId, EntityManager &enti
     sq.stragglerTimer.erase(unitId);
     if (Unit *u = entities.GetUnit(unitId))
     {
+        if (sq.focusTargetId != 0 && u->orderedTargetId == sq.focusTargetId)
+            u->orderedTargetId = 0; // no longer the group's order
         u->flowMode = false;
         u->paceScale = 1.0f;
         m_released.push_back(unitId);
@@ -1109,6 +1168,14 @@ void AISquadController::Tick(
         }
         engaged = false;
     }
+
+    if (!sq.playerSquad
+        && (sq.state == AISquadState::Engaged || sq.state == AISquadState::Marching
+            || sq.state == AISquadState::Regrouping || sq.state == AISquadState::FormingUp
+            || sq.state == AISquadState::Assault))
+        UpdateFocusTarget(sq, map, entities, pathfinder);
+    else
+        sq.focusTargetId = 0;
 
     // Combat pauses the cohesion logic (except inside a corridor, where the column must keep flowing)
     if (engaged

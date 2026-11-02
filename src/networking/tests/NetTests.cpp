@@ -958,6 +958,16 @@ void testLobby()
     a->sendOwnerSetTeam(OwnerSetTeam {1, 5, 3});
     pump();
     CHECK(a->lobby().slots[1].choice.handicap == 3 && a->lobby().slots[1].choice.team == 5);
+    // Match options: the owner sets them, everybody sees them, a plain player cannot
+    CHECK(a->lobby().fogOfWar && a->lobby().prebuilt && a->lobby().credits == 1);
+    a->sendOwnerSetOptions(OwnerSetOptions {false, false, 3});
+    pump();
+    CHECK(!b->lobby().fogOfWar && !b->lobby().prebuilt && b->lobby().credits == 3);
+    b->sendOwnerSetOptions(OwnerSetOptions {true, true, 0});
+    pump();
+    CHECK(!a->lobby().fogOfWar && a->lobby().credits == 3);
+    a->sendOwnerSetOptions(OwnerSetOptions {true, true, 1});
+    pump();
     cb.handicap = 0; // (the value B sends is ignored anyway)
     cb.team = 5;
     CHECK(!host.everyoneReady(2));
