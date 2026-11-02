@@ -100,11 +100,14 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
     const Faction faction = Players::FactionOf(player);
 
     // 1. Passive income from headquarters: +50 credits every 3 seconds
+    // The income is the headquarters': without a finished one nothing comes in
+    const bool hasHq = entities.HasBuildingType(UnitType::Headquarters, player, true);
     m_incomeTimer += deltaTime;
     if (m_incomeTimer >= 3.0f)
     {
         m_incomeTimer = 0.0f;
-        m_credits += 50 * (100 + ResearchTotal(player, ResearchEffect::Income)) / 100;
+        if (hasHq)
+            m_credits += 50 * (100 + ResearchTotal(player, ResearchEffect::Income)) / 100;
     }
 
     // Reward for every enemy unit destroyed since the last tick
@@ -144,34 +147,9 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
         if (b->buildProgress < 1.0f)
             continue;
 
-        if (b->type == UnitType::Headquarters)
-        {
-            powerProd += 50;
-        }
-        else if (b->type == UnitType::PowerPlant)
-        {
-            powerProd += 100;
-        }
-        else if (b->type == UnitType::Barracks)
-        {
-            powerCons += 20;
-        }
-        else if (b->type == UnitType::Factory)
-        {
-            powerCons += 40;
-        }
-        else if (b->type == UnitType::ResearchLab)
-        {
-            powerCons += 25;
-        }
-        else if (b->rawBuildingType == 5 || b->rawBuildingType == 13)
-        {
-            // Concrete machine-gun bunkers are autonomous field fortifications (0 kW power consumption)
-        }
-        else if (b->type == UnitType::Tower || b->type == UnitType::Bunker)
-        {
-            powerCons += 25;
-        }
+        // The same figures the buildings are switched by (EntityManager::Update)
+        const int pwr = b->GetPowerOutput();
+        (pwr > 0 ? powerProd : powerCons) += std::abs(pwr);
     }
     powerProd += powerProd * ResearchTotal(player, ResearchEffect::PowerBonus) / 100;
     m_powerProduced = powerProd;
@@ -179,7 +157,7 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
 
     // 3. Every Barracks / Factory trains its own queue; units appear only at that building's exit
     const bool powerOk = !HasPowerDeficit();
-    const float speedMultiplier = powerOk ? 1.0f : 0.5f;
+    const float speedMultiplier = powerOk ? 1.0f : 0.0f; // training stands still without power
     struct Spawn
     {
         int archetype;

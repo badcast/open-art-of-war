@@ -728,7 +728,12 @@ void HUDController::ActivateCell(
         case TabBuild:
         {
             const auto &blueprints = EntityManager::GetBlueprints();
-            if (index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6
+            if (!entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true))
+            {
+                SoundRequests::Play("ui_error");
+                SetNotification(_("HEADQUARTERS REQUIRED TO BUILD!"));
+            }
+            else if (index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6
                 && !IsRadarUnlocked(Players::Local()))
             {
                 SoundRequests::Play("ui_error");
@@ -1468,6 +1473,7 @@ void HUDController::RenderGameHud(
     bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
     bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
     bool hasLab = HasResearchBuilding(Players::Local(), entities);
+    const bool noHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true); // nothing can be built
     // Orders shown on unit cards come from the buildings that would train them
     auto queuedAt = [&](UnitType buildingType) {
         std::vector<const Building *> out;
@@ -1496,8 +1502,8 @@ void HUDController::RenderGameHud(
                 const auto &bp = EntityManager::GetBlueprints()[i];
                 bool selected = (m_buildMode && m_selectedBlueprint == i);
                 bool canAfford = economy.CanAfford(bp.creditCost);
-                const bool radarLocked = bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local());
-                DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected, radarLocked);
+                const bool radarLocked = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq;
+                DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected && !noHq, radarLocked);
                 DrawCostTag(
                     renderer,
                     fontRenderer,

@@ -4293,3 +4293,6 @@ msgstr "Interface volume"
 
 msgid "Volume of the interface sounds: clicks, dialogs and alerts"
 msgstr "Volume of the interface sounds: clicks, dialogs and alerts"
+
+msgid "HEADQUARTERS REQUIRED TO BUILD!"
+msgstr "HEADQUARTERS REQUIRED TO BUILD!"
