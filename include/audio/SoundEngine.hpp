@@ -35,8 +35,12 @@ public:
     void NextTrack(); // player: mainmenu -> tracks... -> mainmenu
     void PrevTrack();
     void SetMusicVolume(int volume); // 0..128
+    // The interface goes silent (a replay): UI sounds, alerts, unit replies and the announcer; battle sounds and the
+    // music stay
+    void SetInterfaceMuted(bool muted);
     void SetReverb(bool enabled); // reverb of explosions and heavy guns
-    void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
+    void SetFxVolume(int volume);    // 0..128: weapons and impacts
+    void SetUiVolume(int volume);    // 0..128: interface clicks, dialogs and alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
 
     // Sound effects (assets/data/audio_sfx.json, assets/audio/sfx), mixed into their own audio stream
@@ -124,6 +128,7 @@ private:
     SDL_AudioStream *m_sfxStream {nullptr}; // the effects: stereo 44.1 kHz from m_sfx
     std::vector<int16_t> m_sfxBuffer;       // audio thread only
     int m_voiceVolume {128};
+    int m_uiVolume {128};
     SDL_Mutex *m_lock {nullptr}; // guards the decoder shared with the audio thread
     stb_vorbis *m_decoder {nullptr};
     std::vector<uint8_t> m_oggData; // encoded track the decoder reads from

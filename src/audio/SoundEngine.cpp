@@ -112,6 +112,7 @@ bool SoundEngine::Init(const std::string &assetRoot)
     m_sfx.LoadBank(LoaderResources::SfxConfig(assetRoot), LoaderResources::SfxClips(assetRoot));
     m_sfx.SetFxVolume(m_fxVolume);
     m_sfx.SetVoiceVolume(m_voiceVolume);
+    m_sfx.SetUiVolume(m_uiVolume);
     m_sfx.SetMuted(m_muted);
     m_voices.SetVolume(m_voiceVolume);
     m_voices.SetMuted(m_muted);
@@ -509,6 +510,12 @@ void SoundEngine::SetMusicVolume(int volume)
     ApplyGain();
 }
 
+void SoundEngine::SetInterfaceMuted(bool muted)
+{
+    m_sfx.SetInterfaceMuted(muted);
+    m_voices.SetSilenced(muted);
+}
+
 void SoundEngine::SetReverb(bool enabled)
 {
     m_sfx.SetReverb(enabled);
@@ -518,6 +525,12 @@ void SoundEngine::SetFxVolume(int volume)
 {
     m_fxVolume = std::clamp(volume, 0, 128);
     m_sfx.SetFxVolume(m_fxVolume);
+}
+
+void SoundEngine::SetUiVolume(int volume)
+{
+    m_uiVolume = std::clamp(volume, 0, 128);
+    m_sfx.SetUiVolume(m_uiVolume);
 }
 
 void SoundEngine::SetVoiceVolume(int volume)

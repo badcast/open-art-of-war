@@ -41,7 +41,8 @@ struct SimEvent
 {
     enum class Type : uint8_t
     {
-        ResearchCompleted
+        ResearchCompleted,
+        PlayerEliminated // a player of a match lost every building (value unused)
     };
     Type type {Type::ResearchCompleted};
     PlayerId player {0};
@@ -115,6 +116,10 @@ public:
     }
 
     std::vector<SimEvent> TakeEvents();
+    void NoteEvent(const SimEvent &event)
+    {
+        m_events.push_back(event);
+    }
 
     // Every applied command with its tick (a replay of the match)
     void SetRecording(bool on)

@@ -62,6 +62,7 @@ void Application::ApplyAudio()
     m_sound->SetFxVolume(m_settings.fxVolume);
     m_sound->SetReverb(m_settings.reverb);
     m_sound->SetVoiceVolume(m_settings.voiceVolume);
+    m_sound->SetUiVolume(m_settings.uiVolume);
     m_sound->SetVoiceLanguage(m_settings.language); // voices speak the language of the game
     if (m_sound->IsMuted() != m_settings.muted)
         m_sound->ToggleMute();

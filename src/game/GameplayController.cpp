@@ -876,6 +876,8 @@ void GameplayController::Update(
                     else if (!canPlace)
                     {
                         SoundRequests::Announce("ann_cannot_build");
+                        if (!entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true))
+                            hud.SetNotification(_("NO HEADQUARTERS: NOTHING CAN BE BUILT!"));
                     }
                     if (canPlace && canAfford)
                     {
@@ -965,6 +967,19 @@ void GameplayController::Update(
         // 'G' - Siege mode toggle
         if (input.IsKeyJustPressed(SDL_SCANCODE_G))
         {
+            // A unit whose siege mode waits for a technology says so instead of ignoring the key
+            bool locked = false;
+            for (int id : m_selectedUnits)
+            {
+                const Unit *su = entities.GetUnit(id);
+                if (su && su->owner == Players::Local() && !entities.CanDeploySiege(*su))
+                    locked = true;
+            }
+            if (locked)
+            {
+                SoundRequests::Play("ui_error");
+                hud.SetNotification(_("RESEARCH SIEGE MODE FIRST!"));
+            }
             SimCommand c = Command(CommandType::ToggleSiege);
             c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
             m_sim.Issue(std::move(c));
@@ -1187,6 +1202,12 @@ void GameplayController::SimulationStep(
     m_sim.UpdateResearch(deltaTime, ctx);
     hud.Update(deltaTime, entities, economy, m_sim.TakeEvents());
     entities.Update(deltaTime, map, pathfinder);
+    // A match: whoever has no building left is out, computer players too (their controllers stop)
+    if (mission.IsMatch())
+    {
+        for (PlayerId out : entities.UpdateElimination(map))
+            m_sim.NoteEvent({SimEvent::Type::PlayerEliminated, out, 0});
+    }
     m_sim.UpdateOrderQueues(ctx);
     m_sim.UpdateSquads(deltaTime, ctx, aiController.GetChokepoints());
     m_sim.UpdateEconomies(deltaTime, ctx); // the local economy included, in slot order
@@ -1194,7 +1215,10 @@ void GameplayController::SimulationStep(
     if (mission.IsMatch())
     {
         for (auto &ai : m_matchAis)
-            ai->Update(deltaTime, map, entities, pathfinder);
+        {
+            if (!entities.IsEliminated(ai->player()))
+                ai->Update(deltaTime, map, entities, pathfinder);
+        }
     }
     else if (!m_debugMode || !m_pauseAI)
     {

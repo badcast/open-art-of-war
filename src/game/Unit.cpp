@@ -1785,6 +1785,48 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
     //    on through an open route leave the wall alone.
     const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath)
                                || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
+    // On auto-attack, a hostile wall beside the way is shot down with a 50% chance (decided once per unit and wall,
+    // deterministically). Low priority: this only runs without a target, and any enemy in sight drops the wall.
+    if (isAttackMoving && HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && targetEntityId == 0
+        && targetWallTileX < 0 && wallCheckCooldown <= 0.0f)
+    {
+        wallCheckCooldown = 1.0f;
+        constexpr int kReach = 3;
+        int bestX = -1, bestY = -1, bestDist = 1 << 20;
+        for (int y = tileY - kReach; y <= tileY + kReach; ++y)
+        {
+            for (int x = tileX - kReach; x <= tileX + kReach; ++x)
+            {
+                if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
+                    continue;
+                const uint32_t h = static_cast<uint32_t>(id) * 73856093u ^ static_cast<uint32_t>(x) * 19349663u
+                                   ^ static_cast<uint32_t>(y) * 83492791u;
+                if (((h >> 7) & 1u) == 0u)
+                    continue; // this one is left alone
+                const int d = std::abs(x - tileX) + std::abs(y - tileY);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        if (bestX >= 0)
+        {
+            targetWallTileX = bestX;
+            targetWallTileY = bestY;
+            if (state == ActionState::Move)
+            {
+                ClearPathState(); // the move goal stays: the way is planned again once the wall is down
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            waitingForPath = false;
+            blockedTimer = 0.0f;
+            return;
+        }
+    }
     if (targetEntityId == 0 && targetWallTileX < 0 && stuckWithGoal && HasMoveTarget() && CanBreachWalls()
         && wallCheckCooldown <= 0.0f)
     {

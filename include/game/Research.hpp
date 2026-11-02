@@ -107,6 +107,8 @@ bool IsUnitUnlocked(PlayerId player, int archetype);
 // Index of the technology that unlocks the unit, -1 when it needs none
 int UnitUnlockResearch(Faction faction, int archetype);
 bool IsRadarUnlocked(PlayerId player);
+// May the player build this building kind (a building index)? Only the Radar Locator waits for a technology.
+bool IsBuildingUnlocked(PlayerId player, int buildingIndex);
 // The form a unit is trained in: the T-22 Zeus (11) comes without its rocket turret (17) until "Rocket launcher mount"
 // is researched; a Zeus that exists then gets the turret at once (CompleteResearch). Every other archetype as it is.
 int ProductionForm(PlayerId player, int archetype);

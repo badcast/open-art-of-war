@@ -168,6 +168,11 @@ private:
             const ui::UiRect r = row(i);
             return {r.x + 372, r.y + 4, 40, r.h - 8};
         }
+        ui::UiRect SpawnCell(int i) const
+        {
+            const ui::UiRect r = row(i);
+            return {r.x + 418, r.y + 4, 46, r.h - 8};
+        }
         ui::UiRect RemoveCell(int i) const
         {
             const ui::UiRect r = row(i);

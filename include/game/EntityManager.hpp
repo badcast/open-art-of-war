@@ -370,6 +370,16 @@ struct UnitConfig
     bool isSiegeMode {false};
     int siegeArchetypeId {-1};
     bool siegeRequiresResearch {false}; // siege.requires_research: deploying needs the faction's siege technology
+    // siege.auto_deploy: when the unit goes into siege mode by itself (the computer always, a person's units while on
+    // an attack-move). Far: when an enemy is beyond the normal range but within the siege range (needs a longer
+    // siege range); Always: whenever an enemy is within the siege range; Off: by hand only.
+    enum class AutoSiege : uint8_t
+    {
+        Off,
+        Far,
+        Always
+    };
+    AutoSiege autoSiege {AutoSiege::Far};
     int parentArchetypeId {-1};
     bool hasRotatingTurret {false};
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
@@ -691,6 +701,14 @@ public:
     // The player left a network match: every building, wall and unit of it is destroyed at once
     // (no kills for anybody)
     void DestroyPlayer(PlayerId player, TileMap &map);
+    // A match: a player who has no building left (under construction counts; units and walls do not) is out. His
+    // forces are destroyed as when a player leaves. Returns who dropped out on this call. Depends on the state of
+    // the world only, so every peer does it on the same tick.
+    std::vector<PlayerId> UpdateElimination(TileMap &map);
+    bool IsEliminated(PlayerId player) const
+    {
+        return player < kMaxPlayers && m_eliminated[player];
+    }
     // Price of a unit / building in credits (statistics)
     int ValueOf(const Entity &e) const;
     void UpdateRegeneration(float deltaTime);
@@ -726,6 +744,7 @@ private:
     // Puts a living entity into its death (state, death animation, explosions, frees a building's tiles)
     void KillEntity(Entity &e, TileMap &map);
     std::array<int, 2> m_factionBuildRadius {16, 16};   // build_radius of each faction's headquarters, before research
+    std::array<bool, kMaxPlayers> m_eliminated {};       // players who have lost every building (UpdateElimination)
     std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
     bool m_flamethrowerUnlocked[kMaxPlayers] {};
     mutable std::unordered_set<uint64_t>

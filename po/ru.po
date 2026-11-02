@@ -4261,3 +4261,35 @@ msgstr "Дальность радара (голубой)"
 msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
 msgstr "Рисует весь обзор локатора (радиус обзора + дальность радара) голубым кругом."
 
+msgid "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
+msgstr "НЕТ ШТАБА: СТРОИТЬ НЕЛЬЗЯ!"
+
+msgid "PLAYER "
+msgstr "ИГРОК "
+
+msgid "COMPUTER "
+msgstr "КОМПЬЮТЕР "
+
+msgid "IS OUT: NO BUILDINGS LEFT"
+msgstr "ВЫБЫЛ: ЗДАНИЙ НЕ ОСТАЛОСЬ"
+
+msgid "RESEARCH SIEGE MODE FIRST!"
+msgstr "СНАЧАЛА ИЗУЧИТЕ ОСАДНЫЙ РЕЖИМ!"
+
+msgid "Auto deploy"
+msgstr "Авто-переход в осадный режим"
+
+msgid "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
+msgstr "Когда юнит сам переходит в осадный режим: никогда, когда враг дальше обычной дальности, или когда враг в осадной дальности."
+
+msgid "Position"
+msgstr "Позиция"
+
+msgid "Voice the interface"
+msgstr "Озвучивать интерфейс"
+
+msgid "Interface volume"
+msgstr "Громкость интерфейса"
+
+msgid "Volume of the interface sounds: clicks, dialogs and alerts"
+msgstr "Громкость звуков интерфейса: клики, диалоги и тревоги"

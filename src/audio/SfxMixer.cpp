@@ -270,6 +270,8 @@ bool SfxMixer::StartLocked(
     const EventConfig &c = ev.cfg;
     if (c.clips.empty() || gain <= 0.001f || c.volume <= 0.0f)
         return false;
+    if (m_interfaceMuted && c.category != Category::Weapon && c.category != Category::Impact)
+        return false; // the interface is silent
     if (!announcer)
     {
         if (ev.played && c.minIntervalMs > 0 && nowMs - ev.lastPlayMs < static_cast<uint64_t>(c.minIntervalMs))
@@ -312,6 +314,7 @@ bool SfxMixer::StartLocked(
     v.priority = c.priority;
     v.event = eventIdx;
     v.voiceVolume = c.category == Category::Voice || c.category == Category::Announcer;
+    v.uiVolume = c.category == Category::Ui || c.category == Category::Alert;
     v.announcer = announcer;
     v.reverbSend = c.reverb * std::clamp(gain, 0.0f, 1.0f);
     if (muffle > 0.01f)
@@ -346,7 +349,7 @@ bool SfxMixer::Announce(const std::string &event, uint64_t nowMs)
 
 bool SfxMixer::AnnounceLocked(int idx, uint64_t nowMs)
 {
-    if (m_events[static_cast<size_t>(idx)].cfg.clips.empty())
+    if (m_events[static_cast<size_t>(idx)].cfg.clips.empty() || m_interfaceMuted)
         return false;
     const EventState &ev = m_events[static_cast<size_t>(idx)];
     if (ev.played && ev.cfg.cooldownMs > 0 && nowMs - ev.lastPlayMs < static_cast<uint64_t>(ev.cfg.cooldownMs))
@@ -439,7 +442,7 @@ void SfxMixer::Mix(int16_t *out, int frames)
     for (Voice &v : m_voices)
     {
         const std::vector<int16_t> &clip = m_clips[static_cast<size_t>(v.clip)];
-        const float vol = m_muted ? 0.0f : (v.voiceVolume ? m_voiceGain : m_fxGain);
+        const float vol = m_muted ? 0.0f : (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
         const float gl = v.gainL * vol, gr = v.gainR * vol;
         const float send = m_reverbOn ? v.reverbSend * vol : 0.0f;
         const bool filtered = v.lpCoef < 1.0f;
@@ -512,10 +515,24 @@ void SfxMixer::SetVoiceVolume(int volume)
     m_voiceGain = std::clamp(volume, 0, 128) / 128.0f;
 }
 
+void SfxMixer::SetUiVolume(int volume)
+{
+    std::lock_guard<std::mutex> guard(m_lock);
+    m_uiGain = std::clamp(volume, 0, 128) / 128.0f;
+}
+
 void SfxMixer::SetReverb(bool enabled)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     m_reverbOn = enabled;
+}
+
+void SfxMixer::SetInterfaceMuted(bool muted)
+{
+    std::lock_guard<std::mutex> guard(m_lock);
+    m_interfaceMuted = muted;
+    if (muted)
+        m_announcerQueue.clear();
 }
 
 void SfxMixer::SetMuted(bool muted)

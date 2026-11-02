@@ -1114,6 +1114,112 @@ bool HeadlessTest::RunFogBlockTest(Application &app)
     return ok;
 }
 
+bool HeadlessTest::RunBuildRulesTest(Application &app)
+{
+    std::cout << "[Test] Validating: no headquarters, no construction; players without buildings are out..."
+              << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    auto fail = [&](const std::string &msg) {
+        std::cerr << "[Test] Error: " << msg << std::endl;
+        return false;
+    };
+    // A blank arena: a person without a headquarters builds nothing (buildings, walls, a new headquarters)
+    entities.Clear();
+    map.InitBlankArena(60, 40, 0);
+    map.SetFogEnabled(false);
+    app.m_pathfinder->SetMap(&map);
+    app.m_pathfinder->SetEntityManager(&entities);
+    const PlayerId res = Players::OwnerOf(Faction::Resistance);
+    if (entities.CanPlaceBuilding(30, 20, 2, 2, map, res) || entities.CanPlaceBuilding(30, 20, 1, 1, map, res)
+        || entities.CanPlaceBuilding(30, 20, 3, 4, map, res))
+        return fail("without a headquarters a building, a wall and a new headquarters must be refused");
+    // A headquarters under construction does not count, a finished one opens the zone
+    const int hq = entities.SpawnBuildingByIndex(8, 28, 18, Faction::Resistance, 0.4f);
+    if (entities.CanPlaceBuilding(34, 18, 2, 2, map, res))
+        return fail("a headquarters under construction must not allow construction");
+    if (Building *b = entities.GetBuilding(hq))
+        b->buildProgress = 1.0f;
+    if (!entities.CanPlaceBuilding(34, 18, 2, 2, map, res) || !entities.CanPlaceBuilding(34, 22, 1, 1, map, res))
+        return fail("a finished headquarters must allow construction in its zone");
+    // It falls: construction is over again
+    if (Building *b = entities.GetBuilding(hq))
+    {
+        b->alive = false;
+        b->state = ActionState::Die;
+    }
+    if (entities.CanPlaceBuilding(34, 18, 2, 2, map, res) || entities.CanPlaceBuilding(34, 22, 1, 1, map, res))
+        return fail("a player whose headquarters fell must build nothing, walls included");
+
+    // A match with a computer player: it builds under the same rules, and is out when its last building is gone
+    MatchSetup setup;
+    setup.mapPath = LoaderResources::MapPath("m26");
+    setup.seed = 5;
+    setup.local = 0;
+    setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
+    setup.slots[1] = {true, Faction::Confederation, 1, 2, false, 1};
+    setup.startPosition[0] = 0;
+    setup.startPosition[1] = 1;
+    if (!app.m_mission->LoadMatch(setup, map, entities, *app.m_economy, *app.m_pathfinder))
+        return false;
+    app.m_gameplayController->ResetForMission(*app.m_mission, *app.m_hudController, entities, map);
+    const PlayerId ai = 1;
+    int aiHq = 0, hqX = 0, hqY = 0;
+    for (const Entity &e : entities.GetAllEntities())
+        if (e.owner == ai && e.isBuilding && e.type == UnitType::Headquarters)
+        {
+            aiHq = e.id;
+            hqX = e.tileX;
+            hqY = e.tileY;
+        }
+    if (aiHq == 0)
+        return fail("the computer player has no headquarters");
+    map.SetFogEnabled(false);
+    // (somewhere around its headquarters that is free: scan for a tile the rules accept)
+    int freeX = -1, freeY = -1;
+    for (int dy = -10; dy <= 10 && freeX < 0; ++dy)
+        for (int dx = -10; dx <= 10 && freeX < 0; ++dx)
+            if (entities.CanPlaceBuilding(hqX + dx, hqY + dy, 2, 2, map, ai))
+            {
+                freeX = hqX + dx;
+                freeY = hqY + dy;
+            }
+    if (freeX < 0)
+        return fail("the computer player must be able to build around its headquarters");
+    // Destroy its headquarters: it can build nothing
+    if (Entity *h = entities.GetEntity(aiHq))
+    {
+        h->alive = false;
+        h->state = ActionState::Die;
+    }
+    if (entities.CanPlaceBuilding(freeX, freeY, 2, 2, map, ai))
+        return fail("a computer player without a headquarters must build nothing");
+    // Its other buildings still stand: it is not out yet; the person is not touched
+    if (!entities.UpdateElimination(map).empty())
+        return fail("a player with buildings left is not out");
+    for (Entity &e : entities.GetAllEntities())
+        if (e.owner == ai && e.isBuilding)
+        {
+            e.alive = false;
+            e.state = ActionState::Die;
+        }
+    const std::vector<PlayerId> out = entities.UpdateElimination(map);
+    int unitsLeft = 0;
+    for (const Entity &e : entities.GetAllEntities())
+        if (e.owner == ai && e.alive && e.state != ActionState::Die)
+            ++unitsLeft;
+    if (out.size() != 1 || out[0] != ai || !entities.IsEliminated(ai) || entities.IsEliminated(0) || unitsLeft != 0)
+    {
+        std::cerr << "[Test] Error: a player without buildings is out with all its forces (out " << out.size()
+                  << ", units left " << unitsLeft << ")" << std::endl;
+        return false;
+    }
+    if (!entities.UpdateElimination(map).empty())
+        return fail("a player drops out once");
+    std::cout << "  - No headquarters: nothing built; no buildings: out with all units: ok" << std::endl;
+    return true;
+}
+
 bool HeadlessTest::RunMatchAiTest(Application &app)
 {
     std::cout << "[Test] Validating computer players in a match..." << std::endl;
@@ -2043,6 +2149,8 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             setupArena();
             const int id = entities.SpawnUnitByArchetype(arch, 10, 10, Faction::Resistance);
             Unit *u = entities.GetUnit(id);
+            if (u->moveSpeed <= 0.0f)
+                continue; // an immobile gun (the Grad) does not drive anywhere
             u->facingDirection = 4; // moving left
             u->turretFacing = 4;
             entities.IssueMoveOrder({id}, 16, 10, pf, false);
@@ -2157,15 +2265,22 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         };
         const Faction ai = AiFaction();
         const int aiGrad = (ai == Faction::Confederation) ? 13 : 12; // Porcupine has no siege: only test the Grad side
-        auto aiFar = siegeRun(aiGrad, ai, false, true, 12.0f, 4.0f, true);  // 12 tiles: Grad 8 < 12 <= 50
-        auto aiNear = siegeRun(aiGrad, ai, false, true, 5.0f, 4.0f, false); // in normal range: shoots normally
+        // The Grad deploys by itself whenever an enemy is within its siege range (auto_deploy: always), whatever its
+        // range is against the normal one; the Rhino only for an enemy beyond its normal range (far)
+        const UnitConfig *gradNormal = entities.GetUnitConfig(13), *rhinoNormal = entities.GetUnitConfig(10);
+        if (!gradNormal || !rhinoNormal || gradNormal->autoSiege != UnitConfig::AutoSiege::Always
+            || rhinoNormal->autoSiege != UnitConfig::AutoSiege::Far)
+            return fail("auto_deploy must read always for the Grad and far for the Rhino");
+        const float inRange = std::max(2.0f, gradNormal->attackRange - 1.0f);
+        auto aiFar = siegeRun(aiGrad, ai, false, true, inRange, 4.0f, true); // an enemy in range: deploys, packs up after
+        auto aiNear = siegeRun(aiGrad, ai, false, true, 5.0f, 4.0f, false);  // close by: deploys as well (always)
         auto rhinoLocked = siegeRun(10, Faction::Resistance, true, false, 8.0f, 4.0f, false);
         auto rhinoQ = siegeRun(10, Faction::Resistance, true, true, 8.0f, 4.0f, false);
         auto rhinoPlain = siegeRun(10, Faction::Resistance, false, true, 8.0f, 4.0f, false);
         std::cout << "  - Auto siege: AI far deploy " << aiFar.first << " / pack up " << aiFar.second
                   << ", AI near deploy " << aiNear.first << ", Rhino locked " << rhinoLocked.first << ", Rhino Q "
                   << rhinoQ.first << ", Rhino plain " << rhinoPlain.first << std::endl;
-        if (ai == Faction::Confederation && (!aiFar.first || !aiFar.second || aiNear.first))
+        if (ai == Faction::Confederation && (!aiFar.first || !aiFar.second || !aiNear.first))
             return fail("AI auto siege broken");
         if (rhinoLocked.first || !rhinoQ.first || rhinoPlain.first)
             return fail("player auto siege rules broken");
@@ -2400,8 +2515,9 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         }
         std::cout << "  - Wall " << (sealed ? std::string("sealed") : "with a gap of " + std::to_string(gap))
                   << ": wall targeted=" << (shotWall ? "yes" : "no") << ", crossed " << crossed << "/6" << std::endl;
-        if (gap > 2 && (shotWall || crossed < 5))
-            return fail("units must walk around a wall that has a wide gap");
+        // (on auto-attack a unit may shoot a wall beside its way by chance - 50% - but must still get across)
+        if (gap > 2 && crossed < 5)
+            return fail("units must still get across a wall that has a wide gap");
         if (gap > 0 && gap <= 2 && crossed < 5)
             return fail("a group must get through a narrow gap in an enemy wall");
         if (sealed && !shotWall)
@@ -2693,6 +2809,8 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
     {
         setupArena();
         ai.Init(5, 5, 35, 25);
+        // (a computer player without a headquarters builds nothing)
+        entities.SpawnBuildingByIndex(ai.side() == Faction::Confederation ? 0 : 8, 5, 5, ai.side(), 1.0f, ai.player());
         const int blocker = entities.SpawnUnitByArchetype(
             ai.side() == Faction::Confederation ? 1 : 0, 20, 10, ai.side(), ai.player());
         AIDefenseSite site {AIDefenseSite::Wall, 20, 10, false};
@@ -3370,6 +3488,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "aivehicle")
     {
         return RunAiVehicleTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "buildrules")
+    {
+        return RunBuildRulesTest(app);
     }
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "fogblock")
     {
@@ -6332,6 +6454,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // 29a. Zeus turret, research time, radar locator, quiet far-off battle sounds (see RunTechTest)
     if (!RunTechTest(app))
+        return false;
+
+    // 29e. No headquarters, no construction; players without buildings are out (see RunBuildRulesTest)
+    if (!RunBuildRulesTest(app))
         return false;
 
     // 29d. Units sent through the fog meet enemy buildings shutting a passage (see RunFogBlockTest)

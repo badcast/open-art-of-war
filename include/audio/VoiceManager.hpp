@@ -39,6 +39,8 @@ public:
 
     void SetVolume(int volume); // 0..128
     void SetMuted(bool muted);
+    // The voices keep quiet (an interface that is silent: replies and the announcer)
+    void SetSilenced(bool silenced);
     bool Has(const std::string &event) const;
     size_t LineCount() const
     {
@@ -52,6 +54,7 @@ private:
     std::string m_root;
     int m_volume {128};
     bool m_muted {false};
+    bool m_silenced {false};
     size_t m_lines {0};
 };
 

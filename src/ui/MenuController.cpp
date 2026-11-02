@@ -108,9 +108,11 @@ UiRect CustomCell(const UiRect &d, int i, int kind)
         case 1:
             return {r.x + 136, r.y, 118, r.h};
         case 2:
-            return {r.x + 260, r.y, 62, r.h};
+            return {r.x + 260, r.y, 56, r.h};
         case 3:
-            return {r.x + 328, r.y, 54, r.h};
+            return {r.x + 322, r.y, 50, r.h};
+        case 6:
+            return {r.x + 378, r.y, 42, r.h};
         case 5:
             return {r.Right() - 28, r.y + 3, 24, r.h - 6};
         default:
@@ -772,6 +774,18 @@ std::vector<SettingsRow> BuildSettingsRows(
                 notify(SettingsArea::Audio);
             }));
         rows.push_back(SliderRow(
+            _("Interface volume"),
+            _("Volume of the interface sounds: clicks, dialogs and alerts"),
+            static_cast<float>(s.uiVolume),
+            0.0f,
+            128.0f,
+            8.0f,
+            percent,
+            [&s, notify](float v) {
+                s.uiVolume = static_cast<int>(v);
+                notify(SettingsArea::Audio);
+            }));
+        rows.push_back(SliderRow(
             _("Voice volume"),
             _("Volume of the unit replies and the announcer"),
             static_cast<float>(s.voiceVolume),
@@ -880,6 +894,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.musicVolume = d.musicVolume;
         s.fxVolume = d.fxVolume;
         s.voiceVolume = d.voiceVolume;
+        s.uiVolume = d.uiVolume;
         s.reverb = d.reverb;
         s.muted = d.muted;
     }
@@ -1211,7 +1226,7 @@ bool MenuController::UpdateCampaignSelect(
                 slot.team = static_cast<uint8_t>(cs.team);
                 slot.color = static_cast<uint8_t>(cs.color);
                 slot.aiLevel = static_cast<uint8_t>(std::clamp(cs.level, 0, 3));
-                match.startPosition[p] = static_cast<int8_t>(p);
+                match.startPosition[p] = static_cast<int8_t>(cs.position);
             }
         }
         const bool started
@@ -1350,7 +1365,7 @@ bool MenuController::UpdateCampaignSelect(
             const UiRect &d = l.details;
             for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
             {
-                for (int kind : {1, 2, 3, 4})
+                for (int kind : {1, 2, 3, 4, 6})
                 {
                     if ((i > 0 || kind != 4) && CustomCell(d, i, kind).Contains(mx, my))
                         return openCombo(kComboSlot + i * 10 + kind);
@@ -1365,6 +1380,17 @@ bool MenuController::UpdateCampaignSelect(
                 && CustomAddBtn(d, static_cast<int>(m_customSlots.size())).Contains(mx, my))
             {
                 CustomSlot add;
+                for (int pos = 0; pos < kMaxPlayers; ++pos)
+                { // the first start position nobody holds
+                    bool used = false;
+                    for (const CustomSlot &cs : m_customSlots)
+                        used = used || cs.position == pos;
+                    if (!used)
+                    {
+                        add.position = pos;
+                        break;
+                    }
+                }
                 add.level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
                 const std::vector<bool> takenColors = CustomTakenColors(-1);
                 for (int c = 0; c < static_cast<int>(takenColors.size()); ++c)
@@ -2625,6 +2651,7 @@ void MenuController::RenderCampaignMissionSelect(
                 ui::DrawButton(renderer, fontRenderer, x, "x", ui::ButtonStyle::Danger, x.Contains(m_mouseX, m_mouseY));
             }
             combo(2, std::to_string(cs.team + 1));
+            combo(6, std::to_string(cs.position + 1));
             combo(3, "");
             const UiRect cc = CustomCell(d, i, 3);
             renderer.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, ArmyColor(cs.color));
@@ -2645,6 +2672,30 @@ void MenuController::RenderCampaignMissionSelect(
         int pw = 0, ph = 0;
         SDL_Texture *tex = m_mapPreview.Get(renderer.GetSdlRenderer(), texManager, info.path, info.path, {}, pw, ph);
         DrawMapPreviewIn(renderer, tex, pw, ph, pv);
+        // The start positions with their numbers, in the colour of the player who takes each
+        if (m_spotsPath != info.path)
+        {
+            m_spotsPath = info.path;
+            m_spots = MissionController::StartPositions(info.path);
+        }
+        if (info.width > 0 && info.height > 0)
+        {
+            const float sc = std::min((pv.w - 4) / static_cast<float>(info.width), (pv.h - 4) / static_cast<float>(info.height));
+            const float ox = pv.CenterX() - info.width * sc / 2, oy = pv.CenterY() - info.height * sc / 2;
+            for (int n = 0; n < static_cast<int>(m_spots.size()); ++n)
+            {
+                SDL_Color c = col::TextDim;
+                for (const CustomSlot &cs : m_customSlots)
+                    if (cs.position == n)
+                        c = ArmyColor(cs.color);
+                const int sx = static_cast<int>(ox + (m_spots[n].first + 0.5f) * sc);
+                const int sy = static_cast<int>(oy + (m_spots[n].second + 0.5f) * sc);
+                renderer.FillRectScreen(sx - 8, sy - 8, 16, 16, c);
+                renderer.DrawRectScreen(sx - 8, sy - 8, 16, 16, col::Text);
+                fontRenderer.DrawString(
+                    std::to_string(n + 1), sx, sy, ui::FONT_SMALL_BOLD, col::AccentText, false, Anchor::HCENTER | Anchor::VCENTER);
+            }
+        }
         const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
         DrawTextSection(
             renderer, fontRenderer, pv.x, pv.Bottom() + 12, pv.w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
@@ -2806,6 +2857,14 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
             for (int i = 1; i <= Settings::kArmyColors; ++i)
                 out.push_back(_(ArmyColorName(i)));
         }
+        else if (kind == 6)
+        {
+            const int count = m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size())
+                ? std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers)
+                : kMaxPlayers;
+            for (int i = 1; i <= count; ++i)
+                out.push_back(std::string(_("Position")) + " " + std::to_string(i));
+        }
         else
         {
             for (int i = 0; i < 4; ++i)
@@ -2840,6 +2899,8 @@ int MenuController::CampaignComboCurrent(int id) const
             return cs.team;
         if (kind == 3)
             return cs.color - 1;
+        if (kind == 6)
+            return cs.position;
         return cs.level;
     }
     if (id == kComboSide)
@@ -2874,6 +2935,15 @@ void MenuController::CampaignComboApply(int id, int index)
             if (index >= 0 && index < static_cast<int>(taken.size()) && !taken[index])
                 cs.color = index + 1;
         }
+        else if (kind == 6)
+        {
+            std::vector<int> positions;
+            for (const CustomSlot &s : m_customSlots)
+                positions.push_back(s.position);
+            ApplyCustomPosition(positions, row, index);
+            for (size_t i = 0; i < positions.size(); ++i)
+                m_customSlots[i].position = positions[i];
+        }
         else
         {
             cs.level = std::clamp(index, 0, 3);
@@ -2897,6 +2967,21 @@ void MenuController::CampaignComboApply(int id, int index)
     {
         m_skirmishPrebuilt = index == 0;
     }
+}
+
+void MenuController::ApplyCustomPosition(std::vector<int> &positions, int row, int position)
+{
+    if (row < 0 || row >= static_cast<int>(positions.size()) || position < 0 || position >= kMaxPlayers)
+        return;
+    for (size_t i = 0; i < positions.size(); ++i)
+    {
+        if (static_cast<int>(i) != row && positions[i] == position)
+        {
+            positions[i] = positions[row]; // the holder takes the place that was left
+            break;
+        }
+    }
+    positions[row] = position;
 }
 
 // Colours the other players of the custom game already wear (index 0 = colour 1)
@@ -2925,9 +3010,33 @@ void MenuController::EnsureCustomSlots()
         m_customSlots[1].color = 2;
         m_customSlots[1].team = 1;
         m_customSlots[1].level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
+        m_customSlots[1].position = 1;
     }
     if (m_customSlots.size() > most)
         m_customSlots.resize(most);
+    // Positions the map does not have, or held twice: the players take the lowest free ones
+    std::vector<bool> used(kMaxPlayers, false);
+    for (CustomSlot &cs : m_customSlots)
+    {
+        if (cs.position < 0 || cs.position >= static_cast<int>(most) || used[cs.position])
+            cs.position = -1;
+        else
+            used[cs.position] = true;
+    }
+    for (CustomSlot &cs : m_customSlots)
+    {
+        if (cs.position >= 0)
+            continue;
+        for (int pos = 0; pos < static_cast<int>(most); ++pos)
+        {
+            if (!used[pos])
+            {
+                cs.position = pos;
+                used[pos] = true;
+                break;
+            }
+        }
+    }
 }
 
 } // namespace OpenArtOfWar

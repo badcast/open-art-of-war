@@ -101,7 +101,11 @@ public:
 
     void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
+    void SetUiVolume(int volume);    // 0..128: interface clicks, dialogs and alerts
     void SetMuted(bool muted);
+    // The interface goes silent (a replay): interface sounds, alerts, unit replies and the announcer do not start;
+    // weapons and impacts do
+    void SetInterfaceMuted(bool muted);
     void SetReverb(bool enabled); // the reverb of explosions and heavy guns
 
     int ActiveVoices() const;
@@ -119,6 +123,7 @@ private:
         int priority {0};
         int event {-1};
         bool voiceVolume {false}; // Voice / Announcer category
+        bool uiVolume {false};    // Ui / Alert category
         bool announcer {false};
         float lpCoef {1.0f};     // one-pole low-pass coefficient, 1 = filter off
         float reverbSend {0.0f}; // share of the voice sent into the reverb
@@ -170,7 +175,9 @@ private:
     std::mt19937 m_rng {0x5f5fu}; // presentation only, never the simulation's random numbers
     float m_fxGain {1.0f};
     float m_voiceGain {1.0f};
+    float m_uiGain {1.0f};
     bool m_muted {false};
+    bool m_interfaceMuted {false};
     bool m_reverbOn {true};
     Reverb m_reverb;
     std::vector<float> m_sendBus, m_wetL, m_wetR; // scratch buffers of Mix
