@@ -4001,6 +4001,23 @@ bool EntityManager::IsHostileBuildingShown(const Building &b, const TileMap &map
     return inSight || (b.buildProgress >= 1.0f && m_seenBuildings.count(key) > 0);
 }
 
+namespace
+{
+// Bubble colour of a selected object by its health: green, yellow, red
+SDL_Color SelectionHealthColor(float ratio)
+{
+    const SDL_Color green {80, 255, 130, 255}, yellow {255, 220, 70, 255}, red {255, 70, 60, 255};
+    auto mix = [](SDL_Color a, SDL_Color b, float t) {
+        return SDL_Color {
+            static_cast<Uint8>(a.r + (b.r - a.r) * t),
+            static_cast<Uint8>(a.g + (b.g - a.g) * t),
+            static_cast<Uint8>(a.b + (b.b - a.b) * t),
+            255};
+    };
+    return ratio >= 0.5f ? mix(yellow, green, (ratio - 0.5f) * 2.0f) : mix(red, yellow, ratio * 2.0f);
+}
+} // namespace
+
 void EntityManager::render(
     Renderer &renderer,
     const Camera &camera,
@@ -4106,8 +4123,11 @@ void EntityManager::render(
             if (u->selected)
             {
                 renderer.SetDrawOwner(kNoPlayer);
-                int ringComp = u->IsInfantry() ? 1811 : (u->archetypeId == 6 ? 1812 : 1813);
-                renderer.DrawCompositeWorld(ringComp, wx - 90.0f, wy - 60.0f, camera, u->faction);
+                // A glowing bubble at the feet (health as its colour) instead of the ring
+                const float ratio = u->maxHp > 0 ? std::clamp(static_cast<float>(u->currentHp) / u->maxHp, 0.0f, 1.0f) : 1.0f;
+                const float rx = u->IsInfantry() ? TILE_WIDTH * 0.80f : TILE_WIDTH * 1.05f;
+                renderer.DrawSelectionBubble(
+                    wx + TILE_WIDTH * 0.5f, wy + TILE_HEIGHT * 0.75f, rx, rx * 0.55f, camera, SelectionHealthColor(ratio), 0.0f);
                 if (u->isSiegeMode || u->state == ActionState::Transform)
                 {
                     renderer.DrawCompositeWorld(1872, wx - 90.0f, wy - 60.0f, camera, u->faction);
@@ -4198,10 +4218,18 @@ void EntityManager::render(
 
             if (b->selected)
             {
-                float sizeW = b->buildWidth * TILE_WIDTH;
-                float sizeH = b->buildHeight * TILE_HEIGHT;
-                renderer.DrawRectWorld(
-                    b->tileX * TILE_WIDTH, b->tileY * TILE_HEIGHT, sizeW, sizeH, camera, {0, 255, 0, 255});
+                const float sizeW = b->buildWidth * TILE_WIDTH;
+                const float sizeH = b->buildHeight * TILE_HEIGHT;
+                const float ratio = b->maxHp > 0 ? std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f) : 1.0f;
+                // The bubble around the building and a veil of light that makes the building itself shine
+                renderer.DrawSelectionBubble(
+                    b->tileX * TILE_WIDTH + sizeW * 0.5f,
+                    b->tileY * TILE_HEIGHT + sizeH * 0.5f,
+                    sizeW * 0.68f,
+                    sizeH * 0.68f,
+                    camera,
+                    SelectionHealthColor(ratio),
+                    b->buildProgress >= 1.0f ? 0.55f : 0.0f);
             }
         }
     }
@@ -4211,9 +4239,8 @@ void EntityManager::render(
     {
         if (const Unit *u = it.unit)
         {
-            bool showUnitHp = showAllHealth
-                              || (debugMode ? (u->currentHp < u->maxHp || u->selected)
-                                            : (u->selected && u->owner == Players::Local()));
+            // (the selection bubble shows the health of a selected unit by its colour)
+            bool showUnitHp = showAllHealth || (debugMode && (u->currentHp < u->maxHp || u->selected));
             if (showUnitHp)
             {
                 float barW = 24.0f;
@@ -4244,8 +4271,7 @@ void EntityManager::render(
             renderer.FillRectWorld(barX, barY, barW * progPct, barH, camera, {255, 215, 0, 255});
             renderer.DrawRectWorld(barX, barY, barW, barH, camera, {255, 255, 255, 200});
 
-            bool showBuildingHp
-                = debugMode ? (b->currentHp < b->maxHp || b->selected) : (b->selected && b->owner == Players::Local());
+            bool showBuildingHp = showAllHealth || (debugMode && (b->currentHp < b->maxHp || b->selected));
             if (showBuildingHp)
             {
                 float hpPct = std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f);
@@ -4255,8 +4281,7 @@ void EntityManager::render(
         }
         else
         {
-            bool showBuildingHp
-                = debugMode ? (b->currentHp < b->maxHp || b->selected) : (b->selected && b->owner == Players::Local());
+            bool showBuildingHp = showAllHealth || (debugMode && (b->currentHp < b->maxHp || b->selected));
             if (showBuildingHp)
             {
                 float barW = b->buildWidth * TILE_WIDTH;

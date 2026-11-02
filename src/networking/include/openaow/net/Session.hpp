@@ -82,6 +82,8 @@ public:
     void setAiSlot(const OwnerSetAi &change);
     // The team of a player in the room (the host / room owner decides teams, see OwnerSetTeam)
     void setTeam(uint8_t slot, uint8_t team, uint8_t handicap);
+    // Match options of the room (the host / room owner decides, everybody sees them in the lobby)
+    void setOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
     bool everyoneReady(int minPlayers) const;
 
@@ -283,6 +285,7 @@ public:
     void sendOwnerStart(const std::vector<uint8_t> &setup, uint32_t firstTurnDelayMs = 3000);
     void sendOwnerSetAi(const OwnerSetAi &change);
     void sendOwnerSetTeam(const OwnerSetTeam &change);
+    void sendOwnerSetOptions(const OwnerSetOptions &change);
 
     // The host started the match: its setup (the game decodes it) and when turn 0 is due
     bool matchStarted() const

@@ -396,6 +396,9 @@ void encode(BitWriter &w, const LobbyState &m)
     w.writeString(m.map, kMaxMapPathLength);
     w.writeU64(m.mapHash);
     w.writeRanged(m.spawnCount, 0, kMaxPlayers);
+    w.writeBool(m.fogOfWar);
+    w.writeBool(m.prebuilt);
+    w.writeBits(m.credits, 3);
     w.writeRanged(static_cast<std::int32_t>(m.slots.size()), 0, kMaxPlayers);
     for (const LobbySlot &s : m.slots)
     {
@@ -412,6 +415,11 @@ bool decode(BitReader &r, LobbyState &m)
     m.map = r.readString(kMaxMapPathLength);
     m.mapHash = r.readU64();
     m.spawnCount = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
+    m.fogOfWar = r.readBool();
+    m.prebuilt = r.readBool();
+    m.credits = static_cast<uint8_t>(r.readBits(3));
+    if (m.credits > 4)
+        r.fail();
     const int count = r.readRanged(0, kMaxPlayers);
     m.slots.resize(r.failed() ? 0 : static_cast<std::size_t>(count));
     for (LobbySlot &s : m.slots)
@@ -561,6 +569,24 @@ bool decode(BitReader &r, OwnerSetTeam &m)
     m.team = static_cast<uint8_t>(r.readBits(3));
     m.handicap = static_cast<uint8_t>(r.readBits(3));
     if (m.handicap > 5)
+        r.fail();
+    return done(r);
+}
+
+void encode(BitWriter &w, const OwnerSetOptions &m)
+{
+    writeType(w, MsgType::OwnerSetOptions);
+    w.writeBool(m.fogOfWar);
+    w.writeBool(m.prebuilt);
+    w.writeBits(m.credits, 3);
+}
+
+bool decode(BitReader &r, OwnerSetOptions &m)
+{
+    m.fogOfWar = r.readBool();
+    m.prebuilt = r.readBool();
+    m.credits = static_cast<uint8_t>(r.readBits(3));
+    if (m.credits > 4)
         r.fail();
     return done(r);
 }

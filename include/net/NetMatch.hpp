@@ -135,6 +135,8 @@ public:
     void SetAi(const Net::OwnerSetAi &change);
     // Host / room owner: the team of a player (players cannot choose their own)
     void SetTeam(uint8_t slot, uint8_t team, uint8_t handicap);
+    // The owner sets the match options of the room
+    void SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
     void SendChat(const std::string &text);
     std::vector<Net::Chat> TakeChat();
     // Host: everybody in the room is ready (two players at least)
@@ -143,7 +145,8 @@ public:
     // match seed, so every peer gets the same resolved setup
     // `prebuilt`: prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch (HQ + power
     // only)
-    void StartFromLobby(uint32_t nowMs, int startingCredits, bool prebuilt = true);
+    // Starts with the room's match options (fog of war, prebuilt bases, starting credits)
+    void StartFromLobby(uint32_t nowMs);
 
     // Host: every connected player takes part, in the order they joined; the setup goes to all of them
     void startMatch(const MatchSetup &setup, uint32_t nowMs);

@@ -898,6 +898,26 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     {
         UpdateBaseBuilder(deltaTime, map, entities, pathfinder);
     }
+    else if (m_skirmish && m_startingBaseRecorded)
+    {
+        // A base without the defense building still keeps its power balanced (nothing works without power)
+        m_buildTimer += deltaTime;
+        if (m_buildTimer >= 3.0f)
+        {
+            m_buildTimer = 0.0f;
+            int produced = 0, consumed = 0;
+            for (const auto &e : entities.GetAllEntities())
+            {
+                const Building *b = e.AsBuilding();
+                if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || b->buildProgress < 1.0f)
+                    continue;
+                const int pwr = b->GetPowerOutput();
+                (pwr > 0 ? produced : consumed) += std::abs(pwr);
+            }
+            if (produced < consumed)
+                UpdateCoreBuildOrder(map, entities);
+        }
+    }
 
     m_economyTimer += deltaTime;
     while (m_economyTimer >= 1.0f)
@@ -1047,7 +1067,9 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     }
 
     // Unit cap per match for performance & balance
-    if (enemyUnitCount >= 40)
+    // (a crowd of infantry must not keep the vehicles from the factory: they have a little more room)
+    const bool infantryAllowed = enemyUnitCount < 40;
+    if (enemyUnitCount >= 52)
         return;
 
     float speedMult = m_currentDifficultyConfig.productionSpeedMultiplier;
@@ -1114,7 +1136,8 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     else
         m_vehicleHoldSeconds = 0.0f;
     for (Building *barracks : availableBarracks)
-        produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
+        if (infantryAllowed)
+            produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
     for (Building *factory : availableFactories)
     {
         const size_t before = m_vehicleQueue.size();
@@ -2439,14 +2462,31 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
         ox /= olen;
         oy /= olen;
     }
-    AIDefenseSite site;
-    site.kind = kind;
-    site.tileX = static_cast<int>(std::lround(cx + ox * radius)) - 1;
-    site.tileY = static_cast<int>(std::lround(cy + oy * radius)) - 1;
-    if (!BuildDefenseSite(site, map, entities))
-        return false;
-    Think("BUILD", why);
-    return true;
+    // The preferred side first, then the others in turn (a spot at the edge of the map or in rock would stall the base for good)
+    constexpr float kC = 0.70710678f, kS = 0.70710678f;
+    for (int k = 0; k < 8; ++k)
+    {
+        const int turns = (k + 1) / 2;
+        const bool left = (k % 2) == 1;
+        float vx = ox, vy = oy;
+        for (int t = 0; t < turns; ++t)
+        {
+            const float sgn = left ? 1.0f : -1.0f;
+            const float nx = vx * kC - sgn * vy * kS, ny = sgn * vx * kS + vy * kC;
+            vx = nx;
+            vy = ny;
+        }
+        AIDefenseSite site;
+        site.kind = kind;
+        site.tileX = static_cast<int>(std::lround(cx + vx * radius)) - 1;
+        site.tileY = static_cast<int>(std::lround(cy + vy * radius)) - 1;
+        if (BuildDefenseSite(site, map, entities))
+        {
+            Think("BUILD", why);
+            return true;
+        }
+    }
+    return false;
 }
 
 void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)

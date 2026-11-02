@@ -286,6 +286,7 @@ private:
     int m_skirmishSelected {0};
     bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
     bool m_skirmishFogOfWar {true}; // custom game: fog of war enabled
+    int m_skirmishCredits {kDefaultCreditsIndex}; // custom game: index into kStartingCredits
     // Custom game players, as the network room has them: [0] is the person, the rest are computer players
     struct CustomSlot
     {
@@ -308,7 +309,7 @@ private:
                                                       // first visible row of the map list
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
-    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102;
+    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102, kComboCredits = 103;
     static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;

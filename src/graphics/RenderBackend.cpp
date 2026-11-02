@@ -25,7 +25,7 @@ struct DriverName
 // SDL GPU comes first: it runs on Vulkan / Direct3D 12 / Metal itself and is the one API with the
 // shader effects (ShaderEffects).
 const DriverName kPreference[] = {
-    {"gpu", "SDL GPU (shader effects)"},
+    {"gpu", "SDL GPU"},
     {"vulkan", "Vulkan"},
     {"direct3d12", "Direct3D 12"},
     {"metal", "Metal"},
