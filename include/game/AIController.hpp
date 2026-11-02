@@ -123,6 +123,11 @@ public:
 
     // enemyHq: this AI's own base (the player's enemy), playerHq: the base it goes for
     void Init(int enemyHqX, int enemyHqY, int playerHqX, int playerHqY);
+    // Match handicap: scales the treasury the computer player starts with
+    void ApplyHandicap(int percent)
+    {
+        m_credits = m_credits * percent / 100;
+    }
     // The player slot this AI commands (single player: set by init from the factions)
     void SetPlayer(PlayerId player);
     PlayerId player() const

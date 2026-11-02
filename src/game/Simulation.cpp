@@ -97,7 +97,7 @@ void Simulation::startMatch(const MatchSetup &setup)
     {
         if (!setup.slots[p].active || p == setup.local)
             continue;
-        m_economies[p].Reset(setup.startingCredits);
+        m_economies[p].Reset(setup.startingCredits * HandicapPercentOf(setup.slots[p].handicap) / 100);
         m_economies[p].SetPlayer(p);
         m_economyMask |= 1u << p;
     }

@@ -4296,3 +4296,18 @@ msgstr "Volume of the interface sounds: clicks, dialogs and alerts"
 
 msgid "HEADQUARTERS REQUIRED TO BUILD!"
 msgstr "HEADQUARTERS REQUIRED TO BUILD!"
+
+msgid "Handicap"
+msgstr "Handicap"
+
+msgid "Pos."
+msgstr "Pos."
+
+msgid "None"
+msgstr "None"
+
+msgid "Colour"
+msgstr "Colour"
+
+msgid "Say"
+msgstr "Say"

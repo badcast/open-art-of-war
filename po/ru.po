@@ -4296,3 +4296,18 @@ msgstr "Громкость звуков интерфейса: клики, диа
 
 msgid "HEADQUARTERS REQUIRED TO BUILD!"
 msgstr "ШТАБ НУЖЕН ДЛЯ СТРОИТЕЛЬСТВА!"
+
+msgid "Handicap"
+msgstr "Фора"
+
+msgid "Pos."
+msgstr "Поз."
+
+msgid "None"
+msgstr "Нет"
+
+msgid "Colour"
+msgstr "Цвет"
+
+msgid "Say"
+msgstr "Сказать"

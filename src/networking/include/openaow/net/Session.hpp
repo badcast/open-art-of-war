@@ -81,7 +81,7 @@ public:
     // Computer players: add (slot kRandom: the first free one), change or remove (see OwnerSetAi)
     void setAiSlot(const OwnerSetAi &change);
     // The team of a player in the room (the host / room owner decides teams, see OwnerSetTeam)
-    void setTeam(uint8_t slot, uint8_t team);
+    void setTeam(uint8_t slot, uint8_t team, uint8_t handicap);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
     bool everyoneReady(int minPlayers) const;
 
@@ -160,7 +160,8 @@ private:
     void broadcast(Channel channel, const uint8_t *data, size_t size);
     void broadcastRoster();
     void broadcastLobby();
-    void applyChoice(uint8_t slot, LobbyChoice choice);
+    // `ownerEdit`: the room owner sets it (computer players); a player cannot change his own handicap
+    void applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit = false);
     void setPaused(bool paused, uint8_t bySlot, uint32_t nowMs);
     bool m_paused {false};
     uint32_t m_pauseStartMs {0};

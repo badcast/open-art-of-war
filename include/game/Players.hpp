@@ -22,7 +22,16 @@ struct PlayerSlot
     uint8_t color {0}; // army colour (0 = the faction's classic sheets)
     bool human {false};
     uint8_t aiLevel {1}; // computer player: 0 easy .. 3 hardcore
+    uint8_t handicap {0}; // start credits: index into kHandicapPercent (0 = none)
 };
+
+// Handicaps ("forms"): the share of the match's starting credits a player gets
+constexpr int kHandicapCount = 6;
+constexpr int kHandicapPercent[kHandicapCount] = {100, 75, 50, 125, 150, 200};
+inline int HandicapPercentOf(int index)
+{
+    return kHandicapPercent[(index >= 0 && index < kHandicapCount) ? index : 0];
+}
 
 namespace Players
 {

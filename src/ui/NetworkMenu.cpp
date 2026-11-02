@@ -55,6 +55,10 @@ std::vector<std::string> ComboChoices(int kind)
     else if (kind == 4)
         for (int i = 0; i < 4; ++i)
             out.push_back(AiLevelName(static_cast<uint8_t>(i)));
+    else if (kind == 7)
+    {
+        out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"}; // the start credits form, see kHandicapPercent
+    }
     else if (kind == 6)
     {
         out.push_back("?");
@@ -171,15 +175,15 @@ NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int w, int h)
 NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
 {
     LobbyLayout l;
-    l.dialog = ui::CenteredRect(w, h, 1000, 640);
+    l.dialog = ui::CenteredRect(w, h, 1080, 640);
     const int x = l.dialog.x + 20, y = l.dialog.y + 60;
-    l.players = {x, y, 520, 30 + 8 * 40};
-    l.map = {x + 540, y + 30, l.dialog.Right() - 20 - (x + 540), 300};
+    l.players = {x, y, 600, 30 + 8 * 40};
+    l.map = {x + 620, y + 30, l.dialog.Right() - 20 - (x + 620), 300};
     l.mapPrev = {l.map.x, y - 4, 32, 26};
     l.mapNext = {l.map.Right() - 32, y - 4, 32, 26};
     l.mapName = {l.mapPrev.Right() + 4, y - 4, l.mapNext.x - 4 - (l.mapPrev.Right() + 4), 26};
-    l.chatLog = {x, l.players.Bottom() + 10, 520, l.dialog.Bottom() - 70 - (l.players.Bottom() + 10) - 44};
-    l.chatField = {x, l.chatLog.Bottom() + 6, 520 - 52, 36};
+    l.chatLog = {x, l.players.Bottom() + 10, 600, l.dialog.Bottom() - 70 - (l.players.Bottom() + 10) - 44};
+    l.chatField = {x, l.chatLog.Bottom() + 6, 600 - 52, 36};
     l.chatSend = {l.chatField.Right() + 8, l.chatField.y, 44, 36};
     l.prebuiltBtn = {l.map.Right() - 8 - 190, l.map.Bottom() - 8 - 28, 190, 28};
     // Bottom row: Leave on the left (under the chat), Ready and Start on the right - never on top of each other
@@ -517,6 +521,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                : kind == 2 ? l.TeamCell(row)
                : kind == 3 ? l.ColorCell(row)
                : kind == 6 ? l.SpawnCell(row)
+               : kind == 7 ? l.HandicapCell(row)
                            : l.NameCell(row);
     };
     if (m_combo.open >= 0)
@@ -583,7 +588,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
-                                net.SetTeam(s.slot, choice.team);
+                                net.SetTeam(s.slot, choice.team, choice.handicap);
                             return NetworkAction::None;
                         }
                     }
@@ -597,6 +602,17 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     }
                     if (kind == 4)
                         level = static_cast<uint8_t>(picked);
+                    if (kind == 7)
+                    {
+                        // The form (start credits) is the owner's decision, for every player
+                        choice.handicap = static_cast<uint8_t>(picked);
+                        if (!s.ai)
+                        {
+                            if (net.ControlsRoom())
+                                net.SetTeam(s.slot, choice.team, choice.handicap);
+                            return NetworkAction::None;
+                        }
+                    }
                     if (kind == 6)
                     {
                         // 0 is "?" (random); the host swaps the places when another player holds the position
@@ -715,9 +731,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         for (int i = 0; i < rows; ++i)
         {
             const Net::LobbySlot &s = lobby->slots[i];
-            // The host / owner sets every player's team
+            // The host / owner sets every player's team and form
             if (l.TeamCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 2);
+            if (l.HandicapCell(i).Contains(mx, my))
+                return openCombo(i * 10 + 7);
             if (!s.ai)
                 continue;
             if (l.RemoveCell(i).Contains(mx, my))
@@ -807,6 +825,10 @@ void NetworkMenu::render(
         const UiRect content = ui::DrawDialog(r, font, w, h, l.dialog, title);
         (void) content;
         ui::DrawCaption(font, r, l.players.x, l.players.y, _("PLAYERS"));
+        // Column captions, the same order as in the custom game window
+        for (const auto &[cx, text] : std::initializer_list<std::pair<int, const char *>> {
+                 {170, _("Faction")}, {296, _("Team")}, {372, _("Colour")}, {418, _("Pos.")}, {470, _("Handicap")}})
+            font.DrawString(text, l.players.x + cx, l.players.y + 4, ui::FONT_SMALL, col::TextMuted, false);
         auto nameOf = [&](uint8_t slot) {
             if (roster)
             {
@@ -921,6 +943,15 @@ void NetworkMenu::render(
                         l.SpawnCell(rowIndex).Contains(m_mouseX, m_mouseY));
                 else
                     cell(l.SpawnCell(rowIndex), spawn);
+                {
+                    const UiRect hc = l.HandicapCell(rowIndex);
+                    const std::string form = ComboChoices(7)[std::min<int>(choice.handicap, 5)];
+                    if (net->ControlsRoom())
+                        ui::DrawComboField(
+                            r, font, hc, form, m_combo.open == rowIndex * 10 + 7, hc.Contains(m_mouseX, m_mouseY));
+                    else
+                        cell(hc, form);
+                }
                 if (!s.ai)
                 {
                     font.DrawString(
@@ -1168,11 +1199,13 @@ void NetworkMenu::render(
                                          : kind == 2 ? l.TeamCell(row)
                                          : kind == 3 ? l.ColorCell(row)
                                          : kind == 6 ? l.SpawnCell(row)
+                                         : kind == 7 ? l.HandicapCell(row)
                                                      : l.NameCell(row);
                 const int current = kind == 1   ? (sc.faction == Net::kRandom ? 0 : sc.faction + 1)
                                     : kind == 2 ? sc.team
                                     : kind == 3 ? std::max(0, sc.color - 1)
                                     : kind == 6 ? (sc.spawn == Net::kRandom ? 0 : sc.spawn + 1)
+                                    : kind == 7 ? std::min<int>(sc.handicap, 5)
                                                 : s.aiLevel;
                 std::vector<std::string> items = ComboChoices(kind);
                 std::vector<bool> taken;

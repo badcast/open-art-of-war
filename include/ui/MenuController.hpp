@@ -78,7 +78,12 @@ public:
     // Menu States
     bool IsAnyMenuOpen() const
     {
-        return m_inGameMenuOpen || m_inGameSettingsOpen || m_objectivesDialogOpen || m_missionDialogOpen;
+        return m_inGameMenuOpen || m_inGameSettingsOpen || m_objectivesDialogOpen || m_missionDialogOpen || m_chatOpen;
+    }
+    // The chat line of a network match is open: the game takes no keys meanwhile
+    void SetChatOpen(bool open)
+    {
+        m_chatOpen = open;
     }
     bool IsInGameMenuOpen() const
     {
@@ -271,6 +276,7 @@ private:
     int m_inGameMenuSelected {0};
     bool m_objectivesDialogOpen {false};
     bool m_missionDialogOpen {false};
+    bool m_chatOpen {false};
     MissionDialog m_missionDialog;
     bool m_campaignSelectOpen {false};
     int m_campaignMissionSelected {0};
@@ -287,6 +293,7 @@ private:
         int team {0};
         int color {1}; // 1..8
         int level {1}; // computer player: 0 easy .. 3 hardcore
+        int handicap {0}; // start credits form (kHandicapPercent index); 0 = none
         int position {0}; // start position of the map (0-based), never shared by two players
     };
     std::vector<CustomSlot> m_customSlots;
@@ -302,7 +309,7 @@ private:
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
     static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102;
-    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position)
+    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);

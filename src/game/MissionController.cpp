@@ -1235,7 +1235,7 @@ bool MissionController::LoadMatch(
     m_isDefeat = false;
 
     entities.Clear();
-    economy.Reset(setup.startingCredits);
+    economy.Reset(setup.startingCredits * HandicapPercentOf(setup.slots[setup.local].handicap) / 100);
     economy.SetPlayer(setup.local);
     map.SetFogEnabled(setup.fogOfWar);
     if (!setup.fogOfWar)

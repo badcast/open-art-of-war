@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 6;
+constexpr std::uint16_t kProtocolVersion = 7;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -194,6 +194,7 @@ struct LobbyChoice
     uint8_t team {0};          // 0..7
     uint8_t color {0};         // 0..15
     uint8_t spawn {kRandom};   // start position 0..7 or kRandom
+    uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
     bool ready {false};
 };
 
@@ -219,6 +220,7 @@ struct OwnerSetTeam
 {
     uint8_t slot {0};
     uint8_t team {0}; // 0..7
+    uint8_t handicap {0}; // 0..5, see LobbyChoice
 };
 
 struct LobbyState

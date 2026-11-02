@@ -949,6 +949,16 @@ void testLobby()
     a->sendOwnerSetTeam(OwnerSetTeam {1, 5});
     pump();
     CHECK(a->lobby().slots[1].choice.team == 5);
+    // The handicap (start credits form) is the owner's: B cannot give itself one, A can
+    cb.handicap = 4;
+    cb.team = 5;
+    b->sendLobbyChoice(cb);
+    pump();
+    CHECK(a->lobby().slots[1].choice.handicap == 0);
+    a->sendOwnerSetTeam(OwnerSetTeam {1, 5, 3});
+    pump();
+    CHECK(a->lobby().slots[1].choice.handicap == 3 && a->lobby().slots[1].choice.team == 5);
+    cb.handicap = 0; // (the value B sends is ignored anyway)
     cb.team = 5;
     CHECK(!host.everyoneReady(2));
     ca.ready = true;

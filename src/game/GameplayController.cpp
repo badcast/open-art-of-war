@@ -292,6 +292,7 @@ void GameplayController::CreateMatchAis(const MissionController &mission, Entity
         ai->SetPlayer(p);
         ai->SetDifficulty(static_cast<AIDifficulty>(std::min<int>(slot.aiLevel, 3)));
         ai->Init(ownX, ownY, targetX, targetY);
+        ai->ApplyHandicap(HandicapPercentOf(slot.handicap));
         ai->RecordStartingBase(entities, map);
         ai->SetSkirmish(true);
         m_matchAis.push_back(std::move(ai));

@@ -454,6 +454,7 @@ void Application::run()
         // One clock for all network timing: SDL ticks, the same the lobby's Start button uses (epoch
         // milliseconds here made a host started from the menu close thousands of turns at once)
         UpdateNetwork(static_cast<uint32_t>(SDL_GetTicks()));
+        UpdateGameChat(static_cast<uint32_t>(SDL_GetTicks()));
 
         // Simulation / Menu Update
         if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
@@ -1292,6 +1293,7 @@ void Application::render()
 
     RenderMenuFade();
     RenderNotices();
+    RenderGameChat();
     RenderScoreboard();
     RenderFpsCounter();
     RenderNetStats();

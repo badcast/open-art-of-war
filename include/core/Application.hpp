@@ -148,6 +148,9 @@ private:
     // Short messages over the battlefield ("Player X has disconnected"), they fade after a few seconds
     void PushNotice(const std::string &text, uint32_t nowMs);
     void RenderNotices();
+    // In-game chat of a network match: Enter opens the input line, Enter sends, Esc closes
+    void UpdateGameChat(uint32_t nowMs);
+    void RenderGameChat();
     void RenderMenuFade();
     // Tab held in a match: every player with faction, colour, name and efficiency points
     void RenderScoreboard();
@@ -288,6 +291,12 @@ private:
         uint32_t untilMs {0};
     };
     std::vector<Notice> m_notices;
+    struct GameChat
+    {
+        bool open {false};
+        std::string input;
+        std::vector<Notice> lines; // received messages, shown for a while
+    } m_gameChat;
     std::unique_ptr<TextureManager> m_texManager;
     std::unique_ptr<Renderer> m_renderer;
     std::unique_ptr<Camera> m_camera;
