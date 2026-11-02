@@ -79,6 +79,8 @@ void ReloadResearchCatalogs();
 
 // Research is only possible while the player owns a finished Tech Center / Laboratory
 bool HasResearchBuilding(PlayerId player, const EntityManager &entities);
+// A finished laboratory / tech center that has power: without power the research stands still
+bool ResearchBuildingPowered(PlayerId player, const EntityManager &entities);
 // Sets the research animation flag (Building::isResearching) of every finished Tech Center / Laboratory of a player
 void SetResearchAnimation(PlayerId player, bool researching, EntityManager &entities);
 

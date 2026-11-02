@@ -980,18 +980,18 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         {
             if (b->type == UnitType::Headquarters)
             {
-                hasHq = true;
+                hasHq = hasHq || b->buildProgress >= 1.0f;
             }
             else if (b->type == UnitType::Barracks)
             {
                 hasBarracks = true;
-                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f)
+                if (b->buildProgress >= 1.0f && b->isPowered && !b->isProducing && b->productionTimer <= 0.0f)
                     availableBarracks.push_back(b);
             }
             else if (b->type == UnitType::Factory)
             {
                 hasFactory = true;
-                if (b->buildProgress >= 1.0f && !b->isProducing && b->productionTimer <= 0.0f)
+                if (b->buildProgress >= 1.0f && b->isPowered && !b->isProducing && b->productionTimer <= 0.0f)
                     availableFactories.push_back(b);
             }
         }
@@ -1032,7 +1032,8 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         return; // All enemy production structures destroyed
     }
 
-    m_credits += m_creditsPerSec;
+    if (hasHq)
+        m_credits += m_creditsPerSec; // the income is the headquarters'
 
     // Units lost while assembling are replaced so the wave can still reach 100% strength
     int planned = static_cast<int>(m_currentPlan.archetypes.size());

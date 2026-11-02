@@ -4293,3 +4293,6 @@ msgstr "Громкость интерфейса"
 
 msgid "Volume of the interface sounds: clicks, dialogs and alerts"
 msgstr "Громкость звуков интерфейса: клики, диалоги и тревоги"
+
+msgid "HEADQUARTERS REQUIRED TO BUILD!"
+msgstr "ШТАБ НУЖЕН ДЛЯ СТРОИТЕЛЬСТВА!"

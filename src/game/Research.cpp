@@ -293,6 +293,20 @@ bool HasResearchBuilding(PlayerId player, const EntityManager &entities)
     return false;
 }
 
+bool ResearchBuildingPowered(PlayerId player, const EntityManager &entities)
+{
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (b && b->alive && b->state != ActionState::Die && b->owner == player && b->type == UnitType::ResearchLab
+            && b->buildProgress >= 1.0f && b->isPowered)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void SetResearchAnimation(PlayerId player, bool researching, EntityManager &entities)
 {
     for (auto &e : entities.GetAllEntities())

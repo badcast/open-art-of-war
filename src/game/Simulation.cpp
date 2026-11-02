@@ -573,8 +573,8 @@ void Simulation::UpdateResearch(float dt, SimContext &ctx)
     for (PlayerId p = 0; p < kMaxPlayers; ++p)
     {
         ResearchProgress &r = m_research[p];
-        // Research pauses while the Tech Center / Laboratory is down
-        if (r.active < 0 || r.active >= kResearchCount || !HasResearchBuilding(p, ctx.entities))
+        // Research pauses while the Tech Center / Laboratory is down or without power
+        if (r.active < 0 || r.active >= kResearchCount || !ResearchBuildingPowered(p, ctx.entities))
             continue;
         r.timer += dt;
         if (r.timer < r.duration)
@@ -586,7 +586,7 @@ void Simulation::UpdateResearch(float dt, SimContext &ctx)
     }
     // The labs of a researching player animate (the computer players set theirs in AIController::Update, after this)
     for (PlayerId p = 0; p < kMaxPlayers; ++p)
-        SetResearchAnimation(p, m_research[p].active >= 0, ctx.entities);
+        SetResearchAnimation(p, m_research[p].active >= 0 && ResearchBuildingPowered(p, ctx.entities), ctx.entities);
 }
 
 void Simulation::UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints)

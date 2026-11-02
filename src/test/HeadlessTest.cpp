@@ -1150,6 +1150,34 @@ bool HeadlessTest::RunBuildRulesTest(Application &app)
     }
     if (entities.CanPlaceBuilding(34, 18, 2, 2, map, res) || entities.CanPlaceBuilding(34, 22, 1, 1, map, res))
         return fail("a player whose headquarters fell must build nothing, walls included");
+    // The income is the headquarters': none without one; with one it comes, and research stands still without power
+    {
+        Economy &eco = *app.m_economy;
+        eco.SetPlayer(res);
+        eco.Reset(0);
+        eco.SetPlayer(res);
+        for (int i = 0; i < 70; ++i)
+            eco.Update(0.05f, entities, map, *app.m_pathfinder);
+        if (eco.GetCredits() != 0)
+            return fail("without a headquarters no credits may come in");
+        const int hq2 = entities.SpawnBuildingByIndex(8, 28, 18, Faction::Resistance, 1.0f);
+        for (int i = 0; i < 70; ++i)
+            eco.Update(0.05f, entities, map, *app.m_pathfinder);
+        if (eco.GetCredits() <= 0)
+            return fail("a headquarters must bring income");
+        const int lab = entities.SpawnBuildingByIndex(4, 36, 18, Faction::Resistance, 1.0f);
+        if (Building *l = entities.GetBuilding(lab))
+            l->isPowered = false;
+        if (ResearchBuildingPowered(res, entities))
+            return fail("a laboratory without power must not count for research");
+        if (Building *l = entities.GetBuilding(lab))
+            l->isPowered = true;
+        if (!ResearchBuildingPowered(res, entities))
+            return fail("a powered laboratory must count for research");
+        entities.Clear();
+        (void)hq2;
+        map.InitBlankArena(60, 40, 0);
+    }
 
     // A match with a computer player: it builds under the same rules, and is out when its last building is gone
     MatchSetup setup;
