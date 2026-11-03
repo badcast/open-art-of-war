@@ -13,6 +13,12 @@ Random &rng()
     return s_rng;
 }
 
+Random &visualRng()
+{
+    static Random s_visualRng(0x85431234u);
+    return s_visualRng;
+}
+
 int Dir8FromVector(float dx, float dy)
 {
     constexpr float kPi = static_cast<float>(M_PI);

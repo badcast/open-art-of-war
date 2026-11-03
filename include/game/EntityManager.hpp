@@ -557,6 +557,7 @@ public:
     void NoteEntityHit(Entity &victim, int attackerId);
     // Keeps Unit::turretShiftX/Y in line with the turret layer of the unit's current hull sprite
     void UpdateTurretShift(Unit &u) const;
+    static void GetDeterministicTurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY);
     // Siege-capable units deploy by themselves when a visible enemy is out of normal range but within
     // siege range (AI always, the player only on an attack-move [Q] order), and pack up again when idle
     void UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime);
