@@ -20,6 +20,7 @@
 #include "game/Effects.hpp"
 #include "game/Economy.hpp"
 #include "game/AIController.hpp"
+#include "game/Missions.hpp"
 #include "game/MissionController.hpp"
 #include "game/GameplayController.hpp"
 #include "game/Simulation.hpp"
@@ -1336,6 +1337,372 @@ bool HeadlessTest::RunMatchAiTest(Application &app)
         return false;
     }
     return true;
+}
+
+bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
+{
+    std::cout << "[Test] Validating the base layout of computer allies on four-player maps..." << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    Economy &economy = *app.m_economy;
+    MissionController &mission = *app.m_mission;
+    GameplayController &gc = *app.m_gameplayController;
+    Simulation &sim = gc.simulation();
+    const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+    bool ok = true;
+
+    // Two computer allies against two: plays `ticks` ticks of the match
+    auto play = [&](const std::string &mapName, uint32_t seed, int ticks) {
+        MatchSetup setup;
+        setup.mapPath = LoaderResources::MapPath(mapName);
+        setup.seed = seed;
+        setup.local = 0;
+        setup.localOnly = true;
+        setup.startingCredits = 10000;
+        for (int i = 0; i < 4; ++i)
+        {
+            setup.slots[i] = {true, i % 2 ? Faction::Confederation : Faction::Resistance,
+                              static_cast<uint8_t>(i / 2), static_cast<uint8_t>(i + 1), false, 2};
+            setup.startPosition[i] = static_cast<int8_t>(i);
+        }
+        if (!mission.LoadMatch(setup, map, entities, economy, pf))
+            return false;
+        gc.ResetForMission(mission, *app.m_hudController, entities, map);
+        for (auto &ai : gc.m_matchAis)
+            ai->m_credits = 10000;
+        SimContext ctx {entities, map, pf, economy, *app.m_aiController};
+        for (int tick = 0; tick < ticks; ++tick)
+        {
+            sim.ApplyCommands(ctx);
+            sim.UpdateResearch(dt, ctx);
+            entities.Update(dt, map, pf);
+            sim.UpdateSquads(dt, ctx, app.m_aiController->GetChokepoints());
+            sim.UpdateEconomies(dt, ctx);
+            for (auto &ai : gc.m_matchAis)
+                ai->Update(dt, map, entities, pf);
+            sim.EndTick();
+        }
+        return true;
+    };
+    // A free tile around a building
+    auto doorOf = [&](const Entity &e, int &x, int &y) {
+        const Building *b = e.AsBuilding();
+        for (int ty = b->tileY - 1; ty <= b->tileY + b->buildHeight; ++ty)
+            for (int tx = b->tileX - 1; tx <= b->tileX + b->buildWidth; ++tx)
+                if (map.IsPassable(tx, ty) && map.GetWall(tx, ty) == 0)
+                {
+                    x = tx;
+                    y = ty;
+                    return true;
+                }
+        return false;
+    };
+    auto layoutOf = [&](PlayerId p) {
+        std::vector<std::tuple<int, int, int>> out;
+        for (const Entity &e : entities.GetAllEntities())
+            if (e.alive && e.isBuilding && e.owner == p)
+                out.emplace_back(static_cast<int>(e.type), e.tileX, e.tileY);
+        return out;
+    };
+
+    for (const char *mapName : {"4x_runs", "map_skirmish_5", "4x_gage", "4x_kings"})
+    {
+        if (!play(mapName, 777, 4800))
+        {
+            std::cerr << "[Test] Error: " << mapName << " did not load" << std::endl;
+            return false;
+        }
+        // The first headquarters of every player
+        std::array<const Entity *, kMaxPlayers> hq {};
+        for (const Entity &e : entities.GetAllEntities())
+            if (e.alive && e.isBuilding && e.type == UnitType::Headquarters && e.owner < kMaxPlayers && !hq[e.owner])
+                hq[e.owner] = &e;
+        int closed = 0, checked = 0, labs = 0, frontPower = 0, power = 0;
+        for (auto &ai : gc.m_matchAis)
+        {
+            const PlayerId p = ai->player();
+            bool hasLab = entities.HasBuildingType(UnitType::ResearchLab, p, false);
+            for (const AIStructurePlan &plan : ai->m_startingBuildings) // one the enemy destroyed counts (it comes back)
+                hasLab = hasLab || (plan.type == UnitType::ResearchLab && plan.destroyed);
+            // (a base the enemy has wiped out builds nothing: it does not count)
+            const bool hasHq = entities.HasBuildingType(UnitType::Headquarters, p, true);
+            labs += (hasLab || !hasHq) ? 1 : 0;
+            if (!hasLab)
+            {
+                int n = 0;
+                for (const Entity &e : entities.GetAllEntities())
+                    n += e.alive && e.isBuilding && e.owner == p;
+                std::cout << "    " << mapName << ": player " << int(p) << " has no laboratory (HQ " << hasHq << ", "
+                          << n << " buildings, credits " << ai->m_credits << ")" << std::endl;
+            }
+            for (const Entity &e : entities.GetAllEntities())
+            {
+                if (!e.alive || e.state == ActionState::Die || !e.isBuilding || e.owner != p)
+                    continue;
+                if (e.type == UnitType::PowerPlant && hq[p])
+                {
+                    const Building *h = hq[p]->AsBuilding();
+                    const float cx = h->tileX + h->buildWidth * 0.5f, cy = h->tileY + h->buildHeight * 0.5f;
+                    const float tx = ai->m_playerHqX - cx, ty = ai->m_playerHqY - cy;
+                    const Building *b = e.AsBuilding();
+                    const float ox = b->tileX + b->buildWidth * 0.5f - cx, oy = b->tileY + b->buildHeight * 0.5f - cy;
+                    const float facing = (ox * tx + oy * ty)
+                                         / std::max(0.01f, DetMath::Hypot(ox, oy) * DetMath::Hypot(tx, ty));
+                    ++power;
+                    if (facing > 0.55f)
+                        ++frontPower;
+                }
+                if (e.type != UnitType::Headquarters && e.type != UnitType::Barracks && e.type != UnitType::Factory)
+                    continue;
+                // Some free side of it leads to every other headquarters
+                std::vector<std::pair<int, int>> sides;
+                {
+                    const Building *bb = e.AsBuilding();
+                    for (int ty = bb->tileY - 1; ty <= bb->tileY + bb->buildHeight; ++ty)
+                        for (int tx = bb->tileX - 1; tx <= bb->tileX + bb->buildWidth; ++tx)
+                            if (map.IsPassable(tx, ty) && map.GetWall(tx, ty) == 0)
+                                sides.emplace_back(tx, ty);
+                }
+                if (sides.empty())
+                {
+                    ++closed;
+                    std::cout << "    " << mapName << ": player " << int(p) << " building " << e.id
+                              << " has no free tile around it" << std::endl;
+                    continue;
+                }
+                for (PlayerId q = 0; q < kMaxPlayers; ++q)
+                {
+                    int gx = 0, gy = 0;
+                    if (q == p || !hq[q] || !doorOf(*hq[q], gx, gy))
+                        continue;
+                    bool found = false;
+                    for (size_t k = 0; k < sides.size() && !found; ++k)
+                    {
+                        std::vector<PathNode> path;
+                        bool partial = false;
+                        pf.SetIgnoreUnitsOnce();
+                        found = pf.FindPath(sides[k].first, sides[k].second, gx, gy, path, 0, &partial, true) && !partial;
+                    }
+                    ++checked;
+                    if (!found)
+                    {
+                        ++closed;
+                        std::cout << "    " << mapName << ": no way from building " << e.id << " (player " << int(p)
+                                  << ") to the HQ of player " << int(q) << std::endl;
+                    }
+                }
+            }
+        }
+        std::cout << "  - " << mapName << ": " << checked << " ways checked, " << closed << " closed, labs " << labs
+                  << "/4, power plants " << power << " (" << frontPower << " facing the enemy)" << std::endl;
+        if (closed > 0)
+        {
+            std::cerr << "[Test] Error: a computer base closes itself or its ally in on " << mapName << std::endl;
+            ok = false;
+        }
+        if (labs < 4)
+        {
+            std::cerr << "[Test] Error: every computer player needs a laboratory (" << mapName << ")" << std::endl;
+            ok = false;
+        }
+        if (frontPower > 0)
+        {
+            std::cerr << "[Test] Error: power plants stand on the side of the enemy (" << mapName << ")" << std::endl;
+            ok = false;
+        }
+    }
+
+    // The seed changes how a base is laid out; the same seed lays it out alike
+    play("4x_gage", 1001, 2400);
+    const auto a = layoutOf(0);
+    play("4x_gage", 1001, 2400);
+    const auto b = layoutOf(0);
+    play("4x_gage", 90210, 2400);
+    const auto c = layoutOf(0);
+    std::cout << "  - Seed: same seed same layout " << (a == b) << ", another seed another layout " << (a != c)
+              << std::endl;
+    if (a != b || a == c)
+    {
+        std::cerr << "[Test] Error: the base layout must follow the seed of the match" << std::endl;
+        ok = false;
+    }
+
+    SetPlayerFaction(Faction::Resistance);
+    entities.Clear();
+    sim.Reset();
+    gc.m_matchAis.clear();
+    ResetResearch();
+    return ok;
+}
+
+bool HeadlessTest::RunLocalReplayTest(Application &app)
+{
+    std::cout << "[Test] Validating replays of a custom game and of a campaign mission..." << std::endl;
+    namespace fs = std::filesystem;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    Economy &economy = *app.m_economy;
+    MissionController &mission = *app.m_mission;
+    GameplayController &gc = *app.m_gameplayController;
+    Simulation &sim = gc.simulation();
+    const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+    constexpr uint32_t kTicks = 1600;
+    bool ok = true;
+
+    // Plays kTicks of the loaded match through the full game step. `before` runs ahead of every tick
+    auto play = [&](const std::function<void(uint32_t)> &before, const std::function<void(uint32_t, uint64_t)> &after) {
+        AppState state = mission.IsMatch() ? AppState::SkirmishPlaying : AppState::CampaignPlaying;
+        for (uint32_t tick = 0; tick < kTicks; ++tick)
+        {
+            before(tick);
+            gc.SimulationStep(dt, map, pf, entities, economy, *app.m_aiController, mission, *app.m_hudController, state);
+            SimContext ctx {entities, map, pf, economy, *app.m_aiController};
+            if (tick % NetMatch::kHashIntervalTicks == 0)
+                after(tick, sim.Checksum(ctx));
+        }
+    };
+    // The player's own units go for the enemy headquarters (a command of the interface)
+    auto order = [&]() {
+        SimCommand o;
+        o.type = CommandType::OrderAt;
+        o.player = Players::Local();
+        int tx = 0, ty = 0;
+        for (const Entity &e : entities.GetAllEntities())
+        {
+            if (e.alive && e.owner == Players::Local() && !e.isBuilding)
+                o.ids.push_back(static_cast<uint32_t>(e.id));
+            if (e.alive && e.isBuilding && e.type == UnitType::Headquarters && Players::Hostile(e.owner, Players::Local()))
+            {
+                tx = e.tileX * TILE_WIDTH;
+                ty = e.tileY * TILE_HEIGHT;
+            }
+        }
+        o.x = tx;
+        o.y = ty;
+        o.a = static_cast<int32_t>(OrderKind::AttackMove);
+        sim.Issue(o);
+    };
+
+    auto check = [&](const char *what, ReplayRecorder::Info info, const std::function<bool()> &load) {
+        // --- Recording, as Application does it: the commands by tick, a turn per tick
+        if (!load())
+        {
+            std::cerr << "[Test] Error: " << what << " did not load" << std::endl;
+            return false;
+        }
+        std::map<uint32_t, std::vector<SimCommand>> commands;
+        sim.SetRecordHook([&](uint32_t tick, const SimCommand &c) { commands[tick].push_back(c); });
+        ReplayRecorder recorder;
+        recorder.Begin(info);
+        play([&](uint32_t tick) { if (tick == 40 || tick == 700) order(); },
+             [&](uint32_t tick, uint64_t sum) { recorder.OnChecksum(tick, sum); });
+        sim.SetRecordHook(nullptr);
+        for (uint32_t t = 0; t < kTicks; ++t)
+        {
+            Net::TurnBundle b;
+            b.turn = t;
+            if (auto it = commands.find(t); it != commands.end())
+                b.players.push_back({static_cast<uint8_t>(info.setup.local), SimCommandCodec::Encode(it->second)});
+            recorder.OnBundle(b);
+        }
+        const std::string path = recorder.Finish("victory", kTicks);
+        // --- Playing the file back
+        ReplayPlayer player;
+        std::string error;
+        bool good = !path.empty() && player.Load(path, error);
+        ReplayPlayer::Info listed;
+        good = good && ReplayPlayer::ReadInfo(path, listed, error) && listed.fileBytes > 0
+               && listed.mode == info.mode && player.info().ticks == kTicks;
+        MatchSetup played;
+        good = good && player.PrepareMatch(-1, played, error);
+        if (good && info.mode == "campaign")
+            good = mission.LoadMission(info.mission, LoaderResources::kDefaultRoot, map, entities, economy, pf);
+        else if (good)
+            good = mission.LoadMatch(played, map, entities, economy, pf);
+        if (good)
+        {
+            gc.ResetForMission(mission, *app.m_hudController, entities, map);
+            play([&](uint32_t tick) { player.ScheduleDue(sim, tick); },
+                 [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
+        }
+        std::cout << "  - " << what << ": " << commands.size() << " ticks with commands, file "
+                  << listed.fileBytes << " bytes (" << listed.mode << "), first difference at "
+                  << player.MismatchTick() << (error.empty() ? "" : " - " + error) << std::endl;
+        std::error_code ec;
+        // (OAOW_TEST_KEEP_REPLAYS=<dir>: the files are kept there, to be played in the game)
+        if (const char *keep = std::getenv("OAOW_TEST_KEEP_REPLAYS"); keep && !path.empty())
+            fs::copy_file(path, fs::path(keep) / fs::path(path).filename(), fs::copy_options::overwrite_existing, ec);
+        if (!path.empty())
+            fs::remove(path, ec);
+        if (!good || player.MismatchTick() >= 0)
+        {
+            std::cerr << "[Test] Error: the replay of " << what << " must play back to the same world" << std::endl;
+            return false;
+        }
+        return true;
+    };
+
+    // A custom game: a person against a computer player
+    {
+        MatchSetup setup;
+        setup.mapPath = LoaderResources::MapPath("m26");
+        setup.mapHash = MapFiles::HashOf(setup.mapPath);
+        setup.seed = 4242;
+        setup.local = 0;
+        setup.localOnly = true;
+        setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
+        setup.slots[1] = {true, Faction::Confederation, 1, 2, false, 2};
+        setup.startPosition[0] = 0;
+        setup.startPosition[1] = 1;
+        ReplayRecorder::Info info;
+        info.setup = setup;
+        info.setupBytes = NetMatch::EncodeSetup(setup);
+        info.names = {"Tester"};
+        info.ticksPerTurn = 1;
+        info.turnMs = 50;
+        info.mode = "custom";
+        ok = check("custom game", info, [&]() {
+                 if (!mission.LoadMatch(setup, map, entities, economy, pf))
+                     return false;
+                 gc.ResetForMission(mission, *app.m_hudController, entities, map);
+                 return true;
+             }) && ok;
+    }
+    // The first campaign mission of the Resistance
+    {
+        SetPlayerFaction(Faction::Resistance);
+        const auto &campaign = Missions::Campaign(Faction::Resistance);
+        MatchSetup setup;
+        setup.mapPath = LoaderResources::MapPath(campaign[0].data.mapFile);
+        setup.mapHash = MapFiles::HashOf(setup.mapPath);
+        setup.local = Players::Local();
+        setup.slots[setup.local] = {true, Faction::Resistance, 0, 0, true, 1};
+        setup.slots[setup.local == 0 ? 1 : 0] = {true, Faction::Confederation, 1, 0, false, 1};
+        ReplayRecorder::Info info;
+        info.setup = setup;
+        info.setupBytes = NetMatch::EncodeSetup(setup);
+        info.ticksPerTurn = 1;
+        info.turnMs = 50;
+        info.mode = "campaign";
+        info.mission = 0;
+        info.playerFaction = static_cast<int>(Faction::Resistance);
+        info.difficulty = 1;
+        ok = check("campaign mission 1", info, [&]() {
+                 if (!mission.LoadMission(0, LoaderResources::kDefaultRoot, map, entities, economy, pf))
+                     return false;
+                 gc.ResetForMission(mission, *app.m_hudController, entities, map);
+                 return true;
+             }) && ok;
+    }
+
+    SetPlayerFaction(Faction::Resistance);
+    entities.Clear();
+    sim.Reset();
+    gc.m_matchAis.clear();
+    ResetResearch();
+    return ok;
 }
 
 bool HeadlessTest::RunGroupMovementTest(Application &app)
@@ -2668,6 +3035,26 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
                   << ", 5 units -> " << five << ", Easy rich " << easyRich << std::endl;
         if (poor != 1 || rich != 5 || few != 1 || five != 1 || easyRich != 1 || tenUnits > 2)
             return fail("attack group count must follow money / difficulty");
+        // Waves that broke nothing: Hard sends more groups and troops, as far as the treasury allows; Medium does not
+        withDifficulty(2);
+        ai.m_credits = 800;
+        ai.m_failedWaves = 0;
+        const int calmGroups = ai.AttackGroupCount(30, map);
+        const int calmSize = static_cast<int>(ai.PlanWave(4, true, true).archetypes.size());
+        ai.m_failedWaves = 2;
+        const int hotGroups = ai.AttackGroupCount(30, map);
+        const int hotSize = static_cast<int>(ai.PlanWave(4, true, true).archetypes.size());
+        ai.m_credits = 0;
+        const int brokeSize = static_cast<int>(ai.PlanWave(4, true, true).archetypes.size());
+        withDifficulty(1);
+        ai.m_credits = 800;
+        const int mediumGroups = ai.AttackGroupCount(30, map);
+        ai.m_failedWaves = 0;
+        std::cout << "  - Escalation after 2 failed waves (Hard): groups " << calmGroups << " -> " << hotGroups
+                  << ", troops " << calmSize << " -> " << hotSize << " (no money: " << brokeSize << "), Medium groups "
+                  << mediumGroups << std::endl;
+        if (hotGroups <= calmGroups || hotSize <= calmSize || brokeSize > calmSize || mediumGroups != 1)
+            return fail("failed waves must escalate on Hard, within the treasury");
     }
 
     // H) Skirmish base builder: wall arc toward the player with two exits, defenses in front, lab behind
@@ -3619,6 +4006,14 @@ bool HeadlessTest::run(Application &app, int numTicks)
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "matchai")
     {
         return RunMatchAiTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "baselayout")
+    {
+        return RunAiBaseLayoutTest(app);
+    }
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "localreplay")
+    {
+        return RunLocalReplayTest(app);
     }
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "tech")
     {
@@ -6672,6 +7067,14 @@ bool HeadlessTest::run(Application &app, int numTicks)
     if (!RunMatchAiTest(app))
         return false;
 
+    // 31. Base layout of computer allies (see RunAiBaseLayoutTest)
+    if (!RunAiBaseLayoutTest(app))
+        return false;
+
+    // 32. Replays of a custom game and of a campaign mission (see RunLocalReplayTest)
+    if (!RunLocalReplayTest(app))
+        return false;
+
     std::cout << "[Test] Simulation completed successfully! Stats:" << std::endl;
     std::cout << "  - Player Credits: " << app.m_economy->GetCredits() << std::endl;
     std::cout << "  - Player Power: " << app.m_economy->GetPowerProduced() << "/" << app.m_economy->GetPowerConsumed()
@@ -7015,7 +7418,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         const int inf = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Infantry);
         const int veh = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Vehicle);
         const int shellBld = WeaponBalance::Scale(100, ProjectileType::Shell, TargetClass::Building);
-        if (bldg != 80 || wall != 80 || inf != 125 || veh != 100 || shellBld != 125
+        if (bldg != 80 || wall != 80 || inf != 125 || veh != 100 || shellBld != 150
             || WeaponBalance::Scale(1, ProjectileType::Sniper, TargetClass::Wall) != 1)
         {
             std::cerr << "[Test] Error: weapon balance bullet building/wall/infantry/vehicle " << bldg << "/" << wall

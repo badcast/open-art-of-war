@@ -107,7 +107,14 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
         {"prebuilt", raw.prebuilt},
         {"local_slot", s.local},
         {"result", {{"outcome", outcome}, {"tick", tick}}},
-        {"checksum_interval", NetMatch::kHashIntervalTicks}};
+        {"checksum_interval", NetMatch::kHashIntervalTicks},
+        {"mode", m_info.mode}};
+    if (m_info.mode == "campaign")
+    {
+        meta["mission"] = m_info.mission;
+        meta["player_faction"] = m_info.playerFaction;
+        meta["difficulty"] = m_info.difficulty;
+    }
     data.meta = meta.dump(2);
 
     // The map and the simulation data this match was played with: the file plays on its own

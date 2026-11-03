@@ -220,6 +220,7 @@ bool MissionController::LoadMission(
     m_currentMissionId = missionId;
     const auto &minfo = mlist[missionId];
     m_missionName = minfo.name;
+    m_mapTitle = _(minfo.name.c_str());
     m_briefingText = minfo.briefing;
     m_objectiveText = minfo.objective;
     m_missionTime = 0.0f;
@@ -1012,6 +1013,7 @@ bool MissionController::LoadSkirmish(
         title = _(doc["title"].get<std::string>());
     }
     m_missionName = "Custom game: " + title;
+    m_mapTitle = title;
     m_objectiveText = "- Build up your base.\n- Destroy the enemy base and all enemy forces.";
     m_briefingText = "Open skirmish on the map '" + title
                      + "'. The enemy commander builds and fortifies "
@@ -1223,6 +1225,7 @@ bool MissionController::LoadMatch(
     if (doc.is_object() && doc.contains("title") && doc["title"].is_string())
         title = _(doc["title"].get<std::string>());
     m_missionName = (setup.localOnly ? "Custom game: " : "Match: ") + title;
+    m_mapTitle = title;
     m_objectiveText = "- Destroy every base and force of the enemy teams.";
     m_briefingText = "Multiplayer match on the map '" + title + "'.";
     m_missionTime = 0.0f;
@@ -1352,7 +1355,29 @@ bool MissionController::LoadMatch(
         int hqX = 0, hqY = 0, unusedX = 0, unusedY = 0;
         if (!planner.Place(base.hq, cx, cy, slot.faction, p, hqX, hqY))
             return false;
-        planner.Place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
+        {
+            // The power plant behind the headquarters, away from the nearest enemy start (not the first thing an
+            // attack meets); next to the HQ when there is no room back there
+            float ex = 0.0f, ey = 0.0f, best = 1e9f;
+            for (PlayerId q = 0; q < kMaxPlayers; ++q)
+            {
+                const int qs = setup.startPosition[q];
+                if (q == p || !setup.slots[q].active || setup.slots[q].team == slot.team || qs < 0
+                    || qs >= static_cast<int>(spots.size()))
+                    continue;
+                const float dx = static_cast<float>(spots[qs].first - cx), dy = static_cast<float>(spots[qs].second - cy);
+                const float d = DetMath::Hypot(dx, dy);
+                if (d > 0.5f && d < best)
+                {
+                    best = d;
+                    ex = dx / d;
+                    ey = dy / d;
+                }
+            }
+            const int px = cx - static_cast<int>(std::lround(ex * 5.0f)), py = cy - static_cast<int>(std::lround(ey * 5.0f));
+            if (!planner.Place(base.power, px, py, slot.faction, p, unusedX, unusedY))
+                planner.Place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
+        }
         if (setup.prebuilt)
         {
             planner.Place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);

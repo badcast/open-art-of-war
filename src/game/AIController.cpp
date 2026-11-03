@@ -3,6 +3,7 @@
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
@@ -376,7 +377,7 @@ void AIController::Think(const std::string &category, const std::string &text)
     ++m_thoughtSerial;
     while (m_thoughts.size() > 300)
         m_thoughts.pop_front();
-    std::cout << "[AIController] " << text << std::endl;
+    std::cout << "[AIController p" << int(m_player) << "] " << text << std::endl;
 }
 
 void AIController::ThinkOnce(const std::string &key, const std::string &category, const std::string &text)
@@ -522,6 +523,12 @@ void AIController::Reset()
 
     m_defensePlanned = false;
     m_defensePlan.clear();
+    m_territoryReady = false;
+    m_road.clear();
+    m_ownGround.clear();
+    m_enemyRoads.clear();
+    m_homeX = m_homeY = -1;
+    m_baseQuietSeconds = 0.0f;
     m_buildTimer = 0.0f;
     m_expandTimer = 0.0f;
     m_expansions = 0;
@@ -540,6 +547,9 @@ void AIController::Reset()
     m_repairing.clear();
     m_retreatTimer = 0.0f;
     m_firstRaidDone = false;
+    m_failedWaves = 0;
+    m_trackedWave = 0;
+    m_trackedBuildingsKilled = 0;
     m_trainedUnits = 0;
     ClearThoughts();
 }
@@ -557,6 +567,7 @@ AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFacto
     int size = std::min(t.waveMaxSize, t.waveBaseSize + t.waveGrowth * (plan.waveNumber - 1));
     size = std::clamp(static_cast<int>(std::lround(size * m_debugConfig.waveSpawnMultiplier)), 1, 30);
     size = std::max(size, kMinAttackWave); // the AI never sends a handful: at least ten troops march
+    size = std::min(30, size + EscalationTroops()); // waves that broke nothing: more troops (what the money allows)
 
     const int n = plan.waveNumber;
     int tier = n >= t.siegeWave ? 4 : n >= t.assaultWave ? 3 : n >= t.vanguardWave ? 2 : 1;
@@ -900,22 +911,15 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     }
     else if (m_skirmish && m_startingBaseRecorded)
     {
-        // A base without the defense building still keeps its power balanced (nothing works without power)
+        // A base without the defense building still builds its core: power, the barracks, the factory and the
+        // laboratory (no extra production, no second HQ)
         m_buildTimer += deltaTime;
         if (m_buildTimer >= 3.0f)
         {
             m_buildTimer = 0.0f;
-            int produced = 0, consumed = 0;
-            for (const auto &e : entities.GetAllEntities())
-            {
-                const Building *b = e.AsBuilding();
-                if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || b->buildProgress < 1.0f)
-                    continue;
-                const int pwr = b->GetPowerOutput();
-                (pwr > 0 ? produced : consumed) += std::abs(pwr);
-            }
-            if (produced < consumed)
-                UpdateCoreBuildOrder(map, entities);
+            if (!m_territoryReady)
+                PlanTerritory(map, entities, pathfinder);
+            UpdateCoreBuildOrder(map, entities, false);
         }
     }
 
@@ -925,6 +929,7 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
         m_economyTimer -= 1.0f;
         UpdateEconomyAndProduction(1.0f, map, entities);
         UpdateResearch(1.0f, entities);
+        UpdateWaveOutcome(entities);
     }
 
     m_defenseCheckTimer += deltaTime;
@@ -1052,8 +1057,9 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         return; // All enemy production structures destroyed
     }
 
-    if (hasHq)
-        m_credits += m_creditsPerSec; // the income is the headquarters'
+    if (hasHq) // the income is the headquarters': every finished one, up to three
+        m_credits += m_creditsPerSec
+                     * std::min(Economy::kMaxIncomeHeadquarters, entities.CountBuildingType(UnitType::Headquarters, m_player, true));
 
     // Units lost while assembling are replaced so the wave can still reach 100% strength
     int planned = static_cast<int>(m_currentPlan.archetypes.size());
@@ -1093,6 +1099,37 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         if (!building || queue.empty())
             return;
         int arch = queue.front();
+        // A unit its technology has not opened yet (a sniper, a heavy tank) cannot be trained, by the computer no
+        // more than by a person: the slot takes the simplest unit of the same kind that is open
+        if (!IsUnitUnlocked(m_player, SideArchetype(arch, side())))
+        {
+            const int infantry[] = {kRifleman, kHeavyAssault, kFlamethrower};
+            const int vehicles[] = {kFortress, kHammer, kGrad, kZeus};
+            int instead = -1;
+            if (IsVehicleArchetype(arch))
+            {
+                for (int v : vehicles)
+                    if (instead < 0 && IsUnitUnlocked(m_player, SideArchetype(v, side())))
+                        instead = v;
+            }
+            else
+            {
+                for (int v : infantry)
+                    if (instead < 0 && IsUnitUnlocked(m_player, SideArchetype(v, side())))
+                        instead = v;
+            }
+            if (instead < 0)
+            {
+                queue.erase(queue.begin());
+                return;
+            }
+            const UnitConfig *lockedCfg = entities.GetUnitConfig(SideArchetype(arch, side()));
+            ThinkOnce(
+                "locked" + std::to_string(arch),
+                "WAVE",
+                std::string(lockedCfg ? lockedCfg->name : "A unit") + " is not researched yet: training another instead");
+            queue.front() = arch = instead;
+        }
         int cost = costOf(arch);
         if (m_credits - cost < researchReserve + savingFor)
         {
@@ -1584,6 +1621,11 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     }
 
     m_waveCount++;
+    if (m_trackedWave == 0)
+    { // this wave is watched: did it destroy anything by the time its groups are gone?
+        m_trackedWave = m_waveCount;
+        m_trackedBuildingsKilled = entities.GetPlayerStats(m_player).buildingsDestroyed;
+    }
     {
         std::ostringstream why;
         why << "Wave " << m_waveCount << " is " << (full ? "complete" : "all that is left") << ", treasury $"
@@ -1633,6 +1675,49 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     m_vehicleQueue.clear();
 }
 
+bool AIController::Escalates() const
+{
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    return (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore) && m_failedWaves > 0;
+}
+
+int AIController::EscalationTroops() const
+{
+    if (!Escalates())
+        return 0;
+    // Three more troops for every wave that broke nothing, but only what the treasury pays for above a reserve for
+    // the base (rebuilding, defense, research): the escalation never drains the economy
+    constexpr int kBaseReserve = 600, kTroopCost = 150;
+    const int affordable = std::max(0, (m_credits - kBaseReserve) / kTroopCost);
+    return std::min(3 * m_failedWaves, affordable);
+}
+
+void AIController::UpdateWaveOutcome(const EntityManager &entities)
+{
+    if (m_trackedWave == 0)
+        return;
+    for (const AISquad &sq : m_squadController.GetSquads())
+        if (sq.waveNumber == m_trackedWave && !sq.unitIds.empty())
+            return; // still under way
+    const int destroyed = entities.GetPlayerStats(m_player).buildingsDestroyed - m_trackedBuildingsKilled;
+    if (destroyed > 0)
+    {
+        if (m_failedWaves > 0)
+            Think("ATTACK", "Wave " + std::to_string(m_trackedWave) + " broke through: back to the usual waves");
+        m_failedWaves = 0;
+    }
+    else
+    {
+        m_failedWaves = std::min(m_failedWaves + 1, 4);
+        if (Escalates())
+            Think(
+                "ATTACK",
+                "Wave " + std::to_string(m_trackedWave) + " broke nothing (" + std::to_string(m_failedWaves)
+                    + " in a row): the next ones get more groups and troops, as far as the treasury allows");
+    }
+    m_trackedWave = 0;
+}
+
 int AIController::AttackGroupCount(int readyUnits, const TileMap &map) const
 {
     const AITacticsConfig &t = m_currentDifficultyConfig.tactics;
@@ -1645,7 +1730,10 @@ int AIController::AttackGroupCount(int readyUnits, const TileMap &map) const
         ++groups; // room to flank
     if (m_gateX[1] >= 0)
         groups = std::max(groups, 2); // a second exit is used every time
-    groups = std::min(groups, std::clamp(t.maxAttackGroups, 1, 5));
+    // Waves that broke nothing: another route or two for the next one
+    const int extra = Escalates() ? std::min(m_failedWaves, 2) : 0;
+    groups += extra;
+    groups = std::min(groups, std::clamp(t.maxAttackGroups + extra, 1, 5));
     groups = std::min(groups, readyUnits / kMinAttackGroup); // never a squad of two or three
     return std::max(1, groups);
 }
@@ -1718,6 +1806,8 @@ int FactionBuildingIndex(AIDefenseSite::Kind kind, Faction side)
             return conf ? 2 : 10;
         case AIDefenseSite::Factory:
             return conf ? 3 : 11;
+        case AIDefenseSite::Headquarters:
+            return conf ? 0 : 8;
         case AIDefenseSite::Wall:
             return -1;
     }
@@ -1749,6 +1839,8 @@ int DefenseCost(AIDefenseSite::Kind kind, const EntityManager &entities, Faction
             return 500;
         case AIDefenseSite::Wall:
             return 25;
+        case AIDefenseSite::Headquarters:
+            return 1500;
     }
     return 250;
 }
@@ -1791,6 +1883,15 @@ bool AIController::FindSiteNear(
                     continue;
                 if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player))
                     continue;
+                // Not on a road between the bases, not on an ally's ground
+                bool free = true;
+                for (int ty = py; ty < py + h && free; ++ty)
+                {
+                    for (int tx = px; tx < px + w && free; ++tx)
+                        free = !IsRoad(tx, ty) && IsOwnGround(tx, ty);
+                }
+                if (!free)
+                    continue;
                 bool unitInside = false;
                 for (int ty = py; ty < py + h && !unitInside; ++ty)
                 {
@@ -1803,6 +1904,8 @@ bool AIController::FindSiteNear(
                         *unitBlocked = true;
                     continue;
                 }
+                if (!KeepsWayOut(px, py, w, h, map, entities))
+                    continue; // it would close the base in
                 x = px;
                 y = py;
                 return true;
@@ -1816,6 +1919,7 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
 {
     m_defensePlan.clear();
     m_defensePlanned = true;
+    m_gateX[0] = m_gateX[1] = m_gateY[0] = m_gateY[1] = -1;
 
     // Base centre: the AI headquarters; threat direction: toward the player's base
     int cx = m_enemyHqX, cy = m_enemyHqY;
@@ -1831,112 +1935,133 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             break;
         }
     }
+    // The roads between the bases and the ground of the allies come first: nothing below may close them
+    if (!m_territoryReady)
+        PlanTerritory(map, entities, pathfinder);
+    Think("BUILD", m_style.Describe());
+
     float tdx = static_cast<float>(m_playerHqX - cx);
     float tdy = static_cast<float>(m_playerHqY - cy);
     const float tlen = std::max(1.0f, DetMath::Hypot(tdx, tdy));
     tdx /= tlen;
     tdy /= tlen;
     const float threatAngle = DetMath::Atan2(tdy, tdx);
-    const float wallRadius = static_cast<float>(hqRadius + 8);
+    // The line of defense: as far out as the building zone allows (a wall near the HQ would close the base in)
+    const float maxD = static_cast<float>(entities.GetBuildRadius(m_player)) - 0.5f;
+    const float wallRadius
+        = std::max(static_cast<float>(hqRadius + 4), std::min(static_cast<float>(hqRadius + 10 + m_style.lineOffset), maxD - 1.0f));
     auto ringTile = [&](float radius, float angleOffsetDeg, int &x, int &y) {
         const float a = threatAngle + angleOffsetDeg * static_cast<float>(M_PI) / 180.0f;
         x = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * radius)), 1, map.GetWidth() - 2);
         y = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * radius)), 1, map.GetHeight() - 2);
     };
-
-    // Exit 1: where the road to the player crosses the wall ring; exit 2: 60 degrees to one side
-    std::vector<PathNode> road;
-    bool partial = false;
-    pathfinder.SetIgnoreUnitsOnce();
-    pathfinder.FindPath(cx, cy + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
-    for (const auto &n : road)
-    {
-        if (DetMath::Hypot(static_cast<float>(n.x - cx), static_cast<float>(n.y - cy)) >= wallRadius - 0.5f)
-        {
-            m_gateX[0] = n.x;
-            m_gateY[0] = n.y;
-            break;
-        }
-    }
-    if (m_gateX[0] < 0)
-        ringTile(wallRadius, 0.0f, m_gateX[0], m_gateY[0]);
-    const float gateAngle = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
-    // The second exit goes to the side of the first one that still faces the player
-    auto angleDiff = [](float a, float b) {
-        return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
-    };
-    const float rad60 = 60.0f * static_cast<float>(M_PI) / 180.0f;
-    const float firstSide
-        = angleDiff(gateAngle + rad60, threatAngle) <= angleDiff(gateAngle - rad60, threatAngle) ? 1.0f : -1.0f;
-    for (float side : {firstSide, -firstSide})
-    {
-        int gx = 0, gy = 0;
-        const float a = gateAngle + side * 60.0f * static_cast<float>(M_PI) / 180.0f;
-        gx = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
-        gy = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
-        if (map.IsPassable(gx, gy))
-        {
-            m_gateX[1] = gx;
-            m_gateY[1] = gy;
-            break;
-        }
-    }
-
     auto add = [&](AIDefenseSite::Kind kind, int x, int y) {
         m_defensePlan.push_back({kind, x, y, false});
     };
 
-    // Power plants, the barracks and the factory come from the core build order (UpdateCoreBuildOrder)
+    // Power plants, the barracks, the factory and the laboratory come from the core build order (UpdateCoreBuildOrder)
 
-    // 1. First tower right behind the main exit, then a bunker covering the second one
-    const float innerRadius = wallRadius - 3.0f;
-    int x = 0, y = 0;
-    ringTile(innerRadius, 0.0f, x, y);
-    add(AIDefenseSite::Tower, x - 1, y - 1);
-    ringTile(innerRadius, -40.0f, x, y);
-    add(AIDefenseSite::Bunker, x - 1, y - 1);
-
-    // 2. Wall arc facing the player (+-80 degrees), leaving both exits and building doors open
+    // 1. Like the bases of the campaign: a wall straight across the narrowest passage of every road to an enemy,
+    //    the gate on the road, a tower and a bunker behind it
     std::vector<std::pair<int, int>> wallTiles;
-    const float step = 0.45f / wallRadius;
-    for (float a = -80.0f * static_cast<float>(M_PI) / 180.0f; a <= 80.0f * static_cast<float>(M_PI) / 180.0f;
-         a += step)
+    std::vector<int> wallRow; // arc only: 0 the inner row, 1 the outer one
+    const bool passages = PlanPassageWalls(cx, cy, hqRadius, map, entities, wallTiles);
+    if (passages)
     {
-        const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(threatAngle + a) * wallRadius));
-        const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(threatAngle + a) * wallRadius));
-        if (wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
-            continue;
-        if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
-            continue;
-        bool nearGate = false;
-        for (int g = 0; g < 2; ++g)
+        Think("BUILD", "Closing " + std::to_string(wallTiles.size()) + " tiles of the passages toward the enemy");
+    }
+    else
+    {
+        // 2. Open ground: a short arc in front of the base, the exits where the road to the enemy crosses it and
+        //    beside it
+        std::vector<PathNode> road;
+        bool partial = false;
+        pathfinder.SetIgnoreUnitsOnce();
+        pathfinder.FindPath(cx, cy + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
+        for (const auto &n : road)
         {
-            if (m_gateX[g] >= 0 && std::max(std::abs(wx - m_gateX[g]), std::abs(wy - m_gateY[g])) <= 1)
-                nearGate = true;
+            if (DetMath::Hypot(static_cast<float>(n.x - cx), static_cast<float>(n.y - cy)) >= wallRadius - 0.5f)
+            {
+                m_gateX[0] = n.x;
+                m_gateY[0] = n.y;
+                break;
+            }
         }
-        if (nearGate)
-            continue;
-        wallTiles.emplace_back(wx, wy);
+        if (m_gateX[0] < 0)
+            ringTile(wallRadius, 0.0f, m_gateX[0], m_gateY[0]);
+        const float gateAngle = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
+        auto angleDiff = [](float a, float b) {
+            return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
+        };
+        const float rad30 = 30.0f * static_cast<float>(M_PI) / 180.0f;
+        const float firstSide
+            = angleDiff(gateAngle + rad30, threatAngle) <= angleDiff(gateAngle - rad30, threatAngle) ? 1.0f : -1.0f;
+        for (float side : {firstSide, -firstSide})
+        {
+            const float a = gateAngle + side * rad30;
+            const int gx = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
+            const int gy = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
+            if (map.IsPassable(gx, gy))
+            {
+                m_gateX[1] = gx;
+                m_gateY[1] = gy;
+                break;
+            }
+        }
+        const int rows = m_style.towersOnly ? 0 : std::clamp(m_style.wallThickness, 1, 2);
+        const float halfArc = 40.0f * static_cast<float>(M_PI) / 180.0f;
+        for (int row = 0; row < rows; ++row)
+        {
+            const float radius = wallRadius + static_cast<float>(row);
+            const float step = 0.45f / radius;
+            for (float a = -halfArc; a <= halfArc; a += step)
+            {
+                const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(threatAngle + a) * radius));
+                const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(threatAngle + a) * radius));
+                if (wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
+                    continue;
+                if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
+                    continue;
+                bool nearGate = false;
+                for (int g = 0; g < 2; ++g)
+                {
+                    if (m_gateX[g] >= 0 && std::max(std::abs(wx - m_gateX[g]), std::abs(wy - m_gateY[g])) <= 1)
+                        nearGate = true;
+                }
+                // A road to an ally or the band of one stays open (an extra opening), so does an ally's ground;
+                // nothing walks over rock or water anyway
+                if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy) || map.GetWall(wx, wy) > 0)
+                    continue;
+                wallTiles.emplace_back(wx, wy);
+                wallRow.push_back(row);
+            }
+        }
+        // Towers right behind the main exit, a bunker covering the second one, the flanks of the arc
+        const float innerRadius = wallRadius - 3.0f;
+        int x = 0, y = 0;
+        ringTile(innerRadius, 0.0f, x, y);
+        add(AIDefenseSite::Tower, x - 1, y - 1);
+        ringTile(innerRadius, -30.0f, x, y);
+        add(m_style.bunkerHeavy ? AIDefenseSite::Tower : AIDefenseSite::Bunker, x - 1, y - 1);
+        ringTile(innerRadius, 30.0f, x, y);
+        add(AIDefenseSite::Tower, x - 1, y - 1);
     }
-    // 3. More firepower along the inside of the wall
-    ringTile(innerRadius, 40.0f, x, y);
-    add(AIDefenseSite::Tower, x - 1, y - 1);
-
-    // 4. Fragile buildings go behind the headquarters, away from the attack side
-    if (!entities.HasBuildingType(UnitType::ResearchLab, m_player, false))
+    // More firepower when the walls are few
+    if (m_style.towersOnly)
     {
-        ringTile(static_cast<float>(hqRadius + 4), 180.0f, x, y);
-        add(AIDefenseSite::Lab, x - 1, y - 1);
+        int x = 0, y = 0;
+        ringTile(wallRadius - 2.0f, -15.0f, x, y);
+        add(AIDefenseSite::Tower, x - 1, y - 1);
+        ringTile(wallRadius - 2.0f, 15.0f, x, y);
+        add(AIDefenseSite::Bunker, x - 1, y - 1);
+        if (passages)
+            wallTiles.clear();
     }
-    // 5. Flanks of the arc
-    ringTile(innerRadius, -75.0f, x, y);
-    add(AIDefenseSite::Bunker, x - 1, y - 1);
-    ringTile(innerRadius, 75.0f, x, y);
-    add(AIDefenseSite::Tower, x - 1, y - 1);
 
-    // 6. Walls last, and only where an enemy can walk in: a ring tile that links the inside of the ring with
+    // 3. Walls last, and only where an enemy can walk in: a ring tile that links the inside of the ring with
     //    the outside one reachable from a hostile base. Segments in front of trees, cliffs or a closed pocket
     //    stop nobody and are left out.
+    if (!passages)
     {
         const int mw = map.GetWidth(), mh = map.GetHeight();
         auto idx = [mw](int px, int py) {
@@ -1946,8 +2071,9 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             return px >= 0 && py >= 0 && px < mw && py < mh && map.IsPassable(px, py) && map.GetWall(px, py) == 0;
         };
         std::vector<uint8_t> ring(static_cast<size_t>(mw) * mh, 0), inside(ring.size(), 0), outside(ring.size(), 0);
-        for (const auto &[wx, wy] : wallTiles)
-            ring[idx(wx, wy)] = 1;
+        for (size_t i = 0; i < wallTiles.size(); ++i)
+            if (wallRow[i] == 0)
+                ring[idx(wallTiles[i].first, wallTiles[i].second)] = 1; // the outer row lies outside the ring
         auto distOf = [&](int px, int py) {
             return DetMath::Hypot(static_cast<float>(px - cx), static_cast<float>(py - cy));
         };
@@ -2004,8 +2130,14 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         const bool knowsEnemy = !seedsOut.empty();
         flood(outside, std::move(seedsOut), false);
         int skipped = 0;
-        for (const auto &[wx, wy] : wallTiles)
+        // The inner row decides (it links the inside with the outside the enemy comes from); the outer row only
+        // goes where the inner one next to it stays
+        std::vector<uint8_t> kept(wallTiles.size(), 0);
+        for (size_t i = 0; i < wallTiles.size(); ++i)
         {
+            if (wallRow[i] != 0)
+                continue;
+            const auto [wx, wy] = wallTiles[i];
             bool linksIn = false, linksOut = false;
             for (int dy = -1; dy <= 1; ++dy)
             {
@@ -2018,21 +2150,40 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
                     linksOut = linksOut || outside[idx(nx, ny)];
                 }
             }
-            if (knowsEnemy && !(linksIn && linksOut))
+            kept[i] = !knowsEnemy || (linksIn && linksOut);
+        }
+        for (size_t i = 0; i < wallTiles.size(); ++i)
+        {
+            if (wallRow[i] == 0)
+                continue;
+            for (size_t j = 0; j < wallTiles.size() && !kept[i]; ++j)
+                kept[i] = wallRow[j] == 0 && kept[j]
+                          && std::max(std::abs(wallTiles[i].first - wallTiles[j].first),
+                                      std::abs(wallTiles[i].second - wallTiles[j].second)) <= 1;
+        }
+        for (size_t i = 0; i < wallTiles.size(); ++i)
+        {
+            if (!kept[i])
             {
                 ++skipped;
                 continue;
             }
-            add(AIDefenseSite::Wall, wx, wy);
+            add(AIDefenseSite::Wall, wallTiles[i].first, wallTiles[i].second);
         }
         if (skipped > 0)
             Think("BUILD", "Leaving out " + std::to_string(skipped) + " wall tiles nobody can walk through");
     }
 
+    else
+    {
+        for (const auto &[wx, wy] : wallTiles)
+            add(AIDefenseSite::Wall, wx, wy);
+    }
+
     std::ostringstream plan;
     plan << "Base plan: " << m_defensePlan.size() << " items, " << wallTiles.size()
-         << " wall tiles facing the enemy, exits (" << m_gateX[0] << "," << m_gateY[0] << ") and (" << m_gateX[1] << ","
-         << m_gateY[1] << ")";
+         << (passages ? " wall tiles across passages" : " wall tiles in front of the base") << ", exits (" << m_gateX[0]
+         << "," << m_gateY[0] << ") and (" << m_gateX[1] << "," << m_gateY[1] << ")";
     Think("BUILD", plan.str());
 }
 
@@ -2052,9 +2203,10 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
             site.done = ++site.attempts >= kMaxUnitWaits; // a unit stands there: try again next step
             return false;
         }
-        if (!map.IsPassable(x, y) || map.GetWall(x, y) > 0 || !entities.CanPlaceBuilding(x, y, 1, 1, map, m_player))
+        if (!map.IsPassable(x, y) || map.GetWall(x, y) > 0 || !entities.CanPlaceBuilding(x, y, 1, 1, map, m_player)
+            || !IsOwnGround(x, y) || !KeepsWayOut(x, y, 1, 1, map, entities))
         {
-            site.done = true; // blocked for good (terrain / building): skip this segment
+            site.done = true; // blocked for good (terrain / building / it would close the base): skip this segment
             return false;
         }
         m_credits -= cost;
@@ -2070,8 +2222,9 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     const int h = cfg ? cfg->height : 2;
     int x = site.tileX, y = site.tileY;
     const bool core = site.kind == AIDefenseSite::Barracks || site.kind == AIDefenseSite::Factory
-                      || site.kind == AIDefenseSite::PowerPlant;
-    const int searchRadius = core ? 8 : 3;
+                      || site.kind == AIDefenseSite::PowerPlant || site.kind == AIDefenseSite::Lab
+                      || site.kind == AIDefenseSite::Headquarters;
+    const int searchRadius = site.exact ? 0 : (core ? 8 : 3);
     bool unitBlocked = false;
     if (!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked))
     {
@@ -2092,7 +2245,8 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
             map.SetPassable(tx, ty, false);
     }
     static const char *const kKindNames[] = {
-        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory"};
+        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory",
+        "headquarters"};
     Think(
         "BUILD",
         std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y)
@@ -2365,11 +2519,12 @@ void AIController::UpdateRepairs(float deltaTime, EntityManager &entities)
     }
 }
 
-bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
+bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, bool full)
 {
     // Power as planned: buildings under construction count already, so one shortage starts one plant
     int produced = 0, consumed = 0;
-    int barracksCount = 0, factoryCount = 0; // the AI may keep up to three of each
+    int barracksCount = 0, factoryCount = 0, labCount = 0, hqCount = 0; // the AI may keep up to three of each
+    int barracksDone = 0, factoryDone = 0, labDone = 0;
     constexpr int kMaxProduction = 3;
     const Building *hq = nullptr;
     for (const auto &e : entities.GetAllEntities())
@@ -2379,110 +2534,167 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities)
             continue;
         const int pwr = b->GetPowerOutput();
         (pwr > 0 ? produced : consumed) += std::abs(pwr);
+        const bool done = b->buildProgress >= 1.0f;
         barracksCount += b->type == UnitType::Barracks;
         factoryCount += b->type == UnitType::Factory;
-        if (b->type == UnitType::Headquarters && !hq)
+        labCount += b->type == UnitType::ResearchLab;
+        hqCount += b->type == UnitType::Headquarters;
+        barracksDone += b->type == UnitType::Barracks && done;
+        factoryDone += b->type == UnitType::Factory && done;
+        labDone += b->type == UnitType::ResearchLab && done;
+        if (b->type == UnitType::Headquarters && done && !hq)
             hq = b;
     }
-    if (!hq || hq->buildProgress < 1.0f)
+    if (!hq)
         return false; // no finished HQ, no construction
-    constexpr int kSparePower = 40; // what the next consumer (a factory) needs
+    // A structure the rebuilding memory will put up again does not need a second one elsewhere
+    auto rebuildPending = [&](UnitType t) {
+        for (const AIStructurePlan &plan : m_startingBuildings)
+            if (plan.destroyed && plan.type == t && plan.rebuildTimer < 30.0f) // a spot that stays blocked is given up
+                return true;
+        return false;
+    };
+    const int sparePower = m_style.sparePower;
     constexpr int kTroopReserve = 300;
+    const bool needLab = labCount == 0 && !rebuildPending(UnitType::ResearchLab);
 
-    AIDefenseSite::Kind kind;
-    int reserve = 0;
-    const char *why = "";
+    // The base is ready for another headquarters (more income): everything works, the defense stands, there is
+    // money to spare and the base has had peace for a minute
+    auto baseReady = [&]() {
+        if (!full || hqCount >= Economy::kMaxIncomeHeadquarters || barracksDone == 0 || factoryDone == 0 || labDone == 0)
+            return false;
+        if (produced < consumed + sparePower || m_baseQuietSeconds < 60.0f)
+            return false;
+        for (const AIDefenseSite &site : m_defensePlan)
+            if (!site.done && site.kind != AIDefenseSite::Wall)
+                return false;
+        return m_credits >= DefenseCost(AIDefenseSite::Headquarters, entities, side()) + 2 * kTroopReserve;
+    };
+
+    // What the base needs, most urgent first. A thing that has no room is passed over for the next one (a full back
+    // of the base must not stop the barracks); a thing that waits for money stops the list (it comes first)
+    struct Want
+    {
+        AIDefenseSite::Kind kind;
+        int reserve;
+        const char *why;
+    };
+    std::vector<Want> wants;
+    const int powerCost = DefenseCost(AIDefenseSite::PowerPlant, entities, side());
     if (produced < consumed)
-    {
-        kind = AIDefenseSite::PowerPlant;
-        why = "Power is short: a power plant comes first";
-    }
-    else if (barracksCount == 0)
-    {
-        kind = AIDefenseSite::Barracks;
-        why = "No barracks: raising one to start training troops";
-    }
-    else if (produced - consumed < kSparePower && m_credits >= DefenseCost(AIDefenseSite::PowerPlant, entities, side()) + kTroopReserve)
-    {
-        kind = AIDefenseSite::PowerPlant;
-        reserve = kTroopReserve;
-        why = "Credits to spare: an extra power plant for the next buildings";
-    }
-    else if (factoryCount == 0)
-    {
-        kind = AIDefenseSite::Factory;
-        reserve = kTroopReserve / 2;
-        why = "No factory: building one for vehicles";
-    }
-    else if (barracksCount < kMaxProduction && barracksCount <= factoryCount)
-    {
-        kind = AIDefenseSite::Barracks;
-        reserve = kTroopReserve;
-        why = "Credits to spare: another barracks to raise the army faster";
-    }
-    else if (factoryCount < kMaxProduction)
-    {
-        kind = AIDefenseSite::Factory;
-        reserve = kTroopReserve;
-        why = "Credits to spare: another factory for more vehicles";
-    }
-    else
-        return false;
-    const int existing = kind == AIDefenseSite::Barracks ? barracksCount : (kind == AIDefenseSite::Factory ? factoryCount : 0);
+        wants.push_back({AIDefenseSite::PowerPlant, 0, "Power is short: a power plant comes first"});
+    if (barracksCount == 0)
+        wants.push_back({AIDefenseSite::Barracks, 0, "No barracks: raising one to start training troops"});
+    if (needLab && m_style.labEarly)
+        wants.push_back({AIDefenseSite::Lab, kTroopReserve / 2, "No laboratory: research needs one (early in this base's plan)"});
+    if (full && m_style.barracksFirst && barracksCount < 2 && factoryCount == 0)
+        wants.push_back({AIDefenseSite::Barracks, kTroopReserve / 2, "A second barracks before the factory: infantry first"});
+    if (factoryCount == 0)
+        wants.push_back({AIDefenseSite::Factory, kTroopReserve / 2, "No factory: building one for vehicles"});
+    if (needLab)
+        wants.push_back({AIDefenseSite::Lab, kTroopReserve / 2, "No laboratory: research needs one"});
+    // (spare power after the laboratory: the plants would take the back of the base it belongs in)
+    if (produced - consumed < sparePower && m_credits >= powerCost + kTroopReserve)
+        wants.push_back({AIDefenseSite::PowerPlant, kTroopReserve, "Credits to spare: an extra power plant for the next buildings"});
+    if (baseReady())
+        wants.push_back({AIDefenseSite::Headquarters, 2 * kTroopReserve, "The base is ready and quiet: another headquarters for more income"});
+    if (full && barracksCount < kMaxProduction && barracksCount <= factoryCount)
+        wants.push_back({AIDefenseSite::Barracks, kTroopReserve, "Credits to spare: another barracks to raise the army faster"});
+    if (full && factoryCount < kMaxProduction)
+        wants.push_back({AIDefenseSite::Factory, kTroopReserve, "Credits to spare: another factory for more vehicles"});
 
-    const int cost = DefenseCost(kind, entities, side());
-    if (m_credits - cost < reserve)
+    if (m_homeX < 0)
     {
-        ThinkOnce("core", "BUILD", std::string(why) + " (waiting for credits)");
-        return false;
+        m_homeX = hq->tileX + hq->buildWidth / 2;
+        m_homeY = hq->tileY + hq->buildHeight / 2;
     }
-    // Power plants behind the HQ, away from the enemy; barracks and factory to its sides
-    const int cx = hq->tileX + hq->buildWidth / 2, cy = hq->tileY + hq->buildHeight / 2;
+    const int cx = m_homeX, cy = m_homeY;
     float tdx = static_cast<float>(m_playerHqX - cx), tdy = static_cast<float>(m_playerHqY - cy);
     const float tlen = std::max(1.0f, DetMath::Hypot(tdx, tdy));
     tdx /= tlen;
     tdy /= tlen;
-    const float radius = static_cast<float>(std::max(hq->buildWidth, hq->buildHeight) / 2 + 4);
-    float ox = -tdx, oy = -tdy; // behind
-    if (kind == AIDefenseSite::Barracks)
+    const float turn = m_style.turnDeg * static_cast<float>(M_PI) / 180.0f;
+    const float tc = DetMath::Cos(turn), ts = DetMath::Sin(turn);
+    float sideX = -tdy, sideY = tdx;
+    if (m_style.mirror)
     {
-        ox = -tdy;
-        oy = tdx;
+        sideX = -sideX;
+        sideY = -sideY;
     }
-    else if (kind == AIDefenseSite::Factory)
+
+    for (const Want &want : wants)
     {
-        ox = tdy;
-        oy = -tdx;
-    }
-    if (existing > 0)
-    { // the next ones turn towards the back of the base, away from the enemy, so they do not stand in each other's way
-        ox += -tdx * 0.8f * existing;
-        oy += -tdy * 0.8f * existing;
-        const float olen = std::max(0.001f, DetMath::Hypot(ox, oy));
-        ox /= olen;
-        oy /= olen;
-    }
-    // The preferred side first, then the others in turn (a spot at the edge of the map or in rock would stall the base for good)
-    constexpr float kC = 0.70710678f, kS = 0.70710678f;
-    for (int k = 0; k < 8; ++k)
-    {
-        const int turns = (k + 1) / 2;
-        const bool left = (k % 2) == 1;
-        float vx = ox, vy = oy;
-        for (int t = 0; t < turns; ++t)
+        const AIDefenseSite::Kind kind = want.kind;
+        const int cost = DefenseCost(kind, entities, side());
+        if (m_credits - cost < want.reserve)
         {
-            const float sgn = left ? 1.0f : -1.0f;
-            const float nx = vx * kC - sgn * vy * kS, ny = sgn * vx * kS + vy * kC;
-            vx = nx;
-            vy = ny;
+            ThinkOnce("core", "BUILD", std::string(want.why) + " (waiting for credits)");
+            return false;
+        }
+        const int existing
+            = kind == AIDefenseSite::Barracks ? barracksCount : (kind == AIDefenseSite::Factory ? factoryCount : 0);
+        const int index = FactionBuildingIndex(kind, side());
+        const BuildingConfig *cfg = entities.GetBuildingConfig(index);
+        const int w = cfg ? cfg->width : 2, h = cfg ? cfg->height : 2;
+        // Power plants, the laboratory and another HQ behind the HQ, away from the enemy (the power must not be the
+        // first thing an attack meets); barracks and factory to its sides, turned and swapped as the style says
+        float ox = -tdx, oy = -tdy; // behind
+        bool rear = true;
+        int minRing = std::max(hq->buildWidth, hq->buildHeight) / 2 + 2;
+        if (kind == AIDefenseSite::Barracks || kind == AIDefenseSite::Factory)
+        {
+            const float sgn = kind == AIDefenseSite::Barracks ? 1.0f : -1.0f;
+            ox = (sideX * tc - sideY * ts) * sgn;
+            oy = (sideX * ts + sideY * tc) * sgn;
+            if (m_style.layout == AIBaseStyle::Road)
+            { // along the road out of the base: a little toward the back
+                ox -= tdx * 0.5f;
+                oy -= tdy * 0.5f;
+            }
+            if (existing > 0)
+            { // the next ones turn towards the back of the base, so they do not stand in each other's way
+                ox += -tdx * 0.8f * existing;
+                oy += -tdy * 0.8f * existing;
+            }
+            rear = false;
+        }
+        else if (kind == AIDefenseSite::Headquarters)
+        {
+            minRing += 5; // a new HQ widens the building zone: not right beside the old one
+        }
+
+        int x = 0, y = 0;
+        bool found = false;
+        // A gap around it first, then side by side, then also on the band along a road (never on the road itself)
+        for (int crowding = 0; crowding < 3 && !found; ++crowding)
+        {
+            found = FindCoreSite(x, y, w, h, ox, oy, rear, minRing, map, entities, crowding);
+            if (!found && rear && kind != AIDefenseSite::PowerPlant)
+                found = FindCoreSite(x, y, w, h, ox, oy, false, minRing, map, entities, crowding); // the back is full
+            if (!found && kind == AIDefenseSite::PowerPlant)
+            {
+                // The back is full: the sides of the base, never its front
+                found = FindCoreSite(x, y, w, h, sideX, sideY, false, minRing, map, entities, crowding);
+                if (found)
+                {
+                    const float px = x + w * 0.5f - cx, py = y + h * 0.5f - cy;
+                    found = px * tdx + py * tdy <= 0.35f * DetMath::Hypot(px, py);
+                }
+            }
+        }
+        if (!found)
+        {
+            ThinkOnce("core" + std::to_string(kind), "BUILD", std::string(want.why) + " (no room that keeps the base open)");
+            continue;
         }
         AIDefenseSite site;
         site.kind = kind;
-        site.tileX = static_cast<int>(std::lround(cx + vx * radius)) - 1;
-        site.tileY = static_cast<int>(std::lround(cy + vy * radius)) - 1;
+        site.tileX = x;
+        site.tileY = y;
+        site.exact = true;
         if (BuildDefenseSite(site, map, entities))
         {
-            Think("BUILD", why);
+            Think("BUILD", want.why);
             return true;
         }
     }
@@ -2502,6 +2714,7 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
     if (m_buildTimer < 3.0f)
         return;
     m_buildTimer = 0.0f;
+    m_baseQuietSeconds += 3.0f;
 
     if (UpdateCoreBuildOrder(map, entities))
         return; // one structure per step
@@ -2720,6 +2933,7 @@ void AIController::OnEntityAttacked(int victimId, int attackerId, EntityManager 
 
 void AIController::OnStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
 {
+    m_baseQuietSeconds = 0.0f; // no new headquarters while the base is under fire
     OnEntityAttacked(structureId, attackerId, entities, pathfinder);
 }
 
@@ -2816,6 +3030,9 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         }
         else
         {
+            // One laboratory is enough: the core build order may have put up another one elsewhere meanwhile
+            if (plan.type == UnitType::ResearchLab && entities.HasBuildingType(UnitType::ResearchLab, m_player, false))
+                continue;
             plan.rebuildTimer += deltaTime;
             if (canBuild && plan.rebuildTimer >= 6.0f && m_credits >= plan.creditCost
                 && IsBuildingUnlocked(m_player, plan.rawBuildingType))

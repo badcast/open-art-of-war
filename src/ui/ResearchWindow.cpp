@@ -45,14 +45,17 @@ struct WindowLayout
     UiRect dialog, content, search, filter, tree, details, closeBtn, startBtn, zoomIn, zoomOut;
 };
 
-WindowLayout windowLayout(int windowW, int windowH, float scale)
+// `top`: rows kept free above it (the bar of an observer)
+WindowLayout windowLayout(int windowW, int windowH, float scale, int top = 0)
 {
-    const int kDetailsW = sz(kDetailsW0, scale);
     WindowLayout l;
-    l.dialog = ui::CenteredRect(windowW, windowH, sz(1100, scale), sz(680, scale));
+    l.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
+    l.dialog.y += top;
+    l.dialog.h -= top;
     l.content = {l.dialog.x + 16, l.dialog.y + 60, l.dialog.w - 32, l.dialog.h - 60 - 16};
-    l.search = {l.content.x, l.content.y, 320, 30};
-    l.filter = {l.search.Right() + 10, l.content.y, 200, 30};
+    const int kDetailsW = std::clamp(static_cast<int>(l.content.w * 0.26f), kDetailsW0, 440);
+    l.search = {l.content.x, l.content.y, std::clamp(static_cast<int>(l.content.w * 0.28f), 280, 460), 30};
+    l.filter = {l.search.Right() + 10, l.content.y, std::clamp(static_cast<int>(l.content.w * 0.18f), 200, 300), 30};
     l.closeBtn = {l.content.Right() - 130, l.content.y, 130, 30};
     l.details = {l.content.Right() - kDetailsW, l.content.y + 42, kDetailsW, l.content.h - 42};
     l.tree = {l.content.x, l.content.y + 42, l.details.x - 12 - l.content.x, l.content.h - 42};
@@ -215,8 +218,17 @@ void HUDController::CloseResearchWindow()
     m_researchPanning = false;
 }
 
+ResearchProgress HUDController::ResearchShown() const
+{
+    if (m_researchProbe)
+        return m_researchProbe(Players::Local());
+    return m_sim ? m_sim->research(Players::Local()) : ResearchProgress {};
+}
+
 void HUDController::TryStartResearch(int index, Economy &economy, EntityManager &entities)
 {
+    if (m_observer)
+        return; // an observer only looks at the research of the player he watches
     const auto &r = researchDef(PlayerFaction(), index);
     if (!HasResearchBuilding(Players::Local(), entities))
     {
@@ -235,7 +247,7 @@ void HUDController::TryStartResearch(int index, Economy &economy, EntityManager 
         SoundRequests::Play("ui_error");
         SetNotification(std::string(_("REQUIRES: ")) + _(researchDef(PlayerFaction(), r.needs).name));
     }
-    else if (m_sim && m_sim->research(Players::Local()).active >= 0)
+    else if (ResearchShown().active >= 0)
     {
         SoundRequests::Play("ui_error");
         SetNotification(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
@@ -254,6 +266,19 @@ void HUDController::TryStartResearch(int index, Economy &economy, EntityManager 
     }
 }
 
+namespace
+{
+// Where the scroll bars of the tree go: inside its right and bottom edge
+UiRect researchVTrack(const UiRect &tree)
+{
+    return {tree.Right() - 8, tree.y + 3, 5, tree.h - 14};
+}
+UiRect researchHTrack(const UiRect &tree)
+{
+    return {tree.x + 3, tree.Bottom() - 8, tree.w - 14, 5};
+}
+} // namespace
+
 bool HUDController::UpdateResearchWindow(
     InputManager &input,
     int mx,
@@ -266,12 +291,13 @@ bool HUDController::UpdateResearchWindow(
 {
     if (!m_researchOpen)
         return false;
-    const WindowLayout l = windowLayout(windowW, windowH, 1.0f);
+    const WindowLayout l = windowLayout(windowW, windowH, 1.0f, m_observer ? kObserverBarHeight : 0);
     const float sc = m_researchScale;
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
-    const Faction faction = PlayerFaction();
+    const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
-    const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
+    const ResearchProgress researchNow = ResearchShown();
+    const ResearchProgress *progress = &researchNow;
     m_researchSel = std::clamp(m_researchSel, 0, kResearchCount - 1);
     const int wheel = input.ConsumeUiWheel();
 
@@ -352,8 +378,25 @@ bool HUDController::UpdateResearchWindow(
             m_researchPanning = false;
         }
     }
+    // The scroll bars along the right and the bottom edge of the tree: dragged, or a click on the track jumps there
+    const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
+    if (leftClicked && maxY > 0.0f && ui::OnScrollTrack(vTrack, mx, my))
+        m_researchScrollDrag = 1;
+    else if (leftClicked && maxX > 0.0f && ui::OnScrollTrack(hTrack, mx, my))
+        m_researchScrollDrag = 2;
+    if (m_researchScrollDrag != 0)
+    {
+        if (!input.IsLeftMouseDown() && !leftClicked)
+            m_researchScrollDrag = 0;
+        else if (m_researchScrollDrag == 1)
+            m_researchScrollY = ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h));
+        else
+            m_researchScrollX = ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w));
+    }
     m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
     m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
+    if (m_researchScrollDrag != 0)
+        return true;
 
     if (leftClicked)
     {
@@ -435,12 +478,13 @@ void HUDController::RenderResearchWindow(
 {
     if (!m_researchOpen)
         return;
-    const WindowLayout l = windowLayout(windowW, windowH, 1.0f);
+    const WindowLayout l = windowLayout(windowW, windowH, 1.0f, m_observer ? kObserverBarHeight : 0);
     const float sc = m_researchScale;
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
-    const Faction faction = PlayerFaction();
+    const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
-    const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
+    const ResearchProgress researchNow = ResearchShown();
+    const ResearchProgress *progress = &researchNow;
     const bool hasLab = HasResearchBuilding(Players::Local(), entities);
 
     ui::DrawDialog(
@@ -584,6 +628,15 @@ void HUDController::RenderResearchWindow(
             renderer.FillRectScreen(n.x, n.y, n.w, n.h, {8, 10, 14, 170}); // not what the search / filter asks for
     }
     renderer.ResetClipRect();
+    {
+        const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
+        const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
+        const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
+        ui::DrawScrollBar(renderer, vTrack, m_researchScrollY, treeH, static_cast<float>(l.tree.h),
+                          m_researchScrollDrag == 1 || ui::OnScrollTrack(vTrack, mx, my));
+        ui::DrawScrollBar(renderer, hTrack, m_researchScrollX, treeW, static_cast<float>(l.tree.w),
+                          m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
+    }
     ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, l.zoomIn.Contains(mx, my));
     ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, l.zoomOut.Contains(mx, my));
 

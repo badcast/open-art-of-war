@@ -45,6 +45,36 @@ std::string FormatDuration(uint32_t ticks)
     return buf;
 }
 
+// "1.4 MB", "820 KB"
+std::string FormatSize(uint64_t bytes)
+{
+    char buf[32];
+    if (bytes >= 1024u * 1024u)
+        std::snprintf(buf, sizeof buf, "%.1f %s", static_cast<double>(bytes) / (1024.0 * 1024.0), _("MB"));
+    else
+        std::snprintf(buf, sizeof buf, "%u %s", static_cast<unsigned>((bytes + 1023u) / 1024u), _("KB"));
+    return buf;
+}
+
+// What was played: a network match, a custom game of this computer, a campaign mission
+std::string ModeName(const std::string &mode)
+{
+    if (mode == "custom")
+        return _("Custom game");
+    if (mode == "campaign")
+        return _("Campaign");
+    return _("Network");
+}
+
+SDL_Color ModeColor(const std::string &mode)
+{
+    if (mode == "custom")
+        return ui::color::Ok;
+    if (mode == "campaign")
+        return ui::color::Info;
+    return ui::color::Accent;
+}
+
 std::string MapName(const std::string &path)
 {
     return fs::path(path).stem().string();
@@ -206,9 +236,21 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
         if (selected)
             renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
         std::string title = e.ok ? FormatTime(e.info.recordedAt) + "  " + MapName(e.info.map) : e.name;
+        // The kind of match: a small tag at the left
+        int titleX = r.x + 12;
+        if (e.ok)
+        {
+            const std::string tag = ModeName(e.info.mode);
+            const SDL_Color tc = ModeColor(e.info.mode);
+            const int tw = font.GetTextWidth(tag, ui::FONT_SMALL) + 10;
+            renderer.FillRectScreen(titleX, r.CenterY() - 9, tw, 18, ui::WithAlpha(tc, 50));
+            renderer.DrawRectScreen(titleX, r.CenterY() - 9, tw, 18, tc);
+            font.DrawString(tag, titleX + 5, r.CenterY(), ui::FONT_SMALL, tc, false, Anchor::LEFT | Anchor::VCENTER);
+            titleX += tw + 8;
+        }
         font.DrawString(
-            ui::FitText(font, title, ui::FONT_BODY, r.w - 90),
-            r.x + 12,
+            ui::FitText(font, title, ui::FONT_BODY, r.Right() - 150 - titleX),
+            titleX,
             r.CenterY(),
             ui::FONT_BODY,
             e.ok ? (selected ? col::Text : col::TextDim) : col::Danger,
@@ -216,7 +258,7 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             Anchor::LEFT | Anchor::VCENTER);
         if (e.ok)
             font.DrawString(
-                FormatDuration(e.info.ticks),
+                FormatDuration(e.info.ticks) + "   " + FormatSize(e.info.fileBytes),
                 r.Right() - 10,
                 r.CenterY(),
                 ui::FONT_SMALL,
@@ -246,7 +288,9 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
         {
             const ReplayPlayer::Info &in = e.info;
             line(MapName(in.map), col::Accent, ui::FONT_H2);
-            line(FormatTime(in.recordedAt) + "   " + FormatDuration(in.ticks), col::TextDim);
+            line(ModeName(in.mode), ModeColor(in.mode), ui::FONT_BODY_BOLD);
+            line(std::string(_("Played")) + ": " + FormatDuration(in.ticks), col::Text, ui::FONT_BODY_BOLD);
+            line(FormatTime(in.recordedAt) + "   " + std::string(_("Size")) + ": " + FormatSize(in.fileBytes), col::TextDim);
             std::string result = in.outcome == "victory"    ? _("Victory")
                                  : in.outcome == "defeat"   ? _("Defeat")
                                  : in.outcome.empty()       ? ""

@@ -1,4 +1,5 @@
 #include "core/Application.hpp"
+#include "net/ReplayRecorder.hpp"
 #include "core/Localization.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
@@ -253,6 +254,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
     m_gameplayController = std::make_unique<GameplayController>();
     m_gameplayController->LoadOverlayStyle(m_env);
+    m_hudController->SetResearchProbe([this](PlayerId p) { return m_gameplayController->ResearchOf(p); });
     m_menuController->BindLoading(
         [this](const std::string &title, const std::string &path) { BeginMapLoading(title, path); },
         [this]() { EndMapLoading(); });
@@ -323,6 +325,7 @@ bool Application::Init(int windowWidth, int windowHeight)
 
 void Application::Shutdown()
 {
+    FinishLocalReplay("left"); // a match of this computer alone being recorded is saved as it is
     // Quitting the game in a network match is leaving it for good: the others need not wait out the
     // reconnect window before this player's base goes
     if (m_net)
@@ -483,6 +486,12 @@ void Application::run()
             {
                 // A recorded game: the turns of the file drive the world
                 UpdateReplay(frameTime);
+                accumulator = 0.0;
+            }
+            else if (m_spectating)
+            {
+                // A custom match only watched: at the speed of the observer bar
+                UpdateSpectator(frameTime);
                 accumulator = 0.0;
             }
             else
@@ -715,6 +724,12 @@ void Application::Update(float deltaTime)
             m_spectating = spectate;
             m_hudController->SetObserver(spectate);
             m_hudController->SetShowAll(spectate);
+            // The bar of the observer (view, follow, speed, statistics, research), as in a replay
+            m_replayUi = ReplayUi {};
+            if (spectate)
+                m_replaySetup = m_mission->matchSetup();
+            if (m_sound)
+                m_sound->SetInterfaceMuted(spectate); // the computer players' units do not answer the viewer
             m_gameplayController->simulation().SetCommandSink(spectate ? std::function<void(SimCommand)>([](SimCommand) {})
                                                                       : std::function<void(SimCommand)>());
         }
@@ -734,8 +749,10 @@ void Application::Update(float deltaTime)
         }
     }
 
+    UpdateLocalReplay();
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
+        const uint32_t tickBefore = m_gameplayController->simulation().Tick();
         m_gameplayController->Update(
             deltaTime,
             *m_input,
@@ -752,6 +769,8 @@ void Application::Update(float deltaTime)
             m_state,
             m_windowW,
             m_windowH);
+        if (m_gameplayController->simulation().Tick() != tickBefore)
+            LocalTickRan(tickBefore);
     }
     else if (m_state == AppState::SplashLogo)
     {
@@ -845,6 +864,8 @@ void Application::Update(float deltaTime)
         // (and so consumed) from the first frame, but acted on only after kEndScreenInputDelay
         if (m_endScreenTimer <= 0.0f && m_net)
             m_net->FinishReplay(m_state == AppState::Victory ? "victory" : "defeat"); // the match is saved
+        if (m_endScreenTimer <= 0.0f)
+            FinishLocalReplay(m_state == AppState::Victory ? "victory" : "defeat");
         m_endScreenTimer += deltaTime;
         float lx, ly;
         const bool confirm = m_input->IsConfirmJustPressed();
@@ -1162,7 +1183,9 @@ void Application::render()
         // Render Debug Passability Grid (70% Transparency Green/Red)
         m_gameplayController->RenderDebugGrid(*m_renderer, *m_camera, *m_entities, *m_map);
 
-        // Order lines of the selected units (of every unit in sight while Alt is held)
+        // Order lines of the selected units (of every unit in sight while Alt is held); not for a viewer of computer
+        // players: their orders are theirs
+        if (!m_spectating)
         m_gameplayController->RenderOrderLines(
             *m_renderer,
             *m_camera,
@@ -1338,7 +1361,7 @@ void Application::render()
     RenderFpsCounter();
     RenderNetStats();
     RenderNetworkBanner();
-    if (m_replay && m_state == AppState::SkirmishPlaying)
+    if ((m_replay || m_spectating) && m_state == AppState::SkirmishPlaying)
         RenderReplayBar();
     if (m_videoConfirmActive)
         RenderVideoConfirm();

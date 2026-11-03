@@ -4425,3 +4425,36 @@ msgstr "A watched match needs at least two computer players."
 
 msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
 msgstr "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
+
+msgid "Map"
+msgstr "Map"
+
+msgid "Watching"
+msgstr "Watching"
+
+msgid "STATS"
+msgstr "STATS"
+
+msgid "STATISTICS"
+msgstr "STATISTICS"
+
+msgid "Credits"
+msgstr "Credits"
+
+msgid "MB"
+msgstr "MB"
+
+msgid "KB"
+msgstr "KB"
+
+msgid "Custom game"
+msgstr "Custom game"
+
+msgid "Campaign"
+msgstr "Campaign"
+
+msgid "Network"
+msgstr "Network"
+
+msgid "Played"
+msgstr "Played"

@@ -137,6 +137,8 @@ void Simulation::Issue(SimCommand command)
         m_sink(std::move(command));
         return;
     }
+    if (m_record)
+        m_record(m_tick, command);
     Schedule(m_tick, std::move(command));
 }
 

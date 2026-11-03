@@ -44,6 +44,10 @@ bool FillInfo(const Net::ReplayData &data, ReplayPlayer::Info &info, std::string
     info.turns = static_cast<uint32_t>(data.turns.size());
     info.ticks = info.turns * info.ticksPerTurn;
     info.localSlot = meta.value("local_slot", -1);
+    info.mode = meta.value("mode", std::string("network"));
+    info.mission = meta.value("mission", -1);
+    info.playerFaction = meta.value("player_faction", 0);
+    info.difficulty = meta.value("difficulty", 1);
     if (meta.contains("result") && meta["result"].is_object())
         info.outcome = meta["result"].value("outcome", std::string());
     else
@@ -125,6 +129,10 @@ bool ReplayPlayer::ReadInfo(const std::string &path, Info &out, std::string &err
     }
     out = Info {};
     out.file = path;
+    std::error_code ec;
+    out.fileBytes = static_cast<uint64_t>(std::filesystem::file_size(path, ec));
+    if (ec)
+        out.fileBytes = 0;
     return FillInfo(data, out, error);
 }
 

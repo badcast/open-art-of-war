@@ -317,6 +317,47 @@ void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fil
     r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, color::Border);
 }
 
+UiRect ScrollThumb(const UiRect &track, float pos, float total, float visible)
+{
+    const bool vertical = track.h >= track.w;
+    const int len = vertical ? track.h : track.w;
+    if (total <= visible || len <= 0)
+        return {track.x, track.y, vertical ? track.w : len, vertical ? len : track.h};
+    const int thumb = std::max(20, static_cast<int>(len * visible / total));
+    const int at = static_cast<int>((len - thumb) * std::clamp(pos / (total - visible), 0.0f, 1.0f));
+    return vertical ? UiRect {track.x, track.y + at, track.w, thumb} : UiRect {track.x + at, track.y, thumb, track.h};
+}
+
+void DrawScrollBar(Renderer &r, const UiRect &track, float pos, float total, float visible, bool hot)
+{
+    if (total <= visible)
+        return;
+    r.FillRectScreen(track.x, track.y, track.w, track.h, color::PanelSunken);
+    const UiRect t = ScrollThumb(track, pos, total, visible);
+    r.FillRectScreen(t.x, t.y, t.w, t.h, hot ? color::Accent : color::BorderStrong);
+}
+
+float ScrollPosFromMouse(const UiRect &track, int mouse, float total, float visible)
+{
+    if (total <= visible)
+        return 0.0f;
+    const bool vertical = track.h >= track.w;
+    const int len = vertical ? track.h : track.w;
+    const int thumb = std::max(20, static_cast<int>(len * visible / total));
+    const int start = vertical ? track.y : track.x;
+    const float ratio
+        = std::clamp(static_cast<float>(mouse - start - thumb / 2) / std::max(1, len - thumb), 0.0f, 1.0f);
+    return ratio * (total - visible);
+}
+
+bool OnScrollTrack(const UiRect &track, int mx, int my)
+{
+    const bool vertical = track.h >= track.w;
+    const int padX = vertical ? 6 : 0, padY = vertical ? 0 : 6;
+    return track.w > 0 && track.h > 0 && mx >= track.x - padX && mx <= track.Right() + padX && my >= track.y - padY
+           && my <= track.Bottom() + padY;
+}
+
 namespace
 {
 UiRect ConfirmDialogRect(int windowW, int windowH)

@@ -3,6 +3,7 @@
 #include "game/MissionController.hpp"
 #include "ui/MapPreview.hpp"
 #include "ui/UiKit.hpp"
+#include "ui/MapFilter.hpp"
 
 #include <cstdint>
 #include <string>
@@ -129,7 +130,8 @@ private:
         Password,
         Address,
         Code,
-        Chat
+        Chat,
+        Search // the search box over the list of maps
     };
     enum class Tab
     {
@@ -146,44 +148,68 @@ private:
             return {serverList.x + 4, serverList.y + 4 + i * 34, serverList.w - 8, 30};
         }
     };
+    // The room is laid out like the custom game window (left: search, filters, list of maps and the chat; right: the
+    // seats, options and the map picture); everything is a share of the window, nothing has a fixed width
     struct LobbyLayout
     {
-        ui::UiRect dialog, players, map, mapPrev, mapNext, mapName, chatLog, chatField, chatSend, readyBtn, startBtn,
+        ui::UiRect dialog, details, mapSearch, mapList, players, map, chatLog, chatField, chatSend, readyBtn, startBtn,
             leaveBtn, prebuiltBtn, creditsBtn, fogCheckbox;
+        int listRowH {28};
+        int rowH {34};
+        ui::UiRect Filter(int i) const
+        {
+            const int w = (mapSearch.w - 2 * 6) / 3;
+            return {mapSearch.x + i * (w + 6), mapSearch.y + 36, w, 28};
+        }
+        int MapRows() const
+        {
+            return std::max(1, mapList.h / listRowH);
+        }
+        ui::UiRect MapItem(int i) const
+        {
+            return {mapList.x, mapList.y + i * listRowH, mapList.w, listRowH - 2};
+        }
         ui::UiRect row(int i) const
         {
-            return {players.x, players.y + 30 + i * 40, players.w, 36};
+            return {players.x, players.y + 24 + i * rowH, players.w, rowH - 4};
         }
-        // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army size
+        // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army size,
+        // ready; each is a share of the width of the table
+        ui::UiRect Col(int i, int k) const
+        {
+            static constexpr int kShare[7] = {24, 17, 8, 8, 12, 13, 18};
+            const ui::UiRect r = row(i);
+            const int gap = 4, x0 = r.x + 30, total = r.w - 30 - 6 * gap;
+            int used = 0;
+            for (int j = 0; j < k; ++j)
+                used += kShare[j];
+            const int x = x0 + total * used / 100 + k * gap;
+            const int w = total * kShare[k] / 100;
+            return {x, r.y + 4, w, r.h - 8};
+        }
         ui::UiRect TypeCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 30, r.y + 4, 142, r.h - 8};
+            return Col(i, 0);
         }
         ui::UiRect FactionCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 176, r.y + 4, 96, r.h - 8};
+            return Col(i, 1);
         }
         ui::UiRect TeamCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 276, r.y + 4, 52, r.h - 8};
+            return Col(i, 2);
         }
         ui::UiRect ColorCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 332, r.y + 4, 40, r.h - 8};
+            return Col(i, 3);
         }
         ui::UiRect HandicapCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 376, r.y + 4, 64, r.h - 8};
+            return Col(i, 4);
         }
         ui::UiRect ArmyCell(int i) const
         {
-            const ui::UiRect r = row(i);
-            return {r.x + 444, r.y + 4, 84, r.h - 8};
+            return Col(i, 5);
         }
     };
     static BrowserLayout browserLayout(int w, int h);
@@ -212,7 +238,12 @@ private:
     std::string m_notice;
     std::string m_chatInput;
     std::vector<std::string> m_chatLog;
-    std::vector<SkirmishMapInfo> m_maps;
+    std::vector<SkirmishMapInfo> m_maps;      // every map
+    std::vector<SkirmishMapInfo> m_mapsShown; // after the search and the filters
+    ui::MapFilter m_mapFilter;
+    int m_mapTop {0};                         // first visible row of the map list
+    void RebuildMapsShown();
+    static constexpr int kFilterPlayers = 1003, kFilterSize = 1004, kFilterSort = 1005; // the filter lists
     static constexpr int kMapCombo = 1001;    // id of the list of maps (the host picks one)
     static bool IsOptionCombo(int id)
     {

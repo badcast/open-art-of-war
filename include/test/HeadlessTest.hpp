@@ -30,6 +30,11 @@ public:
     static bool RunBuildRulesTest(Application &app);
     // A match with computer players in slots: they build and train, and do it alike every time
     static bool RunMatchAiTest(Application &app);
+    // Computer allies on the four-player maps: no base closes itself or its ally in, each has a laboratory, power
+    // plants stand behind the HQ, and the seed changes the layout
+    static bool RunAiBaseLayoutTest(Application &app);
+    // A custom game and a campaign mission of this computer, recorded tick by tick, play back to the same world
+    static bool RunLocalReplayTest(Application &app);
     static bool RunBurstTest(Application &app);
     static bool RunDataSyncTest(Application &app);
 };

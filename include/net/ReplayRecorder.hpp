@@ -26,6 +26,12 @@ public:
         uint32_t ticksPerTurn {2};
         uint32_t turnMs {100};
         uint64_t assetsHash {0};
+        // What was played: "network", "custom" (a custom game of this computer) or "campaign" (then the mission,
+        // the side of the player and the difficulty of the computer set it up instead of the setup)
+        std::string mode {"network"};
+        int mission {-1};
+        int playerFaction {0};
+        int difficulty {1};
     };
 
     bool Active() const

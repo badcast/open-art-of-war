@@ -132,6 +132,7 @@ set(ENGINE_SOURCES
     src/game/EntityManager.cpp
     src/game/Economy.cpp
     src/game/AIController.cpp
+    src/game/AIBaseLayout.cpp
     src/game/AISquadController.cpp
     src/game/Research.cpp
     src/game/Effects.cpp

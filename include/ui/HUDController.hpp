@@ -4,6 +4,7 @@
 #include "game/Simulation.hpp"
 #include "ui/RadarAlert.hpp"
 #include "ui/UiKit.hpp"
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -197,6 +198,15 @@ public:
         m_radarFog = fog;
     }
     // Watching a replay: no building interface (tabs, build grid, info box), the radar and the menu stay
+    // Where the research window reads the research under way (a computer player keeps its own)
+    void SetResearchProbe(std::function<ResearchProgress(PlayerId)> probe)
+    {
+        m_researchProbe = std::move(probe);
+    }
+    bool IsObserver() const
+    {
+        return m_observer;
+    }
     void SetObserver(bool on)
     {
         m_observer = on;
@@ -261,6 +271,9 @@ public:
     {
         return m_hudNotification;
     }
+    // The window of the technology tree (opened by the button under OBJECTIVES, or by the observer bar)
+    void OpenResearchWindow();
+    void CloseResearchWindow();
     void SetNotification(const std::string &msg, float time = 3.0f)
     {
         m_hudNotification = msg;
@@ -274,9 +287,6 @@ private:
         int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits);
     void CyclePrimaryBuilding(int tab, EntityManager &entities, Camera &camera);
 
-    // The window of the technology tree (opened by the button under OBJECTIVES)
-    void OpenResearchWindow();
-    void CloseResearchWindow();
     bool m_researchOpen {false};
     int m_researchSel {0};
     std::string m_researchSearch;
@@ -286,6 +296,7 @@ private:
     float m_researchScrollX {0.0f}, m_researchScrollY {0.0f};
     float m_researchScale {1.25f}; // size of the whole window and its icons (wheel, + / - buttons)
     bool m_researchPanning {false};
+    int m_researchScrollDrag {0}; // 1: the vertical scroll bar is held, 2: the horizontal one
     int m_researchPanX {0}, m_researchPanY {0};
     uint32_t m_researchClickMs {0};
     int m_researchClickNode {-1};
@@ -301,12 +312,15 @@ private:
     float m_hudNotificationTimer {0.0f};
 
     Simulation *m_sim {nullptr};
+    std::function<ResearchProgress(PlayerId)> m_researchProbe; // whose research is shown (observers: any player)
+    ResearchProgress ResearchShown() const;
     // Command of the local player for the bound simulation
     void Issue(SimCommand command);
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
     bool m_observer {false}; // watching a replay
+    static constexpr int kObserverBarHeight = 64; // the bar of a replay / a watched match over the screen
     bool m_showAll {false}; // a replay's observer sees the whole map
     mutable RadarAlert m_radarAlert; // updated while the radar is drawn
     int m_radarZoom {1};             // 1 = whole map, up to kRadarMaxZoom

@@ -1717,6 +1717,20 @@ bool EntityManager::HasBuildingType(UnitType type, PlayerId owner, bool mustBeCo
     return false;
 }
 
+int EntityManager::CountBuildingType(UnitType type, PlayerId owner, bool mustBeComplete) const
+{
+    int n = 0;
+    for (const auto &e : m_entities)
+    {
+        if (!e.alive || e.state == ActionState::Die || !e.isBuilding || e.owner != owner || e.type != type)
+            continue;
+        const Building *b = e.AsBuilding();
+        if (!mustBeComplete || !b || b->buildProgress >= 1.0f)
+            ++n;
+    }
+    return n;
+}
+
 std::vector<int> EntityManager::GetBuildingsByType(UnitType type, PlayerId owner, bool mustBeComplete) const
 {
     std::vector<int> result;
@@ -3125,10 +3139,8 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                     proj.shooterId + proj.targetId + static_cast<int>(proj.targetX) + static_cast<int>(proj.targetY));
                 mark >= 0)
             {
-                const float markX = targetAlive && target->AsUnit() ? target->GetUnitCenterPixelX() : proj.targetX;
-                const float markY = targetAlive && target->AsUnit() ? target->GetUnitCenterPixelY() : proj.targetY;
-                if (!(targetAlive && target->AsBuilding()))
-                    AddGroundMark(markX, markY, mark, spec.groundMarkSeconds);
+                // At the point of contact (on a building the side it came down on), whatever it hit
+                AddGroundMark(proj.targetX, proj.targetY, mark, spec.groundMarkSeconds);
             }
 
             if (targetAlive)

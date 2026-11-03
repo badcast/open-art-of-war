@@ -1711,6 +1711,12 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             if (!turretAligned)
                 return;
         }
+        else if (!IsInfantry() && HasReservation())
+        {
+            // A hull without a turret finishes the step it is taking first: turning it to the target while it still
+            // slides to the next tile would show a vehicle driving sideways
+            return;
+        }
         else if (state != ActionState::Move)
         {
             if (!IsInfantry() && facingDirection != targetDir8)
@@ -2269,6 +2275,12 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 return;
             }
+        }
+        else if (!IsInfantry() && HasReservation())
+        {
+            // A hull without a turret finishes the step it is taking first: turning it to the target while it still
+            // slides to the next tile would show a vehicle driving sideways
+            return;
         }
         else if (state != ActionState::Move)
         {

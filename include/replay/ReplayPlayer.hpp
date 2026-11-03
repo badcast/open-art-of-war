@@ -45,6 +45,11 @@ public:
         int localSlot {-1};
         int protocol {0};
         bool carriesData {false}; // the file holds its map and simulation data
+        std::string mode {"network"}; // "network", "custom" or "campaign"
+        int mission {-1};             // campaign: the mission, the side of the player, the computer's difficulty
+        int playerFaction {0};
+        int difficulty {1};
+        uint64_t fileBytes {0};       // size of the file on disk
         std::vector<Player> players;
     };
 
