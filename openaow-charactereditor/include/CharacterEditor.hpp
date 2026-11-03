@@ -79,6 +79,16 @@ private:
 
     bool EditProjectileCombo(YAML::Node parent);
 
+    // A sound of the character file: one of the events of data/audio_sfx.json, or none (the game's default for it).
+    // `defaultLabel` names what is heard without one
+    bool EditSoundCombo(YAML::Node parent, const char* key, const char* label, const char* defaultLabel);
+    // The sound fields of a gun (shot, hit, volume)
+    bool EditWeaponSounds(YAML::Node w);
+    // The events of audio_sfx.json (name, category), read once
+    const std::vector<std::pair<std::string, std::string>>& SfxEvents();
+    std::vector<std::pair<std::string, std::string>> sfxEvents;
+    bool sfxEventsRead = false;
+
     void SetMode(PreviewMode mode);
 
     // Animator tab (EditorAnimator.cpp): timing of the pictures of the selected character

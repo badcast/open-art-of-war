@@ -334,6 +334,21 @@ struct WeaponConfig
     bool enabled {true};
     bool requiresResearch {false};
     float maxDistance {0.0f};
+    // Sounds of this gun (events of data/audio_sfx.json; empty: the sound of its projectile kind). Only heard:
+    // nothing of it is part of the world
+    std::string sound;        // the shot
+    std::string impactSound;  // where it hits
+    float soundVolume {1.0f}; // times the event's own volume
+    uint16_t soundId {0};     // the interned events (EntityManager::SoundName)
+    uint16_t impactSoundId {0};
+};
+
+// The sounds of a unit or a building of its own (the `sounds:` block of its character file)
+struct CharacterSounds
+{
+    std::string death;   // when it is destroyed (empty: an explosion / the infantry death)
+    float volume {1.0f}; // times every sound of it (its guns, its hits, its death)
+    uint16_t deathId {0};
 };
 
 struct UnitConfig
@@ -397,6 +412,7 @@ struct UnitConfig
     std::vector<int> flameDeathSequences;
     std::string description;
     std::vector<WeaponConfig> weapons;
+    CharacterSounds sounds;
 };
 
 struct BuildingConfig
@@ -437,6 +453,8 @@ struct BuildingConfig
     bool hasRotatingRadar {false};
     int buildRadius {16};
     std::string description;
+    std::vector<WeaponConfig> weapons;
+    CharacterSounds sounds;
 };
 
 class EntityManager
@@ -690,7 +708,17 @@ public:
         float x {0.0f};
         float y {0.0f};
         PlayerId owner {kNoPlayer}; // who fired
+        uint16_t sound {0};         // the event of the character / weapon (SoundName), 0: the cue's own
+        float gain {1.0f};          // the volume of the character / weapon
     };
+    // The sound events named by the character files (0: none)
+    const std::string &SoundName(uint16_t id) const
+    {
+        static const std::string kNone;
+        return id > 0 && id <= m_soundNames.size() ? m_soundNames[id - 1] : kNone;
+    }
+    // The death sound of a unit / building and the volume of its sounds
+    const CharacterSounds *SoundsOf(const Entity &e) const;
     // Changes whenever the world is cleared (entity ids start again)
     uint32_t Generation() const
     {
@@ -780,11 +808,15 @@ private:
     std::vector<GroundMark> m_groundMarks;
     std::vector<SoundCueEvent> m_soundCues;
     uint32_t m_generation {0};
-    void Cue(SoundCue c, float x, float y, PlayerId owner)
+    void Cue(SoundCue c, float x, float y, PlayerId owner, uint16_t sound = 0, float gain = 1.0f)
     {
         if (m_soundCues.size() < 256) // nobody takes them (headless, editor): they stop piling up
-            m_soundCues.push_back({c, x, y, owner});
+            m_soundCues.push_back({c, x, y, owner, sound, gain});
     }
+    std::vector<std::string> m_soundNames; // only grows: projectiles in flight keep their ids over a reload
+    uint16_t InternSound(const std::string &name);
+    // The gun firing now: weapons[1] while a unit's second gun shoots, else the main one (null: none in the file)
+    const WeaponConfig *FiringWeapon(const Entity &e) const;
     void AddGroundMark(float x, float y, int composite, float seconds);
 
 public:

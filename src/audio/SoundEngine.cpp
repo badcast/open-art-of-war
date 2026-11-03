@@ -560,6 +560,11 @@ const SfxMixer::EventConfig *SoundEngine::SfxConfig(WorldSfx sound) const
     return m_sfx.Config(SoundIds::Name(sound));
 }
 
+const SfxMixer::EventConfig *SoundEngine::SfxConfig(const std::string &event) const
+{
+    return event.empty() || !m_sfx.Has(event) ? nullptr : m_sfx.Config(event);
+}
+
 void SoundEngine::Announce(Announcement line)
 {
     Announce(std::string(SoundIds::Name(line)));

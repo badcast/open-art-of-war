@@ -4458,3 +4458,51 @@ msgstr "Network"
 
 msgid "Played"
 msgstr "Played"
+
+msgid "Shot sound"
+msgstr "Shot sound"
+
+msgid "Impact sound"
+msgstr "Impact sound"
+
+msgid "Sound volume"
+msgstr "Sound volume"
+
+msgid "(by projectile)"
+msgstr "(by projectile)"
+
+msgid "Sounds"
+msgstr "Sounds"
+
+msgid "Death sound"
+msgstr "Death sound"
+
+msgid "(explosion / infantry death)"
+msgstr "(explosion / infantry death)"
+
+msgid "Volume of all its sounds"
+msgstr "Volume of all its sounds"
+
+msgid "not in audio_sfx.json"
+msgstr "not in audio_sfx.json"
+
+msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
+msgstr "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
+
+msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
+msgstr "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
+
+msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
+msgstr "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
+
+msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
+msgstr "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
+
+msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
+msgstr "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
+
+msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
+msgstr "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
+
+msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
+msgstr "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."

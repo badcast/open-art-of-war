@@ -134,6 +134,7 @@ public:
     // A second gun that fires on its own beside the main one (the Zeus rocket launcher, weapons[1] of the character
     // file): own projectile, damage, range and reload, at the same target
     bool hasSecondary {false};
+    bool firingSecondary {false}; // the second gun is the one shooting right now (its sounds are heard)
     ProjectileType secondaryProjectile {ProjectileType::Rocket};
     int secondaryDamage {0};
     float secondaryRange {0.0f};

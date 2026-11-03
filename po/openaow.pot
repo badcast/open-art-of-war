@@ -4412,3 +4412,51 @@ msgstr ""
 
 msgid "Played"
 msgstr ""
+
+msgid "Shot sound"
+msgstr ""
+
+msgid "Impact sound"
+msgstr ""
+
+msgid "Sound volume"
+msgstr ""
+
+msgid "(by projectile)"
+msgstr ""
+
+msgid "Sounds"
+msgstr ""
+
+msgid "Death sound"
+msgstr ""
+
+msgid "(explosion / infantry death)"
+msgstr ""
+
+msgid "Volume of all its sounds"
+msgstr ""
+
+msgid "not in audio_sfx.json"
+msgstr ""
+
+msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
+msgstr ""
+
+msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
+msgstr ""
+
+msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
+msgstr ""
+
+msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
+msgstr ""
+
+msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
+msgstr ""
+
+msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
+msgstr ""
+
+msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
+msgstr ""

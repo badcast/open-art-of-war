@@ -528,6 +528,63 @@ bool CharacterEditor::EditProjectileCombo(YAML::Node parent) {
     return changed;
 }
 
+const std::vector<std::pair<std::string, std::string>>& CharacterEditor::SfxEvents() {
+    if (sfxEventsRead) return sfxEvents;
+    sfxEventsRead = true;
+    // (JSON is YAML too: the events and their categories, sorted by name)
+    try {
+        const YAML::Node doc = YAML::LoadFile(OpenArtOfWar::LoaderResources::SfxConfig(assetsRoot.string()));
+        const YAML::Node events = doc["events"];
+        const std::string defCategory = YamlString(doc["defaults"], "category", "ui");
+        if (events && events.IsMap()) {
+            for (const auto& e : events) {
+                const std::string name = e.first.as<std::string>("");
+                if (!name.empty()) sfxEvents.emplace_back(name, YamlString(e.second, "category", defCategory));
+            }
+        }
+    } catch (const std::exception& ex) {
+        std::cerr << "[Editor] audio_sfx.json: " << ex.what() << std::endl;
+    }
+    std::sort(sfxEvents.begin(), sfxEvents.end());
+    return sfxEvents;
+}
+
+bool CharacterEditor::EditSoundCombo(YAML::Node parent, const char* key, const char* label, const char* defaultLabel) {
+    const std::string current = YamlString(parent, key, "");
+    const auto& events = SfxEvents();
+    bool known = current.empty();
+    for (const auto& e : events) known = known || e.first == current;
+    const std::string shown = current.empty() ? std::string(_(defaultLabel))
+                                              : (known ? current : current + " (" + _("not in audio_sfx.json") + ")");
+    bool changed = false;
+    ImGui::PushID(key);
+    if (ImGui::BeginCombo(_(label), shown.c_str())) {
+        if (ImGui::Selectable(_(defaultLabel), current.empty())) {
+            parent.remove(key);
+            changed = true;
+        }
+        for (const auto& [name, category] : events) {
+            const std::string item = name + "   [" + category + "]";
+            if (ImGui::Selectable(item.c_str(), name == current)) {
+                parent[key] = name;
+                changed = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    FieldHint(label);
+    ImGui::PopID();
+    return changed;
+}
+
+bool CharacterEditor::EditWeaponSounds(YAML::Node w) {
+    bool changed = false;
+    changed |= EditSoundCombo(w, "sound", "Shot sound", "(by projectile)");
+    changed |= EditSoundCombo(w, "impact_sound", "Impact sound", "(by projectile)");
+    changed |= EditFloat(w, "sound_volume", "Sound volume", 1.0f, 0.05f);
+    return changed;
+}
+
 void CharacterEditor::SetMode(PreviewMode mode) {
     previewMode = mode;
     previewTime = 0.0f;

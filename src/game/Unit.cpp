@@ -1696,7 +1696,12 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
         if (!isSiegeMode)
         {
+            // (the turn in place that aims a hull without a turret must keep counting: clearing the path state resets
+            // its timer every tick, and a vehicle whose turn step takes longer than a tick - the Zeus - never turned to
+            // the wall it was ordered to shoot)
+            const float turnProgress = turnTimer;
             ClearPathState();
+            turnTimer = turnProgress;
             if (state == ActionState::Move)
                 state = ActionState::Idle;
         }
@@ -2165,7 +2170,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             muzzleOffsetY = secondaryMuzzleY;
             float mSrcX, mSrcY;
             GetMuzzlePoint(mSrcX, mSrcY);
+            firingSecondary = true;
             delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+            firingSecondary = false;
             attackDamage = mainDamage;
             splashPercent = mainSplash;
             projectile = mainProjectile;

@@ -363,6 +363,11 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         wc.enabled = getBool(w, "enabled", true);
         wc.requiresResearch = getBool(w, "requires_research", false);
         wc.maxDistance = getFloat(w, "max_distance", 0.0f);
+        wc.sound = getStr(w, "sound", inherit.sound);
+        wc.impactSound = getStr(w, "impact_sound", inherit.impactSound);
+        wc.soundVolume = std::max(0.0f, getFloat(w, "sound_volume", inherit.soundVolume));
+        wc.soundId = InternSound(wc.sound);
+        wc.impactSoundId = InternSound(wc.impactSound);
         if (w["localePosition"] && w["localePosition"].IsSequence())
         {
             wc.muzzleOffsetX = getSeqFloat(w["localePosition"], 0, inherit.muzzleOffsetX);
@@ -389,6 +394,14 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     noWeapon.range = 0.0f;
     noWeapon.cooldown = 1.0f;
     const std::vector<WeaponConfig> weapons = parseWeapons(combatNode, noWeapon);
+    // sounds: { death: <event>, volume: 1.0 } - the character's own sounds (its guns have theirs in combat.weapons)
+    CharacterSounds sounds;
+    if (const YAML::Node sn = root["sounds"]; sn && sn.IsMap())
+    {
+        sounds.death = getStr(sn, "death", "");
+        sounds.volume = std::max(0.0f, getFloat(sn, "volume", 1.0f));
+    }
+    sounds.deathId = InternSound(sounds.death);
     const WeaponConfig primary = weapons.empty() ? noWeapon : weapons.front();
     int damage = primary.damage;
     float range = primary.range;
@@ -585,6 +598,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         cfg.weapons = weapons;
         if (cfg.weapons.empty() && canAttack)
             cfg.weapons.push_back(primary);
+        cfg.sounds = sounds;
 
         // Siege / baseline forms bring their own weapons; anything they leave out stays as in the main form
         auto applyForm = [&](UnitConfig &form, const YAML::Node &formCombat) {
@@ -732,6 +746,8 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         cfg.wreckComposite = getInt(animNode, "wreck_composite", 0);
         cfg.wreckStages = getInt(animNode, "wreck_stages", 0);
         cfg.description = desc;
+        cfg.weapons = weapons;
+        cfg.sounds = sounds;
 
         m_buildingConfigs[cfg.buildingIndex] = cfg;
     }
@@ -1715,6 +1731,52 @@ bool EntityManager::HasBuildingType(UnitType type, PlayerId owner, bool mustBeCo
             return true;
     }
     return false;
+}
+
+uint16_t EntityManager::InternSound(const std::string &name)
+{
+    if (name.empty())
+        return 0;
+    for (size_t i = 0; i < m_soundNames.size(); ++i)
+        if (m_soundNames[i] == name)
+            return static_cast<uint16_t>(i + 1);
+    if (m_soundNames.size() >= 0xFFFE)
+        return 0;
+    m_soundNames.push_back(name);
+    return static_cast<uint16_t>(m_soundNames.size());
+}
+
+const WeaponConfig *EntityManager::FiringWeapon(const Entity &e) const
+{
+    const std::vector<WeaponConfig> *list = nullptr;
+    size_t slot = 0;
+    if (const Unit *u = e.AsUnit())
+    {
+        if (const UnitConfig *cfg = GetUnitConfig(u->archetypeId))
+            list = &cfg->weapons;
+        slot = u->firingSecondary ? 1 : 0;
+    }
+    else if (const Building *b = e.AsBuilding())
+    {
+        if (const BuildingConfig *cfg = GetBuildingConfig(b->rawBuildingType))
+            list = &cfg->weapons;
+    }
+    return list && slot < list->size() ? &(*list)[slot] : nullptr;
+}
+
+const CharacterSounds *EntityManager::SoundsOf(const Entity &e) const
+{
+    if (const Unit *u = e.AsUnit())
+    {
+        const UnitConfig *cfg = GetUnitConfig(u->archetypeId);
+        return cfg ? &cfg->sounds : nullptr;
+    }
+    if (const Building *b = e.AsBuilding())
+    {
+        const BuildingConfig *cfg = GetBuildingConfig(b->rawBuildingType);
+        return cfg ? &cfg->sounds : nullptr;
+    }
+    return nullptr;
 }
 
 int EntityManager::CountBuildingType(UnitType type, PlayerId owner, bool mustBeComplete) const
@@ -3133,7 +3195,10 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
             // Hit animation of the projectile kind, picked by the target
             const int impactAnim = spec.PickImpact(proj.targetId);
             if (proj.type == ProjectileType::Shell || proj.type == ProjectileType::Rocket)
-                Cue(SoundCue::ExplodeSmall, proj.targetX, proj.targetY, proj.owner);
+                Cue(SoundCue::ExplodeSmall, proj.targetX, proj.targetY, proj.owner, proj.impactSound, proj.soundGain);
+            else if (proj.impactSound != 0) // a flame / bullet with a hit sound of its own
+                Cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, proj.targetX, proj.targetY, proj.owner,
+                    proj.impactSound, proj.soundGain);
             // A small crater where a shell / rocket lands (on the ground or the unit it hit)
             if (const int mark = spec.PickGroundMark(
                     proj.shooterId + proj.targetId + static_cast<int>(proj.targetX) + static_cast<int>(proj.targetY));
@@ -3469,6 +3534,10 @@ void EntityManager::SpawnProjectileFromEntity(
     const int dir32 = Utility::DirFromNorth(spreadDx, spreadDy, 32);
 
     const ProjectileSpec &spec = Projectiles::of(entity.projectile);
+    // The sounds of the gun firing (its character file may name its own) and how loud this character is
+    const WeaponConfig *gun = FiringWeapon(entity);
+    const CharacterSounds *charSounds = SoundsOf(entity);
+    const float soundGain = (gun ? gun->soundVolume : 1.0f) * (charSounds ? charSounds->volume : 1.0f);
     {
         // The sound of the shot by weapon kind
         const Unit *shooter = entity.AsUnit();
@@ -3496,7 +3565,7 @@ void EntityManager::SpawnProjectileFromEntity(
                 fire = (shooter && shooter->IsInfantry()) ? SoundCue::FireRifle : SoundCue::FireMg;
                 break;
         }
-        Cue(fire, srcX, srcY, entity.owner);
+        Cue(fire, srcX, srcY, entity.owner, gun ? gun->soundId : 0, soundGain);
     }
     if (spec.hitscan)
     {
@@ -3510,7 +3579,8 @@ void EntityManager::SpawnProjectileFromEntity(
             {
                 bool isTargetInfantry = (target->AsUnit() && target->AsUnit()->IsInfantry());
                 int impactAnim = spec.PickImpact(target->id);
-                Cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, finalHitX, finalHitY, entity.owner);
+                Cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, finalHitX, finalHitY, entity.owner,
+                    gun ? gun->impactSoundId : 0, soundGain);
 
                 NoteEntityHit(*target, entity.id);
                 target->currentHp -= ApplyMovingUnitDamage(entity.attackDamage, target, entity.projectile);
@@ -3608,6 +3678,8 @@ void EntityManager::SpawnProjectileFromEntity(
     int projTargetId = targetEntityId;
 
     Projectile p;
+    p.impactSound = gun ? gun->impactSoundId : 0;
+    p.soundGain = soundGain;
     p.x = srcX;
     p.y = srcY;
     p.startX = p.x;
