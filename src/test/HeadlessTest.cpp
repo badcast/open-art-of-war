@@ -7720,6 +7720,128 @@ bool HeadlessTest::run(Application &app, int numTicks)
                   << std::endl;
     }
 
+    // 29. Validating Rhino / Siege transformation order queue, OrderFinished determinism and turret shifts
+    {
+        std::cout << "[Test] Validating Rhino / Siege transformation determinism, order queue and turret shifts..." << std::endl;
+        EntityManager &entities = *app.m_entities;
+        TileMap &map = *app.m_map;
+        Pathfinder &pf = *app.m_pathfinder;
+        Simulation &sim = app.m_gameplayController->simulation();
+
+        entities.Clear();
+        map.InitBlankArena(40, 40, 0);
+        pf.SetMap(&map);
+        pf.SetEntityManager(&entities);
+        sim.Reset();
+        SimContext ctx {entities, map, pf, *app.m_economy, *app.m_aiController};
+
+        const PlayerId player = Players::OwnerOf(Faction::Resistance);
+        entities.SetSiegeUnlocked(player, true);
+        const int rhinoId = entities.SpawnUnitByArchetype(10, 10, 10, Faction::Resistance, player);
+        Unit *rhino = entities.GetUnit(rhinoId);
+        if (!rhino)
+        {
+            std::cerr << "[Test] Error: Failed to spawn Rhino for determinism test!" << std::endl;
+            return false;
+        }
+
+        // Test deterministic turret shift lookup
+        float sx = 0.0f, sy = 0.0f;
+        EntityManager::GetDeterministicTurretShift(10, 2, sx, sy);
+        if (sx != 0.0f || sy != 0.0f)
+        {
+            std::cerr << "[Test] Error: Rhino facing 2 (reference) turret shift mismatch! (" << sx << "," << sy << ")" << std::endl;
+            return false;
+        }
+        EntityManager::GetDeterministicTurretShift(10, 6, sx, sy);
+        if (sx != 0.0f || sy != 7.0f)
+        {
+            std::cerr << "[Test] Error: Rhino facing 6 turret shift mismatch! (" << sx << "," << sy << ") expected (0, 7)" << std::endl;
+            return false;
+        }
+
+        // Issue ToggleSiege via Simulation
+        SimCommand cmdToggle;
+        cmdToggle.type = CommandType::ToggleSiege;
+        cmdToggle.player = player;
+        cmdToggle.ids = {static_cast<uint32_t>(rhinoId)};
+        sim.Apply(cmdToggle, ctx);
+
+        if (rhino->state != ActionState::Transform)
+        {
+            std::cerr << "[Test] Error: Rhino did not enter Transform state after ToggleSiege command!" << std::endl;
+            return false;
+        }
+        if (rhino->OrderFinished())
+        {
+            std::cerr << "[Test] Error: Rhino OrderFinished() evaluated to true while in ActionState::Transform!" << std::endl;
+            return false;
+        }
+
+        // Issue OrderAt while Rhino is transforming
+        SimCommand cmdOrder;
+        cmdOrder.type = CommandType::OrderAt;
+        cmdOrder.player = player;
+        cmdOrder.ids = {static_cast<uint32_t>(rhinoId)};
+        cmdOrder.x = 25 * TILE_WIDTH;
+        cmdOrder.y = 25 * TILE_HEIGHT;
+        cmdOrder.a = static_cast<int32_t>(OrderKind::Move);
+        cmdOrder.b = 0; // plain right click (not queued with shift)
+        sim.Apply(cmdOrder, ctx);
+
+        if (rhino->orderQueue.empty())
+        {
+            std::cerr << "[Test] Error: Order given to transforming Rhino was dropped instead of queued!" << std::endl;
+            return false;
+        }
+
+        // Simulate 2 ticks while transforming - order queue must NOT be consumed yet
+        for (int i = 0; i < 2; ++i)
+        {
+            entities.Update(0.05f, map, pf);
+            sim.UpdateOrderQueues(ctx);
+        }
+        if (rhino->orderQueue.empty() || rhino->state != ActionState::Transform)
+        {
+            std::cerr << "[Test] Error: Transforming Rhino order queue consumed prematurely!" << std::endl;
+            return false;
+        }
+
+        // Advance until transformation finishes (5 frames * 0.09s = 0.45s)
+        for (int i = 0; i < 15 && rhino->state == ActionState::Transform; ++i)
+        {
+            entities.Update(0.05f, map, pf);
+            sim.UpdateOrderQueues(ctx);
+        }
+
+        if (rhino->state == ActionState::Transform)
+        {
+            std::cerr << "[Test] Error: Rhino did not complete transformation!" << std::endl;
+            return false;
+        }
+        if (rhino->archetypeId != 15 || !rhino->isSiegeMode)
+        {
+            std::cerr << "[Test] Error: Rhino transformation result mismatch! arch=" << rhino->archetypeId << std::endl;
+            return false;
+        }
+
+        // Verify visual PRNG does not alter simulation PRNG
+        Utility::VisualRandomFloat(0.0f, 100.0f);
+        Utility::VisualRandomInt(1, 10);
+        Utility::rng().Reseed(0x12345678u);
+        const uint32_t s1 = Utility::rng()();
+        Utility::VisualRandomFloat(-5.0f, 5.0f);
+        Utility::rng().Reseed(0x12345678u);
+        const uint32_t s2 = Utility::rng()();
+        if (s1 != s2)
+        {
+            std::cerr << "[Test] Error: VisualRandom calls contaminated simulation PRNG!" << std::endl;
+            return false;
+        }
+
+        std::cout << "  - Rhino siege order queuing during transformation and turret anchor determinism verified." << std::endl;
+    }
+
     return true;
 }
 

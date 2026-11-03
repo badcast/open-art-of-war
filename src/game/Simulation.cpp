@@ -362,8 +362,26 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             }
             m_squads[cmd.player].ReleaseUnits(units, entities);
             ClearOrders(units, entities);
-            if (!units.empty())
-                OrderUnitsAt(cmd.player, units, cmd.a, cmd.x, cmd.y, asGroup, ctx);
+            std::vector<int> immediateUnits;
+            for (int id : units)
+            {
+                Unit *u = entities.GetUnit(id);
+                if (!u)
+                    continue;
+                if (u->state == ActionState::Transform)
+                {
+                    if (u->orderQueue.size() < kMaxQueuedOrders)
+                        u->orderQueue.push_back(Unit::QueuedOrder {cmd.a, cmd.x, cmd.y});
+                    u->orderX = cmd.x;
+                    u->orderY = cmd.y;
+                }
+                else
+                {
+                    immediateUnits.push_back(id);
+                }
+            }
+            if (!immediateUnits.empty())
+                OrderUnitsAt(cmd.player, immediateUnits, cmd.a, cmd.x, cmd.y, asGroup, ctx);
             break;
         }
         case CommandType::AttackWall:
@@ -387,8 +405,13 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             }
             break;
         case CommandType::ToggleSiege:
-            entities.ToggleSiegeMode(OwnUnits(cmd, ctx));
+        {
+            const std::vector<int> units = OwnUnits(cmd, ctx);
+            m_squads[cmd.player].ReleaseUnits(units, entities);
+            ClearOrders(units, entities);
+            entities.ToggleSiegeMode(units);
             break;
+        }
         case CommandType::Stop:
             ClearOrders(OwnUnits(cmd, ctx), entities);
             for (int id : OwnUnits(cmd, ctx))

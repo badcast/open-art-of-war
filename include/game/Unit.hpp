@@ -228,11 +228,11 @@ public:
     }
 
     // Nothing left of the current order: no move, no target, no path being looked for (the next queued order may
-    // start)
+    // start). Units transforming or dead are not finished with orders.
     bool OrderFinished() const noexcept
     {
         return !HasMoveTarget() && targetEntityId == 0 && targetWallTileX < 0 && !waitingForPath
-               && state != ActionState::Move;
+               && state != ActionState::Move && state != ActionState::Transform && state != ActionState::Die;
     }
 
     bool HasMoveTarget() const noexcept

@@ -80,6 +80,9 @@ private:
 // The shared gameplay generator
 Random &rng();
 
+// Dedicated generator for visual effects and client-side particles (never pollutes simulation PRNG)
+Random &visualRng();
+
 inline int RandomInt(int lo, int hi)
 {
     return rng().Range(lo, hi);
@@ -93,10 +96,25 @@ inline float RandomSigned()
     return rng().SignedUnit();
 }
 
+inline int VisualRandomInt(int lo, int hi)
+{
+    return visualRng().Range(lo, hi);
+}
+inline float VisualRandomFloat(float lo, float hi)
+{
+    return visualRng().Range(lo, hi);
+}
+
 template <typename T>
 const T &Pick(const std::vector<T> &items)
 {
     return items[static_cast<size_t>(RandomInt(0, static_cast<int>(items.size()) - 1))];
+}
+
+template <typename T>
+const T &VisualPick(const std::vector<T> &items)
+{
+    return items[static_cast<size_t>(VisualRandomInt(0, static_cast<int>(items.size()) - 1))];
 }
 
 // ---------------------------------------------------------------------------
