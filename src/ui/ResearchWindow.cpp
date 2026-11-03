@@ -27,7 +27,8 @@ namespace col = ui::color;
 namespace
 {
 
-// Sizes of the window at scale 1 (the window is drawn bigger by m_researchScale)
+// Sizes of the tree at scale 1: the technologies of the tree (their size and icons) are drawn bigger by
+// m_researchScale, the window itself keeps its size
 constexpr int kNodeW0 = 240;
 constexpr int kNodeH0 = 50;
 constexpr int kGapX0 = 34;
@@ -265,7 +266,7 @@ bool HUDController::UpdateResearchWindow(
 {
     if (!m_researchOpen)
         return false;
-    const WindowLayout l = windowLayout(windowW, windowH, m_researchScale);
+    const WindowLayout l = windowLayout(windowW, windowH, 1.0f);
     const float sc = m_researchScale;
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = PlayerFaction();
@@ -320,9 +321,9 @@ bool HUDController::UpdateResearchWindow(
     auto setScale = [&](float v) {
         m_researchScale = std::clamp(std::round(v / kScaleStep) * kScaleStep, kScaleMin, kScaleMax);
     };
-    if (wheel != 0 && l.dialog.Contains(mx, my))
+    if (wheel != 0 && l.tree.Contains(mx, my))
     {
-        // The wheel scales the window (it keeps its place under the cursor), with Shift it scrolls the tree
+        // Over the tree the wheel scales its contents (the window keeps its size), with Shift it scrolls the tree
         const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
         if (shift)
         {
@@ -434,7 +435,7 @@ void HUDController::RenderResearchWindow(
 {
     if (!m_researchOpen)
         return;
-    const WindowLayout l = windowLayout(windowW, windowH, m_researchScale);
+    const WindowLayout l = windowLayout(windowW, windowH, 1.0f);
     const float sc = m_researchScale;
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = PlayerFaction();
