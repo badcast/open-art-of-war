@@ -51,10 +51,13 @@ int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target, P
         return baseDamage;
     baseDamage = WeaponBalance::Scale(baseDamage, kind, WeaponBalance::ClassOf(*target));
     const Unit *u = target->AsUnit();
-    if (u && (u->state == ActionState::Move || (!u->path.empty() && u->pathIndex < u->path.size())))
+    // A unit on the move is harder to hit: it takes a random share of the damage (weapon_balance.json: moving_target),
+    // from every kind of damage (direct hit, splash, flame)
+    if (u && (u->state == ActionState::Move || (!u->path.empty() && u->pathIndex < u->path.size() && !u->waitingForPath)))
     {
-        // A moving target takes 50..100% of the damage
-        const uint32_t roll = static_cast<uint32_t>(Utility::RandomInt(50, 100));
+        int lo = 50, hi = 100;
+        WeaponBalance::MovingTargetPercent(lo, hi);
+        const uint32_t roll = static_cast<uint32_t>(Utility::RandomInt(lo, hi));
         int finalDamage = static_cast<int>((static_cast<uint64_t>(baseDamage) * roll + 50u) / 100u);
         return ReduceDamageByArmor((finalDamage < 1) ? 1 : finalDamage, *target);
     }
@@ -3148,8 +3151,15 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
             {
                 int hitTileX = static_cast<int>(proj.targetX / TILE_WIDTH);
                 int hitTileY = static_cast<int>(proj.targetY / TILE_HEIGHT);
+                // The wall the shooter was ordered to destroy takes the hit, whoever owns it
+                const bool forced = proj.forcedWallX >= 0 && map.GetWall(proj.forcedWallX, proj.forcedWallY) > 0;
+                if (forced)
+                {
+                    hitTileX = proj.forcedWallX;
+                    hitTileY = proj.forcedWallY;
+                }
                 if (map.GetWall(hitTileX, hitTileY) > 0
-                    && Players::Hostile(map.GetWallOwner(hitTileX, hitTileY), proj.owner))
+                    && (forced || Players::Hostile(map.GetWallOwner(hitTileX, hitTileY), proj.owner)))
                 {
                     NoteHit(map.GetWallOwner(hitTileX, hitTileY), proj.shooterId);
                     map.DamageWall(hitTileX, hitTileY, WeaponBalance::Scale(proj.damage, proj.type, TargetClass::Wall));
@@ -3172,14 +3182,16 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                 }
             }
 
-            // Splash / AoE Damage (2x2 tiles around impact) for Shell, Rocket, Flame
+            // Splash / AoE Damage (3x3 tiles around impact) for Shell, Rocket, Flame
             if (proj.splashPercent > 0 && !spec.hitscan)
             {
                 float impactX = targetAlive ? target->GetUnitCenterPixelX() : proj.targetX;
                 float impactY = targetAlive ? target->GetUnitCenterPixelY() : proj.targetY;
                 int primaryHitId = targetAlive ? target->id : 0;
                 int splashDmg = std::max(1, static_cast<int>(std::round(proj.damage * (proj.splashPercent / 100.0f))));
-                float maxSplashDist = static_cast<float>(TILE_WIDTH) * 1.5f; // 2x2 tile area (~45px radius)
+                // The splash covers 3x3 tiles around the tile of the impact (a building when any tile of it is inside)
+                const int splashTileX = static_cast<int>(std::floor(impactX / TILE_WIDTH));
+                const int splashTileY = static_cast<int>(std::floor(impactY / TILE_HEIGHT));
 
                 for (auto &other : m_entities)
                 {
@@ -3190,10 +3202,19 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                     if (!Players::Hostile(other.owner, proj.owner))
                         continue;
 
-                    float ox = other.GetUnitCenterPixelX();
-                    float oy = other.GetUnitCenterPixelY();
-                    float distFromImpact = DetMath::Hypot(ox - impactX, oy - impactY);
-                    if (distFromImpact <= maxSplashDist)
+                    bool inSplash = false;
+                    if (const Building *ob = other.AsBuilding())
+                    {
+                        inSplash = ob->tileX <= splashTileX + 1 && ob->tileX + ob->buildWidth - 1 >= splashTileX - 1
+                                   && ob->tileY <= splashTileY + 1 && ob->tileY + ob->buildHeight - 1 >= splashTileY - 1;
+                    }
+                    else
+                    {
+                        const int otx = static_cast<int>(std::floor(other.GetUnitCenterPixelX() / TILE_WIDTH));
+                        const int oty = static_cast<int>(std::floor(other.GetUnitCenterPixelY() / TILE_HEIGHT));
+                        inSplash = std::abs(otx - splashTileX) <= 1 && std::abs(oty - splashTileY) <= 1;
+                    }
+                    if (inSplash)
                     {
                         NoteEntityHit(other, proj.shooterId);
                         other.currentHp -= ApplyMovingUnitDamage(splashDmg, &other, proj.type);
@@ -3243,7 +3264,9 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                     {
                         if (wx < 0 || wy < 0 || wx >= map.GetWidth() || wy >= map.GetHeight())
                             continue;
-                        if (map.GetWall(wx, wy) > 0 && Players::Hostile(map.GetWallOwner(wx, wy), proj.owner))
+                        if (map.GetWall(wx, wy) > 0
+                            && (Players::Hostile(map.GetWallOwner(wx, wy), proj.owner)
+                                || (wx == proj.forcedWallX && wy == proj.forcedWallY)))
                         {
                             NoteHit(map.GetWallOwner(wx, wy), proj.shooterId);
                             map.DamageWall(wx, wy, WeaponBalance::Scale(splashDmg, proj.type, TargetClass::Wall));
@@ -3545,6 +3568,11 @@ void EntityManager::SpawnProjectileFromEntity(
     p.startY = p.y;
     p.targetX = projTargetX;
     p.targetY = projTargetY;
+    if (const Unit *su = entity.AsUnit(); su && su->isManualWallTarget && entity.targetWallTileX >= 0)
+    {
+        p.forcedWallX = entity.targetWallTileX;
+        p.forcedWallY = entity.targetWallTileY;
+    }
     p.damage = entity.attackDamage;
     p.splashPercent = entity.splashPercent;
     p.faction = entity.faction;
@@ -3929,18 +3957,25 @@ void EntityManager::RenderGroundRemnants(
             continue;
         }
 
+        // After the burial time the remains fade out: linear transparency over fade_seconds of effects.yaml
+        {
+            const EffectsConfig &fx = EffectsConfig::Get();
+            const float over = -entity.deathTimer;
+            renderer.SetDrawAlpha(over > 0.0f && fx.fadeSeconds > 0.0f ? std::clamp(1.0f - over / fx.fadeSeconds, 0.0f, 1.0f) : 1.0f);
+        }
         if (const Building *b = entity.AsBuilding())
         {
             int btype = (b->rawBuildingType >= 0) ? b->rawBuildingType : (static_cast<int>(b->type) % 15);
             float bx = b->tileX * TILE_WIDTH;
             float by = b->tileY * TILE_HEIGHT;
-            // The rubble sinks into the ground stage by stage over the 120 s the remains stay
+            // The rubble sinks into the ground stage by stage over the burial time the remains stay
             int wreckComp = 0, stages = 0;
             Renderer::DefaultBuildingWreck(b->buildWidth, b->buildHeight, wreckComp, stages);
             if (b->wreckStages > 0)
                 stages = b->wreckStages;
+            const float burial = EffectsConfig::Get().burialSeconds;
             const int stage
-                = std::min(stages - 1, static_cast<int>(std::clamp(elapsedDeath, 0.0f, 120.0f) / 120.0f * stages));
+                = std::min(stages - 1, static_cast<int>(std::clamp(elapsedDeath, 0.0f, burial) / burial * stages));
             renderer.SetDrawOwner(b->owner);
             renderer.DrawBuildingWorld(
                 btype,
@@ -3977,6 +4012,7 @@ void EntityManager::RenderGroundRemnants(
                 u->wreckStages,
                 u->selectedDeathSeq);
         }
+        renderer.SetDrawAlpha(1.0f);
     }
     renderer.SetDrawOwner(kNoPlayer);
 }
@@ -4180,6 +4216,15 @@ void EntityManager::render(
             bool isAttacking = live && (b->state == ActionState::Attack && b->attackAnimTimer > 0.0f);
 
             renderer.SetDrawOwner(b->owner);
+            if (b->selected && b->buildProgress >= 1.0f)
+            {
+                // The selected building itself shines, its colour breathing between white and the health colour
+                const float t = 0.5f + 0.5f * std::sin(static_cast<float>(SDL_GetTicks() % 100000) * 0.00691f);
+                const float hp = b->maxHp > 0 ? std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f) : 1.0f;
+                const SDL_Color hc = SelectionHealthColor(hp);
+                auto mix = [&](uint8_t c) { return static_cast<uint8_t>(255.0f + (c - 255.0f) * t); };
+                renderer.SetSpriteGlow({mix(hc.r), mix(hc.g), mix(hc.b), 255}, 0.12f + 0.28f * t);
+            }
 
             // The progress of an enemy construction is not shown: just the scaffolding
             const bool hiddenProgress
@@ -4215,22 +4260,7 @@ void EntityManager::render(
                 isAttacking,
                 b->isPowered);
             renderer.SetAnimatedPartsVisible(true);
-
-            if (b->selected)
-            {
-                const float sizeW = b->buildWidth * TILE_WIDTH;
-                const float sizeH = b->buildHeight * TILE_HEIGHT;
-                const float ratio = b->maxHp > 0 ? std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f) : 1.0f;
-                // The bubble around the building and a veil of light that makes the building itself shine
-                renderer.DrawSelectionBubble(
-                    b->tileX * TILE_WIDTH + sizeW * 0.5f,
-                    b->tileY * TILE_HEIGHT + sizeH * 0.5f,
-                    sizeW * 0.68f,
-                    sizeH * 0.68f,
-                    camera,
-                    SelectionHealthColor(ratio),
-                    b->buildProgress >= 1.0f ? 0.55f : 0.0f);
-            }
+            renderer.SetSpriteGlow({255, 255, 255, 255}, 0.0f);
         }
     }
 
@@ -4281,17 +4311,20 @@ void EntityManager::render(
         }
         else
         {
-            bool showBuildingHp = showAllHealth || (debugMode && (b->currentHp < b->maxHp || b->selected));
+            bool showBuildingHp = showAllHealth || b->selected || (debugMode && b->currentHp < b->maxHp);
             if (showBuildingHp)
             {
                 float barW = b->buildWidth * TILE_WIDTH;
-                float barH = 3.0f;
+                float barH = b->selected ? 4.0f : 3.0f;
                 float barX = b->tileX * TILE_WIDTH;
-                float barY = b->tileY * TILE_HEIGHT - 6.0f;
+                float barY = b->tileY * TILE_HEIGHT - (b->selected ? 8.0f : 6.0f);
 
                 float hpPct = std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f);
                 renderer.FillRectWorld(barX, barY, barW, barH, camera, {60, 0, 0, 200});
-                renderer.FillRectWorld(barX, barY, barW * hpPct, barH, camera, {0, 230, 0, 255});
+                renderer.FillRectWorld(
+                    barX, barY, barW * hpPct, barH, camera, b->selected ? SelectionHealthColor(hpPct) : SDL_Color {0, 230, 0, 255});
+                if (b->selected)
+                    renderer.DrawRectWorld(barX, barY, barW, barH, camera, {255, 255, 255, 200});
             }
         }
     }

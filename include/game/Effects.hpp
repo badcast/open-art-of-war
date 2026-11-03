@@ -35,6 +35,7 @@ struct EffectsConfig
 
     // --- Wrecks ---
     float burialSeconds {120.0f}; // how long a wreck stays; it sinks stage by stage
+    float fadeSeconds {3.0f};     // then it fades out (linear transparency) over this long and is gone
     Wreck vehicle {1764, 5};
     Wreck light {1759, 5};
     Wreck heavy {1769, 4};

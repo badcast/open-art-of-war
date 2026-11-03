@@ -4608,6 +4608,47 @@ bool HeadlessTest::run(Application &app, int numTicks)
                  "isManualWallTarget=true."
               << std::endl;
 
+    // A2. A shell (flying projectile) brings down an own wall that was ordered to be destroyed
+    {
+        const int tankId = app.m_entities->SpawnUnitByArchetype(10, 50, 20, Faction::Resistance);
+        Unit *tank = app.m_entities->GetUnit(tankId);
+        if (tank && tank->projectile == ProjectileType::Shell)
+        {
+            app.m_map->SetWall(53, 20, Faction::Resistance, 100);
+            const int before = app.m_map->GetWallHp(53, 20);
+            app.m_entities->IssueAttackWallOrder({tankId}, 53, 20, *app.m_pathfinder);
+            for (int i = 0; i < 400 && app.m_map->GetWall(53, 20) > 0 && app.m_map->GetWallHp(53, 20) >= before; ++i)
+                app.m_entities->Update(0.05f, *app.m_map, *app.m_pathfinder);
+            if (app.m_map->GetWall(53, 20) > 0 && app.m_map->GetWallHp(53, 20) >= before)
+            {
+                std::cerr << "[Test] Error: a shell did not damage an own wall that was ordered destroyed!" << std::endl;
+                return false;
+            }
+            std::cout << "  - Shell damages an own wall ordered destroyed." << std::endl;
+            app.m_map->DamageWall(53, 20, 100000);
+        }
+        if (tank)
+            tank->currentHp = 0;
+    }
+
+    // A3. Grad: single rockets within 6 tiles while walking, 6-rocket salvos within 13 tiles deployed
+    {
+        const int gradId = app.m_entities->SpawnUnitByArchetype(13, 60, 20, Faction::Confederation);
+        const int gradSiegeId = app.m_entities->SpawnUnitByArchetype(16, 62, 20, Faction::Confederation);
+        const Unit *grad = app.m_entities->GetUnit(gradId);
+        const Unit *gradSiege = app.m_entities->GetUnit(gradSiegeId);
+        if (!grad || !gradSiege || grad->burstCount != 1 || std::abs(grad->attackRange - 6.0f) > 0.01f
+            || gradSiege->burstCount != 6 || std::abs(gradSiege->attackRange - 13.0f) > 0.01f || grad->moveSpeed <= 0.0f)
+        {
+            std::cerr << "[Test] Error: Grad forms: walking 1 rocket / range 6 and siege 6 rockets / range 13 expected!"
+                      << std::endl;
+            return false;
+        }
+        std::cout << "  - Grad forms validated (walking 1 rocket at 6 tiles, siege salvo of 6 at 13)." << std::endl;
+        app.m_entities->GetUnit(gradId)->currentHp = 0;
+        app.m_entities->GetUnit(gradSiegeId)->currentHp = 0;
+    }
+
     // B. Friendly Wall Raycast Pass-Through (non-targeted stray fire ignores friendly wall)
     int enemyDummyId = app.m_entities->SpawnUnitByArchetype(0, 23, 20, Faction::Confederation);
     Entity *enemyDummy = app.m_entities->GetEntity(enemyDummyId);
@@ -4697,13 +4738,21 @@ bool HeadlessTest::run(Application &app, int numTicks)
     dummyClose->tileY = 40;
     fortress->targetEntityId = dummyCloseId;
     fortress->cooldownTimer = 0.0f;
-    app.m_entities->Update(0.05f, *app.m_map, *app.m_pathfinder);
-    if (fortress->projectile != ProjectileType::Bullet)
+    fortress->projectile = ProjectileType::Bullet;
+    for (int i = 0; i < 4; ++i)
+        app.m_entities->Update(0.05f, *app.m_map, *app.m_pathfinder);
+    // With the upgrade a Fortress that knows its target closes in to the flame's reach instead of shooting from afar
+    if (fortress->projectile == ProjectileType::Flame || (fortress->state != ActionState::Move && fortress->path.empty()))
     {
-        std::cerr << "[Test] Error: Fortress did not revert to bullet when distance > 1 tile!" << std::endl;
+        std::cerr << "[Test] Error: Fortress with the upgrade did not close in on a target 3 tiles away!" << std::endl;
         return false;
     }
-    std::cout << "  - Fortress flamethrower range rule validated: flame <= 1 tile with upgrade, bullet > 1 tile."
+    if (std::abs(fortress->attackRange - 6.0f) > 0.01f)
+    {
+        std::cerr << "[Test] Error: Fortress machine-gun range was not restored after the approach!" << std::endl;
+        return false;
+    }
+    std::cout << "  - Fortress flamethrower rule validated: flame <= 1 tile with upgrade, it closes in on far targets."
               << std::endl;
 
     // E. Heavy Assault / Grenadier Crouching Posture During Attack Cooldown

@@ -183,13 +183,97 @@ void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64
     m_lobby.map = map;
     m_lobby.mapHash = mapHash;
     m_lobby.spawnCount = std::min<uint8_t>(spawnCount, kMaxPlayers);
-    // Another map: nobody is ready for it yet, start positions beyond it are gone
+    // Another map: nobody is ready for it yet, blocked places are open again, everybody keeps a place of his own
+    m_lobby.blockedMask = 0;
     for (SlotState &s : m_slots)
     {
         s.choice.ready = s.ai; // computer players are always ready
-        if (s.choice.spawn != kRandom && s.choice.spawn >= m_lobby.spawnCount)
+        if (s.used && s.choice.spawn != kRandom && s.choice.spawn >= m_lobby.spawnCount)
             s.choice.spawn = kRandom;
     }
+    for (uint8_t i = 0; i < kMaxPlayers; ++i)
+    {
+        if (m_slots[i].used && m_slots[i].choice.spawn == kRandom)
+            m_slots[i].choice.spawn = freeSpawn();
+    }
+    broadcastLobby();
+}
+
+uint8_t SessionHost::freeSpawn() const
+{
+    for (uint8_t n = 0; n < m_lobby.spawnCount && n < kMaxPlayers; ++n)
+    {
+        if (m_lobby.blockedMask & (1u << n))
+            continue;
+        bool held = false;
+        for (const SlotState &s : m_slots)
+            held = held || (s.used && s.choice.spawn == n);
+        if (!held)
+            return n;
+    }
+    return kRandom;
+}
+
+void SessionHost::setSeat(const OwnerSetSeat &change)
+{
+    if (m_running || change.spawn >= m_lobby.spawnCount || change.spawn >= kMaxPlayers || change.kind > OwnerSetSeat::Ai)
+        return;
+    int holder = -1;
+    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    {
+        if (m_slots[s].used && m_slots[s].choice.spawn == change.spawn)
+            holder = s;
+    }
+    if (holder >= 0 && !m_slots[holder].ai && holder == ownerSlot())
+        return; // the owner cannot free his own place
+    // A computer player of another level only changes its level
+    if (change.kind == OwnerSetSeat::Ai && holder >= 0 && m_slots[holder].ai)
+    {
+        m_slots[holder].aiLevel = change.level & 3;
+        broadcastRoster();
+        broadcastLobby();
+        return;
+    }
+    // A person is sent out of the room
+    if (holder >= 0 && !m_slots[holder].ai && m_slots[holder].connected)
+    {
+        for (size_t i = 0; i < m_connections.size(); ++i)
+        {
+            if (m_connections[i].slot == holder)
+            {
+                reject(i, RejectReason::Kicked, "");
+                m_connections[i].slot = -2;
+            }
+        }
+    }
+    if (holder >= 0)
+        m_slots[holder] = SlotState {};
+    if (change.kind == OwnerSetSeat::Blocked)
+        m_lobby.blockedMask |= static_cast<uint8_t>(1u << change.spawn);
+    else
+        m_lobby.blockedMask &= static_cast<uint8_t>(~(1u << change.spawn));
+    if (change.kind == OwnerSetSeat::Ai)
+    {
+        uint8_t slot = kRandom;
+        for (uint8_t s = 0; s < m_config.maxPlayers && slot == kRandom; ++s)
+        {
+            if (!m_slots[s].used)
+                slot = s;
+        }
+        if (slot != kRandom)
+        {
+            m_slots[slot] = SlotState {};
+            m_slots[slot].used = true;
+            m_slots[slot].ai = true;
+            m_slots[slot].name = "AI";
+            m_slots[slot].aiLevel = change.level & 3;
+            m_slots[slot].choice.team = static_cast<uint8_t>(slot % 2);
+            m_slots[slot].choice.color = freeColor(slot, static_cast<uint8_t>(slot + 1));
+            m_slots[slot].choice.ready = true;
+            m_slots[slot].choice.spawn = change.spawn;
+        }
+    }
+    broadcastRoster();
     broadcastLobby();
 }
 
@@ -197,25 +281,22 @@ void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
-    // A start position the map does not have stays as it was; one somebody else holds is swapped: the holder takes
-    // the position this player leaves (a person or a computer player, the order of the players is freely changeable)
-    if (choice.spawn != kRandom)
+    // A start position the map does not have, a held or a blocked one: the player stays where he is (places are
+    // taken from an open position, the room owner frees others with OwnerSetSeat)
     {
-        if (choice.spawn >= m_lobby.spawnCount)
+        bool ok = choice.spawn != kRandom && choice.spawn < m_lobby.spawnCount
+                  && !(m_lobby.blockedMask & (1u << choice.spawn));
+        for (uint8_t s = 0; ok && s < kMaxPlayers; ++s)
+            ok = !(s != slot && m_slots[s].used && m_slots[s].choice.spawn == choice.spawn);
+        if (!ok)
             choice.spawn = m_slots[slot].choice.spawn;
-        else
-        {
-            for (uint8_t s = 0; s < kMaxPlayers; ++s)
-            {
-                if (s != slot && m_slots[s].used && m_slots[s].choice.spawn == choice.spawn)
-                    m_slots[s].choice.spawn = m_slots[slot].choice.spawn;
-            }
-        }
     }
     choice.team &= 7;
     choice.color &= 15;
     if (!ownerEdit || choice.handicap > 5)
         choice.handicap = m_slots[slot].choice.handicap;
+    if (!ownerEdit || choice.armyCap > 7)
+        choice.armyCap = m_slots[slot].choice.armyCap;
     // A colour somebody else has already picked: the player keeps the own one (two armies of one colour could not
     // be told apart)
     if (freeColor(slot, choice.color) != choice.color)
@@ -247,13 +328,15 @@ uint8_t SessionHost::freeColor(uint8_t slot, uint8_t preferred) const
     return preferred;
 }
 
-void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap)
+void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
     m_slots[slot].choice.team = team & 7;
     if (handicap <= 5)
         m_slots[slot].choice.handicap = handicap;
+    if (armyCap <= 7)
+        m_slots[slot].choice.armyCap = armyCap;
     broadcastLobby();
 }
 
@@ -291,6 +374,12 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
         m_slots[slot].used = true;
         m_slots[slot].ai = true;
         m_slots[slot].name = "AI";
+        m_slots[slot].choice.spawn = freeSpawn();
+        if (m_slots[slot].choice.spawn == kRandom && m_lobby.spawnCount > 0)
+        {
+            m_slots[slot] = SlotState {}; // no open start position left
+            return;
+        }
     }
     if (slot >= kMaxPlayers || !m_slots[slot].used || !m_slots[slot].ai)
         return;
@@ -596,7 +685,14 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
         {
             OwnerSetTeam m;
             if (slot == ownerSlot() && decode(r, m))
-                setTeam(m.slot, m.team, m.handicap);
+                setTeam(m.slot, m.team, m.handicap, m.armyCap);
+            break;
+        }
+        case MsgType::OwnerSetSeat:
+        {
+            OwnerSetSeat m;
+            if (slot == ownerSlot() && decode(r, m))
+                setSeat(m);
             break;
         }
         case MsgType::OwnerSetOptions:
@@ -777,6 +873,11 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
         const int capacity = (!m_lobby.map.empty() && m_lobby.spawnCount)
                                  ? std::min<int>(m_config.maxPlayers, m_lobby.spawnCount)
                                  : m_config.maxPlayers; // no map yet: no limit
+        if (!m_lobby.map.empty() && m_lobby.spawnCount && freeSpawn() == kRandom)
+        {
+            reject(connection, RejectReason::RoomFull, ""); // every start position is taken or blocked
+            return;
+        }
         for (int s = 0; s < m_config.maxPlayers && slot < 0 && taken < capacity; ++s)
         {
             if (!m_slots[s].used)
@@ -793,6 +894,7 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
         // Defaults: random faction and start, alternating teams, an own colour
         m_slots[slot].choice.team = static_cast<uint8_t>(slot % 2);
         m_slots[slot].choice.color = freeColor(static_cast<uint8_t>(slot), static_cast<uint8_t>(slot + 1));
+        m_slots[slot].choice.spawn = freeSpawn(); // the first open start position
     }
     SlotState &s = m_slots[slot];
     s.connected = true;

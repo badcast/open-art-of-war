@@ -705,6 +705,20 @@ void Application::Update(float deltaTime)
     }
 #endif
 
+    // Typed text for the map search of the main menu and the search box of the research window
+    {
+        const bool wantMenuText = (m_state == AppState::MainMenu && m_menuController->WantsText())
+                                  || (m_hudController && m_hudController->WantsText());
+        if (wantMenuText != m_menuTextInput && (!wantMenuText || !m_textInput))
+        {
+            if (wantMenuText)
+                SDL_StartTextInput(m_window);
+            else
+                SDL_StopTextInput(m_window);
+            m_textInput = m_menuTextInput = wantMenuText;
+        }
+    }
+
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
         m_gameplayController->Update(
@@ -1225,6 +1239,17 @@ void Application::render()
             m_windowW,
             m_windowH,
             m_gameplayController->GetSelectedUnits());
+
+        // The technology tree window (over the map and the sidebar)
+        m_hudController->RenderResearchWindow(
+            *m_renderer,
+            *m_fontRenderer,
+            *m_economy,
+            *m_entities,
+            m_input->GetMouseScreenX(),
+            m_input->GetMouseScreenY(),
+            m_windowW,
+            m_windowH);
 
         // Top Debug Toolbar (--debug mode)
         m_gameplayController->RenderDebugToolbar(*m_renderer, *m_fontRenderer, m_windowW);

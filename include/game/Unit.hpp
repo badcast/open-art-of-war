@@ -301,12 +301,15 @@ public:
         int avoidY = -1) const;
 
     void Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
+    // The tiles a Fortress with the flamethrower upgrade closes in to on a known target (its flame needs it close)
+    static constexpr float kFortressFlameApproach = 1.6f;
     void UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
     void UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
     // Rotating turret on a driving vehicle: aim at an enemy in range and fire without stopping
     void FireOnTheMove(float deltaTime, TileMap &map, const UnitDelegates &delegates);
     // Steps turretFacing toward targetDir8 by 45 degrees every turretTurnStepDelay seconds; returns true when aligned
     bool StepTurretToward(int targetDir8, float deltaTime);
+    void UpdateImpl(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates);
     void UpdateTransformation(float deltaTime, const UnitDelegates &delegates);
     void UpdateBurst(float deltaTime, TileMap &map, const UnitDelegates &delegates);
 

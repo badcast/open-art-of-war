@@ -2,6 +2,7 @@
 
 #include "core/Localization.hpp"
 #include "game/Match.hpp"
+#include "game/Players.hpp"
 #include <string>
 #include <vector>
 
@@ -18,6 +19,14 @@ inline std::vector<std::string> CreditsChoices()
     std::vector<std::string> out;
     for (int c : kStartingCredits)
         out.push_back("$" + std::to_string(c));
+    return out;
+}
+// The army size limit of a player (kArmyCapUnits): 10 ... 1000 units or unlimited
+inline std::vector<std::string> ArmyCapChoices()
+{
+    std::vector<std::string> out;
+    for (int u : kArmyCapUnits)
+        out.push_back(u > 0 ? std::to_string(u) : std::string(_("Unlimited")));
     return out;
 }
 inline std::string CreditsLabel(int index)

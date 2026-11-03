@@ -171,6 +171,7 @@ bool Application::StartReplay(int watchSlot)
     if (const char *speed = DebugEnv("OAOW_REPLAY_SPEED"))
         m_replayUi.speed = std::clamp(std::atoi(speed), 0, kSpeedCount - 1);
     m_hudController->SetShowAll(false);
+    m_hudController->SetObserver(true);
     m_state = AppState::SkirmishPlaying;
     m_camera->SetZoom(m_settings.zoomDefault);
     m_camera->CenterOn(m_mission->GetPlayerHqX() * TILE_WIDTH, m_mission->GetPlayerHqY() * TILE_HEIGHT);
@@ -187,7 +188,10 @@ void Application::CloseReplay()
         m_gameplayController->simulation().SetCommandSink(nullptr);
     }
     if (m_hudController)
+    {
         m_hudController->SetShowAll(false);
+        m_hudController->SetObserver(false);
+    }
     if (m_sound)
         m_sound->SetInterfaceMuted(false);
     m_replay.reset(); // takes the recorded data away

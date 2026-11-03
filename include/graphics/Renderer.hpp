@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <utility>
+
 #include <SDL3/SDL.h>
 #include <cstdint>
 #include <vector>
@@ -99,6 +102,12 @@ public:
     // Rubble composite family a destroyed building of that size leaves (first stage, and its stage count)
     static void DefaultBuildingWreck(int width, int height, int &outComposite, int &outStages);
 
+    // How far the pictured middle of a composite (the box around its sprites) lies from the middle of its 180x120
+    // canvas, in pixels: a wreck is drawn shifted back by it, so it sits in the middle of the place of the object
+    void CompositeCenterOffset(int compId, float &outDx, float &outDy);
+    // Draws a composite so that the middle of what it shows is at (centerX, centerY)
+    void DrawCompositeCentered(int compId, float centerX, float centerY, const Camera &camera, Faction faction);
+
     void DrawUnitWorld(
         int unitTypeId,
         int actionState,
@@ -170,6 +179,12 @@ public:
     // Army colour of a player: its units take this colour instead of the classic red / blue sheets
     // (only with shader effects; the sheets themselves stay as they are)
     void SetArmyColor(PlayerId player, bool custom, SDL_Color color);
+    // The next sprites also shine: the sprite is drawn once more, added in this colour (strength 0..1; 0 = off)
+    void SetSpriteGlow(SDL_Color color, float strength)
+    {
+        m_glowColor = color;
+        m_glowStrength = strength;
+    }
     // Whose thing the next draws are (kNoPlayer: nobody's, classic sheets)
     void SetDrawOwner(PlayerId player)
     {
@@ -232,7 +247,10 @@ private:
     SDL_Color m_armyColor[kMaxPlayers] {};
     PlayerId m_drawOwner {kNoPlayer};
     float m_drawAlpha {1.0f};
+    SDL_Color m_glowColor {255, 255, 255, 255};
+    float m_glowStrength {0.0f};
     int m_structureTeam {0};   // see setStructureFaction
+    std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
     bool m_tintedSheet[64] {}; // sheets whose colour mod carries an army colour right now
 
     SDL_Renderer *m_renderer {nullptr};

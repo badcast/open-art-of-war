@@ -114,9 +114,9 @@ void Building::Update(float deltaTime, TileMap &map, const BuildingDelegates &de
         const float elapsed = std::clamp(fx.burialSeconds - deathTimer, 0.0f, fx.burialSeconds);
         const int stages = wreckStages > 0 ? wreckStages : fx.WreckOfBuilding(buildWidth, buildHeight).stages;
         animFrame = std::min(stages - 1, static_cast<int>((elapsed / fx.burialSeconds) * static_cast<float>(stages)));
-        if (deathTimer <= 0.0f)
+        if (deathTimer <= -fx.fadeSeconds)
         {
-            alive = false;
+            alive = false; // after the burial time and the fade
         }
         return;
     }

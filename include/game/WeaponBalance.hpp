@@ -30,6 +30,8 @@ bool LoadText(const std::string &jsonText);
 int Percent(ProjectileType type, TargetClass target);
 // `damage` scaled for the target class; never below 1 for a positive damage
 int Scale(int damage, ProjectileType type, TargetClass target);
+// Share of the damage a moving unit takes, in percent: a random value in [min, max] (the file's `moving_target`)
+void MovingTargetPercent(int &minPercent, int &maxPercent);
 // Class of an entity (building, infantry or vehicle)
 TargetClass ClassOf(const Entity &target);
 } // namespace WeaponBalance

@@ -229,12 +229,12 @@ void CharacterEditor::DrawEffectsScene() {
         const int stages = std::max(1, w.stages);
         const float t = std::clamp(wreckClock / std::max(0.1f, wreckPlaySeconds), 0.0f, 0.999f);
         const int current = std::min(stages - 1, static_cast<int>(t * static_cast<float>(stages)));
-        gameRenderer->DrawCompositeWorld(w.composite + current, -90.0f, -100.0f, *camera, faction);
+        gameRenderer->DrawCompositeCentered(w.composite + current, 0.0f, -40.0f, *camera, faction);
         // Every stage in a row below, the current one marked
         const float step = 90.0f;
         for (int s = 0; s < stages; ++s) {
             const float cx = (static_cast<float>(s) - static_cast<float>(stages - 1) * 0.5f) * step;
-            gameRenderer->DrawCompositeWorld(w.composite + s, cx - 90.0f, 40.0f, *camera, faction);
+            gameRenderer->DrawCompositeCentered(w.composite + s, cx, 100.0f, *camera, faction);
             if (s == current) {
                 gameRenderer->FillRectWorld(cx - step * 0.5f + 2.0f, 112.0f, step - 4.0f, 3.0f, *camera,
                                             SDL_Color{232, 176, 74, 255});
@@ -255,7 +255,7 @@ void CharacterEditor::DrawEffectsScene() {
     }
     if (fxPreset <= 3 && fxTime >= 0.25f) {
         const EffectsConfig::Wreck wr = fxPreset == 0 ? fx.vehicle : fx.WreckOfBuilding(w, h);
-        gameRenderer->DrawCompositeWorld(wr.composite, -90.0f, -60.0f, *camera, faction);
+        gameRenderer->DrawCompositeCentered(wr.composite, 0.0f, 0.0f, *camera, faction);
     }
     for (const FxEvent& e : fxEvents) {
         if (e.done || e.delay > 0.0f) continue;
@@ -343,6 +343,7 @@ void CharacterEditor::DrawWreckTabProperties() {
     DrawSettingsBar(effectsYaml, "effects.yaml");
     ImGui::Separator();
     bool changed = EditYamlScalar(effectsYaml, "wrecks.burial_seconds", _("Burial seconds"));
+    changed |= EditYamlScalar(effectsYaml, "wrecks.fade_seconds", _("Fade seconds"));
     for (int i = 0; i < 6; ++i) {
         const std::string base = std::string("wrecks.") + kWreckClasses[i].key;
         if (!ImGui::CollapsingHeader(_(kWreckClasses[i].label), i == wreckClass ? ImGuiTreeNodeFlags_DefaultOpen : 0)) continue;

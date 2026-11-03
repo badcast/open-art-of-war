@@ -3,6 +3,7 @@
 #include "core/Config.hpp"
 #include "game/Simulation.hpp"
 #include "ui/RadarAlert.hpp"
+#include "ui/UiKit.hpp"
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@ namespace OpenArtOfWar
 {
 
 class Renderer;
+class InputManager;
 class Camera;
 class TextureManager;
 class BitmapFontRenderer;
@@ -37,12 +39,29 @@ public:
         TabBuild = 0,
         TabInfantry,
         TabVehicles,
-        TabResearch,
         TabOrders,
         TabCount
     };
 
     HUDController() = default;
+
+    // Window of the technology tree: search, filter, the tree, the selected technology and its start button
+    bool IsResearchWindowOpen() const
+    {
+        return m_researchOpen;
+    }
+    // The search box has the keyboard (SDL text input must be on)
+    bool WantsText() const
+    {
+        return m_researchOpen && m_researchSearchFocus;
+    }
+    // Returns true while the window takes the input of this frame
+    bool UpdateResearchWindow(
+        InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, Economy &economy,
+        EntityManager &entities);
+    void RenderResearchWindow(
+        Renderer &renderer, BitmapFontRenderer &fontRenderer, const Economy &economy, const EntityManager &entities,
+        int mx, int my, int windowW, int windowH);
 
     // `events`: what the simulation reported this tick (research done, ...)
     void Update(float deltaTime, EntityManager &entities, Economy &economy, const std::vector<SimEvent> &events);
@@ -175,6 +194,11 @@ public:
     {
         m_radarFog = fog;
     }
+    // Watching a replay: no building interface (tabs, build grid, info box), the radar and the menu stay
+    void SetObserver(bool on)
+    {
+        m_observer = on;
+    }
     // A replay's observer: the radar shows the whole map
     void SetShowAll(bool on)
     {
@@ -248,9 +272,26 @@ private:
         int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits);
     void CyclePrimaryBuilding(int tab, EntityManager &entities, Camera &camera);
 
+    // The window of the technology tree (opened by the button under OBJECTIVES)
+    void OpenResearchWindow();
+    void CloseResearchWindow();
+    bool m_researchOpen {false};
+    int m_researchSel {0};
+    std::string m_researchSearch;
+    bool m_researchSearchFocus {false};
+    int m_researchFilter {0}; // 0 all, 1 available, 2 researched, 3 locked, 4 in progress
+    ui::ComboState m_researchCombo;
+    float m_researchScrollX {0.0f}, m_researchScrollY {0.0f};
+    bool m_researchPanning {false};
+    int m_researchPanX {0}, m_researchPanY {0};
+    uint32_t m_researchClickMs {0};
+    int m_researchClickNode {-1};
+    // Starts the technology (messages as the cameo click gave them)
+    void TryStartResearch(int index, Economy &economy, EntityManager &entities);
+
     int m_activeTab {TabBuild};
     int m_topInset {0};
-    int m_scrollRow[TabCount] {0, 0, 0, 0, 0};
+    int m_scrollRow[TabCount] {0, 0, 0, 0};
     int m_primaryBarracksId {0};
     int m_primaryFactoryId {0};
     std::string m_hudNotification;
@@ -262,6 +303,7 @@ private:
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
+    bool m_observer {false}; // watching a replay
     bool m_showAll {false}; // a replay's observer sees the whole map
     mutable RadarAlert m_radarAlert; // updated while the radar is drawn
     int m_radarZoom {1};             // 1 = whole map, up to kRadarMaxZoom

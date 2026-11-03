@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 8;
+constexpr std::uint16_t kProtocolVersion = 9;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -71,6 +71,7 @@ enum class MsgType : std::uint8_t
     OwnerSetAi = 26,   // client -> room: add, change or remove a computer player
     OwnerSetTeam = 27, // client -> room: the team of a player (only the host / room owner decides teams)
     OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits)
+    OwnerSetSeat = 29,    // client -> room: a start position is made open, blocked or taken by a computer player
     // Realtime
     Heartbeat = 32,
     // Master server (openaow-server's main port)
@@ -100,6 +101,7 @@ enum class RejectReason : std::uint8_t
     Malformed,
     NotFound,
     ServerFull,
+    Kicked,   // the room owner freed this player's place
     TryAgain, // the server does not know a socket address yet: ask again in a moment
 };
 
@@ -196,6 +198,7 @@ struct LobbyChoice
     uint8_t color {0};         // 0..15
     uint8_t spawn {kRandom};   // start position 0..7 or kRandom
     uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
+    uint8_t armyCap {7};       // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
     bool ready {false};
 };
 
@@ -222,6 +225,7 @@ struct OwnerSetTeam
     uint8_t slot {0};
     uint8_t team {0}; // 0..7
     uint8_t handicap {0}; // 0..5, see LobbyChoice
+    uint8_t armyCap {7};  // 0..7, see LobbyChoice
 };
 
 struct LobbyState
@@ -232,7 +236,23 @@ struct LobbyState
     bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
     uint8_t credits {1};    // index into the game's list of starting credits (0..4)
+    uint8_t blockedMask {0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
+};
+
+// The room owner decides what a start position holds: open (a joining player takes it), blocked, or a computer
+// player of a level (a person or computer player holding it goes away; a person is sent out of the room)
+struct OwnerSetSeat
+{
+    enum Kind : uint8_t
+    {
+        Open = 0,
+        Blocked = 1,
+        Ai = 2
+    };
+    uint8_t spawn {0}; // start position 0..7
+    uint8_t kind {Open};
+    uint8_t level {1}; // Ai: 0..3
 };
 
 struct OwnerSetOptions
@@ -449,6 +469,7 @@ void encode(BitWriter &w, const OwnerStart &m);
 void encode(BitWriter &w, const OwnerSetAi &m);
 void encode(BitWriter &w, const OwnerSetTeam &m);
 void encode(BitWriter &w, const OwnerSetOptions &m);
+void encode(BitWriter &w, const OwnerSetSeat &m);
 void encode(BitWriter &w, const ListRooms &m);
 void encode(BitWriter &w, const RoomList &m);
 void encode(BitWriter &w, const CreateRoom &m);
@@ -487,6 +508,7 @@ bool decode(BitReader &r, OwnerStart &m);
 bool decode(BitReader &r, OwnerSetAi &m);
 bool decode(BitReader &r, OwnerSetTeam &m);
 bool decode(BitReader &r, OwnerSetOptions &m);
+bool decode(BitReader &r, OwnerSetSeat &m);
 bool decode(BitReader &r, ListRooms &m);
 bool decode(BitReader &r, RoomList &m);
 bool decode(BitReader &r, CreateRoom &m);

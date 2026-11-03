@@ -194,6 +194,18 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
            std::round(frame->width * sScale),
            std::round(frame->height * sScale)};
     SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
+    if (m_glowStrength > 0.0f)
+    {
+        // The same pixels once more, added in the glow colour: only the sprite itself shines
+        SDL_SetTextureBlendMode(sheet, SDL_BLENDMODE_ADD);
+        SDL_SetTextureColorMod(sheet, m_glowColor.r, m_glowColor.g, m_glowColor.b);
+        SDL_SetTextureAlphaMod(sheet, static_cast<Uint8>(std::clamp(m_glowStrength, 0.0f, 1.0f) * 255.0f));
+        SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
+        SDL_SetTextureBlendMode(sheet, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureColorMod(sheet, 255, 255, 255);
+        if (page >= 0 && page < 64)
+            m_tintedSheet[page] = false;
+    }
 }
 
 void Renderer::DrawCompositeWorld(
@@ -224,6 +236,79 @@ void Renderer::DrawCompositeWorld(
             DrawCompositeWorld(part->child, px, py, camera, faction, depth + 1);
         }
     }
+}
+
+namespace
+{
+// Box (x0, y0, x1, y1) of the sprites of a composite; false when it shows nothing
+bool CompositeBox(const TextureManager &tex, int compId, float ox, float oy, int depth, float box[4], bool &any)
+{
+    if (depth > 6)
+        return any;
+    const IndexRange r = tex.GetCompositeRange(compId);
+    for (int p = r.start; r.end >= r.start && p <= r.end; ++p)
+    {
+        const auto *part = tex.GetCompositePart(p);
+        if (!part)
+            continue;
+        if (part->isComp != 0)
+        {
+            CompositeBox(tex, part->child, ox + part->ox, oy + part->oy, depth + 1, box, any);
+            continue;
+        }
+        const auto *frame = tex.GetSpriteFrame(part->child);
+        if (!frame || frame->width <= 0 || frame->height <= 0)
+            continue;
+        const float x0 = ox + part->ox, y0 = oy + part->oy;
+        const float x1 = x0 + frame->width, y1 = y0 + frame->height;
+        if (!any)
+        {
+            box[0] = x0;
+            box[1] = y0;
+            box[2] = x1;
+            box[3] = y1;
+            any = true;
+        }
+        else
+        {
+            box[0] = std::min(box[0], x0);
+            box[1] = std::min(box[1], y0);
+            box[2] = std::max(box[2], x1);
+            box[3] = std::max(box[3], y1);
+        }
+    }
+    return any;
+}
+} // namespace
+
+void Renderer::CompositeCenterOffset(int compId, float &outDx, float &outDy)
+{
+    outDx = outDy = 0.0f;
+    if (!m_texManager)
+        return;
+    const auto it = m_compCenterOffset.find(compId);
+    if (it != m_compCenterOffset.end())
+    {
+        outDx = it->second.first;
+        outDy = it->second.second;
+        return;
+    }
+    float box[4] {0, 0, 0, 0};
+    bool any = false;
+    CompositeBox(*m_texManager, compId, 0.0f, 0.0f, 0, box, any);
+    if (any)
+    {
+        outDx = (box[0] + box[2]) * 0.5f - 90.0f;
+        outDy = (box[1] + box[3]) * 0.5f - 60.0f;
+    }
+    m_compCenterOffset[compId] = {outDx, outDy};
+}
+
+void Renderer::DrawCompositeCentered(int compId, float centerX, float centerY, const Camera &camera, Faction faction)
+{
+    float dx = 0.0f, dy = 0.0f;
+    CompositeCenterOffset(compId, dx, dy);
+    DrawCompositeWorld(compId, centerX - 90.0f - dx, centerY - 60.0f - dy, camera, faction);
 }
 
 void Renderer::DrawAnimSequenceWorld(
@@ -477,7 +562,7 @@ void Renderer::DrawBuildingWorld(
             // Remnant composite is centered at (centerX, centerY) of the building
             float centerX = worldX + (bdef->width * OpenArtOfWar::TILE_WIDTH * 0.5f);
             float centerY = worldY + (bdef->height * OpenArtOfWar::TILE_HEIGHT * 0.5f);
-            DrawCompositeWorld(baseRemnant + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
+            DrawCompositeCentered(baseRemnant + stage, centerX, centerY, camera, faction);
         }
         return;
     }
@@ -651,7 +736,7 @@ void Renderer::DrawUnitWorld(
             // Vehicle wreck composite is centered at (centerX, centerY) of the unit tile
             float centerX = worldX + (static_cast<float>(OpenArtOfWar::TILE_WIDTH) * 0.5f);
             float centerY = worldY + (static_cast<float>(OpenArtOfWar::TILE_HEIGHT) * 0.5f);
-            DrawCompositeWorld(baseWreck + stage, centerX - 90.0f, centerY - 60.0f, camera, faction);
+            DrawCompositeCentered(baseWreck + stage, centerX, centerY, camera, faction);
             return;
         }
         else

@@ -913,16 +913,19 @@ void testLobby()
     LobbyChoice cb;
     cb.faction = 1;
     cb.team = 1;
-    cb.spawn = 2; // A holds it: swapped, A is left with B's (random) position
+    cb.spawn = 2; // A holds it: refused, B keeps the place he got on joining (the other faction pick goes through)
     b->sendLobbyChoice(cb);
     pump();
-    CHECK(a->lobby().slots[1].choice.spawn == 2 && a->lobby().slots[0].choice.spawn == kRandom);
+    CHECK(a->lobby().slots[0].choice.spawn == 2 && a->lobby().slots[1].choice.spawn == 1);
     CHECK(a->lobby().slots[1].choice.faction == 1);
-    ca.spawn = 2; // and back: A takes it again
+    ca.spawn = 3; // A moves to an open place, B takes the one A left
     a->sendLobbyChoice(ca);
-    cb.spawn = kRandom;
     pump();
-    CHECK(a->lobby().slots[0].choice.spawn == 2 && a->lobby().slots[1].choice.spawn == kRandom);
+    cb.spawn = 2;
+    b->sendLobbyChoice(cb);
+    pump();
+    CHECK(a->lobby().slots[0].choice.spawn == 3 && a->lobby().slots[1].choice.spawn == 2);
+    ca.spawn = 3;
     // Colours are one per player: a colour somebody has is refused, the player keeps the own one
     ca.color = 5;
     a->sendLobbyChoice(ca);
@@ -982,17 +985,13 @@ void testLobby()
     b->sendLobbyChoice(cb);
     pump();
     CHECK(host.everyoneReady(2) && !host.everyoneReady(3));
-    // A start position another player holds is swapped: the holder takes the one that was left, nobody shares one
+    // A start position another player holds is refused: nobody shares one
     {
         const uint8_t aSpawn = a->lobby().slots[0].choice.spawn;
         cb.spawn = aSpawn;
         b->sendLobbyChoice(cb);
         pump();
-        CHECK(a->lobby().slots[1].choice.spawn == aSpawn && a->lobby().slots[0].choice.spawn == 3);
-        cb.spawn = 3; // back again
-        b->sendLobbyChoice(cb);
-        pump();
-        CHECK(a->lobby().slots[1].choice.spawn == 3 && a->lobby().slots[0].choice.spawn == aSpawn);
+        CHECK(a->lobby().slots[1].choice.spawn == 2 && a->lobby().slots[0].choice.spawn == aSpawn);
     }
     // A file the host offers comes to whoever asks; an unknown one comes back empty
     host.offerFile(0xABCDEF, std::vector<uint8_t>(300000, 7));
@@ -1009,7 +1008,7 @@ void testLobby()
     // Another map: nobody is ready any more
     host.setLobbyMap("assets/maps/brod.json", 2);
     pump();
-    CHECK(!host.everyoneReady(2) && a->lobby().slots[1].choice.spawn == kRandom);
+    CHECK(!host.everyoneReady(2) && a->lobby().slots[0].choice.spawn == 0 && a->lobby().slots[1].choice.spawn == 1);
     // A computer player: in the next free slot, always ready, counted for the start (a 2-start map is
     // full with two people: refused there)
     OwnerSetAi add;
@@ -1066,6 +1065,60 @@ void testLobby()
     host.setLobbyMap("assets/maps/map_skirmish_5.json", 1);
     pump();
     CHECK(a->lobby().map == "assets/maps/m26.json" && a->lobby().spawnCount == 4);
+
+    // Seats: the owner opens, blocks or gives a start position to a computer player; a person there is sent out
+    {
+        const uint8_t freeOne = host.lobby().slots.size() < 4 ? 3 : 2;
+        // A blocked place is not taken by a joining player
+        a->sendOwnerSetSeat(OwnerSetSeat {freeOne, OwnerSetSeat::Blocked, 1});
+        pump();
+        CHECK(a->lobby().blockedMask == (1u << freeOne));
+        // A computer player on an open place
+        uint8_t openOne = 255;
+        for (uint8_t n = 0; n < 4 && openOne == 255; ++n)
+        {
+            bool held = (a->lobby().blockedMask >> n) & 1u;
+            for (const LobbySlot &ls : a->lobby().slots)
+                held = held || ls.choice.spawn == n;
+            if (!held)
+                openOne = n;
+        }
+        CHECK(openOne != 255);
+        a->sendOwnerSetSeat(OwnerSetSeat {openOne, OwnerSetSeat::Ai, 3});
+        pump();
+        bool aiThere = false;
+        for (const LobbySlot &ls : a->lobby().slots)
+            aiThere = aiThere || (ls.ai && ls.choice.spawn == openOne && ls.aiLevel == 3 && ls.choice.ready);
+        CHECK(aiThere);
+        // Open again: the computer player goes
+        a->sendOwnerSetSeat(OwnerSetSeat {openOne, OwnerSetSeat::Open, 1});
+        pump();
+        aiThere = false;
+        for (const LobbySlot &ls : a->lobby().slots)
+            aiThere = aiThere || ls.ai;
+        CHECK(!aiThere);
+        // The person on the other place is sent out
+        const size_t before = host.playerCount();
+        uint8_t dSpawn = 255;
+        for (const LobbySlot &ls : a->lobby().slots)
+            if (ls.slot != a->slot())
+                dSpawn = ls.choice.spawn;
+        CHECK(dSpawn != 255);
+        a->sendOwnerSetSeat(OwnerSetSeat {dSpawn, OwnerSetSeat::Open, 1});
+        pump();
+        for (int i = 0; i < 3; ++i)
+            host.update(0);
+        CHECK(host.playerCount() == before - 1);
+        // The owner cannot send himself out
+        const uint8_t mine = a->lobby().slots[0].choice.spawn;
+        a->sendOwnerSetSeat(OwnerSetSeat {mine, OwnerSetSeat::Open, 1});
+        pump();
+        CHECK(a->lobby().slots.size() == 1);
+        // A plain player cannot block
+        a->sendOwnerSetSeat(OwnerSetSeat {freeOne, OwnerSetSeat::Open, 1});
+        pump();
+        CHECK(a->lobby().blockedMask == 0);
+    }
 }
 
 // The same over real UDP on localhost

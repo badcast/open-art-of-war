@@ -47,12 +47,6 @@ class MenuController
 {
 public:
     MenuController() = default;
-    // Test hook: the swap rule of the position boxes
-    static void SwapPositions(std::vector<int> &positions, int row, int position)
-    {
-        ApplyCustomPosition(positions, row, position);
-    }
-
     // The player's options the settings screen edits; onChanged applies (and stores) one group of them
     // The application shows its loading screen (the map's picture, at least three seconds) around the loading of a game
     void BindLoading(std::function<void(const std::string &, const std::string &)> begin, std::function<void()> end)
@@ -128,6 +122,11 @@ public:
     bool UpdateMissionDialog(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH);
     void RenderMissionDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
 
+    // The map search box has the keyboard (SDL text input must be on)
+    bool WantsText() const
+    {
+        return m_campaignSelectOpen && m_customGame && m_mapSearchFocus;
+    }
     bool IsCampaignSelectOpen() const
     {
         return m_campaignSelectOpen;
@@ -282,7 +281,14 @@ private:
     int m_campaignMissionSelected {0};
     // "Custom game": the same dialog lists every map of assets/maps instead of the campaign missions
     bool m_customGame {false};
-    std::vector<SkirmishMapInfo> m_skirmishMaps;
+    std::vector<SkirmishMapInfo> m_skirmishMaps; // the maps the dialog shows: m_skirmishAll after search and filters
+    std::vector<SkirmishMapInfo> m_skirmishAll;
+    std::string m_mapSearch;
+    bool m_mapSearchFocus {false};
+    int m_mapPlayersFilter {0}; // 0 any, else maps made for exactly that many players
+    int m_mapSizeFilter {0};    // 0 any, 1 small, 2 medium, 3 large
+    int m_mapSort {0};          // 0 name, 1 players, 2 size
+    void RebuildMapList();
     int m_skirmishSelected {0};
     bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
     bool m_skirmishFogOfWar {true}; // custom game: fog of war enabled
@@ -296,11 +302,18 @@ private:
         int level {1}; // computer player: 0 easy .. 3 hardcore
         int handicap {0}; // start credits form (kHandicapPercent index); 0 = none
         int position {0}; // start position of the map (0-based), never shared by two players
+        int armyCap {7};  // army size limit: index into kArmyCapUnits (7 = unlimited)
     };
     std::vector<CustomSlot> m_customSlots;
     void EnsureCustomSlots();
-    // Gives player `row` start position `position`; the player who held it takes the position `row` had (a swap)
-    static void ApplyCustomPosition(std::vector<int> &positions, int row, int position);
+    unsigned m_customBlocked {0}; // custom game: start positions nobody takes (bit per position)
+    // What holds a start position: index into m_customSlots, -1 nobody
+    int CustomSlotAt(int position) const;
+    // The choices of the type combo of a start position (codes of SetCustomSeat)
+    std::vector<int> CustomSeatCodes(int position) const;
+    bool m_sideRandom {false}; // the person's side is drawn when the match starts
+    // Puts something on a start position: 1 the person, 2 nobody, 3..6 a computer player (level 0..3), 7 blocked
+    void SetCustomSeat(int position, int code);
     std::string m_spotsPath;                         // map whose start positions m_spots holds
     std::vector<std::pair<int, int>> m_spots;        // start positions of that map (tiles), for the numbers on its picture
     std::vector<bool> CustomTakenColors(int row) const;
@@ -309,7 +322,9 @@ private:
                                                       // first visible row of the map list
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
-    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboLayout = 102, kComboCredits = 103;
+    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboCredits = 103;
+    static constexpr int kComboMapPlayers = 104, kComboMapSize = 105, kComboMapSort = 106; // filters over the map list
+    std::vector<int> MapPlayerCounts() const; // 0 (any) and the player counts of the maps
     static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;

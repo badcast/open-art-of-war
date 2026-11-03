@@ -1517,8 +1517,8 @@ msgstr "Горючая смесь 'Лава'"
 msgid "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
 msgstr "Позволяет создавать огнеметчиков. Огнемет не причиняет вреда пехоте и технике Конфедерации, благодаря огнеупорной броне."
 
-msgid "VULCAN HEAVY FLAMETHROWER"
-msgstr "Тяж. огнемет 'Вулкан'"
+msgid "FORTRESS UPGRADE"
+msgstr "МОДЕРНИЗАЦИЯ ДЛЯ КРЕПОСТИ"
 
 msgid ""
 "A heavy flamethrower is mounted on the TM-40 Fortress.\n"
@@ -4311,3 +4311,111 @@ msgstr "Цвет"
 
 msgid "Say"
 msgstr "Сказать"
+
+msgid "Search map..."
+msgstr "Поиск карты..."
+
+msgid "Players"
+msgstr "Игроки"
+
+msgid "Size"
+msgstr "Размер"
+
+msgid "Sort"
+msgstr "Сортировка"
+
+msgid "Any"
+msgstr "Любой"
+
+msgid "Small"
+msgstr "Малая"
+
+msgid "Large"
+msgstr "Большая"
+
+msgid "No maps match."
+msgstr "Нет подходящих карт."
+
+msgid "Place"
+msgstr "Место"
+
+msgid "Occupy"
+msgstr "Занять"
+
+msgid "Open"
+msgstr "Открыто"
+
+msgid "Blocked"
+msgstr "Заблокировано"
+
+msgid "Army"
+msgstr "Армия"
+
+msgid "START WITH A BASE"
+msgstr "НАЧИНАТЬ С БАЗЫ"
+
+msgid "RANDOM"
+msgstr "СЛУЧАЙНО"
+
+msgid "The room owner freed your place"
+msgstr "Хозяин комнаты освободил ваше место"
+
+msgid "RESEARCH NEW TECHNOLOGIES"
+msgstr "ИССЛЕДОВАТЬ НОВЫЕ ТЕХНОЛОГИИ"
+
+msgid "Search technology..."
+msgstr "Поиск технологии..."
+
+msgid "All"
+msgstr "Все"
+
+msgid "Available"
+msgstr "Доступные"
+
+msgid "Researched"
+msgstr "Изучено"
+
+msgid "Locked"
+msgstr "Закрытые"
+
+msgid "In progress"
+msgstr "Исследуются"
+
+msgid "Show"
+msgstr "Показать"
+
+msgid "CLOSE"
+msgstr "ЗАКРЫТЬ"
+
+msgid "RESEARCHED"
+msgstr "ИЗУЧЕНО"
+
+msgid "RESEARCHING"
+msgstr "ИССЛЕДУЕТСЯ"
+
+msgid "LOCKED"
+msgstr "ЗАКРЫТО"
+
+msgid "AVAILABLE"
+msgstr "ДОСТУПНО"
+
+msgid "Time"
+msgstr "Время"
+
+msgid "TECH CENTER - RESEARCH"
+msgstr "ТЕХЦЕНТР - ИССЛЕДОВАНИЯ"
+
+msgid "LABORATORY - RESEARCH"
+msgstr "ЛАБОРАТОРИЯ - ИССЛЕДОВАНИЯ"
+
+msgid "Build a Tech Center to start research"
+msgstr "Постройте техцентр, чтобы начать исследования"
+
+msgid "Build a Laboratory to start research"
+msgstr "Постройте лабораторию, чтобы начать исследования"
+
+msgid "START RESEARCH"
+msgstr "НАЧАТЬ ИССЛЕДОВАНИЕ"
+
+msgid "Fade seconds"
+msgstr "Исчезновение, с"

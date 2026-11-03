@@ -23,7 +23,16 @@ struct PlayerSlot
     bool human {false};
     uint8_t aiLevel {1}; // computer player: 0 easy .. 3 hardcore
     uint8_t handicap {0}; // start credits: index into kHandicapPercent (0 = none)
+    uint8_t armyCap {7};  // most units alive at once: index into kArmyCapUnits (7 = unlimited)
 };
+
+// The army size limit of a player: the choices of the lobby / custom game (0 units = unlimited)
+constexpr int kArmyCapCount = 8;
+constexpr int kArmyCapUnits[kArmyCapCount] = {10, 25, 50, 100, 200, 500, 1000, 0};
+inline int ArmyCapUnitsOf(int index)
+{
+    return kArmyCapUnits[(index >= 0 && index < kArmyCapCount) ? index : kArmyCapCount - 1];
+}
 
 // Handicaps ("forms"): the share of the match's starting credits a player gets
 constexpr int kHandicapCount = 6;

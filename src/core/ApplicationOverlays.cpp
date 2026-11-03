@@ -615,7 +615,8 @@ void Application::UpdateGameChat(uint32_t nowMs)
     if (!m_gameChat.open)
     {
         // (not over a pause menu, a dialog or the in-game settings: Enter belongs to them there)
-        if (enter && m_state != AppState::Paused && !m_menuController->IsAnyMenuOpen())
+        if (enter && m_state != AppState::Paused && !m_menuController->IsAnyMenuOpen()
+            && !m_hudController->IsResearchWindowOpen())
         {
             m_gameChat.open = true;
             m_gameChat.input.clear();

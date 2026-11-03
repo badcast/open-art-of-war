@@ -1517,8 +1517,8 @@ msgstr "LAVA FUEL MIX"
 msgid "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
 msgstr "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
 
-msgid "VULCAN HEAVY FLAMETHROWER"
-msgstr "VULCAN HEAVY FLAMETHROWER"
+msgid "FORTRESS UPGRADE"
+msgstr "FORTRESS UPGRADE"
 
 msgid ""
 "A heavy flamethrower is mounted on the TM-40 Fortress.\n"
@@ -4311,3 +4311,111 @@ msgstr "Colour"
 
 msgid "Say"
 msgstr "Say"
+
+msgid "Search map..."
+msgstr "Search map..."
+
+msgid "Players"
+msgstr "Players"
+
+msgid "Size"
+msgstr "Size"
+
+msgid "Sort"
+msgstr "Sort"
+
+msgid "Any"
+msgstr "Any"
+
+msgid "Small"
+msgstr "Small"
+
+msgid "Large"
+msgstr "Large"
+
+msgid "No maps match."
+msgstr "No maps match."
+
+msgid "Place"
+msgstr "Place"
+
+msgid "Occupy"
+msgstr "Occupy"
+
+msgid "Open"
+msgstr "Open"
+
+msgid "Blocked"
+msgstr "Blocked"
+
+msgid "Army"
+msgstr "Army"
+
+msgid "START WITH A BASE"
+msgstr "START WITH A BASE"
+
+msgid "RANDOM"
+msgstr "RANDOM"
+
+msgid "The room owner freed your place"
+msgstr "The room owner freed your place"
+
+msgid "RESEARCH NEW TECHNOLOGIES"
+msgstr "RESEARCH NEW TECHNOLOGIES"
+
+msgid "Search technology..."
+msgstr "Search technology..."
+
+msgid "All"
+msgstr "All"
+
+msgid "Available"
+msgstr "Available"
+
+msgid "Researched"
+msgstr "Researched"
+
+msgid "Locked"
+msgstr "Locked"
+
+msgid "In progress"
+msgstr "In progress"
+
+msgid "Show"
+msgstr "Show"
+
+msgid "CLOSE"
+msgstr "CLOSE"
+
+msgid "RESEARCHED"
+msgstr "RESEARCHED"
+
+msgid "RESEARCHING"
+msgstr "RESEARCHING"
+
+msgid "LOCKED"
+msgstr "LOCKED"
+
+msgid "AVAILABLE"
+msgstr "AVAILABLE"
+
+msgid "Time"
+msgstr "Time"
+
+msgid "TECH CENTER - RESEARCH"
+msgstr "TECH CENTER - RESEARCH"
+
+msgid "LABORATORY - RESEARCH"
+msgstr "LABORATORY - RESEARCH"
+
+msgid "Build a Tech Center to start research"
+msgstr "Build a Tech Center to start research"
+
+msgid "Build a Laboratory to start research"
+msgstr "Build a Laboratory to start research"
+
+msgid "START RESEARCH"
+msgstr "START RESEARCH"
+
+msgid "Fade seconds"
+msgstr "Fade seconds"

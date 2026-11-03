@@ -305,6 +305,13 @@ void SessionClient::sendOwnerSetTeam(const OwnerSetTeam &change)
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
+void SessionClient::sendOwnerSetSeat(const OwnerSetSeat &change)
+{
+    BitWriter w(m_buffer.data(), m_buffer.size());
+    encode(w, change);
+    send(Channel::Control, m_buffer.data(), w.finish());
+}
+
 void SessionClient::sendOwnerSetOptions(const OwnerSetOptions &change)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
