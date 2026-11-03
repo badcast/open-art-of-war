@@ -16,6 +16,7 @@
 #include "graphics/TextureManager.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
+#include "graphics/NightLighting.hpp"
 #include "net/NetMatch.hpp"
 #include "ui/NetworkMenu.hpp"
 #include "openaow/net/Discovery.hpp"
@@ -339,6 +340,7 @@ void Application::Shutdown()
 #endif
     if (m_effects)
         m_effects->Shutdown();
+    m_nightLighting.reset();
     if (m_sound)
         m_sound->Cleanup();
     if (m_lowResTarget)
@@ -888,6 +890,20 @@ void Application::Update(float deltaTime)
                            || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
                            || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
     m_sound->Update(menuMusic, gameplayMusic);
+
+    // The time of day of the match (campaign missions are by day): the picture and the loop of the surroundings
+    const bool inMatch = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
+                         || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat;
+    const bool night = inMatch && m_mission && m_mission->IsMatch() && m_mission->matchSetup().night;
+    if (night != m_night)
+    {
+        m_night = night;
+        ApplyGraphics();
+    }
+    if (inMatch)
+        m_sound->PlayAmbient(night);
+    else
+        m_sound->StopAmbient();
 }
 
 void Application::UpdateSounds()
@@ -1141,6 +1157,17 @@ void Application::render()
         RenderMapEdgeFade(worldCam);
         m_renderer->ResetClipRect();
         m_renderer->EndWorldPass();
+
+        // Night without the shader effects: the light map over the world picture (the SDL GPU renderer grades it)
+        if (m_night && !(m_effects && m_effects->Available()))
+        {
+            if (!m_nightLighting)
+                m_nightLighting = std::make_unique<NightLighting>();
+            std::vector<EntityManager::LightSpot> &lights = m_nightLighting->Lights();
+            m_entities->CollectLights(*m_map, !disableFog, lights);
+            m_nightLighting->Apply(
+                m_sdlRenderer, worldCam, lights, worldCam.GetViewportWidth(), worldCam.GetViewportHeight());
+        }
 
         if (scene)
         {

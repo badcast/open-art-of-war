@@ -4489,11 +4489,11 @@ msgstr "нет в audio_sfx.json"
 msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
 msgstr "События и их громкость, высота, дальность: assets/data/audio_sfx.json; клипы: audio/sfx/<событие>_<n>.ogg, перечисленные в main.json."
 
-msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
-msgstr "Звук выстрела этого оружия: событие из assets/data/audio_sfx.json (его громкость, высота и дальность задаются там). Пусто: звук по типу снаряда (sound)."
+msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."
+msgstr "Звук выстрела этого оружия: событие из assets/data/audio_sfx.json (его громкость, высота и дальность задаются там). Пусто: звук по типу снаряда (fire_sfx)."
 
-msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
-msgstr "Звук в месте попадания выстрела этого оружия: событие из audio_sfx.json. Пусто: звук по типу снаряда (impact_sound)."
+msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."
+msgstr "Звук в месте попадания выстрела этого оружия: событие из audio_sfx.json. Пусто: звук по типу снаряда (impact_sfx)."
 
 msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
 msgstr "Множитель громкости звуков этого оружия (sound_volume, 1.0 = как в событии)."
@@ -4501,8 +4501,29 @@ msgstr "Множитель громкости звуков этого оружи
 msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
 msgstr "Звуки самого персонажа (блок sounds:); у его оружия — свои, в weapons."
 
-msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
-msgstr "Звук гибели: событие из audio_sfx.json (sounds.death). Пусто: взрыв или гибель пехоты."
+msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."
+msgstr "Звук гибели: событие из audio_sfx.json (sounds.death). Пусто: взрыв, гибель пехоты или разрушение стены (файл стены задаёт звуки всех сегментов стены своей стороны)."
 
 msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
 msgstr "Множитель громкости всех звуков персонажа: выстрелов, попаданий, гибели (sounds.volume)."
+
+msgid "Damage sound"
+msgstr "Звук урона"
+
+msgid "(bullet / armour hit)"
+msgstr "(попадание пули / по броне)"
+
+msgid "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."
+msgstr "Звук попадания пули в персонажа: событие из audio_sfx.json (sounds.damage). Собственный звук попадания оружия важнее; снаряды, ракеты и огонь сохраняют свой звук попадания. Пусто: попадание пули (пехота) или попадание по броне."
+
+msgid "DAY"
+msgstr "ДЕНЬ"
+
+msgid "NIGHT"
+msgstr "НОЧЬ"
+
+msgid "Ambient volume"
+msgstr "Громкость окружения"
+
+msgid "Volume of the surroundings in a match: the forest by day or by night"
+msgstr "Громкость звуков окружения в матче: лес днём или ночью"

@@ -44,6 +44,7 @@ class MenuController;
 class HUDController;
 class GameplayController;
 class ShaderEffects;
+class NightLighting;
 class NetMatch;
 namespace Net
 {
@@ -219,6 +220,10 @@ private:
     SDL_Renderer *m_sdlRenderer {nullptr};
 
     std::unique_ptr<ShaderEffects> m_effects; // SDL GPU renderer only (available() false otherwise)
+    // The time of day of the match on screen (MatchSetup::night): the SDL GPU renderer grades the picture as night,
+    // the others darken it with a light map (NightLighting)
+    bool m_night {false};
+    std::unique_ptr<NightLighting> m_nightLighting;
     std::unique_ptr<NetMatch> m_net;
     std::unique_ptr<NetworkMenu> m_networkMenu;
     std::vector<LanGame> m_lanGames;

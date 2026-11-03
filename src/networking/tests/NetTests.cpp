@@ -962,14 +962,14 @@ void testLobby()
     pump();
     CHECK(a->lobby().slots[1].choice.handicap == 3 && a->lobby().slots[1].choice.team == 5);
     // Match options: the owner sets them, everybody sees them, a plain player cannot
-    CHECK(a->lobby().fogOfWar && a->lobby().prebuilt && a->lobby().credits == 1);
-    a->sendOwnerSetOptions(OwnerSetOptions {false, false, 3});
+    CHECK(a->lobby().fogOfWar && a->lobby().prebuilt && a->lobby().credits == 1 && !a->lobby().night);
+    a->sendOwnerSetOptions(OwnerSetOptions {false, false, 3, true});
     pump();
-    CHECK(!b->lobby().fogOfWar && !b->lobby().prebuilt && b->lobby().credits == 3);
-    b->sendOwnerSetOptions(OwnerSetOptions {true, true, 0});
+    CHECK(!b->lobby().fogOfWar && !b->lobby().prebuilt && b->lobby().credits == 3 && b->lobby().night);
+    b->sendOwnerSetOptions(OwnerSetOptions {true, true, 0, false});
     pump();
-    CHECK(!a->lobby().fogOfWar && a->lobby().credits == 3);
-    a->sendOwnerSetOptions(OwnerSetOptions {true, true, 1});
+    CHECK(!a->lobby().fogOfWar && a->lobby().credits == 3 && a->lobby().night);
+    a->sendOwnerSetOptions(OwnerSetOptions {true, true, 1, false});
     pump();
     cb.handicap = 0; // (the value B sends is ignored anyway)
     cb.team = 5;

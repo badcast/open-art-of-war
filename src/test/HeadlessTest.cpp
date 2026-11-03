@@ -715,6 +715,22 @@ bool HeadlessTest::RunReplayTest(Application &app)
         },
         [&](uint32_t tick, uint64_t sum) { recordedSums.emplace_back(tick, sum); });
 
+    // The time of day travels with the setup (the last bit: a setup written before it reads as day)
+    {
+        MatchSetup atNight = setup, back;
+        atNight.night = true;
+        const bool nightBack = NetMatch::DecodeSetup(NetMatch::EncodeSetup(atNight), back) && back.night;
+        atNight.night = false;
+        const bool dayBack = NetMatch::DecodeSetup(NetMatch::EncodeSetup(atNight), back) && !back.night;
+        std::cout << "  - Time of day in the setup: night " << (nightBack ? "kept" : "LOST") << ", day "
+                  << (dayBack ? "kept" : "LOST") << std::endl;
+        if (!nightBack || !dayBack)
+        {
+            std::cerr << "[Test] Error: the time of day must come through the match setup" << std::endl;
+            return false;
+        }
+    }
+
     // --- The file
     const fs::path dir = fs::temp_directory_path() / "oaow-replay-play-test";
     fs::remove_all(dir);
@@ -1562,21 +1578,34 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         const int fortress = entities.SpawnUnitByArchetype(7, 5, 5, Faction::Confederation);
         const int target = entities.SpawnUnitByArchetype(0, 9, 5, Faction::Resistance);
         entities.TakeSoundCues();
-        std::string heard;
+        // ... and the rifleman it hits names its own damage sound (sounds.damage): the hit is heard as that
+        const UnitConfig *hurtCfg = entities.GetUnitConfig(0);
+        const std::string hurtNamed = hurtCfg ? hurtCfg->sounds.damage : std::string();
+        std::string heard, hitHeard;
         if (Entity *f = entities.GetEntity(fortress))
         {
             entities.SpawnProjectileFromEntity(*f, f->GetUnitCenterPixelX(), f->GetUnitCenterPixelY(), 9 * TILE_WIDTH,
                                                5 * TILE_HEIGHT, target, *app.m_map);
             for (const auto &c : entities.TakeSoundCues())
+            {
                 if (c.cue == EntityManager::SoundCue::FireMg)
                     heard = entities.SoundName(c.sound);
+                else if (c.cue == EntityManager::SoundCue::HitBullet)
+                    hitHeard = entities.SoundName(c.sound);
+            }
         }
         entities.Clear();
         std::cout << "  - Character sounds: the Fortress gun names '" << named << "', its shot is heard as '" << heard
-                  << "'" << std::endl;
+                  << "'; the rifleman's damage sound '" << hurtNamed << "' is heard as '" << hitHeard << "'"
+                  << std::endl;
         if (named.empty() || heard != named)
         {
             std::cerr << "[Test] Error: a weapon's own sound must reach the shot it fires" << std::endl;
+            return false;
+        }
+        if (hurtNamed.empty() || hitHeard != hurtNamed)
+        {
+            std::cerr << "[Test] Error: the damage sound of the one hit must reach the hit" << std::endl;
             return false;
         }
     }

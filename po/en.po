@@ -4489,11 +4489,11 @@ msgstr "not in audio_sfx.json"
 msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
 msgstr "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
 
-msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
-msgstr "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
+msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."
+msgstr "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."
 
-msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
-msgstr "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
+msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."
+msgstr "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."
 
 msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
 msgstr "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
@@ -4501,8 +4501,29 @@ msgstr "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event 
 msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
 msgstr "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
 
-msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
-msgstr "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
+msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."
+msgstr "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."
 
 msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
 msgstr "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
+
+msgid "Damage sound"
+msgstr "Damage sound"
+
+msgid "(bullet / armour hit)"
+msgstr "(bullet / armour hit)"
+
+msgid "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."
+msgstr "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."
+
+msgid "DAY"
+msgstr "DAY"
+
+msgid "NIGHT"
+msgstr "NIGHT"
+
+msgid "Ambient volume"
+msgstr "Ambient volume"
+
+msgid "Volume of the surroundings in a match: the forest by day or by night"
+msgstr "Volume of the surroundings in a match: the forest by day or by night"

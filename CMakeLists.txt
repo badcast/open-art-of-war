@@ -120,6 +120,7 @@ set(ENGINE_SOURCES
     src/graphics/RenderUtility.cpp
     src/graphics/RenderBackend.cpp
     src/graphics/ShaderEffects.cpp
+    src/graphics/NightLighting.cpp
     src/graphics/BitmapFontRenderer.cpp
     src/input/InputManager.cpp
     src/audio/SoundEngine.cpp

@@ -20,13 +20,15 @@ void Settings::Clamp()
     fullscreenH = std::clamp(fullscreenH, kMinWindowH, MaxResolution);
     fpsLimit = std::clamp(fpsLimit, 0, 1000);
     graphicsQuality = std::clamp(graphicsQuality, 0, 2);
-    colorGrade = std::clamp(colorGrade, 0, 5);
+    // (dusk and night are no longer a player's choice but the time of day of the match: such a setting is off)
+    colorGrade = colorGrade > 3 ? 0 : std::max(colorGrade, 0); // 3: ColorGrade::Cinematic
     zoomMin = std::clamp(zoomMin, kZoomLowest, 1.0f);
     zoomMax = std::clamp(zoomMax, 2.0f, kZoomHighest);
     zoomDefault = std::clamp(zoomDefault, zoomMin, zoomMax);
     musicVolume = std::clamp(musicVolume, 0, 128);
     fxVolume = std::clamp(fxVolume, 0, 128);
     voiceVolume = std::clamp(voiceVolume, 0, 128);
+    ambientVolume = std::clamp(ambientVolume, 0, 128);
     uiVolume = std::clamp(uiVolume, 0, 128);
     difficulty = std::clamp(difficulty, 0, 3);
     edgePanMargin = std::clamp(edgePanMargin, kMinEdgePanMargin, kMaxEdgePanMargin);
@@ -80,6 +82,7 @@ bool Settings::Save(const std::string &path) const
         j["fxVolume"] = fxVolume;
         j["reverb"] = reverb;
         j["voiceVolume"] = voiceVolume;
+        j["ambientVolume"] = ambientVolume;
         j["uiVolume"] = uiVolume;
         j["muted"] = muted;
         j["language"] = language;
@@ -129,6 +132,7 @@ bool Settings::load(const std::string &path)
         fxVolume = j.value("fxVolume", fxVolume);
         reverb = j.value("reverb", reverb);
         voiceVolume = j.value("voiceVolume", voiceVolume);
+        ambientVolume = j.value("ambientVolume", ambientVolume);
         uiVolume = j.value("uiVolume", uiVolume);
         muted = j.value("muted", muted);
         language = j.value("language", language);

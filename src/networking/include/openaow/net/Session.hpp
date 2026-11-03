@@ -85,7 +85,7 @@ public:
     // What a start position holds (see OwnerSetSeat): the host / room owner decides
     void setSeat(const OwnerSetSeat &change);
     // Match options of the room (the host / room owner decides, everybody sees them in the lobby)
-    void setOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
+    void setOptions(bool fogOfWar, bool prebuilt, uint8_t credits, bool night);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
     bool everyoneReady(int minPlayers) const;
 

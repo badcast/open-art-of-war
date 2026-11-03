@@ -579,8 +579,8 @@ bool CharacterEditor::EditSoundCombo(YAML::Node parent, const char* key, const c
 
 bool CharacterEditor::EditWeaponSounds(YAML::Node w) {
     bool changed = false;
-    changed |= EditSoundCombo(w, "sound", "Shot sound", "(by projectile)");
-    changed |= EditSoundCombo(w, "impact_sound", "Impact sound", "(by projectile)");
+    changed |= EditSoundCombo(w, "fire_sfx", "Shot sound", "(by projectile)");
+    changed |= EditSoundCombo(w, "impact_sfx", "Impact sound", "(by projectile)");
     changed |= EditFloat(w, "sound_volume", "Sound volume", 1.0f, 0.05f);
     return changed;
 }

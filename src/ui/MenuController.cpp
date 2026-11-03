@@ -153,6 +153,7 @@ struct CampaignLayout
     UiRect baseCheckbox;  // custom game: start with a base (check box under the picture)
     UiRect fogCheckbox;   // custom game: fog of war checkbox
     UiRect creditsBtn;    // custom game: starting credits (top right of the details)
+    UiRect timeBtn;       // custom game: time of day (left of the credits)
     int itemH {40};
     int itemGap {4};
 
@@ -177,6 +178,7 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.sideBtn[0] = {l.dialog.x + 20, footerY + 10, 240, 40};
     l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
     l.creditsBtn = {l.details.Right() - 20 - 200, l.details.y + 12, 200, 32};
+    l.timeBtn = {l.creditsBtn.x - 12 - 160, l.details.y + 12, 160, 32};
     const UiRect pv = CustomPreviewArea(l.details);
     const int optX = pv.Right() + 20;
     l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
@@ -731,15 +733,14 @@ std::vector<SettingsRow> BuildSettingsRows(
         // Shader effects: only the SDL GPU render API draws them
         const bool fx = renderApi.effectsAvailable && renderApi.effectsAvailable();
         const std::string fxHint = _("Needs the SDL GPU render API");
-        static const char *const kGrades[6] = {"Off", "Natural", "Vivid", "Cinematic", "Dusk", "Night"};
-        static const char *const kGradeHints[6]
+        // (night is the time of day of the match, chosen with the map: not a player's own setting)
+        static const char *const kGrades[4] = {"Off", "Natural", "Vivid", "Cinematic"};
+        static const char *const kGradeHints[4]
             = {"The picture as drawn",
                "A little more contrast and colour",
                "Strong colours",
-               "Muted colours, warm light, dark corners",
-               "Evening light",
-               "Night: explosions light up the dark"};
-        const int g = std::clamp(s.colorGrade, 0, 5);
+               "Muted colours, warm light, dark corners"};
+        const int g = std::clamp(s.colorGrade, 0, 3);
         std::vector<std::string> gradeNames;
         for (const char *name : kGrades)
             gradeNames.push_back(_(name));
@@ -749,7 +750,7 @@ std::vector<SettingsRow> BuildSettingsRows(
             gradeNames,
             g,
             [&s, notify](int i) {
-                s.colorGrade = std::clamp(i, 0, 5);
+                s.colorGrade = std::clamp(i, 0, 3);
                 notify(SettingsArea::Graphics);
             },
             fx);
@@ -793,6 +794,18 @@ std::vector<SettingsRow> BuildSettingsRows(
             percent,
             [&s, notify](float v) {
                 s.musicVolume = static_cast<int>(v);
+                notify(SettingsArea::Audio);
+            }));
+        rows.push_back(SliderRow(
+            _("Ambient volume"),
+            _("Volume of the surroundings in a match: the forest by day or by night"),
+            static_cast<float>(s.ambientVolume),
+            0.0f,
+            128.0f,
+            8.0f,
+            percent,
+            [&s, notify](float v) {
+                s.ambientVolume = static_cast<int>(v);
                 notify(SettingsArea::Audio);
             }));
         rows.push_back(SliderRow(
@@ -928,6 +941,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.musicVolume = d.musicVolume;
         s.fxVolume = d.fxVolume;
         s.voiceVolume = d.voiceVolume;
+        s.ambientVolume = d.ambientVolume;
         s.uiVolume = d.uiVolume;
         s.reverb = d.reverb;
         s.muted = d.muted;
@@ -1276,6 +1290,7 @@ bool MenuController::UpdateCampaignSelect(
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
             match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
+            match.night = m_skirmishNight;
             // The person watches: he is no player, the computer players take the ids from 0 (a watcher's view belongs
             // to the first of them)
             match.local = 0;
@@ -1416,11 +1431,12 @@ bool MenuController::UpdateCampaignSelect(
             return MapFilterBtn(l, id - kComboMapPlayers);
         return id == kComboSide ? l.sideBtn[0]
                : id == kComboCredits ? l.creditsBtn
+               : id == kComboTime ? l.timeBtn
                : l.difficultyBtn;
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
-    if ((m_combo.open == kComboCredits || m_combo.open >= kComboSlot) && !hasLayoutChoice)
+    if ((m_combo.open == kComboCredits || m_combo.open == kComboTime || m_combo.open >= kComboSlot) && !hasLayoutChoice)
         m_combo.open = -1;
     if (m_combo.open >= kComboSlot && hasLayoutChoice
         && (m_combo.open - kComboSlot) / 10 >= std::min(m_skirmishMaps[m_skirmishSelected].players, kMaxPlayers))
@@ -1473,6 +1489,8 @@ bool MenuController::UpdateCampaignSelect(
         }
         if (hasLayoutChoice && l.creditsBtn.Contains(mx, my))
             return openCombo(kComboCredits);
+        if (hasLayoutChoice && l.timeBtn.Contains(mx, my))
+            return openCombo(kComboTime);
         if (hasLayoutChoice && l.fogCheckbox.Contains(mx, my))
         {
             m_skirmishFogOfWar = !m_skirmishFogOfWar;
@@ -2731,7 +2749,7 @@ void MenuController::RenderCampaignMissionSelect(
 
         int x = d.x + 20;
         int w = d.w - 40;
-        const int titleW = w - 220 - 118;
+        const int titleW = w - 220 - 172 - 118;
         fontRenderer.DrawString(
             ui::FitText(fontRenderer, info.DisplayName(), ui::FONT_H2, titleW),
             x,
@@ -2746,6 +2764,13 @@ void MenuController::RenderCampaignMissionSelect(
             ui::CreditsLabel(m_skirmishCredits),
             m_combo.open == kComboCredits,
             l.creditsBtn.Contains(m_mouseX, m_mouseY));
+        ui::DrawComboField(
+            renderer,
+            fontRenderer,
+            l.timeBtn,
+            ui::TimeOfDayChoices()[m_skirmishNight ? 1 : 0],
+            m_combo.open == kComboTime,
+            l.timeBtn.Contains(m_mouseX, m_mouseY));
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
         ui::DrawCaption(fontRenderer, renderer, x, d.y + 80, std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u)) + ")");
         // Column captions, the same order as in the network room
@@ -2961,6 +2986,7 @@ void MenuController::RenderCampaignMissionSelect(
                          ? MapFilterBtn(l, id - kComboMapPlayers)
                          : id == kComboSide ? l.sideBtn[0]
                          : id == kComboCredits ? l.creditsBtn
+                         : id == kComboTime ? l.timeBtn
                          : l.difficultyBtn);
         std::vector<std::string> items = CampaignComboOptions(id);
         std::vector<bool> taken;
@@ -3067,6 +3093,8 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
     }
     if (id == kComboCredits)
         return ui::CreditsChoices();
+    if (id == kComboTime)
+        return ui::TimeOfDayChoices();
     return ui::LayoutChoices();
 }
 
@@ -3112,6 +3140,8 @@ int MenuController::CampaignComboCurrent(int id) const
         return m_sideRandom ? 2 : (PlayerFaction() == Faction::Confederation ? 1 : 0);
     if (id == kComboDifficulty)
         return std::clamp(static_cast<int>(m_difficulty), 0, 3);
+    if (id == kComboTime)
+        return m_skirmishNight ? 1 : 0;
     return std::clamp(m_skirmishCredits, 0, 4);
 }
 
@@ -3199,6 +3229,10 @@ void MenuController::CampaignComboApply(int id, int index)
     else if (id == kComboCredits)
     {
         m_skirmishCredits = std::clamp(index, 0, 4);
+    }
+    else if (id == kComboTime)
+    {
+        m_skirmishNight = index == 1;
     }
 }
 

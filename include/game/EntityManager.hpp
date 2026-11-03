@@ -336,8 +336,8 @@ struct WeaponConfig
     float maxDistance {0.0f};
     // Sounds of this gun (events of data/audio_sfx.json; empty: the sound of its projectile kind). Only heard:
     // nothing of it is part of the world
-    std::string sound;        // the shot
-    std::string impactSound;  // where it hits
+    std::string sound;        // the shot (fire_sfx)
+    std::string impactSound;  // where it hits (impact_sfx)
     float soundVolume {1.0f}; // times the event's own volume
     uint16_t soundId {0};     // the interned events (EntityManager::SoundName)
     uint16_t impactSoundId {0};
@@ -346,9 +346,11 @@ struct WeaponConfig
 // The sounds of a unit or a building of its own (the `sounds:` block of its character file)
 struct CharacterSounds
 {
-    std::string death;   // when it is destroyed (empty: an explosion / the infantry death)
+    std::string death;   // when it is destroyed (empty: an explosion / the infantry death / a wall coming down)
+    std::string damage;  // when a bullet hits it (empty: the bullet hit / the armour hit); a gun's impact_sfx wins
     float volume {1.0f}; // times every sound of it (its guns, its hits, its death)
     uint16_t deathId {0};
+    uint16_t damageId {0};
 };
 
 struct UnitConfig
@@ -577,6 +579,16 @@ public:
         bool showAllHealth = false);
     // What shines: projectiles and explosions (the glow pass of the shader effects draws them once more)
     void RenderEmissive(Renderer &renderer, const Camera &camera) const;
+    // What lights up its surroundings at night (explosions, flames, rockets and shells in flight), in world pixels:
+    // only those in sight when `fog` is on. Drawing only
+    struct LightSpot
+    {
+        float x {0.0f};
+        float y {0.0f};
+        float radius {0.0f};
+        float intensity {0.0f}; // 0..1
+    };
+    void CollectLights(const TileMap &map, bool fog, std::vector<LightSpot> &out) const;
 
     // Fortress auxiliary flamethrower, researched per faction
     bool IsFortressFlamethrowerUnlocked(PlayerId p) const
@@ -719,6 +731,8 @@ public:
     }
     // The death sound of a unit / building and the volume of its sounds
     const CharacterSounds *SoundsOf(const Entity &e) const;
+    // The sounds of the wall segments of a side (the wall character of its faction; null: none loaded)
+    const CharacterSounds *WallSoundsOf(Faction faction) const;
     // Changes whenever the world is cleared (entity ids start again)
     uint32_t Generation() const
     {

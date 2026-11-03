@@ -62,6 +62,7 @@ void Application::ApplyAudio()
     m_sound->SetFxVolume(m_settings.fxVolume);
     m_sound->SetReverb(m_settings.reverb);
     m_sound->SetVoiceVolume(m_settings.voiceVolume);
+    m_sound->SetAmbientVolume(m_settings.ambientVolume);
     m_sound->SetUiVolume(m_settings.uiVolume);
     m_sound->SetVoiceLanguage(m_settings.language); // voices speak the language of the game
     if (m_sound->IsMuted() != m_settings.muted)
@@ -86,7 +87,8 @@ void Application::ApplyGraphics()
         m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
     const bool effects = m_effects && m_effects->Available();
     if (m_effects)
-        m_effects->Configure(static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
+        m_effects->Configure(
+            m_night ? ColorGrade::Night : static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
     // The pixel-art filter blends texel edges itself and needs linear samples to do it
     if (m_texManager)
         m_texManager->SetSpriteFiltering(m_settings.smoothing, effects && m_settings.sharpPixels);

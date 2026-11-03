@@ -14,6 +14,11 @@ inline std::vector<std::string> LayoutChoices()
 {
     return {_("PREBUILT BASES"), _("FROM SCRATCH")};
 }
+// The time of day of a match: 0 day, 1 night (only drawn and heard)
+inline std::vector<std::string> TimeOfDayChoices()
+{
+    return {_("DAY"), _("NIGHT")};
+}
 inline std::vector<std::string> CreditsChoices()
 {
     std::vector<std::string> out;

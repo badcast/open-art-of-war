@@ -727,12 +727,12 @@ void NetMatch::SetSeat(const Net::OwnerSetSeat &change)
     else if (IsOwner())
         m_client->sendOwnerSetSeat(change);
 }
-void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits)
+void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits, bool night)
 {
     if (m_host)
-        m_host->setOptions(fogOfWar, prebuilt, credits);
+        m_host->setOptions(fogOfWar, prebuilt, credits, night);
     else if (IsOwner())
-        m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits});
+        m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits, night});
 }
 void NetMatch::SendChat(const std::string &text)
 {
@@ -768,6 +768,7 @@ void NetMatch::StartFromLobby(uint32_t nowMs)
     setup.startingCredits = kStartingCredits[lobby.credits <= 4 ? lobby.credits : kDefaultCreditsIndex];
     setup.prebuilt = lobby.prebuilt;
     setup.fogOfWar = lobby.fogOfWar;
+    setup.night = lobby.night;
     std::mt19937 rng(setup.seed);
     // Start positions picked by the players first, the random ones get the free spots left
     std::vector<int> free;
@@ -1064,6 +1065,7 @@ std::vector<uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
         w.writeBits(s.handicap, 3);
         w.writeBits(s.armyCap, 3);
     }
+    w.writeBool(setup.night); // last: a setup written before it has none (day)
     buf.resize(w.finish());
     return buf;
 }
@@ -1101,6 +1103,8 @@ bool NetMatch::DecodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out)
             return false;
         s.armyCap = static_cast<uint8_t>(r.readBits(3));
     }
+    // The time of day came later: an older setup (a replay) ends here with zero padding, a day
+    out.night = !r.atEnd() && r.readBool();
     // Only maps of the game's own folder (the path comes from another computer)
     if (out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
         return false;

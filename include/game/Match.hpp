@@ -28,6 +28,7 @@ struct MatchSetup
     bool localOnly {false}; // custom game on this computer (not sent anywhere): menus pause it, it can restart
     bool prebuilt {true};   // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
                             // (HQ + power only)
+    bool night {false};     // time of day: night (only drawn and heard, not part of the simulation)
 };
 
 } // namespace OpenArtOfWar
