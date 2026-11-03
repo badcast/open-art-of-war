@@ -2599,7 +2599,8 @@ void EntityManager::UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime
     if (!cfg->isSiegeMode)
     {
         u.siegeQuietTimer = 0.0f;
-        if (cfg->siegeArchetypeId < 0 || cfg->autoSiege == UnitConfig::AutoSiege::Off || !CanDeploySiege(u))
+        if (cfg->siegeArchetypeId < 0 || cfg->autoSiege == UnitConfig::AutoSiege::Off || !CanDeploySiege(u)
+            || u.autoSiegeCooldownTimer > 0.0f)
             return;
         if (!aiSide && !u.isAttackMoving)
             return;
@@ -2652,6 +2653,7 @@ void EntityManager::UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime
     {
         u.siegeQuietTimer = 0.0f;
         u.autoDeployed = false;
+        u.autoSiegeCooldownTimer = 3.5f;
         ToggleSiegeMode({u.id});
     }
 }
@@ -2705,6 +2707,19 @@ void EntityManager::ToggleSiegeMode(const std::vector<int> &unitIds)
         }
         if (newArch >= 0)
         {
+            // Settle any active tile reservation before transforming so the unit doesn't glide or lock tiles
+            if (u->HasReservation())
+            {
+                if (std::abs(u->subX) * 2.0f > TILE_WIDTH || std::abs(u->subY) * 2.0f > TILE_HEIGHT)
+                {
+                    u->tileX = u->resTileX;
+                    u->tileY = u->resTileY;
+                }
+                u->subX = 0.0f;
+                u->subY = 0.0f;
+                u->ReleaseReservation();
+            }
+
             // Deployed by hand: the unit stays where the player put it
             if (!(curCfg && curCfg->isSiegeMode))
             {
