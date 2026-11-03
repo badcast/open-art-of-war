@@ -32,6 +32,8 @@ struct NightConfig
     Spot flameStart {60.0f, 0.6f};
     Spot flameEnd {80.0f, 0.8f};
     Spot projectile {40.0f, 0.5f};
+    Spot muzzleFlash {55.0f, 0.7f};
+    float muzzleFlashSeconds {0.15f}; // how long a shot lights its surroundings (fading out), at most 0.5
     // The light of buildings: their whole footprint lit, spreading spreadTiles tiles around it and fading out
     bool buildingsEnabled {true};
     float buildingSpreadTiles {2.0f};

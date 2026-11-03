@@ -1855,7 +1855,8 @@ bool AIController::FindSiteNear(
     int searchRadius,
     const TileMap &map,
     const EntityManager &entities,
-    bool *unitBlocked) const
+    bool *unitBlocked,
+    bool needsExit) const
 {
     if (unitBlocked)
         *unitBlocked = false;
@@ -1904,8 +1905,8 @@ bool AIController::FindSiteNear(
                         *unitBlocked = true;
                     continue;
                 }
-                if (!KeepsWayOut(px, py, w, h, map, entities))
-                    continue; // it would close the base in
+                if (!KeepsWayOut(px, py, w, h, map, entities, needsExit))
+                    continue; // it would close the base in (or itself)
                 x = px;
                 y = py;
                 return true;
@@ -2220,13 +2221,36 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     const BuildingConfig *cfg = entities.GetBuildingConfig(index);
     const int w = cfg ? cfg->width : 2;
     const int h = cfg ? cfg->height : 2;
+    static const char *const kKindNames[] = {
+        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory",
+        "headquarters"};
+    // Foresight: a building that takes power goes up only when the finished plants carry it as well; else it waits
+    // and the next step raises a power plant (a base in the dark trains, researches and shoots nothing)
+    const int power = entities.BuildingPower(index);
+    if (power < 0)
+    {
+        const int balance = PowerBalance(entities, false);
+        if (balance + power < 0)
+        {
+            m_powerNeeded = std::max(m_powerNeeded, -power);
+            ThinkOnce(
+                "power" + std::to_string(site.kind),
+                "BUILD",
+                std::string(kKindNames[std::clamp(static_cast<int>(site.kind), 0, 7)]) + " waits: it takes "
+                    + std::to_string(-power) + " kW and only " + std::to_string(std::max(0, balance))
+                    + " kW are spare - a power plant first");
+            return false;
+        }
+    }
     int x = site.tileX, y = site.tileY;
     const bool core = site.kind == AIDefenseSite::Barracks || site.kind == AIDefenseSite::Factory
                       || site.kind == AIDefenseSite::PowerPlant || site.kind == AIDefenseSite::Lab
                       || site.kind == AIDefenseSite::Headquarters;
     const int searchRadius = site.exact ? 0 : (core ? 8 : 3);
     bool unitBlocked = false;
-    if (!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked))
+    const bool needsExit = site.kind == AIDefenseSite::Barracks || site.kind == AIDefenseSite::Factory
+                           || site.kind == AIDefenseSite::Headquarters;
+    if (!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked, needsExit))
     {
         // No room around the planned spot; when only units were in the way, try again later
         site.done = !unitBlocked || ++site.attempts >= kMaxUnitWaits;
@@ -2244,9 +2268,8 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
         for (int tx = x; tx < x + w && tx < map.GetWidth(); ++tx)
             map.SetPassable(tx, ty, false);
     }
-    static const char *const kKindNames[] = {
-        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory",
-        "headquarters"};
+    if (site.kind == AIDefenseSite::PowerPlant)
+        m_powerNeeded = 0; // the plant for what waited is coming
     Think(
         "BUILD",
         std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y)
@@ -2519,6 +2542,24 @@ void AIController::UpdateRepairs(float deltaTime, EntityManager &entities)
     }
 }
 
+int AIController::PowerBalance(const EntityManager &entities, bool plannedPlants) const
+{
+    int produced = 0, consumed = 0;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player)
+            continue;
+        const int pwr = b->GetPowerOutput();
+        if (pwr < 0)
+            consumed -= pwr;
+        else if (b->buildProgress >= 1.0f || plannedPlants)
+            produced += pwr;
+    }
+    produced += produced * ResearchTotal(m_player, ResearchEffect::PowerBonus) / 100;
+    return produced - consumed;
+}
+
 bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, bool full)
 {
     // Power as planned: buildings under construction count already, so one shortage starts one plant
@@ -2581,8 +2622,12 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
     };
     std::vector<Want> wants;
     const int powerCost = DefenseCost(AIDefenseSite::PowerPlant, entities, side());
-    if (produced < consumed)
+    // Looking ahead: with the plants already being built, is there power for what waits for it?
+    const int plannedBalance = PowerBalance(entities, true);
+    if (plannedBalance < 0)
         wants.push_back({AIDefenseSite::PowerPlant, 0, "Power is short: a power plant comes first"});
+    else if (m_powerNeeded > 0 && plannedBalance < m_powerNeeded)
+        wants.push_back({AIDefenseSite::PowerPlant, 0, "The next building would leave the base without power: a power plant first"});
     if (barracksCount == 0)
         wants.push_back({AIDefenseSite::Barracks, 0, "No barracks: raising one to start training troops"});
     if (needLab && m_style.labEarly)
@@ -2665,16 +2710,18 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
 
         int x = 0, y = 0;
         bool found = false;
+        const bool needsExit = kind == AIDefenseSite::Barracks || kind == AIDefenseSite::Factory
+                               || kind == AIDefenseSite::Headquarters;
         // A gap around it first, then side by side, then also on the band along a road (never on the road itself)
         for (int crowding = 0; crowding < 3 && !found; ++crowding)
         {
-            found = FindCoreSite(x, y, w, h, ox, oy, rear, minRing, map, entities, crowding);
+            found = FindCoreSite(x, y, w, h, ox, oy, rear, minRing, map, entities, crowding, needsExit);
             if (!found && rear && kind != AIDefenseSite::PowerPlant)
-                found = FindCoreSite(x, y, w, h, ox, oy, false, minRing, map, entities, crowding); // the back is full
+                found = FindCoreSite(x, y, w, h, ox, oy, false, minRing, map, entities, crowding, needsExit); // the back is full
             if (!found && kind == AIDefenseSite::PowerPlant)
             {
                 // The back is full: the sides of the base, never its front
-                found = FindCoreSite(x, y, w, h, sideX, sideY, false, minRing, map, entities, crowding);
+                found = FindCoreSite(x, y, w, h, sideX, sideY, false, minRing, map, entities, crowding, needsExit);
                 if (found)
                 {
                     const float px = x + w * 0.5f - cx, py = y + h * 0.5f - cy;
@@ -3039,6 +3086,14 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
             {
                 bool siteClear
                     = entities.CanPlaceBuilding(plan.tileX, plan.tileY, plan.width, plan.height, map, m_player);
+                // Foresight as for a new building: one that takes power waits for the plants (rebuilt first)
+                const int power = entities.BuildingPower(plan.rawBuildingType);
+                if (siteClear && power < 0 && PowerBalance(entities, false) + power < 0)
+                {
+                    m_powerNeeded = std::max(m_powerNeeded, -power);
+                    ThinkOnce("rebuildpower", "BUILD", "Rebuilding waits for power: a power plant first");
+                    siteClear = false;
+                }
                 if (siteClear)
                 {
                     m_credits -= plan.creditCost;

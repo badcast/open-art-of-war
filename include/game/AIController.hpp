@@ -347,7 +347,9 @@ private:
     bool IsOwnGround(int x, int y) const;
     // Would a structure on (x, y, w, h) still leave the headquarters, the barracks and the factories a way out (two
     // tiles wide) to the roads leading away from the base?
-    bool KeepsWayOut(int x, int y, int w, int h, const TileMap &map, const EntityManager &entities) const;
+    // `needsExit`: the structure placed there trains troops or is a headquarters: its own sides must lead out too
+    bool KeepsWayOut(
+        int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit = false) const;
     // A free place for a structure of the core build order: ring by ring outward from the HQ, the best of a ring by
     // the preferred direction (dx, dy); `rearOnly`: never on the side of the enemy (power plants). False: none
     bool FindCoreSite(
@@ -361,7 +363,8 @@ private:
         int minRing,
         const TileMap &map,
         const EntityManager &entities,
-        int crowding = 0) const; // 0: a gap around it, 1: side by side, 2: also on the band along a road
+        int crowding = 0,        // 0: a gap around it, 1: side by side, 2: also on the band along a road
+        bool needsExit = false) const;
     // Walls across the narrowest passage on each road to an enemy, gates on the road, towers behind them; true
     // when at least one passage was closed (else the caller falls back to an arc in front of the base)
     bool PlanPassageWalls(
@@ -387,6 +390,11 @@ private:
     void PlanBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
     void UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     bool BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities);
+    // The power of the base as the economy will count it (finished buildings, the power research bonus), looking
+    // ahead: `plannedPlants` also counts the power plants still being built, every consumer counts already (it takes
+    // its power the moment it is finished)
+    int PowerBalance(const EntityManager &entities, bool plannedPlants) const;
+    int m_powerNeeded {0}; // a building that waits for power: what it takes (the next build step raises a plant)
     // unitBlocked (optional): set when only units stood on the free spots, so a later try may succeed
     bool FindSiteNear(
         int &x,
@@ -396,7 +404,8 @@ private:
         int searchRadius,
         const TileMap &map,
         const EntityManager &entities,
-        bool *unitBlocked = nullptr) const;
+        bool *unitBlocked = nullptr,
+        bool needsExit = false) const;
     // Units a squad let go far from the base (stragglers, stuck in a passage, retreat timeout, assault over)
     // walk back to the staging area and rejoin the reserve
     void RecallReleasedUnits(EntityManager &entities);

@@ -492,14 +492,17 @@ void HUDController::SetActiveTab(int tab)
         m_activeTab = tab;
 }
 
-void HUDController::Issue(SimCommand command)
+void HUDController::Issue(SimCommand command, bool withSound)
 {
-    if (command.type == CommandType::Produce || command.type == CommandType::StartResearch)
-        SoundRequests::Play("production_start");
-    else if (
-        command.type == CommandType::Stop || command.type == CommandType::HoldPosition
-        || command.type == CommandType::SetStance)
-        SoundRequests::Play("@hold");
+    if (withSound)
+    {
+        if (command.type == CommandType::Produce || command.type == CommandType::StartResearch)
+            SoundRequests::Play("production_start");
+        else if (
+            command.type == CommandType::Stop || command.type == CommandType::HoldPosition
+            || command.type == CommandType::SetStance)
+            SoundRequests::Play("@hold");
+    }
     if (!m_sim)
         return;
     command.player = Players::Local();
@@ -665,13 +668,6 @@ bool HUDController::OrderUnit(
     if (targets.empty())
         return false;
 
-    // The selected building with the shortest queue trains it
-    int best = targets.front();
-    for (int id : targets)
-    {
-        if (entities.GetBuilding(id)->productionQueue.size() < entities.GetBuilding(best)->productionQueue.size())
-            best = id;
-    }
     const auto *cfg = entities.GetUnitConfig(archetype);
     const int cost = cfg ? cfg->creditCost : 100;
     if (!economy.CanAfford(cost))
@@ -680,14 +676,21 @@ bool HUDController::OrderUnit(
         SetNotification(_("INSUFFICIENT CREDITS!"));
         return false;
     }
-    SimCommand c;
-    c.type = CommandType::Produce;
-    c.a = archetype;
-    c.b = best;
-    // Shift: a batch of 5, Ctrl: a batch of 10
+    // Every selected building of the kind trains it at once: one click, one order each (as far as the credits go:
+    // the simulation queues what they pay for). Shift: a batch of 5 each, Ctrl: a batch of 10 each
     const SDL_Keymod mod = SDL_GetModState();
-    c.c = (mod & SDL_KMOD_CTRL) ? 10 : ((mod & SDL_KMOD_SHIFT) ? 5 : 1);
-    Issue(std::move(c));
+    const int batch = (mod & SDL_KMOD_CTRL) ? 10 : ((mod & SDL_KMOD_SHIFT) ? 5 : 1);
+    bool first = true;
+    for (int id : targets)
+    {
+        SimCommand c;
+        c.type = CommandType::Produce;
+        c.a = archetype;
+        c.b = id;
+        c.c = batch;
+        Issue(std::move(c), first);
+        first = false;
+    }
     return true;
 }
 

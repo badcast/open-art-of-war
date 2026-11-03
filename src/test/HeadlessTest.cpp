@@ -1434,10 +1434,17 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
         for (const Entity &e : entities.GetAllEntities())
             if (e.alive && e.isBuilding && e.type == UnitType::Headquarters && e.owner < kMaxPlayers && !hq[e.owner])
                 hq[e.owner] = &e;
-        int closed = 0, checked = 0, labs = 0, frontPower = 0, power = 0;
+        int closed = 0, checked = 0, labs = 0, frontPower = 0, power = 0, unpowered = 0;
         for (auto &ai : gc.m_matchAis)
         {
             const PlayerId p = ai->player();
+            // Foresight: a computer player never builds itself into the dark (power the finished plants carry)
+            if (entities.HasBuildingType(UnitType::Headquarters, p, true) && ai->PowerBalance(entities, false) < 0)
+            {
+                ++unpowered;
+                std::cout << "    " << mapName << ": player " << int(p) << " is short of power ("
+                          << ai->PowerBalance(entities, false) << " kW)" << std::endl;
+            }
             bool hasLab = entities.HasBuildingType(UnitType::ResearchLab, p, false);
             for (const AIStructurePlan &plan : ai->m_startingBuildings) // one the enemy destroyed counts (it comes back)
                 hasLab = hasLab || (plan.type == UnitType::ResearchLab && plan.destroyed);
@@ -1525,6 +1532,12 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
         if (frontPower > 0)
         {
             std::cerr << "[Test] Error: power plants stand on the side of the enemy (" << mapName << ")" << std::endl;
+            ok = false;
+        }
+        if (unpowered > 0)
+        {
+            std::cerr << "[Test] Error: a computer player built more than its power plants carry (" << mapName << ")"
+                      << std::endl;
             ok = false;
         }
     }

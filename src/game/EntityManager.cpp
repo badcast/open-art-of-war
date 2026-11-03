@@ -868,6 +868,7 @@ void EntityManager::Clear()
     m_explosions.clear();
     m_smokePuffs.clear();
     m_flameBursts.clear();
+    m_muzzleFlashes.clear();
     m_groundMarks.clear();
     m_soundCues.clear();
     m_eliminated = {};
@@ -1347,6 +1348,7 @@ int EntityManager::SpawnBuildingByIndex(
     b->state = ActionState::Idle;
     b->sightRadius = 7;
     b->rawBuildingType = buildingIdx;
+    b->powerOutput = BuildingPower(buildingIdx);
     b->buildProgress = initialProgress;
     b->attackDamage = 0;
 
@@ -1780,6 +1782,12 @@ const CharacterSounds *EntityManager::SoundsOf(const Entity &e) const
         return cfg ? &cfg->sounds : nullptr;
     }
     return nullptr;
+}
+
+int EntityManager::BuildingPower(int buildingIndex) const
+{
+    const BuildingConfig *cfg = GetBuildingConfig(buildingIndex);
+    return cfg ? cfg->powerCost : Building::DefaultPowerOutput(buildingIndex);
 }
 
 const CharacterSounds *EntityManager::WallSoundsOf(Faction faction) const
@@ -3442,7 +3450,13 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
         std::remove_if(m_smokePuffs.begin(), m_smokePuffs.end(), [](const SmokePuff &p) { return !p.active; }),
         m_smokePuffs.end());
 
-    // 3b. Flamethrower jets (visual only)
+    // 3b. Flamethrower jets and muzzle flashes (visual only)
+    for (auto &flash : m_muzzleFlashes)
+        flash.age += deltaTime;
+    m_muzzleFlashes.erase(
+        std::remove_if(
+            m_muzzleFlashes.begin(), m_muzzleFlashes.end(), [](const MuzzleFlash &f) { return f.age >= kMuzzleFlashKeep; }),
+        m_muzzleFlashes.end());
     for (auto &burst : m_flameBursts)
         burst.age += deltaTime;
     m_flameBursts.erase(
@@ -3587,6 +3601,9 @@ void EntityManager::SpawnProjectileFromEntity(
                 break;
         }
         Cue(fire, srcX, srcY, entity.owner, gun ? gun->soundId : 0, soundGain);
+        if (m_muzzleFlashes.size() < 512) // its light at night (a flame jet lights itself)
+            if (entity.projectile != ProjectileType::Flame)
+                m_muzzleFlashes.push_back({srcX, srcY, 0.0f});
     }
     if (spec.hitscan)
     {
@@ -4531,6 +4548,17 @@ void EntityManager::CollectLights(const TileMap &map, bool fog, std::vector<Ligh
     {
         if (proj.active && (proj.type == ProjectileType::Rocket || proj.type == ProjectileType::Shell) && seen(proj.x, proj.y))
             out.push_back({Kind::Projectile, proj.x, proj.y});
+    }
+    for (const auto &flash : m_muzzleFlashes)
+    {
+        if (!seen(flash.x, flash.y))
+            continue;
+        LightSpot l;
+        l.kind = Kind::MuzzleFlash;
+        l.x = flash.x;
+        l.y = flash.y;
+        l.age = flash.age;
+        out.push_back(l);
     }
     // Buildings in sight (one of their tiles is enough: a building hidden in the fog gives itself away by no light)
     for (const auto &ptr : m_entities.Raw())
