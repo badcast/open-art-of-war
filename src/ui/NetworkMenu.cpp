@@ -62,8 +62,6 @@ std::vector<std::string> ComboChoices(int kind)
     }
     else if (kind == 8)
         out = ui::ArmyCapChoices();
-    else
-        out = {_("PREBUILT BASES"), _("FROM SCRATCH")};
     return out;
 }
 
@@ -583,6 +581,13 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         m_optionsSent = true;
         PushOptions(net); // the room shows the owner's options from the start
     }
+    if (lobby && !net.ControlsRoom())
+    {
+        m_fog = lobby->fogOfWar;
+        m_prebuilt = lobby->prebuilt;
+        m_credits = lobby->credits;
+        m_night = lobby->night;
+    }
     // Start positions from the room's map as this computer has it (the own file or the downloaded copy)
     if (net.LobbyMapFile() != m_spotsMap)
     {
@@ -636,8 +641,6 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     };
     // An open drop-down list takes the mouse first; a pick changes the value, a click elsewhere closes the list
     auto comboField = [&](int id) -> ui::UiRect {
-        if (id == kLayoutCombo)
-            return l.prebuiltBtn;
         if (id == kCreditsCombo)
             return l.creditsBtn;
         if (id == kTimeCombo)
@@ -692,13 +695,14 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     if (m_combo.open >= 0 && !(m_combo.open >= kFilterPlayers && m_combo.open <= kFilterSort))
     {
         const bool optionList = IsOptionCombo(m_combo.open);
-        const int id = m_combo.open, row = id / 10, kind = optionList ? 5 : id % 10;
+        const int id = m_combo.open, row = id / 10, kind = id % 10;
         const bool isMapList = false;
         const bool valid = optionList || isMapList ? net.ControlsRoom()
                                                            : (lobby && row < std::min<int>(lobby->spawnCount, kMaxPlayers));
         if (!valid)
         {
             m_combo.open = -1;
+            return NetworkAction::None;
         }
         else
         {
@@ -709,7 +713,6 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     isMapList          ? static_cast<int>(m_maps.size())
                     : id == kTimeCombo ? static_cast<int>(ui::TimeOfDayChoices().size())
                     : id == kCreditsCombo ? static_cast<int>(ui::CreditsChoices().size())
-                    : id == kLayoutCombo ? static_cast<int>(ui::LayoutChoices().size())
                     : kind == 0        ? static_cast<int>(SeatOptions(net, *lobby, row).size())
                                        : static_cast<int>(ComboChoices(kind).size()),
                     h,
@@ -719,15 +722,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     input.ConsumeWheel(),
                     picked))
             {
-                if (false)
-                {
-                }
-                else if (picked >= 0 && id == kLayoutCombo)
-                {
-                    m_prebuilt = picked == 0;
-                    PushOptions(net);
-                }
-                else if (picked >= 0 && id == kCreditsCombo)
+                if (picked >= 0 && id == kCreditsCombo)
                 {
                     m_credits = std::clamp(picked, 0, 4);
                     PushOptions(net);
@@ -900,22 +895,22 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     }
     if (l.startBtn.Contains(mx, my) && net.ControlsRoom() && net.CanStart())
         return NetworkAction::Start;
-    if (net.ControlsRoom() && l.prebuiltBtn.Contains(mx, my))
-    {
-        m_prebuilt = !m_prebuilt;
-        PushOptions(net);
-        SoundRequests::Play("ui_confirm");
-        return NetworkAction::None;
-    }
-    if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
-        return openCombo(kCreditsCombo);
     if (net.ControlsRoom() && l.timeBtn.Contains(mx, my))
         return openCombo(kTimeCombo);
+    if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
+        return openCombo(kCreditsCombo);
     if (net.ControlsRoom() && l.fogCheckbox.Contains(mx, my))
     {
         m_fog = !m_fog;
         SoundRequests::Play("ui_confirm");
         PushOptions(net);
+        return NetworkAction::None;
+    }
+    if (net.ControlsRoom() && l.prebuiltBtn.Contains(mx, my))
+    {
+        m_prebuilt = !m_prebuilt;
+        PushOptions(net);
+        SoundRequests::Play("ui_confirm");
         return NetworkAction::None;
     }
     // The filters over the maps (everybody may look through the list) and the list: only the owner picks the map
@@ -1102,7 +1097,8 @@ void NetworkMenu::render(
                         text, c.CenterX(), c.CenterY(), ui::FONT_SMALL, col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
                 };
                 auto combo = [&](const UiRect &c, int kind, const std::string &text) {
-                    ui::DrawComboField(r, font, c, text, m_combo.open == i * 10 + kind, c.Contains(m_mouseX, m_mouseY));
+                    ui::DrawComboField(
+                        r, font, c, text, m_combo.open == i * 10 + kind, m_combo.open < 0 && c.Contains(m_mouseX, m_mouseY));
                 };
                 Net::LobbyChoice choice = s->choice;
                 if (me)
@@ -1292,21 +1288,14 @@ void NetworkMenu::render(
             const int credits = owner ? m_credits : (lobby ? lobby->credits : kDefaultCreditsIndex);
             const bool fog = owner ? m_fog : (lobby ? lobby->fogOfWar : true);
             const bool night = owner ? m_night : (lobby && lobby->night);
+            const bool hoverOk = m_combo.open < 0;
             ui::DrawComboField(
                 r,
                 font,
                 l.timeBtn,
                 ui::TimeOfDayChoices()[night ? 1 : 0],
                 m_combo.open == kTimeCombo,
-                owner && l.timeBtn.Contains(m_mouseX, m_mouseY),
-                owner);
-            ui::DrawCheckbox(
-                r,
-                font,
-                l.prebuiltBtn,
-                _("START WITH A BASE"),
-                prebuilt,
-                owner && l.prebuiltBtn.Contains(m_mouseX, m_mouseY),
+                owner && hoverOk && l.timeBtn.Contains(m_mouseX, m_mouseY),
                 owner);
             ui::DrawComboField(
                 r,
@@ -1314,10 +1303,24 @@ void NetworkMenu::render(
                 l.creditsBtn,
                 ui::CreditsLabel(credits),
                 m_combo.open == kCreditsCombo,
-                owner && l.creditsBtn.Contains(m_mouseX, m_mouseY),
+                owner && hoverOk && l.creditsBtn.Contains(m_mouseX, m_mouseY),
                 owner);
             ui::DrawCheckbox(
-                r, font, l.fogCheckbox, _("FOG OF WAR"), fog, owner && l.fogCheckbox.Contains(m_mouseX, m_mouseY), owner);
+                r,
+                font,
+                l.fogCheckbox,
+                _("FOG OF WAR"),
+                fog,
+                owner && hoverOk && l.fogCheckbox.Contains(m_mouseX, m_mouseY),
+                owner);
+            ui::DrawCheckbox(
+                r,
+                font,
+                l.prebuiltBtn,
+                _("START WITH A BASE"),
+                prebuilt,
+                owner && hoverOk && l.prebuiltBtn.Contains(m_mouseX, m_mouseY),
+                owner);
         }
         if (lobby && !lobby->map.empty())
         {
@@ -1423,11 +1426,6 @@ void NetworkMenu::render(
                                                          : m_mapFilter.sort;
                 ui::DrawComboList(
                     r, font, l.Filter(id - kFilterPlayers), MapFilterChoices(id, m_maps), current, m_combo, h, m_mouseX, m_mouseY);
-            }
-            else if (id == kLayoutCombo)
-            {
-                ui::DrawComboList(
-                    r, font, l.prebuiltBtn, ui::LayoutChoices(), m_prebuilt ? 0 : 1, m_combo, h, m_mouseX, m_mouseY);
             }
             else if (id == kCreditsCombo)
             {
