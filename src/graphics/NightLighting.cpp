@@ -57,6 +57,8 @@ bool NightConfig::Load(const std::string &path)
             ReadSpot(*e, "flame_start", flameStart);
             ReadSpot(*e, "flame_end", flameEnd);
             ReadSpot(*e, "projectile", projectile);
+            ReadSpot(*e, "muzzle_flash", muzzleFlash);
+            muzzleFlashSeconds = std::clamp(e->value("muzzle_flash_seconds", muzzleFlashSeconds), 0.01f, 0.5f);
         }
         if (const auto b = j.find("buildings"); b != j.end() && b->is_object())
         {
@@ -268,10 +270,17 @@ void NightLighting::Apply(
                                         : l.kind == Kind::FlameStart ? &c.flameStart
                                         : l.kind == Kind::FlameEnd   ? &c.flameEnd
                                         : l.kind == Kind::Projectile ? &c.projectile
+                                        : l.kind == Kind::MuzzleFlash ? &c.muzzleFlash
                                                                      : nullptr;
         if (!spot)
             continue;
-        const float k = spot->intensity * (l.kind == Kind::Explosion ? 1.0f - c.explosionFade * l.age : 1.0f);
+        float k = spot->intensity;
+        if (l.kind == Kind::Explosion)
+            k *= 1.0f - c.explosionFade * l.age;
+        else if (l.kind == Kind::MuzzleFlash)
+            k *= std::max(0.0f, 1.0f - l.age / c.muzzleFlashSeconds); // the flash fades out
+        if (k <= 0.0f)
+            continue;
         float sx, sy;
         toMap(l.x, l.y, sx, sy);
         DrawSpot(renderer, sx, sy, spot->radius * scale, k, c.effectColor);

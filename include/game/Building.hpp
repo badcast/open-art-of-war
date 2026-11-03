@@ -127,7 +127,12 @@ public:
     }
 
     void GetMuzzlePoint(float &outX, float &outY) const override;
+    // Power it gives (> 0) or takes (< 0): production.power of its character file, the same number the build menu
+    // shows (set when it is placed)
     int GetPowerOutput() const;
+    int powerOutput {0};
+    // The power of a building kind without a character file (the original game's numbers)
+    static int DefaultPowerOutput(int rawBuildingType);
 
     void Update(float deltaTime, TileMap &map, const BuildingDelegates &delegates);
     void UpdateConstruction(float deltaTime);

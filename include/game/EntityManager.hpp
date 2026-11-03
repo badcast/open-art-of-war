@@ -496,6 +496,8 @@ public:
     void RebuildBlueprints();
     const UnitConfig *GetUnitConfig(int archetypeId) const;
     const BuildingConfig *GetBuildingConfig(int buildingIndex) const;
+    // The power a building of this kind gives (> 0) or takes (< 0): production.power of its character file
+    int BuildingPower(int buildingIndex) const;
     const UnitConfig *GetUnitConfigByUnitType(UnitType type, Faction faction) const;
 
     // `player` builds there: within the radius of one of its headquarters, on ground it sees (people)
@@ -590,6 +592,7 @@ public:
             FlameStart, // where a flamethrower's jet leaves the gun
             FlameEnd,   // where it lands
             Projectile, // a rocket or a shell in flight
+            MuzzleFlash, // a shot leaving the gun (`age` in seconds)
             Building
         };
         Kind kind {Kind::Explosion};
@@ -824,6 +827,15 @@ private:
     std::vector<ExplosionParticle> m_explosions;
     std::vector<SmokePuff> m_smokePuffs;
     std::vector<FlameBurst> m_flameBursts;
+    // Muzzle flashes of the last moments, for the night's light (visual only: never part of the world's checksum)
+    struct MuzzleFlash
+    {
+        float x {0.0f};
+        float y {0.0f};
+        float age {0.0f}; // seconds
+    };
+    std::vector<MuzzleFlash> m_muzzleFlashes;
+    static constexpr float kMuzzleFlashKeep = 0.5f; // longest a flash's light may last (data/nights.json)
     // Small craters where shells and rockets landed (only a picture: not part of the simulation state)
     struct GroundMark
     {

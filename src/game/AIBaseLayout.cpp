@@ -227,7 +227,8 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
     m_territoryReady = true;
 }
 
-bool AIController::KeepsWayOut(int x, int y, int w, int h, const TileMap &map, const EntityManager &entities) const
+bool AIController::KeepsWayOut(
+    int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit) const
 {
     if (!m_territoryReady)
         return true;
@@ -321,6 +322,19 @@ bool AIController::KeepsWayOut(int x, int y, int w, int h, const TileMap &map, c
     };
 
     const std::vector<uint8_t> after = flood(true);
+    // A barracks, a factory or a headquarters in a pocket the others have nearly closed: its troops would never
+    // get out (only the structures already standing were checked before). Unless the base has no wide way out at
+    // all (narrow exits of the map): then its headquarters is not reached either and the pocket is no worse
+    if (needsExit && !touches(after, x, y, w, h))
+    {
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Building *b = e.AsBuilding();
+            if (b && b->alive && b->state != ActionState::Die && b->owner == m_player && b->type == UnitType::Headquarters
+                && touches(after, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
+                return false;
+        }
+    }
     std::vector<uint8_t> before;
     for (const auto &e : entities.GetAllEntities())
     {
@@ -349,7 +363,8 @@ bool AIController::FindCoreSite(
     int minRing,
     const TileMap &map,
     const EntityManager &entities,
-    int crowding) const
+    int crowding,
+    bool needsExit) const
 {
     const int cx = m_homeX, cy = m_homeY;
     if (cx < 0 || cy < 0)
@@ -449,7 +464,7 @@ bool AIController::FindCoreSite(
                 break;
             if (++tried > 24)
                 break; // the way-out check floods the map: a ring gets a limited number of tries
-            if (KeepsWayOut(c.x, c.y, w, h, map, entities))
+            if (KeepsWayOut(c.x, c.y, w, h, map, entities, needsExit))
             {
                 outX = c.x;
                 outY = c.y;

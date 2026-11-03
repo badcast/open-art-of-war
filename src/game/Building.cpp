@@ -53,6 +53,11 @@ int Building::RepairStep(float dt, int buildingCost, int budget)
 
 int Building::GetPowerOutput() const
 {
+    return powerOutput;
+}
+
+int Building::DefaultPowerOutput(int rawBuildingType)
+{
     int bMod = (rawBuildingType >= 0) ? (rawBuildingType % 8) : 0;
     if (bMod == 0)
         return 50; // HQ

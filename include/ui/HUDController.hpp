@@ -315,7 +315,7 @@ private:
     std::function<ResearchProgress(PlayerId)> m_researchProbe; // whose research is shown (observers: any player)
     ResearchProgress ResearchShown() const;
     // Command of the local player for the bound simulation
-    void Issue(SimCommand command);
+    void Issue(SimCommand command, bool withSound = true); // withSound: the order's own sound (one per click)
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
