@@ -53,15 +53,13 @@ enum class NetworkAction
 class NetworkMenu
 {
 public:
-    static constexpr int kLayoutCombo = 1000;  // id of the map layout list (the rows use row * 10 + kind)
-    static constexpr int kMapCombo = 1001;     // id of the list of maps (the host picks one)
     static constexpr int kCreditsCombo = 1002; // starting credits list
     static constexpr int kTimeCombo = 1003;    // time of day list (day / night)
     static constexpr int kFilterPlayers = 1010, kFilterSize = 1011, kFilterSort = 1012; // the filter lists
 
     static bool IsOptionCombo(int id)
     {
-        return id == kLayoutCombo || id == kCreditsCombo || id == kTimeCombo;
+        return id == kCreditsCombo || id == kTimeCombo;
     }
 
     NetworkMenu() = default;
