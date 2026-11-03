@@ -53,6 +53,17 @@ enum class NetworkAction
 class NetworkMenu
 {
 public:
+    static constexpr int kLayoutCombo = 1000;  // id of the map layout list (the rows use row * 10 + kind)
+    static constexpr int kMapCombo = 1001;     // id of the list of maps (the host picks one)
+    static constexpr int kCreditsCombo = 1002; // starting credits list
+    static constexpr int kTimeCombo = 1003;    // time of day list (day / night)
+    static constexpr int kFilterPlayers = 1010, kFilterSize = 1011, kFilterSort = 1012; // the filter lists
+
+    static bool IsOptionCombo(int id)
+    {
+        return id == kLayoutCombo || id == kCreditsCombo || id == kTimeCombo;
+    }
+
     NetworkMenu() = default;
 
     // `net`: the session (nullptr while browsing); `lan`: games found on the local network
@@ -243,15 +254,6 @@ private:
     ui::MapFilter m_mapFilter;
     int m_mapTop {0};                         // first visible row of the map list
     void RebuildMapsShown();
-    static constexpr int kFilterPlayers = 1003, kFilterSize = 1004, kFilterSort = 1005; // the filter lists
-    static constexpr int kMapCombo = 1001;    // id of the list of maps (the host picks one)
-    static bool IsOptionCombo(int id)
-    {
-        return id == 1000 || id == 1002 || id == 1003; // kLayoutCombo, kCreditsCombo, kTimeCombo
-    }
-    static constexpr int kCreditsCombo = 1002; // starting credits list
-    static constexpr int kTimeCombo = 1003;    // time of day list (day / night)
-    static constexpr int kLayoutCombo = 1000; // id of the map layout list (the rows use row * 10 + kind)
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"
     ui::ComboState m_combo;     // the open drop-down list of the room

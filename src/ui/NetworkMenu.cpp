@@ -71,12 +71,12 @@ std::vector<std::string> ComboChoices(int kind)
 std::vector<std::string> MapFilterChoices(int id, const std::vector<SkirmishMapInfo> &all)
 {
     std::vector<std::string> out;
-    if (id == 1003)
+    if (id == NetworkMenu::kFilterPlayers)
     {
         for (int n : ui::MapFilter::PlayerCounts(all))
             out.push_back(std::string(_("Players")) + ": " + (n == 0 ? std::string(_("Any")) : std::to_string(n)));
     }
-    else if (id == 1004)
+    else if (id == NetworkMenu::kFilterSize)
     {
         for (const char *z : {_("Any"), _("Small"), _("Medium"), _("Large")})
             out.push_back(std::string(_("Size")) + ": " + z);
@@ -706,11 +706,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             if (ui::ComboUpdate(
                     m_combo,
                     comboField(id),
-                    isMapList  ? static_cast<int>(m_maps.size())
+                    isMapList          ? static_cast<int>(m_maps.size())
                     : id == kTimeCombo ? static_cast<int>(ui::TimeOfDayChoices().size())
-                    : optionList ? static_cast<int>(ui::CreditsChoices().size())
-                    : kind == 0 ? static_cast<int>(SeatOptions(net, *lobby, row).size())
-                                : static_cast<int>(ComboChoices(kind).size()),
+                    : id == kCreditsCombo ? static_cast<int>(ui::CreditsChoices().size())
+                    : id == kLayoutCombo ? static_cast<int>(ui::LayoutChoices().size())
+                    : kind == 0        ? static_cast<int>(SeatOptions(net, *lobby, row).size())
+                                       : static_cast<int>(ComboChoices(kind).size()),
                     h,
                     mx,
                     my,
