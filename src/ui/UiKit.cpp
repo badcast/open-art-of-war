@@ -1,5 +1,6 @@
 #include <cmath>
 #include "ui/UiKit.hpp"
+#include "ui/ImGuiBridge.hpp"
 #include "audio/SoundRequests.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -386,6 +387,9 @@ int ConfirmUpdate(
 {
     if (!state.open)
         return -1;
+    const int modalAns = ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
+    if (modalAns >= 0)
+        return modalAns;
     const UiRect d = ConfirmDialogRect(windowW, windowH);
     if (enterPressed || (clicked && ConfirmYes(d).Contains(mx, my)))
         return 1;
@@ -397,13 +401,13 @@ int ConfirmUpdate(
 void DrawConfirm(
     Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my)
 {
+    (void) r;
+    (void) font;
+    (void) mx;
+    (void) my;
     if (!state.open)
         return;
-    const UiRect d = ConfirmDialogRect(windowW, windowH);
-    const UiRect content = DrawDialog(r, font, windowW, windowH, d, state.title);
-    font.DrawTextWrapped(state.text, content.x + 24, content.y + 18, content.w - 48, FONT_BODY, color::Text, false);
-    DrawButton(r, font, ConfirmYes(d), _("YES"), ButtonStyle::Danger, ConfirmYes(d).Contains(mx, my));
-    DrawButton(r, font, ConfirmNo(d), _("NO"), ButtonStyle::Secondary, ConfirmNo(d).Contains(mx, my));
+    ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
 }
 
 void DrawComboField(
