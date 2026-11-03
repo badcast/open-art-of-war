@@ -4419,3 +4419,9 @@ msgstr "START RESEARCH"
 
 msgid "Fade seconds"
 msgstr "Fade seconds"
+
+msgid "A watched match needs at least two computer players."
+msgstr "A watched match needs at least two computer players."
+
+msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
+msgstr "(Shift - 5, Ctrl - 10; the infinity button repeats it)"

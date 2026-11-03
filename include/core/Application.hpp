@@ -263,8 +263,10 @@ private:
     // The observer of a replay sees the whole map (drawing only: the simulation's fog is part of the match)
     bool ReplayShowsAll() const
     {
-        return m_replay && m_replayUi.watch < 0;
+        return (m_replay && m_replayUi.watch < 0) || m_spectating;
     }
+    // A custom game without a player of this computer: only the computer players fight, the whole map is shown
+    bool m_spectating {false};
     bool m_textInput {false};
     bool m_menuTextInput {false}; // the text input is on for the map search of the main menu
     void UpdateNetworkMenu();

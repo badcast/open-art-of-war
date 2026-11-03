@@ -213,7 +213,13 @@ void Simulation::OrderUnitsAt(
     Pathfinder &pathfinder = ctx.pathfinder;
     const float wx = static_cast<float>(x), wy = static_cast<float>(y);
     const int clickedId = entities.GetUnitAt(wx, wy);
-    const int destX = x / TILE_WIDTH, destY = y / TILE_HEIGHT;
+    int destX = x / TILE_WIDTH, destY = y / TILE_HEIGHT;
+    // The click may be on the very edge of the map or on ground nobody can stand on: the nearest open tile is the goal
+    // (a wall that is clicked on is attacked, see below, so it keeps its tile)
+    const bool onWall = destX >= 0 && destY >= 0 && destX < map.GetWidth() && destY < map.GetHeight()
+                        && map.GetWall(destX, destY) > 0;
+    if (!onWall)
+        EntityManager::NearestOpenTile(map, destX, destY);
     if (static_cast<OrderKind>(kind) == OrderKind::AttackMove)
     {
         if (clickedId > 0)
@@ -466,7 +472,21 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             if (!Alive(b) || b->owner != cmd.player || !b->IsUnitProducer() || b->buildProgress < 1.0f)
                 return;
             const auto *cfg = entities.GetUnitConfig(cmd.a);
-            economy.QueueUnit(cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities);
+            // A batch (Shift: 5, Ctrl: 10): as many as the credits and the queue allow
+            const int count = std::clamp(cmd.c, 1, 20);
+            for (int i = 0; i < count; ++i)
+            {
+                if (!economy.QueueUnit(cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities))
+                    break;
+            }
+            break;
+        }
+        case CommandType::SetRepeat:
+        {
+            Building *b = entities.GetBuilding(cmd.b);
+            if (!Alive(b) || b->owner != cmd.player || !b->IsUnitProducer() || b->buildProgress < 1.0f)
+                return;
+            b->repeatArchetype = b->repeatArchetype == cmd.a ? -1 : cmd.a;
             break;
         }
         case CommandType::CancelProduce:
@@ -634,6 +654,8 @@ uint64_t Simulation::ChecksumSections(const SimContext &ctx, uint64_t (&sections
         h.I32(e.lastAttackerId);
         if (const Building *b = e.AsBuilding())
             h.I32(b->repairing ? 1 : 0);
+        if (const Building *b = e.AsBuilding())
+            h.I32(b->repeatArchetype);
         if (const Unit *u = e.AsUnit())
         {
             h.I32(u->orderX);

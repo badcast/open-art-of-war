@@ -14,6 +14,7 @@ public:
     // A group in front of a hostile wall with one gap breaches the wall; a unit hit from afar goes
     // after the shooter, except when holding position
     static bool RunCombatBehaviourTest(Application &app);
+    static bool RunZeusTest(Application &app);
     // Allies let each other through: a gap in an own wall packed with idle units, two units head-on in a corridor;
     // diagonal steps cut corners (a diagonal wall line can be crossed)
     static bool RunMakeWayTest(Application &app);

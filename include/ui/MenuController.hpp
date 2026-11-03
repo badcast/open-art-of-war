@@ -122,6 +122,11 @@ public:
     bool UpdateMissionDialog(InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH);
     void RenderMissionDialog(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
 
+    // The running custom match has no player of this computer: it is only watched (every computer player fights)
+    bool IsSpectatorMatch() const
+    {
+        return m_spectatorMatch;
+    }
     // The map search box has the keyboard (SDL text input must be on)
     bool WantsText() const
     {
@@ -311,6 +316,8 @@ private:
     int CustomSlotAt(int position) const;
     // The choices of the type combo of a start position (codes of SetCustomSeat)
     std::vector<int> CustomSeatCodes(int position) const;
+    bool m_customSpectator {false}; // the person's place is Open: the match of the computer players is only watched
+    bool m_spectatorMatch {false};  // the match that was started has no person
     bool m_sideRandom {false}; // the person's side is drawn when the match starts
     // Puts something on a start position: 1 the person, 2 nobody, 3..6 a computer player (level 0..3), 7 blocked
     void SetCustomSeat(int position, int code);

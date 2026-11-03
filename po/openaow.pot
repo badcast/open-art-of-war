@@ -4373,3 +4373,9 @@ msgstr ""
 
 msgid "Fade seconds"
 msgstr ""
+
+msgid "A watched match needs at least two computer players."
+msgstr ""
+
+msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
+msgstr ""

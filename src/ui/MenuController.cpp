@@ -1302,8 +1302,14 @@ bool MenuController::UpdateCampaignSelect(
         {
             EnsureCustomSlots();
             bool foes = false;
-            for (const CustomSlot &cs : m_customSlots)
-                foes = foes || cs.team != m_customSlots[0].team;
+            const size_t first = m_customSpectator ? 1 : 0;
+            if (m_customSlots.size() <= first + (m_customSpectator ? 1u : 0u))
+            {
+                m_editorNotice = _("A watched match needs at least two computer players.");
+                return;
+            }
+            for (size_t i = first; i < m_customSlots.size(); ++i)
+                foes = foes || m_customSlots[i].team != m_customSlots[first].team;
             if (!foes)
             {
                 m_editorNotice = _("Everybody is in one team: there is nobody to fight.");
@@ -1337,11 +1343,13 @@ bool MenuController::UpdateCampaignSelect(
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
             match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
-            match.local = 0;
+            match.local = m_customSpectator ? 1 : 0; // (a watcher's view belongs to the first computer player)
             for (int p = 0; p < static_cast<int>(m_customSlots.size()) && p < kMaxPlayers; ++p)
             {
                 const CustomSlot &cs = m_customSlots[p];
                 PlayerSlot &slot = match.slots[p];
+                if (p == 0 && m_customSpectator)
+                    continue; // the person watches: no player at that place
                 slot.active = true;
                 slot.human = p == 0;
                 if (p == 0)
@@ -1371,6 +1379,7 @@ bool MenuController::UpdateCampaignSelect(
             m_endLoading();
         if (!started)
             return;
+        m_spectatorMatch = m_customGame && m_customSpectator;
         state = AppState::Briefing;
         m_campaignSelectOpen = false;
     };
@@ -1649,6 +1658,7 @@ void MenuController::ActivateMenuItem(
             m_customGame = true;
             m_customSlots.clear();
             m_customBlocked = 0;
+            m_customSpectator = false;
             m_skirmishSelected = 0;
             m_skirmishTop = 0;
             break;
@@ -3280,7 +3290,7 @@ int MenuController::CustomSlotAt(int position) const
 std::vector<int> MenuController::CustomSeatCodes(int position) const
 {
     if (CustomSlotAt(position) == 0)
-        return {1}; // the person's own place: nothing to choose
+        return {1, 2}; // the person's own place: he stays, or leaves it Open and only watches
     if (CustomSlotAt(position) < 0)
         return {1, 2, 3, 4, 5, 6, 7}; // you / open / four computer levels / blocked
     return {1, 2, 3, 4, 5, 6, 7};
@@ -3300,10 +3310,18 @@ void MenuController::SetCustomSeat(int position, int code)
             m_customSlots.erase(m_customSlots.begin() + held);
         m_customBlocked &= ~(1u << position);
         m_customSlots[0].position = position;
+        m_customSpectator = false;
         return;
     }
     if (held == 0)
-        return; // the person never leaves the match
+    {
+        if (code == 2)
+        { // Open on the person's own place: he does not take part, the computer players fight and he watches
+            m_customSpectator = true;
+            m_customSlots[0].position = -1;
+        }
+        return;
+    }
     if (code >= 3 && code <= 6)
     {
         m_customBlocked &= ~(1u << position);
@@ -3376,7 +3394,7 @@ void MenuController::EnsureCustomSlots()
     }
     for (CustomSlot &cs : m_customSlots)
     {
-        if (cs.position >= 0)
+        if (cs.position >= 0 || (m_customSpectator && &cs == &m_customSlots[0]))
             continue;
         for (int pos = 0; pos < static_cast<int>(most); ++pos)
         {

@@ -29,7 +29,7 @@ constexpr uint8_t kSchema[static_cast<int>(CommandType::Count)] = {
     Ids,                   // Stop
     Ids,                   // HoldPosition
     X | Y | A,             // PlaceBuilding
-    A | B,                 // Produce
+    A | B | C,             // Produce
     A | B,                 // CancelProduce
     A,                     // StartResearch
     Ids,                   // Demolish
@@ -39,6 +39,7 @@ constexpr uint8_t kSchema[static_cast<int>(CommandType::Count)] = {
     Ids | A,               // SetStance
     Ids,                   // ToggleRepair
     X | Y | A,             // View
+    A | B,                 // SetRepeat
 };
 
 constexpr int kTypeBits = 5;

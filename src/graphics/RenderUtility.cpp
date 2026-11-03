@@ -41,6 +41,13 @@ void DrawRadius(
     DrawRadius(renderer, camera, worldX, worldY, radius, radius, color, thickness);
 }
 
+void DrawRangeRing(
+    Renderer &renderer, const Camera &camera, float worldX, float worldY, float rangeTiles, SDL_Color color, float thickness)
+{
+    const float radius = rangeTiles * static_cast<float>(TILE_WIDTH);
+    DrawRadius(renderer, camera, worldX, worldY, radius, radius, color, thickness);
+}
+
 void DrawTileRadius(
     Renderer &renderer, const Camera &camera, float worldX, float worldY, float tiles, SDL_Color color, float thickness)
 {

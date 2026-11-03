@@ -38,6 +38,10 @@ void DrawRadius(
 
 // A radius counted in map tiles, drawn as the ground ellipse of the map view (tiles are wider than tall). The build
 // radius of a headquarters and the firing range of a structure both use it, so they look alike.
+// The firing range of a weapon: the game measures it as a circle in pixels of radius range * TILE_WIDTH (the tiles are
+// 30 x 20 px), so on the ground it is a circle taller than the ellipse DrawTileRadius draws for the same tile count
+void DrawRangeRing(
+    Renderer &renderer, const Camera &camera, float worldX, float worldY, float rangeTiles, SDL_Color color, float thickness);
 void DrawTileRadius(
     Renderer &renderer,
     const Camera &camera,

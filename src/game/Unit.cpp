@@ -2166,6 +2166,14 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             muzzleOffsetX = mainMuzzleX;
             muzzleOffsetY = mainMuzzleY;
             hasCustomTurretOffset = mainCustomTurret;
+            // The second gun shows its own firing pose and flash (not while the hull is driving)
+            if (state != ActionState::Move)
+            {
+                state = ActionState::Attack;
+                animFrame = 0;
+                animTimer = 0.0f;
+                attackAnimTimer = std::max(attackAnimTimer, 0.22f);
+            }
         }
 
         // 5c. Out-of-Range Check (Crucial for Siege Mode Anti-Vibration!)

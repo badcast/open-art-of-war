@@ -1317,19 +1317,14 @@ void GameplayController::RenderOrderLines(
         // A move / attack-move order: the line ends at the clicked point (not at the unit's own formation tile),
         // then the Shift-queued points follow, each with a small mark
         auto mark = [&](float px, float py, const LineStyle &style) {
-            if (&style == &m_overlay.attack)
-            {
-                // The auto-attack point looks like a rally point (a filled square in a frame), in red
-                float sx = 0, sy = 0;
-                camera.WorldToScreen(px, py, sx, sy);
-                SDL_Color red {255, 60, 60, 150};
-                const int m = std::max(4, static_cast<int>(5 * camera.GetZoom()));
-                renderer.FillRectScreen(static_cast<int>(sx) - m / 2, static_cast<int>(sy) - m / 2, m, m, red);
-                renderer.DrawRectScreen(static_cast<int>(sx) - m, static_cast<int>(sy) - m, 2 * m, 2 * m, red);
-                return;
-            }
-            drawLine(px - 4.0f, py - 4.0f, px + 4.0f, py + 4.0f, style);
-            drawLine(px - 4.0f, py + 4.0f, px + 4.0f, py - 4.0f, style);
+            // The end of an order looks like a rally point (a filled square in a frame), in the colour of its line
+            float sx = 0, sy = 0;
+            camera.WorldToScreen(px, py, sx, sy);
+            SDL_Color c = style.color;
+            c.a = static_cast<Uint8>(std::clamp(c.a * m_overlay.opacity * 1.5f, 0.0f, 255.0f));
+            const int m = std::max(4, static_cast<int>(5 * camera.GetZoom()));
+            renderer.FillRectScreen(static_cast<int>(sx) - m / 2, static_cast<int>(sy) - m / 2, m, m, c);
+            renderer.DrawRectScreen(static_cast<int>(sx) - m, static_cast<int>(sy) - m, 2 * m, 2 * m, c);
         };
         float fromX = x, fromY = y;
         if (u->orderX >= 0 && u->orderY >= 0)
@@ -1396,8 +1391,8 @@ void GameplayController::RenderDebugNavigation(
         float wy = e->GetUnitCenterPixelY();
 
         // 1. Attack Range Ellipse
-        SDL_Color rangeCol = (e->owner == Players::Local()) ? SDL_Color {0, 220, 255, 90} : SDL_Color {255, 60, 60, 90};
-        RenderUtility::DrawTileRadius(renderer, camera, wx, wy, e->attackRange, rangeCol, 1.5f);
+        const SDL_Color rangeCol {255, 60, 60, 110}; // red
+        RenderUtility::DrawRangeRing(renderer, camera, wx, wy, e->attackRange, rangeCol, 1.5f);
 
         // 2. Navigation Path Lines & Waypoints
         const Unit *u = e->AsUnit();
