@@ -81,8 +81,8 @@ public:
     // offsets are tuned with in the character editor); kept up to date by EntityManager from sprite data
     int moveFireTargetId {0};
     bool autoDeployed {false};    // went into siege mode by itself (packs up again by itself)
-    float siegeQuietTimer {0.0f}; // time in auto siege mode without anything to shoot at   // rotating turret shooting
-                                  // at this enemy while the hull keeps driving
+    float siegeQuietTimer {0.0f}; // time in auto siege mode without anything to shoot at
+    float autoSiegeCooldownTimer {0.0f}; // cooldown after auto-packing before auto-deploying again
     float turretShiftX {0.0f};
     float turretShiftY {0.0f};
     float turnTimer {0.0f};

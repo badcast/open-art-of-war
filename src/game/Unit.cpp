@@ -178,6 +178,10 @@ void Unit::UpdateImpl(float deltaTime, TileMap &map, Pathfinder &pathfinder, con
     {
         secondaryCooldownTimer -= deltaTime;
     }
+    if (autoSiegeCooldownTimer > 0.0f)
+    {
+        autoSiegeCooldownTimer = std::max(0.0f, autoSiegeCooldownTimer - deltaTime);
+    }
 
     UpdateBurst(deltaTime, map, delegates);
 
@@ -348,7 +352,8 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
             // Transformation complete! Apply new archetype & stats
             int newArch = pendingArchetypeId;
             archetypeId = newArch;
-            isSiegeMode = (newArch >= 14 && newArch <= 16);
+            const UnitConfig *cfg = delegates.getUnitConfig ? delegates.getUnitConfig(newArch) : nullptr;
+            isSiegeMode = cfg ? cfg->isSiegeMode : (newArch >= 14 && newArch <= 16);
             state = ActionState::Idle;
             animFrame = 0;
             animTimer = 0.0f;
@@ -360,10 +365,12 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
                 pathRetryTimer = 0.45f;
             }
 
-            const UnitConfig *cfg = delegates.getUnitConfig ? delegates.getUnitConfig(newArch) : nullptr;
             if (cfg)
             {
+                const int oldMax = std::max(1, maxHp);
+                const int oldHp = currentHp;
                 maxHp = cfg->maxHp;
+                currentHp = std::clamp(static_cast<int>(static_cast<int64_t>(oldHp) * maxHp / oldMax), 1, maxHp);
                 attackDamage = cfg->attackDamage;
                 attackRange = cfg->attackRange;
                 attackCooldown = cfg->attackCooldown;
@@ -372,6 +379,9 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
                 sightRadius = cfg->sightRadius;
                 burstCount = cfg->burstCount;
                 burstDelay = cfg->burstDelay;
+                splashPercent = cfg->splashPercent;
+                bulletSpeed = cfg->bulletSpeed;
+                spreadAngle = cfg->spreadAngle;
                 moveFrameTime = cfg->moveFrameTime;
                 attackFrameTime = cfg->attackFrameTime;
                 attackPoseTime = cfg->attackPoseTime;
@@ -387,6 +397,25 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
                 hasCustomTurretOffset = cfg->hasCustomTurretOffset;
                 turnStepDelay = cfg->turnStepDelay;
                 turretTurnStepDelay = cfg->turretTurnStepDelay;
+                wreckType = cfg->wreckType;
+                wreckComposite = cfg->wreckComposite;
+                wreckStages = cfg->wreckStages;
+                deathSequences = cfg->deathSequences;
+                flameDeathSequences = cfg->flameDeathSequences;
+                hasSecondary = false;
+                if (cfg->weapons.size() > 1 && cfg->weapons[1].enabled && cfg->weapons[1].damage > 0)
+                {
+                    const WeaponConfig &w = cfg->weapons[1];
+                    hasSecondary = true;
+                    secondaryProjectile = w.projectile;
+                    secondaryDamage = w.damage;
+                    secondaryRange = w.range;
+                    secondaryMinRange = w.minRange;
+                    secondaryCooldown = std::max(0.1f, w.cooldown);
+                    secondarySplash = w.splashPercent;
+                    secondaryMuzzleX = w.muzzleOffsetX;
+                    secondaryMuzzleY = w.muzzleOffsetY;
+                }
                 // The new form starts from its config: give it the technologies back
                 if (delegates.applyResearch)
                     delegates.applyResearch(*this);
@@ -485,7 +514,7 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
     // snaps back to the origin tile and never gets parked between two tiles (whatever its state is now).
     if (HasReservation())
     {
-        if (budget <= 0.0f)
+        if (budget <= 0.0f || state == ActionState::Transform)
         {
             // Cannot move at all any more: settle on whichever tile the sprite is closer to
             if (std::abs(subX) * 2.0f > TILE_WIDTH || std::abs(subY) * 2.0f > TILE_HEIGHT)

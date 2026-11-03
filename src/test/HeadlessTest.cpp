@@ -4891,7 +4891,15 @@ bool HeadlessTest::run(Application &app, int numTicks)
                   << " state=" << static_cast<int>(rhino->state) << std::endl;
         return false;
     }
-    std::cout << "  - Rhino siege deployment animation & 2-shot burst validated (delay: 0.1s, cooldown: 0.9s)."
+    if (rhino->maxHp != 620 || rhino->currentHp != 620 || rhino->splashPercent != 15)
+    {
+        std::cerr << "[Test] Error: Rhino siege mode HP or splash mismatch! maxHp=" << rhino->maxHp
+                  << " currentHp=" << rhino->currentHp << " splash=" << rhino->splashPercent << std::endl;
+        return false;
+    }
+    // Test proportional HP retention when damaged
+    rhino->currentHp = 310; // 50% damaged
+    std::cout << "  - Rhino siege deployment animation, HP & splash synced (620 HP, 15% splash)."
               << std::endl;
 
     // Test undeployment back to mobile mode
@@ -4912,10 +4920,30 @@ bool HeadlessTest::run(Application &app, int numTicks)
                   << " isSiege=" << rhino->isSiegeMode << std::endl;
         return false;
     }
-    std::cout << "  - Rhino undeployment animation back to mobile mode validated." << std::endl;
+    if (rhino->maxHp != 620 || rhino->currentHp != 310)
+    {
+        std::cerr << "[Test] Error: Rhino mobile mode did not retain proportional HP! maxHp=" << rhino->maxHp
+                  << " currentHp=" << rhino->currentHp << std::endl;
+        return false;
+    }
+    std::cout << "  - Rhino undeployment animation back to mobile mode and proportional HP (310/620) validated."
+              << std::endl;
 
-    // Re-enter siege mode for the wall-switch combat test below
+    // Test mid-step transformation reservation settlement (no glide, no leak)
+    rhino->resTileX = rhino->tileX + 1;
+    rhino->resTileY = rhino->tileY;
+    rhino->subX = 12.0f;
+    rhino->subY = 0.0f;
     app.m_entities->ToggleSiegeMode({rhinoId});
+    if (rhino->HasReservation() || rhino->subX != 0.0f || rhino->subY != 0.0f)
+    {
+        std::cerr << "[Test] Error: Mid-step ToggleSiegeMode did not settle reservation! hasRes="
+                  << rhino->HasReservation() << " subX=" << rhino->subX << " subY=" << rhino->subY << std::endl;
+        return false;
+    }
+    std::cout << "  - Mid-step siege transition tile reservation settlement validated." << std::endl;
+
+    // Finish transformation into siege mode for subsequent tests
     for (int step = 0; step < 6; ++step)
     {
         app.m_entities->Update(0.10f, *app.m_map, *app.m_pathfinder);
@@ -4930,6 +4958,18 @@ bool HeadlessTest::run(Application &app, int numTicks)
         return false;
     }
     std::cout << "  - Grad MLRS siege range validated: 13 tiles." << std::endl;
+
+    // Test Auto-Siege Cooldown anti-oscillation timer decay
+    rhino->autoSiegeCooldownTimer = 3.5f;
+    app.m_entities->Update(1.0f, *app.m_map, *app.m_pathfinder);
+    if (rhino->autoSiegeCooldownTimer >= 3.5f || rhino->autoSiegeCooldownTimer <= 0.0f)
+    {
+        std::cerr << "[Test] Error: autoSiegeCooldownTimer did not decay! timer="
+                  << rhino->autoSiegeCooldownTimer << std::endl;
+        return false;
+    }
+    rhino->autoSiegeCooldownTimer = 0.0f;
+    std::cout << "  - Auto-siege cooldown anti-oscillation timer validated." << std::endl;
 
     // E. Wall auto-targeting immediate switch to enemy unit
     app.m_map->SetWall(14, 10, Faction::Confederation, 100);
