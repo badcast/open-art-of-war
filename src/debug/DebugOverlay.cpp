@@ -25,27 +25,15 @@ DebugOverlay::DebugOverlay(SDL_Window *window, SDL_Renderer *renderer)
     : m_window(window)
     , m_renderer(renderer)
 {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
-    ImGui_ImplSDLRenderer3_Init(m_renderer);
 }
 
 DebugOverlay::~DebugOverlay()
 {
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
 }
 
 void DebugOverlay::ProcessEvent(const SDL_Event &event)
 {
-    if (m_visible)
-    {
-        ImGui_ImplSDL3_ProcessEvent(&event);
-    }
+    (void) event;
 }
 
 void DebugOverlay::render(
@@ -60,10 +48,6 @@ void DebugOverlay::render(
 {
     if (!m_visible)
         return;
-
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
 
     ImGui::SetNextWindowSize(ImVec2(480, 520), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Open Art Of War - RTS Engine Debug Inspector", &m_visible))
@@ -239,9 +223,6 @@ void DebugOverlay::render(
         }
     }
     ImGui::End();
-
-    ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
 }
 
 void DebugOverlay::RenderAiPanel(AIController &ai, EntityManager &entities)

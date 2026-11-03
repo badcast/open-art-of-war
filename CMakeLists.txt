@@ -162,6 +162,7 @@ set(ENGINE_SOURCES
     src/ui/HUDController.cpp
     src/ui/ResearchWindow.cpp
     src/ui/UiKit.cpp
+    src/ui/ImGuiBridge.cpp
     src/ui/NetworkMenu.cpp
     src/storage/SaveManager.cpp
     src/debug/DebugOverlay.cpp

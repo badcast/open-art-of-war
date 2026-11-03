@@ -7,6 +7,7 @@
 #include "ui/MenuController.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/UiKit.hpp"
+#include "ui/ImGuiBridge.hpp"
 #include "game/GameplayController.hpp"
 #include "game/Sides.hpp"
 #include "game/Players.hpp"
@@ -250,6 +251,7 @@ bool Application::Init(int windowWidth, int windowHeight)
         }
     });
 
+    ImGuiBridge::Init(m_window, m_sdlRenderer);
 #if defined(AOW_DEBUG)
     m_debug = std::make_unique<DebugOverlay>(m_window, m_sdlRenderer);
 #endif
@@ -344,6 +346,7 @@ void Application::Shutdown()
     if (m_debug)
         m_debug.reset();
 #endif
+    ImGuiBridge::Shutdown();
     if (m_effects)
         m_effects->Shutdown();
     m_nightLighting.reset();
@@ -638,6 +641,7 @@ void Application::HandleEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        ImGuiBridge::ProcessEvent(event);
 #if defined(AOW_DEBUG)
         if (m_debug && m_debug->IsVisible())
         {
@@ -1000,6 +1004,7 @@ void Application::RenderMenuFade()
 
 void Application::render()
 {
+    ImGuiBridge::BeginFrame();
     SoundRequests::HoverFlag() = false; // the widgets drawn now mark it again
     m_renderer->Clear({0, 0, 0, 255});
 
@@ -1010,6 +1015,7 @@ void Application::render()
     const int localColor = inGame ? Players::Slot(Players::Local()).color : 0;
     const SDL_Color localArmy = ArmyColor(localColor);
     ui::ApplyTheme(inGame ? PlayerFaction() : Faction::Neutral, localColor > 0 ? &localArmy : nullptr);
+    ImGuiBridge::ApplyTheme(inGame ? PlayerFaction() : Faction::Neutral, localColor > 0 ? &localArmy : nullptr);
 
     if (m_state == AppState::SplashLogo)
     {
@@ -1415,6 +1421,8 @@ void Application::render()
         m_debug->render(*m_map, *m_entities, *m_economy, *m_mission, *m_sound, *m_camera, *m_aiController, m_fps);
     }
 #endif
+
+    ImGuiBridge::EndFrame();
 
     m_renderer->Present();
     if (m_renderFirstFrame)
