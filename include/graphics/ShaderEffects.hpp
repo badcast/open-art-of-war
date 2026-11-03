@@ -62,6 +62,12 @@ public:
     }
 
     void Configure(ColorGrade grade, bool glow, bool sharp);
+    // Times the exposure of the Night grade: the night's light map keeps the picture at a fraction of its brightness
+    // (lights go above it), the grade gives that back (NightLighting, data/nights.json gpu_base)
+    void SetNightExposureScale(float scale)
+    {
+        m_nightExposureScale = scale;
+    }
     bool Sharp() const
     {
         return m_available && m_sharp;
@@ -125,6 +131,7 @@ private:
     int m_glowBW {0}, m_glowBH {0};
 
     ColorGrade m_grade {ColorGrade::Off};
+    float m_nightExposureScale {1.0f};
     bool m_glow {false};
     bool m_sharp {false};
 };

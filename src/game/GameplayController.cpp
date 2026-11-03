@@ -612,8 +612,9 @@ void GameplayController::Update(
     input.SetMenuOpen(windowOpen);
     if (windowOpen)
         input.ConsumeUiWheel();
-    else
-        input.ConsumeWheel(); // the generic counter is for menu lists only
+    else if (!hud.IsResearchWindowOpen())
+        input.ConsumeWheel(); // the generic counter is for menu lists only (and the technology tree window: it
+                              // covers the map, its steps come from anywhere)
 
     int mx = input.GetMouseScreenX();
     int my = input.GetMouseScreenY();

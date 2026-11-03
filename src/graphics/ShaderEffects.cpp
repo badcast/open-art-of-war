@@ -282,7 +282,7 @@ void ShaderEffects::Composite(const SDL_FRect &dst, const SDL_FRect &glowDst, bo
         return;
     const GradePreset &g = kPresets[static_cast<int>(m_grade)];
     PostParams p {
-        {g.exposure, g.contrast, g.saturation, g.vignette},
+        {g.exposure * (m_grade == ColorGrade::Night ? m_nightExposureScale : 1.0f), g.contrast, g.saturation, g.vignette},
         {g.r, g.g, g.b, m_grade != ColorGrade::Off ? 1.0f : 0.0f},
         {m_sharp ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f}};
     SDL_SetGPURenderStateFragmentUniforms(m_postState, 0, &p, sizeof p);

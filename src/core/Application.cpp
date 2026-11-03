@@ -205,6 +205,12 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_effects = std::make_unique<ShaderEffects>();
     if (!m_headless)
         m_effects->Init(m_sdlRenderer);
+    {
+        NightConfig night;
+        night.Load(LoaderResources::Nights());
+        m_nightLighting = std::make_unique<NightLighting>();
+        m_nightLighting->Configure(night);
+    }
     m_renderer->SetEffects(m_effects.get());
     // The map viewport ends where the command sidebar begins
     m_camera = std::make_unique<Camera>(m_windowW - HUDController::kSidebarWidth, m_windowH);
@@ -1158,15 +1164,24 @@ void Application::render()
         m_renderer->ResetClipRect();
         m_renderer->EndWorldPass();
 
-        // Night without the shader effects: the light map over the world picture (the SDL GPU renderer grades it)
-        if (m_night && !(m_effects && m_effects->Available()))
+        // Night: the light map over the world picture (buildings, explosions, fire); without shader effects it also
+        // darkens it, the SDL GPU renderer's Night grade does that itself
+        if (m_night && m_nightLighting)
         {
-            if (!m_nightLighting)
-                m_nightLighting = std::make_unique<NightLighting>();
+            const bool gpu = m_effects && m_effects->Available();
+            if (gpu)
+                m_effects->UseDefaultState();
             std::vector<EntityManager::LightSpot> &lights = m_nightLighting->Lights();
             m_entities->CollectLights(*m_map, !disableFog, lights);
             m_nightLighting->Apply(
-                m_sdlRenderer, worldCam, lights, worldCam.GetViewportWidth(), worldCam.GetViewportHeight());
+                m_sdlRenderer,
+                worldCam,
+                *m_map,
+                !disableFog,
+                gpu,
+                lights,
+                worldCam.GetViewportWidth(),
+                worldCam.GetViewportHeight());
         }
 
         if (scene)

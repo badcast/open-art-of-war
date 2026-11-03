@@ -3504,6 +3504,13 @@ void EntityManager::SpawnProjectileFromEntity(
             dstY = std::clamp(srcY, minY, maxY) + Utility::RandomFloat(-6.0f, 6.0f);
             dstX = std::clamp(dstX, minX, maxX);
             dstY = std::clamp(dstY, minY, maxY);
+            // ... a tenth of the way in towards its middle: shots, shells and rockets land on the building, not on
+            // its very edge
+            constexpr float kInwards = 0.10f;
+            const float cx = (tb->tileX + tb->buildWidth * 0.5f) * TILE_WIDTH;
+            const float cy = (tb->tileY + tb->buildHeight * 0.5f) * TILE_HEIGHT;
+            dstX += (cx - dstX) * kInwards;
+            dstY += (cy - dstY) * kInwards;
         }
     }
 
@@ -4496,33 +4503,56 @@ void EntityManager::render(
 
 void EntityManager::CollectLights(const TileMap &map, bool fog, std::vector<LightSpot> &out) const
 {
+    using Kind = LightSpot::Kind;
     out.clear();
-    auto add = [&](float x, float y, float radius, float intensity) {
-        if (intensity <= 0.0f)
-            return;
-        const int tx = static_cast<int>(x) / TILE_WIDTH, ty = static_cast<int>(y) / TILE_HEIGHT;
-        if (fog && map.GetFogState(tx, ty) != FogState::Visible)
-            return;
-        out.push_back({x, y, radius, std::min(intensity, 1.0f)});
+    auto seen = [&](float x, float y) {
+        return !fog
+               || map.GetFogState(static_cast<int>(x) / TILE_WIDTH, static_cast<int>(y) / TILE_HEIGHT) == FogState::Visible;
     };
     for (const auto &exp : m_explosions)
     {
-        if (!exp.active || exp.delay > 0.0f)
+        if (!exp.active || exp.delay > 0.0f || !seen(exp.x, exp.y))
             continue;
-        // Brightest at the start, fading out with the animation
-        const float t = exp.totalFrames > 0 ? static_cast<float>(exp.currentFrame) / static_cast<float>(exp.totalFrames)
-                                            : 0.0f;
-        add(exp.x, exp.y, 110.0f, 1.0f - 0.8f * t);
+        LightSpot l;
+        l.kind = Kind::Explosion;
+        l.x = exp.x;
+        l.y = exp.y;
+        l.age = exp.totalFrames > 0 ? static_cast<float>(exp.currentFrame) / static_cast<float>(exp.totalFrames) : 0.0f;
+        out.push_back(l);
     }
     for (const auto &burst : m_flameBursts)
     {
-        add(burst.startX, burst.startY, 60.0f, 0.6f);
-        add(burst.targetX, burst.targetY, 80.0f, 0.8f);
+        if (seen(burst.startX, burst.startY))
+            out.push_back({Kind::FlameStart, burst.startX, burst.startY});
+        if (seen(burst.targetX, burst.targetY))
+            out.push_back({Kind::FlameEnd, burst.targetX, burst.targetY});
     }
     for (const auto &proj : m_projectiles)
     {
-        if (proj.active && (proj.type == ProjectileType::Rocket || proj.type == ProjectileType::Shell))
-            add(proj.x, proj.y, 40.0f, 0.5f);
+        if (proj.active && (proj.type == ProjectileType::Rocket || proj.type == ProjectileType::Shell) && seen(proj.x, proj.y))
+            out.push_back({Kind::Projectile, proj.x, proj.y});
+    }
+    // Buildings in sight (one of their tiles is enough: a building hidden in the fog gives itself away by no light)
+    for (const auto &ptr : m_entities.Raw())
+    {
+        const Building *b = ptr ? ptr->AsBuilding() : nullptr;
+        if (!b || !b->alive || b->state == ActionState::Die)
+            continue;
+        bool visible = !fog;
+        for (int ty = b->tileY; !visible && ty < b->tileY + b->buildHeight; ++ty)
+            for (int tx = b->tileX; !visible && tx < b->tileX + b->buildWidth; ++tx)
+                visible = map.GetFogState(tx, ty) == FogState::Visible;
+        if (!visible)
+            continue;
+        LightSpot l;
+        l.kind = Kind::Building;
+        l.x = static_cast<float>(b->tileX * TILE_WIDTH);
+        l.y = static_cast<float>(b->tileY * TILE_HEIGHT);
+        l.w = static_cast<float>(b->buildWidth * TILE_WIDTH);
+        l.h = static_cast<float>(b->buildHeight * TILE_HEIGHT);
+        l.powered = b->isPowered;
+        l.complete = b->buildProgress >= 1.0f;
+        out.push_back(l);
     }
 }
 

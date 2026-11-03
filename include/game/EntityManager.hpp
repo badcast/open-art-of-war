@@ -579,14 +579,27 @@ public:
         bool showAllHealth = false);
     // What shines: projectiles and explosions (the glow pass of the shader effects draws them once more)
     void RenderEmissive(Renderer &renderer, const Camera &camera) const;
-    // What lights up its surroundings at night (explosions, flames, rockets and shells in flight), in world pixels:
-    // only those in sight when `fog` is on. Drawing only
+    // What lights up its surroundings at night (explosions, flames, rockets and shells in flight, buildings), in
+    // world pixels: only those in sight when `fog` is on. How far and how bright: NightLighting (data/nights.json).
+    // Drawing only
     struct LightSpot
     {
-        float x {0.0f};
+        enum class Kind : uint8_t
+        {
+            Explosion,
+            FlameStart, // where a flamethrower's jet leaves the gun
+            FlameEnd,   // where it lands
+            Projectile, // a rocket or a shell in flight
+            Building
+        };
+        Kind kind {Kind::Explosion};
+        float x {0.0f}; // the centre (a building: the top left corner of its footprint)
         float y {0.0f};
-        float radius {0.0f};
-        float intensity {0.0f}; // 0..1
+        float w {0.0f}; // a building's footprint
+        float h {0.0f};
+        float age {0.0f};     // an explosion: 0 at its start .. 1 at its end
+        bool powered {true};  // a building: has power
+        bool complete {true}; // a building: finished
     };
     void CollectLights(const TileMap &map, bool fog, std::vector<LightSpot> &out) const;
 
