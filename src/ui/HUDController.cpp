@@ -349,6 +349,21 @@ std::string UnitDesc(const UnitCameoDef &def, const EntityManager &entities)
     return (cfg && !cfg->description.empty()) ? cfg->description : std::string(def.desc);
 }
 
+// The infinity button in the bottom right corner of a unit cameo
+UiRect InfinityBtn(const UiRect &cell)
+{
+    return {cell.Right() - 28, cell.Bottom() - 22, 24, 18};
+}
+void DrawInfinity(Renderer &r, const UiRect &b, bool on, bool hovered)
+{
+    r.FillRectScreen(b.x, b.y, b.w, b.h, on ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
+    r.DrawRectScreen(b.x, b.y, b.w, b.h, on ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+    // two rings side by side: the infinity sign
+    const SDL_Color c = on ? col::Accent : col::TextDim;
+    r.DrawRingScreen(static_cast<float>(b.x + 7), static_cast<float>(b.CenterY()), 4.0f, 3.5f, 1.6f, c, 24);
+    r.DrawRingScreen(static_cast<float>(b.x + 17), static_cast<float>(b.CenterY()), 4.0f, 3.5f, 1.6f, c, 24);
+}
+
 void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color)
 {
     int tw = font.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
@@ -622,6 +637,27 @@ std::vector<int> HUDController::ProductionTargets(
     return targets;
 }
 
+void HUDController::ToggleRepeat(
+    int archetype, UnitType buildingType, EntityManager &entities, const std::vector<int> &selected)
+{
+    const std::vector<int> targets = ProductionTargets(buildingType, entities, selected);
+    bool anyOn = false;
+    for (int id : targets)
+        anyOn = anyOn || entities.GetBuilding(id)->repeatArchetype == archetype;
+    for (int id : targets)
+    {
+        // Off: only the producers that repeat it; on: every producer that does not yet
+        if ((entities.GetBuilding(id)->repeatArchetype == archetype) != anyOn)
+            continue;
+        SimCommand c;
+        c.type = CommandType::SetRepeat;
+        c.a = archetype;
+        c.b = id;
+        Issue(std::move(c));
+    }
+    SoundRequests::Play("ui_click");
+}
+
 bool HUDController::OrderUnit(
     int archetype, UnitType buildingType, EntityManager &entities, Economy &economy, const std::vector<int> &selected)
 {
@@ -648,6 +684,9 @@ bool HUDController::OrderUnit(
     c.type = CommandType::Produce;
     c.a = archetype;
     c.b = best;
+    // Shift: a batch of 5, Ctrl: a batch of 10
+    const SDL_Keymod mod = SDL_GetModState();
+    c.c = (mod & SDL_KMOD_CTRL) ? 10 : ((mod & SDL_KMOD_SHIFT) ? 5 : 1);
     Issue(std::move(c));
     return true;
 }
@@ -1056,6 +1095,14 @@ bool HUDController::HandleHudClick(
             UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
             if (c.Contains(mx, my) && c.y >= l.grid.y && c.Bottom() <= l.grid.Bottom() + SidebarLayout::kGap)
             {
+                if ((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && InfinityBtn(c).Contains(mx, my))
+                {
+                    const bool inf = m_activeTab == TabInfantry;
+                    const int archetype = unitCatalog(inf).items[i].archetype;
+                    if (IsUnitUnlocked(Players::Local(), archetype))
+                        ToggleRepeat(archetype, inf ? UnitType::Barracks : UnitType::Factory, entities, selectedUnits);
+                    break;
+                }
                 ActivateCell(m_activeTab, i, false, economy, entities, selectedUnits);
                 break;
             }
@@ -1557,6 +1604,14 @@ void HUDController::RenderGameHud(
                         fontRenderer.DrawString(badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
                     }
                 }
+                if (available)
+                {
+                    bool repeating = false;
+                    for (const Building *pb : producers)
+                        repeating = repeating || pb->repeatArchetype == def.archetype;
+                    const UiRect inf8 = InfinityBtn(c);
+                    DrawInfinity(renderer, inf8, repeating, inf8.Contains(mx, my));
+                }
                 if (hovered)
                 {
                     hoverTitle = name + "  $" + std::to_string(cost);
@@ -1576,6 +1631,7 @@ void HUDController::RenderGameHud(
                         hoverText = _(UnitDesc(def, entities));
                         if (queued > 0)
                             hoverText += std::string("  ") + _("(RMB - cancel one)");
+                        hoverText += std::string("  ") + _("(Shift - 5, Ctrl - 10; the infinity button repeats it)");
                     }
                 }
                 break;
@@ -1890,9 +1946,9 @@ void HUDController::RenderProductionOverlay(
         {
             continue;
         }
-        // The same look as the build radius: a ground ellipse, 2 px, 70% transparent
-        const SDL_Color c = (b->owner == Players::Local()) ? SDL_Color {90, 230, 120, 77} : SDL_Color {240, 80, 70, 77};
-        RenderUtility::DrawTileRadius(
+        // The attack range, red for everybody: the ring the game really measures the firing distance with
+        const SDL_Color c {240, 80, 70, 90};
+        RenderUtility::DrawRangeRing(
             renderer, camera, b->GetUnitCenterPixelX(), b->GetUnitCenterPixelY(), b->attackRange, c, 2.0f);
     }
 
@@ -2018,13 +2074,13 @@ void HUDController::RenderBuildGhost(
     {
         if (cfg->canAttack && cfg->attackRange > 0.0f)
         {
-            RenderUtility::DrawTileRadius(
+            RenderUtility::DrawRangeRing(
                 renderer,
                 camera,
                 (mouseTileX + bp.width * 0.5f) * TILE_WIDTH,
                 (mouseTileY + bp.height * 0.5f) * TILE_HEIGHT,
                 cfg->attackRange,
-                {90, 230, 120, 77},
+                {240, 80, 70, 90},
                 2.0f);
         }
     }

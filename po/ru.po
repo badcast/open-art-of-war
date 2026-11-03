@@ -4419,3 +4419,9 @@ msgstr "НАЧАТЬ ИССЛЕДОВАНИЕ"
 
 msgid "Fade seconds"
 msgstr "Исчезновение, с"
+
+msgid "A watched match needs at least two computer players."
+msgstr "Для наблюдения нужно минимум два компьютерных игрока."
+
+msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
+msgstr "(Shift - 5, Ctrl - 10; кнопка бесконечности повторяет производство)"

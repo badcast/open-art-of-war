@@ -2024,6 +2024,41 @@ static float ComputeDistanceToEntityPixels(const Unit &attacker, const Entity &t
     return DetMath::Hypot(dstX - srcX, dstY - srcY);
 }
 
+void EntityManager::NearestOpenTile(const TileMap &map, int &tileX, int &tileY)
+{
+    const int w = map.GetWidth(), h = map.GetHeight();
+    if (w <= 0 || h <= 0)
+        return;
+    tileX = std::clamp(tileX, 0, w - 1);
+    tileY = std::clamp(tileY, 0, h - 1);
+    auto open = [&](int x, int y) { return map.IsPassable(x, y) && map.GetWall(x, y) == 0; };
+    if (open(tileX, tileY))
+        return;
+    int bestX = tileX, bestY = tileY;
+    float best = 1e9f;
+    for (int r = 1; r <= 16 && best >= 1e9f; ++r)
+    {
+        for (int y = tileY - r; y <= tileY + r; ++y)
+        {
+            for (int x = tileX - r; x <= tileX + r; ++x)
+            {
+                if (std::max(std::abs(x - tileX), std::abs(y - tileY)) != r || x < 0 || y < 0 || x >= w || y >= h
+                    || !open(x, y))
+                    continue;
+                const float d = static_cast<float>((x - tileX) * (x - tileX) + (y - tileY) * (y - tileY));
+                if (d < best)
+                {
+                    best = d;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+    }
+    tileX = bestX;
+    tileY = bestY;
+}
+
 void EntityManager::IssueMoveOrder(
     const std::vector<int> &unitIds, int targetTileX, int targetTileY, Pathfinder &pathfinder, bool attackMove)
 {
@@ -2032,12 +2067,10 @@ void EntityManager::IssueMoveOrder(
     if (!map || unitIds.empty())
         return;
 
-    int mapW = map->GetWidth();
-    int mapH = map->GetHeight();
-    if (targetTileX < 0 || targetTileY < 0 || targetTileX >= mapW || targetTileY >= mapH)
-    {
-        return; // Reject invalid negative or out-of-bounds ground coordinates
-    }
+    // A click on the edge of the map (or on ground nobody can stand on) sends the units to the nearest place they can
+    NearestOpenTile(*map, targetTileX, targetTileY);
+    const int mapW = map->GetWidth();
+    const int mapH = map->GetHeight();
 
     std::vector<int> validUnits;
     float sumUnitX = 0.0f, sumUnitY = 0.0f;
@@ -2145,6 +2178,7 @@ void EntityManager::IssueMoveOrder(
 
         int destX = (i < slots.size()) ? std::clamp(slots[i].x, 0, mapW - 1) : targetTileX;
         int destY = (i < slots.size()) ? std::clamp(slots[i].y, 0, mapH - 1) : targetTileY;
+        NearestOpenTile(*map, destX, destY); // (formation slots at the edge / on blocked ground too)
 
         u->targetEntityId = 0;
         u->targetWallTileX = -1;
@@ -4163,7 +4197,8 @@ void EntityManager::render(
                 const float ratio = u->maxHp > 0 ? std::clamp(static_cast<float>(u->currentHp) / u->maxHp, 0.0f, 1.0f) : 1.0f;
                 const float rx = u->IsInfantry() ? TILE_WIDTH * 0.80f : TILE_WIDTH * 1.05f;
                 renderer.DrawSelectionBubble(
-                    wx + TILE_WIDTH * 0.5f, wy + TILE_HEIGHT * 0.75f, rx, rx * 0.55f, camera, SelectionHealthColor(ratio), 0.0f);
+                    wx + TILE_WIDTH * 0.5f, wy + TILE_HEIGHT * 0.75f, rx, rx * 0.55f, camera,
+                    Players::Hostile(u->owner, Players::Local()) ? SDL_Color {240, 80, 70, 255} : SelectionHealthColor(ratio), 0.0f);
                 if (u->isSiegeMode || u->state == ActionState::Transform)
                 {
                     renderer.DrawCompositeWorld(1872, wx - 90.0f, wy - 60.0f, camera, u->faction);
@@ -4221,7 +4256,8 @@ void EntityManager::render(
                 // The selected building itself shines, its colour breathing between white and the health colour
                 const float t = 0.5f + 0.5f * std::sin(static_cast<float>(SDL_GetTicks() % 100000) * 0.00691f);
                 const float hp = b->maxHp > 0 ? std::clamp(static_cast<float>(b->currentHp) / b->maxHp, 0.0f, 1.0f) : 1.0f;
-                const SDL_Color hc = SelectionHealthColor(hp);
+                const SDL_Color hc = Players::Hostile(b->owner, Players::Local()) ? SDL_Color {240, 80, 70, 255}
+                                                                                   : SelectionHealthColor(hp); // (an opponent's health is not shown)
                 auto mix = [&](uint8_t c) { return static_cast<uint8_t>(255.0f + (c - 255.0f) * t); };
                 renderer.SetSpriteGlow({mix(hc.r), mix(hc.g), mix(hc.b), 255}, 0.12f + 0.28f * t);
             }
@@ -4243,7 +4279,8 @@ void EntityManager::render(
                 hpRatio,
                 b->turretFacing,
                 isAttacking,
-                b->isPowered);
+                // (an opponent's missing power is not shown: no offline sign, its parts keep working)
+                b->isPowered || Players::Hostile(b->owner, Players::Local()));
             renderer.SetDrawOwner(b->owner);
             renderer.DrawBuildingWorld(
                 btype,
@@ -4258,7 +4295,8 @@ void EntityManager::render(
                 hpRatio,
                 b->turretFacing,
                 isAttacking,
-                b->isPowered);
+                // (an opponent's missing power is not shown: no offline sign, its parts keep working)
+                b->isPowered || Players::Hostile(b->owner, Players::Local()));
             renderer.SetAnimatedPartsVisible(true);
             renderer.SetSpriteGlow({255, 255, 255, 255}, 0.0f);
         }
@@ -4267,6 +4305,9 @@ void EntityManager::render(
     // Bars on top of every sprite
     for (const DepthItem &it : items)
     {
+        // The health and the construction progress of an opponent are not for the player's eyes (not even with Alt)
+        if (!debugMode && Players::Hostile(it.unit ? it.unit->owner : (it.building ? it.building->owner : kNoPlayer), Players::Local()))
+            continue;
         if (const Unit *u = it.unit)
         {
             // (the selection bubble shows the health of a selected unit by its colour)

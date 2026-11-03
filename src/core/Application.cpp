@@ -705,6 +705,21 @@ void Application::Update(float deltaTime)
     }
 #endif
 
+    // A custom match without a person: watched with the whole map, nothing the viewer does reaches the world
+    {
+        const bool playing = m_state == AppState::SkirmishPlaying || m_state == AppState::Paused
+                             || m_state == AppState::Briefing;
+        const bool spectate = playing && !m_replay && !m_net && m_menuController->IsSpectatorMatch();
+        if (spectate != m_spectating)
+        {
+            m_spectating = spectate;
+            m_hudController->SetObserver(spectate);
+            m_hudController->SetShowAll(spectate);
+            m_gameplayController->simulation().SetCommandSink(spectate ? std::function<void(SimCommand)>([](SimCommand) {})
+                                                                      : std::function<void(SimCommand)>());
+        }
+    }
+
     // Typed text for the map search of the main menu and the search box of the research window
     {
         const bool wantMenuText = (m_state == AppState::MainMenu && m_menuController->WantsText())

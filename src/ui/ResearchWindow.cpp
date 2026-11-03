@@ -27,21 +27,28 @@ namespace col = ui::color;
 namespace
 {
 
-constexpr int kNodeW = 240;
-constexpr int kNodeH = 50;
-constexpr int kGapX = 34;
-constexpr int kGapY = 10;
-constexpr int kDetailsW = 270;
+// Sizes of the window at scale 1 (the window is drawn bigger by m_researchScale)
+constexpr int kNodeW0 = 240;
+constexpr int kNodeH0 = 50;
+constexpr int kGapX0 = 34;
+constexpr int kGapY0 = 10;
+constexpr int kDetailsW0 = 270;
+constexpr float kScaleMin = 0.75f, kScaleMax = 2.0f, kScaleStep = 0.125f;
+int sz(int v, float scale)
+{
+    return static_cast<int>(std::lround(v * scale));
+}
 
 struct WindowLayout
 {
-    UiRect dialog, content, search, filter, tree, details, closeBtn, startBtn;
+    UiRect dialog, content, search, filter, tree, details, closeBtn, startBtn, zoomIn, zoomOut;
 };
 
-WindowLayout windowLayout(int windowW, int windowH)
+WindowLayout windowLayout(int windowW, int windowH, float scale)
 {
+    const int kDetailsW = sz(kDetailsW0, scale);
     WindowLayout l;
-    l.dialog = ui::CenteredRect(windowW, windowH, 1100, 680);
+    l.dialog = ui::CenteredRect(windowW, windowH, sz(1100, scale), sz(680, scale));
     l.content = {l.dialog.x + 16, l.dialog.y + 60, l.dialog.w - 32, l.dialog.h - 60 - 16};
     l.search = {l.content.x, l.content.y, 320, 30};
     l.filter = {l.search.Right() + 10, l.content.y, 200, 30};
@@ -49,6 +56,9 @@ WindowLayout windowLayout(int windowW, int windowH)
     l.details = {l.content.Right() - kDetailsW, l.content.y + 42, kDetailsW, l.content.h - 42};
     l.tree = {l.content.x, l.content.y + 42, l.details.x - 12 - l.content.x, l.content.h - 42};
     l.startBtn = {l.details.x + 12, l.details.Bottom() - 52, l.details.w - 24, 40};
+    // + / - at the bottom right of the tree, like the radar's zoom buttons
+    l.zoomOut = {l.tree.Right() - 30, l.tree.Bottom() - 30, 24, 24};
+    l.zoomIn = {l.tree.Right() - 30, l.tree.Bottom() - 58, 24, 24};
     return l;
 }
 
@@ -255,7 +265,9 @@ bool HUDController::UpdateResearchWindow(
 {
     if (!m_researchOpen)
         return false;
-    const WindowLayout l = windowLayout(windowW, windowH);
+    const WindowLayout l = windowLayout(windowW, windowH, m_researchScale);
+    const float sc = m_researchScale;
+    const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = PlayerFaction();
     const TreeLayout tree = buildTree(faction);
     const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
@@ -305,10 +317,25 @@ bool HUDController::UpdateResearchWindow(
     const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
     const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
     const float maxX = std::max(0.0f, treeW - l.tree.w), maxY = std::max(0.0f, treeH - l.tree.h);
-    if (wheel != 0 && l.tree.Contains(mx, my))
+    auto setScale = [&](float v) {
+        m_researchScale = std::clamp(std::round(v / kScaleStep) * kScaleStep, kScaleMin, kScaleMax);
+    };
+    if (wheel != 0 && l.dialog.Contains(mx, my))
     {
+        // The wheel scales the window (it keeps its place under the cursor), with Shift it scrolls the tree
         const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-        (shift ? m_researchScrollX : m_researchScrollY) -= wheel * 60.0f;
+        if (shift)
+        {
+            m_researchScrollY -= wheel * 60.0f;
+        }
+        else
+        {
+            const float before = m_researchScale;
+            setScale(m_researchScale + wheel * kScaleStep);
+            const float k = m_researchScale / before;
+            m_researchScrollX *= k;
+            m_researchScrollY *= k;
+        }
     }
     if (m_researchPanning)
     {
@@ -334,6 +361,15 @@ bool HUDController::UpdateResearchWindow(
         {
             CloseResearchWindow();
             SoundRequests::Play("ui_confirm");
+            return true;
+        }
+        if (l.zoomIn.Contains(mx, my) || l.zoomOut.Contains(mx, my))
+        {
+            const float before = m_researchScale;
+            setScale(m_researchScale + (l.zoomIn.Contains(mx, my) ? kScaleStep : -kScaleStep));
+            m_researchScrollX *= m_researchScale / before;
+            m_researchScrollY *= m_researchScale / before;
+            SoundRequests::Play("ui_click");
             return true;
         }
         if (l.filter.Contains(mx, my))
@@ -398,7 +434,9 @@ void HUDController::RenderResearchWindow(
 {
     if (!m_researchOpen)
         return;
-    const WindowLayout l = windowLayout(windowW, windowH);
+    const WindowLayout l = windowLayout(windowW, windowH, m_researchScale);
+    const float sc = m_researchScale;
+    const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = PlayerFaction();
     const TreeLayout tree = buildTree(faction);
     const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
@@ -515,7 +553,7 @@ void HUDController::RenderResearchWindow(
             renderer.DrawRectScreen(n.x + 1, n.y + 1, n.w - 2, n.h - 2, edge);
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, n.x + 4, n.y + 6, 0.62f, faction);
+        renderer.DrawCompositeScreen(r.compId, n.x + 4, n.y + 6, 0.62f * sc, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
         const std::string state = st == State::Done     ? std::string(_("RESEARCHED"))
@@ -545,6 +583,8 @@ void HUDController::RenderResearchWindow(
             renderer.FillRectScreen(n.x, n.y, n.w, n.h, {8, 10, 14, 170}); // not what the search / filter asks for
     }
     renderer.ResetClipRect();
+    ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, l.zoomIn.Contains(mx, my));
+    ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, l.zoomOut.Contains(mx, my));
 
     // The selected technology
     ui::DrawPanel(renderer, l.details, col::PanelRaised, col::Border);
@@ -556,7 +596,7 @@ void HUDController::RenderResearchWindow(
         int y = l.details.y + 12;
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, x, y, 1.0f, faction);
+        renderer.DrawCompositeScreen(r.compId, x, y, sc, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
         font.DrawTextWrapped(_(r.name), x + 72, y, w - 72, ui::FONT_BODY_BOLD, col::Accent, true);

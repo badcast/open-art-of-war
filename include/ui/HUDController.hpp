@@ -102,6 +102,8 @@ public:
     // the order goes to the one with the shortest queue, cancelling refunds the latest matching order
     std::vector<int> ProductionTargets(
         UnitType buildingType, const EntityManager &entities, const std::vector<int> &selected) const;
+    // The infinity button of a unit cameo: that unit is trained again and again by the producers (on / off)
+    void ToggleRepeat(int archetype, UnitType buildingType, EntityManager &entities, const std::vector<int> &selected);
     bool OrderUnit(
         int archetype,
         UnitType buildingType,
@@ -282,6 +284,7 @@ private:
     int m_researchFilter {0}; // 0 all, 1 available, 2 researched, 3 locked, 4 in progress
     ui::ComboState m_researchCombo;
     float m_researchScrollX {0.0f}, m_researchScrollY {0.0f};
+    float m_researchScale {1.25f}; // size of the whole window and its icons (wheel, + / - buttons)
     bool m_researchPanning {false};
     int m_researchPanX {0}, m_researchPanY {0};
     uint32_t m_researchClickMs {0};

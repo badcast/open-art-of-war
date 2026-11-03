@@ -26,6 +26,9 @@ struct BuildingDelegates
 };
 
 // One unit ordered at a Barracks / Factory
+// Most orders one Barracks / Factory holds at once
+constexpr size_t kMaxProductionQueue = 99;
+
 struct ProductionItem
 {
     int archetype {0};
@@ -60,6 +63,7 @@ public:
     static constexpr float kRepairSeconds = 180.0f;
     static constexpr float kRepairCostShare = 0.30f;
     bool repairing {false};
+    int repeatArchetype {-1}; // a unit this producer trains again and again (-1: off)
     float repairHpAccum {0.0f};    // fractions of a hit point healed so far
     float repairCreditDebt {0.0f}; // fractions of a credit owed so far
     // One repair step: heals, returns the credits it costs (never more than `budget`); stops by itself

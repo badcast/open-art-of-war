@@ -21,7 +21,7 @@ enum class CommandType : uint8_t
     Stop,          // ids: units
     HoldPosition,  // ids: units (stop moving, keep fighting from where they stand)
     PlaceBuilding, // a: blueprint index; x, y: tile
-    Produce,       // a: unit archetype; b: building id
+    Produce,       // a: unit archetype; b: building id; c: how many (0: one)
     CancelProduce, // a: unit archetype; b: building id
     StartResearch, // a: technology index
     Demolish,      // ids: own buildings
@@ -33,6 +33,8 @@ enum class CommandType : uint8_t
     ToggleRepair,  // ids: own buildings (repair on when any of them is not repairing, else off)
     View,          // x, y: where the player's camera looks (world pixel); a: zoom x100. Changes nothing in the world:
                    // it only travels with the turns, so a replay can follow a player's camera
+    SetRepeat,     // a: unit archetype; b: building id: the building trains that unit again and again (a second
+                   // command with the same unit turns it off)
     Count
 };
 

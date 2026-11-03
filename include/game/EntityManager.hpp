@@ -587,6 +587,10 @@ public:
         m_unlimitedPower = unlimited;
     }
 
+    // A clicked ground tile as a destination: clamped into the map (a click at the very edge is a valid order) and,
+    // when the tile cannot be stood on (impassable, wall), moved to the nearest tile that can (rings outward, ties by
+    // scan order: deterministic)
+    static void NearestOpenTile(const TileMap &map, int &tileX, int &tileY);
     void IssueMoveOrder(
         const std::vector<int> &unitIds,
         int targetTileX,

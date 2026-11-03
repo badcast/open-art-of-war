@@ -61,7 +61,8 @@ bool Economy::SpendCredits(int amount)
 bool Economy::QueueUnit(int archetype, int cost, float buildTime, int buildingId, EntityManager &entities)
 {
     Building *b = entities.GetBuilding(buildingId);
-    if (!b || !b->alive || b->state == ActionState::Die || !b->IsUnitProducer())
+    if (!b || !b->alive || b->state == ActionState::Die || !b->IsUnitProducer()
+        || b->productionQueue.size() >= kMaxProductionQueue)
         return false;
     if (!SpendCredits(cost))
         return false;
@@ -194,6 +195,13 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
         b->isPowered = powerOk;
         if (!b->IsUnitProducer())
             continue;
+        // Infinite production: the next unit is ordered as soon as the queue runs low and the credits are there
+        if (b->repeatArchetype >= 0 && b->buildProgress >= 1.0f && b->productionQueue.size() < 2
+            && IsUnitUnlocked(player, b->repeatArchetype))
+        {
+            const auto *cfg = entities.GetUnitConfig(b->repeatArchetype);
+            QueueUnit(b->repeatArchetype, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, b->id, entities);
+        }
         b->isProducing = !b->productionQueue.empty();
         if (b->productionQueue.empty() || b->buildProgress < 1.0f)
             continue;

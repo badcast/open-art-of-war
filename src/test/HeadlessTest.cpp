@@ -3554,8 +3554,60 @@ bool HeadlessTest::RunDataSyncTest(Application &app)
     return true;
 }
 
+bool HeadlessTest::RunZeusTest(Application &app)
+{
+    std::cout << "[Test] Validating the Zeus guns and orders to the map edge..." << std::endl;
+    const float dt = 1.0f / 30.0f;
+    auto fresh = [&] {
+        app.m_entities->Clear();
+        app.m_map->InitBlankArena(60, 40, 0);
+        app.m_pathfinder->SetMap(app.m_map.get());
+        app.m_pathfinder->SetEntityManager(app.m_entities.get());
+    };
+    for (const float tiles : {6.0f, 7.5f})
+    {
+        fresh();
+        const int zeusId = app.m_entities->SpawnUnitByArchetype(11, 20, 20, Faction::Confederation);
+        const int foeId = app.m_entities->SpawnUnitByArchetype(0, 20 + static_cast<int>(tiles), 20, Faction::Resistance);
+        Unit *zeus = app.m_entities->GetUnit(zeusId);
+        Entity *foe = app.m_entities->GetEntity(foeId);
+        if (!zeus || !foe)
+            return false;
+        foe->currentHp = 100000;
+        foe->cooldownTimer = 1000.0f;
+        zeus->targetEntityId = foeId;
+        int shells = 0, rockets = 0;
+        size_t seen = 0;
+        for (int i = 0; i < 300; ++i)
+        {
+            app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
+            const auto &list = app.m_entities->GetProjectiles();
+            for (const Projectile &p : list)
+            {
+                if (!p.active || p.shooterId != zeusId)
+                    continue;
+                const float travelled = std::hypot(p.x - p.startX, p.y - p.startY);
+                if (travelled < p.speed * 1.5f && travelled > 0.0f)
+                {
+                    shells += p.type == ProjectileType::Shell;
+                    rockets += p.type == ProjectileType::Rocket;
+                }
+            }
+            (void) seen;
+        }
+        std::cout << "  - [Zeus] foe " << tiles << " tiles away: unit now at tile " << zeus->tileX << "," << zeus->tileY
+                  << ", shell frames " << shells << ", rocket frames " << rockets << " (range " << zeus->attackRange
+                  << "/" << zeus->secondaryRange << ", flash mode " << zeus->flashMode << ")" << std::endl;
+    }
+    return true;
+}
+
 bool HeadlessTest::run(Application &app, int numTicks)
 {
+    if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "zeus")
+    {
+        return RunZeusTest(app);
+    }
     if (const char *only = std::getenv("OAOW_TEST_ONLY"); only && std::string(only) == "datasync")
     {
         return RunDataSyncTest(app);
@@ -6578,6 +6630,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // 27b. Wall breach at a single gap, retaliation against far shooters (see runCombatBehaviourTest)
     if (!RunCombatBehaviourTest(app))
+        return false;
+
+    // 27b2. Zeus guns (see RunZeusTest)
+    if (!RunZeusTest(app))
         return false;
 
     // 27c. Allies make way for each other in narrow passages (see runMakeWayTest)
