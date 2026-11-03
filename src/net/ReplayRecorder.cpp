@@ -105,6 +105,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
         {"starting_credits", raw.startingCredits},
         {"fog", raw.fogOfWar},
         {"prebuilt", raw.prebuilt},
+        {"night", raw.night},
         {"local_slot", s.local},
         {"result", {{"outcome", outcome}, {"tick", tick}}},
         {"checksum_interval", NetMatch::kHashIntervalTicks},

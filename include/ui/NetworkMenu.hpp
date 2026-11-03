@@ -153,7 +153,7 @@ private:
     struct LobbyLayout
     {
         ui::UiRect dialog, details, mapSearch, mapList, players, map, chatLog, chatField, chatSend, readyBtn, startBtn,
-            leaveBtn, prebuiltBtn, creditsBtn, fogCheckbox;
+            leaveBtn, prebuiltBtn, creditsBtn, timeBtn, fogCheckbox;
         int listRowH {28};
         int rowH {34};
         ui::UiRect Filter(int i) const
@@ -247,15 +247,17 @@ private:
     static constexpr int kMapCombo = 1001;    // id of the list of maps (the host picks one)
     static bool IsOptionCombo(int id)
     {
-        return id == 1000 || id == 1002; // kLayoutCombo, kCreditsCombo
+        return id == 1000 || id == 1002 || id == 1003; // kLayoutCombo, kCreditsCombo, kTimeCombo
     }
     static constexpr int kCreditsCombo = 1002; // starting credits list
+    static constexpr int kTimeCombo = 1003;    // time of day list (day / night)
     static constexpr int kLayoutCombo = 1000; // id of the map layout list (the rows use row * 10 + kind)
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"
     ui::ComboState m_combo;     // the open drop-down list of the room
     bool m_fog {true};          // host: fog of war
     int m_credits {1};          // host: index of the starting credits (kStartingCredits)
+    bool m_night {false};       // host: the match is played at night
     bool m_optionsSent {false}; // the options of this room went to the room already
     bool m_prebuilt {true};     // host: prebuilt bases (else from scratch: HQ + power plant only)
     int m_mapIndex {0};

@@ -240,6 +240,12 @@ std::string LoaderResources::Tracklist(const std::string &root)
     return join(root, Str("audio", "tracklist"));
 }
 
+std::string LoaderResources::Ambient(bool night, const std::string &root)
+{
+    const std::string name = Str("audio", night ? "ambient_night" : "ambient_day");
+    return name.empty() ? std::string() : join(root, name);
+}
+
 std::string LoaderResources::AudioLicense(const std::string &root)
 {
     return join(root, Str("audio", "license"));

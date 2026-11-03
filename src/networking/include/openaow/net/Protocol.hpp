@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 1;
+constexpr std::uint16_t kProtocolVersion = 2;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -70,7 +70,7 @@ enum class MsgType : std::uint8_t
     OwnerStart = 25,   // client -> room: the resolved match setup to start with
     OwnerSetAi = 26,   // client -> room: add, change or remove a computer player
     OwnerSetTeam = 27, // client -> room: the team of a player (only the host / room owner decides teams)
-    OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits)
+    OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits, time of day)
     OwnerSetSeat = 29,    // client -> room: a start position is made open, blocked or taken by a computer player
     // Realtime
     Heartbeat = 32,
@@ -236,6 +236,7 @@ struct LobbyState
     bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
     uint8_t credits {1};    // index into the game's list of starting credits (0..4)
+    bool night {false};     // time of day of the match (day / night)
     uint8_t blockedMask {0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
 };
@@ -260,6 +261,7 @@ struct OwnerSetOptions
     bool fogOfWar {true};
     bool prebuilt {true};
     uint8_t credits {1}; // 0..4
+    bool night {false};  // time of day
 };
 
 struct OwnerSetMap

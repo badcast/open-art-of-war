@@ -138,7 +138,7 @@ public:
     // Host / room owner: a start position open, blocked or taken by a computer player
     void SetSeat(const Net::OwnerSetSeat &change);
     // The owner sets the match options of the room
-    void SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
+    void SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits, bool night);
     void SendChat(const std::string &text);
     std::vector<Net::Chat> TakeChat();
     // Host: everybody in the room is ready (two players at least)

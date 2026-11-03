@@ -42,7 +42,7 @@ struct Settings
     float zoomMin {0.5f};
     float zoomMax {4.0f};
     // Shader effects (SDL GPU render API only)
-    int colorGrade {0};       // ColorGrade: 0 off, 1 natural, 2 vivid, 3 cinematic, 4 dusk, 5 night
+    int colorGrade {0};       // ColorGrade: 0 off, 1 natural, 2 vivid, 3 cinematic (night is the match's time of day)
     bool glow {true};         // glow of explosions, shots and projectiles
     bool sharpPixels {false}; // pixel-art anti-aliased upscaling instead of plain nearest / linear
 
@@ -50,6 +50,7 @@ struct Settings
     int musicVolume {96};  // 0..128
     int fxVolume {128};    // 0..128
     int voiceVolume {128}; // 0..128: unit replies and the announcer
+    int ambientVolume {96}; // 0..128: the sound of the surroundings in a match (day / night loop)
     int uiVolume {128};    // 0..128: interface clicks, dialogs and alerts
     bool muted {false};
     bool reverb {true};    // reverb of explosions and heavy guns

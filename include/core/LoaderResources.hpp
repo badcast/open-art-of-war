@@ -46,6 +46,8 @@ public:
     static std::string AudioFile(const std::string &name, const std::string &root = kDefaultRoot);
     static std::string Tracklist(const std::string &root = kDefaultRoot);
     static std::string AudioLicense(const std::string &root = kDefaultRoot);
+    // The loop of the surroundings in a match (audio.ambient_day / audio.ambient_night; empty: none)
+    static std::string Ambient(bool night, const std::string &root = kDefaultRoot);
     // Sound effects: event settings (audio_sfx.json) and every clip <event>_<n>.ogg (sfx.clips)
     static std::string SfxConfig(const std::string &root = kDefaultRoot);
     static std::vector<std::string> SfxClips(const std::string &root = kDefaultRoot);

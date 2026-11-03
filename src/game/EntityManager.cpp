@@ -363,8 +363,8 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         wc.enabled = getBool(w, "enabled", true);
         wc.requiresResearch = getBool(w, "requires_research", false);
         wc.maxDistance = getFloat(w, "max_distance", 0.0f);
-        wc.sound = getStr(w, "sound", inherit.sound);
-        wc.impactSound = getStr(w, "impact_sound", inherit.impactSound);
+        wc.sound = getStr(w, "fire_sfx", inherit.sound);
+        wc.impactSound = getStr(w, "impact_sfx", inherit.impactSound);
         wc.soundVolume = std::max(0.0f, getFloat(w, "sound_volume", inherit.soundVolume));
         wc.soundId = InternSound(wc.sound);
         wc.impactSoundId = InternSound(wc.impactSound);
@@ -394,14 +394,17 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     noWeapon.range = 0.0f;
     noWeapon.cooldown = 1.0f;
     const std::vector<WeaponConfig> weapons = parseWeapons(combatNode, noWeapon);
-    // sounds: { death: <event>, volume: 1.0 } - the character's own sounds (its guns have theirs in combat.weapons)
+    // sounds: { death: <event>, damage: <event>, volume: 1.0 } - the character's own sounds (its guns have theirs in
+    // combat.weapons: fire_sfx, impact_sfx)
     CharacterSounds sounds;
     if (const YAML::Node sn = root["sounds"]; sn && sn.IsMap())
     {
         sounds.death = getStr(sn, "death", "");
+        sounds.damage = getStr(sn, "damage", "");
         sounds.volume = std::max(0.0f, getFloat(sn, "volume", 1.0f));
     }
     sounds.deathId = InternSound(sounds.death);
+    sounds.damageId = InternSound(sounds.damage);
     const WeaponConfig primary = weapons.empty() ? noWeapon : weapons.front();
     int damage = primary.damage;
     float range = primary.range;
@@ -1777,6 +1780,12 @@ const CharacterSounds *EntityManager::SoundsOf(const Entity &e) const
         return cfg ? &cfg->sounds : nullptr;
     }
     return nullptr;
+}
+
+const CharacterSounds *EntityManager::WallSoundsOf(Faction faction) const
+{
+    const BuildingConfig *cfg = GetBuildingConfig(faction == Faction::Resistance ? 25 : 15);
+    return cfg ? &cfg->sounds : nullptr;
 }
 
 int EntityManager::CountBuildingType(UnitType type, PlayerId owner, bool mustBeComplete) const
@@ -3280,7 +3289,9 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                             hitTileX * TILE_WIDTH + TILE_WIDTH * 0.5f,
                             hitTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f,
                             spec.wallDestroyed);
-                        Cue(SoundCue::WallDestroyed, proj.targetX, proj.targetY, proj.owner);
+                        const CharacterSounds *wallSounds = WallSoundsOf(map.GetWallFaction(hitTileX, hitTileY));
+                        Cue(SoundCue::WallDestroyed, proj.targetX, proj.targetY, proj.owner,
+                            wallSounds ? wallSounds->deathId : 0, wallSounds ? wallSounds->volume : 1.0f);
                     }
                     else
                     {
@@ -3387,10 +3398,13 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
                                     wx * TILE_WIDTH + TILE_WIDTH * 0.5f,
                                     wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f,
                                     spec.wallDestroyed);
+                                const CharacterSounds *wallSounds = WallSoundsOf(map.GetWallFaction(wx, wy));
                                 Cue(SoundCue::WallDestroyed,
                                     wx * TILE_WIDTH + TILE_WIDTH * 0.5f,
                                     wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f,
-                                    proj.owner);
+                                    proj.owner,
+                                    wallSounds ? wallSounds->deathId : 0,
+                                    wallSounds ? wallSounds->volume : 1.0f);
                             }
                         }
                     }
@@ -3579,8 +3593,13 @@ void EntityManager::SpawnProjectileFromEntity(
             {
                 bool isTargetInfantry = (target->AsUnit() && target->AsUnit()->IsInfantry());
                 int impactAnim = spec.PickImpact(target->id);
+                // The gun's own hit sound, else the damage sound of the one hit (at its own volume)
+                const CharacterSounds *hurt = SoundsOf(*target);
+                const bool gunHit = gun && gun->impactSoundId != 0;
+                const bool ownHit = !gunHit && hurt && hurt->damageId != 0;
                 Cue(isTargetInfantry ? SoundCue::HitBullet : SoundCue::HitArmor, finalHitX, finalHitY, entity.owner,
-                    gun ? gun->impactSoundId : 0, soundGain);
+                    gunHit ? gun->impactSoundId : (ownHit ? hurt->damageId : 0),
+                    ownHit ? hurt->volume : soundGain);
 
                 NoteEntityHit(*target, entity.id);
                 target->currentHp -= ApplyMovingUnitDamage(entity.attackDamage, target, entity.projectile);
@@ -3637,15 +3656,22 @@ void EntityManager::SpawnProjectileFromEntity(
                 map.DamageWall(wx, wy, WeaponBalance::Scale(entity.attackDamage, entity.projectile, TargetClass::Wall));
                 finalHitX = wx * TILE_WIDTH + (TILE_WIDTH * 0.5f);
                 finalHitY = wy * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
+                // (the wall character of the side names how its segments sound)
+                const CharacterSounds *wallSounds = WallSoundsOf(map.GetWallFaction(wx, wy));
+                const float wallGain = wallSounds ? wallSounds->volume : 1.0f;
                 if (map.GetWall(wx, wy) == 0)
                 {
                     SpawnExplosion(finalHitX, finalHitY, spec.wallDestroyed);
-                    Cue(SoundCue::WallDestroyed, finalHitX, finalHitY, entity.owner);
+                    Cue(SoundCue::WallDestroyed, finalHitX, finalHitY, entity.owner, wallSounds ? wallSounds->deathId : 0,
+                        wallGain);
                 }
                 else
                 {
                     SpawnExplosion(finalHitX, finalHitY, spec.impactWall);
-                    Cue(SoundCue::HitArmor, finalHitX, finalHitY, entity.owner);
+                    const bool gunHit = gun && gun->impactSoundId != 0;
+                    Cue(SoundCue::HitArmor, finalHitX, finalHitY, entity.owner,
+                        gunHit ? gun->impactSoundId : (wallSounds ? wallSounds->damageId : 0),
+                        gunHit ? soundGain : wallGain);
                 }
             }
         }
@@ -4466,6 +4492,38 @@ void EntityManager::render(
 
     // 5..6. Projectiles and explosions (drawn again by the glow pass of the shader effects)
     RenderEmissive(renderer, camera);
+}
+
+void EntityManager::CollectLights(const TileMap &map, bool fog, std::vector<LightSpot> &out) const
+{
+    out.clear();
+    auto add = [&](float x, float y, float radius, float intensity) {
+        if (intensity <= 0.0f)
+            return;
+        const int tx = static_cast<int>(x) / TILE_WIDTH, ty = static_cast<int>(y) / TILE_HEIGHT;
+        if (fog && map.GetFogState(tx, ty) != FogState::Visible)
+            return;
+        out.push_back({x, y, radius, std::min(intensity, 1.0f)});
+    };
+    for (const auto &exp : m_explosions)
+    {
+        if (!exp.active || exp.delay > 0.0f)
+            continue;
+        // Brightest at the start, fading out with the animation
+        const float t = exp.totalFrames > 0 ? static_cast<float>(exp.currentFrame) / static_cast<float>(exp.totalFrames)
+                                            : 0.0f;
+        add(exp.x, exp.y, 110.0f, 1.0f - 0.8f * t);
+    }
+    for (const auto &burst : m_flameBursts)
+    {
+        add(burst.startX, burst.startY, 60.0f, 0.6f);
+        add(burst.targetX, burst.targetY, 80.0f, 0.8f);
+    }
+    for (const auto &proj : m_projectiles)
+    {
+        if (proj.active && (proj.type == ProjectileType::Rocket || proj.type == ProjectileType::Shell))
+            add(proj.x, proj.y, 40.0f, 0.5f);
+    }
 }
 
 void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) const

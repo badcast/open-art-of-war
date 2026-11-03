@@ -216,7 +216,7 @@ void DrawField(
 
 void NetworkMenu::PushOptions(NetMatch &net)
 {
-    net.SetOptions(m_fog, m_prebuilt, static_cast<uint8_t>(std::clamp(m_credits, 0, 4)));
+    net.SetOptions(m_fog, m_prebuilt, static_cast<uint8_t>(std::clamp(m_credits, 0, 4)), m_night);
 }
 
 void NetworkMenu::Reset()
@@ -290,8 +290,9 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     l.map = {d.x + 20, l.players.Bottom() + 12, size, size};
     const int optX = l.map.Right() + 20;
     const int optW = d.Right() - 20 - optX;
-    // Match options: the credits next to the title, the check boxes beside the picture
+    // Match options: the time of day and the credits next to the title, the check boxes beside the picture
     l.creditsBtn = {d.Right() - 20 - 200, d.y + 12, 200, 32};
+    l.timeBtn = {l.creditsBtn.x - 12 - 160, d.y + 12, 160, 32};
     l.fogCheckbox = {optX, l.map.y, optW, 28};
     l.prebuiltBtn = {optX, l.map.y + 32, optW, 28}; // a check box: start with a base
     // Footer: Leave on the left, Ready and Start on the right - never on top of each other
@@ -639,6 +640,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             return l.prebuiltBtn;
         if (id == kCreditsCombo)
             return l.creditsBtn;
+        if (id == kTimeCombo)
+            return l.timeBtn;
         if (id >= kFilterPlayers && id <= kFilterSort)
             return l.Filter(id - kFilterPlayers);
         const int row = id / 10, kind = id % 10;
@@ -704,6 +707,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     m_combo,
                     comboField(id),
                     isMapList  ? static_cast<int>(m_maps.size())
+                    : id == kTimeCombo ? static_cast<int>(ui::TimeOfDayChoices().size())
                     : optionList ? static_cast<int>(ui::CreditsChoices().size())
                     : kind == 0 ? static_cast<int>(SeatOptions(net, *lobby, row).size())
                                 : static_cast<int>(ComboChoices(kind).size()),
@@ -725,6 +729,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 else if (picked >= 0 && id == kCreditsCombo)
                 {
                     m_credits = std::clamp(picked, 0, 4);
+                    PushOptions(net);
+                }
+                else if (picked >= 0 && id == kTimeCombo)
+                {
+                    m_night = picked == 1;
                     PushOptions(net);
                 }
                 else if (picked >= 0 && kind == 0)
@@ -899,6 +908,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     }
     if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
         return openCombo(kCreditsCombo);
+    if (net.ControlsRoom() && l.timeBtn.Contains(mx, my))
+        return openCombo(kTimeCombo);
     if (net.ControlsRoom() && l.fogCheckbox.Contains(mx, my))
     {
         m_fog = !m_fog;
@@ -1153,7 +1164,7 @@ void NetworkMenu::render(
                 mapName = lobby->map.substr(lobby->map.find_last_of('/') + 1);
         }
         font.DrawString(
-            ui::FitText(font, mapName, ui::FONT_H2, l.creditsBtn.x - l.details.x - 40),
+            ui::FitText(font, mapName, ui::FONT_H2, l.timeBtn.x - l.details.x - 40),
             l.details.x + 20,
             l.details.y + 18,
             ui::FONT_H2,
@@ -1279,6 +1290,15 @@ void NetworkMenu::render(
             const bool prebuilt = owner ? m_prebuilt : (lobby ? lobby->prebuilt : true);
             const int credits = owner ? m_credits : (lobby ? lobby->credits : kDefaultCreditsIndex);
             const bool fog = owner ? m_fog : (lobby ? lobby->fogOfWar : true);
+            const bool night = owner ? m_night : (lobby && lobby->night);
+            ui::DrawComboField(
+                r,
+                font,
+                l.timeBtn,
+                ui::TimeOfDayChoices()[night ? 1 : 0],
+                m_combo.open == kTimeCombo,
+                owner && l.timeBtn.Contains(m_mouseX, m_mouseY),
+                owner);
             ui::DrawCheckbox(
                 r,
                 font,
@@ -1411,6 +1431,11 @@ void NetworkMenu::render(
             else if (id == kCreditsCombo)
             {
                 ui::DrawComboList(r, font, l.creditsBtn, ui::CreditsChoices(), m_credits, m_combo, h, m_mouseX, m_mouseY);
+            }
+            else if (id == kTimeCombo)
+            {
+                ui::DrawComboList(
+                    r, font, l.timeBtn, ui::TimeOfDayChoices(), m_night ? 1 : 0, m_combo, h, m_mouseX, m_mouseY);
             }
             else if (lobby && kind == 0 && row < std::min<int>(lobby->spawnCount, kMaxPlayers))
             {

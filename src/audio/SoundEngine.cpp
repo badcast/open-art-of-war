@@ -131,6 +131,7 @@ bool SoundEngine::Init(const std::string &assetRoot)
 
 void SoundEngine::Cleanup()
 {
+    StopAmbient();
     if (m_sfxStream)
     {
         SDL_DestroyAudioStream(m_sfxStream);
@@ -178,6 +179,97 @@ void SDLCALL SoundEngine::FeedSfx(void *userdata, SDL_AudioStream *stream, int a
     self->m_sfx.Mix(self->m_sfxBuffer.data(), frames);
     self->m_voices.Mix(self->m_sfxBuffer.data(), frames); // the voices on top
     SDL_PutAudioStreamData(stream, self->m_sfxBuffer.data(), frames * 4);
+}
+
+void SDLCALL SoundEngine::FeedAmbient(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
+{
+    auto *self = static_cast<SoundEngine *>(userdata);
+    if (!self->m_ambientDecoder || additionalAmount <= 0)
+        return;
+    const int channels = self->m_ambientChannels;
+    const int framesWanted = additionalAmount / static_cast<int>(sizeof(short) * channels) + 1;
+    self->m_ambientPcm.resize(static_cast<size_t>(framesWanted * channels));
+    int produced = 0;
+    bool rewound = false; // a file that gives nothing even from its start stops here instead of spinning
+    while (produced < framesWanted)
+    {
+        const int got = stb_vorbis_get_samples_short_interleaved(
+            self->m_ambientDecoder,
+            channels,
+            self->m_ambientPcm.data() + produced * channels,
+            (framesWanted - produced) * channels);
+        if (got > 0)
+        {
+            produced += got;
+            rewound = false;
+            continue;
+        }
+        if (rewound || !stb_vorbis_seek_start(self->m_ambientDecoder))
+            break;
+        rewound = true; // the end: round again (a loop)
+    }
+    if (produced > 0)
+        SDL_PutAudioStreamData(stream, self->m_ambientPcm.data(), produced * channels * static_cast<int>(sizeof(short)));
+}
+
+void SoundEngine::PlayAmbient(bool night)
+{
+    if (!m_initialized)
+        return;
+    const std::string path = LoaderResources::Ambient(night, m_assetRoot);
+    if (path == m_ambientPath && m_ambientStream)
+        return;
+    StopAmbient();
+    if (path.empty() || !Assets::ReadBytes(path, m_ambientOgg) || m_ambientOgg.empty())
+    {
+        std::cerr << "[SoundEngine] Warning: no ambient sound " << path << std::endl;
+        m_ambientOgg.clear();
+        return;
+    }
+    int error = 0;
+    m_ambientDecoder = stb_vorbis_open_memory(m_ambientOgg.data(), static_cast<int>(m_ambientOgg.size()), &error, nullptr);
+    if (!m_ambientDecoder)
+    {
+        std::cerr << "[SoundEngine] Warning: could not decode " << path << " (stb_vorbis error " << error << ")"
+                  << std::endl;
+        m_ambientOgg.clear();
+        return;
+    }
+    const stb_vorbis_info info = stb_vorbis_get_info(m_ambientDecoder);
+    m_ambientChannels = std::clamp(info.channels, 1, 2);
+    SDL_AudioSpec spec {SDL_AUDIO_S16, m_ambientChannels, static_cast<int>(info.sample_rate)};
+    m_ambientStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SoundEngine::FeedAmbient, this);
+    if (!m_ambientStream)
+    {
+        std::cerr << "[SoundEngine] Warning: no stream for the ambient sound: " << SDL_GetError() << std::endl;
+        StopAmbient();
+        return;
+    }
+    m_ambientPath = path;
+    ApplyGain();
+    SDL_ResumeAudioStreamDevice(m_ambientStream);
+}
+
+void SoundEngine::StopAmbient()
+{
+    if (m_ambientStream)
+    {
+        SDL_DestroyAudioStream(m_ambientStream); // stops the callback before the decoder goes away
+        m_ambientStream = nullptr;
+    }
+    if (m_ambientDecoder)
+    {
+        stb_vorbis_close(m_ambientDecoder);
+        m_ambientDecoder = nullptr;
+    }
+    m_ambientOgg.clear();
+    m_ambientPath.clear();
+}
+
+void SoundEngine::SetAmbientVolume(int volume)
+{
+    m_ambientVolume = std::clamp(volume, 0, 128);
+    ApplyGain();
 }
 
 void SDLCALL SoundEngine::FeedAudio(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
@@ -502,6 +594,8 @@ void SoundEngine::ApplyGain()
     {
         SDL_SetAudioStreamGain(m_stream, m_muted ? 0.0f : static_cast<float>(m_volume) / 128.0f);
     }
+    if (m_ambientStream)
+        SDL_SetAudioStreamGain(m_ambientStream, m_muted ? 0.0f : static_cast<float>(m_ambientVolume) / 128.0f);
 }
 
 void SoundEngine::SetMusicVolume(int volume)

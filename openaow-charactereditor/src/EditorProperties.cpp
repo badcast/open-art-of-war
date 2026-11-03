@@ -977,6 +977,7 @@ void CharacterEditor::DrawProperties() {
         YAML::Node sounds = document["sounds"];
         if (!sounds || !sounds.IsMap()) sounds = YAML::Node(YAML::NodeType::Map);
         bool soundsChanged = EditSoundCombo(sounds, "death", "Death sound", "(explosion / infantry death)");
+        soundsChanged |= EditSoundCombo(sounds, "damage", "Damage sound", "(bullet / armour hit)");
         soundsChanged |= EditFloat(sounds, "volume", "Volume of all its sounds", 1.0f, 0.05f);
         if (soundsChanged) {
             if (sounds.size() == 0) document.remove("sounds");
