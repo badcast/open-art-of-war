@@ -81,7 +81,9 @@ public:
     // Computer players: add (slot kRandom: the first free one), change or remove (see OwnerSetAi)
     void setAiSlot(const OwnerSetAi &change);
     // The team of a player in the room (the host / room owner decides teams, see OwnerSetTeam)
-    void setTeam(uint8_t slot, uint8_t team, uint8_t handicap);
+    void setTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap = 7);
+    // What a start position holds (see OwnerSetSeat): the host / room owner decides
+    void setSeat(const OwnerSetSeat &change);
     // Match options of the room (the host / room owner decides, everybody sees them in the lobby)
     void setOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
@@ -156,6 +158,8 @@ private:
     // A team colour (1..8) nobody else in the room has: `preferred` when it is free, else the first free one.
     // The classic look (0) and anything else is left as it is.
     uint8_t freeColor(uint8_t slot, uint8_t preferred) const;
+    // The first start position of the map nobody holds and nobody blocked (kRandom: none)
+    uint8_t freeSpawn() const;
     void handle(size_t connection, const TransportEvent &e, uint32_t nowMs);
     void handleHello(size_t connection, const Hello &hello, uint32_t nowMs);
     void sendTo(size_t connection, Channel channel, const uint8_t *data, size_t size);
@@ -286,6 +290,7 @@ public:
     void sendOwnerSetAi(const OwnerSetAi &change);
     void sendOwnerSetTeam(const OwnerSetTeam &change);
     void sendOwnerSetOptions(const OwnerSetOptions &change);
+    void sendOwnerSetSeat(const OwnerSetSeat &change);
 
     // The host started the match: its setup (the game decodes it) and when turn 0 is due
     bool matchStarted() const

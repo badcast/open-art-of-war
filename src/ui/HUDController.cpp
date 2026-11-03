@@ -104,10 +104,10 @@ const OrderDef kOrders[] = {
 };
 constexpr int kFirstStanceOrder = 4;
 
-const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "TECH", "ORDERS"};
+const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "ORDERS"};
 // Tab icons per faction: HQ, rifleman, main tank, a research cameo; Orders draws a crosshair
-const int kResistanceTabIcons[HUDController::TabCount] = {2074, 2057, 2061, 2115, -1};
-const int kConfederationTabIcons[HUDController::TabCount] = {2064, 2049, 2053, 2087, -1};
+const int kResistanceTabIcons[HUDController::TabCount] = {2074, 2057, 2061, -1};
+const int kConfederationTabIcons[HUDController::TabCount] = {2064, 2049, 2053, -1};
 
 int TabIcon(int tab)
 {
@@ -128,6 +128,7 @@ struct SidebarLayout
     UiRect radar;
     UiRect menuBtn;
     UiRect objectivesBtn;
+    UiRect researchBtn; // opens the window of the technology tree
     UiRect tabs[HUDController::TabCount];
     UiRect strip;
     UiRect scrollUp;
@@ -166,21 +167,22 @@ SidebarLayout sidebarLayout(int windowW, int windowH, int top)
     l.radar = {x + pad, top + 54, innerW, 150};
     l.menuBtn = {x + pad, top + 212, (innerW - 8) / 2, 30};
     l.objectivesBtn = {l.menuBtn.Right() + 8, top + 212, innerW - l.menuBtn.w - 8, 30};
+    l.researchBtn = {x + pad, top + 248, innerW, 30};
 
     const int tabGap = 5;
     const int tabW = (innerW - (HUDController::TabCount - 1) * tabGap) / HUDController::TabCount;
     for (int t = 0; t < HUDController::TabCount; ++t)
     {
-        l.tabs[t] = {x + pad + t * (tabW + tabGap), top + 252, tabW, 44};
+        l.tabs[t] = {x + pad + t * (tabW + tabGap), top + 286, tabW, 44};
     }
 
-    l.strip = {x + pad, top + 302, innerW, 24};
+    l.strip = {x + pad, top + 336, innerW, 24};
     l.scrollDown = {l.strip.Right() - 24, l.strip.y, 24, l.strip.h};
     l.scrollUp = {l.scrollDown.x - 26, l.strip.y, 24, l.strip.h};
     l.primaryBtn = {l.strip.x + innerW / 2 - 10, l.strip.y, innerW / 2 - 44, l.strip.h};
 
     l.info = {x + pad, windowH - 82, innerW, 72};
-    l.grid = {x + pad, top + 332, innerW, std::max(SidebarLayout::kCellH, l.info.y - 8 - (top + 332))};
+    l.grid = {x + pad, top + 366, innerW, std::max(SidebarLayout::kCellH, l.info.y - 8 - (top + 366))};
     return l;
 }
 
@@ -577,7 +579,6 @@ void HUDController::FocusBuilding(int buildingId, const EntityManager &entities)
             SetActiveTab(TabVehicles);
             break;
         case UnitType::ResearchLab:
-            SetActiveTab(TabResearch);
             break;
         default:
             SetActiveTab(TabBuild);
@@ -593,6 +594,7 @@ void HUDController::ResetForMission()
     m_primaryFactoryId = 0;
     m_buildMode = false;
     m_attackMoveMode = false;
+    CloseResearchWindow();
     m_hudNotification.clear();
     m_hudNotificationTimer = 0.0f;
 }
@@ -690,8 +692,6 @@ int HUDController::ItemCountForTab(int tab) const
             return unitCatalog(true).count;
         case TabVehicles:
             return unitCatalog(false).count;
-        case TabResearch:
-            return kResearchCount;
         case TabOrders:
             return static_cast<int>(std::size(kOrders));
     }
@@ -781,45 +781,6 @@ void HUDController::ActivateCell(
                     unitCatalog(false).items[index].archetype, UnitType::Factory, entities, economy, selectedUnits);
             }
             break;
-        case TabResearch:
-        {
-            const auto &r = researchDef(PlayerFaction(), index);
-            if (!HasResearchBuilding(Players::Local(), entities))
-            {
-                SoundRequests::Play("ui_error");
-                SetNotification(
-                    PlayerFaction() == Faction::Confederation ? _("TECH CENTER REQUIRED FOR RESEARCH!")
-                                                              : _("LABORATORY REQUIRED FOR RESEARCH!"));
-            }
-            else if (IsResearched(Players::Local(), index))
-            {
-                SoundRequests::Play("ui_error");
-                SetNotification(_("THIS TECHNOLOGY IS ALREADY RESEARCHED!"));
-            }
-            else if (!IsResearchAvailable(Players::Local(), index))
-            {
-                SoundRequests::Play("ui_error");
-                SetNotification(std::string(_("REQUIRES: ")) + _(researchDef(PlayerFaction(), r.needs).name));
-            }
-            else if (m_sim && m_sim->research(Players::Local()).active >= 0)
-            {
-                SoundRequests::Play("ui_error");
-                SetNotification(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
-            }
-            else if (economy.CanAfford(r.cost))
-            {
-                SimCommand c;
-                c.type = CommandType::StartResearch;
-                c.a = index;
-                Issue(std::move(c));
-            }
-            else
-            {
-                SoundRequests::Announce("ann_insufficient_funds");
-                SetNotification(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
-            }
-            break;
-        }
         case TabOrders:
             switch (index)
             {
@@ -987,7 +948,7 @@ bool HUDController::HandleHudClick(
     int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
     m_scrollRow[m_activeTab] = std::clamp(m_scrollRow[m_activeTab] - wheelSteps, 0, maxScroll);
 
-    if (rightClicked && l.grid.Contains(mx, my))
+    if (!m_observer && rightClicked && l.grid.Contains(mx, my))
     {
         int count = ItemCountForTab(m_activeTab);
         for (int i = 0; i < count; ++i)
@@ -1002,6 +963,8 @@ bool HUDController::HandleHudClick(
         return true;
     }
     if (!leftClicked)
+        return true;
+    if (m_observer && !l.menuBtn.Contains(mx, my) && !l.objectivesBtn.Contains(mx, my))
         return true;
 
     // Repair on / off for the selected own structures (paid as it goes)
@@ -1055,6 +1018,11 @@ bool HUDController::HandleHudClick(
     if (l.objectivesBtn.Contains(mx, my))
     {
         outOpenObjectives = true;
+        return true;
+    }
+    if (l.researchBtn.Contains(mx, my))
+    {
+        OpenResearchWindow();
         return true;
     }
     for (int t = 0; t < TabCount; ++t)
@@ -1367,6 +1335,16 @@ void HUDController::RenderGameHud(
         ui::ButtonStyle::Secondary,
         l.objectivesBtn.Contains(mx, my));
 
+    // A replay's observer has no buildings to command: only the radar, the header and the menu stay
+    if (!m_observer)
+    {
+    ui::DrawButton(
+        renderer,
+        fontRenderer,
+        l.researchBtn,
+        ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, l.researchBtn.w - 12),
+        ui::ButtonStyle::Secondary,
+        l.researchBtn.Contains(mx, my));
     // --- Tabs ----------------------------------------------------------------------------------
     for (int t = 0; t < TabCount; ++t)
     {
@@ -1602,56 +1580,6 @@ void HUDController::RenderGameHud(
                 }
                 break;
             }
-            case TabResearch:
-            {
-                const auto &r = researchDef(PlayerFaction(), i);
-                bool done = IsResearched(Players::Local(), i);
-                const ResearchProgress *progress = m_sim ? &m_sim->research(Players::Local()) : nullptr;
-                bool active = progress && progress->active == i;
-                const bool reqMet = IsResearchAvailable(Players::Local(), i);
-                DrawCameo(renderer, fontRenderer, c, r.compId, _(r.name), hovered, done, !hasLab || !reqMet);
-                if (!hasLab)
-                {
-                    DrawLockBadge(renderer, fontRenderer, c);
-                }
-                else if (!reqMet)
-                {
-                    DrawLockBadge(renderer, fontRenderer, c);
-                }
-                else if (done)
-                {
-                    DrawCostTag(renderer, fontRenderer, c, _("READY"), col::Ok);
-                }
-                else if (active)
-                {
-                    DrawProgressShutter(
-                        renderer, fontRenderer, c, progress->timer / std::max(0.1f, progress->duration), col::Info);
-                }
-                else
-                {
-                    DrawCostTag(
-                        renderer,
-                        fontRenderer,
-                        c,
-                        "$" + std::to_string(r.cost),
-                        economy.CanAfford(r.cost) ? col::Accent : col::Danger);
-                }
-                if (hovered)
-                {
-                    hoverTitle = std::string(_(r.name)) + (done ? "" : "  $" + std::to_string(r.cost));
-                    hoverText
-                        = !hasLab
-                              ? std::string(
-                                    PlayerFaction() == Faction::Confederation
-                                        ? _("[TECH CENTER REQUIRED] Research is paused until a Tech Center is built")
-                                        : _("[LAB REQUIRED] Research is paused until a Laboratory is built"))
-                              : (done ? std::string(_("[RESEARCHED] ")) + _(r.desc)
-                                      : (reqMet ? std::string(_(r.desc))
-                                                : std::string(_("[REQUIRES] "))
-                                                      + _(researchDef(PlayerFaction(), r.needs).name)));
-                }
-                break;
-            }
             case TabOrders:
             {
                 const auto &o = kOrders[i];
@@ -1824,7 +1752,6 @@ void HUDController::RenderGameHud(
                 "Select building to construct",
                 "Recruit infantry at the selected or primary Barracks (RMB - cancel)",
                 "Build vehicles at the selected or primary Factory (RMB - cancel)",
-                "Select technology to research",
                 "Select units and issue a command",
             };
             fontRenderer.DrawTextWrapped(
@@ -1881,6 +1808,7 @@ void HUDController::RenderGameHud(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
+    }
     }
 }
 

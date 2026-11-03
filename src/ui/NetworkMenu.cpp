@@ -60,15 +60,75 @@ std::vector<std::string> ComboChoices(int kind)
     {
         out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"}; // the start credits form, see kHandicapPercent
     }
-    else if (kind == 6)
-    {
-        out.push_back("?");
-        for (int i = 1; i <= kMaxPlayers; ++i)
-            out.push_back(std::string(_("Position")) + " " + std::to_string(i));
-    }
+    else if (kind == 8)
+        out = ui::ArmyCapChoices();
     else
         out = {_("PREBUILT BASES"), _("FROM SCRATCH")};
     return out;
+}
+
+// What a start position row can hold, as the combo shows it: the choices depend on the viewer and the row
+enum SeatCode
+{
+    kSeatOccupy = 1,
+    kSeatOpen = 2,
+    kSeatAi = 3, // + level 0..3
+    kSeatBlocked = 7
+};
+struct SeatOption
+{
+    std::string label;
+    int code;
+};
+
+// Index into lobby.slots of the player holding the start position (-1: nobody)
+int SlotAtSpawn(const Net::LobbyState &lobby, int position)
+{
+    for (size_t i = 0; i < lobby.slots.size(); ++i)
+        if (lobby.slots[i].choice.spawn == position)
+            return static_cast<int>(i);
+    return -1;
+}
+
+std::vector<SeatOption> SeatOptions(const NetMatch &net, const Net::LobbyState &lobby, int position)
+{
+    std::vector<SeatOption> out;
+    const int held = SlotAtSpawn(lobby, position);
+    const bool blocked = ((lobby.blockedMask >> position) & 1u) != 0;
+    const bool mine = held >= 0 && !lobby.slots[held].ai && lobby.slots[held].slot == net.LocalSlot();
+    if (mine)
+        return out; // your own place: nothing to choose
+    const bool free = held < 0 && !blocked;
+    if (net.ControlsRoom())
+    {
+        if (free)
+            out.push_back({_("Occupy"), kSeatOccupy});
+        out.push_back({_("Open"), kSeatOpen});
+        for (int level = 0; level < 4; ++level)
+            out.push_back({std::string(_("AI")) + " - " + AiLevelName(static_cast<uint8_t>(level)), kSeatAi + level});
+        out.push_back({_("Blocked"), kSeatBlocked});
+    }
+    else if (free)
+    {
+        out.push_back({_("Open"), kSeatOpen});
+        out.push_back({_("Occupy"), kSeatOccupy});
+    }
+    return out;
+}
+
+// Index in SeatOptions of what the position holds now (-1: a person)
+int SeatCurrent(const std::vector<SeatOption> &options, const Net::LobbyState &lobby, int position)
+{
+    const int held = SlotAtSpawn(lobby, position);
+    int code = kSeatOpen;
+    if (held >= 0)
+        code = lobby.slots[held].ai ? kSeatAi + (lobby.slots[held].aiLevel & 3) : 0;
+    else if ((lobby.blockedMask >> position) & 1u)
+        code = kSeatBlocked;
+    for (size_t i = 0; i < options.size(); ++i)
+        if (options[i].code == code)
+            return static_cast<int>(i);
+    return -1;
 }
 
 // Team colours (index 0 = colour 1) other players of the room already have: nobody may pick them again
@@ -193,10 +253,9 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     l.chatField = {x, l.chatLog.Bottom() + 6, 600 - 52, 36};
     l.chatSend = {l.chatField.Right() + 8, l.chatField.y, 44, 36};
     // Match options under the map, the same three the custom game window has: bases, starting credits, fog of war
-    const int half = (l.map.w - 8) / 2;
-    l.prebuiltBtn = {l.map.x, l.map.Bottom() + 8, half, 28};
-    l.creditsBtn = {l.map.x + half + 8, l.map.Bottom() + 8, l.map.w - half - 8, 28};
-    l.fogCheckbox = {l.map.x, l.map.Bottom() + 42, l.map.w, 26};
+    l.creditsBtn = {l.map.x, l.map.Bottom() + 8, l.map.w, 28};
+    l.prebuiltBtn = {l.map.x, l.map.Bottom() + 40, l.map.w, 26}; // a check box: start with a base
+    l.fogCheckbox = {l.map.x, l.map.Bottom() + 68, l.map.w, 26};
     // Bottom row: Leave on the left (under the chat), Ready and Start on the right - never on top of each other
     l.leaveBtn = {x, l.dialog.Bottom() - 60, 140, 40};
     l.startBtn = {l.dialog.Right() - 20 - 150, l.leaveBtn.y, 150, 40};
@@ -433,8 +492,8 @@ bool NetworkMenu::SpotOnScreen(const UiRect &area, int mapW, int mapH, int tileX
     const int ox = area.x + (area.w - static_cast<int>(mapW * scale)) / 2;
     const int oy = area.y + (area.h - static_cast<int>(mapH * scale)) / 2;
     // The base is set around the spot: show its middle
-    sx = ox + static_cast<int>((tileX + 5) * scale);
-    sy = oy + static_cast<int>((tileY + 5) * scale);
+    sx = std::clamp(ox + static_cast<int>((tileX + 5) * scale), area.x + 14, area.Right() - 14);
+    sy = std::clamp(oy + static_cast<int>((tileY + 5) * scale), area.y + 14, area.Bottom() - 14);
     return true;
 }
 
@@ -538,9 +597,9 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         return kind == 1   ? l.FactionCell(row)
                : kind == 2 ? l.TeamCell(row)
                : kind == 3 ? l.ColorCell(row)
-               : kind == 6 ? l.SpawnCell(row)
                : kind == 7 ? l.HandicapCell(row)
-                           : l.NameCell(row);
+               : kind == 8 ? l.ArmyCell(row)
+                           : l.TypeCell(row);
     };
     if (m_combo.open >= 0)
     {
@@ -548,7 +607,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         const int id = m_combo.open, row = id / 10, kind = optionList ? 5 : id % 10;
         const bool isMapList = id == kMapCombo;
         const bool valid = optionList || isMapList ? net.ControlsRoom()
-                                                           : (lobby && row < static_cast<int>(lobby->slots.size()));
+                                                           : (lobby && row < std::min<int>(lobby->spawnCount, kMaxPlayers));
         if (!valid)
         {
             m_combo.open = -1;
@@ -559,7 +618,10 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             if (ui::ComboUpdate(
                     m_combo,
                     comboField(id),
-                    isMapList ? static_cast<int>(m_maps.size()) : static_cast<int>(ComboChoices(kind).size()),
+                    isMapList  ? static_cast<int>(m_maps.size())
+                    : optionList ? static_cast<int>(ui::CreditsChoices().size())
+                    : kind == 0 ? static_cast<int>(SeatOptions(net, *lobby, row).size())
+                                : static_cast<int>(ComboChoices(kind).size()),
                     h,
                     mx,
                     my,
@@ -594,13 +656,43 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     m_credits = std::clamp(picked, 0, 4);
                     PushOptions(net);
                 }
+                else if (picked >= 0 && kind == 0)
+                {
+                    // What the start position holds: a seat for the player himself, or the owner's decision
+                    const std::vector<SeatOption> options = SeatOptions(net, *lobby, row);
+                    if (picked >= static_cast<int>(options.size()))
+                        return NetworkAction::None;
+                    const int code = options[picked].code;
+                    Net::LobbyChoice own;
+                    if (code == kSeatOccupy)
+                    {
+                        if (net.LocalChoice(own))
+                        {
+                            own.spawn = static_cast<uint8_t>(row);
+                            own.ready = false;
+                            net.SetChoice(own);
+                        }
+                    }
+                    else if (code != SeatCurrent(options, *lobby, row) || SlotAtSpawn(*lobby, row) >= 0)
+                    {
+                        Net::OwnerSetSeat seat;
+                        seat.spawn = static_cast<uint8_t>(row);
+                        seat.kind = code == kSeatOpen ? Net::OwnerSetSeat::Open
+                                    : code == kSeatBlocked ? Net::OwnerSetSeat::Blocked
+                                                           : Net::OwnerSetSeat::Ai;
+                        seat.level = code >= kSeatAi && code < kSeatBlocked ? static_cast<uint8_t>(code - kSeatAi) : 1;
+                        net.SetSeat(seat);
+                    }
+                }
                 else if (picked >= 0)
                 {
-                    const Net::LobbySlot &s = lobby->slots[row];
+                    const int si = SlotAtSpawn(*lobby, row);
+                    if (si < 0)
+                        return NetworkAction::None;
+                    const Net::LobbySlot &s = lobby->slots[si];
                     Net::LobbyChoice choice = s.choice;
                     if (!s.ai && s.slot == net.LocalSlot())
                         net.LocalChoice(choice); // edit what was last sent, not the room's lagging echo
-                    uint8_t level = s.aiLevel;
                     if (kind == 1)
                     {
                         choice.faction = picked == 0 ? Net::kRandom : static_cast<uint8_t>(picked - 1);
@@ -613,7 +705,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
-                                net.SetTeam(s.slot, choice.team, choice.handicap);
+                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap);
                             return NetworkAction::None;
                         }
                     }
@@ -625,30 +717,25 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         choice.color = static_cast<uint8_t>(picked + 1);
                         choice.ready = false; // like faction and team: the owner never starts with an old colour
                     }
-                    if (kind == 4)
-                        level = static_cast<uint8_t>(picked);
-                    if (kind == 7)
+                    if (kind == 7 || kind == 8)
                     {
-                        // The form (start credits) is the owner's decision, for every player
-                        choice.handicap = static_cast<uint8_t>(picked);
+                        // The form (start credits) and the army size limit are the owner's decision, for every player
+                        if (kind == 7)
+                            choice.handicap = static_cast<uint8_t>(picked);
+                        else
+                            choice.armyCap = static_cast<uint8_t>(picked);
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
-                                net.SetTeam(s.slot, choice.team, choice.handicap);
+                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap);
                             return NetworkAction::None;
                         }
-                    }
-                    if (kind == 6)
-                    {
-                        // 0 is "?" (random); the host swaps the places when another player holds the position
-                        choice.spawn = picked == 0 ? Net::kRandom : static_cast<uint8_t>(picked - 1);
-                        choice.ready = false;
                     }
                     if (s.ai && net.ControlsRoom())
                     {
                         Net::OwnerSetAi change;
                         change.slot = s.slot;
-                        change.level = level;
+                        change.level = s.aiLevel;
                         change.choice = choice;
                         net.SetAi(change);
                     }
@@ -715,7 +802,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     if (l.startBtn.Contains(mx, my) && net.ControlsRoom() && net.CanStart())
         return NetworkAction::Start;
     if (net.ControlsRoom() && l.prebuiltBtn.Contains(mx, my))
-        return openCombo(kLayoutCombo);
+    {
+        m_prebuilt = !m_prebuilt;
+        PushOptions(net);
+        SoundRequests::Play("ui_confirm");
+        return NetworkAction::None;
+    }
     if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
         return openCombo(kCreditsCombo);
     if (net.ControlsRoom() && l.fogCheckbox.Contains(mx, my))
@@ -751,47 +843,29 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         net.SetLobbyMap(m_maps[m_mapIndex].path);
         return NetworkAction::None;
     }
-    // Computer players: the host / owner adds them and changes them like their own row
-    if (net.ControlsRoom() && lobby)
+    // The rows are the start positions of the map: what holds each (a drop-down list), and the picks of who holds it
+    if (lobby)
     {
-        const int rows = static_cast<int>(lobby->slots.size());
-        if (rows < std::max<int>(1, lobby->spawnCount) && l.AddAi(rows).Contains(mx, my))
-        {
-            Net::OwnerSetAi add;
-            add.level = 1;
-            net.SetAi(add);
-            return NetworkAction::None;
-        }
+        const int rows = std::min<int>(lobby->spawnCount, kMaxPlayers);
         for (int i = 0; i < rows; ++i)
         {
-            const Net::LobbySlot &s = lobby->slots[i];
-            // The host / owner sets every player's team and form
-            if (l.TeamCell(i).Contains(mx, my))
-                return openCombo(i * 10 + 2);
-            if (l.HandicapCell(i).Contains(mx, my))
-                return openCombo(i * 10 + 7);
-            if (!s.ai)
+            if (!SeatOptions(net, *lobby, i).empty() && l.TypeCell(i).Contains(mx, my))
+                return openCombo(i * 10);
+            const int si = SlotAtSpawn(*lobby, i);
+            if (si < 0)
                 continue;
-            if (l.RemoveCell(i).Contains(mx, my))
-            {
-                Net::OwnerSetAi change;
-                change.slot = s.slot;
-                change.level = s.aiLevel;
-                change.choice = s.choice;
-                change.remove = true;
-                net.SetAi(change);
-                return NetworkAction::None;
-            }
-            if (l.SpawnCell(i).Contains(mx, my))
-                return openCombo(i * 10 + 6);
-            if (l.FactionCell(i).Contains(mx, my))
+            const Net::LobbySlot &s = lobby->slots[si];
+            const bool editable = s.ai ? net.ControlsRoom() : s.slot == net.LocalSlot();
+            if (editable && l.FactionCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 1);
-            if (l.TeamCell(i).Contains(mx, my))
+            if (net.ControlsRoom() && l.TeamCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 2);
-            if (l.ColorCell(i).Contains(mx, my))
+            if (editable && l.ColorCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 3);
-            if (l.NameCell(i).Contains(mx, my))
-                return openCombo(i * 10 + 4);
+            if (net.ControlsRoom() && l.HandicapCell(i).Contains(mx, my))
+                return openCombo(i * 10 + 7);
+            if (net.ControlsRoom() && l.ArmyCell(i).Contains(mx, my))
+                return openCombo(i * 10 + 8);
         }
     }
     if (!haveMine)
@@ -800,28 +874,18 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     Net::LobbyChoice next = mine;
     if (l.readyBtn.Contains(mx, my) && net.MapReady())
         next.ready = !mine.ready;
-    if (myRow >= 0)
-    {
-        if (l.FactionCell(myRow).Contains(mx, my))
-            return openCombo(myRow * 10 + 1);
-        if (l.TeamCell(myRow).Contains(mx, my) && net.ControlsRoom())
-            return openCombo(myRow * 10 + 2);
-        if (l.ColorCell(myRow).Contains(mx, my))
-            return openCombo(myRow * 10 + 3);
-        if (l.SpawnCell(myRow).Contains(mx, my))
-            return openCombo(myRow * 10 + 6);
-    }
-    // A start position on the map: take it (again: give it up)
-    if (l.map.Contains(mx, my))
+    // An open start position on the map: take it
+    if (l.map.Contains(mx, my) && lobby)
     {
         for (size_t i = 0; i < m_spots.size(); ++i)
         {
             int sx = 0, sy = 0;
             if (!SpotOnScreen(l.map, m_mapW, m_mapH, m_spots[i].first, m_spots[i].second, sx, sy))
                 continue;
-            if (std::abs(mx - sx) <= 14 && std::abs(my - sy) <= 14)
+            if (std::abs(mx - sx) <= 14 && std::abs(my - sy) <= 14 && SlotAtSpawn(*lobby, static_cast<int>(i)) < 0
+                && !((lobby->blockedMask >> i) & 1u))
             {
-                next.spawn = mine.spawn == i ? Net::kRandom : static_cast<uint8_t>(i);
+                next.spawn = static_cast<uint8_t>(i);
                 next.ready = false;
             }
         }
@@ -859,9 +923,10 @@ void NetworkMenu::render(
         const UiRect content = ui::DrawDialog(r, font, w, h, l.dialog, title);
         (void) content;
         ui::DrawCaption(font, r, l.players.x, l.players.y, _("PLAYERS"));
-        // Column captions, the same order as in the custom game window
+        // Column captions: a row is a start position of the map
         for (const auto &[cx, text] : std::initializer_list<std::pair<int, const char *>> {
-                 {170, _("Faction")}, {296, _("Team")}, {372, _("Colour")}, {418, _("Pos.")}, {470, _("Handicap")}})
+                 {30, _("Place")}, {176, _("Faction")}, {276, _("Team")}, {332, _("Colour")}, {376, _("Handicap")},
+                 {444, _("Army")}})
             font.DrawString(text, l.players.x + cx, l.players.y + 4, ui::FONT_SMALL, col::TextMuted, false);
         auto nameOf = [&](uint8_t slot) {
             if (roster)
@@ -872,75 +937,73 @@ void NetworkMenu::render(
             }
             return std::string("?");
         };
-        int rowIndex = 0;
         if (lobby)
         {
-            for (const Net::LobbySlot &s : lobby->slots)
+            const int rows = std::min<int>(lobby->spawnCount, kMaxPlayers);
+            for (int i = 0; i < rows; ++i)
             {
-                const UiRect row = l.row(rowIndex);
-                const bool me = s.slot == net->LocalSlot();
-                const bool editable = me || (s.ai && net->ControlsRoom());
-                ui::DrawPanel(r, row, me ? col::Hover : col::PanelRaised, me ? col::Accent : col::Border);
-                const std::string name
-                    = s.ai ? std::string(_("AI")) + " (" + AiLevelName(s.aiLevel) + ")" : nameOf(s.slot);
-                if (s.ai && net->ControlsRoom())
+                const UiRect row = l.row(i);
+                const int si = SlotAtSpawn(*lobby, i);
+                const bool blocked = ((lobby->blockedMask >> i) & 1u) != 0;
+                const Net::LobbySlot *s = si >= 0 ? &lobby->slots[si] : nullptr;
+                const bool me = s && !s->ai && s->slot == net->LocalSlot();
+                const bool editable = s && (me || (s->ai && net->ControlsRoom()));
+                ui::DrawPanel(
+                    r, row, me ? col::Hover : (blocked ? col::PanelSunken : col::PanelRaised), me ? col::Accent : col::Border);
+                font.DrawString(
+                    std::to_string(i + 1),
+                    row.x + 15,
+                    row.CenterY(),
+                    ui::FONT_BODY_BOLD,
+                    s ? SlotColor(s->choice.color) : col::TextMuted,
+                    false,
+                    Anchor::HCENTER | Anchor::VCENTER);
+                // The type of the place: a drop-down list when this viewer may change it
+                const UiRect tc = l.TypeCell(i);
+                const std::vector<SeatOption> options = SeatOptions(*net, *lobby, i);
+                const std::string typeText = s ? (s->ai ? std::string(_("AI")) + " - " + AiLevelName(s->aiLevel) : nameOf(s->slot))
+                                               : (blocked ? std::string(_("Blocked")) : std::string(_("Open")));
+                const SDL_Color typeColor = s ? (s->ai ? col::Info : col::Text) : (blocked ? col::Danger : col::TextDim);
+                if (!options.empty())
                 {
-                    // The level of a computer player: a drop-down list
-                    const UiRect nc = l.NameCell(rowIndex);
                     ui::DrawComboField(
                         r,
                         font,
-                        nc,
-                        name,
-                        m_combo.open == rowIndex * 10 + 4,
-                        nc.Contains(m_mouseX, m_mouseY),
+                        tc,
+                        ui::FitText(font, typeText, ui::FONT_SMALL, tc.w - 36),
+                        m_combo.open == i * 10,
+                        tc.Contains(m_mouseX, m_mouseY),
                         true,
-                        col::Info);
+                        typeColor);
                 }
                 else
                 {
                     font.DrawString(
-                        ui::FitText(font, name, ui::FONT_BODY_BOLD, 150),
-                        row.x + 10,
+                        ui::FitText(font, typeText, ui::FONT_BODY_BOLD, tc.w - 8),
+                        tc.x + 8,
                         row.CenterY(),
                         ui::FONT_BODY_BOLD,
-                        s.ai ? col::Info : col::Text,
+                        typeColor,
                         false,
                         Anchor::LEFT | Anchor::VCENTER);
                 }
-                if (s.ai && net->ControlsRoom())
-                {
-                    const UiRect x = l.RemoveCell(rowIndex);
-                    ui::DrawButton(r, font, x, "x", ui::ButtonStyle::Danger, x.Contains(m_mouseX, m_mouseY));
-                }
+                if (!s)
+                    continue;
                 auto cell = [&](const UiRect &c, const std::string &text) {
-                    const bool hot = editable && c.Contains(m_mouseX, m_mouseY);
-                    ui::DrawPanel(r, c, hot ? col::Hover : col::PanelSunken, hot ? col::BorderStrong : col::Border);
+                    ui::DrawPanel(r, c, col::PanelSunken, col::Border);
                     font.DrawString(
-                        text,
-                        c.CenterX(),
-                        c.CenterY(),
-                        ui::FONT_SMALL,
-                        col::Text,
-                        false,
-                        Anchor::HCENTER | Anchor::VCENTER);
+                        text, c.CenterX(), c.CenterY(), ui::FONT_SMALL, col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
                 };
-                Net::LobbyChoice choice = s.choice;
-                if (me && !s.ai)
+                auto combo = [&](const UiRect &c, int kind, const std::string &text) {
+                    ui::DrawComboField(r, font, c, text, m_combo.open == i * 10 + kind, c.Contains(m_mouseX, m_mouseY));
+                };
+                Net::LobbyChoice choice = s->choice;
+                if (me)
                     net->LocalChoice(choice);
-                const UiRect cc = l.ColorCell(rowIndex);
+                const UiRect cc = l.ColorCell(i);
                 if (editable)
                 {
-                    // Drop-down lists: faction, team, colour
-                    auto combo = [&](const UiRect &c, int kind, const std::string &text) {
-                        ui::DrawComboField(
-                            r, font, c, text, m_combo.open == rowIndex * 10 + kind, c.Contains(m_mouseX, m_mouseY));
-                    };
-                    combo(l.FactionCell(rowIndex), 1, FactionName(choice.faction));
-                    if (net->ControlsRoom())
-                        combo(l.TeamCell(rowIndex), 2, std::to_string(choice.team + 1));
-                    else
-                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(choice.team + 1));
+                    combo(l.FactionCell(i), 1, FactionName(choice.faction));
                     combo(cc, 3, "");
                     const UiRect sw {cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12};
                     r.FillRectScreen(sw.x, sw.y, sw.w, sw.h, SlotColor(choice.color));
@@ -948,62 +1011,37 @@ void NetworkMenu::render(
                 }
                 else
                 {
-                    cell(l.FactionCell(rowIndex), FactionName(choice.faction));
-                    // The host / owner sets the team of every player
-                    if (net->ControlsRoom())
-                        ui::DrawComboField(
-                            r,
-                            font,
-                            l.TeamCell(rowIndex),
-                            std::to_string(choice.team + 1),
-                            m_combo.open == rowIndex * 10 + 2,
-                            l.TeamCell(rowIndex).Contains(m_mouseX, m_mouseY));
-                    else
-                        cell(l.TeamCell(rowIndex), std::string(_("Team")) + " " + std::to_string(choice.team + 1));
+                    cell(l.FactionCell(i), FactionName(choice.faction));
                     ui::DrawPanel(r, cc, col::PanelSunken, col::Border);
                     const UiRect sw {cc.x + 6, cc.y + 6, cc.w - 12, cc.h - 12};
                     r.FillRectScreen(sw.x, sw.y, sw.w, sw.h, SlotColor(choice.color));
                     r.DrawRectScreen(sw.x, sw.y, sw.w, sw.h, col::BorderStrong);
                 }
-                const std::string spawn
-                    = choice.spawn == Net::kRandom ? std::string("?") : std::to_string(choice.spawn + 1);
-                if (editable)
-                    ui::DrawComboField(
-                        r,
-                        font,
-                        l.SpawnCell(rowIndex),
-                        spawn,
-                        m_combo.open == rowIndex * 10 + 6,
-                        l.SpawnCell(rowIndex).Contains(m_mouseX, m_mouseY));
-                else
-                    cell(l.SpawnCell(rowIndex), spawn);
+                const std::string form = ComboChoices(7)[std::min<int>(choice.handicap, 5)];
+                const std::string cap = ui::ArmyCapChoices()[std::min<int>(choice.armyCap, kArmyCapCount - 1)];
+                if (net->ControlsRoom())
                 {
-                    const UiRect hc = l.HandicapCell(rowIndex);
-                    const std::string form = ComboChoices(7)[std::min<int>(choice.handicap, 5)];
-                    if (net->ControlsRoom())
-                        ui::DrawComboField(
-                            r, font, hc, form, m_combo.open == rowIndex * 10 + 7, hc.Contains(m_mouseX, m_mouseY));
-                    else
-                        cell(hc, form);
+                    combo(l.TeamCell(i), 2, std::to_string(choice.team + 1));
+                    combo(l.HandicapCell(i), 7, form);
+                    combo(l.ArmyCell(i), 8, cap);
                 }
-                if (!s.ai)
+                else
+                {
+                    cell(l.TeamCell(i), std::to_string(choice.team + 1));
+                    cell(l.HandicapCell(i), form);
+                    cell(l.ArmyCell(i), cap);
+                }
+                if (!s->ai && choice.ready)
                 {
                     font.DrawString(
-                        choice.ready ? _("READY") : "",
-                        row.Right() - 10,
+                        _("READY"),
+                        row.Right() - 8,
                         row.CenterY(),
                         ui::FONT_SMALL_BOLD,
                         col::Ok,
                         false,
                         Anchor::RIGHT | Anchor::VCENTER);
                 }
-                ++rowIndex;
-            }
-            if (net->ControlsRoom() && rowIndex < std::max<int>(1, lobby->spawnCount))
-            {
-                const UiRect add = l.AddAi(rowIndex);
-                ui::DrawButton(
-                    r, font, add, _("+ AI PLAYER"), ui::ButtonStyle::Ghost, add.Contains(m_mouseX, m_mouseY));
             }
         }
 
@@ -1086,8 +1124,14 @@ void NetworkMenu::render(
                 }
                 const bool hot = std::abs(m_mouseX - sx) <= 14 && std::abs(m_mouseY - sy) <= 14;
                 r.FillRectScreen(sx - 12, sy - 12, 24, 24, col::PanelSunken);
-                r.FillRectScreen(sx - 10, sy - 10, 20, 20, c);
-                r.DrawRectScreen(sx - 12, sy - 12, 24, 24, hot ? col::Accent : col::Text);
+                const bool blockedSpot = ((lobby->blockedMask >> i) & 1u) != 0;
+                r.FillRectScreen(sx - 10, sy - 10, 20, 20, blockedSpot ? SDL_Color {40, 20, 20, 255} : c);
+                r.DrawRectScreen(sx - 12, sy - 12, 24, 24, hot ? col::Accent : (blockedSpot ? col::Danger : col::Text));
+                if (blockedSpot)
+                {
+                    r.DrawLineScreen(sx - 9, sy - 9, sx + 9, sy + 9, col::Danger);
+                    r.DrawLineScreen(sx - 9, sy + 9, sx + 9, sy - 9, col::Danger);
+                }
                 font.DrawString(
                     std::to_string(i + 1),
                     sx,
@@ -1104,12 +1148,12 @@ void NetworkMenu::render(
             const bool prebuilt = owner ? m_prebuilt : (lobby ? lobby->prebuilt : true);
             const int credits = owner ? m_credits : (lobby ? lobby->credits : kDefaultCreditsIndex);
             const bool fog = owner ? m_fog : (lobby ? lobby->fogOfWar : true);
-            ui::DrawComboField(
+            ui::DrawCheckbox(
                 r,
                 font,
                 l.prebuiltBtn,
-                ui::LayoutChoices()[prebuilt ? 0 : 1],
-                m_combo.open == kLayoutCombo,
+                _("START WITH A BASE"),
+                prebuilt,
                 owner && l.prebuiltBtn.Contains(m_mouseX, m_mouseY),
                 owner);
             ui::DrawComboField(
@@ -1242,24 +1286,31 @@ void NetworkMenu::render(
             {
                 ui::DrawComboList(r, font, l.creditsBtn, ui::CreditsChoices(), m_credits, m_combo, h, m_mouseX, m_mouseY);
             }
-            else if (lobby && row < static_cast<int>(lobby->slots.size()))
+            else if (lobby && kind == 0 && row < std::min<int>(lobby->spawnCount, kMaxPlayers))
             {
-                const Net::LobbySlot &s = lobby->slots[row];
+                const std::vector<SeatOption> options = SeatOptions(*net, *lobby, row);
+                std::vector<std::string> items;
+                for (const SeatOption &o : options)
+                    items.push_back(o.label);
+                ui::DrawComboList(
+                    r, font, l.TypeCell(row), items, SeatCurrent(options, *lobby, row), m_combo, h, m_mouseX, m_mouseY);
+            }
+            else if (lobby && SlotAtSpawn(*lobby, row) >= 0)
+            {
+                const Net::LobbySlot &s = lobby->slots[SlotAtSpawn(*lobby, row)];
                 Net::LobbyChoice sc = s.choice;
                 if (!s.ai && s.slot == net->LocalSlot())
                     net->LocalChoice(sc);
                 const ui::UiRect field = kind == 1   ? l.FactionCell(row)
                                          : kind == 2 ? l.TeamCell(row)
                                          : kind == 3 ? l.ColorCell(row)
-                                         : kind == 6 ? l.SpawnCell(row)
                                          : kind == 7 ? l.HandicapCell(row)
-                                                     : l.NameCell(row);
+                                                     : l.ArmyCell(row);
                 const int current = kind == 1   ? (sc.faction == Net::kRandom ? 0 : sc.faction + 1)
                                     : kind == 2 ? sc.team
                                     : kind == 3 ? std::max(0, sc.color - 1)
-                                    : kind == 6 ? (sc.spawn == Net::kRandom ? 0 : sc.spawn + 1)
                                     : kind == 7 ? std::min<int>(sc.handicap, 5)
-                                                : s.aiLevel;
+                                                : std::min<int>(sc.armyCap, kArmyCapCount - 1);
                 std::vector<std::string> items = ComboChoices(kind);
                 std::vector<bool> taken;
                 std::vector<SDL_Color> swatches;

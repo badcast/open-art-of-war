@@ -1491,7 +1491,7 @@ msgstr ""
 msgid "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
 msgstr ""
 
-msgid "VULCAN HEAVY FLAMETHROWER"
+msgid "FORTRESS UPGRADE"
 msgstr ""
 
 msgid ""
@@ -4264,4 +4264,112 @@ msgid "Colour"
 msgstr ""
 
 msgid "Say"
+msgstr ""
+
+msgid "Search map..."
+msgstr ""
+
+msgid "Players"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "Sort"
+msgstr ""
+
+msgid "Any"
+msgstr ""
+
+msgid "Small"
+msgstr ""
+
+msgid "Large"
+msgstr ""
+
+msgid "No maps match."
+msgstr ""
+
+msgid "Place"
+msgstr ""
+
+msgid "Occupy"
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+msgid "Blocked"
+msgstr ""
+
+msgid "Army"
+msgstr ""
+
+msgid "START WITH A BASE"
+msgstr ""
+
+msgid "RANDOM"
+msgstr ""
+
+msgid "The room owner freed your place"
+msgstr ""
+
+msgid "RESEARCH NEW TECHNOLOGIES"
+msgstr ""
+
+msgid "Search technology..."
+msgstr ""
+
+msgid "All"
+msgstr ""
+
+msgid "Available"
+msgstr ""
+
+msgid "Researched"
+msgstr ""
+
+msgid "Locked"
+msgstr ""
+
+msgid "In progress"
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
+msgid "CLOSE"
+msgstr ""
+
+msgid "RESEARCHED"
+msgstr ""
+
+msgid "RESEARCHING"
+msgstr ""
+
+msgid "LOCKED"
+msgstr ""
+
+msgid "AVAILABLE"
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "TECH CENTER - RESEARCH"
+msgstr ""
+
+msgid "LABORATORY - RESEARCH"
+msgstr ""
+
+msgid "Build a Tech Center to start research"
+msgstr ""
+
+msgid "Build a Laboratory to start research"
+msgstr ""
+
+msgid "START RESEARCH"
+msgstr ""
+
+msgid "Fade seconds"
 msgstr ""

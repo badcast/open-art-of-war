@@ -41,6 +41,13 @@ Table &Storage()
     return t;
 }
 
+// Share of the damage a moving unit takes (percent, [min, max])
+std::array<int, 2> &MovingShare()
+{
+    static std::array<int, 2> share {50, 100};
+    return share;
+}
+
 const char *const kClassKeys[WeaponBalance::kClasses] = {"infantry", "vehicle", "building", "wall"};
 
 } // namespace
@@ -52,6 +59,17 @@ bool LoadText(const std::string &jsonText)
 {
     const nlohmann::json doc = JsonFile::ReadFromString(jsonText);
     Table t = Defaults();
+    MovingShare() = {50, 100};
+    if (doc.contains("moving_target") && doc["moving_target"].is_object())
+    {
+        const nlohmann::json &m = doc["moving_target"];
+        int lo = 50, hi = 100;
+        if (m.contains("min") && m["min"].is_number())
+            lo = static_cast<int>(std::lround(std::clamp(m["min"].get<double>(), 0.0, 1.0) * 100.0));
+        if (m.contains("max") && m["max"].is_number())
+            hi = static_cast<int>(std::lround(std::clamp(m["max"].get<double>(), 0.0, 1.0) * 100.0));
+        MovingShare() = {std::min(lo, hi), std::max(lo, hi)};
+    }
     if (doc.contains("multipliers") && doc["multipliers"].is_object())
     {
         for (int kind = 0; kind < kKinds; ++kind)
@@ -76,6 +94,7 @@ bool LoadText(const std::string &jsonText)
 void Reload()
 {
     Storage() = Defaults();
+    MovingShare() = {50, 100};
     std::string text;
     if (Assets::ReadText(LoaderResources::weaponBalance(), text))
         LoadText(text);
@@ -96,6 +115,13 @@ int Scale(int damage, ProjectileType type, TargetClass target)
     if (percent == 100)
         return damage;
     return std::max(1, (damage * percent + 50) / 100);
+}
+
+void MovingTargetPercent(int &minPercent, int &maxPercent)
+{
+    Percent(ProjectileType::Bullet, TargetClass::Infantry); // makes sure the file has been read
+    minPercent = MovingShare()[0];
+    maxPercent = MovingShare()[1];
 }
 
 TargetClass ClassOf(const Entity &target)

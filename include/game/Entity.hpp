@@ -68,6 +68,9 @@ struct Projectile
     int dir32 {0};     // 0..31 (32-direction sprites, e.g. bullets and shells)
     bool active {false};
     float smokeTimer {0.0f};
+    // A wall the shooter was ordered to bring down (also an own one): it takes the hit whoever owns it
+    int forcedWallX {-1};
+    int forcedWallY {-1};
 };
 
 struct ExplosionParticle

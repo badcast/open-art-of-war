@@ -608,6 +608,16 @@ void GameplayController::Update(
         }
     }
 
+    // 1a. The technology tree window: it takes the input, the game stands still behind it (a network match goes on)
+    if (hud.IsResearchWindowOpen())
+    {
+        hud.SetTopInset(m_debugMode ? 32 : 0);
+        hud.UpdateResearchWindow(input, mx, my, leftClicked, windowW, windowH, economy, entities);
+        if (mission.IsOnlineMatch())
+            SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+        return;
+    }
+
     // 1b. Campaign mission dialogue: the mission waits while it is read
     if (menu.IsMissionDialogOpen() && menu.UpdateMissionDialog(input, mx, my, leftClicked, windowW, windowH))
         return;

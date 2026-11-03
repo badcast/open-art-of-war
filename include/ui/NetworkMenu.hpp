@@ -154,47 +154,36 @@ private:
         {
             return {players.x, players.y + 30 + i * 40, players.w, 36};
         }
-        // Columns of a row: name, faction, team, colour, start
+        // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army size
+        ui::UiRect TypeCell(int i) const
+        {
+            const ui::UiRect r = row(i);
+            return {r.x + 30, r.y + 4, 142, r.h - 8};
+        }
         ui::UiRect FactionCell(int i) const
         {
             const ui::UiRect r = row(i);
-            return {r.x + 170, r.y + 4, 120, r.h - 8};
+            return {r.x + 176, r.y + 4, 96, r.h - 8};
         }
         ui::UiRect TeamCell(int i) const
         {
             const ui::UiRect r = row(i);
-            return {r.x + 296, r.y + 4, 70, r.h - 8};
+            return {r.x + 276, r.y + 4, 52, r.h - 8};
         }
         ui::UiRect ColorCell(int i) const
         {
             const ui::UiRect r = row(i);
-            return {r.x + 372, r.y + 4, 40, r.h - 8};
-        }
-        ui::UiRect SpawnCell(int i) const
-        {
-            const ui::UiRect r = row(i);
-            return {r.x + 418, r.y + 4, 46, r.h - 8};
+            return {r.x + 332, r.y + 4, 40, r.h - 8};
         }
         ui::UiRect HandicapCell(int i) const
         {
             const ui::UiRect r = row(i);
-            return {r.x + 470, r.y + 4, 70, r.h - 8};
+            return {r.x + 376, r.y + 4, 64, r.h - 8};
         }
-        ui::UiRect RemoveCell(int i) const
+        ui::UiRect ArmyCell(int i) const
         {
             const ui::UiRect r = row(i);
-            return {r.Right() - 30, r.y + 6, 24, r.h - 12};
-        }
-        ui::UiRect NameCell(int i) const
-        {
-            const ui::UiRect r = row(i);
-            return {r.x, r.y, 165, r.h};
-        }
-        // "+ AI" under the last row
-        ui::UiRect AddAi(int rows) const
-        {
-            const ui::UiRect r = row(rows);
-            return {r.x, r.y + 2, 150, 30};
+            return {r.x + 444, r.y + 4, 84, r.h - 8};
         }
     };
     static BrowserLayout browserLayout(int w, int h);

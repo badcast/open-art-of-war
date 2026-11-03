@@ -703,14 +703,29 @@ void NetMatch::SetAi(const Net::OwnerSetAi &change)
     else if (IsOwner())
         m_client->sendOwnerSetAi(change);
 }
-void NetMatch::SetTeam(uint8_t slot, uint8_t team, uint8_t handicap)
+void NetMatch::SetTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap)
 {
+    if (armyCap > 7)
+    {
+        armyCap = 7;
+        if (const Net::LobbyState *lobby = Lobby())
+            for (const Net::LobbySlot &s : lobby->slots)
+                if (s.slot == slot)
+                    armyCap = s.choice.armyCap;
+    }
     if (m_hasPendingChoice && slot == LocalSlot())
         m_pendingChoice[1] = team;
     if (m_host)
-        m_host->setTeam(slot, team, handicap);
+        m_host->setTeam(slot, team, handicap, armyCap);
     else if (IsOwner())
-        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap});
+        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap, armyCap});
+}
+void NetMatch::SetSeat(const Net::OwnerSetSeat &change)
+{
+    if (m_host)
+        m_host->setSeat(change);
+    else if (IsOwner())
+        m_client->sendOwnerSetSeat(change);
 }
 void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits)
 {
@@ -775,6 +790,7 @@ void NetMatch::StartFromLobby(uint32_t nowMs)
                                                         : static_cast<Faction>(s.choice.faction);
         slot.team = s.choice.team;
         slot.handicap = s.choice.handicap <= 5 ? s.choice.handicap : 0;
+        slot.armyCap = s.choice.armyCap < kArmyCapCount ? s.choice.armyCap : kArmyCapCount - 1;
         slot.color = s.choice.color <= 8 ? s.choice.color : static_cast<uint8_t>(1 + s.slot % 8);
         int spawn = s.choice.spawn;
         if (spawn == Net::kRandom)
@@ -1046,6 +1062,7 @@ std::vector<uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
             w.writeBits(s.aiLevel & 3u, 2);
         w.writeBits(static_cast<uint32_t>(setup.startPosition[i]) & 7u, 3);
         w.writeBits(s.handicap, 3);
+        w.writeBits(s.armyCap, 3);
     }
     buf.resize(w.finish());
     return buf;
@@ -1082,6 +1099,7 @@ bool NetMatch::DecodeSetup(const std::vector<uint8_t> &bytes, MatchSetup &out)
         s.handicap = static_cast<uint8_t>(r.readBits(3));
         if (s.handicap >= kHandicapCount)
             return false;
+        s.armyCap = static_cast<uint8_t>(r.readBits(3));
     }
     // Only maps of the game's own folder (the path comes from another computer)
     if (out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)

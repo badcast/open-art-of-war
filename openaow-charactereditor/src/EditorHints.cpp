@@ -50,6 +50,7 @@ const Hint kHints[] = {
     {"Power building", "Preview of a power plant or tech center blowing up."},
     {"Large building", "Preview of a big building blowing up."},
     {"Families", "Known wreck pictures of the game: a click sets the composite and the number of stages."},
+    {"Fade seconds", "After the burial time the remains fade out: their transparency rises linearly over this many seconds, then they are gone (0: they vanish at once)."},
     {"Play burial", "The wreck sinks stage by stage; uncheck to pick the moment by hand."},
     {"Burial preview seconds", "How long the preview of the whole burial takes (the game uses 'Burial seconds')."},
     {"Burial time", "Moment of the burial to show."},

@@ -266,6 +266,7 @@ private:
         return m_replay && m_replayUi.watch < 0;
     }
     bool m_textInput {false};
+    bool m_menuTextInput {false}; // the text input is on for the map search of the main menu
     void UpdateNetworkMenu();
     void LeaveNetworkGame();
     // Reads the simulation data (characters, research, projectiles, ...) again: a network game plays with the host's

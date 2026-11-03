@@ -166,6 +166,8 @@ bool EffectsConfig::LoadText(const std::string &yamlText)
         const YAML::Node w = root["wrecks"];
         Read(w, "burial_seconds", burialSeconds);
         burialSeconds = std::max(1.0f, burialSeconds);
+        Read(w, "fade_seconds", fadeSeconds);
+        fadeSeconds = std::max(0.0f, fadeSeconds);
         ReadWreck(w, "vehicle", vehicle);
         ReadWreck(w, "light", light);
         ReadWreck(w, "heavy", heavy);

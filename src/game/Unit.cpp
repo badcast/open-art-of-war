@@ -98,6 +98,24 @@ void Unit::GetMuzzlePoint(float &outX, float &outY) const
 
 void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
 {
+    // A Fortress with the flamethrower upgrade that knows its target walks up to it (machine gun and flame together
+    // work at the flame's reach): its range for chasing, firing and standing off is that short one meanwhile
+    const float savedRange = attackRange;
+    bool shortened = false;
+    if (alive && IsFortress() && !isSiegeMode && moveSpeed > 0.0f && state != ActionState::Die
+        && (targetEntityId != 0 || targetWallTileX >= 0) && delegates.isFortressFlamethrowerUnlocked
+        && delegates.isFortressFlamethrowerUnlocked(owner) && attackRange > kFortressFlameApproach)
+    {
+        attackRange = kFortressFlameApproach;
+        shortened = true;
+    }
+    UpdateImpl(deltaTime, map, pathfinder, delegates);
+    if (shortened && attackRange == kFortressFlameApproach)
+        attackRange = savedRange; // (a transformation inside the update sets its own range: left alone)
+}
+
+void Unit::UpdateImpl(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
+{
     if (!alive)
         return;
 
@@ -125,9 +143,9 @@ void Unit::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder, const U
             animFrame
                 = std::min(stages - 1, static_cast<int>((elapsed / fx.burialSeconds) * static_cast<float>(stages)));
         }
-        if (deathTimer <= 0.0f)
+        if (deathTimer <= -EffectsConfig::Get().fadeSeconds)
         {
-            alive = false;
+            alive = false; // after the burial time and the fade
         }
         return;
     }

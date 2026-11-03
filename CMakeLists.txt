@@ -158,6 +158,7 @@ set(ENGINE_SOURCES
     src/core/ApplicationReplay.cpp
     src/ui/MenuController.cpp
     src/ui/HUDController.cpp
+    src/ui/ResearchWindow.cpp
     src/ui/UiKit.cpp
     src/ui/NetworkMenu.cpp
     src/storage/SaveManager.cpp

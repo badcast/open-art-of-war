@@ -171,6 +171,8 @@ std::string RejectText(Net::RejectReason reason, const std::string &detail, bool
             return _("The match has already started");
         case Net::RejectReason::Banned:
             return _("Not allowed to join");
+        case Net::RejectReason::Kicked:
+            return _("The room owner freed your place");
         case Net::RejectReason::BadPassword:
             return _("Wrong password");
         case Net::RejectReason::NotFound:

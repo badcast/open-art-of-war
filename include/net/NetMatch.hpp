@@ -134,7 +134,9 @@ public:
     // Host / room owner: add, change or remove a computer player
     void SetAi(const Net::OwnerSetAi &change);
     // Host / room owner: the team of a player (players cannot choose their own)
-    void SetTeam(uint8_t slot, uint8_t team, uint8_t handicap);
+    void SetTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap = 255); // 255: keep the player's limit
+    // Host / room owner: a start position open, blocked or taken by a computer player
+    void SetSeat(const Net::OwnerSetSeat &change);
     // The owner sets the match options of the room
     void SetOptions(bool fogOfWar, bool prebuilt, uint8_t credits);
     void SendChat(const std::string &text);

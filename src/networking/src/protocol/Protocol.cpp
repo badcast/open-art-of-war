@@ -357,6 +357,7 @@ void writeChoice(BitWriter &w, const LobbyChoice &c)
     w.writeBits(c.color, 4);
     w.writeBits(c.spawn, 4);
     w.writeBits(c.handicap, 3);
+    w.writeBits(c.armyCap, 3);
     w.writeBool(c.ready);
 }
 
@@ -367,6 +368,7 @@ void readChoice(BitReader &r, LobbyChoice &c)
     c.color = static_cast<uint8_t>(r.readBits(4));
     c.spawn = static_cast<uint8_t>(r.readBits(4));
     c.handicap = static_cast<uint8_t>(r.readBits(3));
+    c.armyCap = static_cast<uint8_t>(r.readBits(3));
     c.ready = r.readBool();
     if (c.handicap > 5)
         r.fail();
@@ -399,6 +401,7 @@ void encode(BitWriter &w, const LobbyState &m)
     w.writeBool(m.fogOfWar);
     w.writeBool(m.prebuilt);
     w.writeBits(m.credits, 3);
+    w.writeBits(m.blockedMask, 8);
     w.writeRanged(static_cast<std::int32_t>(m.slots.size()), 0, kMaxPlayers);
     for (const LobbySlot &s : m.slots)
     {
@@ -420,6 +423,7 @@ bool decode(BitReader &r, LobbyState &m)
     m.credits = static_cast<uint8_t>(r.readBits(3));
     if (m.credits > 4)
         r.fail();
+    m.blockedMask = static_cast<uint8_t>(r.readBits(8));
     const int count = r.readRanged(0, kMaxPlayers);
     m.slots.resize(r.failed() ? 0 : static_cast<std::size_t>(count));
     for (LobbySlot &s : m.slots)
@@ -561,6 +565,7 @@ void encode(BitWriter &w, const OwnerSetTeam &m)
     w.writeBits(m.slot, 3);
     w.writeBits(m.team, 3);
     w.writeBits(m.handicap, 3);
+    w.writeBits(m.armyCap, 3);
 }
 
 bool decode(BitReader &r, OwnerSetTeam &m)
@@ -568,7 +573,26 @@ bool decode(BitReader &r, OwnerSetTeam &m)
     m.slot = static_cast<uint8_t>(r.readBits(3));
     m.team = static_cast<uint8_t>(r.readBits(3));
     m.handicap = static_cast<uint8_t>(r.readBits(3));
+    m.armyCap = static_cast<uint8_t>(r.readBits(3));
     if (m.handicap > 5)
+        r.fail();
+    return done(r);
+}
+
+void encode(BitWriter &w, const OwnerSetSeat &m)
+{
+    writeType(w, MsgType::OwnerSetSeat);
+    w.writeBits(m.spawn, 3);
+    w.writeBits(m.kind, 2);
+    w.writeBits(m.level, 2);
+}
+
+bool decode(BitReader &r, OwnerSetSeat &m)
+{
+    m.spawn = static_cast<uint8_t>(r.readBits(3));
+    m.kind = static_cast<uint8_t>(r.readBits(2));
+    m.level = static_cast<uint8_t>(r.readBits(2));
+    if (m.kind > OwnerSetSeat::Ai)
         r.fail();
     return done(r);
 }
@@ -841,6 +865,8 @@ const char *rejectReasonText(RejectReason reason)
             return "The match has already started";
         case RejectReason::Banned:
             return "Not allowed to join";
+        case RejectReason::Kicked:
+            return "The room owner freed your place";
         case RejectReason::BadPassword:
             return "Wrong password";
         case RejectReason::Malformed:
