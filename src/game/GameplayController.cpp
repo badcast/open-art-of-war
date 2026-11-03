@@ -292,6 +292,8 @@ void GameplayController::CreateMatchAis(const MissionController &mission, Entity
         ai->SetPlayer(p);
         ai->SetDifficulty(static_cast<AIDifficulty>(std::min<int>(slot.aiLevel, 3)));
         ai->Init(ownX, ownY, targetX, targetY);
+        // Its own style of base: the seed of the match mixed with the slot (two computer players build differently)
+        ai->SetSeed(setup.seed ^ (static_cast<uint32_t>(p) + 1u) * 0x9E3779B9u);
         ai->ApplyHandicap(HandicapPercentOf(slot.handicap));
         ai->RecordStartingBase(entities, map);
         ai->SetSkirmish(true);
@@ -320,6 +322,30 @@ void GameplayController::ResetForMission(
     m_dialogTimer = 0.0f;
     entities.RebuildBlueprints(); // build menu of the faction picked for this mission
     CreateMatchAis(mission, entities, map);
+}
+
+const AIController *GameplayController::MatchAi(PlayerId player) const
+{
+    for (const auto &ai : m_matchAis)
+        if (ai && ai->player() == player)
+            return ai.get();
+    return nullptr;
+}
+
+ResearchProgress GameplayController::ResearchOf(PlayerId player) const
+{
+    if (const AIController *ai = MatchAi(player))
+    {
+        ResearchProgress r;
+        if (ai->IsResearchActive())
+        {
+            r.active = ai->GetResearchIndex();
+            r.duration = 1.0f;
+            r.timer = ai->GetResearchProgress();
+        }
+        return r;
+    }
+    return m_sim.research(player);
 }
 
 SimCommand GameplayController::Command(CommandType type) const
@@ -602,7 +628,7 @@ void GameplayController::Update(
         if (menu.UpdateObjectivesDialog(input, leftClicked))
         {
             // A network match goes on while a player reads its menus
-            if (mission.IsOnlineMatch())
+            if (mission.IsOnlineMatch() && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -613,7 +639,8 @@ void GameplayController::Update(
     {
         hud.SetTopInset(m_debugMode ? 32 : 0);
         hud.UpdateResearchWindow(input, mx, my, leftClicked, windowW, windowH, economy, entities);
-        if (mission.IsOnlineMatch())
+        // (an observer's window stops nothing; a held tick - a replay frame without one - stays held)
+        if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
             SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
         return;
     }
@@ -641,7 +668,7 @@ void GameplayController::Update(
                 camera,
                 appState))
         {
-            if (mission.IsOnlineMatch() && appState == AppState::SkirmishPlaying)
+            if (mission.IsOnlineMatch() && appState == AppState::SkirmishPlaying && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -1029,7 +1056,7 @@ void GameplayController::Update(
         if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
         {
             menu.SetInGameMenuOpen(true);
-            if (mission.IsOnlineMatch())
+            if (mission.IsOnlineMatch() && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -1182,6 +1209,8 @@ void GameplayController::Update(
     }
 
     // The mission dialogue opens after its delay of playing time (menus and pauses do not count)
+    if (m_pendingDialogId != 0 && hud.IsObserver())
+        m_pendingDialogId = 0; // a replay of the mission: its story was read when it was played
     if (m_pendingDialogId != 0)
     {
         m_dialogTimer += deltaTime;
@@ -1327,9 +1356,13 @@ void GameplayController::RenderOrderLines(
             renderer.DrawRectScreen(static_cast<int>(sx) - m, static_cast<int>(sy) - m, 2 * m, 2 * m, c);
         };
         float fromX = x, fromY = y;
+        // Red while the unit has a target to fight (a unit, a building, a wall, or what it shoots at on the move),
+        // green otherwise
+        const bool fighting = u->targetEntityId != 0 || u->moveFireTargetId != 0
+                              || (u->targetWallTileX >= 0 && u->targetWallTileY >= 0);
         if (u->orderX >= 0 && u->orderY >= 0)
         {
-            const LineStyle &style = u->isAttackMoving ? m_overlay.attack : m_overlay.move;
+            const LineStyle &style = (u->isAttackMoving || fighting) ? m_overlay.attack : m_overlay.move;
             const float px = static_cast<float>(u->orderX), py = static_cast<float>(u->orderY);
             if (u->targetEntityId == 0)
                 drawLine(x, y, px, py, style);
@@ -1341,7 +1374,7 @@ void GameplayController::RenderOrderLines(
         {
             fromX = u->targetTileX * TILE_WIDTH + TILE_WIDTH * 0.5f;
             fromY = u->targetTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-            drawLine(x, y, fromX, fromY, m_overlay.move);
+            drawLine(x, y, fromX, fromY, fighting ? m_overlay.attack : m_overlay.move);
         }
         for (const Unit::QueuedOrder &q : u->orderQueue)
         {

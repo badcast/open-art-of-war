@@ -67,6 +67,28 @@ std::vector<std::string> ComboChoices(int kind)
     return out;
 }
 
+// The three filter lists over the list of maps (the same choices as in the custom game window)
+std::vector<std::string> MapFilterChoices(int id, const std::vector<SkirmishMapInfo> &all)
+{
+    std::vector<std::string> out;
+    if (id == 1003)
+    {
+        for (int n : ui::MapFilter::PlayerCounts(all))
+            out.push_back(std::string(_("Players")) + ": " + (n == 0 ? std::string(_("Any")) : std::to_string(n)));
+    }
+    else if (id == 1004)
+    {
+        for (const char *z : {_("Any"), _("Small"), _("Medium"), _("Large")})
+            out.push_back(std::string(_("Size")) + ": " + z);
+    }
+    else
+    {
+        for (const char *z : {_("Name"), _("Players"), _("Size")})
+            out.push_back(std::string(_("Sort")) + ": " + z);
+    }
+    return out;
+}
+
 // What a start position row can hold, as the combo shows it: the choices depend on the viewer and the row
 enum SeatCode
 {
@@ -242,25 +264,49 @@ NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int w, int h)
 NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
 {
     LobbyLayout l;
-    l.dialog = ui::CenteredRect(w, h, 1080, 640);
-    const int x = l.dialog.x + 20, y = l.dialog.y + 60;
-    l.players = {x, y, 600, 30 + 8 * 40};
-    l.map = {x + 620, y + 30, l.dialog.Right() - 20 - (x + 620), 300};
-    l.mapPrev = {l.map.x, y - 4, 32, 26};
-    l.mapNext = {l.map.Right() - 32, y - 4, 32, 26};
-    l.mapName = {l.mapPrev.Right() + 4, y - 4, l.mapNext.x - 4 - (l.mapPrev.Right() + 4), 26};
-    l.chatLog = {x, l.players.Bottom() + 10, 600, l.dialog.Bottom() - 70 - (l.players.Bottom() + 10) - 44};
-    l.chatField = {x, l.chatLog.Bottom() + 6, 600 - 52, 36};
+    l.dialog = ui::CenteredRect(w, h, w, h); // the whole window
+    const int x = l.dialog.x + 20;
+    const int contentY = l.dialog.y + 52 + 16;
+    const int footerY = l.dialog.Bottom() - 64;
+    const int colH = footerY - contentY - 8;
+    const int leftW = std::clamp(static_cast<int>(l.dialog.w * 0.30f), 330, 480);
+    // Left: search and filters, the list of maps, the chat
+    const int chatH = std::max(170, static_cast<int>(colH * 0.36f));
+    l.mapSearch = {x, contentY, leftW, 30};
+    l.mapList = {x, contentY + 72, leftW, colH - 72 - chatH - 10};
+    l.chatField = {x, contentY + colH - 36, leftW - 52, 36};
     l.chatSend = {l.chatField.Right() + 8, l.chatField.y, 44, 36};
-    // Match options under the map, the same three the custom game window has: bases, starting credits, fog of war
-    l.creditsBtn = {l.map.x, l.map.Bottom() + 8, l.map.w, 28};
-    l.prebuiltBtn = {l.map.x, l.map.Bottom() + 40, l.map.w, 26}; // a check box: start with a base
-    l.fogCheckbox = {l.map.x, l.map.Bottom() + 68, l.map.w, 26};
-    // Bottom row: Leave on the left (under the chat), Ready and Start on the right - never on top of each other
-    l.leaveBtn = {x, l.dialog.Bottom() - 60, 140, 40};
-    l.startBtn = {l.dialog.Right() - 20 - 150, l.leaveBtn.y, 150, 40};
-    l.readyBtn = {l.startBtn.x - 12 - 150, l.leaveBtn.y, 150, 40};
+    l.chatLog = {x, l.mapList.Bottom() + 10, leftW, l.chatField.y - 6 - (l.mapList.Bottom() + 10)};
+    // Right: the details
+    l.details = {x + leftW + 16, contentY, l.dialog.Right() - 20 - (x + leftW + 16), colH};
+    const ui::UiRect &d = l.details;
+    // The seat table takes the whole width of the details (its cells share it); the map picture sits under it on the
+    // left, the options and the hint on its right
+    const int rowH = std::clamp((d.h - 74 - 24 - 150 - 30) / 8, 30, 40);
+    l.rowH = rowH;
+    l.players = {d.x + 20, d.y + 74, d.w - 40, 24 + 8 * rowH};
+    const int below = d.Bottom() - 16 - (l.players.Bottom() + 12);
+    const int size = std::clamp(std::min(below, static_cast<int>(d.w * 0.45f)), 120, 460);
+    l.map = {d.x + 20, l.players.Bottom() + 12, size, size};
+    const int optX = l.map.Right() + 20;
+    const int optW = d.Right() - 20 - optX;
+    // Match options: the credits next to the title, the check boxes beside the picture
+    l.creditsBtn = {d.Right() - 20 - 200, d.y + 12, 200, 32};
+    l.fogCheckbox = {optX, l.map.y, optW, 28};
+    l.prebuiltBtn = {optX, l.map.y + 32, optW, 28}; // a check box: start with a base
+    // Footer: Leave on the left, Ready and Start on the right - never on top of each other
+    l.leaveBtn = {x, footerY + 10, 140, 40};
+    l.startBtn = {l.dialog.Right() - 20 - 200, footerY + 10, 200, 40};
+    l.readyBtn = {l.startBtn.x - 12 - 200, footerY + 10, 200, 40};
     return l;
+}
+
+void NetworkMenu::RebuildMapsShown()
+{
+    if (m_maps.empty())
+        m_maps = MissionController::ListSkirmishMaps();
+    m_mapsShown = m_mapFilter.Apply(m_maps);
+    m_mapTop = 0;
 }
 
 void NetworkMenu::EditText(InputManager &input, std::string &text, size_t maxLength)
@@ -522,6 +568,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     }
 
     // The host picks the first map when the room opens
+    if (m_maps.empty())
+        RebuildMapsShown();
     if (net.ControlsRoom() && lobby && lobby->map.empty())
     {
         if (m_maps.empty())
@@ -591,8 +639,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             return l.prebuiltBtn;
         if (id == kCreditsCombo)
             return l.creditsBtn;
-        if (id == kMapCombo)
-            return l.mapName;
+        if (id >= kFilterPlayers && id <= kFilterSort)
+            return l.Filter(id - kFilterPlayers);
         const int row = id / 10, kind = id % 10;
         return kind == 1   ? l.FactionCell(row)
                : kind == 2 ? l.TeamCell(row)
@@ -601,11 +649,48 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                : kind == 8 ? l.ArmyCell(row)
                            : l.TypeCell(row);
     };
-    if (m_combo.open >= 0)
+    // The filter lists over the maps work for everybody in the room
+    if (m_combo.open >= kFilterPlayers && m_combo.open <= kFilterSort)
+    {
+        const int id = m_combo.open;
+        int picked = -1;
+        if (ui::ComboUpdate(
+                m_combo,
+                comboField(id),
+                static_cast<int>(MapFilterChoices(id, m_maps).size()),
+                h,
+                mx,
+                my,
+                clicked,
+                input.ConsumeWheel(),
+                picked))
+        {
+            if (picked >= 0)
+            {
+                if (id == kFilterPlayers)
+                {
+                    const std::vector<int> counts = ui::MapFilter::PlayerCounts(m_maps);
+                    m_mapFilter.players = counts[std::clamp(picked, 0, static_cast<int>(counts.size()) - 1)];
+                }
+                else if (id == kFilterSize)
+                    m_mapFilter.size = std::clamp(picked, 0, 3);
+                else
+                    m_mapFilter.sort = std::clamp(picked, 0, 2);
+                RebuildMapsShown();
+            }
+            return NetworkAction::None;
+        }
+        if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
+        {
+            m_combo.open = -1;
+            return NetworkAction::None;
+        }
+    }
+    if (m_combo.open >= 0 && !(m_combo.open >= kFilterPlayers && m_combo.open <= kFilterSort))
     {
         const bool optionList = IsOptionCombo(m_combo.open);
         const int id = m_combo.open, row = id / 10, kind = optionList ? 5 : id % 10;
-        const bool isMapList = id == kMapCombo;
+        const bool isMapList = false;
         const bool valid = optionList || isMapList ? net.ControlsRoom()
                                                            : (lobby && row < std::min<int>(lobby->spawnCount, kMaxPlayers));
         if (!valid)
@@ -629,22 +714,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     input.ConsumeWheel(),
                     picked))
             {
-                if (picked >= 0 && isMapList)
+                if (false)
                 {
-                    // Only a map with a start position for everybody in the room
-                    const size_t inRoom = lobby ? lobby->slots.size() : 1;
-                    if (picked < static_cast<int>(m_maps.size())
-                        && MissionController::StartPositions(m_maps[picked].path).size() >= inRoom)
-                    {
-                        m_mapIndex = picked;
-                        net.SetLobbyMap(m_maps[picked].path);
-                    }
-                    else
-                    {
-                        m_chatLog.push_back(_("This map has no start position for everybody in the room."));
-                        if (m_chatLog.size() > 50)
-                            m_chatLog.erase(m_chatLog.begin());
-                    }
                 }
                 else if (picked >= 0 && id == kLayoutCombo)
                 {
@@ -761,6 +832,22 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
 
     if (m_focus == Field::Chat)
         EditText(input, m_chatInput, Net::kMaxChatLength);
+    if (m_focus == Field::Search)
+    {
+        const std::string before = m_mapFilter.search;
+        EditText(input, m_mapFilter.search, 40);
+        if (m_mapFilter.search != before)
+            RebuildMapsShown();
+        if (input.IsKeyJustPressed(SDL_SCANCODE_RETURN) || input.IsKeyJustPressed(SDL_SCANCODE_KP_ENTER))
+        {
+            m_focus = Field::None;
+            return NetworkAction::None;
+        }
+    }
+    // The wheel over the list of maps scrolls it
+    if (m_combo.open < 0 && l.mapList.Contains(mx, my))
+        m_mapTop = std::clamp(
+            m_mapTop - input.ConsumeWheel(), 0, std::max(0, static_cast<int>(m_mapsShown.size()) - l.MapRows()));
     auto sendChat = [&]() {
         if (m_chatInput.empty())
             return;
@@ -787,7 +874,9 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     if (!clicked)
         return NetworkAction::None;
 
-    m_focus = l.chatField.Contains(mx, my) ? Field::Chat : Field::None;
+    m_focus = l.chatField.Contains(mx, my) ? Field::Chat : (l.mapSearch.Contains(mx, my) ? Field::Search : Field::None);
+    if (m_focus == Field::Search)
+        return NetworkAction::None;
     if (l.chatSend.Contains(mx, my))
     {
         sendChat();
@@ -817,30 +906,31 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         PushOptions(net);
         return NetworkAction::None;
     }
-    if (net.ControlsRoom() && !m_maps.empty() && l.mapName.Contains(mx, my))
-        return openCombo(kMapCombo);
-    if (net.ControlsRoom() && !m_maps.empty() && (l.mapPrev.Contains(mx, my) || l.mapNext.Contains(mx, my)))
+    // The filters over the maps (everybody may look through the list) and the list: only the owner picks the map
+    for (int k = 0; k < 3; ++k)
+        if (l.Filter(k).Contains(mx, my))
+            return openCombo(kFilterPlayers + k);
+    if (net.ControlsRoom() && l.mapList.Contains(mx, my))
     {
-        // The next map in that direction that has a start position for everybody in the room
-        const int n = static_cast<int>(m_maps.size());
-        const int step = l.mapNext.Contains(mx, my) ? 1 : -1;
-        const size_t inRoom = lobby ? lobby->slots.size() : 1;
-        int pick = -1;
-        for (int k = 1; k <= n && pick < 0; ++k)
+        const int i = m_mapTop + (my - l.mapList.y) / l.listRowH;
+        if (i >= 0 && i < static_cast<int>(m_mapsShown.size()))
         {
-            const int i = ((m_mapIndex + step * k) % n + n) % n;
-            if (MissionController::StartPositions(m_maps[i].path).size() >= inRoom)
-                pick = i;
+            // Only a map with a start position for everybody in the room
+            const size_t inRoom = lobby ? lobby->slots.size() : 1;
+            if (MissionController::StartPositions(m_mapsShown[i].path).size() >= inRoom)
+            {
+                for (size_t k = 0; k < m_maps.size(); ++k)
+                    if (m_maps[k].path == m_mapsShown[i].path)
+                        m_mapIndex = static_cast<int>(k);
+                net.SetLobbyMap(m_mapsShown[i].path);
+            }
+            else
+            {
+                m_chatLog.push_back(_("This map has no start position for everybody in the room."));
+                if (m_chatLog.size() > 50)
+                    m_chatLog.erase(m_chatLog.begin());
+            }
         }
-        if (pick < 0 || pick == m_mapIndex)
-        {
-            m_chatLog.push_back(_("No other map has a start position for everybody in the room."));
-            if (m_chatLog.size() > 50)
-                m_chatLog.erase(m_chatLog.begin());
-            return NetworkAction::None;
-        }
-        m_mapIndex = pick;
-        net.SetLobbyMap(m_maps[m_mapIndex].path);
         return NetworkAction::None;
     }
     // The rows are the start positions of the map: what holds each (a drop-down list), and the picks of who holds it
@@ -922,12 +1012,17 @@ void NetworkMenu::render(
             title += std::string("  -  ") + _("code") + " " + net->PublicCode();
         const UiRect content = ui::DrawDialog(r, font, w, h, l.dialog, title);
         (void) content;
-        ui::DrawCaption(font, r, l.players.x, l.players.y, _("PLAYERS"));
-        // Column captions: a row is a start position of the map
-        for (const auto &[cx, text] : std::initializer_list<std::pair<int, const char *>> {
-                 {30, _("Place")}, {176, _("Faction")}, {276, _("Team")}, {332, _("Colour")}, {376, _("Handicap")},
-                 {444, _("Army")}})
-            font.DrawString(text, l.players.x + cx, l.players.y + 4, ui::FONT_SMALL, col::TextMuted, false);
+        ui::DrawCaption(font, r, l.players.x, l.players.y - 22, _("PLAYERS"));
+        // Column captions: a row is a start position of the map; they sit over the same cells as the rows
+        {
+            const char *names[6] = {_("Place"), _("Faction"), _("Team"), _("Colour"), _("Handicap"), _("Army")};
+            for (int k = 0; k < 6; ++k)
+            {
+                const UiRect c = l.Col(0, k);
+                font.DrawString(
+                    ui::FitText(font, names[k], ui::FONT_SMALL, c.w), c.x + 2, l.players.y + 2, ui::FONT_SMALL, col::TextMuted, false);
+            }
+        }
         auto nameOf = [&](uint8_t slot) {
             if (roster)
             {
@@ -1045,10 +1140,9 @@ void NetworkMenu::render(
             }
         }
 
-        // Map with its start positions
-        // The map's own title (the list of maps is the same on every peer: the assets match)
+        // The list of maps (search, filters), the title of the room's map over the details
         if (m_maps.empty())
-            m_maps = MissionController::ListSkirmishMaps();
+            RebuildMapsShown();
         std::string mapName;
         if (lobby)
         {
@@ -1058,26 +1152,63 @@ void NetworkMenu::render(
             if (mapName.empty() && !lobby->map.empty())
                 mapName = lobby->map.substr(lobby->map.find_last_of('/') + 1);
         }
-        if (net->ControlsRoom())
+        font.DrawString(
+            ui::FitText(font, mapName, ui::FONT_H2, l.creditsBtn.x - l.details.x - 40),
+            l.details.x + 20,
+            l.details.y + 18,
+            ui::FONT_H2,
+            col::Accent,
+            true);
         {
-            ui::DrawComboField(
-                r, font, l.mapName, mapName, m_combo.open == kMapCombo, l.mapName.Contains(m_mouseX, m_mouseY));
-        }
-        else
-        {
-            font.DrawString(
-                ui::FitText(font, mapName, ui::FONT_BODY_BOLD, l.mapName.w),
-                l.map.CenterX(),
-                l.mapPrev.CenterY(),
-                ui::FONT_BODY_BOLD,
-                col::Text,
-                false,
-                Anchor::HCENTER | Anchor::VCENTER);
-        }
-        if (net->ControlsRoom())
-        {
-            ui::DrawButton(r, font, l.mapPrev, "<", ui::ButtonStyle::Secondary, l.mapPrev.Contains(m_mouseX, m_mouseY));
-            ui::DrawButton(r, font, l.mapNext, ">", ui::ButtonStyle::Secondary, l.mapNext.Contains(m_mouseX, m_mouseY));
+            const bool searching = m_focus == Field::Search;
+            DrawField(r, font, l.mapSearch, m_mapFilter.search, _("Search map..."), searching);
+            const std::vector<int> counts = ui::MapFilter::PlayerCounts(m_maps);
+            const auto cur = std::find(counts.begin(), counts.end(), m_mapFilter.players);
+            for (int k = 0; k < 3; ++k)
+            {
+                const std::vector<std::string> items = MapFilterChoices(kFilterPlayers + k, m_maps);
+                const int idx = k == 0 ? (cur == counts.end() ? 0 : static_cast<int>(cur - counts.begin()))
+                                       : (k == 1 ? m_mapFilter.size : m_mapFilter.sort);
+                ui::DrawComboField(
+                    r,
+                    font,
+                    l.Filter(k),
+                    ui::FitText(font, items[std::clamp(idx, 0, static_cast<int>(items.size()) - 1)], ui::FONT_SMALL, l.Filter(k).w - 34),
+                    m_combo.open == kFilterPlayers + k,
+                    l.Filter(k).Contains(m_mouseX, m_mouseY));
+            }
+            ui::DrawPanel(r, l.mapList, col::PanelSunken, col::Border);
+            const size_t inRoom = lobby ? lobby->slots.size() : 1;
+            const int rows = l.MapRows();
+            r.SetClipRect({l.mapList.x, l.mapList.y, l.mapList.w, l.mapList.h});
+            for (int row = 0; row < rows && m_mapTop + row < static_cast<int>(m_mapsShown.size()); ++row)
+            {
+                const SkirmishMapInfo &m = m_mapsShown[m_mapTop + row];
+                const ui::UiRect it = l.MapItem(row);
+                const bool selected = lobby && m.path == lobby->map;
+                const bool unfit = MissionController::StartPositions(m.path).size() < inRoom;
+                const bool hot = net->ControlsRoom() && it.Contains(m_mouseX, m_mouseY);
+                r.FillRectScreen(it.x + 2, it.y, it.w - 4, it.h, selected ? col::Hover : (hot ? col::PanelRaised : col::PanelSunken));
+                if (selected)
+                    r.FillRectScreen(it.x + 2, it.y, 3, it.h, col::Accent);
+                font.DrawString(
+                    ui::FitText(font, m.DisplayName(), ui::FONT_BODY, it.w - 60),
+                    it.x + 14,
+                    it.CenterY(),
+                    ui::FONT_BODY,
+                    selected ? col::Text : (unfit ? col::TextMuted : col::TextDim),
+                    false,
+                    Anchor::LEFT | Anchor::VCENTER);
+                font.DrawString(
+                    std::to_string(m.players),
+                    it.Right() - 10,
+                    it.CenterY(),
+                    ui::FONT_SMALL,
+                    col::TextMuted,
+                    false,
+                    Anchor::RIGHT | Anchor::VCENTER);
+            }
+            r.ResetClipRect();
         }
         ui::DrawPanel(r, l.map, col::PanelSunken, col::Border);
         if (lobby && !lobby->map.empty() && !net->MapReady())
@@ -1181,9 +1312,9 @@ void NetworkMenu::render(
         font.DrawTextWrapped(
             _("Click a number on the map to start there, again to leave it to chance. Click your faction and colour to "
               "change them; the host sets the teams."),
-            l.map.x,
-            l.fogCheckbox.Bottom() + 8,
-            l.map.w,
+            l.fogCheckbox.x,
+            l.prebuiltBtn.Bottom() + 10,
+            l.fogCheckbox.w,
             ui::FONT_SMALL,
             col::TextDim,
             false);
@@ -1262,20 +1393,15 @@ void NetworkMenu::render(
         if (m_combo.open >= 0)
         {
             const int id = m_combo.open, row = id / 10, kind = IsOptionCombo(id) ? 5 : id % 10;
-            if (id == kMapCombo)
+            if (id >= kFilterPlayers && id <= kFilterSort)
             {
-                std::vector<std::string> names;
-                std::vector<bool> unfit;
-                int current = 0;
-                const size_t inRoom = lobby ? lobby->slots.size() : 1;
-                for (size_t i = 0; i < m_maps.size(); ++i)
-                {
-                    names.push_back(m_maps[i].DisplayName());
-                    unfit.push_back(MissionController::StartPositions(m_maps[i].path).size() < inRoom);
-                    if (lobby && m_maps[i].path == lobby->map)
-                        current = static_cast<int>(i);
-                }
-                ui::DrawComboList(r, font, l.mapName, names, current, m_combo, h, m_mouseX, m_mouseY, &unfit);
+                const std::vector<int> counts = ui::MapFilter::PlayerCounts(m_maps);
+                const auto cur = std::find(counts.begin(), counts.end(), m_mapFilter.players);
+                const int current = id == kFilterPlayers ? (cur == counts.end() ? 0 : static_cast<int>(cur - counts.begin()))
+                                    : id == kFilterSize  ? m_mapFilter.size
+                                                         : m_mapFilter.sort;
+                ui::DrawComboList(
+                    r, font, l.Filter(id - kFilterPlayers), MapFilterChoices(id, m_maps), current, m_combo, h, m_mouseX, m_mouseY);
             }
             else if (id == kLayoutCombo)
             {

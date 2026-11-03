@@ -21,6 +21,7 @@ void RallyPointOf(const Building &b, const TileMap &map, int &outTileX, int &out
 class Economy
 {
 public:
+    static constexpr int kMaxIncomeHeadquarters = 3; // every finished headquarters up to this many brings income
     Economy();
 
     // `player`: whose economy it is (single player: the local one)

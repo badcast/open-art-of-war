@@ -4379,3 +4379,36 @@ msgstr ""
 
 msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
 msgstr ""
+
+msgid "Map"
+msgstr ""
+
+msgid "Watching"
+msgstr ""
+
+msgid "STATS"
+msgstr ""
+
+msgid "STATISTICS"
+msgstr ""
+
+msgid "Credits"
+msgstr ""
+
+msgid "MB"
+msgstr ""
+
+msgid "KB"
+msgstr ""
+
+msgid "Custom game"
+msgstr ""
+
+msgid "Campaign"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "Played"
+msgstr ""

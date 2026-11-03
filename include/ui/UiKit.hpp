@@ -132,6 +132,14 @@ void DrawCheckbox(
     bool enabled = true);
 
 void DrawProgressBar(Renderer &r, const UiRect &rect, float ratio, SDL_Color fillColor);
+// A thin scroll bar along `track` (vertical when it is taller than wide): `pos` of `total - visible`, the thumb as
+// long as the visible share. Nothing is drawn when everything fits.
+UiRect ScrollThumb(const UiRect &track, float pos, float total, float visible);
+void DrawScrollBar(Renderer &r, const UiRect &track, float pos, float total, float visible, bool hot = false);
+// The scroll position that puts the middle of the thumb under the mouse (`mouse`: x or y along the track)
+float ScrollPosFromMouse(const UiRect &track, int mouse, float total, float visible);
+// Scroll bars are thin: they are grabbed from a wider strip
+bool OnScrollTrack(const UiRect &track, int mx, int my);
 
 // A yes / no question over a dimmed screen (leaving a room or a game). Enter / click Yes confirms, Esc / click No
 // cancels.

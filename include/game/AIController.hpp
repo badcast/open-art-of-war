@@ -104,13 +104,39 @@ struct AIDefenseSite
         Lab,
         PowerPlant,
         Barracks,
-        Factory
+        Factory,
+        Headquarters // another headquarters (more income and a wider building zone)
     };
     Kind kind {Tower};
     int tileX {0};
     int tileY {0};
     bool done {false};
     int attempts {0}; // build steps the spot was taken by units (they move on; terrain and buildings do not)
+    bool exact {false}; // the spot was chosen with every check already: built right there or not at all
+};
+
+// How one computer player builds its base, drawn from the seed of the match and its slot (so two computer players
+// of a match, and the same one in two matches, do not build alike). Deterministic: no clock, no shared generator.
+struct AIBaseStyle
+{
+    enum Layout
+    {
+        Compact, // the buildings pack the rings around the headquarters
+        Road,    // they line up along the road out of the base, behind the HQ
+        Fan      // they spread to the sides, a little apart
+    };
+    Layout layout {Compact};
+    float turnDeg {0.0f};      // the barracks / factory sides turn by this much around the HQ
+    bool mirror {false};       // barracks and factory swap sides
+    bool labEarly {false};     // the laboratory comes before the factory
+    bool barracksFirst {false}; // a second barracks before the first factory
+    int sparePower {40};       // power kept spare before another consumer
+    int wallThickness {2};     // rows of a wall across a passage
+    int gateWidth {3};         // tiles left open in it for the road
+    int lineOffset {0};        // the wall line this many tiles farther out than the nearest place allowed
+    bool towersOnly {false};   // hardly any walls: the money goes into towers and bunkers
+    bool bunkerHeavy {false};  // more bunkers than towers
+    std::string Describe() const;
 };
 
 class AIController
@@ -130,6 +156,12 @@ public:
     }
     // The player slot this AI commands (single player: set by init from the factions)
     void SetPlayer(PlayerId player);
+    // The seed of the match (mixed with the slot by the caller): picks the style of the base
+    void SetSeed(uint32_t seed);
+    const AIBaseStyle &BaseStyle() const
+    {
+        return m_style;
+    }
     PlayerId player() const
     {
         return m_player;
@@ -305,7 +337,36 @@ private:
     void UpdateUnitStances(EntityManager &entities);
     // Core build order, ahead of the defense plan: a power plant when power runs short, the barracks, a
     // spare power plant when credits allow, the factory. True when something was started this step
-    bool UpdateCoreBuildOrder(TileMap &map, EntityManager &entities);
+    bool UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, bool full = true);
+    // --- Base layout (AIBaseLayout.cpp) ---
+    // Roads between all headquarters of the map (kept free of buildings) and the ground of this player (nearer to
+    // its headquarters than to an ally's): worked out once, when the base is planned
+    void PlanTerritory(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
+    bool IsRoad(int x, int y) const;     // a road or the band along it
+    bool IsRoadCore(int x, int y) const; // the road itself (where the gates go)
+    bool IsOwnGround(int x, int y) const;
+    // Would a structure on (x, y, w, h) still leave the headquarters, the barracks and the factories a way out (two
+    // tiles wide) to the roads leading away from the base?
+    bool KeepsWayOut(int x, int y, int w, int h, const TileMap &map, const EntityManager &entities) const;
+    // A free place for a structure of the core build order: ring by ring outward from the HQ, the best of a ring by
+    // the preferred direction (dx, dy); `rearOnly`: never on the side of the enemy (power plants). False: none
+    bool FindCoreSite(
+        int &outX,
+        int &outY,
+        int w,
+        int h,
+        float dirX,
+        float dirY,
+        bool rearOnly,
+        int minRing,
+        const TileMap &map,
+        const EntityManager &entities,
+        int crowding = 0) const; // 0: a gap around it, 1: side by side, 2: also on the band along a road
+    // Walls across the narrowest passage on each road to an enemy, gates on the road, towers behind them; true
+    // when at least one passage was closed (else the caller falls back to an arc in front of the base)
+    bool PlanPassageWalls(
+        int cx, int cy, int hqRadius, const TileMap &map, const EntityManager &entities,
+        std::vector<std::pair<int, int>> &wallTiles);
     // Hard / Hardcore: repairs buildings that are not under fire, paid from the AI treasury
     void UpdateRepairs(float deltaTime, EntityManager &entities);
     // What the computer knows of the enemy: structures and units it has seen (Hardcore: everything)
@@ -402,6 +463,17 @@ private:
     std::vector<AIWallPlan> m_startingWalls;
     bool m_startingBaseRecorded {false};
 
+    // Base layout: the style of this match, the roads and the ground
+    uint32_t m_seed {0};
+    AIBaseStyle m_style;
+    bool m_territoryReady {false};
+    int m_terrW {0}, m_terrH {0};
+    std::vector<uint8_t> m_road;      // 2: a road between two headquarters, 1: the band along it, 0: free
+    std::vector<uint8_t> m_ownGround; // 1: nearer to this player's headquarters than to any ally's
+    std::vector<std::vector<std::pair<int, int>>> m_enemyRoads; // from this HQ to every enemy headquarters
+    int m_homeX {-1}, m_homeY {-1}; // centre of the own (first) headquarters
+    float m_baseQuietSeconds {0.0f}; // since a structure of the base was last attacked
+
     // Skirmish base builder
     bool m_skirmish {false};
     bool m_defensePlanned {false};
@@ -434,6 +506,14 @@ private:
     std::set<int> m_repairing;
     float m_retreatTimer {0.0f};
     bool m_firstRaidDone {false};
+    // Waves that broke nothing: Hard / Hardcore send more groups and more troops after them (as far as the treasury
+    // allows), one that destroys a structure resets it
+    int m_failedWaves {0};
+    int m_trackedWave {0};           // the wave being watched (0: none)
+    int m_trackedBuildingsKilled {0}; // enemy structures destroyed before it left
+    bool Escalates() const;
+    int EscalationTroops() const;
+    void UpdateWaveOutcome(const EntityManager &entities);
     int m_trainedUnits {0}; // troops trained since the start (the early raid waits for the first one)
 
     void InitDifficultyDefaults();

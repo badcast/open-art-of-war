@@ -376,7 +376,7 @@ void Application::RenderScoreboard()
     std::stable_sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) { return a.points > b.points; });
 
     const int viewW = m_camera->GetViewportWidth();
-    const int rowH = 30, headH = 64;
+    const int rowH = 30, headH = 84;
     // Columns: colour swatch + name | faction | colour | efficiency | kills | losses
     const int colName = 16, colFaction = 250, colColor = 410, colPoints = 520, colKills = 620, colLosses = 700;
     const int w = std::min(viewW - 32, 780);
@@ -386,7 +386,25 @@ void Application::RenderScoreboard()
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
     m_renderer->FillRectScreen(x, y, w, 2, col::Accent);
     m_fontRenderer->DrawString(_("MATCH STATISTICS"), x + colName, y + 12, ui::FONT_H2, col::Accent, false);
-    const int hy = y + 44;
+    // The map and how long the match has gone on
+    {
+        std::string about;
+        if (m_mission && !m_mission->GetMapTitle().empty())
+            about = std::string(_("Map")) + ": " + m_mission->GetMapTitle() + "    ";
+        const uint32_t seconds = m_gameplayController
+                                     ? static_cast<uint32_t>(m_gameplayController->simulation().Tick() / SIMULATION_TICK_RATE)
+                                     : 0u;
+        char clock[32];
+        if (seconds >= 3600)
+            std::snprintf(clock, sizeof clock, "%u:%02u:%02u", seconds / 3600, seconds / 60 % 60, seconds % 60);
+        else
+            std::snprintf(clock, sizeof clock, "%u:%02u", seconds / 60, seconds % 60);
+        about += std::string(_("Time")) + ": " + clock;
+        m_fontRenderer->DrawString(
+            ui::FitText(*m_fontRenderer, about, ui::FONT_BODY, w - 2 * colName), x + colName, y + 40, ui::FONT_BODY,
+            col::TextDim, false);
+    }
+    const int hy = y + 64;
     m_fontRenderer->DrawString(_("Player"), x + colName + 22, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     m_fontRenderer->DrawString(_("Faction"), x + colFaction, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     m_fontRenderer->DrawString(_("Color"), x + colColor, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);

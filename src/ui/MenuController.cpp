@@ -1,4 +1,5 @@
 #include "ui/MenuController.hpp"
+#include "ui/MapFilter.hpp"
 #include "ui/MatchOptions.hpp"
 #include "audio/SoundRequests.hpp"
 #include <nlohmann/json.hpp>
@@ -33,6 +34,8 @@ namespace OpenArtOfWar
 {
 
 using ui::UiRect;
+using ui::LowerText;
+using ui::PopLastUtf8;
 namespace col = ui::color;
 
 namespace
@@ -105,39 +108,35 @@ std::string HandicapText(int index)
 }
 
 // Custom game: the table of players in the details panel (columns: level / name, faction, team, colour, remove)
-// The map picture of the custom game grows with the window (the dialog fills the whole screen)
-int CustomPreviewSize(const UiRect &d)
+// The seat table takes the whole width of the details (as in the network room); the map picture sits under it on the
+// left, the options and the map size on its right
+int CustomRowH(const UiRect &d)
 {
-    return std::clamp(static_cast<int>(std::min(d.w * 0.30f, d.h * 0.45f)), 210, 460);
+    return std::clamp((d.h - 118 - 150 - 30) / 8, 30, 40);
 }
 UiRect CustomRow(const UiRect &d, int i)
 {
-    return {d.x + 20, d.y + 104 + i * 34, d.w - 40 - (CustomPreviewSize(d) + 12), 30};
+    const int rowH = CustomRowH(d);
+    return {d.x + 20, d.y + 118 + i * rowH, d.w - 40, rowH - 4};
 }
 UiRect CustomCell(const UiRect &d, int i, int kind)
 {
     // (i is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap, 8 army size)
+    // The cells share the width of the row, so they stretch with the window
+    static constexpr int kShare[6] = {26, 19, 9, 9, 13, 14};
     const UiRect r = CustomRow(d, i);
-    switch (kind)
-    {
-        case 1:
-            return {r.x + 136, r.y, 96, r.h};
-        case 2:
-            return {r.x + 236, r.y, 46, r.h};
-        case 3:
-            return {r.x + 286, r.y, 44, r.h};
-        case 7:
-            return {r.x + 334, r.y, 58, r.h};
-        case 8:
-            return {r.x + 396, r.y, 66, r.h};
-        default:
-            return {r.x + 24, r.y, 108, r.h};
-    }
+    const int k = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : 0;
+    const int gap = 4, x0 = r.x + 24, total = r.w - 24 - 5 * gap - 4;
+    int used = 0;
+    for (int j = 0; j < k; ++j)
+        used += kShare[j];
+    return {x0 + total * used / 100 + k * gap, r.y, total * kShare[k] / 100, r.h};
 }
 UiRect CustomPreviewArea(const UiRect &d)
 {
-    const int size = CustomPreviewSize(d);
-    return {d.Right() - 20 - size, d.y + 88, size, size};
+    const int top = d.y + 118 + 8 * CustomRowH(d) + 12;
+    const int size = std::clamp(std::min(d.Bottom() - 16 - top, static_cast<int>(d.w * 0.45f)), 120, 460);
+    return {d.x + 20, top, size, size};
 }
 
 // Campaign mission select
@@ -179,8 +178,9 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
     l.creditsBtn = {l.details.Right() - 20 - 200, l.details.y + 12, 200, 32};
     const UiRect pv = CustomPreviewArea(l.details);
-    l.fogCheckbox = {pv.x, pv.Bottom() + 66, pv.w, 28};
-    l.baseCheckbox = {pv.x, pv.Bottom() + 98, pv.w, 28};
+    const int optX = pv.Right() + 20;
+    l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
+    l.baseCheckbox = {optX, pv.y + 32, l.details.Right() - 20 - optX, 28};
     l.difficultyBtn = {
         l.sideBtn[0].Right() + 12, footerY + 10, std::max(180, l.editorBtn.x - 12 - (l.sideBtn[0].Right() + 12)), 40};
     return l;
@@ -204,52 +204,6 @@ UiRect MapFilterBtn(const CampaignLayout &l, int i)
 {
     const int w = (l.list.w - 2 * 6) / 3;
     return {l.list.x + i * (w + 6), l.list.y - kMapFilterBarH + 36, w, 28};
-}
-// Case-insensitive for ASCII and Cyrillic (UTF-8)
-std::string LowerText(const std::string &t)
-{
-    std::string out;
-    for (size_t i = 0; i < t.size(); ++i)
-    {
-        const unsigned char c = static_cast<unsigned char>(t[i]);
-        if (c == 0xD0 && i + 1 < t.size())
-        {
-            const unsigned char d = static_cast<unsigned char>(t[i + 1]);
-            if (d >= 0x90 && d <= 0x9F)
-            {
-                out += static_cast<char>(0xD0);
-                out += static_cast<char>(d + 0x20);
-                ++i;
-                continue;
-            }
-            if (d >= 0xA0 && d <= 0xAF)
-            {
-                out += static_cast<char>(0xD1);
-                out += static_cast<char>(d - 0x20);
-                ++i;
-                continue;
-            }
-            if (d == 0x81)
-            { // Yo
-                out += static_cast<char>(0xD1);
-                out += static_cast<char>(0x91);
-                ++i;
-                continue;
-            }
-        }
-        out += (c < 0x80) ? static_cast<char>(std::tolower(c)) : static_cast<char>(c);
-    }
-    return out;
-}
-void PopLastUtf8(std::string &s)
-{
-    while (!s.empty())
-    {
-        const unsigned char c = static_cast<unsigned char>(s.back());
-        s.pop_back();
-        if ((c & 0xC0) != 0x80)
-            break;
-    }
 }
 int CustomListRows(CampaignLayout &l)
 {
@@ -1206,12 +1160,7 @@ bool MenuController::UpdateMissionDialog(
 
 std::vector<int> MenuController::MapPlayerCounts() const
 {
-    std::vector<int> counts {0};
-    for (const SkirmishMapInfo &m : m_skirmishAll)
-        if (std::find(counts.begin(), counts.end(), m.players) == counts.end())
-            counts.push_back(m.players);
-    std::sort(counts.begin(), counts.end());
-    return counts;
+    return ui::MapFilter::PlayerCounts(m_skirmishAll);
 }
 
 void MenuController::RebuildMapList()
@@ -1219,28 +1168,12 @@ void MenuController::RebuildMapList()
     const std::string keep = (m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size()))
                                  ? m_skirmishMaps[m_skirmishSelected].path
                                  : std::string();
-    const std::string needle = LowerText(m_mapSearch);
-    m_skirmishMaps.clear();
-    for (const SkirmishMapInfo &m : m_skirmishAll)
-    {
-        const int area = m.width * m.height;
-        const int sizeClass = area <= 2400 ? 1 : (area <= 4800 ? 2 : 3);
-        if (m_mapPlayersFilter > 0 && m.players != m_mapPlayersFilter)
-            continue;
-        if (m_mapSizeFilter > 0 && sizeClass != m_mapSizeFilter)
-            continue;
-        if (!needle.empty() && LowerText(m.DisplayName()).find(needle) == std::string::npos
-            && LowerText(m.name).find(needle) == std::string::npos)
-            continue;
-        m_skirmishMaps.push_back(m);
-    }
-    std::stable_sort(m_skirmishMaps.begin(), m_skirmishMaps.end(), [&](const SkirmishMapInfo &a, const SkirmishMapInfo &b) {
-        if (m_mapSort == 1 && a.players != b.players)
-            return a.players < b.players;
-        if (m_mapSort == 2 && a.width * a.height != b.width * b.height)
-            return a.width * a.height < b.width * b.height;
-        return LowerText(a.DisplayName()) < LowerText(b.DisplayName());
-    });
+    ui::MapFilter filter;
+    filter.search = m_mapSearch;
+    filter.players = m_mapPlayersFilter;
+    filter.size = m_mapSizeFilter;
+    filter.sort = m_mapSort;
+    m_skirmishMaps = filter.Apply(m_skirmishAll);
     m_skirmishSelected = 0;
     for (size_t i = 0; i < m_skirmishMaps.size(); ++i)
         if (m_skirmishMaps[i].path == keep)
@@ -1343,16 +1276,18 @@ bool MenuController::UpdateCampaignSelect(
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
             match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
-            match.local = m_customSpectator ? 1 : 0; // (a watcher's view belongs to the first computer player)
-            for (int p = 0; p < static_cast<int>(m_customSlots.size()) && p < kMaxPlayers; ++p)
+            // The person watches: he is no player, the computer players take the ids from 0 (a watcher's view belongs
+            // to the first of them)
+            match.local = 0;
+            const int firstSlot = m_customSpectator ? 1 : 0;
+            for (int i = firstSlot; i < static_cast<int>(m_customSlots.size()) && i - firstSlot < kMaxPlayers; ++i)
             {
-                const CustomSlot &cs = m_customSlots[p];
+                const int p = i - firstSlot;
+                const CustomSlot &cs = m_customSlots[i];
                 PlayerSlot &slot = match.slots[p];
-                if (p == 0 && m_customSpectator)
-                    continue; // the person watches: no player at that place
                 slot.active = true;
-                slot.human = p == 0;
-                if (p == 0)
+                slot.human = i == 0;
+                if (i == 0)
                 {
                     if (m_sideRandom)
                         SetPlayerFaction((rd() & 1u) ? Faction::Confederation : Faction::Resistance); // drawn now
@@ -2812,13 +2747,13 @@ void MenuController::RenderCampaignMissionSelect(
             m_combo.open == kComboCredits,
             l.creditsBtn.Contains(m_mouseX, m_mouseY));
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
-        ui::DrawCaption(fontRenderer, renderer, x, d.y + 82, std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size()) + ")");
+        ui::DrawCaption(fontRenderer, renderer, x, d.y + 80, std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u)) + ")");
         // Column captions, the same order as in the network room
         for (const auto &[kind, text] : std::initializer_list<std::pair<int, const char *>> {
                  {0, _("Place")}, {1, _("Faction")}, {2, _("Team")}, {3, _("Colour")}, {7, _("Handicap")}, {8, _("Army")}})
         {
             const UiRect cell = CustomCell(d, 0, kind);
-            fontRenderer.DrawString(text, cell.x, d.y + 90, ui::FONT_SMALL, col::TextMuted, false);
+            fontRenderer.DrawString(ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w), cell.x + 2, d.y + 100, ui::FONT_SMALL, col::TextMuted, false);
         }
         const int places = std::min(info.players, kMaxPlayers);
         for (int i = 0; i < places; ++i)
@@ -2911,7 +2846,7 @@ void MenuController::RenderCampaignMissionSelect(
         }
         const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
         DrawTextSection(
-            renderer, fontRenderer, pv.x, pv.Bottom() + 12, pv.w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
+            renderer, fontRenderer, l.fogCheckbox.x, l.baseCheckbox.Bottom() + 14, l.fogCheckbox.w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
         ui::DrawCheckbox(
             renderer,
             fontRenderer,
@@ -3272,6 +3207,8 @@ std::vector<bool> MenuController::CustomTakenColors(int row) const
     std::vector<bool> taken(Settings::kArmyColors, false);
     for (int i = 0; i < static_cast<int>(m_customSlots.size()); ++i)
     {
+        if (i == 0 && m_customSpectator)
+            continue; // a watcher shows no colour
         const int c = m_customSlots[i].color;
         if (i != row && c >= 1 && c <= Settings::kArmyColors)
             taken[c - 1] = true;
@@ -3290,7 +3227,7 @@ int MenuController::CustomSlotAt(int position) const
 std::vector<int> MenuController::CustomSeatCodes(int position) const
 {
     if (CustomSlotAt(position) == 0)
-        return {1, 2}; // the person's own place: he stays, or leaves it Open and only watches
+        return {1, 2, 3, 4, 5, 6, 7}; // the person's own place: he stays, or leaves it (Open / a computer player / blocked) and watches
     if (CustomSlotAt(position) < 0)
         return {1, 2, 3, 4, 5, 6, 7}; // you / open / four computer levels / blocked
     return {1, 2, 3, 4, 5, 6, 7};
@@ -3311,15 +3248,28 @@ void MenuController::SetCustomSeat(int position, int code)
         m_customBlocked &= ~(1u << position);
         m_customSlots[0].position = position;
         m_customSpectator = false;
+        // While he watched, a computer player may have taken his colour
+        if (const std::vector<bool> taken = CustomTakenColors(0);
+            m_customSlots[0].color >= 1 && m_customSlots[0].color <= Settings::kArmyColors && taken[m_customSlots[0].color - 1])
+        {
+            for (int c = 0; c < static_cast<int>(taken.size()); ++c)
+            {
+                if (!taken[c])
+                {
+                    m_customSlots[0].color = c + 1;
+                    break;
+                }
+            }
+        }
         return;
     }
     if (held == 0)
     {
-        if (code == 2)
-        { // Open on the person's own place: he does not take part, the computer players fight and he watches
-            m_customSpectator = true;
-            m_customSlots[0].position = -1;
-        }
+        // Anything but "you" on the person's own place: he does not take part, the computer players fight and he
+        // watches (the place becomes Open, a computer player or blocked)
+        m_customSpectator = true;
+        m_customSlots[0].position = -1;
+        SetCustomSeat(position, code);
         return;
     }
     if (code >= 3 && code <= 6)
@@ -3380,8 +3330,10 @@ void MenuController::EnsureCustomSlots()
         m_customSlots[1].level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
         m_customSlots[1].position = 1;
     }
-    if (m_customSlots.size() > most)
-        m_customSlots.resize(most);
+    // A watching person holds no start position: the computer players may fill every one of them
+    const size_t slotsMost = most + (m_customSpectator ? 1u : 0u);
+    if (m_customSlots.size() > slotsMost)
+        m_customSlots.resize(slotsMost);
     m_customBlocked &= (1u << most) - 1;
     // Positions the map does not have, or held twice: the players take the lowest free ones
     std::vector<bool> used(kMaxPlayers, false);

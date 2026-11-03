@@ -114,6 +114,9 @@ void GameSounds::Update(
 
     // Deaths, finished buildings, new units, damage to the base: by comparing with the last look
     const PlayerId me = Players::Local();
+    // A person who only watches (a custom match of computer players) has no base: the announcer tells nobody about
+    // the computer player whose view is shown
+    const PlayerId mine = me < kMaxPlayers && Players::Slot(me).human ? me : kNoPlayer;
     bool baseHit = false;
     const auto &all = entities.GetAllEntities();
     if (entities.Generation() != m_generation) // the world was rebuilt (a new mission / match)
@@ -132,12 +135,12 @@ void GameSounds::Update(
         {
             m_seen[e.id] = {dead, complete, e.currentHp, e.owner};
             // A fresh unit of the player next to its own barracks / factory: trained
-            if (m_primed && !dead && !b && e.owner == me)
+            if (m_primed && !dead && !b && e.owner == mine)
             {
                 for (const Entity &o : all)
                 {
                     const Building *pb = o.AsBuilding();
-                    if (pb && pb->owner == me && pb->IsUnitProducer()
+                    if (pb && pb->owner == mine && pb->IsUnitProducer()
                         && std::abs(pb->tileX - e.tileX) <= pb->buildWidth + 3
                         && std::abs(pb->tileY - e.tileY) <= pb->buildHeight + 3)
                     {
@@ -154,16 +157,18 @@ void GameSounds::Update(
             const float x = e.GetUnitCenterPixelX(), y = e.GetUnitCenterPixelY();
             if (Hearable(map, fogEnabled, x, y, e.owner))
                 at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge), x, y);
-            if (e.owner == me && !b)
+            if (e.owner == mine && !b)
                 sound.Announce(Announcement::UnitLost);
             else if (
                 e.owner < kMaxPlayers && Players::Hostile(e.owner, me) && !Infantry(e)
                 && Hearable(map, fogEnabled, x, y, e.owner))
                 sound.PlayVoice(UnitReply::TargetDestroyed, false);
         }
-        if (m_primed && !dead && b && e.owner == me && complete && !s.complete)
+        if (m_primed && !dead && b && e.owner == mine && complete && !s.complete)
             sound.Announce(Announcement::ConstructionComplete);
-        if (m_primed && !dead && b && e.owner == me && e.currentHp < s.hp && complete)
+        // A finished building of the player lost health. Not at the moment it is finished: the last tick of the
+        // construction clamps the health that was gained by rounding down to the maximum (that is no attack)
+        if (m_primed && !dead && b && e.owner == mine && e.currentHp < s.hp && complete && s.complete)
             baseHit = true;
         s.dead = dead;
         s.complete = complete;
@@ -176,7 +181,7 @@ void GameSounds::Update(
     }
 
     // Power running short
-    const bool low = economy.HasPowerDeficit();
+    const bool low = mine != kNoPlayer && economy.HasPowerDeficit();
     if (m_primed && low && !m_lowPower)
         sound.Announce(Announcement::LowPower);
     m_lowPower = low;

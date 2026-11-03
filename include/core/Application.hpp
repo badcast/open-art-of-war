@@ -9,6 +9,7 @@
 #include "core/VideoModes.hpp"
 #include "graphics/RenderBackend.hpp"
 #include <array>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ namespace OpenArtOfWar
 {
 class GameSounds;
 class ReplayPlayer;
+class ReplayRecorder;
+struct SimCommand;
 class ReplayMenu;
 
 class TextureManager;
@@ -251,7 +254,8 @@ private:
         bool interfaceSound {false}; // "Voice the interface": off at the start of every replay, the interface is silent
         int comboOpen {-1};          // the view combobox: -1 closed, else it is open
         int comboScroll {0};
-    } m_replayUi;
+        bool stats {false}; // the table of every player is shown
+    } m_replayUi; // also the bar of a custom match watched without playing (m_spectating)
     bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
     std::string m_pendingReplay; // a file dropped on the window / given on the command line, opened when possible
     bool StartReplay(int watchSlot);
@@ -260,10 +264,33 @@ private:
     void UpdateReplay(double frameTime);
     void UpdateReplayInput(double frameTime);
     void RenderReplayBar();
+    // The bar of an observer: the replay's, and the same one for a custom match only watched
+    struct ObserverPlayer
+    {
+        int slot;
+        std::string name;
+        int color;
+        bool human;
+    };
+    std::vector<ObserverPlayer> ObserverPlayers() const;
+    bool ArmyCentreOf(int slot, float &x, float &y) const;
+    void LeaveObserver();
+    void UpdateSpectator(double frameTime);
+    void RenderObserverStats(const std::vector<ObserverPlayer> &players);
+    // --- The replay of a match of this computer alone (a custom game, a campaign mission): the commands of the
+    //     player tick by tick, the world checksums and the camera, in the same file as a network match's
+    std::unique_ptr<ReplayRecorder> m_localRecorder;
+    std::map<uint32_t, std::vector<SimCommand>> m_localCommands;
+    int m_localRecordSerial {-1};
+    uint32_t m_localTicks {0};
+    float m_localViewX {-1e9f}, m_localViewY {-1e9f}, m_localViewZoom {0.0f};
+    void UpdateLocalReplay(); // starts / ends the recording with the match
+    void LocalTickRan(uint32_t tick);
+    void FinishLocalReplay(const std::string &outcome);
     // The observer of a replay sees the whole map (drawing only: the simulation's fog is part of the match)
     bool ReplayShowsAll() const
     {
-        return (m_replay && m_replayUi.watch < 0) || m_spectating;
+        return (m_replay || m_spectating) && m_replayUi.watch < 0;
     }
     // A custom game without a player of this computer: only the computer players fight, the whole map is shown
     bool m_spectating {false};

@@ -139,6 +139,15 @@ public:
     {
         return m_sim;
     }
+    // The research a player has under way: the simulation's for a person, the computer player's own otherwise
+    ResearchProgress ResearchOf(PlayerId player) const;
+    // The mission load the controller has set itself up for (the simulation is reset on its first update)
+    int MissionSerial() const
+    {
+        return m_missionSerial;
+    }
+    // The computer player of a match in that slot, null when the slot is a person's (or empty)
+    const AIController *MatchAi(PlayerId player) const;
     // Bar of the non-empty control groups at the bottom of the map view
     void RenderGroupBar(
         Renderer &renderer,

@@ -161,6 +161,11 @@ public:
     {
         return m_missionName;
     }
+    // The name of the map being played (its "title", translated; the file name when it has none)
+    const std::string &GetMapTitle() const
+    {
+        return m_mapTitle;
+    }
     const std::string &GetBriefingText() const
     {
         return m_briefingText;
@@ -217,6 +222,7 @@ private:
     bool m_isDefeat {false};
 
     std::string m_missionName;
+    std::string m_mapTitle;
     std::string m_briefingText;
     std::string m_objectiveText;
 

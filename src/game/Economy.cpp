@@ -100,15 +100,15 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
     const PlayerId player = m_player;
     const Faction faction = Players::FactionOf(player);
 
-    // 1. Passive income from headquarters: +50 credits every 3 seconds
-    // The income is the headquarters': without a finished one nothing comes in
-    const bool hasHq = entities.HasBuildingType(UnitType::Headquarters, player, true);
+    // 1. Passive income from headquarters: +50 credits every 3 seconds for every finished one (up to
+    // kMaxIncomeHeadquarters); without a finished one nothing comes in
+    const int hqs = std::min(kMaxIncomeHeadquarters, entities.CountBuildingType(UnitType::Headquarters, player, true));
     m_incomeTimer += deltaTime;
     if (m_incomeTimer >= 3.0f)
     {
         m_incomeTimer = 0.0f;
-        if (hasHq)
-            m_credits += 50 * (100 + ResearchTotal(player, ResearchEffect::Income)) / 100;
+        if (hqs > 0)
+            m_credits += hqs * 50 * (100 + ResearchTotal(player, ResearchEffect::Income)) / 100;
     }
 
     // Reward for every enemy unit destroyed since the last tick

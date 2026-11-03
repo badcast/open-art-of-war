@@ -4425,3 +4425,36 @@ msgstr "Для наблюдения нужно минимум два компь�
 
 msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
 msgstr "(Shift - 5, Ctrl - 10; кнопка бесконечности повторяет производство)"
+
+msgid "Map"
+msgstr "Карта"
+
+msgid "Watching"
+msgstr "Наблюдение"
+
+msgid "STATS"
+msgstr "СТАТИСТИКА"
+
+msgid "STATISTICS"
+msgstr "СТАТИСТИКА"
+
+msgid "Credits"
+msgstr "Кредиты"
+
+msgid "MB"
+msgstr "МБ"
+
+msgid "KB"
+msgstr "КБ"
+
+msgid "Custom game"
+msgstr "Простая игра"
+
+msgid "Campaign"
+msgstr "Кампания"
+
+msgid "Network"
+msgstr "Сеть"
+
+msgid "Played"
+msgstr "Сыграно"

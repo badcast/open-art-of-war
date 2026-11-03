@@ -511,6 +511,7 @@ public:
     static const BuildingBlueprint *FindBlueprint(Faction faction, int blueprintId);
 
     bool HasBuildingType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
+    int CountBuildingType(UnitType type, PlayerId owner, bool mustBeComplete = true) const;
     bool HasBuildingType(UnitType type, Faction faction, bool mustBeComplete = true) const
     {
         return HasBuildingType(type, Players::OwnerOf(faction), mustBeComplete);

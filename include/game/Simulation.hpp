@@ -80,6 +80,11 @@ public:
     {
         m_sink = std::move(sink);
     }
+    // A match of this computer alone being recorded: every command issued, with the tick it applies on
+    void SetRecordHook(std::function<void(uint32_t tick, const SimCommand &)> hook)
+    {
+        m_record = std::move(hook);
+    }
     // Turn bundle of a network game: applied on `tick`
     void Schedule(uint32_t tick, SimCommand command);
 
@@ -156,6 +161,7 @@ private:
     uint32_t m_tick {0};
     std::vector<TimedCommand> m_pending;
     std::function<void(SimCommand)> m_sink;
+    std::function<void(uint32_t, const SimCommand &)> m_record;
     std::vector<TimedCommand> m_log;
     bool m_recording {true};
     std::array<AISquadController, kMaxPlayers> m_squads;

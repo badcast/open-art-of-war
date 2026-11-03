@@ -18,7 +18,7 @@ addresses of each player in its replay's `replay.json`. Both are private data of
 
 | Entry | Content |
 | --- | --- |
-| `replay.json` | Meta data, JSON: `format` (1), `game_version`, `protocol`, `source` (`client`/`server`), `recorded_at`, `map`, `map_hash`, `assets_hash`, `seed`, `turn_ms`, `ticks_per_turn`, `turns`, `ticks`, `players[]`, `starting_credits`, `fog`, `prebuilt`, `local_slot`, `result {outcome, tick}` (client) or `end_reason`, `desynced` (server), `checksum_interval`. A server file adds `addresses[]` to each player |
+| `replay.json` | Meta data, JSON: `format` (1), `game_version`, `protocol`, `source` (`client`/`server`), `recorded_at`, `map`, `map_hash`, `assets_hash`, `seed`, `turn_ms`, `ticks_per_turn`, `turns`, `ticks`, `players[]`, `starting_credits`, `fog`, `prebuilt`, `local_slot`, `result {outcome, tick}` (client) or `end_reason`, `desynced` (server), `checksum_interval`, `mode` (`network`, `custom`: a custom game of this computer, `campaign`; missing = `network`), for a campaign mission also `mission`, `player_faction`, `difficulty` (the setup then only names the map and the two sides: playback loads the mission). A server file adds `addresses[]` to each player |
 | `setup.bin` | The match setup bytes (`NetMatch::EncodeSetup`): map, seed, slots. The truth about the match; the names in the meta are only labels |
 | `turns.bin` | Repeated `u32 length (LE)` + an encoded `TurnBundle` message (`Net::encodeTurn`), turn 0, 1, 2, ... |
 | `checksums.bin` | Repeated `u32 tick` + `u64 world checksum` (LE), every 20 ticks |
@@ -45,3 +45,7 @@ Main menu -> OPEN REPLAY (list of `replays/`), a file dropped on the window, or 
 Space pause, `+`/`-` speed (x0.5 ... x8), the view combo box (or Tab: observer / each player), F follow the camera of the watched player,
 the "Voice the interface" check box above the controls (off by default: UI sounds, announcer, unit replies and alerts are muted),
 Home restart, Esc leave. The world can only go forward: going back restarts from the first turn.
+
+A match of this computer alone (a custom game, a campaign mission) is recorded by the client too: one turn per tick
+(`ticks_per_turn` 1), each with the commands the player issued on it, the checksums every `checksum_interval` ticks and
+the player's camera as `View` commands, like a network match's.
