@@ -29,8 +29,11 @@ namespace
 
 // Sizes of the tree at scale 1: the technologies of the tree (their size and icons) are drawn bigger by
 // m_researchScale, the window itself keeps its size
-constexpr int kNodeW0 = 240;
-constexpr int kNodeH0 = 50;
+constexpr int kNodeW0 = 270;
+constexpr int kNodeH0 = 66;
+constexpr float kIconScale0 = 0.9f;   // the icon of a technology in the tree (the picture is about 64 px)
+constexpr int kIconBox0 = 62;         // ... and the room it takes on the left of the node
+constexpr float kDetailsIconScale = 1.3f; // the icon of the selected technology
 constexpr int kGapX0 = 34;
 constexpr int kGapY0 = 10;
 constexpr int kDetailsW0 = 270;
@@ -299,7 +302,9 @@ bool HUDController::UpdateResearchWindow(
     const ResearchProgress researchNow = ResearchShown();
     const ResearchProgress *progress = &researchNow;
     m_researchSel = std::clamp(m_researchSel, 0, kResearchCount - 1);
-    const int wheel = input.ConsumeUiWheel();
+    // The window covers the map as well: every wheel step is its own, over the map or the sidebar
+    const int wheel = input.ConsumeWheel();
+    input.ConsumeUiWheel();
 
     // The open filter list takes the mouse first
     if (m_researchCombo.open == 0)
@@ -600,24 +605,26 @@ void HUDController::RenderResearchWindow(
             renderer.DrawRectScreen(n.x + 1, n.y + 1, n.w - 2, n.h - 2, edge);
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, n.x + 4, n.y + 6, 0.62f * sc, faction);
+        const int iconBox = sz(kIconBox0, sc);
+        renderer.DrawCompositeScreen(r.compId, n.x + 4, n.y + (n.h - iconBox) / 2, kIconScale0 * sc, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
         const std::string state = st == State::Done     ? std::string(_("RESEARCHED"))
                                   : st == State::Active ? std::string(_("RESEARCHING"))
                                   : st == State::Locked ? std::string(_("LOCKED"))
                                                         : "$" + std::to_string(r.cost);
+        const int textX = n.x + 4 + iconBox + 6;
         font.DrawString(
-            ui::FitText(font, _(r.name), ui::FONT_SMALL_BOLD, n.w - 62),
-            n.x + 58,
-            n.y + 8,
+            ui::FitText(font, _(r.name), ui::FONT_SMALL_BOLD, n.Right() - 6 - textX),
+            textX,
+            n.CenterY() - 20,
             ui::FONT_SMALL_BOLD,
             lit ? col::Text : col::TextMuted,
             false);
         font.DrawString(
             state,
-            n.x + 58,
-            n.y + 28,
+            textX,
+            n.CenterY() + 2,
             ui::FONT_SMALL,
             st == State::Done ? col::Ok
             : st == State::Active ? col::Info
@@ -652,11 +659,12 @@ void HUDController::RenderResearchWindow(
         int y = l.details.y + 12;
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, x, y, sc, faction);
+        renderer.DrawCompositeScreen(r.compId, x, y, kDetailsIconScale, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
-        font.DrawTextWrapped(_(r.name), x + 72, y, w - 72, ui::FONT_BODY_BOLD, col::Accent, true);
-        y += 72;
+        const int iconW = static_cast<int>(66 * kDetailsIconScale);
+        font.DrawTextWrapped(_(r.name), x + iconW + 8, y, w - iconW - 8, ui::FONT_BODY_BOLD, col::Accent, true);
+        y += iconW + 6;
         renderer.FillRectScreen(x, y, w, 1, col::Border);
         y += 10;
         font.DrawString(std::string(_("Cost")) + ": $" + std::to_string(r.cost), x, y, ui::FONT_BODY, col::Text, false);

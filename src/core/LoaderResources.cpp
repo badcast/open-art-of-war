@@ -297,6 +297,11 @@ std::string LoaderResources::aiDifficulty(const std::string &root)
     return join(root, Str(nullptr, "ai_difficulty"));
 }
 
+std::string LoaderResources::Nights(const std::string &root)
+{
+    return join(root, Str(nullptr, "nights"));
+}
+
 std::string LoaderResources::Effects(const std::string &root)
 {
     return join(root, Str(nullptr, "effects"));

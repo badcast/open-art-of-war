@@ -58,6 +58,8 @@ public:
     static std::string VoicesFallbackLanguage();
     static std::string aiDifficulty(const std::string &root = kDefaultRoot);
     static std::string Effects(const std::string &root = kDefaultRoot);
+    // How the night of a match is lit (data/nights.json)
+    static std::string Nights(const std::string &root = kDefaultRoot);
     // How projectiles fly and hit (characters/projectiles.yaml)
     static std::string projectiles(const std::string &root = kDefaultRoot);
     // Damage multipliers by projectile kind and target class (data/weapon_balance.json)

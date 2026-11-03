@@ -15,6 +15,7 @@
 #include "graphics/TextureManager.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
+#include "graphics/NightLighting.hpp"
 #include "net/NetMatch.hpp"
 #include "ui/NetworkMenu.hpp"
 #include "openaow/net/Discovery.hpp"
@@ -86,6 +87,8 @@ void Application::ApplyGraphics()
     if (m_camera)
         m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
     const bool effects = m_effects && m_effects->Available();
+    if (m_effects && m_nightLighting) // the night's light map keeps the picture at gpu_base: the grade gives it back
+        m_effects->SetNightExposureScale(1.0f / m_nightLighting->Config().gpuBase);
     if (m_effects)
         m_effects->Configure(
             m_night ? ColorGrade::Night : static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
