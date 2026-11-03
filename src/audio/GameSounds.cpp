@@ -91,25 +91,30 @@ void GameSounds::Update(
     const float viewX = camera.GetX(), viewY = camera.GetY();
     const float viewW = camera.GetViewportWidth() / zoom, viewH = camera.GetViewportHeight() / zoom;
     // Range and the rest come from the sound's settings (audio_sfx.json), not from here
-    auto at = [&](WorldSfx what, float x, float y) {
-        const SfxMixer::EventConfig *cfg = sound.SfxConfig(what);
+    // `own`: the event the character file names (empty, or without clips: the game's own `what`); `gain`: the
+    // volume of that character / gun
+    auto at = [&](WorldSfx what, float x, float y, const std::string &own = std::string(), float gain = 1.0f) {
+        const SfxMixer::EventConfig *cfg = sound.SfxConfig(own);
+        const std::string event = cfg ? own : std::string(SoundIds::Name(what));
         if (!cfg)
+            cfg = sound.SfxConfig(what);
+        if (!cfg || gain <= 0.0f)
             return;
         if (!cfg->positional)
         {
-            sound.PlaySfx(what);
+            sound.PlaySfx(event, std::min(1.0f, gain));
             return;
         }
         const SfxPlacement p = PlaceSfx(x, y, viewX, viewY, viewW, viewH, cfg->rangeTiles * TILE_WIDTH, zoom, cfg->minGain);
         if (p.audible)
-            sound.PlaySfx(what, p.gain, p.pan, p.muffle);
+            sound.PlaySfx(event, p.gain * gain, p.pan, p.muffle);
     };
 
     // Shots, hits, shells landing, walls coming down
     for (const EntityManager::SoundCueEvent &c : entities.TakeSoundCues())
     {
         if (Hearable(map, fogEnabled, c.x, c.y, c.owner))
-            at(CueSound(c.cue), c.x, c.y);
+            at(CueSound(c.cue), c.x, c.y, entities.SoundName(c.sound), c.gain);
     }
 
     // Deaths, finished buildings, new units, damage to the base: by comparing with the last look
@@ -156,7 +161,11 @@ void GameSounds::Update(
         {
             const float x = e.GetUnitCenterPixelX(), y = e.GetUnitCenterPixelY();
             if (Hearable(map, fogEnabled, x, y, e.owner))
-                at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge), x, y);
+            {
+                const CharacterSounds *own = entities.SoundsOf(e); // its own death sound and volume, if it has them
+                at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge), x, y,
+                   own ? entities.SoundName(own->deathId) : std::string(), own ? own->volume : 1.0f);
+            }
             if (e.owner == mine && !b)
                 sound.Announce(Announcement::UnitLost);
             else if (

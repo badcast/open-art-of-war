@@ -700,6 +700,7 @@ void CharacterEditor::DrawProperties() {
                     changed |= EditInt(w, "burst_count", "Burst count", 1);
                     changed |= EditFloat(w, "burst_delay", "Burst delay (seconds)", 0.1f);
                     changed |= EditInt(w, "splash_percent", "Splash Damage (%) [2x2 tile area]", 0);
+                    changed |= EditWeaponSounds(w);
 
                     float wLocPos[2] = {0.0f, 0.0f};
                     if (w["localePosition"] && w["localePosition"].IsSequence() && w["localePosition"].size() >= 2) {
@@ -913,6 +914,7 @@ void CharacterEditor::DrawProperties() {
                         changed |= EditFloat(sGun, "burst_delay", "Burst delay", 0.1f);
                         changed |= EditInt(sGun, "splash_percent", "Splash Damage (%) [2x2 tile area]", 0);
                         changed |= EditProjectileCombo(sGun);
+                        changed |= EditWeaponSounds(sGun);
                         ImGui::PopID();
                         changed |= EditBool(sCombat, "has_rotating_turret", "Rotating turret");
                     }
@@ -961,12 +963,27 @@ void CharacterEditor::DrawProperties() {
                         changed |= EditWeaponDelay(uGun);
                         changed |= EditInt(uGun, "burst_count", "Burst count", 1);
                         changed |= EditFloat(uGun, "burst_delay", "Burst delay", 0.1f);
+                        changed |= EditWeaponSounds(uGun);
                         ImGui::PopID();
                     }
                     ImGui::TreePop();
                 }
             }
         }
+    }
+
+    // The sounds of the character itself (its guns have theirs above)
+    if (Hinted(ImGui::CollapsingHeader(_("Sounds")), "Sounds")) {
+        YAML::Node sounds = document["sounds"];
+        if (!sounds || !sounds.IsMap()) sounds = YAML::Node(YAML::NodeType::Map);
+        bool soundsChanged = EditSoundCombo(sounds, "death", "Death sound", "(explosion / infantry death)");
+        soundsChanged |= EditFloat(sounds, "volume", "Volume of all its sounds", 1.0f, 0.05f);
+        if (soundsChanged) {
+            if (sounds.size() == 0) document.remove("sounds");
+            else document["sounds"] = sounds;
+            changed = true;
+        }
+        ImGui::TextDisabled("%s", _("Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."));
     }
 
     if (changed) dirty = true;

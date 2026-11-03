@@ -53,6 +53,8 @@ public:
     // The sounds of the game itself, by constant (SoundIds.hpp)
     void PlaySfx(WorldSfx sound, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
     const SfxMixer::EventConfig *SfxConfig(WorldSfx sound) const;
+    // An event by name with clips to play (null: unknown, or no clip of it was found)
+    const SfxMixer::EventConfig *SfxConfig(const std::string &event) const;
     void Announce(Announcement line);
     void PlayVoice(UnitReply reply, bool infantry);
     // Voices (VoiceManager, the game's language): an announcer line (queued, one at a time) and a unit reply

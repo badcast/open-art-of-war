@@ -1551,6 +1551,36 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
     constexpr uint32_t kTicks = 1600;
     bool ok = true;
 
+    // A character's own sounds: the Fortress' machine gun names fire_mg_fortress (sound: of its weapon); the matches
+    // below load their maps again
+    {
+        EntityManager &entities = *app.m_entities;
+        entities.Clear();
+        app.m_map->InitBlankArena(40, 30, 0);
+        const UnitConfig *cfg = entities.GetUnitConfig(7);
+        const std::string named = cfg && !cfg->weapons.empty() ? cfg->weapons[0].sound : std::string();
+        const int fortress = entities.SpawnUnitByArchetype(7, 5, 5, Faction::Confederation);
+        const int target = entities.SpawnUnitByArchetype(0, 9, 5, Faction::Resistance);
+        entities.TakeSoundCues();
+        std::string heard;
+        if (Entity *f = entities.GetEntity(fortress))
+        {
+            entities.SpawnProjectileFromEntity(*f, f->GetUnitCenterPixelX(), f->GetUnitCenterPixelY(), 9 * TILE_WIDTH,
+                                               5 * TILE_HEIGHT, target, *app.m_map);
+            for (const auto &c : entities.TakeSoundCues())
+                if (c.cue == EntityManager::SoundCue::FireMg)
+                    heard = entities.SoundName(c.sound);
+        }
+        entities.Clear();
+        std::cout << "  - Character sounds: the Fortress gun names '" << named << "', its shot is heard as '" << heard
+                  << "'" << std::endl;
+        if (named.empty() || heard != named)
+        {
+            std::cerr << "[Test] Error: a weapon's own sound must reach the shot it fires" << std::endl;
+            return false;
+        }
+    }
+
     // Plays kTicks of the loaded match through the full game step. `before` runs ahead of every tick
     auto play = [&](const std::function<void(uint32_t)> &before, const std::function<void(uint32_t, uint64_t)> &after) {
         AppState state = mission.IsMatch() ? AppState::SkirmishPlaying : AppState::CampaignPlaying;
@@ -3951,6 +3981,36 @@ bool HeadlessTest::RunZeusTest(Application &app)
         app.m_pathfinder->SetMap(app.m_map.get());
         app.m_pathfinder->SetEntityManager(app.m_entities.get());
     };
+    // An order to bring a wall down: both forms of the Zeus, next to it and from afar, shoot it to pieces
+    for (const int arch : {11, 17})
+    {
+        for (const int fromX : {14, 4})
+        {
+            fresh();
+            app.m_map->SetWall(20, 20, Faction::Resistance, 100);
+            const int startHp = app.m_map->GetWallHp(20, 20);
+            const int zeusId = app.m_entities->SpawnUnitByArchetype(arch, fromX, 20, Faction::Confederation);
+            app.m_entities->IssueAttackWallOrder({zeusId}, 20, 20, *app.m_pathfinder);
+            int shots = 0;
+            for (int i = 0; i < 900 && app.m_map->GetWall(20, 20) > 0; ++i)
+            {
+                app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
+                for (const auto &c : app.m_entities->TakeSoundCues())
+                    shots += c.cue == EntityManager::SoundCue::FireCannonHigh || c.cue == EntityManager::SoundCue::FireCannon
+                             || c.cue == EntityManager::SoundCue::FireRocket;
+            }
+            const Unit *z = app.m_entities->GetUnit(zeusId);
+            std::cout << "  - Zeus (arch " << arch << ") ordered at a wall from x=" << fromX << ": " << shots
+                      << " shots, wall hp " << startHp << " -> " << app.m_map->GetWallHp(20, 20) << ", unit at ("
+                      << (z ? z->tileX : -1) << "," << (z ? z->tileY : -1) << ") state " << (z ? int(z->state) : -1)
+                      << " facing " << (z ? z->facingDirection : -1) << std::endl;
+            if (app.m_map->GetWall(20, 20) > 0)
+            {
+                std::cerr << "[Test] FAILED: a Zeus ordered to bring a wall down must do it" << std::endl;
+                return false;
+            }
+        }
+    }
     for (const float tiles : {6.0f, 7.5f})
     {
         fresh();

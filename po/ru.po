@@ -4458,3 +4458,51 @@ msgstr "Сеть"
 
 msgid "Played"
 msgstr "Сыграно"
+
+msgid "Shot sound"
+msgstr "Звук выстрела"
+
+msgid "Impact sound"
+msgstr "Звук попадания"
+
+msgid "Sound volume"
+msgstr "Громкость звука"
+
+msgid "(by projectile)"
+msgstr "(по типу снаряда)"
+
+msgid "Sounds"
+msgstr "Звуки"
+
+msgid "Death sound"
+msgstr "Звук гибели"
+
+msgid "(explosion / infantry death)"
+msgstr "(взрыв / гибель пехоты)"
+
+msgid "Volume of all its sounds"
+msgstr "Громкость всех его звуков"
+
+msgid "not in audio_sfx.json"
+msgstr "нет в audio_sfx.json"
+
+msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
+msgstr "События и их громкость, высота, дальность: assets/data/audio_sfx.json; клипы: audio/sfx/<событие>_<n>.ogg, перечисленные в main.json."
+
+msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (sound)."
+msgstr "Звук выстрела этого оружия: событие из assets/data/audio_sfx.json (его громкость, высота и дальность задаются там). Пусто: звук по типу снаряда (sound)."
+
+msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sound)."
+msgstr "Звук в месте попадания выстрела этого оружия: событие из audio_sfx.json. Пусто: звук по типу снаряда (impact_sound)."
+
+msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
+msgstr "Множитель громкости звуков этого оружия (sound_volume, 1.0 = как в событии)."
+
+msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
+msgstr "Звуки самого персонажа (блок sounds:); у его оружия — свои, в weapons."
+
+msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, or the infantry death."
+msgstr "Звук гибели: событие из audio_sfx.json (sounds.death). Пусто: взрыв или гибель пехоты."
+
+msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
+msgstr "Множитель громкости всех звуков персонажа: выстрелов, попаданий, гибели (sounds.volume)."

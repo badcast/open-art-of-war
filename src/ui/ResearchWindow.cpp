@@ -340,7 +340,7 @@ bool HUDController::UpdateResearchWindow(
         return true;
     }
 
-    // The tree scrolls with the wheel (Shift: sideways) and by dragging the background
+    // The tree scrolls with the wheel (Shift: sideways), the scroll bars and by dragging the background
     const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
     const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
     const float maxX = std::max(0.0f, treeW - l.tree.w), maxY = std::max(0.0f, treeH - l.tree.h);
@@ -349,13 +349,11 @@ bool HUDController::UpdateResearchWindow(
     };
     if (wheel != 0 && l.tree.Contains(mx, my))
     {
-        // Over the tree the wheel scales its contents (the window keeps its size), with Shift it scrolls the tree
+        // Over the tree the wheel scrolls it (Shift: sideways); Ctrl + wheel scales its contents (the window keeps
+        // its size; the + / - buttons do that too)
         const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-        if (shift)
-        {
-            m_researchScrollY -= wheel * 60.0f;
-        }
-        else
+        const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
+        if (ctrl)
         {
             const float before = m_researchScale;
             setScale(m_researchScale + wheel * kScaleStep);
@@ -363,6 +361,10 @@ bool HUDController::UpdateResearchWindow(
             m_researchScrollX *= k;
             m_researchScrollY *= k;
         }
+        else if (shift)
+            m_researchScrollX -= wheel * 60.0f;
+        else
+            m_researchScrollY -= wheel * 60.0f;
     }
     if (m_researchPanning)
     {

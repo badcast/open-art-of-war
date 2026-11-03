@@ -71,6 +71,10 @@ struct Projectile
     // A wall the shooter was ordered to bring down (also an own one): it takes the hit whoever owns it
     int forcedWallX {-1};
     int forcedWallY {-1};
+    // Heard where it lands (the gun's impact_sound, EntityManager::SoundName; 0: by kind) and how loud: only a sound,
+    // not part of the world
+    uint16_t impactSound {0};
+    float soundGain {1.0f};
 };
 
 struct ExplosionParticle
