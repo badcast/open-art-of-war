@@ -7,15 +7,15 @@
 namespace OpenArtOfWar::Utility
 {
 
-Random &rng()
+RandomGenerator &Rng()
 {
-    static Random s_rng;
+    static RandomGenerator s_rng;
     return s_rng;
 }
 
-Random &visualRng()
+RandomGenerator &VisualRng()
 {
-    static Random s_visualRng(0x85431234u);
+    static RandomGenerator s_visualRng(0x85431234u);
     return s_visualRng;
 }
 
@@ -115,7 +115,7 @@ const std::vector<BuildingKindInfo> kBuildingKinds = {
 };
 } // namespace
 
-const ArchetypeInfo *archetypeInfo(int archetypeId)
+const ArchetypeInfo *GetArchetypeInfo(int archetypeId)
 {
     return (archetypeId >= 0 && archetypeId < kArchetypeCount) ? &kArchetypes[archetypeId] : nullptr;
 }
@@ -181,7 +181,7 @@ float DefaultTurretTurnStepDelay(int archetypeId)
     }
 }
 
-const BuildingKindInfo *buildingKindInfo(int buildingIndex)
+const BuildingKindInfo *GetBuildingKindInfo(int buildingIndex)
 {
     for (const auto &k : kBuildingKinds)
     {

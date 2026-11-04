@@ -83,7 +83,7 @@ bool SaveManager::Save(const SaveData &data)
     }
 }
 
-bool SaveManager::load(SaveData &outData)
+bool SaveManager::Load(SaveData &outData)
 {
     if (!HasSave())
         return false;

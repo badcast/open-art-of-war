@@ -25,7 +25,11 @@ public:
     explicit SaveManager(const std::string &saveFilePath = "");
 
     bool Save(const SaveData &data);
-    bool load(SaveData &outData);
+    bool Load(SaveData &outData);
+    inline bool load(SaveData &outData)
+    {
+        return Load(outData);
+    }
     bool HasSave() const;
     const std::string &Path() const
     {

@@ -24,7 +24,7 @@ float Uniform(std::mt19937 &rng, float lo, float hi)
 
 } // namespace
 
-void MenuBackdropFx::spawn(TextureManager &textures, int areaW, int windowH)
+void MenuBackdropFx::Spawn(TextureManager &textures, int areaW, int windowH)
 {
     // The blasts of the game: vehicles, the chain of a building and its big main blasts
     const EffectsConfig &fx = EffectsConfig::Get();
@@ -51,7 +51,7 @@ void MenuBackdropFx::spawn(TextureManager &textures, int areaW, int windowH)
     m_blasts.push_back(b);
 }
 
-void MenuBackdropFx::render(
+void MenuBackdropFx::Render(
     Renderer &renderer, TextureManager &textures, int areaW, int windowW, int windowH, Uint32 ticks)
 {
     if (areaW <= 0)
@@ -68,7 +68,7 @@ void MenuBackdropFx::render(
     m_nextSpawn -= dt;
     if (m_nextSpawn <= 0.0f && m_blasts.size() < kMaxBlasts)
     {
-        spawn(textures, areaW, windowH);
+        Spawn(textures, areaW, windowH);
         m_nextSpawn = Uniform(m_rng, 0.5f, 1.6f);
     }
 

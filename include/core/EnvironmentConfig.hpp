@@ -16,7 +16,11 @@ class EnvironmentConfig
 {
 public:
     // The path comes from assets/main.json (LoaderResources::environment())
-    bool load(const std::string &assetPath = LoaderResources::environment());
+    bool Load(const std::string &assetPath = LoaderResources::Environment());
+    inline bool load(const std::string &assetPath = LoaderResources::Environment())
+    {
+        return Load(assetPath);
+    }
     // Writes the runtime sections into settings.json if anything changed (atomically: temp file + rename)
     bool Save();
 

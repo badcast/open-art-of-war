@@ -100,7 +100,7 @@ bool Settings::Save(const std::string &path) const
     }
 }
 
-bool Settings::load(const std::string &path)
+bool Settings::Load(const std::string &path)
 {
     try
     {

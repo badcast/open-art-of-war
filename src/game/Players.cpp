@@ -40,7 +40,7 @@ void SetupSinglePlayer(Faction human)
     table().SinglePlayer(human);
 }
 
-void setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId localId)
+void Setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId localId)
 {
     table().slots = slots;
     table().local = localId < kMaxPlayers ? localId : 0;
@@ -59,7 +59,7 @@ PlayerId Local()
     return table().local;
 }
 
-int count()
+int Count()
 {
     int n = 0;
     for (const PlayerSlot &s : table().slots)

@@ -9,7 +9,7 @@
 namespace OpenArtOfWar
 {
 
-bool VoiceManager::load(const std::string &language, const std::string &assetRoot)
+bool VoiceManager::Load(const std::string &language, const std::string &assetRoot)
 {
     m_root = assetRoot;
     // A fresh set is prepared off to the side and swapped in, so the audio thread never mixes a half-loaded one

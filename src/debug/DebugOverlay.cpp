@@ -36,7 +36,7 @@ void DebugOverlay::ProcessEvent(const SDL_Event &event)
     (void) event;
 }
 
-void DebugOverlay::render(
+void DebugOverlay::Render(
     TileMap &map,
     EntityManager &entities,
     Economy &economy,

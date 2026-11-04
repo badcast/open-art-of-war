@@ -437,7 +437,7 @@ bool Application::LaunchMap(const std::string &nameOrPath, bool fromScratch)
     return true;
 }
 
-void Application::run()
+void Application::Run()
 {
     using clock = std::chrono::high_resolution_clock;
     auto prevTime = clock::now();
@@ -614,7 +614,7 @@ void Application::run()
         }
 
         UpdateSounds();
-        render();
+        Render();
 
         // Frame rate cap (also with vsync on, when the limit is below the refresh rate)
         if (m_settings.fpsLimit > 0)
@@ -1002,7 +1002,7 @@ void Application::RenderMenuFade()
     m_renderer->FillRectScreen(0, 0, m_windowW, m_windowH, {0, 0, 0, alpha});
 }
 
-void Application::render()
+void Application::Render()
 {
     ImGuiBridge::BeginFrame();
     SoundRequests::HoverFlag() = false; // the widgets drawn now mark it again

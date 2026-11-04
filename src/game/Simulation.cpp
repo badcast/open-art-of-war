@@ -78,7 +78,7 @@ const AITacticsConfig &Simulation::GroupTactics()
 
 void Simulation::Reset(uint32_t seed)
 {
-    Utility::rng().Reseed(seed);
+    Utility::Rng().Reseed(seed);
     m_tick = 0;
     m_economyMask = 0;
     m_pending.clear();
@@ -90,7 +90,7 @@ void Simulation::Reset(uint32_t seed)
     m_events.clear();
 }
 
-void Simulation::startMatch(const MatchSetup &setup)
+void Simulation::StartMatch(const MatchSetup &setup)
 {
     Reset(setup.seed);
     for (PlayerId p = 0; p < kMaxPlayers; ++p)

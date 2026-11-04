@@ -94,8 +94,7 @@ bool SoundEngine::Init(const std::string &assetRoot)
     m_shuffledTracks.resize(m_gameTracks.size());
     std::iota(m_shuffledTracks.begin(), m_shuffledTracks.end(), 0);
 
-    std::mt19937 audioRng(0x50114d45u);
-    std::shuffle(m_shuffledTracks.begin(), m_shuffledTracks.end(), audioRng);
+    std::shuffle(m_shuffledTracks.begin(), m_shuffledTracks.end(), OpenArtOfWar::Utility::VisualRng());
 
     // Placeholder format; each track switches the stream input to its own rate and channel count
     SDL_AudioSpec spec {SDL_AUDIO_S16, 2, 44100};

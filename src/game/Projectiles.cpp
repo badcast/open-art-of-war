@@ -138,7 +138,7 @@ int ProjectileSpec::PickGroundMark(int seed) const
 namespace Projectiles
 {
 
-const ProjectileSpec &of(ProjectileType type)
+const ProjectileSpec &Of(ProjectileType type)
 {
     const int i = static_cast<int>(type);
     return Specs()[static_cast<size_t>(i >= 0 && i < kCount ? i : 0)];
@@ -146,7 +146,7 @@ const ProjectileSpec &of(ProjectileType type)
 
 const char *KeyOf(ProjectileType type)
 {
-    return of(type).key;
+    return Of(type).key;
 }
 
 ProjectileType FromKey(const std::string &key)
@@ -195,7 +195,7 @@ bool LoadText(const std::string &yamlText)
     }
 }
 
-void reload()
+void Reload()
 {
     Specs() = Defaults();
     std::string text;

@@ -29,7 +29,7 @@ struct RadarAlertConfig
     int edgeWidthPx {4}; // red band on the radar's sides
     int edgeAlpha {190}; // opacity of that band at the outer edge (it fades inward)
 
-    void load(const nlohmann::json &section)
+    void Load(const nlohmann::json &section)
     {
         if (!section.is_object())
             return;
@@ -55,6 +55,10 @@ struct RadarAlertConfig
         dotRadiusPx = std::max(0.0f, section.value("dot_radius_px", dotRadiusPx));
         edgeWidthPx = std::clamp(section.value("edge_width_px", edgeWidthPx), 0, 32);
         edgeAlpha = std::clamp(section.value("edge_alpha", edgeAlpha), 0, 255);
+    }
+    inline void load(const nlohmann::json &section)
+    {
+        Load(section);
     }
 };
 

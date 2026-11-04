@@ -29,10 +29,14 @@ enum class Mode
 // Safe to call more than once.
 bool Init();
 
-Mode mode();
+Mode GetMode();
+inline Mode mode()
+{
+    return GetMode();
+}
 inline bool IsBlob()
 {
-    return mode() == Mode::Blob;
+    return GetMode() == Mode::Blob;
 }
 std::string Describe();
 

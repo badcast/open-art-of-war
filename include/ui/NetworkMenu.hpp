@@ -74,7 +74,7 @@ public:
         Settings &settings,
         const std::vector<LanGame> &lan,
         const std::vector<LanGame> &server);
-    void render(
+    void Render(
         Renderer &renderer,
         BitmapFontRenderer &font,
         TextureManager &textures,
@@ -85,6 +85,20 @@ public:
         const std::vector<LanGame> &lan,
         const std::vector<LanGame> &server,
         const std::string &serverStatus);
+    inline void render(
+        Renderer &renderer,
+        BitmapFontRenderer &font,
+        TextureManager &textures,
+        int windowW,
+        int windowH,
+        const NetMatch *net,
+        const Settings &settings,
+        const std::vector<LanGame> &lan,
+        const std::vector<LanGame> &server,
+        const std::string &serverStatus)
+    {
+        Render(renderer, font, textures, windowW, windowH, net, settings, lan, server, serverStatus);
+    }
     bool InternetTab() const
     {
         return m_tab == Tab::Internet;
@@ -178,9 +192,13 @@ private:
         {
             return {mapList.x, mapList.y + i * listRowH, mapList.w, listRowH - 2};
         }
-        ui::UiRect row(int i) const
+        ui::UiRect Row(int i) const
         {
             return {players.x, players.y + 24 + i * rowH, players.w, rowH - 4};
+        }
+        inline ui::UiRect row(int i) const
+        {
+            return Row(i);
         }
         // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army size,
         // ready; each is a share of the width of the table

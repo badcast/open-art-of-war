@@ -56,10 +56,18 @@ bool Probe(const std::string &name);
 
 // The options for the settings screen: every candidate with what is known about it.
 // `probeUnknown` tries the not yet probed ones now (and stores the results in `env`).
-std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUnknown);
+std::vector<RenderApiOption> Options(EnvironmentConfig &env, bool probeUnknown);
+inline std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUnknown)
+{
+    return Options(env, probeUnknown);
+}
 
 // The API to use from the next start (or the next renderer recreation) on
-void select(EnvironmentConfig &env, const std::string &name);
+void Select(EnvironmentConfig &env, const std::string &name);
+inline void select(EnvironmentConfig &env, const std::string &name)
+{
+    Select(env, name);
+}
 std::string Configured(const EnvironmentConfig &env);
 
 } // namespace RenderBackend

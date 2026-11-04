@@ -262,7 +262,7 @@ int main(int argc, char *argv[])
         }
 #endif
 
-        app.run();
+        app.Run();
         restart = app.RestartRequested();
     } while (restart);
     std::cout << "Engine shut down cleanly." << std::endl;

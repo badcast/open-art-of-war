@@ -162,13 +162,21 @@ public:
     {
         return m_style;
     }
-    PlayerId player() const
+    PlayerId Player() const
     {
         return m_player;
     }
-    Faction side() const
+    inline PlayerId player() const
+    {
+        return Player();
+    }
+    Faction Side() const
     {
         return Players::FactionOf(m_player);
+    }
+    inline Faction side() const
+    {
+        return Side();
     }
     // A living thing of a player hostile to this AI
     bool IsFoe(const Entity &e) const;

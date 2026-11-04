@@ -995,7 +995,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     return NetworkAction::None;
 }
 
-void NetworkMenu::render(
+void NetworkMenu::Render(
     Renderer &r,
     BitmapFontRenderer &font,
     TextureManager &textures,

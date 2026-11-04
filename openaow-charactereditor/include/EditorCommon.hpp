@@ -75,6 +75,15 @@ inline const WreckFamily kWreckFamilies[] = {
 
 fs::path FindAssetRoot();
 
+template <typename T>
+inline T YamlValue(const YAML::Node& node, const char* key, T fallback = {}) {
+    try {
+        return node[key].as<T>(fallback);
+    } catch (...) {
+        return fallback;
+    }
+}
+
 std::string YamlString(const YAML::Node& node, const char* key, const std::string& fallback = {});
 
 int YamlInt(const YAML::Node& node, const char* key, int fallback = 0);

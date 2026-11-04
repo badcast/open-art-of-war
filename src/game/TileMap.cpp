@@ -559,7 +559,7 @@ FogState TileMap::GetFogState(int tileX, int tileY) const
     return m_fog[tileY][tileX];
 }
 
-void TileMap::render(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick)
+void TileMap::Render(Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick)
 {
     bool useFog = fogEnabled && m_hasFog;
     RenderTerrain(renderer, camera, useFog, globalAnimTick);

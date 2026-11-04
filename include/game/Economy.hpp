@@ -30,9 +30,13 @@ public:
     {
         m_player = player;
     }
-    PlayerId player() const
+    PlayerId Player() const
     {
         return m_player;
+    }
+    inline PlayerId player() const
+    {
+        return Player();
     }
     void Update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder);
 
