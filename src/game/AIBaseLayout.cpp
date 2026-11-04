@@ -81,7 +81,7 @@ std::string AIBaseStyle::Describe() const
 void AIController::SetSeed(uint32_t seed)
 {
     m_seed = seed;
-    Utility::Random r(seed ? seed : 0x2545f491u);
+    Utility::RandomGenerator r(seed ? seed : 0x2545f491u);
     r.Next(); // the first numbers of a fresh xorshift follow the seed too closely
     r.Next();
     AIBaseStyle s;

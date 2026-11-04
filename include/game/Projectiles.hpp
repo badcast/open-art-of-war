@@ -37,7 +37,11 @@ namespace Projectiles
 {
 constexpr int kCount = 5; // ProjectileType values
 
-const ProjectileSpec &of(ProjectileType type);
+const ProjectileSpec &Of(ProjectileType type);
+inline const ProjectileSpec &of(ProjectileType type)
+{
+    return Of(type);
+}
 const char *KeyOf(ProjectileType type);
 // A key of the file / a weapon's `projectile:` (unknown: bullet)
 ProjectileType FromKey(const std::string &key);
@@ -45,7 +49,11 @@ ProjectileType FromKey(const std::string &key);
 // Reads the file text over the defaults; false when it cannot be parsed
 bool LoadText(const std::string &yamlText);
 // Back to the defaults overlaid with assets/characters/projectiles.yaml
-void reload();
+void Reload();
+inline void reload()
+{
+    Reload();
+}
 // Defaults overlaid with this text (the editor shows its changes at once)
 void Apply(const std::string &yamlText);
 } // namespace Projectiles

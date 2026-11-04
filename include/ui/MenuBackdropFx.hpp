@@ -17,7 +17,11 @@ class MenuBackdropFx
 {
 public:
     // `areaW`: width of the dark area the blasts stay in (they are clipped to it)
-    void render(Renderer &renderer, TextureManager &textures, int areaW, int windowW, int windowH, Uint32 ticks);
+    void Render(Renderer &renderer, TextureManager &textures, int areaW, int windowW, int windowH, Uint32 ticks);
+    inline void render(Renderer &renderer, TextureManager &textures, int areaW, int windowW, int windowH, Uint32 ticks)
+    {
+        Render(renderer, textures, areaW, windowW, windowH, ticks);
+    }
 
 private:
     struct Blast
@@ -29,7 +33,11 @@ private:
         float life {3.0f};
         float peak {0.4f};
     };
-    void spawn(TextureManager &textures, int areaW, int windowH);
+    void Spawn(TextureManager &textures, int areaW, int windowH);
+    inline void spawn(TextureManager &textures, int areaW, int windowH)
+    {
+        Spawn(textures, areaW, windowH);
+    }
 
     std::vector<Blast> m_blasts;
     std::mt19937 m_rng {0x0AA5u};

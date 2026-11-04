@@ -19,7 +19,11 @@ class VoiceManager
 {
 public:
     // Loads the lines of `language` (with the fallback ones); false when no line could be loaded
-    bool load(const std::string &language, const std::string &assetRoot);
+    bool Load(const std::string &language, const std::string &assetRoot);
+    inline bool load(const std::string &language, const std::string &assetRoot)
+    {
+        return Load(language, assetRoot);
+    }
     // Loads another language when it differs from the current one
     void SetLanguage(const std::string &language);
     const std::string &Language() const

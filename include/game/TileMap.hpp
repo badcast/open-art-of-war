@@ -66,7 +66,11 @@ public:
         m_fogStyle = style;
     }
     void InitBlankArena(int width, int height, int tilesetId = 0);
-    void render(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0);
+    void Render(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0);
+    inline void render(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0)
+    {
+        Render(renderer, camera, fogEnabled, globalAnimTick);
+    }
     void RenderTerrain(Renderer &renderer, const Camera &camera, bool fogEnabled = true, int globalAnimTick = 0) const;
     void RenderWallRubble(Renderer &renderer, const Camera &camera, bool fogEnabled = true) const;
     void RenderDecorations(

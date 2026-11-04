@@ -40,35 +40,19 @@ fs::path FindAssetRoot() {
 }
 
 std::string YamlString(const YAML::Node& node, const char* key, const std::string& fallback) {
-    try {
-        return node[key].as<std::string>(fallback);
-    } catch (...) {
-        return fallback;
-    }
+    return YamlValue<std::string>(node, key, fallback);
 }
 
 int YamlInt(const YAML::Node& node, const char* key, int fallback) {
-    try {
-        return node[key].as<int>(fallback);
-    } catch (...) {
-        return fallback;
-    }
+    return YamlValue<int>(node, key, fallback);
 }
 
 float YamlFloat(const YAML::Node& node, const char* key, float fallback) {
-    try {
-        return node[key].as<float>(fallback);
-    } catch (...) {
-        return fallback;
-    }
+    return YamlValue<float>(node, key, fallback);
 }
 
 bool YamlBool(const YAML::Node& node, const char* key, bool fallback) {
-    try {
-        return node[key].as<bool>(fallback);
-    } catch (...) {
-        return fallback;
-    }
+    return YamlValue<bool>(node, key, fallback);
 }
 
 YAML::Node MainWeapon(const YAML::Node& combat) {
@@ -101,7 +85,7 @@ float WeaponCooldown(const YAML::Node& w, bool sample, float fallback) {
     if (!WeaponRandomDelay(w)) return YamlFloat(w, "cooldown", fallback);
     const float lo = YamlFloat(w, "cooldown_min", YamlFloat(w, "cooldown", fallback));
     const float hi = std::max(lo, YamlFloat(w, "cooldown_max", lo));
-    return sample ? OpenArtOfWar::Utility::RandomFloat(lo, hi) : 0.5f * (lo + hi);
+    return sample ? OpenArtOfWar::Utility::Random(lo, hi) : 0.5f * (lo + hi);
 }
 
 bool DocIsBuilding(const YAML::Node& doc) {
@@ -110,10 +94,10 @@ bool DocIsBuilding(const YAML::Node& doc) {
 
 OpenArtOfWar::Faction DocFaction(const YAML::Node& doc) {
     if (DocIsBuilding(doc)) {
-        const auto* k = OpenArtOfWar::Utility::buildingKindInfo(YamlInt(doc, "building_index", -1));
+        const auto* k = OpenArtOfWar::Utility::GetBuildingKindInfo(YamlInt(doc, "building_index", -1));
         return k ? k->faction : OpenArtOfWar::Faction::Neutral;
     }
-    const auto* a = OpenArtOfWar::Utility::archetypeInfo(YamlInt(doc, "archetype_id", -1));
+    const auto* a = OpenArtOfWar::Utility::GetArchetypeInfo(YamlInt(doc, "archetype_id", -1));
     return a ? a->faction : OpenArtOfWar::Faction::Neutral;
 }
 

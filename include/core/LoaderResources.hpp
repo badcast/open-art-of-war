@@ -31,7 +31,11 @@ public:
     // ---- Single files ----
     static std::string LocaleDir(const std::string &root = kDefaultRoot);
     static std::string DefaultLanguage();
-    static std::string environment(const std::string &root = kDefaultRoot);
+    static std::string Environment(const std::string &root = kDefaultRoot);
+    static inline std::string environment(const std::string &root = kDefaultRoot)
+    {
+        return Environment(root);
+    }
     static std::string UiTheme(const std::string &root = kDefaultRoot);
     static std::string FontRegular(const std::string &root = kDefaultRoot);
     static std::string FontBold(const std::string &root = kDefaultRoot);
@@ -56,17 +60,37 @@ public:
     static std::string VoicesConfig(const std::string &root = kDefaultRoot);
     static std::vector<std::string> VoiceClips(const std::string &language, const std::string &root = kDefaultRoot);
     static std::string VoicesFallbackLanguage();
-    static std::string aiDifficulty(const std::string &root = kDefaultRoot);
+    static std::string AiDifficulty(const std::string &root = kDefaultRoot);
+    static inline std::string aiDifficulty(const std::string &root = kDefaultRoot)
+    {
+        return AiDifficulty(root);
+    }
     static std::string Effects(const std::string &root = kDefaultRoot);
     // How the night of a match is lit (data/nights.json)
     static std::string Nights(const std::string &root = kDefaultRoot);
     // How projectiles fly and hit (characters/projectiles.yaml)
-    static std::string projectiles(const std::string &root = kDefaultRoot);
+    static std::string Projectiles(const std::string &root = kDefaultRoot);
+    static inline std::string projectiles(const std::string &root = kDefaultRoot)
+    {
+        return Projectiles(root);
+    }
     // Damage multipliers by projectile kind and target class (data/weapon_balance.json)
-    static std::string weaponBalance(const std::string &root = kDefaultRoot);
+    static std::string WeaponBalance(const std::string &root = kDefaultRoot);
+    static inline std::string weaponBalance(const std::string &root = kDefaultRoot)
+    {
+        return WeaponBalance(root);
+    }
     // `faction` is "confederation" or "resistance"
-    static std::string research(const std::string &faction, const std::string &root = kDefaultRoot);
-    static std::string tileCollision(const std::string &root = kDefaultRoot);
+    static std::string Research(const std::string &faction, const std::string &root = kDefaultRoot);
+    static inline std::string research(const std::string &faction, const std::string &root = kDefaultRoot)
+    {
+        return Research(faction, root);
+    }
+    static std::string TileCollision(const std::string &root = kDefaultRoot);
+    static inline std::string tileCollision(const std::string &root = kDefaultRoot)
+    {
+        return TileCollision(root);
+    }
 
     // ---- Unit and building definitions ----
     // Every unit/building definition file (characters.files)

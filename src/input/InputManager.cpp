@@ -280,7 +280,7 @@ bool InputManager::WasLeftClickIssued(float &worldX, float &worldY, int &screenX
     return false;
 }
 
-bool InputManager::isKeyPressed(SDL_Scancode scancode) const
+bool InputManager::IsKeyPressed(SDL_Scancode scancode) const
 {
     if (!m_keystates || scancode < 0 || scancode >= SDL_SCANCODE_COUNT)
         return false;

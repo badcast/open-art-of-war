@@ -11,7 +11,7 @@ Entity::Entity(bool isBuildingVal)
 
 float Entity::NextCooldown() const
 {
-    return attackCooldownMax > attackCooldown ? Utility::RandomFloat(attackCooldown, attackCooldownMax)
+    return attackCooldownMax > attackCooldown ? Utility::Random(attackCooldown, attackCooldownMax)
                                               : attackCooldown;
 }
 

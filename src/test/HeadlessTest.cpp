@@ -7747,13 +7747,13 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
         // Test deterministic turret shift lookup
         float sx = 0.0f, sy = 0.0f;
-        EntityManager::GetDeterministicTurretShift(10, 2, sx, sy);
+        EntityManager::TurretShift(10, 2, sx, sy);
         if (sx != 0.0f || sy != 0.0f)
         {
             std::cerr << "[Test] Error: Rhino facing 2 (reference) turret shift mismatch! (" << sx << "," << sy << ")" << std::endl;
             return false;
         }
-        EntityManager::GetDeterministicTurretShift(10, 6, sx, sy);
+        EntityManager::TurretShift(10, 6, sx, sy);
         if (sx != 0.0f || sy != 7.0f)
         {
             std::cerr << "[Test] Error: Rhino facing 6 turret shift mismatch! (" << sx << "," << sy << ") expected (0, 7)" << std::endl;
@@ -7826,13 +7826,13 @@ bool HeadlessTest::run(Application &app, int numTicks)
         }
 
         // Verify visual PRNG does not alter simulation PRNG
-        Utility::VisualRandomFloat(0.0f, 100.0f);
-        Utility::VisualRandomInt(1, 10);
-        Utility::rng().Reseed(0x12345678u);
-        const uint32_t s1 = Utility::rng()();
-        Utility::VisualRandomFloat(-5.0f, 5.0f);
-        Utility::rng().Reseed(0x12345678u);
-        const uint32_t s2 = Utility::rng()();
+        Utility::VisualRandom(0.0f, 100.0f);
+        Utility::VisualRandom(1, 10);
+        Utility::Rng().Reseed(0x12345678u);
+        const uint32_t s1 = Utility::Rng()();
+        Utility::VisualRandom(-5.0f, 5.0f);
+        Utility::Rng().Reseed(0x12345678u);
+        const uint32_t s2 = Utility::Rng()();
         if (s1 != s2)
         {
             std::cerr << "[Test] Error: VisualRandom calls contaminated simulation PRNG!" << std::endl;

@@ -2,8 +2,10 @@
 
 #include "core/Config.hpp"
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace OpenArtOfWar::Utility
@@ -13,7 +15,7 @@ namespace OpenArtOfWar::Utility
 // Random numbers: one fast xorshift32 generator for gameplay noise (shot spread, damage rolls,
 // death variants, AI cooldown jitter). Not for anything security related.
 // ---------------------------------------------------------------------------
-class Random
+class RandomGenerator
 {
 public:
     using result_type = uint32_t;
@@ -26,7 +28,7 @@ public:
         return UINT32_MAX;
     }
 
-    explicit Random(uint32_t seed = 0x9e3779b9u)
+    explicit RandomGenerator(uint32_t seed = 0x9e3779b9u)
     {
         Reseed(seed);
     }
@@ -78,43 +80,104 @@ private:
 };
 
 // The shared gameplay generator
-Random &rng();
+RandomGenerator &Rng();
+inline RandomGenerator &rng()
+{
+    return Rng();
+}
 
 // Dedicated generator for visual effects and client-side particles (never pollutes simulation PRNG)
-Random &visualRng();
+RandomGenerator &VisualRng();
+inline RandomGenerator &visualRng()
+{
+    return VisualRng();
+}
 
+// ---------------------------------------------------------------------------
+// Generalized random range functions (integral or floating point)
+// ---------------------------------------------------------------------------
+template <typename T1, typename T2, typename Common = std::common_type_t<T1, T2>>
+inline Common Random(T1 lo, T2 hi)
+{
+    if constexpr (std::is_integral_v<Common>)
+    {
+        return static_cast<Common>(Rng().Range(static_cast<int>(lo), static_cast<int>(hi)));
+    }
+    else
+    {
+        return static_cast<Common>(Rng().Range(static_cast<float>(lo), static_cast<float>(hi)));
+    }
+}
+
+template <typename T1, typename T2, typename Common = std::common_type_t<T1, T2>>
+inline Common VisualRandom(T1 lo, T2 hi)
+{
+    if constexpr (std::is_integral_v<Common>)
+    {
+        return static_cast<Common>(VisualRng().Range(static_cast<int>(lo), static_cast<int>(hi)));
+    }
+    else
+    {
+        return static_cast<Common>(VisualRng().Range(static_cast<float>(lo), static_cast<float>(hi)));
+    }
+}
+
+inline float RandomSigned()
+{
+    return Rng().SignedUnit();
+}
+
+inline float VisualRandomSigned()
+{
+    return VisualRng().SignedUnit();
+}
+
+// Backward-compatible wrappers for type-explicit calls
 inline int RandomInt(int lo, int hi)
 {
-    return rng().Range(lo, hi);
+    return Random(lo, hi);
 }
 inline float RandomFloat(float lo, float hi)
 {
-    return rng().Range(lo, hi);
-}
-inline float RandomSigned()
-{
-    return rng().SignedUnit();
+    return Random(lo, hi);
 }
 
 inline int VisualRandomInt(int lo, int hi)
 {
-    return visualRng().Range(lo, hi);
+    return VisualRandom(lo, hi);
 }
 inline float VisualRandomFloat(float lo, float hi)
 {
-    return visualRng().Range(lo, hi);
+    return VisualRandom(lo, hi);
+}
+
+// ---------------------------------------------------------------------------
+// Generalized container picking
+// ---------------------------------------------------------------------------
+template <typename Container>
+inline const auto &Pick(const Container &items)
+{
+    return items[static_cast<size_t>(Random(0, static_cast<int>(items.size()) - 1))];
+}
+
+template <typename Container>
+inline const auto &VisualPick(const Container &items)
+{
+    return items[static_cast<size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1))];
 }
 
 template <typename T>
-const T &Pick(const std::vector<T> &items)
+inline const T &Pick(std::initializer_list<T> items)
 {
-    return items[static_cast<size_t>(RandomInt(0, static_cast<int>(items.size()) - 1))];
+    const size_t idx = static_cast<size_t>(Random(0, static_cast<int>(items.size()) - 1));
+    return *(items.begin() + idx);
 }
 
 template <typename T>
-const T &VisualPick(const std::vector<T> &items)
+inline const T &VisualPick(std::initializer_list<T> items)
 {
-    return items[static_cast<size_t>(VisualRandomInt(0, static_cast<int>(items.size()) - 1))];
+    const size_t idx = static_cast<size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1));
+    return *(items.begin() + idx);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +214,11 @@ struct ArchetypeInfo
     int baseFormId; // for siege / baseline forms: the archetype they belong to, otherwise -1
 };
 constexpr int kArchetypeCount = 19;
-const ArchetypeInfo *archetypeInfo(int archetypeId); // nullptr for an unknown id
+const ArchetypeInfo *GetArchetypeInfo(int archetypeId); // nullptr for an unknown id
+inline const ArchetypeInfo *archetypeInfo(int archetypeId)
+{
+    return GetArchetypeInfo(archetypeId);
+}
 const char *UnitClassName(int archetypeId);          // "infantry" / "vehicle"
 const char *ProducedIn(int archetypeId);             // "barracks" / "factory"
 float DefaultTurnStepDelay(int archetypeId);         // seconds per 45-degree hull turn (0 for infantry)
@@ -164,7 +231,11 @@ struct BuildingKindInfo
     Faction faction;
     UnitType type;
 };
-const BuildingKindInfo *buildingKindInfo(int buildingIndex); // nullptr for an unknown index
+const BuildingKindInfo *GetBuildingKindInfo(int buildingIndex); // nullptr for an unknown index
+inline const BuildingKindInfo *buildingKindInfo(int buildingIndex)
+{
+    return GetBuildingKindInfo(buildingIndex);
+}
 const std::vector<BuildingKindInfo> &BuildingKinds();
 const char *UnitTypeName(UnitType type);
 

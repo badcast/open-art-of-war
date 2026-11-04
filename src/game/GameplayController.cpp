@@ -357,7 +357,7 @@ SimCommand GameplayController::Command(CommandType type) const
     return c;
 }
 
-void GameplayController::orderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued)
+void GameplayController::OrderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued)
 {
     SimCommand c = Command(CommandType::OrderAt);
     c.ids.assign(units.begin(), units.end());
@@ -969,7 +969,7 @@ void GameplayController::Update(
             if (!combatUnits.empty())
             {
                 const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-                orderAt(combatUnits, lx, ly, OrderKind::AttackMove, shift);
+                OrderAt(combatUnits, lx, ly, OrderKind::AttackMove, shift);
             }
             // With Shift the attack-move mode stays on for the next point of the route
             if (!(input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT)))
@@ -1089,7 +1089,7 @@ void GameplayController::Update(
             {
                 // Shift: the point is queued after the current orders (a route, as in other RTS games)
                 const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-                orderAt(combatUnits, rx, ry, OrderKind::Move, shift);
+                OrderAt(combatUnits, rx, ry, OrderKind::Move, shift);
             }
         }
 

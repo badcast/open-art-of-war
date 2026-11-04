@@ -557,7 +557,11 @@ public:
     void NoteEntityHit(Entity &victim, int attackerId);
     // Keeps Unit::turretShiftX/Y in line with the turret layer of the unit's current hull sprite
     void UpdateTurretShift(Unit &u) const;
-    static void GetDeterministicTurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY);
+    static void TurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY);
+    static inline void GetDeterministicTurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY)
+    {
+        TurretShift(archetypeId, facingDirection, outShiftX, outShiftY);
+    }
     // Siege-capable units deploy by themselves when a visible enemy is out of normal range but within
     // siege range (AI always, the player only on an attack-move [Q] order), and pack up again when idle
     void UpdateAutoSiege(Unit &u, const TileMap &map, float deltaTime);
@@ -572,7 +576,7 @@ public:
     bool IsHostileBuildingShown(const Building &building, const TileMap &map, bool *outInSight = nullptr) const;
     void RenderGroundRemnants(
         Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled = true) const;
-    void render(
+    void Render(
         Renderer &renderer,
         const Camera &camera,
         const TileMap &map,
@@ -580,6 +584,17 @@ public:
         int globalAnimTick = 0,
         bool debugMode = false,
         bool showAllHealth = false);
+    inline void render(
+        Renderer &renderer,
+        const Camera &camera,
+        const TileMap &map,
+        bool fogEnabled = true,
+        int globalAnimTick = 0,
+        bool debugMode = false,
+        bool showAllHealth = false)
+    {
+        Render(renderer, camera, map, fogEnabled, globalAnimTick, debugMode, showAllHealth);
+    }
     // What shines: projectiles and explosions (the glow pass of the shader effects draws them once more)
     void RenderEmissive(Renderer &renderer, const Camera &camera) const;
     // What lights up its surroundings at night (explosions, flames, rockets and shells in flight, buildings), in

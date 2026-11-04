@@ -270,7 +270,7 @@ bool VerifyCertificate(std::vector<std::string> &problems, std::string &certific
     return problems.empty();
 }
 
-Mode mode()
+Mode GetMode()
 {
     return state().mode;
 }

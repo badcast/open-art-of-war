@@ -48,12 +48,20 @@ namespace Players
 // Single player: slot 0 the person with `human`, slot 1 the computer with the other faction
 void SetupSinglePlayer(Faction human);
 // A network / custom match with the given slots; `local` is the slot of this computer
-void setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId local);
+void Setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId local);
+inline void setup(const std::array<PlayerSlot, kMaxPlayers> &slots, PlayerId local)
+{
+    Setup(slots, local);
+}
 
 const PlayerSlot &Slot(PlayerId id);
 bool IsActive(PlayerId id);
 PlayerId Local();
-int count(); // active slots
+int Count(); // active slots
+inline int count()
+{
+    return Count();
+}
 
 Faction FactionOf(PlayerId id);
 uint8_t TeamOf(PlayerId id);

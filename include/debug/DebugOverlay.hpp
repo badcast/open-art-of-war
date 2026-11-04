@@ -33,7 +33,7 @@ public:
         return m_visible;
     }
 
-    void render(
+    void Render(
         TileMap &map,
         EntityManager &entities,
         Economy &economy,
@@ -42,6 +42,18 @@ public:
         Camera &camera,
         AIController &ai,
         float fps);
+    inline void render(
+        TileMap &map,
+        EntityManager &entities,
+        Economy &economy,
+        MissionController &mission,
+        SoundEngine &sound,
+        Camera &camera,
+        AIController &ai,
+        float fps)
+    {
+        Render(map, entities, economy, mission, sound, camera, ai, fps);
+    }
 
     bool IsFogDisabled() const
     {

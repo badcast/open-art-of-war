@@ -26,7 +26,7 @@ namespace OpenArtOfWar {
 namespace {
 
 using MapNoise::OctaveNoise2D;
-using Rng = Utility::Random;
+using Rng = Utility::RandomGenerator;
 
 constexpr float kPi = 3.14159265f;
 constexpr int kBaseSize = 10;      // a base occupies 10x10 tiles

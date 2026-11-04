@@ -57,7 +57,7 @@ int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target, P
     {
         int lo = 50, hi = 100;
         WeaponBalance::MovingTargetPercent(lo, hi);
-        const uint32_t roll = static_cast<uint32_t>(Utility::RandomInt(lo, hi));
+        const uint32_t roll = static_cast<uint32_t>(Utility::Random(lo, hi));
         int finalDamage = static_cast<int>((static_cast<uint64_t>(baseDamage) * roll + 50u) / 100u);
         return ReduceDamageByArmor((finalDamage < 1) ? 1 : finalDamage, *target);
     }
@@ -163,7 +163,7 @@ static void HandleUnitDeathState(Unit *tu, bool isFlameDamage)
         }
         else
         {
-            tu->selectedDeathSeq = Utility::VisualRandomInt(247, 248);
+            tu->selectedDeathSeq = Utility::VisualRandom(247, 248);
         }
     }
 }
@@ -216,53 +216,30 @@ bool EntityManager::LoadCharacterConfigs(const std::string &assetRoot)
 
 bool EntityManager::LoadCharacterYaml(YAML::Node root)
 {
-    auto getStr = [](const YAML::Node &node, const char *key, const std::string &def = "") -> std::string {
+    auto getVal = [](const YAML::Node &node, const char *key, auto def) {
+        using T = decltype(def);
         if (node && node[key])
         {
             try
             {
-                return node[key].as<std::string>();
+                return node[key].as<T>();
             }
             catch (...)
             {}
         }
         return def;
     };
-    auto getInt = [](const YAML::Node &node, const char *key, int def = 0) -> int {
-        if (node && node[key])
-        {
-            try
-            {
-                return node[key].as<int>();
-            }
-            catch (...)
-            {}
-        }
-        return def;
+    auto getStr = [&](const YAML::Node &node, const char *key, const std::string &def = "") -> std::string {
+        return getVal(node, key, def);
     };
-    auto getFloat = [](const YAML::Node &node, const char *key, float def = 0.0f) -> float {
-        if (node && node[key])
-        {
-            try
-            {
-                return node[key].as<float>();
-            }
-            catch (...)
-            {}
-        }
-        return def;
+    auto getInt = [&](const YAML::Node &node, const char *key, int def = 0) -> int {
+        return getVal(node, key, def);
     };
-    auto getBool = [](const YAML::Node &node, const char *key, bool def = false) -> bool {
-        if (node && node[key])
-        {
-            try
-            {
-                return node[key].as<bool>();
-            }
-            catch (...)
-            {}
-        }
-        return def;
+    auto getFloat = [&](const YAML::Node &node, const char *key, float def = 0.0f) -> float {
+        return getVal(node, key, def);
+    };
+    auto getBool = [&](const YAML::Node &node, const char *key, bool def = false) -> bool {
+        return getVal(node, key, def);
     };
 
     if (!root.IsDefined() || !root.IsMap())
@@ -279,12 +256,12 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     // they are not read from the file, so a file can never contradict the game about them
     Faction faction = Faction::Resistance;
     UnitType uType = UnitType::Unknown;
-    if (const Utility::ArchetypeInfo *a = (type == "building") ? nullptr : Utility::archetypeInfo(archId))
+    if (const Utility::ArchetypeInfo *a = (type == "building") ? nullptr : Utility::GetArchetypeInfo(archId))
     {
         faction = a->faction;
         uType = a->type;
     }
-    else if (const Utility::BuildingKindInfo *k = Utility::buildingKindInfo(bldgIdx))
+    else if (const Utility::BuildingKindInfo *k = Utility::GetBuildingKindInfo(bldgIdx))
     {
         faction = k->faction;
         uType = k->type;
@@ -2742,7 +2719,7 @@ void EntityManager::ToggleSiegeMode(const std::vector<int> &unitIds)
     }
 }
 
-void EntityManager::GetDeterministicTurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY)
+void EntityManager::TurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY)
 {
     outShiftX = 0.0f;
     outShiftY = 0.0f;
@@ -2794,7 +2771,7 @@ void EntityManager::UpdateTurretShift(Unit &u) const
     }
     else
     {
-        GetDeterministicTurretShift(u.archetypeId, fixedHull ? 0 : u.facingDirection, u.turretShiftX, u.turretShiftY);
+        TurretShift(u.archetypeId, fixedHull ? 0 : u.facingDirection, u.turretShiftX, u.turretShiftY);
     }
 }
 
@@ -3570,8 +3547,8 @@ void EntityManager::SpawnProjectileFromEntity(
             const float minY = tb->tileY * TILE_HEIGHT + inset;
             const float maxX = (tb->tileX + tb->buildWidth) * TILE_WIDTH - inset;
             const float maxY = (tb->tileY + tb->buildHeight) * TILE_HEIGHT - inset;
-            dstX = std::clamp(srcX, minX, maxX) + Utility::RandomFloat(-8.0f, 8.0f);
-            dstY = std::clamp(srcY, minY, maxY) + Utility::RandomFloat(-6.0f, 6.0f);
+            dstX = std::clamp(srcX, minX, maxX) + Utility::Random(-8.0f, 8.0f);
+            dstY = std::clamp(srcY, minY, maxY) + Utility::Random(-6.0f, 6.0f);
             dstX = std::clamp(dstX, minX, maxX);
             dstY = std::clamp(dstY, minY, maxY);
             // ... a tenth of the way in towards its middle: shots, shells and rockets land on the building, not on
@@ -3644,7 +3621,7 @@ void EntityManager::SpawnProjectileFromEntity(
             case ProjectileType::Shell:
             {
                 // The heavy tanks (T-22 Zeus, Rhino, in any of their forms) have a deeper gun than the rest
-                const Utility::ArchetypeInfo *info = shooter ? Utility::archetypeInfo(shooter->archetypeId) : nullptr;
+                const Utility::ArchetypeInfo *info = shooter ? Utility::GetArchetypeInfo(shooter->archetypeId) : nullptr;
                 const int base = info && info->baseFormId >= 0 ? info->baseFormId : (shooter ? shooter->archetypeId : -1);
                 fire = (base == 10 || base == 11) ? SoundCue::FireCannonHigh : SoundCue::FireCannon;
                 break;
@@ -3995,26 +3972,26 @@ void EntityManager::SpawnDeathExplosions(const Entity &e)
         const int extra = std::clamp(b->buildWidth * b->buildHeight / 2, fx.buildingExtraMin, fx.buildingExtraMax);
         for (int i = 0; i < extra; ++i)
         {
-            const float x = (b->tileX + Utility::VisualRandomFloat(0.2f, b->buildWidth - 0.2f)) * TILE_WIDTH;
-            const float y = (b->tileY + Utility::VisualRandomFloat(0.2f, b->buildHeight - 0.2f)) * TILE_HEIGHT;
+            const float x = (b->tileX + Utility::VisualRandom(0.2f, b->buildWidth - 0.2f)) * TILE_WIDTH;
+            const float y = (b->tileY + Utility::VisualRandom(0.2f, b->buildHeight - 0.2f)) * TILE_HEIGHT;
             const int anim = (i % fx.buildingBigEvery == 0) ? fx.buildingBigAnim
-                                                            : pick(fx.buildingExtraAnims, Utility::VisualRandomInt(0, 3));
+                                                            : pick(fx.buildingExtraAnims, Utility::VisualRandom(0, 3));
             SpawnExplosion(
                 x,
                 y,
                 anim,
                 fx.buildingDelayStart + fx.buildingDelayStep * static_cast<float>(i)
-                    + Utility::VisualRandomFloat(0.0f, fx.buildingDelayJitter));
+                    + Utility::VisualRandom(0.0f, fx.buildingDelayJitter));
         }
         return;
     }
     // Vehicle: the blast, then the ammunition / fuel a moment later
     SpawnExplosion(cx, cy, pick(fx.vehicleMain, e.id));
     SpawnExplosion(
-        cx + Utility::VisualRandomFloat(-fx.vehicleSecondSpreadX, fx.vehicleSecondSpreadX),
-        cy + Utility::VisualRandomFloat(fx.vehicleSecondSpreadYMin, fx.vehicleSecondSpreadYMax),
+        cx + Utility::VisualRandom(-fx.vehicleSecondSpreadX, fx.vehicleSecondSpreadX),
+        cy + Utility::VisualRandom(fx.vehicleSecondSpreadYMin, fx.vehicleSecondSpreadYMax),
         pick(fx.vehicleSecond, e.id + 2),
-        Utility::VisualRandomFloat(fx.vehicleSecondDelayMin, fx.vehicleSecondDelayMax));
+        Utility::VisualRandom(fx.vehicleSecondDelayMin, fx.vehicleSecondDelayMax));
 }
 
 void EntityManager::SpawnExplosion(float worldX, float worldY, int animId, float delay)
@@ -4278,7 +4255,7 @@ SDL_Color SelectionHealthColor(float ratio)
 }
 } // namespace
 
-void EntityManager::render(
+void EntityManager::Render(
     Renderer &renderer,
     const Camera &camera,
     const TileMap &map,

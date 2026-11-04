@@ -63,7 +63,11 @@ public:
     }
 
     // Queries
-    bool isKeyPressed(SDL_Scancode scancode) const;
+    bool IsKeyPressed(SDL_Scancode scancode) const;
+    inline bool isKeyPressed(SDL_Scancode scancode) const
+    {
+        return IsKeyPressed(scancode);
+    }
     bool IsKeyJustPressed(SDL_Scancode scancode);
 
     const SelectionBox &GetSelectionBox() const

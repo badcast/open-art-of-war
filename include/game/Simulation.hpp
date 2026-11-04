@@ -67,7 +67,11 @@ public:
 
     // A match of several players: seeds the random numbers and gives every other player an economy
     // (the local player's is SimContext::economy)
-    void startMatch(const MatchSetup &setup);
+    void StartMatch(const MatchSetup &setup);
+    inline void startMatch(const MatchSetup &setup)
+    {
+        StartMatch(setup);
+    }
     // The economy of a player in this tick
     Economy &EconomyOf(PlayerId player, SimContext &ctx);
     // Income, power and production of every economy (the local one too), in slot order

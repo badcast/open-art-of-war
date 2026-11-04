@@ -156,24 +156,23 @@ void CharacterEditor::StartExplosionPreview(int preset) {
         e.delay = delay;
         fxEvents.push_back(e);
     };
-    using OpenArtOfWar::Utility::RandomFloat;
-    using OpenArtOfWar::Utility::RandomInt;
+    using OpenArtOfWar::Utility::Random;
     if (preset == 0) {
         add(0.0f, 0.0f, pick(fx.vehicleMain, seed), 0.0f);
-        add(RandomFloat(-fx.vehicleSecondSpreadX, fx.vehicleSecondSpreadX),
-            RandomFloat(fx.vehicleSecondSpreadYMin, fx.vehicleSecondSpreadYMax), pick(fx.vehicleSecond, seed + 2),
-            RandomFloat(fx.vehicleSecondDelayMin, fx.vehicleSecondDelayMax));
+        add(Random(-fx.vehicleSecondSpreadX, fx.vehicleSecondSpreadX),
+            Random(fx.vehicleSecondSpreadYMin, fx.vehicleSecondSpreadYMax), pick(fx.vehicleSecond, seed + 2),
+            Random(fx.vehicleSecondDelayMin, fx.vehicleSecondDelayMax));
     } else if (preset >= 1 && preset <= 3) {
         const BuildingPreset& b = kBuildingPresets[preset - 1];
         const int main = preset == 1 ? fx.buildingSmallMain : preset == 2 ? fx.buildingPowerMain : fx.buildingLargeMain;
         add(0.0f, 0.0f, main, 0.0f);
         const int extra = std::clamp(b.w * b.h / 2, fx.buildingExtraMin, fx.buildingExtraMax);
         for (int i = 0; i < extra; ++i) {
-            const float x = (RandomFloat(0.2f, b.w - 0.2f) - b.w * 0.5f) * TILE_WIDTH;
-            const float y = (RandomFloat(0.2f, b.h - 0.2f) - b.h * 0.5f) * TILE_HEIGHT;
-            const int anim = (i % fx.buildingBigEvery == 0) ? fx.buildingBigAnim : pick(fx.buildingExtraAnims, RandomInt(0, 3));
+            const float x = (Random(0.2f, b.w - 0.2f) - b.w * 0.5f) * TILE_WIDTH;
+            const float y = (Random(0.2f, b.h - 0.2f) - b.h * 0.5f) * TILE_HEIGHT;
+            const int anim = (i % fx.buildingBigEvery == 0) ? fx.buildingBigAnim : pick(fx.buildingExtraAnims, Random(0, 3));
             add(x, y, anim,
-                fx.buildingDelayStart + fx.buildingDelayStep * static_cast<float>(i) + RandomFloat(0.0f, fx.buildingDelayJitter));
+                fx.buildingDelayStart + fx.buildingDelayStep * static_cast<float>(i) + Random(0.0f, fx.buildingDelayJitter));
         }
     } else {
         add(0.0f, 0.0f, fxAnim, 0.0f);

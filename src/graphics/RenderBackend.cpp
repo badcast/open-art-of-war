@@ -153,7 +153,7 @@ std::string Configured(const EnvironmentConfig &env)
     return env.Section("render").value("api", std::string());
 }
 
-void select(EnvironmentConfig &env, const std::string &name)
+void Select(EnvironmentConfig &env, const std::string &name)
 {
     nlohmann::json &r = RenderSection(env);
     const std::string previous = r.value("api", std::string());
@@ -292,7 +292,7 @@ bool Probe(const std::string &name)
     return ok;
 }
 
-std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUnknown)
+std::vector<RenderApiOption> Options(EnvironmentConfig &env, bool probeUnknown)
 {
     nlohmann::json &r = RenderSection(env);
     const std::string current = r.value("api", std::string());

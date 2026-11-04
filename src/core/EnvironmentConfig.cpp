@@ -20,7 +20,7 @@ const char *const kSettingsKey = "environment";
 
 } // namespace
 
-bool EnvironmentConfig::load(const std::string &assetPath)
+bool EnvironmentConfig::Load(const std::string &assetPath)
 {
     m_assetPath = assetPath;
     m_dirty = false;

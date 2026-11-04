@@ -147,7 +147,7 @@ std::string LoaderResources::DefaultLanguage()
     return Str("locale", "default_language");
 }
 
-std::string LoaderResources::environment(const std::string &root)
+std::string LoaderResources::Environment(const std::string &root)
 {
     return join(root, Str(nullptr, "environment"));
 }
@@ -292,7 +292,7 @@ std::vector<std::string> LoaderResources::SfxClips(const std::string &root)
     return Joined(root, List("sfx", "clips"));
 }
 
-std::string LoaderResources::aiDifficulty(const std::string &root)
+std::string LoaderResources::AiDifficulty(const std::string &root)
 {
     return join(root, Str(nullptr, "ai_difficulty"));
 }
@@ -307,22 +307,22 @@ std::string LoaderResources::Effects(const std::string &root)
     return join(root, Str(nullptr, "effects"));
 }
 
-std::string LoaderResources::projectiles(const std::string &root)
+std::string LoaderResources::Projectiles(const std::string &root)
 {
     return join(root, Str(nullptr, "projectiles"));
 }
 
-std::string LoaderResources::weaponBalance(const std::string &root)
+std::string LoaderResources::WeaponBalance(const std::string &root)
 {
     return join(root, Str(nullptr, "weapon_balance"));
 }
 
-std::string LoaderResources::research(const std::string &faction, const std::string &root)
+std::string LoaderResources::Research(const std::string &faction, const std::string &root)
 {
     return join(root, Str("research", faction.c_str()));
 }
 
-std::string LoaderResources::tileCollision(const std::string &root)
+std::string LoaderResources::TileCollision(const std::string &root)
 {
     return join(root, Str(nullptr, "tile_collision"));
 }

@@ -65,7 +65,11 @@ public:
     ~Application();
 
     bool Init(int windowWidth = DEFAULT_WINDOW_WIDTH, int windowHeight = DEFAULT_WINDOW_HEIGHT);
-    void run();
+    void Run();
+    inline void run()
+    {
+        Run();
+    }
 #if defined(AOW_DEBUG)
     bool RunHeadlessTest(int numTicks = 200); // debug builds only (HeadlessTest.cpp)
 #endif
@@ -125,7 +129,11 @@ public:
 private:
     void HandleEvents();
     void Update(float deltaTime);
-    void render();
+    void Render();
+    inline void render()
+    {
+        Render();
+    }
 
     void ApplyGraphics();
     // Graphics quality: the game world is drawn at 1/3 (low), 1/2 (medium) or the full (high) resolution

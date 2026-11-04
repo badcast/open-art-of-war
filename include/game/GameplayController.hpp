@@ -190,7 +190,11 @@ private:
     int GroupOfUnits(const std::vector<int> &unitIds) const;
     // Order for the selected units at a world point: a whole control group marches as one squad
     // (leash, chokepoints), anything else gets a plain order
-    void orderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued = false);
+    void OrderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued = false);
+    inline void orderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued = false)
+    {
+        OrderAt(units, worldX, worldY, kind, queued);
+    }
     // Command of the local player (debug: may command any faction)
     SimCommand Command(CommandType type) const;
 

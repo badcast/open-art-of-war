@@ -75,7 +75,11 @@ struct Settings
     // Brings every value into its valid range
     void Clamp();
 
-    bool load(const std::string &path);
+    bool Load(const std::string &path);
+    inline bool load(const std::string &path)
+    {
+        return Load(path);
+    }
     bool Save(const std::string &path) const;
 
     // settings.json in the per-user directory
