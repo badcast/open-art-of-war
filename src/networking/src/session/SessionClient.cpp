@@ -7,7 +7,7 @@ namespace OpenArtOfWar::Net
 
 namespace
 {
-constexpr size_t kBufferSize = 16 * 1024;
+constexpr std::size_t kBufferSize = 16 * 1024;
 } // namespace
 
 SessionClient::SessionClient(std::unique_ptr<Transport> transport, ClientConfig config)
@@ -19,13 +19,13 @@ SessionClient::SessionClient(std::unique_ptr<Transport> transport, ClientConfig 
         m_state = State::Disconnected;
 }
 
-void SessionClient::send(Channel channel, const uint8_t *data, size_t size)
+void SessionClient::send(Channel channel, const std::uint8_t *data, std::size_t size)
 {
     if (m_transport && m_state != State::Disconnected)
         m_transport->send(0, channel, data, size);
 }
 
-void SessionClient::update(uint32_t nowMs)
+void SessionClient::update(std::uint32_t nowMs)
 {
     (void) nowMs;
     if (!m_transport)
@@ -166,22 +166,22 @@ void SessionClient::handle(const TransportEvent &e)
     }
 }
 
-void SessionClient::sendCommands(uint32_t turn, const std::vector<uint8_t> &bytes)
+void SessionClient::sendCommands(std::uint32_t turn, const std::vector<std::uint8_t> &bytes)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, Commands {turn, bytes});
-    const size_t size = w.finish();
+    const std::size_t size = w.finish();
     if (!w.overflowed())
         send(Channel::Lockstep, m_buffer.data(), size);
 }
 
-const TurnBundle *SessionClient::turn(uint32_t turn) const
+const TurnBundle *SessionClient::turn(std::uint32_t turn) const
 {
     auto it = m_turns.find(turn);
     return it == m_turns.end() ? nullptr : &it->second;
 }
 
-void SessionClient::dropTurnsBefore(uint32_t turn)
+void SessionClient::dropTurnsBefore(std::uint32_t turn)
 {
     m_turns.erase(m_turns.begin(), m_turns.lower_bound(turn));
 }
@@ -193,7 +193,7 @@ void SessionClient::requestPause(bool pause)
     send(Channel::Lockstep, m_buffer.data(), w.finish());
 }
 
-void SessionClient::sendWorldHash(uint32_t tick, uint64_t hash)
+void SessionClient::sendWorldHash(std::uint32_t tick, std::uint64_t hash)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, WorldHash {tick, hash});
@@ -233,7 +233,7 @@ bool SessionClient::takeDataFile(FilePathData &out)
     return true;
 }
 
-void SessionClient::sayHelloAgain(uint64_t assetsHash)
+void SessionClient::sayHelloAgain(std::uint64_t assetsHash)
 {
     m_config.identity.assetsHash = assetsHash;
     Hello hello;
@@ -249,24 +249,24 @@ void SessionClient::sayHelloAgain(uint64_t assetsHash)
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
-void SessionClient::requestFile(uint64_t hash)
+void SessionClient::requestFile(std::uint64_t hash)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, FileRequest {hash});
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
-void SessionClient::uploadFile(uint64_t hash, const std::vector<uint8_t> &bytes)
+void SessionClient::uploadFile(std::uint64_t hash, const std::vector<std::uint8_t> &bytes)
 {
-    std::vector<uint8_t> big(bytes.size() + 64);
+    std::vector<std::uint8_t> big(bytes.size() + 64);
     BitWriter w(big.data(), big.size());
     encode(w, FileData {hash, bytes});
-    const size_t size = w.finish();
+    const std::size_t size = w.finish();
     if (!w.overflowed())
         send(Channel::Bulk, big.data(), size);
 }
 
-bool SessionClient::takeFile(uint64_t &hash, std::vector<uint8_t> &bytes)
+bool SessionClient::takeFile(std::uint64_t &hash, std::vector<std::uint8_t> &bytes)
 {
     if (m_files.empty())
         return false;
@@ -276,14 +276,14 @@ bool SessionClient::takeFile(uint64_t &hash, std::vector<uint8_t> &bytes)
     return true;
 }
 
-void SessionClient::sendOwnerSetMap(const std::string &map, uint8_t spawnCount, uint64_t mapHash)
+void SessionClient::sendOwnerSetMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, OwnerSetMap {map, mapHash, spawnCount});
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
-void SessionClient::sendOwnerStart(const std::vector<uint8_t> &setup, uint32_t firstTurnDelayMs)
+void SessionClient::sendOwnerStart(const std::vector<std::uint8_t> &setup, std::uint32_t firstTurnDelayMs)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, OwnerStart {firstTurnDelayMs, setup});
@@ -352,7 +352,7 @@ void SessionClient::disconnect()
     m_state = State::Disconnected;
 }
 
-uint32_t SessionClient::roundTripMs() const
+std::uint32_t SessionClient::roundTripMs() const
 {
     return m_transport ? m_transport->roundTripMs(0) : 0;
 }

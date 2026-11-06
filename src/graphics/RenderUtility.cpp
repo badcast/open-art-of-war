@@ -89,7 +89,7 @@ SDL_Color ParseHexColor(const std::string &text, SDL_Color fallback)
         if (!std::isxdigit(static_cast<unsigned char>(c)))
             return fallback;
     }
-    auto byte = [&](size_t i) {
+    auto byte = [&](std::size_t i) {
         return static_cast<Uint8>(std::stoi(s.substr(i, 2), nullptr, 16));
     };
     return {byte(0), byte(2), byte(4), s.size() == 8 ? byte(6) : static_cast<Uint8>(255)};

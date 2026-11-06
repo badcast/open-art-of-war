@@ -13,19 +13,19 @@ class Sha256
 {
 public:
     Sha256();
-    void Update(const void *data, size_t size);
-    std::array<uint8_t, 32> Final();
+    void Update(const void *data, std::size_t size);
+    std::array<std::uint8_t, 32> Final();
 
     // Lower-case hex digest of a whole buffer
-    static std::string Hex(const void *data, size_t size);
+    static std::string Hex(const void *data, std::size_t size);
 
 private:
-    void Block(const uint8_t *p);
+    void Block(const std::uint8_t *p);
 
-    uint32_t m_state[8];
-    uint8_t m_buffer[64];
-    size_t m_used {0};
-    uint64_t m_bits {0};
+    std::uint32_t m_state[8];
+    std::uint8_t m_buffer[64];
+    std::size_t m_used {0};
+    std::uint64_t m_bits {0};
 };
 
 } // namespace OpenArtOfWar

@@ -30,8 +30,8 @@ struct State
     Mode mode = Mode::None;
     std::string description = "no assets located";
     std::mutex lock;
-    std::map<std::string, std::vector<uint8_t>> blobFiles;
-    std::map<std::string, std::vector<uint8_t>> overlay; // session overlay, see SetSessionOverlay
+    std::map<std::string, std::vector<std::uint8_t>> blobFiles;
+    std::map<std::string, std::vector<std::uint8_t>> overlay; // session overlay, see SetSessionOverlay
     std::string userDir;
     fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
@@ -91,7 +91,7 @@ std::string UserDirLocked(State &state)
     return state.userDir;
 }
 
-bool ReadFile(const fs::path &p, std::vector<uint8_t> &out)
+bool ReadFile(const fs::path &p, std::vector<std::uint8_t> &out)
 {
     std::ifstream f(p, std::ios::binary);
     if (!f)
@@ -101,7 +101,7 @@ bool ReadFile(const fs::path &p, std::vector<uint8_t> &out)
 }
 
 // Unpacks every regular file of the tar.zst blob into memory (blobArhive tar stream has no random access)
-bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<uint8_t>> &files)
+bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<std::uint8_t>> &files)
 {
     archive *blobArhive = archive_read_new();
     archive_read_support_filter_all(blobArhive);
@@ -118,14 +118,14 @@ bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<uint8_
     {
         if (archive_entry_filetype(entry) != AE_IFREG)
             continue;
-        std::vector<uint8_t> data(static_cast<size_t>(archive_entry_size(entry)));
-        size_t got = 0;
+        std::vector<std::uint8_t> data(static_cast<std::size_t>(archive_entry_size(entry)));
+        std::size_t got = 0;
         while (got < data.size())
         {
             const la_ssize_t n = archive_read_data(blobArhive, data.data() + got, data.size() - got);
             if (n <= 0)
                 break;
-            got += static_cast<size_t>(n);
+            got += static_cast<std::size_t>(n);
         }
         data.resize(got);
         std::string name = fs::path(archive_entry_pathname(entry)).lexically_normal().generic_string();
@@ -141,7 +141,7 @@ bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<uint8_
 }
 
 // Blob lookups; the caller holds the lock
-bool BlobRead(State &s, const std::string &key, std::vector<uint8_t> &out)
+bool BlobRead(State &s, const std::string &key, std::vector<std::uint8_t> &out)
 {
     const auto it = s.blobFiles.find(key);
     if (key.empty() || it == s.blobFiles.end())
@@ -280,7 +280,7 @@ std::string Describe()
     return state().description;
 }
 
-void SetSessionOverlay(std::map<std::string, std::vector<uint8_t>> files)
+void SetSessionOverlay(std::map<std::string, std::vector<std::uint8_t>> files)
 {
     State &s = state();
     std::lock_guard<std::mutex> guard(s.lock);
@@ -304,7 +304,7 @@ bool HasSessionOverlay()
 namespace
 {
 // The overlay's file for `path`, when there is one
-bool OverlayRead(State &s, const std::string &path, std::vector<uint8_t> *out)
+bool OverlayRead(State &s, const std::string &path, std::vector<std::uint8_t> *out)
 {
     std::lock_guard<std::mutex> guard(s.lock);
     if (s.overlay.empty())
@@ -337,7 +337,7 @@ bool Exists(const std::string &path)
     return fs::exists(fs::path(UserDirLocked(s)) / key, ec) || BlobHas(s, key);
 }
 
-bool ReadBytes(const std::string &path, std::vector<uint8_t> &out)
+bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out)
 {
     State &s = state();
     if (OverlayRead(s, path, &out))
@@ -353,7 +353,7 @@ bool ReadBytes(const std::string &path, std::vector<uint8_t> &out)
 
 bool ReadText(const std::string &path, std::string &out)
 {
-    std::vector<uint8_t> bytes;
+    std::vector<std::uint8_t> bytes;
     if (!ReadBytes(path, bytes))
         return false;
     out.assign(bytes.begin(), bytes.end());

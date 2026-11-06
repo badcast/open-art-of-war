@@ -55,7 +55,7 @@ private:
     int m_selected {0};
     int m_top {0};
     int m_mouseX {0}, m_mouseY {0};
-    uint32_t m_lastClickMs {0};
+    std::uint32_t m_lastClickMs {0};
     int m_lastClickRow {-1};
     std::string m_notice;
 };

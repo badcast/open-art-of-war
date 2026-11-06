@@ -21,7 +21,7 @@ namespace
 namespace fs = std::filesystem;
 namespace col = ui::color;
 
-std::string FormatTime(int64_t t)
+std::string FormatTime(std::int64_t t)
 {
     if (t <= 0)
         return "-";
@@ -37,16 +37,16 @@ std::string FormatTime(int64_t t)
     return buf;
 }
 
-std::string FormatDuration(uint32_t ticks)
+std::string FormatDuration(std::uint32_t ticks)
 {
-    const uint32_t seconds = ticks / 20;
+    const std::uint32_t seconds = ticks / 20;
     char buf[24];
     std::snprintf(buf, sizeof buf, "%u:%02u", seconds / 60, seconds % 60);
     return buf;
 }
 
 // "1.4 MB", "820 KB"
-std::string FormatSize(uint64_t bytes)
+std::string FormatSize(std::uint64_t bytes)
 {
     char buf[32];
     if (bytes >= 1024u * 1024u)
@@ -192,7 +192,7 @@ ReplayMenu::Result ReplayMenu::Update(InputManager &input, int windowW, int wind
             const int row = m_top + (m_mouseY - l.list.y) / l.rowH;
             if (row >= 0 && row < count)
             {
-                const uint32_t now = SDL_GetTicks();
+                const std::uint32_t now = SDL_GetTicks();
                 if (row == m_lastClickRow && now - m_lastClickMs < 400)
                     openSelected();
                 m_selected = row;

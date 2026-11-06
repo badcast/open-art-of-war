@@ -10,7 +10,7 @@ namespace OpenArtOfWar
 // whose settings (volume, range, limits) are the only parameters of a sound.
 
 // Effects heard where they happen, and the alerts
-enum class WorldSfx : uint8_t
+enum class WorldSfx : std::uint8_t
 {
     FireRifle,
     FireMg,
@@ -31,7 +31,7 @@ enum class WorldSfx : uint8_t
 };
 
 // Lines of the announcer (queued, one at a time)
-enum class Announcement : uint8_t
+enum class Announcement : std::uint8_t
 {
     ConstructionComplete,
     UnitReady,
@@ -42,7 +42,7 @@ enum class Announcement : uint8_t
 };
 
 // What a unit says
-enum class UnitReply : uint8_t
+enum class UnitReply : std::uint8_t
 {
     Select,
     Move,

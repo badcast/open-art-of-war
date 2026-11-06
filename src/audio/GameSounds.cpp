@@ -84,7 +84,7 @@ void GameSounds::Update(
     const Camera &camera,
     bool fogEnabled,
     const RadarAlert &radar,
-    uint64_t nowMs)
+    std::uint64_t nowMs)
 {
     // The view in world pixels
     const float zoom = std::max(0.01f, camera.GetZoom());

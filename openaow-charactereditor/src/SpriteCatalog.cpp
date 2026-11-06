@@ -81,7 +81,7 @@ std::string GraphicsDigest(nlohmann::json entry)
 {
     entry.erase("digest");
     const std::string text = entry.dump();
-    uint64_t hash = 1469598103934665603ull;
+    std::uint64_t hash = 1469598103934665603ull;
     for (unsigned char c : text)
         hash = (hash ^ c) * 1099511628211ull;
     char out[24];
@@ -108,7 +108,7 @@ SpriteGroup SpriteCatalog::GroupOfSprite(int spriteId) const
 {
     if (spriteId < 0 || spriteId >= static_cast<int>(spriteGroup.size()))
         return SpriteGroup::Other;
-    return static_cast<SpriteGroup>(spriteGroup[static_cast<size_t>(spriteId)]);
+    return static_cast<SpriteGroup>(spriteGroup[static_cast<std::size_t>(spriteId)]);
 }
 
 std::set<int> SpriteCatalog::SpritesOfSequence(int sequenceId) const
@@ -137,10 +137,10 @@ void SpriteCatalog::CollectComposite(int id, SpriteObject &out, int depth) const
     if (depth > kMaxDepth || id < 0 || id >= compCount || !out.composites.insert(id).second)
         return;
     const auto &comp = gd["composite_sprites"];
-    const auto range = comp["ranges"][static_cast<size_t>(id)];
+    const auto range = comp["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        const auto &part = comp["parts"][static_cast<size_t>(i)];
+        const auto &part = comp["parts"][static_cast<std::size_t>(i)];
         CollectChild(part["is_comp"].get<int>() == 1 ? kComposite : kSprite, part["child"].get<int>(), out, depth + 1);
     }
 }
@@ -150,10 +150,10 @@ void SpriteCatalog::CollectAnim(int id, SpriteObject &out, int depth) const
     if (depth > kMaxDepth || id < 0 || id >= animCount || !out.anims.insert(id).second)
         return;
     const auto &anim = gd["anim_sequences"];
-    const auto range = anim["ranges"][static_cast<size_t>(id)];
+    const auto range = anim["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        const auto &frame = anim["frames"][static_cast<size_t>(i)];
+        const auto &frame = anim["frames"][static_cast<std::size_t>(i)];
         CollectChild(
             frame["is_comp"].get<int>() == 1 ? kComposite : kSprite, frame["child"].get<int>(), out, depth + 1);
     }
@@ -164,10 +164,10 @@ void SpriteCatalog::CollectBody(int id, SpriteObject &out) const
     if (id < 0 || id >= bodyCount || !out.bodies.insert(id).second)
         return;
     const auto &bodies = gd["unit_bodies"];
-    const auto range = bodies["ranges"][static_cast<size_t>(id)];
+    const auto range = bodies["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        const auto &layer = bodies["layers"][static_cast<size_t>(i)];
+        const auto &layer = bodies["layers"][static_cast<std::size_t>(i)];
         CollectChild(layer["is_comp"].get<int>(), layer["child"].get<int>(), out, 1);
     }
 }
@@ -177,10 +177,10 @@ void SpriteCatalog::CollectSequence(int id, SpriteObject &out) const
     if (id < 0 || id >= seqCount || !out.sequences.insert(id).second)
         return;
     const auto &seqs = gd["unit_sequences"];
-    const auto range = seqs["ranges"][static_cast<size_t>(id)];
+    const auto range = seqs["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        CollectBody(seqs["steps"][static_cast<size_t>(i)]["body"].get<int>(), out);
+        CollectBody(seqs["steps"][static_cast<std::size_t>(i)]["body"].get<int>(), out);
     }
 }
 
@@ -189,10 +189,10 @@ void SpriteCatalog::CollectBuilding(int id, SpriteObject &out) const
     if (id < 0 || id >= buildingCount || !out.buildings.insert(id).second)
         return;
     const auto &blds = gd["buildings"];
-    const auto range = blds["ranges"][static_cast<size_t>(id)];
+    const auto range = blds["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        const auto &part = blds["parts"][static_cast<size_t>(i)];
+        const auto &part = blds["parts"][static_cast<std::size_t>(i)];
         CollectChild(part["is_comp"].get<int>(), part["child"].get<int>(), out, 1);
     }
 }
@@ -236,7 +236,7 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
             rawSprites.push_back(r);
         }
         // Ids are indices everywhere in the tables
-        for (size_t i = 0; i < rawSprites.size(); ++i)
+        for (std::size_t i = 0; i < rawSprites.size(); ++i)
             rawSprites[i].id = static_cast<int>(i);
         compCount = static_cast<int>(gd["composite_sprites"]["ranges"].size());
         animCount = static_cast<int>(gd["anim_sequences"]["ranges"].size());
@@ -305,7 +305,7 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
         const bool form = info->baseFormId >= 0; // siege / baseline forms have single sequences
         if (!bases[a].empty())
             o.thumbSequence = bases[a][0].get<int>() + (form ? 0 : 2);
-        for (size_t k = 0; k < bases[a].size(); ++k)
+        for (std::size_t k = 0; k < bases[a].size(); ++k)
         {
             const int base = bases[a][k].get<int>();
             if (!form && k < 2)
@@ -384,16 +384,16 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
         o.id = t;
         o.name = "Tileset " + std::to_string(t);
         o.slug = SpriteSlug(o.name);
-        const auto &list = tilesets[static_cast<size_t>(t)];
+        const auto &list = tilesets[static_cast<std::size_t>(t)];
         for (int i = 0; i < kTileCount && i < static_cast<int>(list.size()); ++i)
-            o.rootComposites.push_back(list[static_cast<size_t>(i)].get<int>());
-        const int offset = gd["decor_offsets"].size() > static_cast<size_t>(t)
-                               ? gd["decor_offsets"][static_cast<size_t>(t)].get<int>()
+            o.rootComposites.push_back(list[static_cast<std::size_t>(i)].get<int>());
+        const int offset = gd["decor_offsets"].size() > static_cast<std::size_t>(t)
+                               ? gd["decor_offsets"][static_cast<std::size_t>(t)].get<int>()
                                : kTileCount;
         std::set<int> decor;
         for (int i = offset; i < static_cast<int>(list.size()); ++i)
         {
-            const int b = list[static_cast<size_t>(i)].get<int>();
+            const int b = list[static_cast<std::size_t>(i)].get<int>();
             if (b >= 0 && b < buildingCount)
                 decor.insert(b);
         }
@@ -437,14 +437,14 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
     std::vector<bool> used(rawSprites.size(), false);
     for (const auto &o : objs)
         for (int s : o.sprites)
-            used[static_cast<size_t>(s)] = true;
+            used[static_cast<std::size_t>(s)] = true;
     for (int s : rest.sprites)
-        used[static_cast<size_t>(s)] = true;
+        used[static_cast<std::size_t>(s)] = true;
     objs.push_back(std::move(rest));
     std::map<int, SpriteObject> loose;
     for (const RawSprite &s : rawSprites)
     {
-        if (used[static_cast<size_t>(s.id)])
+        if (used[static_cast<std::size_t>(s.id)])
             continue;
         SpriteObject &o = loose[s.page];
         if (o.name.empty())
@@ -479,7 +479,7 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
     });
 
     // Every sprite goes to the first group (units, buildings, terrain, other) that uses it
-    spriteGroup.assign(rawSprites.size(), static_cast<uint8_t>(SpriteGroup::Other));
+    spriteGroup.assign(rawSprites.size(), static_cast<std::uint8_t>(SpriteGroup::Other));
     std::vector<bool> assigned(rawSprites.size(), false);
     for (int g = 0; g < kSpriteGroupCount; ++g)
     {
@@ -489,10 +489,10 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
                 continue;
             for (int s : o.sprites)
             {
-                if (assigned[static_cast<size_t>(s)])
+                if (assigned[static_cast<std::size_t>(s)])
                     continue;
-                assigned[static_cast<size_t>(s)] = true;
-                spriteGroup[static_cast<size_t>(s)] = static_cast<uint8_t>(g);
+                assigned[static_cast<std::size_t>(s)] = true;
+                spriteGroup[static_cast<std::size_t>(s)] = static_cast<std::uint8_t>(g);
             }
         }
     }
@@ -530,10 +530,10 @@ DepNode SpriteCatalog::CompositeNode(int id, int depth) const
     if (depth > 6 || id < 0 || id >= compCount)
         return n;
     const auto &comp = gd["composite_sprites"];
-    const auto range = comp["ranges"][static_cast<size_t>(id)];
+    const auto range = comp["ranges"][static_cast<std::size_t>(id)];
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
     {
-        const auto &part = comp["parts"][static_cast<size_t>(i)];
+        const auto &part = comp["parts"][static_cast<std::size_t>(i)];
         n.children.push_back(ChildNode(
             part["is_comp"].get<int>() == 1 ? kComposite : kSprite,
             part["child"].get<int>(),
@@ -553,11 +553,11 @@ DepNode SpriteCatalog::AnimNode(int id) const
     if (id < 0 || id >= animCount)
         return n;
     const auto &anim = gd["anim_sequences"];
-    const auto range = anim["ranges"][static_cast<size_t>(id)];
+    const auto range = anim["ranges"][static_cast<std::size_t>(id)];
     int k = 0;
     for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i, ++k)
     {
-        const auto &frame = anim["frames"][static_cast<size_t>(i)];
+        const auto &frame = anim["frames"][static_cast<std::size_t>(i)];
         DepNode f = ChildNode(
             frame["is_comp"].get<int>() == 1 ? kComposite : kSprite,
             frame["child"].get<int>(),
@@ -587,11 +587,11 @@ DepNode SpriteCatalog::tree(const SpriteObject &o) const
         sn.kind = "sequence";
         sn.id = s;
         sn.label = "Sequence #" + std::to_string(s);
-        const auto range = seqs["ranges"][static_cast<size_t>(s)];
+        const auto range = seqs["ranges"][static_cast<std::size_t>(s)];
         int k = 0;
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i, ++k)
         {
-            const auto &step = seqs["steps"][static_cast<size_t>(i)];
+            const auto &step = seqs["steps"][static_cast<std::size_t>(i)];
             DepNode st;
             st.kind = "step";
             st.id = i;
@@ -601,10 +601,10 @@ DepNode SpriteCatalog::tree(const SpriteObject &o) const
             st.label = "Step " + std::to_string(k) + " (body #" + std::to_string(body) + ")";
             if (body >= 0 && body < bodyCount)
             {
-                const auto br = bodies["ranges"][static_cast<size_t>(body)];
+                const auto br = bodies["ranges"][static_cast<std::size_t>(body)];
                 for (int l = br[0].get<int>(); l <= br[1].get<int>(); ++l)
                 {
-                    const auto &layer = bodies["layers"][static_cast<size_t>(l)];
+                    const auto &layer = bodies["layers"][static_cast<std::size_t>(l)];
                     DepNode ln = ChildNode(
                         layer["is_comp"].get<int>(),
                         layer["child"].get<int>(),
@@ -632,10 +632,10 @@ DepNode SpriteCatalog::tree(const SpriteObject &o) const
         bn.kind = "building";
         bn.id = b;
         bn.label = "Building #" + std::to_string(b);
-        const auto range = blds["ranges"][static_cast<size_t>(b)];
+        const auto range = blds["ranges"][static_cast<std::size_t>(b)];
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
         {
-            const auto &part = blds["parts"][static_cast<size_t>(i)];
+            const auto &part = blds["parts"][static_cast<std::size_t>(i)];
             DepNode pn = ChildNode(
                 part["is_comp"].get<int>(), part["child"].get<int>(), part["ox"].get<int>(), part["oy"].get<int>(), 1);
             pn.label = "Part (layer " + std::to_string(part["layer"].get<int>()) + ", state "
@@ -668,10 +668,10 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     json seqs = json::array();
     for (int s : o.sequences)
     {
-        const auto range = gd["unit_sequences"]["ranges"][static_cast<size_t>(s)];
+        const auto range = gd["unit_sequences"]["ranges"][static_cast<std::size_t>(s)];
         json steps = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
-            steps.push_back(gd["unit_sequences"]["steps"][static_cast<size_t>(i)]);
+            steps.push_back(gd["unit_sequences"]["steps"][static_cast<std::size_t>(i)]);
         {
             json e = {{"id", s}, {"steps", steps}};
             e["digest"] = GraphicsDigest(e);
@@ -683,11 +683,11 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     json bodies = json::array();
     for (int b : o.bodies)
     {
-        const auto range = gd["unit_bodies"]["ranges"][static_cast<size_t>(b)];
+        const auto range = gd["unit_bodies"]["ranges"][static_cast<std::size_t>(b)];
         json layers = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
         {
-            const auto &l = gd["unit_bodies"]["layers"][static_cast<size_t>(i)];
+            const auto &l = gd["unit_bodies"]["layers"][static_cast<std::size_t>(i)];
             json item = childJson(l, l["is_comp"].get<int>());
             item["flag"] = l["flag"];
             layers.push_back(item);
@@ -703,11 +703,11 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     json comps = json::array();
     for (int c : o.composites)
     {
-        const auto range = gd["composite_sprites"]["ranges"][static_cast<size_t>(c)];
+        const auto range = gd["composite_sprites"]["ranges"][static_cast<std::size_t>(c)];
         json parts = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
         {
-            const auto &p = gd["composite_sprites"]["parts"][static_cast<size_t>(i)];
+            const auto &p = gd["composite_sprites"]["parts"][static_cast<std::size_t>(i)];
             parts.push_back(childJson(p, p["is_comp"].get<int>() == 1 ? kComposite : kSprite));
         }
         {
@@ -721,11 +721,11 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     json anims = json::array();
     for (int a : o.anims)
     {
-        const auto range = gd["anim_sequences"]["ranges"][static_cast<size_t>(a)];
+        const auto range = gd["anim_sequences"]["ranges"][static_cast<std::size_t>(a)];
         json frames = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
         {
-            const auto &f = gd["anim_sequences"]["frames"][static_cast<size_t>(i)];
+            const auto &f = gd["anim_sequences"]["frames"][static_cast<std::size_t>(i)];
             frames.push_back(childJson(f, f["is_comp"].get<int>() == 1 ? kComposite : kSprite));
         }
         {
@@ -739,11 +739,11 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     json blds = json::array();
     for (int b : o.buildings)
     {
-        const auto range = gd["buildings"]["ranges"][static_cast<size_t>(b)];
+        const auto range = gd["buildings"]["ranges"][static_cast<std::size_t>(b)];
         json parts = json::array();
         for (int i = range[0].get<int>(); i <= range[1].get<int>(); ++i)
         {
-            const auto &p = gd["buildings"]["parts"][static_cast<size_t>(i)];
+            const auto &p = gd["buildings"]["parts"][static_cast<std::size_t>(i)];
             json item = childJson(p, p["is_comp"].get<int>());
             item["layer"] = p["layer"];
             item["state"] = p["state"];
@@ -751,14 +751,99 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
         }
         json entry
             = {{"id", b},
-               {"width", gd["buildings"]["widths"][static_cast<size_t>(b)]},
-               {"height", gd["buildings"]["heights"][static_cast<size_t>(b)]},
+               {"width", gd["buildings"]["widths"][static_cast<std::size_t>(b)]},
+               {"height", gd["buildings"]["heights"][static_cast<std::size_t>(b)]},
                {"parts", parts}};
         entry["digest"] = GraphicsDigest(entry);
         blds.push_back(entry);
     }
     out["buildings"] = blds;
     return out;
+}
+
+bool SpriteCatalog::SetSpriteRect(int spriteId, int x, int y, int w, int h, int page, int palette)
+{
+    if (spriteId < 0 || spriteId >= static_cast<int>(rawSprites.size()))
+        return false;
+    auto &s = rawSprites[static_cast<std::size_t>(spriteId)];
+    s.x = x;
+    s.y = y;
+    s.w = w;
+    s.h = h;
+    if (page >= 0)
+        s.page = page;
+    if (palette >= 0)
+        s.palette = palette;
+    return true;
+}
+
+bool SpriteCatalog::SaveSpritesJson(const fs::path &assetsRoot, std::string &error) const
+{
+    const fs::path outPath = assetsRoot / "characters" / "sprites.json";
+    try
+    {
+        nlohmann::ordered_json root = nlohmann::ordered_json::array();
+        for (const auto &s : rawSprites)
+        {
+            nlohmann::ordered_json item;
+            item["id"] = s.id;
+            item["page"] = s.page;
+            item["x"] = s.x;
+            item["y"] = s.y;
+            item["width"] = s.w;
+            item["height"] = s.h;
+            item["palette"] = s.palette;
+            root.push_back(std::move(item));
+        }
+        std::ofstream out(outPath);
+        if (!out.is_open())
+        {
+            error = "Could not open file for writing: " + outPath.string();
+            return false;
+        }
+        out << root.dump(2) << "\n";
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        error = e.what();
+        return false;
+    }
+}
+
+bool SpriteCatalog::ReloadSpritesJson(const fs::path &assetsRoot, std::string &error)
+{
+    try
+    {
+        const nlohmann::json sp = ReadJson(assetsRoot / "characters" / "sprites.json");
+        if (!sp.is_array())
+        {
+            error = "sprites.json is not an array";
+            return false;
+        }
+        rawSprites.clear();
+        rawSprites.reserve(sp.size());
+        for (const auto &s : sp)
+        {
+            RawSprite r;
+            r.id = IntOf(s, "id", static_cast<int>(rawSprites.size()));
+            r.page = IntOf(s, "page");
+            r.x = IntOf(s, "x");
+            r.y = IntOf(s, "y");
+            r.w = IntOf(s, "width");
+            r.h = IntOf(s, "height");
+            r.palette = IntOf(s, "palette");
+            rawSprites.push_back(r);
+        }
+        for (std::size_t i = 0; i < rawSprites.size(); ++i)
+            rawSprites[i].id = static_cast<int>(i);
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        error = e.what();
+        return false;
+    }
 }
 
 } // namespace CharEditor

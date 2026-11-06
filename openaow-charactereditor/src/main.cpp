@@ -44,7 +44,7 @@ static int ExportWithoutWindow(
     if (mode == "--export-sprites")
     {
         std::vector<int> all(catalog.Objects().size());
-        for (size_t i = 0; i < all.size(); ++i)
+        for (std::size_t i = 0; i < all.size(); ++i)
             all[i] = static_cast<int>(i);
         ok = CharEditor::ExportSpriteObjects(catalog, root, folder, all, report);
     }

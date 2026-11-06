@@ -35,7 +35,7 @@ public:
         const Camera &camera,
         bool fogEnabled,
         const RadarAlert &radar,
-        uint64_t nowMs);
+        std::uint64_t nowMs);
     // Unit replies of the '@' requests (see SoundRequests, SoundIds::ReplyFromRequest): by the first selected unit
     void PlayReply(
         SoundEngine &sound, const EntityManager &entities, const std::vector<int> &selected, UnitReply reply);
@@ -52,9 +52,9 @@ private:
     };
     std::unordered_map<int, Seen> m_seen;
     bool m_primed {false}; // the first look at a world only records it
-    uint32_t m_generation {0xFFFFFFFFu};
+    std::uint32_t m_generation {0xFFFFFFFFu};
     bool m_lowPower {false};
-    uint64_t m_radarStart {0};
+    std::uint64_t m_radarStart {0};
     std::vector<int> m_selection;
 };
 

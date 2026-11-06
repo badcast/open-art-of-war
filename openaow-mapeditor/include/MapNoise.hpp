@@ -25,7 +25,7 @@ inline float grad(int hash, float x, float y)
     return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
 }
 
-inline float SampleNoise2D(float x, float y, uint32_t seed)
+inline float SampleNoise2D(float x, float y, std::uint32_t seed)
 {
     int X = static_cast<int>(std::floor(x)) & 255;
     int Y = static_cast<int>(std::floor(y)) & 255;
@@ -37,7 +37,7 @@ inline float SampleNoise2D(float x, float y, uint32_t seed)
     float v = Fade(y);
 
     auto hash = [seed](int ix, int iy) -> int {
-        uint32_t n = static_cast<uint32_t>(ix + iy * 57) + seed * 1337u;
+        std::uint32_t n = static_cast<std::uint32_t>(ix + iy * 57) + seed * 1337u;
         n = (n << 13) ^ n;
         return (n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff;
     };
@@ -52,7 +52,7 @@ inline float SampleNoise2D(float x, float y, uint32_t seed)
     return (res + 1.0f) * 0.5f; // Normalize to [0, 1]
 }
 
-inline float OctaveNoise2D(float x, float y, int octaves, float persistence, uint32_t seed)
+inline float OctaveNoise2D(float x, float y, int octaves, float persistence, std::uint32_t seed)
 {
     float total = 0.0f;
     float frequency = 1.0f;

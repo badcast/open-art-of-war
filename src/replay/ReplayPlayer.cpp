@@ -19,7 +19,7 @@ namespace OpenArtOfWar
 namespace
 {
 
-constexpr size_t kMaxOverlayBytes = 8u * 1024u * 1024u;
+constexpr std::size_t kMaxOverlayBytes = 8u * 1024u * 1024u;
 
 bool EndsWith(const std::string &s, const char *suffix)
 {
@@ -39,9 +39,9 @@ bool FillInfo(const Net::ReplayData &data, ReplayPlayer::Info &info, std::string
     info.source = meta.value("source", std::string("client"));
     info.gameVersion = meta.value("game_version", std::string());
     info.protocol = meta.value("protocol", 0);
-    info.recordedAt = meta.value("recorded_at", static_cast<int64_t>(0));
-    info.ticksPerTurn = std::clamp<uint32_t>(meta.value("ticks_per_turn", 2u), 1, 16);
-    info.turns = static_cast<uint32_t>(data.turns.size());
+    info.recordedAt = meta.value("recorded_at", static_cast<std::int64_t>(0));
+    info.ticksPerTurn = std::clamp<std::uint32_t>(meta.value("ticks_per_turn", 2u), 1, 16);
+    info.turns = static_cast<std::uint32_t>(data.turns.size());
     info.ticks = info.turns * info.ticksPerTurn;
     info.localSlot = meta.value("local_slot", -1);
     info.mode = meta.value("mode", std::string("network"));
@@ -130,7 +130,7 @@ bool ReplayPlayer::ReadInfo(const std::string &path, Info &out, std::string &err
     out = Info {};
     out.file = path;
     std::error_code ec;
-    out.fileBytes = static_cast<uint64_t>(std::filesystem::file_size(path, ec));
+    out.fileBytes = static_cast<std::uint64_t>(std::filesystem::file_size(path, ec));
     if (ec)
         out.fileBytes = 0;
     return FillInfo(data, out, error);
@@ -157,7 +157,7 @@ bool ReplayPlayer::Load(const std::string &path, std::string &error)
         m_checksums[tick] = hash;
     // Every turn must read, and the cameras are collected on the way
     m_views.clear();
-    for (size_t t = 0; t < m_turns.size(); ++t)
+    for (std::size_t t = 0; t < m_turns.size(); ++t)
     {
         Net::TurnBundle bundle;
         if (!Net::decodeTurn(m_turns[t].data(), m_turns[t].size(), bundle) || bundle.turn != t)
@@ -177,7 +177,7 @@ bool ReplayPlayer::Load(const std::string &path, std::string &error)
             {
                 if (c.type == CommandType::View)
                     m_views[p.slot].push_back(
-                        {static_cast<uint32_t>(t) * m_info.ticksPerTurn,
+                        {static_cast<std::uint32_t>(t) * m_info.ticksPerTurn,
                          static_cast<float>(c.x),
                          static_cast<float>(c.y),
                          std::clamp(static_cast<float>(c.a) / 100.0f, 0.25f, 8.0f)});
@@ -202,8 +202,8 @@ bool ReplayPlayer::PrepareMatch(int watchSlot, MatchSetup &out, std::string &err
         m_overlayInstalled = false;
     }
     const std::string prefix = "data/assets/";
-    std::map<std::string, std::vector<uint8_t>> overlay;
-    size_t total = 0;
+    std::map<std::string, std::vector<std::uint8_t>> overlay;
+    std::size_t total = 0;
     for (const auto &[name, bytes] : m_files)
     {
         if (name.compare(0, prefix.size(), prefix) != 0)
@@ -274,11 +274,11 @@ bool ReplayPlayer::PrepareMatch(int watchSlot, MatchSetup &out, std::string &err
     return true;
 }
 
-void ReplayPlayer::ScheduleDue(Simulation &sim, uint32_t tick)
+void ReplayPlayer::ScheduleDue(Simulation &sim, std::uint32_t tick)
 {
     if (m_info.ticksPerTurn == 0 || tick % m_info.ticksPerTurn != 0)
         return;
-    const uint32_t turn = tick / m_info.ticksPerTurn;
+    const std::uint32_t turn = tick / m_info.ticksPerTurn;
     if (turn >= m_turns.size())
         return;
     Net::TurnBundle bundle;
@@ -286,21 +286,21 @@ void ReplayPlayer::ScheduleDue(Simulation &sim, uint32_t tick)
         NetMatch::ScheduleBundle(sim, bundle, m_info.ticksPerTurn);
 }
 
-void ReplayPlayer::Verify(uint32_t tick, uint64_t checksum)
+void ReplayPlayer::Verify(std::uint32_t tick, std::uint64_t checksum)
 {
     auto it = m_checksums.find(tick);
     if (it != m_checksums.end() && it->second != checksum && m_mismatchTick < 0)
         m_mismatchTick = tick;
 }
 
-bool ReplayPlayer::CameraOf(int slot, uint32_t tick, float &x, float &y, float &zoom) const
+bool ReplayPlayer::CameraOf(int slot, std::uint32_t tick, float &x, float &y, float &zoom) const
 {
     auto it = m_views.find(slot);
     if (it == m_views.end() || it->second.empty())
         return false;
     const std::vector<View> &v = it->second;
     // The last view at or before `tick`; before the first one, the first
-    auto after = std::upper_bound(v.begin(), v.end(), tick, [](uint32_t t, const View &w) { return t < w.tick; });
+    auto after = std::upper_bound(v.begin(), v.end(), tick, [](std::uint32_t t, const View &w) { return t < w.tick; });
     const View &cur = after == v.begin() ? v.front() : *(after - 1);
     x = cur.x;
     y = cur.y;

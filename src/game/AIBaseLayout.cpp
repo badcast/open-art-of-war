@@ -78,7 +78,7 @@ std::string AIBaseStyle::Describe() const
     return s.str();
 }
 
-void AIController::SetSeed(uint32_t seed)
+void AIController::SetSeed(std::uint32_t seed)
 {
     m_seed = seed;
     Utility::RandomGenerator r(seed ? seed : 0x2545f491u);
@@ -103,14 +103,14 @@ bool AIController::IsRoad(int x, int y) const
 {
     if (!m_territoryReady || x < 0 || y < 0 || x >= m_terrW || y >= m_terrH)
         return false;
-    return m_road[static_cast<size_t>(y) * m_terrW + x] != 0;
+    return m_road[static_cast<std::size_t>(y) * m_terrW + x] != 0;
 }
 
 bool AIController::IsRoadCore(int x, int y) const
 {
     if (!m_territoryReady || x < 0 || y < 0 || x >= m_terrW || y >= m_terrH)
         return false;
-    return m_road[static_cast<size_t>(y) * m_terrW + x] == 2;
+    return m_road[static_cast<std::size_t>(y) * m_terrW + x] == 2;
 }
 
 bool AIController::IsOwnGround(int x, int y) const
@@ -119,14 +119,14 @@ bool AIController::IsOwnGround(int x, int y) const
         return true;
     if (x < 0 || y < 0 || x >= m_terrW || y >= m_terrH)
         return false;
-    return m_ownGround[static_cast<size_t>(y) * m_terrW + x] != 0;
+    return m_ownGround[static_cast<std::size_t>(y) * m_terrW + x] != 0;
 }
 
 void AIController::PlanTerritory(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder)
 {
     m_terrW = map.GetWidth();
     m_terrH = map.GetHeight();
-    const size_t n = static_cast<size_t>(m_terrW) * m_terrH;
+    const std::size_t n = static_cast<std::size_t>(m_terrW) * m_terrH;
     m_road.assign(n, 0);
     m_ownGround.assign(n, 1);
     m_enemyRoads.clear();
@@ -173,7 +173,7 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
                     const float px = x + 0.5f, py = y + 0.5f;
                     const float own = DetMath::Hypot(px - ox, py - oy), other = DetMath::Hypot(px - qx, py - qy);
                     if (other < own || (other == own && q < m_player))
-                        m_ownGround[static_cast<size_t>(y) * m_terrW + x] = 0;
+                        m_ownGround[static_cast<std::size_t>(y) * m_terrW + x] = 0;
                 }
             }
         }
@@ -210,8 +210,8 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
                         const int bx = x + dx, by = y + dy;
                         if (bx < 0 || by < 0 || bx >= m_terrW || by >= m_terrH)
                             continue;
-                        uint8_t &cell = m_road[static_cast<size_t>(by) * m_terrW + bx];
-                        cell = std::max<uint8_t>(cell, (dx == 0 && dy == 0) ? 2 : 1);
+                        std::uint8_t &cell = m_road[static_cast<std::size_t>(by) * m_terrW + bx];
+                        cell = std::max<std::uint8_t>(cell, (dx == 0 && dy == 0) ? 2 : 1);
                     }
                 }
             }
@@ -255,7 +255,7 @@ bool AIController::KeepsWayOut(
     {
         for (int tx = 0; tx < mw; ++tx)
         {
-            if (m_road[static_cast<size_t>(ty) * mw + tx] != 2)
+            if (m_road[static_cast<std::size_t>(ty) * mw + tx] != 2)
                 continue;
             if (DetMath::Hypot(static_cast<float>(tx - m_homeX), static_cast<float>(ty - m_homeY)) <= far)
                 continue;
@@ -266,7 +266,7 @@ bool AIController::KeepsWayOut(
         return true;
 
     auto flood = [&](bool withRect) {
-        std::vector<uint8_t> reached(static_cast<size_t>(mw) * mh, 0);
+        std::vector<std::uint8_t> reached(static_cast<std::size_t>(mw) * mh, 0);
         std::vector<std::pair<int, int>> frontier;
         for (const auto &[tx, ty] : targets)
         {
@@ -275,32 +275,32 @@ bool AIController::KeepsWayOut(
                 for (int ox = -1; ox <= 0; ++ox)
                 {
                     const int bx = tx + ox, by = ty + oy;
-                    if (bx < 0 || by < 0 || bx >= mw || by >= mh || reached[static_cast<size_t>(by) * mw + bx]
+                    if (bx < 0 || by < 0 || bx >= mw || by >= mh || reached[static_cast<std::size_t>(by) * mw + bx]
                         || !wide(bx, by, withRect))
                         continue;
-                    reached[static_cast<size_t>(by) * mw + bx] = 1;
+                    reached[static_cast<std::size_t>(by) * mw + bx] = 1;
                     frontier.emplace_back(bx, by);
                 }
             }
         }
         static const int kDx[4] = {1, -1, 0, 0}, kDy[4] = {0, 0, 1, -1};
-        for (size_t i = 0; i < frontier.size(); ++i)
+        for (std::size_t i = 0; i < frontier.size(); ++i)
         {
             const auto [fx, fy] = frontier[i];
             for (int k = 0; k < 4; ++k)
             {
                 const int nx = fx + kDx[k], ny = fy + kDy[k];
-                if (nx < 0 || ny < 0 || nx >= mw || ny >= mh || reached[static_cast<size_t>(ny) * mw + nx]
+                if (nx < 0 || ny < 0 || nx >= mw || ny >= mh || reached[static_cast<std::size_t>(ny) * mw + nx]
                     || !wide(nx, ny, withRect))
                     continue;
-                reached[static_cast<size_t>(ny) * mw + nx] = 1;
+                reached[static_cast<std::size_t>(ny) * mw + nx] = 1;
                 frontier.emplace_back(nx, ny);
             }
         }
         return reached;
     };
     // Does a reached 2 x 2 block touch the ring around (bx, by, bw, bh)?
-    auto touches = [&](const std::vector<uint8_t> &reached, int bx, int by, int bw, int bh) {
+    auto touches = [&](const std::vector<std::uint8_t> &reached, int bx, int by, int bw, int bh) {
         for (int ty = by - 1; ty <= by + bh; ++ty)
         {
             for (int tx = bx - 1; tx <= bx + bw; ++tx)
@@ -312,7 +312,7 @@ bool AIController::KeepsWayOut(
                     for (int ox = -1; ox <= 0; ++ox)
                     {
                         const int kx = tx + ox, ky = ty + oy;
-                        if (kx >= 0 && ky >= 0 && kx < mw && ky < mh && reached[static_cast<size_t>(ky) * mw + kx])
+                        if (kx >= 0 && ky >= 0 && kx < mw && ky < mh && reached[static_cast<std::size_t>(ky) * mw + kx])
                             return true;
                     }
                 }
@@ -321,7 +321,7 @@ bool AIController::KeepsWayOut(
         return false;
     };
 
-    const std::vector<uint8_t> after = flood(true);
+    const std::vector<std::uint8_t> after = flood(true);
     // A barracks, a factory or a headquarters in a pocket the others have nearly closed: its troops would never
     // get out (only the structures already standing were checked before). Unless the base has no wide way out at
     // all (narrow exits of the map): then its headquarters is not reached either and the pocket is no worse
@@ -336,7 +336,7 @@ bool AIController::KeepsWayOut(
                 return false;
         }
     }
-    std::vector<uint8_t> before;
+    std::vector<std::uint8_t> before;
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();

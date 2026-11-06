@@ -551,7 +551,7 @@ std::vector<SettingsRow> BuildSettingsRows(
         r.hint = std::move(hint);
         const int n = static_cast<int>(options.size());
         current = n > 0 ? std::clamp(current, 0, n - 1) : 0;
-        r.value = n > 0 ? options[static_cast<size_t>(current)] : std::move(fallbackValue);
+        r.value = n > 0 ? options[static_cast<std::size_t>(current)] : std::move(fallbackValue);
         r.options = std::move(options);
         r.current = current;
         r.select = select;
@@ -606,7 +606,7 @@ std::vector<SettingsRow> BuildSettingsRows(
         int &h = exclusive ? s.fullscreenH : s.windowH;
         int index = 0;
         long best = -1;
-        for (size_t i = 0; i < resolutions.size(); ++i)
+        for (std::size_t i = 0; i < resolutions.size(); ++i)
         { // the listed size nearest to the current one
             const long d = static_cast<long>(resolutions[i].w - w) * (resolutions[i].w - w)
                            + static_cast<long>(resolutions[i].h - h) * (resolutions[i].h - h);
@@ -629,8 +629,8 @@ std::vector<SettingsRow> BuildSettingsRows(
             [&w, &h, resolutions, notify](int i) {
                 if (i < 0 || i >= static_cast<int>(resolutions.size()))
                     return;
-                w = resolutions[static_cast<size_t>(i)].w;
-                h = resolutions[static_cast<size_t>(i)].h;
+                w = resolutions[static_cast<std::size_t>(i)].w;
+                h = resolutions[static_cast<std::size_t>(i)].h;
                 notify(SettingsArea::Video);
             },
             !borderless,
@@ -707,7 +707,7 @@ std::vector<SettingsRow> BuildSettingsRows(
             const std::string active = renderApi.active();
             int ci = 0;
             std::vector<std::string> apiLabels;
-            for (size_t i = 0; i < usable.size(); ++i)
+            for (std::size_t i = 0; i < usable.size(); ++i)
             {
                 apiLabels.push_back(
                     RenderBackend::Label(usable[i].name)
@@ -726,7 +726,7 @@ std::vector<SettingsRow> BuildSettingsRows(
                 [usable, select](int i) {
                     if (!select || i < 0 || i >= static_cast<int>(usable.size()))
                         return;
-                    select(usable[static_cast<size_t>(i)].name);
+                    select(usable[static_cast<std::size_t>(i)].name);
                 },
                 usable.size() > 1,
                 value);
@@ -1093,7 +1093,7 @@ bool MenuController::UpdateInGameMenu(
                 }
                 break;
             case 4: // Restart mission
-                mission.Restart(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
+                mission.Restart(map, entities, economy, pathfinder);
                 camera.CenterOn(mission.GetPlayerHqX() * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
                 m_inGameMenuOpen = false;
                 break;
@@ -1190,7 +1190,7 @@ void MenuController::RebuildMapList()
     filter.sort = m_mapSort;
     m_skirmishMaps = filter.Apply(m_skirmishAll);
     m_skirmishSelected = 0;
-    for (size_t i = 0; i < m_skirmishMaps.size(); ++i)
+    for (std::size_t i = 0; i < m_skirmishMaps.size(); ++i)
         if (m_skirmishMaps[i].path == keep)
             m_skirmishSelected = static_cast<int>(i);
     m_skirmishTop = 0;
@@ -1250,13 +1250,13 @@ bool MenuController::UpdateCampaignSelect(
         {
             EnsureCustomSlots();
             bool foes = false;
-            const size_t first = m_customSpectator ? 1 : 0;
+            const std::size_t first = m_customSpectator ? 1 : 0;
             if (m_customSlots.size() <= first + (m_customSpectator ? 1u : 0u))
             {
                 m_editorNotice = _("A watched match needs at least two computer players.");
                 return;
             }
-            for (size_t i = first; i < m_customSlots.size(); ++i)
+            for (std::size_t i = first; i < m_customSlots.size(); ++i)
                 foes = foes || m_customSlots[i].team != m_customSlots[first].team;
             if (!foes)
             {
@@ -1313,19 +1313,19 @@ bool MenuController::UpdateCampaignSelect(
                     slot.faction = (rd() & 1u) ? Faction::Confederation : Faction::Resistance;
                 else
                     slot.faction = cs.faction == 2 ? Faction::Confederation : Faction::Resistance;
-                slot.team = static_cast<uint8_t>(cs.team);
-                slot.color = static_cast<uint8_t>(cs.color);
-                slot.handicap = static_cast<uint8_t>(std::clamp(cs.handicap, 0, kHandicapCount - 1));
-                slot.armyCap = static_cast<uint8_t>(std::clamp(cs.armyCap, 0, kArmyCapCount - 1));
-                slot.aiLevel = static_cast<uint8_t>(std::clamp(cs.level, 0, 3));
-                match.startPosition[p] = static_cast<int8_t>(cs.position);
+                slot.team = static_cast<std::uint8_t>(cs.team);
+                slot.color = static_cast<std::uint8_t>(cs.color);
+                slot.handicap = static_cast<std::uint8_t>(std::clamp(cs.handicap, 0, kHandicapCount - 1));
+                slot.armyCap = static_cast<std::uint8_t>(std::clamp(cs.armyCap, 0, kArmyCapCount - 1));
+                slot.aiLevel = static_cast<std::uint8_t>(std::clamp(cs.level, 0, 3));
+                match.startPosition[p] = static_cast<std::int8_t>(cs.position);
             }
         }
         const bool started
             = m_customGame
                   ? mission.LoadMatch(match, map, entities, economy, pathfinder)
                   : mission.LoadMission(
-                        m_campaignMissionSelected, LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
+                        m_campaignMissionSelected, map, entities, economy, pathfinder);
         if (m_endLoading)
             m_endLoading();
         if (!started)
@@ -1623,7 +1623,7 @@ void MenuController::ActivateMenuItem(
             state = AppState::MenuReplay;
             break;
         case 4: // Test map
-            mission.LoadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
+            mission.LoadTestMap(map, entities, economy, pathfinder);
             state = AppState::CampaignPlaying;
             camera.CenterOn((mission.GetPlayerHqX() + 12) * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
             break;
@@ -2717,7 +2717,7 @@ void MenuController::RenderCampaignMissionSelect(
         {
             // Mission names are "Mission N: Title" - show just the title next to the number
             name = _(missions[i].name);
-            size_t colon = name.find(": ");
+            std::size_t colon = name.find(": ");
             if (colon != std::string::npos)
                 name = name.substr(colon + 2);
         }
@@ -3029,7 +3029,7 @@ void MenuController::RenderCampaignMissionSelect(
             const int current = CampaignComboCurrent(id);
             for (int i = 1; i <= Settings::kArmyColors; ++i)
                 swatches.push_back(ArmyColor(i));
-            for (size_t i = 0; i < items.size() && i < taken.size(); ++i)
+            for (std::size_t i = 0; i < items.size() && i < taken.size(); ++i)
             {
                 if (taken[i] && static_cast<int>(i) != current)
                     items[i] += std::string(" (") + _("taken") + ")";
@@ -3141,7 +3141,7 @@ int MenuController::CampaignComboCurrent(int id) const
             const int now = si == 0 ? 1
                                     : (si > 0 ? 3 + std::clamp(m_customSlots[si].level, 0, 3)
                                               : (((m_customBlocked >> row) & 1u) ? 7 : 2));
-            for (size_t i = 0; i < codes.size(); ++i)
+            for (std::size_t i = 0; i < codes.size(); ++i)
                 if (codes[i] == now)
                     return static_cast<int>(i);
             return 0;
@@ -3285,7 +3285,7 @@ std::vector<bool> MenuController::CustomTakenColors(int row) const
 
 int MenuController::CustomSlotAt(int position) const
 {
-    for (size_t i = 0; i < m_customSlots.size(); ++i)
+    for (std::size_t i = 0; i < m_customSlots.size(); ++i)
         if (m_customSlots[i].position == position)
             return static_cast<int>(i);
     return -1;
@@ -3389,7 +3389,7 @@ void MenuController::EnsureCustomSlots()
 {
     if (m_skirmishSelected < 0 || m_skirmishSelected >= static_cast<int>(m_skirmishMaps.size()))
         return;
-    const size_t most = static_cast<size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
+    const std::size_t most = static_cast<std::size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
     if (m_customSlots.empty())
     {
         m_customSlots.resize(2);
@@ -3400,7 +3400,7 @@ void MenuController::EnsureCustomSlots()
         m_customSlots[1].position = 1;
     }
     // A watching person holds no start position: the computer players may fill every one of them
-    const size_t slotsMost = most + (m_customSpectator ? 1u : 0u);
+    const std::size_t slotsMost = most + (m_customSpectator ? 1u : 0u);
     if (m_customSlots.size() > slotsMost)
         m_customSlots.resize(slotsMost);
     m_customBlocked &= (1u << most) - 1;

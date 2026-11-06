@@ -16,6 +16,73 @@ namespace
 
 using Json = nlohmann::ordered_json;
 
+Json YamlToOrderedJson(const YAML::Node &node)
+{
+    if (!node.IsDefined() || node.IsNull())
+        return nullptr;
+    if (node.IsScalar())
+    {
+        const std::string &scalar = node.Scalar();
+        if (scalar == "true" || scalar == "True" || scalar == "TRUE")
+            return true;
+        if (scalar == "false" || scalar == "False" || scalar == "FALSE")
+            return false;
+        int64_t i = 0;
+        if (YAML::convert<int64_t>::decode(node, i))
+            return i;
+        double d = 0;
+        if (YAML::convert<double>::decode(node, d))
+            return d;
+        return scalar;
+    }
+    if (node.IsSequence())
+    {
+        Json j = Json::array();
+        for (const auto &item : node)
+            j.push_back(YamlToOrderedJson(item));
+        return j;
+    }
+    if (node.IsMap())
+    {
+        Json j = Json::object();
+        for (const auto &it : node)
+            j[it.first.as<std::string>()] = YamlToOrderedJson(it.second);
+        return j;
+    }
+    return nullptr;
+}
+
+YAML::Node OrderedJsonToYaml(const Json &j)
+{
+    if (j.is_null())
+        return YAML::Node();
+    if (j.is_boolean())
+        return YAML::Node(j.get<bool>());
+    if (j.is_number_integer())
+        return YAML::Node(j.get<int64_t>());
+    if (j.is_number_unsigned())
+        return YAML::Node(j.get<uint64_t>());
+    if (j.is_number_float())
+        return YAML::Node(j.get<double>());
+    if (j.is_string())
+        return YAML::Node(j.get<std::string>());
+    if (j.is_array())
+    {
+        YAML::Node n(YAML::NodeType::Sequence);
+        for (const auto &elem : j)
+            n.push_back(OrderedJsonToYaml(elem));
+        return n;
+    }
+    if (j.is_object())
+    {
+        YAML::Node n(YAML::NodeType::Map);
+        for (auto it = j.begin(); it != j.end(); ++it)
+            n[it.key()] = OrderedJsonToYaml(it.value());
+        return n;
+    }
+    return YAML::Node();
+}
+
 // Called by SDL (possibly from another thread) when the file dialog closes
 void SDLCALL OnFontChosen(void *userdata, const char *const *list, int /*filter*/)
 {
@@ -107,14 +174,20 @@ void CharacterEditor::EnsureEnvironment()
     if (envTried)
         return;
     envTried = true;
-    envPath = assetsRoot / "data" / "game_environment.json";
-    std::ifstream in(envPath);
-    if (!in)
+    envPath = assetsRoot / "data" / "game_environment.yaml";
+    try
+    {
+        YAML::Node root = YAML::LoadFile(envPath.string());
+        if (root.IsMap())
+            envJson = YamlToOrderedJson(root);
+        else
+            envJson = Json::object();
+    }
+    catch (const std::exception &ex)
     {
         status = std::string(_("Could not load YAML: ")) + envPath.string();
         return;
     }
-    envJson = Json::parse(in, nullptr, false, true);
     envLoaded = envJson.is_object();
     envBase = envJson;
     if (!envLoaded)
@@ -128,14 +201,19 @@ bool CharacterEditor::SaveEnvironment()
         return false;
     // Only the editor's changes on top of the file as it is now (sections it does not show stay)
     Json disk;
+    try
     {
-        std::ifstream in(envPath);
-        if (in)
-            disk = Json::parse(in, nullptr, false, true);
+        YAML::Node root = YAML::LoadFile(envPath.string());
+        if (root.IsMap())
+            disk = YamlToOrderedJson(root);
+    }
+    catch (...)
+    {
     }
     Json merged = disk.is_object() ? MergeJsonEdits(envBase, envJson, disk) : envJson;
+    YAML::Node outNode = OrderedJsonToYaml(merged);
     std::string error;
-    if (!WriteFileAtomic(envPath, merged.dump(2) + "\n", error))
+    if (!WriteFileAtomic(envPath, YamlText(outNode), error))
     {
         status = error;
         return false;
@@ -323,11 +401,10 @@ void CharacterEditor::DrawEnvironment()
     ImGui::TextUnformatted(_("Game font"));
     FieldHint("Game font");
     ImGui::TextWrapped(
-        "%s", _("The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."));
+        "%s", _("The font files come from assets/main.yaml (fonts.regular, fonts.bold); the sizes are set here."));
     bool changed = false;
-    const std::string root = assetsRoot.string();
-    const std::string regular = OpenArtOfWar::LoaderResources::FontRegular(root);
-    const std::string bold = OpenArtOfWar::LoaderResources::FontBold(root);
+    const std::string regular = OpenArtOfWar::LoaderResources::FontRegular();
+    const std::string bold = OpenArtOfWar::LoaderResources::FontBold();
     ImGui::TextDisabled("%s", regular.c_str());
     ImGui::TextDisabled("%s", bold.c_str());
     struct SizeRow
@@ -379,7 +456,7 @@ void CharacterEditor::DrawEnvironment()
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
     }
-    ImGui::TextDisabled("assets/data/game_environment.json");
+    ImGui::TextDisabled("assets/data/game_environment.yaml");
 }
 
 void CharacterEditor::DrawEnvironmentProperties()

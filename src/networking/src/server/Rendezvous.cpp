@@ -12,26 +12,26 @@ SocketToken randomToken()
 {
     static std::mt19937_64 rng {std::random_device {}()};
     SocketToken t {};
-    for (size_t i = 0; i < t.size(); i += 8)
+    for (std::size_t i = 0; i < t.size(); i += 8)
     {
-        const uint64_t v = rng();
-        for (size_t k = 0; k < 8; ++k)
-            t[i + k] = static_cast<uint8_t>(v >> (8 * k));
+        const std::uint64_t v = rng();
+        for (std::size_t k = 0; k < 8; ++k)
+            t[i + k] = static_cast<std::uint8_t>(v >> (8 * k));
     }
     return t;
 }
 
-std::vector<uint8_t> hello(const SocketToken &token)
+std::vector<std::uint8_t> hello(const SocketToken &token)
 {
-    return encodeRaw(RawKind::Hello, std::vector<uint8_t>(token.begin(), token.end()));
+    return encodeRaw(RawKind::Hello, std::vector<std::uint8_t>(token.begin(), token.end()));
 }
 
-constexpr uint32_t kJoinTimeoutMs = 15000;
+constexpr std::uint32_t kJoinTimeoutMs = 15000;
 
 } // namespace
 
 HostAnnouncer::HostAnnouncer(
-    const std::string &master, uint16_t masterPort, Transport &gameSocket, uint16_t gamePort, const std::string &lanIp)
+    const std::string &master, std::uint16_t masterPort, Transport &gameSocket, std::uint16_t gamePort, const std::string &lanIp)
     : m_master(master, masterPort)
     , m_socket(gameSocket)
     , m_host(master)
@@ -41,7 +41,7 @@ HostAnnouncer::HostAnnouncer(
     , m_token(randomToken())
 {}
 
-void HostAnnouncer::update(uint32_t nowMs, const RoomInfo &room, bool listed)
+void HostAnnouncer::update(std::uint32_t nowMs, const RoomInfo &room, bool listed)
 {
     m_master.update(nowMs);
     // The socket's hello: a few quickly at first (UDP may lose one), then every 10 s to keep the
@@ -75,7 +75,7 @@ void HostAnnouncer::update(uint32_t nowMs, const RoomInfo &room, bool listed)
     }
 }
 
-HostedJoin::HostedJoin(const std::string &master, uint16_t masterPort, const std::string &code)
+HostedJoin::HostedJoin(const std::string &master, std::uint16_t masterPort, const std::string &code)
     : m_master(master, masterPort)
     , m_host(master)
     , m_port(masterPort)
@@ -87,7 +87,7 @@ HostedJoin::HostedJoin(const std::string &master, uint16_t masterPort, const std
         m_state = State::Failed;
 }
 
-void HostedJoin::update(uint32_t nowMs)
+void HostedJoin::update(std::uint32_t nowMs)
 {
     if (m_state != State::Working)
         return;
@@ -129,7 +129,7 @@ void HostedJoin::update(uint32_t nowMs)
         // punched open from both sides
         const bool sameNetwork = where.yourIp == where.ip && !where.lanIp.empty();
         const std::string ip = sameNetwork ? where.lanIp : where.ip;
-        const uint16_t port = sameNetwork ? where.lanPort : where.port;
+        const std::uint16_t port = sameNetwork ? where.lanPort : where.port;
         for (int i = 0; i < 3; ++i)
             m_socket->sendRaw(ip, port, encodeRaw(RawKind::Punch, {}));
         if (!m_socket->connectTo(ip, port))

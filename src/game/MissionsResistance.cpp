@@ -26,12 +26,12 @@ std::vector<MissionDef> BuildResistance()
             = {0,
                37,
                "Mission 1: The Return",
-               "Map: m37 (Southern Jungle)",
+               "Map: resistance_mission_1 (Southern Jungle)",
                "- Establish base.\n- Destroy Confederation base.",
                "We can no longer endure this oppression! The Confederation only hides behind noble words while "
                "plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost "
                "and prepare to strike."};
-        d.data.mapFile = "m37";
+        d.data.mapFile = "resistance_mission_1";
         d.data.mapIndex = 37;
         d.data.entities
             = {{8, 6, 7, 0},
@@ -81,11 +81,11 @@ std::vector<MissionDef> BuildResistance()
             = {1,
                42,
                "Mission 2: Jungle",
-               "Map: m42 (Rainforest)",
+               "Map: resistance_mission_2 (Rainforest)",
                "- Capture the pass.\n- Repel counter-attacks and eliminate Confederation forces.",
                "The central region of Peru is occupied by Confederation forces. Over three months they fortified the "
                "high ground. Launch a surprise strike through the dense jungle."};
-        d.data.mapFile = "m42";
+        d.data.mapFile = "resistance_mission_2";
         d.data.defense = true;
         d.data.mapIndex = 42;
         d.data.entities = {{8, 8, 2, 0}, {9, 4, 7, 0}, {10, 12, 3, 0}};
@@ -137,11 +137,11 @@ std::vector<MissionDef> BuildResistance()
             = {2,
                43,
                "Mission 3: Sabotage",
-               "Map: m43 (River Valley)",
+               "Map: resistance_mission_3 (River Valley)",
                "- Guide sabotage squad.\n- Eliminate Confederation outposts in the sector.",
                "Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy "
                "ammo and fuel depots."};
-        d.data.mapFile = "m43";
+        d.data.mapFile = "resistance_mission_3";
         d.data.mapIndex = 43;
         d.data.entities
             = {{0, 14, 43, 0}, {1, 19, 34, 0}, {1, 14, 32, 0}, {1, 18, 30, 0}, {1, 17, 26, 0}, {1, 12, 26, 0},
@@ -184,11 +184,11 @@ std::vector<MissionDef> BuildResistance()
             = {3,
                43,
                "Mission 4: The Gorge",
-               "Map: m43 (Mountain Canyon)",
+               "Map: resistance_mission_3 (Mountain Canyon)",
                "- Break through mountain canyon.\n- Destroy Confederation defense fortifications.",
                "Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. "
                "Assault the fortifications!"};
-        d.data.mapFile = "m43";
+        d.data.mapFile = "resistance_mission_3";
         d.data.defense = true;
         d.data.mapIndex = 43;
         d.data.entities
@@ -235,11 +235,11 @@ std::vector<MissionDef> BuildResistance()
             = {4,
                26,
                "Mission 5: Matter of Seconds",
-               "Map: m26 (Desert Outpost)",
+               "Map: resistance_mission_4 (Desert Outpost)",
                "- Defend the base and construct factories.\n- Eliminate enemy armor divisions.",
                "The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy "
                "armor to strike back."};
-        d.data.mapFile = "m26";
+        d.data.mapFile = "resistance_mission_4";
         d.data.mapIndex = 26;
         d.data.entities
             = {{8, 4, 10, 0},  {9, 1, 2, 0},   {9, 5, 1, 0},   {10, 9, 7, 0},  {0, 72, 46, 0}, {1, 75, 56, 0},
@@ -301,11 +301,11 @@ std::vector<MissionDef> BuildResistance()
             = {5,
                35,
                "Mission 6: Radio Station",
-               "Map: m35 (Highland Plateau)",
+               "Map: resistance_mission_5 (Highland Plateau)",
                "- Capture the communications relay.\n- Annihilate Confederation plateau garrison.",
                "The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces "
                "and hold the plateau."};
-        d.data.mapFile = "m35";
+        d.data.mapFile = "resistance_mission_5";
         d.data.mapIndex = 35;
         d.data.entities
             = {{8, 50, 7, 0},   {8, 46, 8, 0},   {9, 46, 3, 0},   {9, 56, 13, 0},  {9, 43, 1, 0},   {9, 54, 1, 0},
@@ -362,11 +362,11 @@ std::vector<MissionDef> BuildResistance()
             = {6,
                44,
                "Mission 7: Lima",
-               "Map: m44 (Outskirts of Lima)",
+               "Map: resistance_mission_6 (Outskirts of Lima)",
                "- Assault the capital city of Lima.\n- Total destruction of Confederation Headquarters!",
                "Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike "
                "for the liberation of Peru!"};
-        d.data.mapFile = "m44";
+        d.data.mapFile = "resistance_mission_6";
         d.data.mapIndex = 44;
         d.data.entities
             = {{8, 95, 14, 0}, {9, 96, 1, 0},  {9, 96, 6, 0},  {10, 90, 13, 0}, {0, 7, 58, 0},  {1, 1, 66, 0},
@@ -421,11 +421,11 @@ std::vector<MissionDef> BuildResistance()
             = {7,
                0,
                "Mission 8: Skirmish",
-               "Map: m0 (Training Ground)",
+               "Map: resistance_mission_7 (Training Ground)",
                "- Construct your base.\n- Destroy enemy forces.",
                "Open skirmish for sector control. Test your strategy and tactics against fortified Confederation "
                "positions."};
-        d.data.mapFile = "m0";
+        d.data.mapFile = "resistance_mission_7";
         d.data.mapIndex = 0;
         d.data.entities = {{0, 9, 29, 0}, {1, 4, 30, 0}, {2, 6, 26, 0}, {8, 55, 5, 0}, {10, 50, 5, 0}, {9, 56, 11, 0}};
         d.data.wallZones = ZoneSet {
@@ -451,11 +451,11 @@ std::vector<MissionDef> BuildResistance()
             = {8,
                100,
                "Mission 9: The Ford",
-               "Map: brod (The Ford Crossing)",
+               "Map: resistance_mission_8 (The Ford Crossing)",
                "- Defend the river crossing.\n- Destroy Confederation fortress base.",
                "The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily "
                "guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post."};
-        d.data.mapFile = "m100";
+        d.data.mapFile = "resistance_mission_8";
         d.data.mapIndex = 100;
         d.data.entities
             = {{8, 7, 32, 0},

@@ -27,7 +27,7 @@ public:
     SoundEngine();
     ~SoundEngine();
 
-    bool Init(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+    bool Init();
     void Update(bool inMainMenu, bool inGame);
     void PlayMenuMusic();
     void PlayRandomGameTrack();
@@ -42,7 +42,7 @@ public:
     void SetFxVolume(int volume);    // 0..128: weapons and impacts
     void SetUiVolume(int volume);    // 0..128: interface clicks, dialogs and alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
-    // The sound of the surroundings in a match (main.json audio.ambient_day / ambient_night), looped on its own stream
+    // The sound of the surroundings in a match (main.yaml audio.ambient_day / ambient_night), looped on its own stream
     // until StopAmbient; the same one asked again keeps playing
     void PlayAmbient(bool night);
     void StopAmbient();
@@ -118,9 +118,9 @@ private:
     int m_lastArea {0};            // 1 = menu, 2 = game, 0 = other; manual playback ends when it changes
     int m_musicContext {0};        // 0 = stopped, 1 = menu, 2 = game
     std::vector<Track> m_gameTracks;
-    std::vector<size_t> m_shuffledTracks;
-    size_t m_nextGameTrack {0};
-    size_t m_lastGameTrack {static_cast<size_t>(-1)};
+    std::vector<std::size_t> m_shuffledTracks;
+    std::size_t m_nextGameTrack {0};
+    std::size_t m_lastGameTrack {static_cast<std::size_t>(-1)};
     Track m_menuTrack;
     bool m_hasMenuTrack {false};
     bool m_trackFinished {false};
@@ -132,14 +132,13 @@ private:
     SDL_AudioStream *m_stream {nullptr};
     SfxMixer m_sfx;
     VoiceManager m_voices; // unit replies and the announcer, mixed into the same stream
-    std::string m_assetRoot;
     SDL_AudioStream *m_sfxStream {nullptr}; // the effects: stereo 44.1 kHz from m_sfx
-    std::vector<int16_t> m_sfxBuffer;       // audio thread only
+    std::vector<std::int16_t> m_sfxBuffer;       // audio thread only
     int m_voiceVolume {128};
     // The ambient loop: its decoder is only touched by its stream's callback while the stream exists
     SDL_AudioStream *m_ambientStream {nullptr};
     stb_vorbis *m_ambientDecoder {nullptr};
-    std::vector<uint8_t> m_ambientOgg;
+    std::vector<std::uint8_t> m_ambientOgg;
     std::vector<short> m_ambientPcm; // audio thread only
     int m_ambientChannels {2};
     std::string m_ambientPath;
@@ -147,7 +146,7 @@ private:
     int m_uiVolume {128};
     SDL_Mutex *m_lock {nullptr}; // guards the decoder shared with the audio thread
     stb_vorbis *m_decoder {nullptr};
-    std::vector<uint8_t> m_oggData; // encoded track the decoder reads from
+    std::vector<std::uint8_t> m_oggData; // encoded track the decoder reads from
     int m_channels {2};
     int m_sampleRate {44100};
     std::vector<short> m_pcm;

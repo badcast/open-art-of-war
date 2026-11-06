@@ -169,8 +169,8 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 
 ## 7. Game data guarantee
 
-- `assets/main.json` names every file the game loads by its full path; the game does not start without it.
-  `tools/pack_assets.py` refuses to pack when main.json names a file that does not exist.
+- `assets/main.yaml` names every file the game loads by its full path; the game does not start without it.
+  `tools/pack_assets.py` refuses to pack when main.yaml names a file that does not exist.
 - `tools/pack_assets.py <assets> <out.blob>` packs the data and writes the integrity certificate into the blob
   itself: the entry `certificate.sha256` (`<path>  <sha256>` per packed file). There is no separate certificate
   file. With `-DBUILD_ASSETS_BLOB=ON` CMake runs it.
@@ -192,8 +192,10 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 
 ## 9. Other checks
 
-- **Translations**: every new string goes into `po/ru.po`, `po/en.po`, `po/openaow.pot`; check with
-  `msgfmt -c po/ru.po` (and the others). CMake compiles them into `assets/locale/*/LC_MESSAGES/openaow.mo`.
+- **Translations**: every project has its own catalogs under `po/`:
+  `po/openaow_{en,ru}.po`, `po/openaow_character_editor_{en,ru}.po`, `po/openaow_map_editor_{en,ru}.po`.
+  Check with `tools/localegen.sh --check` or `msgfmt -c po/<file>.po`. CMake compiles them into
+  `assets/locale/*/LC_MESSAGES/*.mo`.
 - **Network assets check**: everything under `assets/data/*.json` and `assets/characters/*.yaml` (except the
   sound settings) is hashed (`NetMatch::AssetsHash`). Peers with different files are refused at join time.
   Protocol changes need `kProtocolVersion` bumped (`src/networking`).

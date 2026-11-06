@@ -85,13 +85,13 @@ bool Application::Init(int windowWidth, int windowHeight)
         {
             std::string message = "The game data failed its integrity check (" + certificate + ", "
                                   + std::to_string(problems.size()) + " problem(s)):\n";
-            for (size_t i = 0; i < problems.size() && i < 15; ++i)
+            for (std::size_t i = 0; i < problems.size() && i < 15; ++i)
                 message += "\n" + problems[i];
             if (problems.size() > 15)
                 message += "\n... and " + std::to_string(problems.size() - 15) + " more";
             message += "\n\nReinstall the game data or pack it again (tools/pack_assets.py).";
             std::cerr << "[Application] " << message << std::endl;
-            for (size_t i = 15; i < problems.size(); ++i)
+            for (std::size_t i = 15; i < problems.size(); ++i)
                 std::cerr << "  " << problems[i] << std::endl;
             if (!m_headless && SDL_Init(SDL_INIT_VIDEO))
             {
@@ -101,8 +101,8 @@ bool Application::Init(int windowWidth, int windowHeight)
             return false;
         }
     }
-    // Every resource path comes from assets/main.json from here on
-    // main.json names every data file: without it the game does not know what to load
+    // Every resource path comes from assets/main.yaml from here on
+    // main.yaml names every data file: without it the game does not know what to load
     if (!LoaderResources::Init())
     {
         const std::string message
@@ -176,7 +176,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_resolutions = VideoModes::AvailableResolutions(m_window);
 
     // The language and the font first: the loading screen is up before the heavy part of the start-up
-    Localization::Init(LoaderResources::LocaleDir(), LoaderResources::DefaultLanguage());
+    Localization::Init(LoaderResources::LocaleDir(), LoaderResources::DefaultLanguage(), "openaow");
     Localization::SetLanguage(m_settings.language);
     {
         std::string uiText;
@@ -186,7 +186,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_texManager = std::make_unique<TextureManager>(m_sdlRenderer);
     m_renderer = std::make_unique<Renderer>(m_sdlRenderer, m_texManager.get());
     {
-        // Font files from assets/main.json, their sizes from section "font" of game_environment.json
+        // Font files from assets/main.yaml, their sizes from section "font" of game_environment.yaml
         const nlohmann::json &f = m_env.Section("font");
         FontSizes sizes;
         sizes.small = f.value("size_small", sizes.small);
@@ -201,7 +201,7 @@ bool Application::Init(int windowWidth, int windowHeight)
 
     // Initialize core subsystems
     ShowLoading(_("Loading graphics..."), 0.12f);
-    m_texManager->LoadAllAssets(LoaderResources::kDefaultRoot);
+    m_texManager->LoadAllAssets();
     ShowLoading(_("Preparing the renderer..."), 0.55f);
     m_effects = std::make_unique<ShaderEffects>();
     if (!m_headless)
@@ -219,7 +219,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_input->SetEdgePanMargin(m_settings.edgePanMargin);
     ShowLoading(_("Loading sound and music..."), 0.65f);
     m_sound = std::make_unique<SoundEngine>();
-    m_sound->Init(LoaderResources::kDefaultRoot);
+    m_sound->Init();
     ApplyAudio();
 
     m_map = std::make_unique<TileMap>();
@@ -227,7 +227,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_pathfinder = std::make_unique<Pathfinder>(m_map.get());
     ShowLoading(_("Loading units and buildings..."), 0.8f);
     m_entities = std::make_unique<EntityManager>();
-    m_entities->LoadCharacterConfigs(LoaderResources::kDefaultRoot);
+    m_entities->LoadCharacterConfigs();
     m_entities->SetTextureManager(m_texManager.get());
     m_pathfinder->SetEntityManager(m_entities.get());
     m_economy = std::make_unique<Economy>();
@@ -394,7 +394,7 @@ void Application::LaunchTestMap()
         return;
     }
     SetDebugMode(true);
-    m_mission->LoadTestMap(LoaderResources::kDefaultRoot, *m_map, *m_entities, *m_economy, *m_pathfinder);
+    m_mission->LoadTestMap(*m_map, *m_entities, *m_economy, *m_pathfinder);
     m_state = AppState::CampaignPlaying;
     m_camera->SetZoom(m_settings.zoomDefault);
     m_camera->CenterOn((m_mission->GetPlayerHqX() + 12) * TILE_WIDTH, m_mission->GetPlayerHqY() * TILE_HEIGHT);
@@ -467,8 +467,8 @@ void Application::Run()
         HandleEvents();
         // One clock for all network timing: SDL ticks, the same the lobby's Start button uses (epoch
         // milliseconds here made a host started from the menu close thousands of turns at once)
-        UpdateNetwork(static_cast<uint32_t>(SDL_GetTicks()));
-        UpdateGameChat(static_cast<uint32_t>(SDL_GetTicks()));
+        UpdateNetwork(static_cast<std::uint32_t>(SDL_GetTicks()));
+        UpdateGameChat(static_cast<std::uint32_t>(SDL_GetTicks()));
 
         // Simulation / Menu Update
         if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
@@ -514,24 +514,24 @@ void Application::Run()
                 {
                     m_net->TogglePause();
                 }
-                const uint32_t nowMs = SDL_GetTicks();
+                const std::uint32_t nowMs = SDL_GetTicks();
                 auto playing = [&] {
                     return m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
                 };
                 // One tick of a network match: only when its turn is here; checksums go out after it
                 auto netTick = [&]() {
-                    const uint32_t tick = sim.Tick();
+                    const std::uint32_t tick = sim.Tick();
                     if (!m_net->CanRunTick(tick))
                         return false;
                     DriveNetworkBot(tick);
                     Update(static_cast<float>(SIMULATION_TIMESTEP));
                     if (sim.Tick() != tick)
                     {
-                        uint64_t checksum = 0;
+                        std::uint64_t checksum = 0;
                         if (tick % NetMatch::kHashIntervalTicks == 0)
                         {
                             SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
-                            uint64_t sections[Simulation::kChecksumSections];
+                            std::uint64_t sections[Simulation::kChecksumSections];
                             checksum = sim.ChecksumSections(ctx, sections);
                             static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
                             if (trace)
@@ -561,7 +561,7 @@ void Application::Run()
                         static const long dropAt
                             = DebugEnv("OAOW_NET_DROP_AT") ? std::atol(DebugEnv("OAOW_NET_DROP_AT")) : -1;
                         static bool dropped = false;
-                        if (!dropped && dropAt >= 0 && tick == static_cast<uint32_t>(dropAt))
+                        if (!dropped && dropAt >= 0 && tick == static_cast<std::uint32_t>(dropAt))
                         {
                             dropped = true;
                             std::cerr << "[Net] Test: dropping the connection at tick " << tick << std::endl;
@@ -765,7 +765,7 @@ void Application::Update(float deltaTime)
     UpdateLocalReplay();
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
-        const uint32_t tickBefore = m_gameplayController->simulation().Tick();
+        const std::uint32_t tickBefore = m_gameplayController->simulation().Tick();
         m_gameplayController->Update(
             deltaTime,
             *m_input,
@@ -986,13 +986,13 @@ void Application::RenderMenuFade()
     const bool menuScreen = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                             || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
                             || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
-    const uint64_t now = SDL_GetTicks();
+    const std::uint64_t now = SDL_GetTicks();
     if (menuScreen && !m_menuFadeWasMenu)
         m_menuFadeStartMs = m_state == AppState::MainMenu ? now : 0;
     m_menuFadeWasMenu = menuScreen;
     if (!menuScreen || m_menuFadeStartMs == 0)
         return;
-    const uint64_t elapsed = now - m_menuFadeStartMs;
+    const std::uint64_t elapsed = now - m_menuFadeStartMs;
     if (elapsed >= kMenuFadeMs)
     {
         m_menuFadeStartMs = 0;

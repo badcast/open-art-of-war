@@ -21,7 +21,7 @@ struct GeneratorParams
     int height {40};
     int tilesetId {0}; // 0 = Jungle, 1 = Desert
     GeneratorSymmetry symmetry {GeneratorSymmetry::Rotational180};
-    uint32_t seed {1337};
+    std::uint32_t seed {1337};
     bool randomSeed {true};
     int players {2}; // 2..8 bases; more than two get no symmetry (bases on a ring around the centre)
 

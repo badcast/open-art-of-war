@@ -356,12 +356,12 @@ bool Pathfinder::FindPath(
         return freeTile(fromX + dx, fromY + dy);
     };
     auto straighten = [&](std::vector<PathNode> &pathVec) -> bool {
-        const size_t n = pathVec.size();
+        const std::size_t n = pathVec.size();
         if (n < 3)
             return !pathVec.empty();
         std::vector<PathNode> steps(n);
         PathNode prev {startX, startY};
-        for (size_t i = 0; i < n; ++i)
+        for (std::size_t i = 0; i < n; ++i)
         {
             steps[i] = {pathVec[i].x - prev.x, pathVec[i].y - prev.y};
             prev = pathVec[i];
@@ -372,7 +372,7 @@ bool Pathfinder::FindPath(
             PathNode at {startX, startY};
             at.x += steps[0].x;
             at.y += steps[0].y;
-            for (size_t k = 1; k + 1 < n; ++k)
+            for (std::size_t k = 1; k + 1 < n; ++k)
             {
                 // ... A, B, A ... -> ... A, A, B ...: the second A joins the run before it
                 const PathNode a = steps[k - 1];
@@ -391,7 +391,7 @@ bool Pathfinder::FindPath(
                 break;
         }
         PathNode cur {startX, startY};
-        for (size_t i = 0; i < n; ++i)
+        for (std::size_t i = 0; i < n; ++i)
         {
             cur.x += steps[i].x;
             cur.y += steps[i].y;
@@ -416,7 +416,7 @@ bool Pathfinder::FindPath(
     if (found && !navResult.connections.empty())
     {
         outPath.reserve(navResult.connections.size());
-        for (size_t i = 1; i < navResult.connections.size(); ++i)
+        for (std::size_t i = 1; i < navResult.connections.size(); ++i)
         {
             outPath.push_back({navResult.connections[i].x, navResult.connections[i].y});
         }

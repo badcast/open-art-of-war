@@ -19,10 +19,10 @@ class VoiceManager
 {
 public:
     // Loads the lines of `language` (with the fallback ones); false when no line could be loaded
-    bool Load(const std::string &language, const std::string &assetRoot);
-    inline bool load(const std::string &language, const std::string &assetRoot)
+    bool Load(const std::string &language);
+    inline bool load(const std::string &language)
     {
-        return Load(language, assetRoot);
+        return Load(language);
     }
     // Loads another language when it differs from the current one
     void SetLanguage(const std::string &language);
@@ -32,13 +32,13 @@ public:
     }
 
     // A unit reply (category voice); false when unknown or held back by its limits
-    bool Play(const std::string &event, uint64_t nowMs);
+    bool Play(const std::string &event, std::uint64_t nowMs);
     // An announcer line: queued, one at a time, each with its own cooldown
-    bool Announce(const std::string &event, uint64_t nowMs);
+    bool Announce(const std::string &event, std::uint64_t nowMs);
     // Starts the next announcer line when the current one is over; once per frame
-    void Update(uint64_t nowMs);
+    void Update(std::uint64_t nowMs);
     // Adds `frames` stereo frames (interleaved int16) of the voices speaking
-    void Mix(int16_t *out, int frames);
+    void Mix(std::int16_t *out, int frames);
     void StopAll();
 
     void SetVolume(int volume); // 0..128
@@ -46,7 +46,7 @@ public:
     // The voices keep quiet (an interface that is silent: replies and the announcer)
     void SetSilenced(bool silenced);
     bool Has(const std::string &event) const;
-    size_t LineCount() const
+    std::size_t LineCount() const
     {
         return m_lines;
     }
@@ -55,11 +55,10 @@ private:
     mutable std::mutex m_swap; // guards m_mixer against the audio thread while a language is loaded
     std::unique_ptr<SfxMixer> m_mixer;
     std::string m_language;
-    std::string m_root;
     int m_volume {128};
     bool m_muted {false};
     bool m_silenced {false};
-    size_t m_lines {0};
+    std::size_t m_lines {0};
 };
 
 } // namespace OpenArtOfWar

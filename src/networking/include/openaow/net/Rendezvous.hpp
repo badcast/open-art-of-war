@@ -21,11 +21,11 @@ public:
     // `gameSocket`: the host's listening transport (it must outlive the announcer)
     HostAnnouncer(
         const std::string &master,
-        uint16_t masterPort,
+        std::uint16_t masterPort,
         Transport &gameSocket,
-        uint16_t gamePort,
+        std::uint16_t gamePort,
         const std::string &lanIp);
-    void update(uint32_t nowMs, const RoomInfo &room, bool listed);
+    void update(std::uint32_t nowMs, const RoomInfo &room, bool listed);
     const std::string &code() const
     {
         return m_master.hostedCode();
@@ -43,12 +43,12 @@ private:
     MasterClient m_master;
     Transport &m_socket;
     std::string m_host;
-    uint16_t m_port;
-    uint16_t m_gamePort;
+    std::uint16_t m_port;
+    std::uint16_t m_gamePort;
     std::string m_lanIp;
     SocketToken m_token {};
-    uint32_t m_nextHelloMs {0};
-    uint32_t m_nextRegisterMs {0};
+    std::uint32_t m_nextHelloMs {0};
+    std::uint32_t m_nextRegisterMs {0};
     int m_hellos {0};
 };
 
@@ -64,8 +64,8 @@ public:
         Failed
     };
 
-    HostedJoin(const std::string &master, uint16_t masterPort, const std::string &code);
-    void update(uint32_t nowMs);
+    HostedJoin(const std::string &master, std::uint16_t masterPort, const std::string &code);
+    void update(std::uint32_t nowMs);
     State state() const
     {
         return m_state;
@@ -84,14 +84,14 @@ private:
     MasterClient m_master;
     std::unique_ptr<Transport> m_socket;
     std::string m_host;
-    uint16_t m_port;
+    std::uint16_t m_port;
     std::string m_code;
     SocketToken m_token {};
     State m_state {State::Working};
     std::string m_error;
-    uint32_t m_startMs {0};
-    uint32_t m_nextHelloMs {0};
-    uint32_t m_nextAskMs {0};
+    std::uint32_t m_startMs {0};
+    std::uint32_t m_nextHelloMs {0};
+    std::uint32_t m_nextAskMs {0};
     bool m_started {false};
 };
 

@@ -92,16 +92,16 @@ Options (command line wins over --config):
   --help                      this text
 )";
 
-bool parsePorts(const std::string &text, uint16_t &first, uint16_t &last)
+bool parsePorts(const std::string &text, std::uint16_t &first, std::uint16_t &last)
 {
-    const size_t dash = text.find('-');
+    const std::size_t dash = text.find('-');
     if (dash == std::string::npos)
         return false;
     const int a = std::stoi(text.substr(0, dash)), b = std::stoi(text.substr(dash + 1));
     if (a <= 0 || b > 65535 || a > b)
         return false;
-    first = static_cast<uint16_t>(a);
-    last = static_cast<uint16_t>(b);
+    first = static_cast<std::uint16_t>(a);
+    last = static_cast<std::uint16_t>(b);
     return true;
 }
 
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
             return 2;
         }
         std::string key = arg.substr(2), value;
-        const size_t eq = key.find('=');
+        const std::size_t eq = key.find('=');
         if (eq != std::string::npos)
         {
             value = key.substr(eq + 1);
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
 
     RoomServerConfig config;
     config.bindAddress = text("bind", "");
-    config.port = static_cast<uint16_t>(number("port", kDefaultPort));
+    config.port = static_cast<std::uint16_t>(number("port", kDefaultPort));
     if (options.contains("room-ports")
         && !parsePorts(text("room-ports", ""), config.roomPortFirst, config.roomPortLast))
     {
@@ -243,13 +243,13 @@ int main(int argc, char *argv[])
     config.maxRooms = static_cast<int>(number("max-rooms", 64));
     config.maxPlayersPerRoom = static_cast<int>(std::clamp<long>(number("max-players", kMaxPlayers), 2, kMaxPlayers));
     config.maxMasterClients = static_cast<int>(number("max-clients", 512));
-    config.turnMs = static_cast<uint16_t>(std::clamp<long>(number("turn-ms", 100), 20, 500));
-    config.inputDelayMin = static_cast<uint8_t>(std::clamp<long>(number("input-delay-min", 1), 1, 20));
+    config.turnMs = static_cast<std::uint16_t>(std::clamp<long>(number("turn-ms", 100), 20, 500));
+    config.inputDelayMin = static_cast<std::uint8_t>(std::clamp<long>(number("input-delay-min", 1), 1, 20));
     config.inputDelayMax
-        = static_cast<uint8_t>(std::clamp<long>(number("input-delay-max", 6), config.inputDelayMin, 30));
-    config.idleRoomTimeoutMs = static_cast<uint32_t>(number("idle-room-timeout-s", 120) * 1000);
-    config.emptyRoomTimeoutMs = static_cast<uint32_t>(number("empty-room-timeout-s", 30) * 1000);
-    config.unusedRoomTimeoutMs = static_cast<uint32_t>(number("unused-room-timeout-s", 120) * 1000);
+        = static_cast<std::uint8_t>(std::clamp<long>(number("input-delay-max", 6), config.inputDelayMin, 30));
+    config.idleRoomTimeoutMs = static_cast<std::uint32_t>(number("idle-room-timeout-s", 120) * 1000);
+    config.emptyRoomTimeoutMs = static_cast<std::uint32_t>(number("empty-room-timeout-s", 30) * 1000);
+    config.unusedRoomTimeoutMs = static_cast<std::uint32_t>(number("unused-room-timeout-s", 120) * 1000);
     config.replayDir = text("dir-replay", "replay");
     if (!config.replayDir.empty())
     {
@@ -278,7 +278,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     StatusPage status;
-    if (tcpPort > 0 && !status.open(static_cast<uint16_t>(tcpPort), config.bindAddress, error))
+    if (tcpPort > 0 && !status.open(static_cast<std::uint16_t>(tcpPort), config.bindAddress, error))
     {
         log.write(Level::Warn, "status page off: " + error);
     }
@@ -293,8 +293,8 @@ int main(int argc, char *argv[])
     while (!g_stop)
     {
         const auto now = std::chrono::steady_clock::now();
-        const uint32_t nowMs
-            = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+        const std::uint32_t nowMs
+            = static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
         server.update(nowMs);
         for (const std::string &line : server.takeLog())
             log.write(Level::Info, line);

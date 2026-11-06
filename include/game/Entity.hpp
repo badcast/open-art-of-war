@@ -73,7 +73,7 @@ struct Projectile
     int forcedWallY {-1};
     // Heard where it lands (the gun's impact_sound, EntityManager::SoundName; 0: by kind) and how loud: only a sound,
     // not part of the world
-    uint16_t impactSound {0};
+    std::uint16_t impactSound {0};
     float soundGain {1.0f};
 };
 

@@ -17,10 +17,11 @@
 #include <cstdio>
 #endif
 
+using namespace OpenArtOfWar;
+
 // 3b. MapGenerator: every symmetry on both tilesets, reproducible, seamless ground, bases joined by open ground
 static bool RunMapGeneratorTest()
 {
-    using namespace OpenArtOfWar;
     const GeneratorSymmetry symmetries[]
         = {GeneratorSymmetry::None,
            GeneratorSymmetry::Rotational180,
@@ -47,7 +48,7 @@ static bool RunMapGeneratorTest()
             return false;
         }
         const auto first = doc.GetStartPos(0);
-        std::vector<char> seen(static_cast<size_t>(map.GetWidth()) * map.GetHeight(), 0);
+        std::vector<char> seen(static_cast<std::size_t>(map.GetWidth()) * map.GetHeight(), 0);
         std::queue<std::pair<int, int>> todo;
         todo.push(first);
         seen[first.second * map.GetWidth() + first.first] = 1;
@@ -185,7 +186,7 @@ static bool RunMapGeneratorTest()
                 }
             };
             seed(doc.GetPlayerStartX(), doc.GetPlayerStartY());
-            for (size_t head = 0; head < queue.size(); ++head)
+            for (std::size_t head = 0; head < queue.size(); ++head)
             {
                 const auto [cx, cy] = queue[head];
                 const int step[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -227,7 +228,6 @@ static bool RunMapGeneratorTest()
 // editing tools keep a cell's passability in step with its tile, decoration, wall and building
 static bool RunTileCollisionTest()
 {
-    using namespace OpenArtOfWar;
     namespace fs = std::filesystem;
 
     long cells = 0, agree = 0, blockedTiles = 0, blockedTilesOpen = 0;
@@ -235,7 +235,9 @@ static bool RunTileCollisionTest()
     for (const auto &entry : fs::directory_iterator("assets/maps"))
     {
         const std::string name = entry.path().filename().string();
-        if (name.rfind("map_", 0) != 0 || entry.path().extension() != ".json")
+        if ((name.rfind("confederation_mission_", 0) != 0 && name.rfind("resistance_mission_", 0) != 0
+             && name.rfind("skirmish_", 0) != 0 && name.rfind("map_", 0) != 0)
+            || entry.path().extension() != ".json")
             continue;
         std::string text;
         if (!Assets::ReadText(entry.path().generic_string(), text))
@@ -250,7 +252,7 @@ static bool RunTileCollisionTest()
         {
             tiles.insert(tiles.end(), run["runLength"].get<int>(), run["tileType"].get<int>());
         }
-        tiles.resize(static_cast<size_t>(w) * h, 0);
+        tiles.resize(static_cast<std::size_t>(w) * h, 0);
         std::vector<char> nearDecor(w * h, 0); // footprints reach up to 4 right / 3 down of the anchor
         for (const auto &d : doc["decorations"])
         {
@@ -268,7 +270,7 @@ static bool RunTileCollisionTest()
                 if (nearDecor[y * w + x])
                     continue;
                 const bool blocked = TileCollision::IsBlocked(tileset, tiles[y * w + x]);
-                const bool masked = (doc["collisionMask"][y][x / 32].get<uint32_t>() & (1u << (31 - x % 32))) != 0;
+                const bool masked = (doc["collisionMask"][y][x / 32].get<std::uint32_t>() & (1u << (31 - x % 32))) != 0;
                 ++cells;
                 agree += blocked == masked ? 1 : 0;
                 if (blocked)
@@ -419,7 +421,7 @@ static bool RunEditorSelfTest()
     }
     const int eraseUnitId = toolsDoc.AddEntity(0, false, OpenArtOfWar::Faction::Resistance, 9, 8);
     toolsDoc.AddDecoration(1, 8, 9);
-    const uint8_t terrainBeforeErase = toolsDoc.GetTileMap().GetBaseTile(8, 9);
+    const std::uint8_t terrainBeforeErase = toolsDoc.GetTileMap().GetBaseTile(8, 9);
     if (eraseUnitId <= 0 || !toolsDoc.HasObjectsInBrush(8, 8, 2) || !toolsDoc.RemoveObjectsBrush(8, 8, 2)
         || toolsDoc.GetTileMap().IsWall(8, 8) || toolsDoc.GetTileMap().IsWall(9, 9)
         || toolsDoc.GetTileMap().GetDecorGrid(8, 9) != 0 || toolsDoc.GetEntityAt(9, 8)
@@ -442,7 +444,7 @@ static bool RunEditorSelfTest()
     std::string gameMapText;
     OpenArtOfWar::Assets::ReadText(gameMapPath, gameMapText);
     nlohmann::json originalGameMap = nlohmann::json::parse(gameMapText);
-    const size_t expectedEntities = originalGameMap.value("buildings", nlohmann::json::array()).size()
+    const std::size_t expectedEntities = originalGameMap.value("buildings", nlohmann::json::array()).size()
                                     + originalGameMap.value("units", nlohmann::json::array()).size();
     const auto *playerHq = gameMapDoc.GetEntityAt(4, 21);
     const auto *enemyHq = gameMapDoc.GetEntityAt(46, 18);
@@ -500,7 +502,7 @@ static bool RunEditorSelfTest()
 
     // 1. Test MapDocument load existing game map
     OpenArtOfWar::MapDocument doc;
-    std::string testMapPath = "assets/maps/m0.json";
+    std::string testMapPath = OpenArtOfWar::LoaderResources::MapPath("resistance_mission_7");
     if (!doc.LoadMap(testMapPath))
     {
         std::cerr << "[MapEditor-Test] FAILED: Could not load map from " << testMapPath << std::endl;
@@ -669,7 +671,7 @@ int main(int argc, char *argv[])
             OpenArtOfWar::GeneratorParams params;
             params.randomSeed = i + 2 >= argc;
             if (i + 2 < argc)
-                params.seed = static_cast<uint32_t>(std::stoul(argv[i + 2]));
+                params.seed = static_cast<std::uint32_t>(std::stoul(argv[i + 2]));
             if (i + 3 < argc)
                 params.tilesetId = std::stoi(argv[i + 3]);
             if (i + 4 < argc)

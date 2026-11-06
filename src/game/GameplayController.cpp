@@ -293,7 +293,7 @@ void GameplayController::CreateMatchAis(const MissionController &mission, Entity
         ai->SetDifficulty(static_cast<AIDifficulty>(std::min<int>(slot.aiLevel, 3)));
         ai->Init(ownX, ownY, targetX, targetY);
         // Its own style of base: the seed of the match mixed with the slot (two computer players build differently)
-        ai->SetSeed(setup.seed ^ (static_cast<uint32_t>(p) + 1u) * 0x9E3779B9u);
+        ai->SetSeed(setup.seed ^ (static_cast<std::uint32_t>(p) + 1u) * 0x9E3779B9u);
         ai->ApplyHandicap(HandicapPercentOf(slot.handicap));
         ai->RecordStartingBase(entities, map);
         ai->SetSkirmish(true);
@@ -361,9 +361,9 @@ void GameplayController::OrderAt(const std::vector<int> &units, float worldX, fl
 {
     SimCommand c = Command(CommandType::OrderAt);
     c.ids.assign(units.begin(), units.end());
-    c.x = static_cast<int32_t>(worldX);
-    c.y = static_cast<int32_t>(worldY);
-    c.a = static_cast<int32_t>(kind);
+    c.x = static_cast<std::int32_t>(worldX);
+    c.y = static_cast<std::int32_t>(worldY);
+    c.a = static_cast<std::int32_t>(kind);
     // bit 0: march as a control group; bit 1: Shift - after the orders the units already have
     c.b = (units.size() >= 2 && GroupOfUnits(units) >= 0) ? 1 : 0;
     if (queued)
@@ -872,7 +872,7 @@ void GameplayController::Update(
                 c.debug = true;
                 c.player = Players::OwnerOf(item.faction);
                 c.a = item.archetypeOrBuildingIdx;
-                c.b = static_cast<int32_t>(
+                c.b = static_cast<std::int32_t>(
                     item.isWall ? DebugSpawnKind::Wall
                                 : (item.isBuilding ? DebugSpawnKind::Building : DebugSpawnKind::Unit));
                 c.c = item.width;
@@ -1047,7 +1047,7 @@ void GameplayController::Update(
             {
                 const Building *b = entities.GetBuilding(id);
                 if (b && b->owner == Players::Local())
-                    c.ids.push_back(static_cast<uint32_t>(id));
+                    c.ids.push_back(static_cast<std::uint32_t>(id));
             }
             if (!c.ids.empty())
                 m_sim.Issue(std::move(c));
@@ -1080,8 +1080,8 @@ void GameplayController::Update(
             {
                 SimCommand c = Command(CommandType::SetRally);
                 c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
-                c.x = static_cast<int32_t>(rx);
-                c.y = static_cast<int32_t>(ry);
+                c.x = static_cast<std::int32_t>(rx);
+                c.y = static_cast<std::int32_t>(ry);
                 if (!c.ids.empty())
                     m_sim.Issue(std::move(c));
             }
@@ -1434,7 +1434,7 @@ void GameplayController::RenderDebugNavigation(
         {
             float prevX = wx;
             float prevY = wy;
-            for (size_t i = u->pathIndex; i < u->path.size(); ++i)
+            for (std::size_t i = u->pathIndex; i < u->path.size(); ++i)
             {
                 float nodeX = u->path[i].x * TILE_WIDTH + (TILE_WIDTH * 0.5f);
                 float nodeY = u->path[i].y * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);

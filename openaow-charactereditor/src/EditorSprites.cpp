@@ -50,13 +50,13 @@ void CharacterEditor::EnsureSpriteCatalog()
     // Build reverse lookup: spriteId -> list of object indices that use it
     spriteToObjects.assign(spriteCatalog.Sprites().size(), {});
     const auto &objs = spriteCatalog.Objects();
-    for (size_t oi = 0; oi < objs.size(); ++oi)
+    for (std::size_t oi = 0; oi < objs.size(); ++oi)
     {
         for (int sid : objs[oi].sprites)
         {
             if (sid >= 0 && sid < static_cast<int>(spriteToObjects.size()))
             {
-                spriteToObjects[static_cast<size_t>(sid)].push_back(static_cast<int>(oi));
+                spriteToObjects[static_cast<std::size_t>(sid)].push_back(static_cast<int>(oi));
             }
         }
     }
@@ -76,7 +76,7 @@ void CharacterEditor::DrawSpriteImageAt(const ImVec2 &pos, int spriteId, float b
     dl->AddRectFilled(pos, ImVec2(pos.x + box, pos.y + box), IM_COL32(28, 34, 30, 255));
     if (spriteId < 0 || spriteId >= static_cast<int>(spriteCatalog.Sprites().size()))
         return;
-    const RawSprite &s = spriteCatalog.Sprites()[static_cast<size_t>(spriteId)];
+    const RawSprite &s = spriteCatalog.Sprites()[static_cast<std::size_t>(spriteId)];
     SDL_Texture *tex = textures->GetSpriteSheet(s.page);
     if (!tex || s.w <= 0 || s.h <= 0)
         return;
@@ -181,7 +181,7 @@ void CharacterEditor::DrawSpriteTools()
         shown += visible(o) ? 1 : 0;
     ImGui::TextDisabled(_("%d objects, %zu sprites"), shown, spriteCatalog.Sprites().size());
     std::vector<int> shownIdx;
-    for (size_t i = 0; i < objects.size(); ++i)
+    for (std::size_t i = 0; i < objects.size(); ++i)
     {
         if (visible(objects[i]))
             shownIdx.push_back(static_cast<int>(i));
@@ -216,7 +216,7 @@ void CharacterEditor::DrawSpriteTools()
     ImGui::BeginChild("sprite-objects", ImVec2(listWidth, 0.0f), true);
     int lastGroup = -1;
     constexpr float rowH = 40.0f;
-    for (size_t i = 0; i < objects.size(); ++i)
+    for (std::size_t i = 0; i < objects.size(); ++i)
     {
         const SpriteObject &o = objects[i];
         if (!visible(o))
@@ -252,6 +252,7 @@ void CharacterEditor::DrawSpriteTools()
                     spriteChecked.insert(index);
                 }
                 spriteSelected = index;
+                OnSpriteObjectSelected(index);
             }
             else if (io.KeyCtrl)
             {
@@ -259,10 +260,13 @@ void CharacterEditor::DrawSpriteTools()
                 {
                     spriteChecked.insert(index);
                     spriteSelected = index;
+                    OnSpriteObjectSelected(index);
                 }
                 else if (spriteSelected == index)
                 {
                     spriteSelected = spriteChecked.empty() ? -1 : *spriteChecked.begin();
+                    if (spriteSelected >= 0)
+                        OnSpriteObjectSelected(spriteSelected);
                 }
                 spriteAnchor = index;
             }
@@ -272,6 +276,7 @@ void CharacterEditor::DrawSpriteTools()
                 spriteChecked.insert(index);
                 spriteSelected = index;
                 spriteAnchor = index;
+                OnSpriteObjectSelected(index);
             }
         }
         const ImVec2 min = ImGui::GetItemRectMin();
@@ -319,10 +324,21 @@ void CharacterEditor::DrawSpriteTools()
     ImGui::SameLine();
     ImGui::BeginChild("sprite-detail", ImVec2(0.0f, 0.0f), true);
 
+    const bool isPointEditor = (spriteDetailTab == SpriteDetailTab::PointEditor);
     const bool isTree = (spriteDetailTab == SpriteDetailTab::Tree);
     const bool isPreview = (spriteDetailTab == SpriteDetailTab::ExportPreview);
     const bool isLoaded = (spriteDetailTab == SpriteDetailTab::LoadedSprites);
 
+    if (isPointEditor)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.35f, 1.0f));
+    if (Hinted(ImGui::Button(_("Point Editor"), ImVec2(120.0f, 26.0f)), "Point Editor"))
+    {
+        spriteDetailTab = SpriteDetailTab::PointEditor;
+    }
+    if (isPointEditor)
+        ImGui::PopStyleColor();
+
+    ImGui::SameLine();
     if (isTree)
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.35f, 1.0f));
     if (Hinted(ImGui::Button(_("Dependencies"), ImVec2(120.0f, 26.0f)), "Dependencies"))
@@ -360,9 +376,24 @@ void CharacterEditor::DrawSpriteTools()
     if (isLoaded)
         ImGui::PopStyleColor();
 
+    if (spritesJsonDirty)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "%s", _("● sprites.json modified"));
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Save sprites.json")), "Save sprites.json"))
+        {
+            SaveSpritesJson();
+        }
+    }
+
     ImGui::Separator();
 
-    if (spriteDetailTab == SpriteDetailTab::Tree)
+    if (spriteDetailTab == SpriteDetailTab::PointEditor)
+    {
+        DrawPointEditor();
+    }
+    else if (spriteDetailTab == SpriteDetailTab::Tree)
     {
         if (spriteSelected < 0 || spriteSelected >= static_cast<int>(objects.size()))
         {
@@ -373,7 +404,7 @@ void CharacterEditor::DrawSpriteTools()
         }
         else
         {
-            const SpriteObject &o = objects[static_cast<size_t>(spriteSelected)];
+            const SpriteObject &o = objects[static_cast<std::size_t>(spriteSelected)];
             if (spriteTreeFor != spriteSelected)
             {
                 spriteTree = spriteCatalog.tree(o);
@@ -426,6 +457,17 @@ void CharacterEditor::DrawSpriteProperties()
         }
     }
     const fs::path outDir = fs::path(spriteOutDir.data());
+
+    if (spritesJsonDirty)
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.2f, 1.0f), "%s", _("● Unsaved changes in sprites.json"));
+        if (Hinted(ImGui::Button(_("Save sprites.json##sp"), ImVec2(140.0f, 26.0f)), "Save sprites.json"))
+            SaveSpritesJson();
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Revert##sp_rev"), ImVec2(80.0f, 26.0f)), "Revert sprites.json"))
+            RevertSpritesJson();
+        ImGui::Separator();
+    }
 
     ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "%s", _("Export objects"));
     ImGui::TextWrapped(
@@ -585,7 +627,7 @@ void CharacterEditor::DrawSpriteProperties()
             if (ImportSpriteFolder(assetsRoot, fs::path(spriteInDir.data()), spriteReport))
             {
                 if (textures)
-                    textures->LoadAllAssets(assetsRoot.string());
+                    textures->LoadAllAssets();
                 for (auto &[k, t] : wreckThumbs)
                     if (t)
                         SDL_DestroyTexture(t);
@@ -637,7 +679,7 @@ void CharacterEditor::InitPreviewFromObject(int objectIndex)
     previewSourceMode = PreviewSourceMode::Object;
     previewForObject = objectIndex;
     previewShowObjectGroups = false;
-    const SpriteObject &o = spriteCatalog.Objects()[static_cast<size_t>(objectIndex)];
+    const SpriteObject &o = spriteCatalog.Objects()[static_cast<std::size_t>(objectIndex)];
 
     // Map each sprite of the object to its first sub-component in the dependency tree
     std::map<int, std::pair<int, std::string>> spriteSubGroup;
@@ -657,7 +699,7 @@ void CharacterEditor::InitPreviewFromObject(int objectIndex)
             self(self, ch, gid, glabel);
         }
     };
-    for (size_t cIdx = 0; cIdx < topNodes->size(); ++cIdx)
+    for (std::size_t cIdx = 0; cIdx < topNodes->size(); ++cIdx)
     {
         const DepNode &comp = (*topNodes)[cIdx];
         collectLeafSprites(collectLeafSprites, comp, static_cast<int>(cIdx), o.name + " - " + comp.label);
@@ -668,7 +710,7 @@ void CharacterEditor::InitPreviewFromObject(int objectIndex)
     {
         if (id < 0 || id >= static_cast<int>(spriteCatalog.Sprites().size()))
             continue;
-        const RawSprite &s = spriteCatalog.Sprites()[static_cast<size_t>(id)];
+        const RawSprite &s = spriteCatalog.Sprites()[static_cast<std::size_t>(id)];
         if (s.w <= 0 || s.h <= 0)
             continue;
         SDL_Texture *tex = textures ? textures->GetSpriteSheet(s.page) : nullptr;
@@ -729,13 +771,13 @@ void CharacterEditor::InitPreviewFromSingleSprites()
     // Map each sprite ID to the first SpriteObject that owns it
     const auto &objs = spriteCatalog.Objects();
     std::vector<int> ownerObj(spriteCatalog.Sprites().size(), -1);
-    for (size_t oi = 0; oi < objs.size(); ++oi)
+    for (std::size_t oi = 0; oi < objs.size(); ++oi)
     {
         for (int sid : objs[oi].sprites)
         {
-            if (sid >= 0 && sid < static_cast<int>(ownerObj.size()) && ownerObj[static_cast<size_t>(sid)] < 0)
+            if (sid >= 0 && sid < static_cast<int>(ownerObj.size()) && ownerObj[static_cast<std::size_t>(sid)] < 0)
             {
-                ownerObj[static_cast<size_t>(sid)] = static_cast<int>(oi);
+                ownerObj[static_cast<std::size_t>(sid)] = static_cast<int>(oi);
             }
         }
     }
@@ -755,7 +797,7 @@ void CharacterEditor::InitPreviewFromSingleSprites()
     {
         if (id < 0 || id >= static_cast<int>(spriteCatalog.Sprites().size()))
             continue;
-        const RawSprite &s = spriteCatalog.Sprites()[static_cast<size_t>(id)];
+        const RawSprite &s = spriteCatalog.Sprites()[static_cast<std::size_t>(id)];
         if (s.w <= 0 || s.h <= 0)
             continue;
         SDL_Texture *tex = textures ? textures->GetSpriteSheet(s.page) : nullptr;
@@ -779,10 +821,10 @@ void CharacterEditor::InitPreviewFromSingleSprites()
         ps.y = 0;
         ps.w = x1 - x0;
         ps.h = y1 - y0;
-        const int oi = ownerObj[static_cast<size_t>(id)];
+        const int oi = ownerObj[static_cast<std::size_t>(id)];
         if (oi >= 0 && oi < static_cast<int>(objs.size()))
         {
-            const SpriteObject &o = objs[static_cast<size_t>(oi)];
+            const SpriteObject &o = objs[static_cast<std::size_t>(oi)];
             ps.groupId = oi;
             ps.groupLabel = (o.kind == SpriteObjectKind::Unit       ? "[#"
                              : o.kind == SpriteObjectKind::Building ? "[B#"
@@ -831,10 +873,10 @@ void CharacterEditor::UpdatePreviewCollisions()
         return;
 
     int shownPairs = 0;
-    for (size_t i = 0; i < previewSprites.size(); ++i)
+    for (std::size_t i = 0; i < previewSprites.size(); ++i)
     {
         auto &a = previewSprites[i];
-        for (size_t j = i + 1; j < previewSprites.size(); ++j)
+        for (std::size_t j = i + 1; j < previewSprites.size(); ++j)
         {
             auto &b = previewSprites[j];
             if (!(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y))
@@ -902,7 +944,7 @@ void CharacterEditor::LayoutPreviewGrid(int cols, int pad, bool compress)
         }
         const int cellW = maxW + pad;
         const int cellH = maxH + pad;
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
         {
             const int col = static_cast<int>(i) % cols;
             const int row = static_cast<int>(i) / cols;
@@ -912,24 +954,24 @@ void CharacterEditor::LayoutPreviewGrid(int cols, int pad, bool compress)
     }
     else
     {
-        std::vector<int> rowHeights(static_cast<size_t>(rows), 0);
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        std::vector<int> rowHeights(static_cast<std::size_t>(rows), 0);
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
         {
-            const size_t r = i / static_cast<size_t>(cols);
+            const std::size_t r = i / static_cast<std::size_t>(cols);
             rowHeights[r] = std::max(rowHeights[r], previewSprites[i].h);
         }
-        std::vector<int> rowY(static_cast<size_t>(rows), 0);
+        std::vector<int> rowY(static_cast<std::size_t>(rows), 0);
         int sumY = 0;
-        for (size_t r = 0; r < rowHeights.size(); ++r)
+        for (std::size_t r = 0; r < rowHeights.size(); ++r)
         {
             rowY[r] = sumY;
             sumY += rowHeights[r] + pad;
         }
         int cursorX = 0;
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
         {
             const int col = static_cast<int>(i) % cols;
-            const size_t row = i / static_cast<size_t>(cols);
+            const std::size_t row = i / static_cast<std::size_t>(cols);
             if (col == 0)
                 cursorX = 0;
             previewSprites[i].x = cursorX;
@@ -958,7 +1000,7 @@ void CharacterEditor::LayoutPreviewPack(int pad)
     }
     int w = 1, h = 1;
     items = PackCustomMaxRects(std::move(items), w, h, pad);
-    for (size_t i = 0; i < previewSprites.size() && i < items.size(); ++i)
+    for (std::size_t i = 0; i < previewSprites.size() && i < items.size(); ++i)
     {
         previewSprites[i].x = items[i].x;
         previewSprites[i].y = items[i].y;
@@ -983,7 +1025,7 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
         {
             if (objIdx < 0 || objIdx >= static_cast<int>(objs.size()))
                 continue;
-            const SpriteObject &o = objs[static_cast<size_t>(objIdx)];
+            const SpriteObject &o = objs[static_cast<std::size_t>(objIdx)];
             const std::string gLabel = (o.kind == SpriteObjectKind::Unit       ? "[#"
                                         : o.kind == SpriteObjectKind::Building ? "[B#"
                                                                                : "[")
@@ -994,7 +1036,7 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
                     continue;
                 if (id < 0 || id >= static_cast<int>(spriteCatalog.Sprites().size()))
                     continue;
-                const RawSprite &s = spriteCatalog.Sprites()[static_cast<size_t>(id)];
+                const RawSprite &s = spriteCatalog.Sprites()[static_cast<std::size_t>(id)];
                 if (s.w <= 0 || s.h <= 0)
                     continue;
                 SDL_Texture *tex = textures ? textures->GetSpriteSheet(s.page) : nullptr;
@@ -1035,20 +1077,20 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
     {
         int groupId {-1};
         std::string label;
-        std::vector<size_t> indices;
+        std::vector<std::size_t> indices;
         int w {0};
         int h {0};
         std::vector<SDL_Point> localPos;
     };
     std::vector<ObjGroup> groups;
-    std::map<int, size_t> groupMap;
-    for (size_t i = 0; i < previewSprites.size(); ++i)
+    std::map<int, std::size_t> groupMap;
+    for (std::size_t i = 0; i < previewSprites.size(); ++i)
     {
         const int gid = previewSprites[i].groupId;
         auto it = groupMap.find(gid);
         if (it == groupMap.end())
         {
-            size_t newIdx = groups.size();
+            std::size_t newIdx = groups.size();
             groupMap[gid] = newIdx;
             ObjGroup g;
             g.groupId = gid;
@@ -1071,21 +1113,21 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
         const int n = static_cast<int>(g.indices.size());
         const int cols = std::clamp(maxCols, 1, n);
         const int rows = (n + cols - 1) / cols;
-        std::vector<int> rowHeights(static_cast<size_t>(rows), 0);
+        std::vector<int> rowHeights(static_cast<std::size_t>(rows), 0);
         for (int k = 0; k < n; ++k)
         {
             const int r = k / cols;
-            rowHeights[static_cast<size_t>(r)]
-                = std::max(rowHeights[static_cast<size_t>(r)], previewSprites[g.indices[static_cast<size_t>(k)]].h);
+            rowHeights[static_cast<std::size_t>(r)]
+                = std::max(rowHeights[static_cast<std::size_t>(r)], previewSprites[g.indices[static_cast<std::size_t>(k)]].h);
         }
-        std::vector<int> rowY(static_cast<size_t>(rows), 0);
+        std::vector<int> rowY(static_cast<std::size_t>(rows), 0);
         int sumY = 0;
         for (int r = 0; r < rows; ++r)
         {
-            rowY[static_cast<size_t>(r)] = sumY;
-            sumY += rowHeights[static_cast<size_t>(r)] + pad;
+            rowY[static_cast<std::size_t>(r)] = sumY;
+            sumY += rowHeights[static_cast<std::size_t>(r)] + pad;
         }
-        g.localPos.resize(static_cast<size_t>(n));
+        g.localPos.resize(static_cast<std::size_t>(n));
         int cursorX = 0;
         int gw = 0;
         for (int k = 0; k < n; ++k)
@@ -1094,8 +1136,8 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
             const int r = k / cols;
             if (c == 0)
                 cursorX = 0;
-            const auto &sp = previewSprites[g.indices[static_cast<size_t>(k)]];
-            g.localPos[static_cast<size_t>(k)] = SDL_Point {cursorX, rowY[static_cast<size_t>(r)]};
+            const auto &sp = previewSprites[g.indices[static_cast<std::size_t>(k)]];
+            g.localPos[static_cast<std::size_t>(k)] = SDL_Point {cursorX, rowY[static_cast<std::size_t>(r)]};
             cursorX += sp.w + pad;
             gw = std::max(gw, cursorX - pad);
         }
@@ -1122,7 +1164,7 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
             curY += shelfH + gapY;
             shelfH = 0;
         }
-        for (size_t k = 0; k < g.indices.size(); ++k)
+        for (std::size_t k = 0; k < g.indices.size(); ++k)
         {
             auto &sp = previewSprites[g.indices[k]];
             sp.x = curX + g.localPos[k].x;
@@ -1152,7 +1194,7 @@ void CharacterEditor::LayoutPreviewScatter()
     const int cellH = maxH + pad;
     const int jitter = std::max(2, pad / 3);
     const int span = jitter * 2 + 1;
-    for (size_t i = 0; i < previewSprites.size(); ++i)
+    for (std::size_t i = 0; i < previewSprites.size(); ++i)
     {
         const int col = static_cast<int>(i) % cols;
         const int row = static_cast<int>(i) / cols;
@@ -1171,10 +1213,10 @@ void CharacterEditor::LayoutPreviewSeparateOverlaps(int pad)
     for (int iter = 0; iter < 150; ++iter)
     {
         bool anyOverlap = false;
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
         {
             auto &a = previewSprites[i];
-            for (size_t j = i + 1; j < previewSprites.size(); ++j)
+            for (std::size_t j = i + 1; j < previewSprites.size(); ++j)
             {
                 auto &b = previewSprites[j];
                 const int ox1 = std::max(a.x, b.x);
@@ -1243,10 +1285,10 @@ void CharacterEditor::LayoutPreviewSeparateOverlaps(int pad)
     // Guaranteed fallback if dense clusters still have residual collisions after relaxation
     if (previewCollisionCount > 0)
     {
-        auto overlapsAny = [&](size_t idx, int x, int y) {
+        auto overlapsAny = [&](std::size_t idx, int x, int y) {
             const int w = previewSprites[idx].w;
             const int h = previewSprites[idx].h;
-            for (size_t k = 0; k < previewSprites.size(); ++k)
+            for (std::size_t k = 0; k < previewSprites.size(); ++k)
             {
                 if (k == idx)
                     continue;
@@ -1258,7 +1300,7 @@ void CharacterEditor::LayoutPreviewSeparateOverlaps(int pad)
             }
             return false;
         };
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
         {
             if (!previewSprites[i].colliding)
                 continue;
@@ -1292,15 +1334,15 @@ void CharacterEditor::LayoutPreviewSeparateOverlaps(int pad)
 
 void CharacterEditor::LayoutPreviewAlign(int mode)
 {
-    std::vector<size_t> indices;
-    for (size_t i = 0; i < previewSprites.size(); ++i)
+    std::vector<std::size_t> indices;
+    for (std::size_t i = 0; i < previewSprites.size(); ++i)
     {
         if (previewSprites[i].selected)
             indices.push_back(i);
     }
     if (indices.empty())
     {
-        for (size_t i = 0; i < previewSprites.size(); ++i)
+        for (std::size_t i = 0; i < previewSprites.size(); ++i)
             indices.push_back(i);
     }
     if (indices.empty())
@@ -1309,40 +1351,40 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
     if (mode == 0)
     { // Align Left
         int minX = previewSprites[indices[0]].x;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             minX = std::min(minX, previewSprites[idx].x);
         minX = std::max(0, minX);
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             previewSprites[idx].x = minX;
     }
     else if (mode == 1)
     { // Align Top
         int minY = previewSprites[indices[0]].y;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             minY = std::min(minY, previewSprites[idx].y);
         minY = std::max(0, minY);
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             previewSprites[idx].y = minY;
     }
     else if (mode == 2)
     { // Align Right
         int maxX = previewSprites[indices[0]].x + previewSprites[indices[0]].w;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             maxX = std::max(maxX, previewSprites[idx].x + previewSprites[idx].w);
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             previewSprites[idx].x = std::max(0, maxX - previewSprites[idx].w);
     }
     else if (mode == 3)
     { // Align Bottom
         int maxY = previewSprites[indices[0]].y + previewSprites[indices[0]].h;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             maxY = std::max(maxY, previewSprites[idx].y + previewSprites[idx].h);
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
             previewSprites[idx].y = std::max(0, maxY - previewSprites[idx].h);
     }
     else if (mode == 4 && indices.size() >= 2)
     { // Distribute H (accounting for sprite widths)
-        std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+        std::sort(indices.begin(), indices.end(), [&](std::size_t a, std::size_t b) {
             if (previewSprites[a].x != previewSprites[b].x)
                 return previewSprites[a].x < previewSprites[b].x;
             return previewSprites[a].id < previewSprites[b].id;
@@ -1350,7 +1392,7 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
         int minX = previewSprites[indices.front()].x;
         int maxRight = previewSprites[indices.front()].x + previewSprites[indices.front()].w;
         int totalW = 0;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
         {
             minX = std::min(minX, previewSprites[idx].x);
             maxRight = std::max(maxRight, previewSprites[idx].x + previewSprites[idx].w);
@@ -1361,7 +1403,7 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
                               ? static_cast<float>(span - totalW) / static_cast<float>(indices.size() - 1)
                               : static_cast<float>(previewPadding);
         float cursor = static_cast<float>(std::max(0, minX));
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
         {
             previewSprites[idx].x = static_cast<int>(std::round(cursor));
             cursor += static_cast<float>(previewSprites[idx].w) + gap;
@@ -1369,7 +1411,7 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
     }
     else if (mode == 5 && indices.size() >= 2)
     { // Distribute V (accounting for sprite heights)
-        std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+        std::sort(indices.begin(), indices.end(), [&](std::size_t a, std::size_t b) {
             if (previewSprites[a].y != previewSprites[b].y)
                 return previewSprites[a].y < previewSprites[b].y;
             return previewSprites[a].id < previewSprites[b].id;
@@ -1377,7 +1419,7 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
         int minY = previewSprites[indices.front()].y;
         int maxBottom = previewSprites[indices.front()].y + previewSprites[indices.front()].h;
         int totalH = 0;
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
         {
             minY = std::min(minY, previewSprites[idx].y);
             maxBottom = std::max(maxBottom, previewSprites[idx].y + previewSprites[idx].h);
@@ -1388,7 +1430,7 @@ void CharacterEditor::LayoutPreviewAlign(int mode)
                               ? static_cast<float>(span - totalH) / static_cast<float>(indices.size() - 1)
                               : static_cast<float>(previewPadding);
         float cursor = static_cast<float>(std::max(0, minY));
-        for (size_t idx : indices)
+        for (std::size_t idx : indices)
         {
             previewSprites[idx].y = static_cast<int>(std::round(cursor));
             cursor += static_cast<float>(previewSprites[idx].h) + gap;
@@ -1447,7 +1489,7 @@ bool CharacterEditor::ExportCurrentPreview(std::string &report)
     if (previewSourceMode == PreviewSourceMode::Object && previewForObject >= 0
         && previewForObject < static_cast<int>(spriteCatalog.Objects().size()))
     {
-        const SpriteObject &o = spriteCatalog.Objects()[static_cast<size_t>(previewForObject)];
+        const SpriteObject &o = spriteCatalog.Objects()[static_cast<std::size_t>(previewForObject)];
         std::string faction = o.faction;
         std::transform(
             faction.begin(), faction.end(), faction.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -1849,13 +1891,13 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     int hoveredGroupHeader = -1;
     if (previewShowObjectGroups && !previewSprites.empty())
     {
-        std::map<int, size_t> gMap;
+        std::map<int, std::size_t> gMap;
         for (const auto &s : previewSprites)
         {
             auto it = gMap.find(s.groupId);
             if (it == gMap.end())
             {
-                size_t idx = groupBounds.size();
+                std::size_t idx = groupBounds.size();
                 gMap[s.groupId] = idx;
                 GroupBounds gb;
                 gb.groupId = s.groupId;
@@ -1880,7 +1922,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
                     gb.anySelected = true;
             }
         }
-        for (size_t gi = 0; gi < groupBounds.size(); ++gi)
+        for (std::size_t gi = 0; gi < groupBounds.size(); ++gi)
         {
             auto &gb = groupBounds[gi];
             const ImVec2 g0(
@@ -1909,7 +1951,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     {
         for (int i = static_cast<int>(previewSprites.size()) - 1; i >= 0; --i)
         {
-            const auto &s = previewSprites[static_cast<size_t>(i)];
+            const auto &s = previewSprites[static_cast<std::size_t>(i)];
             if (mouseAtlasX >= s.x && mouseAtlasX <= s.x + s.w && mouseAtlasY >= s.y && mouseAtlasY <= s.y + s.h)
             {
                 hoveredIdx = i;
@@ -1921,7 +1963,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     // Double-click on a sprite selects all sprites of the same Object / group
     if (canvasHovered && hoveredIdx >= 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !isSpaceDown)
     {
-        const int targetGroup = previewSprites[static_cast<size_t>(hoveredIdx)].groupId;
+        const int targetGroup = previewSprites[static_cast<std::size_t>(hoveredIdx)].groupId;
         if (!io.KeyCtrl)
         {
             for (auto &s : previewSprites)
@@ -1944,14 +1986,14 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
             previewClickedIndex = -1;
             if (io.KeyCtrl)
             {
-                previewSprites[static_cast<size_t>(hoveredIdx)].selected
-                    = !previewSprites[static_cast<size_t>(hoveredIdx)].selected;
+                previewSprites[static_cast<std::size_t>(hoveredIdx)].selected
+                    = !previewSprites[static_cast<std::size_t>(hoveredIdx)].selected;
             }
-            else if (!previewSprites[static_cast<size_t>(hoveredIdx)].selected)
+            else if (!previewSprites[static_cast<std::size_t>(hoveredIdx)].selected)
             {
                 for (auto &s : previewSprites)
                     s.selected = false;
-                previewSprites[static_cast<size_t>(hoveredIdx)].selected = true;
+                previewSprites[static_cast<std::size_t>(hoveredIdx)].selected = true;
             }
             else
             {
@@ -1959,7 +2001,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
                 // one
                 previewClickedIndex = hoveredIdx;
             }
-            previewDragging = previewSprites[static_cast<size_t>(hoveredIdx)].selected;
+            previewDragging = previewSprites[static_cast<std::size_t>(hoveredIdx)].selected;
             previewDragMoved = false;
             previewDragStartMouse = io.MousePos;
             previewOriginalPositions.clear();
@@ -1973,7 +2015,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
         {
             // Clicking an Object group header selects all sprites of that object and allows dragging the whole object
             // at once
-            const int targetGroup = groupBounds[static_cast<size_t>(hoveredGroupHeader)].groupId;
+            const int targetGroup = groupBounds[static_cast<std::size_t>(hoveredGroupHeader)].groupId;
             if (!io.KeyCtrl)
             {
                 for (auto &s : previewSprites)
@@ -2024,7 +2066,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
             {
                 const float dx = rawDx / previewZoomLevel;
                 const float dy = rawDy / previewZoomLevel;
-                for (size_t i = 0; i < previewSprites.size(); ++i)
+                for (std::size_t i = 0; i < previewSprites.size(); ++i)
                 {
                     if (previewSprites[i].selected && i < previewOriginalPositions.size())
                     {
@@ -2049,7 +2091,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
             {
                 for (auto &s : previewSprites)
                     s.selected = false;
-                previewSprites[static_cast<size_t>(previewClickedIndex)].selected = true;
+                previewSprites[static_cast<std::size_t>(previewClickedIndex)].selected = true;
                 UpdatePreviewCollisions();
             }
             previewDragging = false;
@@ -2132,7 +2174,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     // Draw Object Group frames & clickable headers when "By Object" mode is active
     if (previewShowObjectGroups && !groupBounds.empty())
     {
-        for (size_t gi = 0; gi < groupBounds.size(); ++gi)
+        for (std::size_t gi = 0; gi < groupBounds.size(); ++gi)
         {
             const auto &gb = groupBounds[gi];
             const ImVec2 g0(
@@ -2166,7 +2208,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     }
 
     // Draw Sprites
-    for (size_t i = 0; i < previewSprites.size(); ++i)
+    for (std::size_t i = 0; i < previewSprites.size(); ++i)
     {
         const auto &s = previewSprites[i];
         const ImVec2 sp0(
@@ -2244,7 +2286,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     // Tooltip for hovered sprite or hovered object group header
     if (hoveredIdx >= 0 && hoveredIdx < static_cast<int>(previewSprites.size()))
     {
-        const auto &s = previewSprites[static_cast<size_t>(hoveredIdx)];
+        const auto &s = previewSprites[static_cast<std::size_t>(hoveredIdx)];
         ImGui::BeginTooltip();
         ImGui::Text("Sprite #%d (Sheet %02d)", s.id, s.page);
         if (!s.groupLabel.empty())
@@ -2263,7 +2305,7 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     }
     else if (hoveredGroupHeader >= 0 && hoveredGroupHeader < static_cast<int>(groupBounds.size()))
     {
-        const auto &gb = groupBounds[static_cast<size_t>(hoveredGroupHeader)];
+        const auto &gb = groupBounds[static_cast<std::size_t>(hoveredGroupHeader)];
         ImGui::BeginTooltip();
         ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "%s", gb.label.c_str());
         ImGui::Text(_("Sprites: %d | Bounds: (%d, %d) - (%d, %d)"), gb.count, gb.minX, gb.minY, gb.maxX, gb.maxY);
@@ -2280,7 +2322,7 @@ void CharacterEditor::DrawLoadedSprites()
     if (!spriteCatalogOk)
         return;
 
-    const auto &allSprites = spriteCatalog.Sprites();
+    auto &allSprites = spriteCatalog.SpritesMut();
     const auto &objects = spriteCatalog.Objects();
 
     // Helper lambda to scan an export/import folder for external sprite mappings
@@ -2361,6 +2403,21 @@ void CharacterEditor::DrawLoadedSprites()
     {
         ImGui::SetTooltip(
             "%s", _("Scans JSON files in the Import/Output folder to show external atlas file mappings per sprite."));
+    }
+    if (spritesJsonDirty)
+    {
+        ImGui::SameLine(0.0f, 25.0f);
+        ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.2f, 1.0f), "%s", _("● sprites.json modified"));
+        ImGui::SameLine();
+        if (ImGui::Button(_("Save sprites.json##banner")))
+        {
+            SaveSpritesJson();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(_("Revert##banner")))
+        {
+            RevertSpritesJson();
+        }
     }
     ImGui::Text(_("• Rect Definitions: %s (%zu sprites)"), spritesJsonPath.generic_string().c_str(), allSprites.size());
     ImGui::SameLine(0.0f, 18.0f);
@@ -2478,7 +2535,7 @@ void CharacterEditor::DrawLoadedSprites()
         {
             if (oi >= 0 && oi < static_cast<int>(objects.size()))
             {
-                const auto &o = objects[static_cast<size_t>(oi)];
+                const auto &o = objects[static_cast<std::size_t>(oi)];
                 allowedByObject.insert(o.sprites.begin(), o.sprites.end());
             }
         }
@@ -2512,11 +2569,11 @@ void CharacterEditor::DrawLoadedSprites()
                               + SpriteGroupName(spriteCatalog.GroupOfSprite(s.id));
             if (s.id >= 0 && s.id < static_cast<int>(spriteToObjects.size()))
             {
-                for (int oi : spriteToObjects[static_cast<size_t>(s.id)])
+                for (int oi : spriteToObjects[static_cast<std::size_t>(s.id)])
                 {
                     if (oi >= 0 && oi < static_cast<int>(objects.size()))
                     {
-                        hay += " " + objects[static_cast<size_t>(oi)].name;
+                        hay += " " + objects[static_cast<std::size_t>(oi)].name;
                     }
                 }
             }
@@ -2542,7 +2599,7 @@ void CharacterEditor::DrawLoadedSprites()
     if (loadedSpritesShowSheetMap && loadedSpriteSelectedId >= 0
         && loadedSpriteSelectedId < static_cast<int>(allSprites.size()))
     {
-        const RawSprite &sel = allSprites[static_cast<size_t>(loadedSpriteSelectedId)];
+        RawSprite &sel = allSprites[static_cast<std::size_t>(loadedSpriteSelectedId)];
         SDL_Texture *sheetTex = textures ? textures->GetSpriteSheet(sel.page) : nullptr;
         float tw = 1.0f, th = 1.0f;
         if (sheetTex)
@@ -2582,15 +2639,15 @@ void CharacterEditor::DrawLoadedSprites()
             tw,
             th);
         if (sel.id >= 0 && sel.id < static_cast<int>(spriteToObjects.size())
-            && !spriteToObjects[static_cast<size_t>(sel.id)].empty())
+            && !spriteToObjects[static_cast<std::size_t>(sel.id)].empty())
         {
             std::string usedStr;
-            const auto &uList = spriteToObjects[static_cast<size_t>(sel.id)];
-            for (size_t k = 0; k < uList.size() && k < 6; ++k)
+            const auto &uList = spriteToObjects[static_cast<std::size_t>(sel.id)];
+            for (std::size_t k = 0; k < uList.size() && k < 6; ++k)
             {
                 if (k > 0)
                     usedStr += ", ";
-                const auto &o = objects[static_cast<size_t>(uList[k])];
+                const auto &o = objects[static_cast<std::size_t>(uList[k])];
                 usedStr += "[#" + std::to_string(o.id) + "] " + o.name;
             }
             if (uList.size() > 6)
@@ -2600,6 +2657,33 @@ void CharacterEditor::DrawLoadedSprites()
         else
         {
             ImGui::TextDisabled("%s", _("Used by: Unreferenced / Misc raw sprite"));
+        }
+        ImGui::EndGroup();
+
+        ImGui::SameLine(0.0f, 15.0f);
+        ImGui::BeginGroup();
+        ImGui::Text("%s", _("Position:"));
+        ImGui::SameLine();
+        if (ImGui::Button("-1##ls_x")) { sel.x = std::max(0, sel.x - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60.0f);
+        if (ImGui::InputInt("##ls_xv", &sel.x, 0)) { sel.x = std::max(0, sel.x); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##ls_x")) { sel.x += 1; OnSpriteModified(sel); }
+        ImGui::SameLine(0.0f, 10.0f);
+        if (ImGui::Button("-1##ls_y")) { sel.y = std::max(0, sel.y - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60.0f);
+        if (ImGui::InputInt("##ls_yv", &sel.y, 0)) { sel.y = std::max(0, sel.y); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##ls_y")) { sel.y += 1; OnSpriteModified(sel); }
+        if (spritesJsonDirty)
+        {
+            ImGui::SameLine(0.0f, 15.0f);
+            if (ImGui::Button(_("Save sprites.json##ls")))
+            {
+                SaveSpritesJson();
+            }
         }
         ImGui::EndGroup();
 
@@ -2659,10 +2743,10 @@ void CharacterEditor::DrawLoadedSprites()
                     ImGui::SetTooltip(
                         "Sprite #%d (%dx%d at %d,%d) — Click to inspect",
                         hoveredSprite,
-                        allSprites[static_cast<size_t>(hoveredSprite)].w,
-                        allSprites[static_cast<size_t>(hoveredSprite)].h,
-                        allSprites[static_cast<size_t>(hoveredSprite)].x,
-                        allSprites[static_cast<size_t>(hoveredSprite)].y);
+                        allSprites[static_cast<std::size_t>(hoveredSprite)].w,
+                        allSprites[static_cast<std::size_t>(hoveredSprite)].h,
+                        allSprites[static_cast<std::size_t>(hoveredSprite)].x,
+                        allSprites[static_cast<std::size_t>(hoveredSprite)].y);
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                     {
                         loadedSpriteSelectedId = hoveredSprite;
@@ -2701,8 +2785,8 @@ void CharacterEditor::DrawLoadedSprites()
         {
             for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
             {
-                const int sid = filteredIds[static_cast<size_t>(row)];
-                const RawSprite &s = allSprites[static_cast<size_t>(sid)];
+                const int sid = filteredIds[static_cast<std::size_t>(row)];
+                const RawSprite &s = allSprites[static_cast<std::size_t>(sid)];
                 const bool isSelected = (sid == loadedSpriteSelectedId);
 
                 ImGui::TableNextRow(ImGuiTableRowFlags_None, 34.0f);
@@ -2773,16 +2857,16 @@ void CharacterEditor::DrawLoadedSprites()
                 // Col 5: Used By Objects
                 ImGui::TableSetColumnIndex(5);
                 if (sid >= 0 && sid < static_cast<int>(spriteToObjects.size())
-                    && !spriteToObjects[static_cast<size_t>(sid)].empty())
+                    && !spriteToObjects[static_cast<std::size_t>(sid)].empty())
                 {
-                    const auto &uList = spriteToObjects[static_cast<size_t>(sid)];
-                    const size_t maxBadges = std::min<size_t>(uList.size(), 3);
-                    for (size_t k = 0; k < maxBadges; ++k)
+                    const auto &uList = spriteToObjects[static_cast<std::size_t>(sid)];
+                    const std::size_t maxBadges = std::min<std::size_t>(uList.size(), 3);
+                    for (std::size_t k = 0; k < maxBadges; ++k)
                     {
                         if (k > 0)
                             ImGui::SameLine();
                         const int oi = uList[k];
-                        const auto &o = objects[static_cast<size_t>(oi)];
+                        const auto &o = objects[static_cast<std::size_t>(oi)];
                         const std::string btnLbl = (o.kind == SpriteObjectKind::Unit       ? "[#"
                                                     : o.kind == SpriteObjectKind::Building ? "[B#"
                                                                                            : "[")
@@ -2813,6 +2897,857 @@ void CharacterEditor::DrawLoadedSprites()
         }
         ImGui::EndTable();
     }
+}
+
+int CharacterEditor::FindSpriteObjectForActiveCharacter() const
+{
+    if (!document.IsDefined())
+        return -1;
+    const auto &objs = spriteCatalog.Objects();
+    const std::string type = YamlString(document, "type", "");
+    const bool isBuilding = (type == "building");
+    const int numId = isBuilding ? YamlInt(document, "building_index", -1) : YamlInt(document, "archetype_id", -1);
+    const std::string name = YamlString(document, "name", "");
+
+    if (numId >= 0)
+    {
+        for (std::size_t i = 0; i < objs.size(); ++i)
+        {
+            if (isBuilding && objs[i].kind == SpriteObjectKind::Building && objs[i].id == numId)
+                return static_cast<int>(i);
+            if (!isBuilding && objs[i].kind == SpriteObjectKind::Unit && objs[i].id == numId)
+                return static_cast<int>(i);
+        }
+    }
+    if (!name.empty())
+    {
+        for (std::size_t i = 0; i < objs.size(); ++i)
+        {
+            if (objs[i].name == name)
+                return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+void CharacterEditor::SyncSpriteObjectFromActive()
+{
+    EnsureSpriteCatalog();
+    if (!spriteCatalogOk)
+        return;
+    int objIdx = FindSpriteObjectForActiveCharacter();
+    if (objIdx >= 0)
+    {
+        spriteSelected = objIdx;
+        spriteChecked.clear();
+        spriteChecked.insert(objIdx);
+        spriteAnchor = objIdx;
+        OnSpriteObjectSelected(objIdx);
+    }
+}
+
+void CharacterEditor::OnSpriteObjectSelected(int objIdx)
+{
+    if (objIdx < 0 || objIdx >= static_cast<int>(spriteCatalog.Objects().size()))
+        return;
+    const auto &o = spriteCatalog.Objects()[static_cast<std::size_t>(objIdx)];
+    if (!o.sprites.empty())
+    {
+        if (pointEditorSpriteId < 0 || o.sprites.count(pointEditorSpriteId) == 0)
+        {
+            pointEditorSpriteId = *o.sprites.begin();
+        }
+        loadedSpriteSelectedId = pointEditorSpriteId;
+        loadedSpritesScope = 1; // Filter loaded sprites to selected object
+        pointEditorFramedSpriteId = -1;
+    }
+}
+
+void CharacterEditor::OnSpriteModified(const RawSprite &s)
+{
+    if (textures)
+    {
+        textures->UpdateSpriteFrame(s.id, s.page, s.x, s.y, s.w, s.h, s.palette);
+    }
+    spritesJsonDirty = true;
+}
+
+bool CharacterEditor::SaveSpritesJson()
+{
+    EnsureSpriteCatalog();
+    std::string err;
+    if (spriteCatalog.SaveSpritesJson(assetsRoot, err))
+    {
+        spritesJsonDirty = false;
+        status = _("Saved to assets/characters/sprites.json");
+        return true;
+    }
+    else
+    {
+        status = std::string(_("Failed to save sprites.json: ")) + err;
+        return false;
+    }
+}
+
+bool CharacterEditor::RevertSpritesJson()
+{
+    EnsureSpriteCatalog();
+    std::string err;
+    if (spriteCatalog.ReloadSpritesJson(assetsRoot, err))
+    {
+        SyncTextureFramesFromCatalog();
+        spritesJsonDirty = false;
+        status = _("Reverted sprites.json from disk.");
+        return true;
+    }
+    else
+    {
+        status = std::string(_("Failed to reload sprites.json: ")) + err;
+        return false;
+    }
+}
+
+void CharacterEditor::SyncTextureFramesFromCatalog()
+{
+    if (!textures)
+        return;
+    const auto &sprites = spriteCatalog.Sprites();
+    for (const auto &s : sprites)
+    {
+        textures->UpdateSpriteFrame(s.id, s.page, s.x, s.y, s.w, s.h, s.palette);
+    }
+}
+
+void CharacterEditor::DrawPointEditor()
+{
+    EnsureSpriteCatalog();
+    if (!spriteCatalogOk)
+    {
+        ImGui::TextWrapped(
+            "%s", spriteReport.empty() ? _("The sprite data could not be loaded.") : spriteReport.c_str());
+        return;
+    }
+    const auto &objects = spriteCatalog.Objects();
+    if (spriteSelected < 0 || spriteSelected >= static_cast<int>(objects.size()))
+    {
+        ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "%s", _("Point Editor"));
+        ImGui::TextWrapped(
+            "%s",
+            _("Select an object from the left panel (character / building) or from the Sprite Tools list to inspect and edit its sprites."));
+        return;
+    }
+
+    const SpriteObject &obj = objects[static_cast<std::size_t>(spriteSelected)];
+    auto &allSprites = spriteCatalog.SpritesMut();
+
+    // 1. Top Control Bar
+    const std::string objTag = (obj.kind == SpriteObjectKind::Unit ? "[#" : obj.kind == SpriteObjectKind::Building ? "[B#" : "[")
+                               + std::to_string(obj.id) + "] " + obj.name;
+    ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.30f, 1.0f), "%s", objTag.c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%s / %s, %zu sprites)", obj.faction.c_str(), obj.kindName.c_str(), obj.sprites.size());
+
+    ImGui::SameLine(0.0f, 20.0f);
+    if (spritesJsonDirty)
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.20f, 1.0f), "%s", _("● Unsaved changes"));
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.60f, 0.35f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.75f, 0.44f, 1.0f));
+        if (Hinted(ImGui::Button(_("Save (sprites.json)"), ImVec2(150.0f, 24.0f)), "Save sprites.json"))
+        {
+            SaveSpritesJson();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Revert"), ImVec2(80.0f, 24.0f)), "Revert sprites.json"))
+        {
+            RevertSpritesJson();
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled("%s", _("✔ sprites.json up to date"));
+        ImGui::SameLine();
+        ImGui::BeginDisabled(true);
+        ImGui::Button(_("Save (sprites.json)"), ImVec2(150.0f, 24.0f));
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine(0.0f, 15.0f);
+    if (ImGui::Button(_("Shift All Sprites...")))
+    {
+        ImGui::OpenPopup("ShiftAllSpritesPopup");
+    }
+    if (ImGui::BeginPopup("ShiftAllSpritesPopup"))
+    {
+        ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "%s", _("Shift All Sprites of Object"));
+        ImGui::TextDisabled(_("Offsets (x, y) for all %zu sprites of %s:"), obj.sprites.size(), obj.name.c_str());
+        ImGui::SetNextItemWidth(100.0f);
+        ImGui::InputInt(_("ΔX (px)"), &pointEditorShiftAllDx);
+        ImGui::SetNextItemWidth(100.0f);
+        ImGui::InputInt(_("ΔY (px)"), &pointEditorShiftAllDy);
+        if (ImGui::Button(_("Apply Shift")) && (pointEditorShiftAllDx != 0 || pointEditorShiftAllDy != 0))
+        {
+            for (int sid : obj.sprites)
+            {
+                if (sid >= 0 && sid < static_cast<int>(allSprites.size()))
+                {
+                    RawSprite &curS = allSprites[static_cast<std::size_t>(sid)];
+                    curS.x = std::max(0, curS.x + pointEditorShiftAllDx);
+                    curS.y = std::max(0, curS.y + pointEditorShiftAllDy);
+                    OnSpriteModified(curS);
+                }
+            }
+            pointEditorShiftAllDx = 0;
+            pointEditorShiftAllDy = 0;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(_("Cancel")))
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    if (obj.sprites.empty())
+    {
+        ImGui::TextDisabled("%s", _("This object does not reference any sprites directly."));
+        return;
+    }
+
+    std::vector<int> sortedObjSprites(obj.sprites.begin(), obj.sprites.end());
+    if (pointEditorSpriteId < 0 || obj.sprites.count(pointEditorSpriteId) == 0)
+    {
+        pointEditorSpriteId = sortedObjSprites.front();
+        loadedSpriteSelectedId = pointEditorSpriteId;
+    }
+
+    // 2. Left Subpanel: List of Sprites belonging to this Object
+    const float leftColW = 270.0f;
+    ImGui::BeginChild("point-editor-sprite-list", ImVec2(leftColW, 0.0f), true);
+
+    auto itCur = std::find(sortedObjSprites.begin(), sortedObjSprites.end(), pointEditorSpriteId);
+    int curPos = (itCur != sortedObjSprites.end()) ? static_cast<int>(itCur - sortedObjSprites.begin()) : 0;
+    ImGui::BeginDisabled(curPos <= 0);
+    if (ImGui::SmallButton("◄"))
+    {
+        if (curPos > 0)
+        {
+            pointEditorSpriteId = sortedObjSprites[static_cast<std::size_t>(curPos - 1)];
+            loadedSpriteSelectedId = pointEditorSpriteId;
+        }
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::Text("%d / %zu", curPos + 1, sortedObjSprites.size());
+    ImGui::SameLine();
+    ImGui::BeginDisabled(curPos + 1 >= static_cast<int>(sortedObjSprites.size()));
+    if (ImGui::SmallButton("►"))
+    {
+        if (curPos + 1 < static_cast<int>(sortedObjSprites.size()))
+        {
+            pointEditorSpriteId = sortedObjSprites[static_cast<std::size_t>(curPos + 1)];
+            loadedSpriteSelectedId = pointEditorSpriteId;
+        }
+    }
+    ImGui::EndDisabled();
+    ImGui::Separator();
+
+    for (int sid : sortedObjSprites)
+    {
+        if (sid < 0 || sid >= static_cast<int>(allSprites.size()))
+            continue;
+        const RawSprite &s = allSprites[static_cast<std::size_t>(sid)];
+        const bool isSelected = (sid == pointEditorSpriteId);
+        ImGui::PushID(sid);
+
+        constexpr float rowHeight = 36.0f;
+        if (ImGui::Selectable("##srow", isSelected, 0, ImVec2(0.0f, rowHeight)))
+        {
+            pointEditorSpriteId = sid;
+            loadedSpriteSelectedId = sid;
+        }
+        const ImVec2 rMin = ImGui::GetItemRectMin();
+        DrawSpriteImageAt(ImVec2(rMin.x + 2.0f, rMin.y + 2.0f), sid, 32.0f);
+        ImDrawList *dl = ImGui::GetWindowDrawList();
+        char line1[48];
+        std::snprintf(line1, sizeof(line1), "Sprite #%d", sid);
+        dl->AddText(
+            ImVec2(rMin.x + 38.0f, rMin.y + 2.0f),
+            isSelected ? IM_COL32(255, 230, 80, 255) : IM_COL32(230, 235, 230, 255),
+            line1);
+        char line2[48];
+        std::snprintf(line2, sizeof(line2), "P%d: (%d, %d) %dx%d", s.page, s.x, s.y, s.w, s.h);
+        dl->AddText(ImVec2(rMin.x + 38.0f, rMin.y + 18.0f), IM_COL32(145, 175, 165, 255), line2);
+
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+
+    // 3. Right Subpanel: Coordinate Controls & Interactive Sheet Map for Selected Sprite
+    ImGui::BeginChild("point-editor-detail", ImVec2(0.0f, 0.0f), true);
+
+    if (pointEditorSpriteId >= 0 && pointEditorSpriteId < static_cast<int>(allSprites.size()))
+    {
+        RawSprite &sel = allSprites[static_cast<std::size_t>(pointEditorSpriteId)];
+        const float sheetScale = textures ? textures->GetSheetScale(sel.page) : 1.0f;
+        SDL_Texture *sheetTex = textures ? textures->GetSpriteSheet(sel.page) : nullptr;
+        float tw = 1.0f, th = 1.0f;
+        if (sheetTex)
+            SDL_GetTextureSize(sheetTex, &tw, &th);
+
+        ImGui::BeginGroup();
+        const ImVec2 thumbPos = ImGui::GetCursorScreenPos();
+        constexpr float thumbBox = 76.0f;
+        DrawSpriteImage(sel.id, thumbBox);
+        ImGui::SetCursorScreenPos(thumbPos);
+        ImGui::InvisibleButton("##sprite_thumb_drag", ImVec2(thumbBox, thumbBox));
+        const bool thumbHovered = ImGui::IsItemHovered();
+        const bool thumbActive = ImGui::IsItemActive();
+        if (thumbHovered && ImGui::GetIO().MouseWheel != 0.0f)
+        {
+            const float factor = (ImGui::GetIO().MouseWheel > 0.0f) ? 1.25f : 0.8f;
+            pointEditorZoom = std::clamp(pointEditorZoom * factor, 0.15f, 24.0f);
+        }
+        if (thumbActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+        {
+            const ImVec2 delta = ImGui::GetIO().MouseDelta;
+            if (std::abs(delta.x) >= 1.0f || std::abs(delta.y) >= 1.0f)
+            {
+                sel.x = std::max(0, sel.x + static_cast<int>(std::round(delta.x)));
+                sel.y = std::max(0, sel.y + static_cast<int>(std::round(delta.y)));
+                OnSpriteModified(sel);
+            }
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        }
+        if (thumbHovered)
+        {
+            ImGui::SetTooltip(_("Sprite #%d\nLMB + Drag: adjust (x, y)\nMouse Wheel: zoom sheet (%.0f%%)"), sel.id, pointEditorZoom * 100.0f);
+        }
+        ImGui::EndGroup();
+
+        ImGui::SameLine(0.0f, 15.0f);
+        ImGui::BeginGroup();
+        char headerText[96];
+        std::snprintf(
+            headerText, sizeof(headerText), "Sprite #%d  —  sheet_%02d.png (Page %d)", sel.id, sel.page, sel.page);
+        ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.30f, 1.0f), "%s", headerText);
+
+        // Position X Controls
+        ImGui::Text("%s", _("Position X:"));
+        ImGui::SameLine(95.0f);
+        if (ImGui::Button("-10##px")) { sel.x = std::max(0, sel.x - 10); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("-1##px")) { sel.x = std::max(0, sel.x - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(75.0f);
+        if (ImGui::InputInt("##val_px", &sel.x, 0)) { sel.x = std::max(0, sel.x); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##px")) { sel.x += 1; OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+10##px")) { sel.x += 10; OnSpriteModified(sel); }
+
+        // Position Y Controls
+        ImGui::Text("%s", _("Position Y:"));
+        ImGui::SameLine(95.0f);
+        if (ImGui::Button("-10##py")) { sel.y = std::max(0, sel.y - 10); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("-1##py")) { sel.y = std::max(0, sel.y - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(75.0f);
+        if (ImGui::InputInt("##val_py", &sel.y, 0)) { sel.y = std::max(0, sel.y); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##py")) { sel.y += 1; OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+10##py")) { sel.y += 10; OnSpriteModified(sel); }
+
+        // Size W x H Controls
+        ImGui::Text("%s", _("Size (WxH):"));
+        ImGui::SameLine(95.0f);
+        if (ImGui::Button("-1##pw")) { sel.w = std::max(1, sel.w - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(55.0f);
+        if (ImGui::InputInt("##val_pw", &sel.w, 0)) { sel.w = std::max(1, sel.w); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##pw")) { sel.w += 1; OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::Text("x");
+        ImGui::SameLine();
+        if (ImGui::Button("-1##ph")) { sel.h = std::max(1, sel.h - 1); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(55.0f);
+        if (ImGui::InputInt("##val_ph", &sel.h, 0)) { sel.h = std::max(1, sel.h); OnSpriteModified(sel); }
+        ImGui::SameLine();
+        if (ImGui::Button("+1##ph")) { sel.h += 1; OnSpriteModified(sel); }
+        ImGui::EndGroup();
+
+        ImGui::SameLine(0.0f, 25.0f);
+        // Nudge D-Pad
+        ImGui::BeginGroup();
+        ImGui::TextDisabled("%s", _("Nudge:"));
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 26.0f);
+        if (ImGui::Button("▲##nudge_up", ImVec2(24.0f, 22.0f)))
+        {
+            sel.y = std::max(0, sel.y - pointEditorNudgeStep);
+            OnSpriteModified(sel);
+        }
+        if (ImGui::Button("◄##nudge_l", ImVec2(24.0f, 22.0f)))
+        {
+            sel.x = std::max(0, sel.x - pointEditorNudgeStep);
+            OnSpriteModified(sel);
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%d", pointEditorNudgeStep);
+        ImGui::SameLine();
+        if (ImGui::Button("►##nudge_r", ImVec2(24.0f, 22.0f)))
+        {
+            sel.x += pointEditorNudgeStep;
+            OnSpriteModified(sel);
+        }
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 26.0f);
+        if (ImGui::Button("▼##nudge_dn", ImVec2(24.0f, 22.0f)))
+        {
+            sel.y += pointEditorNudgeStep;
+            OnSpriteModified(sel);
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 2.0f));
+        if (ImGui::RadioButton("1px", pointEditorNudgeStep == 1)) pointEditorNudgeStep = 1;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("5px", pointEditorNudgeStep == 5)) pointEditorNudgeStep = 5;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("10px", pointEditorNudgeStep == 10)) pointEditorNudgeStep = 10;
+        ImGui::PopStyleVar();
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+        ImGui::Separator();
+
+        // Canvas Toolbar
+        if (Hinted(ImGui::SmallButton(_("Focus Sprite")), "Focus Sprite"))
+        {
+            pointEditorFramedSpriteId = -1; // triggers auto-focus
+        }
+        ImGui::SameLine();
+        if (Hinted(ImGui::SmallButton(_("Fit Sheet")), "Fit Sheet"))
+        {
+            const ImVec2 avail = ImGui::GetContentRegionAvail();
+            const float fit = std::min(avail.x / tw, (avail.y - 10.0f) / th);
+            pointEditorZoom = std::max(0.1f, fit);
+            pointEditorPan = ImVec2(0.0f, 0.0f);
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("100%")) { pointEditorZoom = 1.0f; }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("200%")) { pointEditorZoom = 2.0f; }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("400%")) { pointEditorZoom = 4.0f; }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("-##zm")) { pointEditorZoom = std::max(0.2f, pointEditorZoom / 1.25f); }
+        ImGui::SameLine();
+        ImGui::Text("%.0f%%", pointEditorZoom * 100.0f);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("+##zm")) { pointEditorZoom = std::min(24.0f, pointEditorZoom * 1.25f); }
+        ImGui::SameLine();
+        ImGui::Checkbox(_("Grid"), &pointEditorShowGrid);
+        ImGui::SameLine(0.0f, 15.0f);
+        ImGui::TextDisabled("%s", _("LMB: Move / Resize | Wheel: Zoom | MMB / Space+Drag: Pan"));
+
+        // Interactive Sheet Canvas
+        if (sheetTex && tw > 0.0f && th > 0.0f)
+        {
+            const ImVec2 avail = ImGui::GetContentRegionAvail();
+            const float canvasW = std::max(100.0f, avail.x);
+            const float canvasH = std::max(150.0f, avail.y - 6.0f);
+            const ImVec2 canvasSize(canvasW, canvasH);
+
+            if (pointEditorFramedSpriteId != sel.id)
+            {
+                pointEditorFramedSpriteId = sel.id;
+                const float targetW = static_cast<float>(std::max(16, sel.w));
+                const float targetH = static_cast<float>(std::max(16, sel.h));
+                const float idealZoom = std::clamp(std::min(canvasW * 0.40f / targetW, canvasH * 0.40f / targetH), 1.5f, 8.0f);
+                pointEditorZoom = std::round(idealZoom);
+                if (pointEditorZoom < 1.0f)
+                    pointEditorZoom = idealZoom;
+                const float cx = sel.x + sel.w * 0.5f;
+                const float cy = sel.y + sel.h * 0.5f;
+                pointEditorPan.x = canvasW * 0.5f - cx * sheetScale * pointEditorZoom;
+                pointEditorPan.y = canvasH * 0.5f - cy * sheetScale * pointEditorZoom;
+            }
+
+            const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
+            const ImVec2 canvasMax(canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y);
+
+            ImGui::InvisibleButton(
+                "##sheet_canvas_interactive",
+                canvasSize,
+                ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+
+            const bool isHovered = ImGui::IsItemHovered();
+            const bool isActive = ImGui::IsItemActive();
+            const ImGuiIO &io = ImGui::GetIO();
+            const ImVec2 mp = io.MousePos;
+
+            // Texture coordinates under mouse cursor
+            const float mouseSheetX = (mp.x - canvasMin.x - pointEditorPan.x) / (sheetScale * pointEditorZoom);
+            const float mouseSheetY = (mp.y - canvasMin.y - pointEditorPan.y) / (sheetScale * pointEditorZoom);
+
+            // 1. Zoom with Mouse Wheel (anchored around mouse pointer)
+            if (isHovered && io.MouseWheel != 0.0f)
+            {
+                const float factor = (io.MouseWheel > 0.0f) ? 1.25f : 0.8f;
+                const float newZoom = std::clamp(pointEditorZoom * factor, 0.15f, 24.0f);
+                if (newZoom != pointEditorZoom)
+                {
+                    const float relX = mp.x - canvasMin.x;
+                    const float relY = mp.y - canvasMin.y;
+                    pointEditorPan.x = relX - mouseSheetX * sheetScale * newZoom;
+                    pointEditorPan.y = relY - mouseSheetY * sheetScale * newZoom;
+                    pointEditorZoom = newZoom;
+                }
+            }
+
+            // 2. Pan with MMB, RMB, or Space + LMB drag
+            const bool isPanning = isActive && (
+                ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)
+                || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)
+                || (ImGui::IsKeyDown(ImGuiKey_Space) && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)));
+
+            if (isPanning)
+            {
+                pointEditorPan.x += io.MouseDelta.x;
+                pointEditorPan.y += io.MouseDelta.y;
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+            }
+
+            // Sprite coordinates on screen
+            const ImVec2 sr0(
+                canvasMin.x + pointEditorPan.x + sel.x * sheetScale * pointEditorZoom,
+                canvasMin.y + pointEditorPan.y + sel.y * sheetScale * pointEditorZoom);
+            const ImVec2 sr1(
+                sr0.x + sel.w * sheetScale * pointEditorZoom,
+                sr0.y + sel.h * sheetScale * pointEditorZoom);
+
+            const float hTol = 7.0f; // handle hover radius in screen pixels
+            auto nearPt = [&](const ImVec2 &pt) {
+                return std::abs(mp.x - pt.x) <= hTol && std::abs(mp.y - pt.y) <= hTol;
+            };
+
+            const ImVec2 ptNW(sr0.x, sr0.y);
+            const ImVec2 ptNE(sr1.x, sr0.y);
+            const ImVec2 ptSW(sr0.x, sr1.y);
+            const ImVec2 ptSE(sr1.x, sr1.y);
+            const ImVec2 ptN(0.5f * (sr0.x + sr1.x), sr0.y);
+            const ImVec2 ptS(0.5f * (sr0.x + sr1.x), sr1.y);
+            const ImVec2 ptW(sr0.x, 0.5f * (sr0.y + sr1.y));
+            const ImVec2 ptE(sr1.x, 0.5f * (sr0.y + sr1.y));
+
+            // Mouse cursor on hover
+            if (!isPanning && pointEditorDragMode == PointEditorDragMode::None && isHovered)
+            {
+                if (nearPt(ptNW) || nearPt(ptSE))
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+                else if (nearPt(ptNE) || nearPt(ptSW))
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
+                else if (nearPt(ptN) || nearPt(ptS) || (mp.x >= sr0.x && mp.x <= sr1.x && (std::abs(mp.y - sr0.y) <= hTol || std::abs(mp.y - sr1.y) <= hTol)))
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                else if (nearPt(ptW) || nearPt(ptE) || (mp.y >= sr0.y && mp.y <= sr1.y && (std::abs(mp.x - sr0.x) <= hTol || std::abs(mp.x - sr1.x) <= hTol)))
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                else if (mp.x >= sr0.x && mp.x <= sr1.x && mp.y >= sr0.y && mp.y <= sr1.y)
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+            }
+
+            // Mouse click start
+            if (!isPanning && isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsKeyDown(ImGuiKey_Space))
+            {
+                pointEditorDragStartMouse = mp;
+                pointEditorOrigX = sel.x;
+                pointEditorOrigY = sel.y;
+                pointEditorOrigW = sel.w;
+                pointEditorOrigH = sel.h;
+
+                if (nearPt(ptNW))
+                    pointEditorDragMode = PointEditorDragMode::ResizeNW;
+                else if (nearPt(ptNE))
+                    pointEditorDragMode = PointEditorDragMode::ResizeNE;
+                else if (nearPt(ptSW))
+                    pointEditorDragMode = PointEditorDragMode::ResizeSW;
+                else if (nearPt(ptSE))
+                    pointEditorDragMode = PointEditorDragMode::ResizeSE;
+                else if (nearPt(ptN) || (mp.x >= sr0.x && mp.x <= sr1.x && std::abs(mp.y - sr0.y) <= hTol))
+                    pointEditorDragMode = PointEditorDragMode::ResizeN;
+                else if (nearPt(ptS) || (mp.x >= sr0.x && mp.x <= sr1.x && std::abs(mp.y - sr1.y) <= hTol))
+                    pointEditorDragMode = PointEditorDragMode::ResizeS;
+                else if (nearPt(ptW) || (mp.y >= sr0.y && mp.y <= sr1.y && std::abs(mp.x - sr0.x) <= hTol))
+                    pointEditorDragMode = PointEditorDragMode::ResizeW;
+                else if (nearPt(ptE) || (mp.y >= sr0.y && mp.y <= sr1.y && std::abs(mp.x - sr1.x) <= hTol))
+                    pointEditorDragMode = PointEditorDragMode::ResizeE;
+                else if (mp.x >= sr0.x && mp.x <= sr1.x && mp.y >= sr0.y && mp.y <= sr1.y)
+                    pointEditorDragMode = PointEditorDragMode::MoveRect;
+                else
+                {
+                    // Check if clicked another sprite on this page
+                    int clickedSpriteId = -1;
+                    for (int sid : obj.sprites)
+                    {
+                        if (sid < 0 || sid >= static_cast<int>(allSprites.size()) || sid == sel.id)
+                            continue;
+                        const RawSprite &other = allSprites[static_cast<std::size_t>(sid)];
+                        if (other.page == sel.page && mouseSheetX >= other.x && mouseSheetX <= other.x + other.w
+                            && mouseSheetY >= other.y && mouseSheetY <= other.y + other.h)
+                        {
+                            clickedSpriteId = sid;
+                            break;
+                        }
+                    }
+                    if (clickedSpriteId < 0)
+                    {
+                        for (const RawSprite &other : allSprites)
+                        {
+                            if (other.page == sel.page && other.id != sel.id
+                                && mouseSheetX >= other.x && mouseSheetX <= other.x + other.w
+                                && mouseSheetY >= other.y && mouseSheetY <= other.y + other.h)
+                            {
+                                clickedSpriteId = other.id;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (clickedSpriteId >= 0)
+                    {
+                        pointEditorSpriteId = clickedSpriteId;
+                        loadedSpriteSelectedId = clickedSpriteId;
+                        pointEditorDragMode = PointEditorDragMode::None;
+                    }
+                    else
+                    {
+                        pointEditorDragMode = PointEditorDragMode::DrawBox;
+                    }
+                }
+            }
+
+            // Mouse dragging
+            if (pointEditorDragMode != PointEditorDragMode::None)
+            {
+                if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                {
+                    pointEditorDragMode = PointEditorDragMode::None;
+                }
+                else
+                {
+                    const float deltaSheetX = (mp.x - pointEditorDragStartMouse.x) / (sheetScale * pointEditorZoom);
+                    const float deltaSheetY = (mp.y - pointEditorDragStartMouse.y) / (sheetScale * pointEditorZoom);
+                    const int idx = static_cast<int>(std::round(deltaSheetX));
+                    const int idy = static_cast<int>(std::round(deltaSheetY));
+
+                    int newX = pointEditorOrigX;
+                    int newY = pointEditorOrigY;
+                    int newW = pointEditorOrigW;
+                    int newH = pointEditorOrigH;
+
+                    switch (pointEditorDragMode)
+                    {
+                        case PointEditorDragMode::MoveRect:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+                            newX = std::max(0, pointEditorOrigX + idx);
+                            newY = std::max(0, pointEditorOrigY + idy);
+                            break;
+                        case PointEditorDragMode::ResizeE:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                            newW = std::max(1, pointEditorOrigW + idx);
+                            break;
+                        case PointEditorDragMode::ResizeW:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                            if (pointEditorOrigW - idx >= 1)
+                            {
+                                newX = std::max(0, pointEditorOrigX + idx);
+                                newW = pointEditorOrigW - idx;
+                            }
+                            break;
+                        case PointEditorDragMode::ResizeS:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                            newH = std::max(1, pointEditorOrigH + idy);
+                            break;
+                        case PointEditorDragMode::ResizeN:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+                            if (pointEditorOrigH - idy >= 1)
+                            {
+                                newY = std::max(0, pointEditorOrigY + idy);
+                                newH = pointEditorOrigH - idy;
+                            }
+                            break;
+                        case PointEditorDragMode::ResizeSE:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+                            newW = std::max(1, pointEditorOrigW + idx);
+                            newH = std::max(1, pointEditorOrigH + idy);
+                            break;
+                        case PointEditorDragMode::ResizeNW:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+                            if (pointEditorOrigW - idx >= 1) { newX = std::max(0, pointEditorOrigX + idx); newW = pointEditorOrigW - idx; }
+                            if (pointEditorOrigH - idy >= 1) { newY = std::max(0, pointEditorOrigY + idy); newH = pointEditorOrigH - idy; }
+                            break;
+                        case PointEditorDragMode::ResizeNE:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
+                            newW = std::max(1, pointEditorOrigW + idx);
+                            if (pointEditorOrigH - idy >= 1) { newY = std::max(0, pointEditorOrigY + idy); newH = pointEditorOrigH - idy; }
+                            break;
+                        case PointEditorDragMode::ResizeSW:
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
+                            if (pointEditorOrigW - idx >= 1) { newX = std::max(0, pointEditorOrigX + idx); newW = pointEditorOrigW - idx; }
+                            newH = std::max(1, pointEditorOrigH + idy);
+                            break;
+                        case PointEditorDragMode::DrawBox:
+                        {
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+                            const float sX0 = (pointEditorDragStartMouse.x - canvasMin.x - pointEditorPan.x) / (sheetScale * pointEditorZoom);
+                            const float sY0 = (pointEditorDragStartMouse.y - canvasMin.y - pointEditorPan.y) / (sheetScale * pointEditorZoom);
+                            const int ix0 = static_cast<int>(std::round(sX0));
+                            const int iy0 = static_cast<int>(std::round(sY0));
+                            const int ix1 = static_cast<int>(std::round(mouseSheetX));
+                            const int iy1 = static_cast<int>(std::round(mouseSheetY));
+                            newX = std::max(0, std::min(ix0, ix1));
+                            newY = std::max(0, std::min(iy0, iy1));
+                            newW = std::max(1, std::abs(ix1 - ix0));
+                            newH = std::max(1, std::abs(iy1 - iy0));
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+
+                    if (newX != sel.x || newY != sel.y || newW != sel.w || newH != sel.h)
+                    {
+                        sel.x = newX;
+                        sel.y = newY;
+                        sel.w = newW;
+                        sel.h = newH;
+                        OnSpriteModified(sel);
+                    }
+                }
+            }
+
+            ImDrawList *dl = ImGui::GetWindowDrawList();
+            dl->PushClipRect(canvasMin, canvasMax, true);
+
+            // Dark canvas background
+            dl->AddRectFilled(canvasMin, canvasMax, IM_COL32(18, 22, 22, 255));
+
+            // Sheet Texture
+            const ImVec2 sheetP0(canvasMin.x + pointEditorPan.x, canvasMin.y + pointEditorPan.y);
+            const ImVec2 sheetP1(sheetP0.x + tw * pointEditorZoom, sheetP0.y + th * pointEditorZoom);
+
+            const float visMinX = std::max(canvasMin.x, sheetP0.x);
+            const float visMaxX = std::min(canvasMax.x, sheetP1.x);
+            const float visMinY = std::max(canvasMin.y, sheetP0.y);
+            const float visMaxY = std::min(canvasMax.y, sheetP1.y);
+            if (visMaxX > visMinX && visMaxY > visMinY)
+            {
+                dl->AddRectFilled(ImVec2(visMinX, visMinY), ImVec2(visMaxX, visMaxY), IM_COL32(28, 32, 30, 255));
+            }
+
+            dl->AddImage(reinterpret_cast<ImTextureID>(sheetTex), sheetP0, sheetP1);
+            dl->AddRect(sheetP0, sheetP1, IM_COL32(90, 130, 115, 220), 0.0f, 0, 1.2f);
+
+            // Pixel Grid when zoomed in
+            if (pointEditorShowGrid && pointEditorZoom >= 4.0f)
+            {
+                const float pixStep = sheetScale * pointEditorZoom;
+                const int startX = std::max(0, static_cast<int>(std::floor((canvasMin.x - sheetP0.x) / pixStep)));
+                const int endX = std::min(static_cast<int>(tw / sheetScale), static_cast<int>(std::ceil((canvasMax.x - sheetP0.x) / pixStep)));
+                const int startY = std::max(0, static_cast<int>(std::floor((canvasMin.y - sheetP0.y) / pixStep)));
+                const int endY = std::min(static_cast<int>(th / sheetScale), static_cast<int>(std::ceil((canvasMax.y - sheetP0.y) / pixStep)));
+
+                if ((endX - startX) * (endY - startY) <= 80000)
+                {
+                    for (int x = startX; x <= endX; ++x)
+                    {
+                        const float gx = sheetP0.x + x * pixStep;
+                        dl->AddLine(ImVec2(gx, std::max(canvasMin.y, sheetP0.y)), ImVec2(gx, std::min(canvasMax.y, sheetP1.y)), IM_COL32(255, 255, 255, 16));
+                    }
+                    for (int y = startY; y <= endY; ++y)
+                    {
+                        const float gy = sheetP0.y + y * pixStep;
+                        dl->AddLine(ImVec2(std::max(canvasMin.x, sheetP0.x), gy), ImVec2(std::min(canvasMax.x, sheetP1.x), gy), IM_COL32(255, 255, 255, 16));
+                    }
+                }
+            }
+
+            // Draw other sprites on this page
+            for (const RawSprite &rs : allSprites)
+            {
+                if (rs.page != sel.page || rs.id == sel.id)
+                    continue;
+                const bool belongsToObj = (obj.sprites.count(rs.id) > 0);
+                const ImVec2 r0(
+                    canvasMin.x + pointEditorPan.x + rs.x * sheetScale * pointEditorZoom,
+                    canvasMin.y + pointEditorPan.y + rs.y * sheetScale * pointEditorZoom);
+                const ImVec2 r1(
+                    r0.x + rs.w * sheetScale * pointEditorZoom,
+                    r0.y + rs.h * sheetScale * pointEditorZoom);
+
+                if (r1.x < canvasMin.x || r0.x > canvasMax.x || r1.y < canvasMin.y || r0.y > canvasMax.y)
+                    continue;
+
+                if (belongsToObj)
+                {
+                    dl->AddRect(r0, r1, IM_COL32(60, 220, 190, 200), 0.0f, 0, 1.2f);
+                }
+                else
+                {
+                    dl->AddRect(r0, r1, IM_COL32(50, 110, 90, 75));
+                }
+            }
+
+            // Selected active sprite highlight
+            dl->AddRectFilled(sr0, sr1, IM_COL32(255, 230, 50, 45));
+            dl->AddRect(sr0, sr1, IM_COL32(255, 230, 50, 255), 0.0f, 0, 2.0f);
+
+            // Center crosshair
+            const ImVec2 center(0.5f * (sr0.x + sr1.x), 0.5f * (sr0.y + sr1.y));
+            dl->AddLine(ImVec2(sr0.x - 4.0f, center.y), ImVec2(sr1.x + 4.0f, center.y), IM_COL32(255, 240, 120, 220), 1.0f);
+            dl->AddLine(ImVec2(center.x, sr0.y - 4.0f), ImVec2(center.x, sr1.y + 4.0f), IM_COL32(255, 240, 120, 220), 1.0f);
+
+            // 8 Interactive Handles
+            const float hr = 3.5f;
+            auto drawHandle = [&](const ImVec2 &c) {
+                dl->AddRectFilled(ImVec2(c.x - hr, c.y - hr), ImVec2(c.x + hr, c.y + hr), IM_COL32(255, 255, 255, 255));
+                dl->AddRect(ImVec2(c.x - hr, c.y - hr), ImVec2(c.x + hr, c.y + hr), IM_COL32(25, 25, 25, 255));
+            };
+            drawHandle(ptNW);
+            drawHandle(ptNE);
+            drawHandle(ptSW);
+            drawHandle(ptSE);
+            drawHandle(ptN);
+            drawHandle(ptS);
+            drawHandle(ptW);
+            drawHandle(ptE);
+
+            // Top-left HUD badge on canvas
+            char hudBuf[128];
+            std::snprintf(hudBuf, sizeof(hudBuf), "Sprite #%d: (%d, %d) %dx%d  |  Zoom: %.0f%%", sel.id, sel.x, sel.y, sel.w, sel.h, pointEditorZoom * 100.0f);
+            const ImVec2 hudSz = ImGui::CalcTextSize(hudBuf);
+            const ImVec2 hb0(canvasMin.x + 8.0f, canvasMin.y + 8.0f);
+            const ImVec2 hb1(hb0.x + hudSz.x + 12.0f, hb0.y + hudSz.y + 6.0f);
+            dl->AddRectFilled(hb0, hb1, IM_COL32(10, 15, 12, 220), 3.0f);
+            dl->AddRect(hb0, hb1, IM_COL32(60, 120, 95, 200), 3.0f);
+            dl->AddText(ImVec2(hb0.x + 6.0f, hb0.y + 3.0f), IM_COL32(255, 235, 120, 255), hudBuf);
+
+            dl->PopClipRect();
+
+            if (isHovered && pointEditorDragMode == PointEditorDragMode::None)
+            {
+                ImGui::SetTooltip(
+                    _("Sheet (%.0f, %.0f)  |  Sprite #%d: (%d, %d) %dx%d\nLMB Drag: Move/Resize | MMB / Space+Drag: Pan | Wheel: Zoom | Click sprite: Select"),
+                    mouseSheetX, mouseSheetY, sel.id, sel.x, sel.y, sel.w, sel.h);
+            }
+        }
+    }
+    ImGui::EndChild();
 }
 
 } // namespace CharEditor

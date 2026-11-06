@@ -169,7 +169,7 @@ struct TurnBundle
 
 struct RosterEntry
 {
-    uint8_t slot {0};
+    std::uint8_t slot {0};
     std::string name;
     bool connected {true};
 };
@@ -179,66 +179,66 @@ struct Roster
     std::vector<RosterEntry> players;
 };
 
-constexpr size_t kMaxMatchSetupBytes = 4096;
+constexpr std::size_t kMaxMatchSetupBytes = 4096;
 
 struct StartMatch
 {
-    uint32_t firstTurnDelayMs {3000}; // countdown before turn 0
-    std::vector<uint8_t> setup;
+    std::uint32_t firstTurnDelayMs {3000}; // countdown before turn 0
+    std::vector<std::uint8_t> setup;
 };
 
 // Picks of a player in the room. Faction and start position may be left to chance (kRandom): the host
 // resolves them with the match seed when it starts the match.
-constexpr uint8_t kRandom = 0x0F;
+constexpr std::uint8_t kRandom = 0x0F;
 constexpr std::size_t kMaxMapPathLength = 128;
 
 struct LobbyChoice
 {
-    uint8_t faction {kRandom}; // 0 / 1 (the game's factions) or kRandom
-    uint8_t team {0};          // 0..7
-    uint8_t color {0};         // 0..15
-    uint8_t spawn {kRandom};   // start position 0..7 or kRandom
-    uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
-    uint8_t armyCap {7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
+    std::uint8_t faction {kRandom}; // 0 / 1 (the game's factions) or kRandom
+    std::uint8_t team {0};          // 0..7
+    std::uint8_t color {0};         // 0..15
+    std::uint8_t spawn {kRandom};   // start position 0..7 or kRandom
+    std::uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
+    std::uint8_t armyCap {7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
     bool ready {false};
 };
 
 struct LobbySlot
 {
-    uint8_t slot {0};
+    std::uint8_t slot {0};
     LobbyChoice choice;
     bool ai {false};     // a computer player (no connection; always ready)
-    uint8_t aiLevel {1}; // 0..3 (the game's difficulties)
+    std::uint8_t aiLevel {1}; // 0..3 (the game's difficulties)
 };
 
 // The host / room owner adds (slot kRandom: the first free one), changes or removes a computer player
 struct OwnerSetAi
 {
-    uint8_t slot {kRandom};
+    std::uint8_t slot {kRandom};
     bool remove {false};
-    uint8_t level {1};
+    std::uint8_t level {1};
     LobbyChoice choice;
 };
 
 // The host / room owner puts a player into a team (players cannot pick their team themselves)
 struct OwnerSetTeam
 {
-    uint8_t slot {0};
-    uint8_t team {0};     // 0..7
-    uint8_t handicap {0}; // 0..5, see LobbyChoice
-    uint8_t armyCap {7};  // 0..7, see LobbyChoice
+    std::uint8_t slot {0};
+    std::uint8_t team {0};     // 0..7
+    std::uint8_t handicap {0}; // 0..5, see LobbyChoice
+    std::uint8_t armyCap {7};  // 0..7, see LobbyChoice
 };
 
 struct LobbyState
 {
     std::string map;        // the game's map path
-    uint64_t mapHash {0};   // of the map file: everybody must have exactly this one
-    uint8_t spawnCount {2}; // start positions of the map
+    std::uint64_t mapHash {0};   // of the map file: everybody must have exactly this one
+    std::uint8_t spawnCount {2}; // start positions of the map
     bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
-    uint8_t credits {1}; // index into the game's list of starting credits (0..4)
+    std::uint8_t credits {1}; // index into the game's list of starting credits (0..4)
     bool night {false};  // time of day of the match (day / night)
-    uint8_t blockedMask {
+    std::uint8_t blockedMask {
         0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
 };
@@ -247,43 +247,43 @@ struct LobbyState
 // player of a level (a person or computer player holding it goes away; a person is sent out of the room)
 struct OwnerSetSeat
 {
-    enum Kind : uint8_t
+    enum Kind : std::uint8_t
     {
         Open = 0,
         Blocked = 1,
         Ai = 2
     };
-    uint8_t spawn {0}; // start position 0..7
-    uint8_t kind {Open};
-    uint8_t level {1}; // Ai: 0..3
+    std::uint8_t spawn {0}; // start position 0..7
+    std::uint8_t kind {Open};
+    std::uint8_t level {1}; // Ai: 0..3
 };
 
 struct OwnerSetOptions
 {
     bool fogOfWar {true};
     bool prebuilt {true};
-    uint8_t credits {1}; // 0..4
+    std::uint8_t credits {1}; // 0..4
     bool night {false};  // time of day
 };
 
 struct OwnerSetMap
 {
     std::string map;
-    uint64_t mapHash {0};
-    uint8_t spawnCount {2};
+    std::uint64_t mapHash {0};
+    std::uint8_t spawnCount {2};
 };
 
 constexpr std::size_t kMaxFileBytes = 2 * 1024 * 1024;
 
 struct FileRequest
 {
-    uint64_t hash {0};
+    std::uint64_t hash {0};
 };
 
 struct FileData
 {
-    uint64_t hash {0};
-    std::vector<uint8_t> bytes;
+    std::uint64_t hash {0};
+    std::vector<std::uint8_t> bytes;
 };
 
 constexpr std::size_t kMaxDataFiles = 96;
@@ -315,8 +315,8 @@ struct FilePathData
 
 struct OwnerStart
 {
-    uint32_t firstTurnDelayMs {3000};
-    std::vector<uint8_t> setup;
+    std::uint32_t firstTurnDelayMs {3000};
+    std::vector<std::uint8_t> setup;
 };
 
 constexpr std::size_t kRoomCodeLength = 6;
@@ -327,27 +327,27 @@ struct RoomListing
     std::string code;
     std::string name;
     std::string map;
-    uint8_t players {0};
-    uint8_t maxPlayers {0};
+    std::uint8_t players {0};
+    std::uint8_t maxPlayers {0};
     bool running {false};
-    uint16_t port {0};
+    std::uint16_t port {0};
     bool hosted {false}; // hosted by a player (join with JoinHosted), not a room of the server
     bool locked {false}; // the room asks for a password
 };
 
-using SocketToken = std::array<uint8_t, 16>;
+using SocketToken = std::array<std::uint8_t, 16>;
 
 struct RegisterHost
 {
     std::string gameVersion;
     std::string name;
     std::string map;
-    uint8_t players {0};
-    uint8_t maxPlayers {0};
+    std::uint8_t players {0};
+    std::uint8_t maxPlayers {0};
     bool listed {true};
     SocketToken token {}; // the token its game socket says hello with
     std::string lanIp;
-    uint16_t lanPort {0};
+    std::uint16_t lanPort {0};
 };
 
 struct HostRegistered
@@ -364,16 +364,16 @@ struct JoinHosted
 struct HostedEndpoint
 {
     std::string ip;
-    uint16_t port {0};
+    std::uint16_t port {0};
     std::string lanIp;
-    uint16_t lanPort {0};
+    std::uint16_t lanPort {0};
     std::string yourIp; // the joining player's own public address (the same as ip: one network)
 };
 
 struct PunchRequest
 {
     std::string ip;
-    uint16_t port {0};
+    std::uint16_t port {0};
 };
 
 struct ListRooms
@@ -389,8 +389,8 @@ struct RoomList
 struct CreateRoom
 {
     std::string gameVersion;
-    uint64_t simBuildId {0};
-    uint64_t assetsHash {0};
+    std::uint64_t simBuildId {0};
+    std::uint64_t assetsHash {0};
     std::string name;
     bool listed {true};   // in the public list (else only by code)
     std::string password; // empty: open to everybody
@@ -404,7 +404,7 @@ struct FindRoom
 struct RoomAddress
 {
     std::string code;
-    uint16_t port {0};
+    std::uint16_t port {0};
 };
 
 struct ServerInfo
@@ -421,13 +421,13 @@ struct PauseRequest
 struct PauseState
 {
     bool paused {false};
-    uint8_t bySlot {0};
-    uint8_t pausesLeft {0}; // of that player
+    std::uint8_t bySlot {0};
+    std::uint8_t pausesLeft {0}; // of that player
 };
 
 struct Desync
 {
-    uint32_t tick {0};
+    std::uint32_t tick {0};
 };
 
 struct WorldHash

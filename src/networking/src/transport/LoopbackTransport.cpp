@@ -12,7 +12,7 @@ struct LoopbackHub::State
     {
         PeerId from;
         Channel channel;
-        std::vector<uint8_t> data;
+        std::vector<std::uint8_t> data;
     };
     // Inbox of the server and of every client (by client id); events in arrival order
     std::deque<TransportEvent> serverInbox;
@@ -43,12 +43,12 @@ public:
             m_s->clientConnected[id] = false;
         }
     }
-    void send(PeerId peer, Channel channel, const uint8_t *data, size_t size) override
+    void send(PeerId peer, Channel channel, const std::uint8_t *data, std::size_t size) override
     {
         auto it = m_s->clientInbox.find(peer);
         if (it == m_s->clientInbox.end() || !m_s->clientConnected[peer])
             return;
-        it->second.push_back({TransportEvent::Type::Received, 0, channel, std::vector<uint8_t>(data, data + size)});
+        it->second.push_back({TransportEvent::Type::Received, 0, channel, std::vector<std::uint8_t>(data, data + size)});
     }
     void poll(std::vector<TransportEvent> &out) override
     {
@@ -66,7 +66,7 @@ public:
         m_s->clientInbox[peer].push_back({TransportEvent::Type::Disconnected, 0, Channel::Control, {}});
         m_s->serverInbox.push_back({TransportEvent::Type::Disconnected, peer, Channel::Control, {}});
     }
-    uint32_t roundTripMs(PeerId) const override
+    std::uint32_t roundTripMs(PeerId) const override
     {
         return 0;
     }
@@ -98,12 +98,12 @@ public:
     {
         disconnect(0);
     }
-    void send(PeerId, Channel channel, const uint8_t *data, size_t size) override
+    void send(PeerId, Channel channel, const std::uint8_t *data, std::size_t size) override
     {
         if (!m_s->clientConnected[m_id])
             return;
         m_s->serverInbox.push_back(
-            {TransportEvent::Type::Received, m_id, channel, std::vector<uint8_t>(data, data + size)});
+            {TransportEvent::Type::Received, m_id, channel, std::vector<std::uint8_t>(data, data + size)});
     }
     void poll(std::vector<TransportEvent> &out) override
     {
@@ -121,7 +121,7 @@ public:
         m_s->clientConnected[m_id] = false;
         m_s->serverInbox.push_back({TransportEvent::Type::Disconnected, m_id, Channel::Control, {}});
     }
-    uint32_t roundTripMs(PeerId) const override
+    std::uint32_t roundTripMs(PeerId) const override
     {
         return 0;
     }

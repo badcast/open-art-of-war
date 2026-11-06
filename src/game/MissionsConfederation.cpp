@@ -26,10 +26,10 @@ std::vector<MissionDef> BuildConfederation()
             = {0,
                0,
                "Mission 1: Pukalpa",
-               "Map: map_mission_1 (Pukalpa)",
+               "Map: confederation_mission_1 (Pukalpa)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_1";
+        d.data.mapFile = "confederation_mission_1";
         d.data.defense = true;
         d.data.mapIndex = 0;
         d.data.entities = {{0, 9, 29, 0}, {1, 4, 30, 0}, {2, 6, 26, 0}, {5, 15, 19, 0}, {5, 17, 24, 0}};
@@ -66,10 +66,10 @@ std::vector<MissionDef> BuildConfederation()
             = {1,
                1,
                "Mission 2: Ukayali Shore",
-               "Map: map_mission_2 (Ukayali Shore)",
+               "Map: confederation_mission_2 (Ukayali Shore)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_2";
+        d.data.mapFile = "confederation_mission_2";
         d.data.mapIndex = 1;
         d.data.entities
             = {{0, 5, 11, 0},   {1, 8, 7, 0},    {8, 54, 52, 0},  {9, 47, 56, 0},  {9, 43, 54, 0},  {9, 52, 41, 0},
@@ -109,10 +109,10 @@ std::vector<MissionDef> BuildConfederation()
             = {2,
                2,
                "Mission 3: Capture of Miguel",
-               "Map: map_mission_3 (Capture of Miguel)",
+               "Map: confederation_mission_3 (Capture of Miguel)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_3";
+        d.data.mapFile = "confederation_mission_3";
         d.data.mapIndex = 2;
         d.data.entities
             = {{0, 19, 74, 0},  {8, 32, 8, 0},   {9, 24, 7, 0},   {9, 21, 9, 0},   {9, 19, 14, 0},  {9, 23, 16, 0},
@@ -161,10 +161,10 @@ std::vector<MissionDef> BuildConfederation()
             = {3,
                3,
                "Mission 4: Outpost",
-               "Map: map_mission_4 (Outpost)",
+               "Map: confederation_mission_4 (Outpost)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_4";
+        d.data.mapFile = "confederation_mission_4";
         d.data.mapIndex = 3;
         d.data.entities
             = {{8, 16, 11, 0},  {9, 24, 10, 0},  {9, 15, 17, 0},  {9, 20, 9, 0},   {9, 27, 8, 0},   {9, 21, 22, 0},
@@ -199,10 +199,10 @@ std::vector<MissionDef> BuildConfederation()
             = {4,
                3,
                "Mission 5: Meat Grinder",
-               "Map: map_mission_4 (Meat Grinder)",
+               "Map: confederation_mission_4 (Meat Grinder)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_4";
+        d.data.mapFile = "confederation_mission_4";
         d.data.defense = true;
         d.data.mapIndex = 3;
         d.data.entities = {{0, 24, 14, 0}, {1, 20, 10, 0}, {1, 25, 9, 0}};
@@ -260,10 +260,10 @@ std::vector<MissionDef> BuildConfederation()
             = {5,
                4,
                "Mission 6: Gorge Assault",
-               "Map: map_mission_5 (Gorge Assault)",
+               "Map: confederation_mission_5 (Gorge Assault)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_5";
+        d.data.mapFile = "confederation_mission_5";
         d.data.mapIndex = 4;
         d.data.entities
             = {{0, 52, 70, 0},  {1, 47, 74, 0},  {1, 56, 76, 0},  {2, 53, 65, 0},  {8, 1, 5, 0},    {9, 4, 0, 0},
@@ -322,10 +322,10 @@ std::vector<MissionDef> BuildConfederation()
             = {6,
                5,
                "Mission 7: Last Stand",
-               "Map: map_mission_6 (Last Stand)",
+               "Map: confederation_mission_6 (Last Stand)",
                "- Destroy the enemy base.",
                "Confederation campaign mission."};
-        d.data.mapFile = "map_mission_6";
+        d.data.mapFile = "confederation_mission_6";
         d.data.mapIndex = 5;
         d.data.entities
             = {{0, 6, 67, 0},   {1, 1, 73, 0},   {1, 10, 75, 0},  {2, 1, 66, 0},   {8, 68, 17, 0},  {9, 72, 13, 0},

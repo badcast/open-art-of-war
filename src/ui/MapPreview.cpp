@@ -56,7 +56,7 @@ SDL_Texture *MapPreview::Get(
             auto put = [&](int x, int y, SDL_Color c) {
                 if (x < 0 || y < 0 || x >= w || y >= h)
                     return;
-                uint8_t *px = static_cast<uint8_t *>(surface->pixels) + y * surface->pitch + x * 4;
+                std::uint8_t *px = static_cast<std::uint8_t *>(surface->pixels) + y * surface->pitch + x * 4;
                 px[0] = c.r;
                 px[1] = c.g;
                 px[2] = c.b;

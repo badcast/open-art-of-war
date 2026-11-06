@@ -25,9 +25,9 @@ public:
         Failed
     };
 
-    MasterClient(const std::string &host, uint16_t port);
+    MasterClient(const std::string &host, std::uint16_t port);
 
-    void update(uint32_t nowMs);
+    void update(std::uint32_t nowMs);
     State state() const
     {
         return m_state;
@@ -85,7 +85,7 @@ private:
     State m_state {State::Connecting};
     std::string m_error;
     ServerInfo m_info;
-    std::vector<std::vector<uint8_t>> m_queue; // requests waiting for the connection
+    std::vector<std::vector<std::uint8_t>> m_queue; // requests waiting for the connection
     bool m_hasList {false};
     std::vector<RoomListing> m_rooms;
     bool m_hasRoom {false};
@@ -96,7 +96,7 @@ private:
     bool m_hasEndpoint {false};
     HostedEndpoint m_endpoint;
     RejectReason m_refusal {RejectReason::None};
-    uint32_t m_startMs {0};
+    std::uint32_t m_startMs {0};
     bool m_started {false};
     std::vector<TransportEvent> m_events;
 };

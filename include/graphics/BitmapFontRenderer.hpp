@@ -16,7 +16,7 @@ struct TextCacheKey
 {
     std::string text;
     int scale {2};
-    uint32_t colorRgba {0xFFFFFFFF};
+    std::uint32_t colorRgba {0xFFFFFFFF};
 
     bool operator==(const TextCacheKey &o) const
     {
@@ -30,7 +30,7 @@ struct TextCacheKeyHash
     {
         std::size_t h1 = std::hash<std::string> {}(k.text);
         std::size_t h2 = std::hash<int> {}(k.scale);
-        std::size_t h3 = std::hash<uint32_t> {}(k.colorRgba);
+        std::size_t h3 = std::hash<std::uint32_t> {}(k.colorRgba);
         return h1 ^ (h2 << 1) ^ (h3 << 2);
     }
 };
@@ -40,7 +40,7 @@ struct CachedText
     SDL_Texture *texture {nullptr};
     int width {0};
     int height {0};
-    uint32_t lastUsedFrame {0};
+    std::uint32_t lastUsedFrame {0};
 };
 
 // Pixel sizes of the font scales (section "font" of game_environment.json)
@@ -98,12 +98,12 @@ private:
     TTF_Font *m_fontTitle {nullptr};        // scale 4 (~30px bold)
     TTF_Font *m_fontSmallBold {nullptr};    // scale 5 (13px bold)
     TTF_Font *m_fontMediumBold {nullptr};   // scale 6 (16px bold)
-    std::vector<uint8_t> m_fontDataRegular; // font files from data.blob, read by m_font* via SDL IO
-    std::vector<uint8_t> m_fontDataBold;
+    std::vector<std::uint8_t> m_fontDataRegular; // font files from data.blob, read by m_font* via SDL IO
+    std::vector<std::uint8_t> m_fontDataBold;
     TTF_Font *m_fontHero {nullptr}; // scale 7 (48px bold)
 
     std::unordered_map<TextCacheKey, CachedText, TextCacheKeyHash> m_cache;
-    uint32_t m_currentFrame {0};
+    std::uint32_t m_currentFrame {0};
 };
 
 // Modern alias

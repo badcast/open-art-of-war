@@ -14,7 +14,7 @@ namespace OpenArtOfWar
 namespace
 {
 
-constexpr size_t kMaxBlasts = 6;
+constexpr std::size_t kMaxBlasts = 6;
 constexpr float kSlowdown = 2.6f; // the blast plays this many times slower than in the game
 
 float Uniform(std::mt19937 &rng, float lo, float hi)
@@ -40,7 +40,7 @@ void MenuBackdropFx::Spawn(TextureManager &textures, int areaW, int windowH)
     if (pool.empty())
         return;
     Blast b;
-    b.anim = pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(m_rng)];
+    b.anim = pool[std::uniform_int_distribution<std::size_t>(0, pool.size() - 1)(m_rng)];
     const IndexRange r = textures.GetAnimRange(b.anim);
     const int frames = std::max(1, r.end - r.start + 1);
     b.zoom = Uniform(m_rng, 4.0f, 8.0f);

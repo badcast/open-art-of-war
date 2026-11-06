@@ -327,8 +327,8 @@ void encode(BitWriter &w, const PauseState &m)
 bool decode(BitReader &r, PauseState &m)
 {
     m.paused = r.readBool();
-    m.bySlot = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers - 1));
-    m.pausesLeft = static_cast<uint8_t>(r.readBits(4));
+    m.bySlot = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers - 1));
+    m.pausesLeft = static_cast<std::uint8_t>(r.readBits(4));
     return done(r);
 }
 
@@ -363,12 +363,12 @@ void writeChoice(BitWriter &w, const LobbyChoice &c)
 
 void readChoice(BitReader &r, LobbyChoice &c)
 {
-    c.faction = static_cast<uint8_t>(r.readBits(4));
-    c.team = static_cast<uint8_t>(r.readBits(3));
-    c.color = static_cast<uint8_t>(r.readBits(4));
-    c.spawn = static_cast<uint8_t>(r.readBits(4));
-    c.handicap = static_cast<uint8_t>(r.readBits(3));
-    c.armyCap = static_cast<uint8_t>(r.readBits(3));
+    c.faction = static_cast<std::uint8_t>(r.readBits(4));
+    c.team = static_cast<std::uint8_t>(r.readBits(3));
+    c.color = static_cast<std::uint8_t>(r.readBits(4));
+    c.spawn = static_cast<std::uint8_t>(r.readBits(4));
+    c.handicap = static_cast<std::uint8_t>(r.readBits(3));
+    c.armyCap = static_cast<std::uint8_t>(r.readBits(3));
     c.ready = r.readBool();
     if (c.handicap > 5)
         r.fail();
@@ -418,22 +418,22 @@ bool decode(BitReader &r, LobbyState &m)
 {
     m.map = r.readString(kMaxMapPathLength);
     m.mapHash = r.readU64();
-    m.spawnCount = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
+    m.spawnCount = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
     m.fogOfWar = r.readBool();
     m.prebuilt = r.readBool();
-    m.credits = static_cast<uint8_t>(r.readBits(3));
+    m.credits = static_cast<std::uint8_t>(r.readBits(3));
     if (m.credits > 4)
         r.fail();
     m.night = r.readBool();
-    m.blockedMask = static_cast<uint8_t>(r.readBits(8));
+    m.blockedMask = static_cast<std::uint8_t>(r.readBits(8));
     const int count = r.readRanged(0, kMaxPlayers);
     m.slots.resize(r.failed() ? 0 : static_cast<std::size_t>(count));
     for (LobbySlot &s : m.slots)
     {
-        s.slot = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers - 1));
+        s.slot = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers - 1));
         readChoice(r, s.choice);
         s.ai = r.readBool();
-        s.aiLevel = s.ai ? static_cast<uint8_t>(r.readBits(2)) : 1;
+        s.aiLevel = s.ai ? static_cast<std::uint8_t>(r.readBits(2)) : 1;
         if (r.failed())
             break;
     }
@@ -452,7 +452,7 @@ bool decode(BitReader &r, OwnerSetMap &m)
 {
     m.map = r.readString(kMaxMapPathLength);
     m.mapHash = r.readU64();
-    m.spawnCount = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
+    m.spawnCount = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
     return done(r);
 }
 
@@ -552,11 +552,11 @@ void encode(BitWriter &w, const OwnerSetAi &m)
 
 bool decode(BitReader &r, OwnerSetAi &m)
 {
-    m.slot = static_cast<uint8_t>(r.readBits(4));
+    m.slot = static_cast<std::uint8_t>(r.readBits(4));
     if (m.slot >= kMaxPlayers && m.slot != kRandom)
         r.fail();
     m.remove = r.readBool();
-    m.level = static_cast<uint8_t>(r.readBits(2));
+    m.level = static_cast<std::uint8_t>(r.readBits(2));
     readChoice(r, m.choice);
     return done(r);
 }
@@ -572,10 +572,10 @@ void encode(BitWriter &w, const OwnerSetTeam &m)
 
 bool decode(BitReader &r, OwnerSetTeam &m)
 {
-    m.slot = static_cast<uint8_t>(r.readBits(3));
-    m.team = static_cast<uint8_t>(r.readBits(3));
-    m.handicap = static_cast<uint8_t>(r.readBits(3));
-    m.armyCap = static_cast<uint8_t>(r.readBits(3));
+    m.slot = static_cast<std::uint8_t>(r.readBits(3));
+    m.team = static_cast<std::uint8_t>(r.readBits(3));
+    m.handicap = static_cast<std::uint8_t>(r.readBits(3));
+    m.armyCap = static_cast<std::uint8_t>(r.readBits(3));
     if (m.handicap > 5)
         r.fail();
     return done(r);
@@ -591,9 +591,9 @@ void encode(BitWriter &w, const OwnerSetSeat &m)
 
 bool decode(BitReader &r, OwnerSetSeat &m)
 {
-    m.spawn = static_cast<uint8_t>(r.readBits(3));
-    m.kind = static_cast<uint8_t>(r.readBits(2));
-    m.level = static_cast<uint8_t>(r.readBits(2));
+    m.spawn = static_cast<std::uint8_t>(r.readBits(3));
+    m.kind = static_cast<std::uint8_t>(r.readBits(2));
+    m.level = static_cast<std::uint8_t>(r.readBits(2));
     if (m.kind > OwnerSetSeat::Ai)
         r.fail();
     return done(r);
@@ -612,7 +612,7 @@ bool decode(BitReader &r, OwnerSetOptions &m)
 {
     m.fogOfWar = r.readBool();
     m.prebuilt = r.readBool();
-    m.credits = static_cast<uint8_t>(r.readBits(3));
+    m.credits = static_cast<std::uint8_t>(r.readBits(3));
     if (m.credits > 4)
         r.fail();
     m.night = r.readBool();
@@ -682,8 +682,8 @@ bool decode(BitReader &r, RoomList &m)
         e.code = r.readString(kRoomCodeLength);
         e.name = r.readString(kMaxNameLength);
         e.map = r.readString(kMaxMapPathLength);
-        e.players = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
-        e.maxPlayers = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
+        e.players = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
+        e.maxPlayers = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
         e.running = r.readBool();
         e.port = r.readU16();
         e.hosted = r.readBool();
@@ -767,8 +767,8 @@ bool decode(BitReader &r, RegisterHost &m)
     m.gameVersion = r.readString(kMaxVersionLength);
     m.name = r.readString(kMaxNameLength);
     m.map = r.readString(kMaxMapPathLength);
-    m.players = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
-    m.maxPlayers = static_cast<uint8_t>(r.readRanged(0, kMaxPlayers));
+    m.players = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
+    m.maxPlayers = static_cast<std::uint8_t>(r.readRanged(0, kMaxPlayers));
     m.listed = r.readBool();
     r.alignToByte();
     readToken(r, m.token);

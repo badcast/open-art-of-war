@@ -40,7 +40,7 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
         return false;
     }
 
-    Localization::Init(LoaderResources::LocaleDir(), LoaderResources::DefaultLanguage());
+    Localization::Init(LoaderResources::LocaleDir(), LoaderResources::DefaultLanguage(), "openaow_map_editor");
 
     m_window = SDL_CreateWindow(
         _("Open Art Of War Map Editor - [openaow-mapeditor]"), m_windowW, m_windowH, SDL_WINDOW_RESIZABLE);
@@ -65,7 +65,7 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
     io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    std::vector<uint8_t> fontData;
+    std::vector<std::uint8_t> fontData;
     if (Assets::ReadBytes(LoaderResources::FontRegular(), fontData) && !fontData.empty())
     {
         // ImGui owns (and frees) the buffer it is given
@@ -100,14 +100,13 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
     m_doc.SetTextureManager(m_texManager.get());
     m_renderer = std::make_unique<Renderer>(m_sdlRenderer, m_texManager.get());
 
-    std::string assetRoot = LoaderResources::kDefaultRoot;
-    if (!m_texManager->LoadAllAssets(assetRoot))
+    if (!m_texManager->LoadAllAssets())
     {
-        assetRoot = "../assets";
-        if (!m_texManager->LoadAllAssets(assetRoot))
+        LoaderResources::SetAssetRoot("../assets");
+        if (!m_texManager->LoadAllAssets())
         {
-            assetRoot = "../../assets";
-            m_texManager->LoadAllAssets(assetRoot);
+            LoaderResources::SetAssetRoot("../../assets");
+            m_texManager->LoadAllAssets();
         }
     }
 
@@ -121,7 +120,7 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
     }
     else
     {
-        if (!m_doc.LoadMap(LoaderResources::MapPath("m0")))
+        if (!m_doc.LoadMap(LoaderResources::MapPath("resistance_mission_7")))
         {
             m_doc.NewMap(60, 40, 0, 0);
         }
@@ -477,12 +476,12 @@ void MapEditorApp::ApplyToolAt(int tx, int ty, bool isDrag)
     switch (tool)
     {
         case EditorTool::TileBrush:
-            m_doc.SetTileBrush(tx, ty, static_cast<uint8_t>(m_ui.GetSelectedTile()), m_ui.GetBrushSize());
+            m_doc.SetTileBrush(tx, ty, static_cast<std::uint8_t>(m_ui.GetSelectedTile()), m_ui.GetBrushSize());
             break;
         case EditorTool::BucketFill:
             if (!isDrag)
             {
-                m_doc.FloodFill(tx, ty, static_cast<uint8_t>(m_ui.GetSelectedTile()));
+                m_doc.FloodFill(tx, ty, static_cast<std::uint8_t>(m_ui.GetSelectedTile()));
             }
             break;
         case EditorTool::PlaceDecor:
@@ -554,7 +553,7 @@ void MapEditorApp::ApplyToolAt(int tx, int ty, bool isDrag)
                 }
                 else
                 {
-                    const size_t players = 2 + m_doc.GetExtraStarts().size();
+                    const std::size_t players = 2 + m_doc.GetExtraStarts().size();
                     m_ui.ShowToast(
                         std::string(
                             result == MapDocument::StartToggle::Added ? _("Start position added: ")
@@ -572,7 +571,7 @@ void MapEditorApp::ApplyToolAt(int tx, int ty, bool isDrag)
         case EditorTool::Eyedropper:
             if (!isDrag)
             {
-                uint8_t sampled = m_doc.GetTileMap().GetBaseTile(tx, ty);
+                std::uint8_t sampled = m_doc.GetTileMap().GetBaseTile(tx, ty);
                 m_ui.SelectTileFromEyedropper(sampled);
                 m_ui.ShowToast(std::string(_("Eyedropper: selected tile #")) + std::to_string(sampled));
             }
@@ -609,7 +608,7 @@ void MapEditorApp::render()
     {
         for (int tx = startTileX; tx < endTileX; ++tx)
         {
-            uint8_t tileIdx = m_doc.GetTileMap().GetBaseTile(tx, ty);
+            std::uint8_t tileIdx = m_doc.GetTileMap().GetBaseTile(tx, ty);
             m_renderer->DrawTileWorld(tilesetId, tileIdx, tx * TILE_WIDTH, ty * TILE_HEIGHT, m_camera, globalAnimTick);
 
             // Optional Grid lines

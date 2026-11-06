@@ -67,7 +67,7 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
     // A skirmish of two mixed groups driven only by commands; returns the checksums along the way.
     // With `replay` the commands come from that recording instead of the script.
     auto run = [&](const std::vector<TimedCommand> *replay) {
-        std::vector<uint64_t> sums;
+        std::vector<std::uint64_t> sums;
         entities.Clear();
         map.InitBlankArena(48, 32, 0);
         pf.SetMap(&map);
@@ -75,26 +75,26 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
         ResetResearch();
         economy.Reset(5000);
         sim.Reset();
-        std::vector<uint32_t> red, blue;
+        std::vector<std::uint32_t> red, blue;
         for (int i = 0; i < 10; ++i)
         {
             red.push_back(
-                static_cast<uint32_t>(
+                static_cast<std::uint32_t>(
                     entities.SpawnUnitByArchetype(i % 3, 3 + i % 4, 10 + i / 4 * 2 + i % 2, Faction::Resistance)));
             blue.push_back(
-                static_cast<uint32_t>(
+                static_cast<std::uint32_t>(
                     entities.SpawnUnitByArchetype(1 + i % 2, 42 - i % 4, 12 + i / 4 * 2, Faction::Confederation)));
         }
         ai.m_chokes.Rebuild(map);
         SimContext ctx {entities, map, pf, economy, ai};
-        auto order = [&](Faction f, const std::vector<uint32_t> &ids, int tx, int ty, OrderKind kind, bool group) {
+        auto order = [&](Faction f, const std::vector<std::uint32_t> &ids, int tx, int ty, OrderKind kind, bool group) {
             SimCommand c;
             c.type = CommandType::OrderAt;
             c.player = Players::OwnerOf(f);
             c.ids = ids;
             c.x = tx * TILE_WIDTH + TILE_WIDTH / 2;
             c.y = ty * TILE_HEIGHT + TILE_HEIGHT / 2;
-            c.a = static_cast<int32_t>(kind);
+            c.a = static_cast<std::int32_t>(kind);
             c.b = group ? 1 : 0;
             sim.Issue(std::move(c));
         };
@@ -138,7 +138,7 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
                     q.ids = blue;
                     q.x = (24 - k * 8) * TILE_WIDTH + TILE_WIDTH / 2;
                     q.y = (8 + k * 14) * TILE_HEIGHT + TILE_HEIGHT / 2;
-                    q.a = static_cast<int32_t>(k == 0 ? OrderKind::Move : OrderKind::AttackMove);
+                    q.a = static_cast<std::int32_t>(k == 0 ? OrderKind::Move : OrderKind::AttackMove);
                     q.b = 2;
                     sim.Issue(std::move(q));
                 }
@@ -156,22 +156,22 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
         return sums;
     };
 
-    const std::vector<uint64_t> first = run(nullptr);
+    const std::vector<std::uint64_t> first = run(nullptr);
     // The recording through the wire format (encoded per tick and side, decoded back)
     std::vector<TimedCommand> recorded;
     {
         const std::vector<TimedCommand> log = sim.log();
-        size_t i = 0;
+        std::size_t i = 0;
         while (i < log.size())
         {
-            size_t j = i;
+            std::size_t j = i;
             std::vector<SimCommand> turn;
             while (j < log.size() && log[j].tick == log[i].tick && log[j].command.player == log[i].command.player)
             {
                 turn.push_back(log[j].command);
                 ++j;
             }
-            const std::vector<uint8_t> bytes = SimCommandCodec::Encode(turn);
+            const std::vector<std::uint8_t> bytes = SimCommandCodec::Encode(turn);
             std::vector<SimCommand> back;
             if (!SimCommandCodec::Decode(bytes.data(), bytes.size(), log[i].command.player, back)
                 || back.size() != turn.size())
@@ -186,9 +186,9 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
             i = j;
         }
     }
-    const std::vector<uint64_t> second = run(&recorded);
-    size_t firstDiff = first.size();
-    for (size_t i = 0; i < first.size() && i < second.size(); ++i)
+    const std::vector<std::uint64_t> second = run(&recorded);
+    std::size_t firstDiff = first.size();
+    for (std::size_t i = 0; i < first.size() && i < second.size(); ++i)
     {
         if (first[i] != second[i])
         {
@@ -236,11 +236,11 @@ bool HeadlessTest::RunMatchTest(Application &app)
     setup.local = 0;
     const Faction factions[4]
         = {Faction::Resistance, Faction::Confederation, Faction::Resistance, Faction::Confederation};
-    const uint8_t teams[4] = {0, 0, 1, 1};
+    const std::uint8_t teams[4] = {0, 0, 1, 1};
     for (int i = 0; i < 4; ++i)
     {
-        setup.slots[i] = {true, factions[i], teams[i], static_cast<uint8_t>(i + 1), true};
-        setup.startPosition[i] = static_cast<int8_t>(i);
+        setup.slots[i] = {true, factions[i], teams[i], static_cast<std::uint8_t>(i + 1), true};
+        setup.startPosition[i] = static_cast<std::int8_t>(i);
     }
     if (MissionController::StartPositions(setup.mapPath).size() < 4)
     {
@@ -253,7 +253,7 @@ bool HeadlessTest::RunMatchTest(Application &app)
         return false;
     }
 
-    auto run = [&](std::vector<uint64_t> &sums) -> bool {
+    auto run = [&](std::vector<std::uint64_t> &sums) -> bool {
         if (!mission.LoadMatch(setup, map, entities, economy, pf))
             return false;
         sim.startMatch(setup);
@@ -281,12 +281,12 @@ bool HeadlessTest::RunMatchTest(Application &app)
             }
         }
         // Player 2 (Resistance, team 1) sends its units at player 0 (Resistance, team 0)
-        std::vector<uint32_t> attackers;
+        std::vector<std::uint32_t> attackers;
         int targetHq = 0;
         for (const Entity &e : entities.GetAllEntities())
         {
             if (e.owner == 2 && !e.isBuilding)
-                attackers.push_back(static_cast<uint32_t>(e.id));
+                attackers.push_back(static_cast<std::uint32_t>(e.id));
             if (e.owner == 0 && e.isBuilding && e.type == UnitType::Headquarters)
                 targetHq = e.id;
         }
@@ -297,7 +297,7 @@ bool HeadlessTest::RunMatchTest(Application &app)
         order.ids = attackers;
         order.x = hqEntity->tileX * TILE_WIDTH;
         order.y = hqEntity->tileY * TILE_HEIGHT;
-        order.a = static_cast<int32_t>(OrderKind::AttackMove);
+        order.a = static_cast<std::int32_t>(OrderKind::AttackMove);
         sim.Issue(order);
         // A command for someone else's units does nothing
         SimCommand foreign = order;
@@ -353,7 +353,7 @@ bool HeadlessTest::RunMatchTest(Application &app)
         return true;
     };
 
-    std::vector<uint64_t> first, second;
+    std::vector<std::uint64_t> first, second;
     if (!run(first))
     {
         std::cerr << "[Test] FAILED: the match did not set up" << std::endl;
@@ -640,20 +640,20 @@ bool HeadlessTest::RunReplayTest(Application &app)
     setup.slots[1] = {true, Faction::Confederation, 1, 2, true};
     setup.startPosition[0] = 0;
     setup.startPosition[1] = 1;
-    constexpr uint32_t kTicksPerTurn = 2;
+    constexpr std::uint32_t kTicksPerTurn = 2;
     constexpr int kTurns = 400;
 
-    std::vector<std::vector<uint8_t>> recordedTurns;
-    std::vector<std::pair<uint32_t, uint64_t>> recordedSums;
-    uint64_t recordedFinal = 0;
+    std::vector<std::vector<std::uint8_t>> recordedTurns;
+    std::vector<std::pair<std::uint32_t, std::uint64_t>> recordedSums;
+    std::uint64_t recordedFinal = 0;
     const float dt = static_cast<float>(SIMULATION_TIMESTEP);
 
     // Plays the loaded match; `source` makes the bundle of each turn
-    auto play = [&](const std::function<bool(uint32_t turn, Net::TurnBundle &)> &source,
-                    const std::function<void(uint32_t tick, uint64_t sum)> &onSum) -> uint64_t {
+    auto play = [&](const std::function<bool(std::uint32_t turn, Net::TurnBundle &)> &source,
+                    const std::function<void(std::uint32_t tick, std::uint64_t sum)> &onSum) -> std::uint64_t {
         sim.startMatch(setup);
         SimContext ctx {entities, map, pf, economy, ai};
-        for (uint32_t tick = 0; tick < kTurns * kTicksPerTurn; ++tick)
+        for (std::uint32_t tick = 0; tick < kTurns * kTicksPerTurn; ++tick)
         {
             if (tick % kTicksPerTurn == 0)
             {
@@ -677,12 +677,12 @@ bool HeadlessTest::RunReplayTest(Application &app)
     // --- Recording: scripted turns, as a host would have closed them
     if (!mission.LoadMatch(setup, map, entities, economy, pf))
         return false;
-    std::vector<uint32_t> own, enemy;
+    std::vector<std::uint32_t> own, enemy;
     int enemyHq = 0;
     for (const Entity &e : entities.GetAllEntities())
     {
         if (e.owner == 0 && !e.isBuilding)
-            own.push_back(static_cast<uint32_t>(e.id));
+            own.push_back(static_cast<std::uint32_t>(e.id));
         if (e.owner == 1 && e.isBuilding && e.type == UnitType::Headquarters)
             enemyHq = e.id;
     }
@@ -693,7 +693,7 @@ bool HeadlessTest::RunReplayTest(Application &app)
         return false;
     }
     const int targetX = hq->tileX * TILE_WIDTH, targetY = hq->tileY * TILE_HEIGHT;
-    auto script = [&](uint32_t turn, Net::TurnBundle &b) {
+    auto script = [&](std::uint32_t turn, Net::TurnBundle &b) {
         b.turn = turn;
         std::vector<SimCommand> c0, c1;
         if (turn == 3)
@@ -703,14 +703,14 @@ bool HeadlessTest::RunReplayTest(Application &app)
             o.ids = own;
             o.x = targetX;
             o.y = targetY;
-            o.a = static_cast<int32_t>(OrderKind::AttackMove);
+            o.a = static_cast<std::int32_t>(OrderKind::AttackMove);
             c0.push_back(o);
         }
         if (turn % 10 == 5)
         {
             SimCommand v;
             v.type = CommandType::View;
-            v.x = 1000 + static_cast<int32_t>(turn) * 3;
+            v.x = 1000 + static_cast<std::int32_t>(turn) * 3;
             v.y = 700;
             v.a = 200;
             c1.push_back(v);
@@ -722,12 +722,12 @@ bool HeadlessTest::RunReplayTest(Application &app)
         return true;
     };
     recordedFinal = play(
-        [&](uint32_t turn, Net::TurnBundle &b) {
+        [&](std::uint32_t turn, Net::TurnBundle &b) {
             script(turn, b);
             recordedTurns.push_back(Net::encodeTurn(b));
             return true;
         },
-        [&](uint32_t tick, uint64_t sum) { recordedSums.emplace_back(tick, sum); });
+        [&](std::uint32_t tick, std::uint64_t sum) { recordedSums.emplace_back(tick, sum); });
 
     // The time of day travels with the setup (the last bit: a setup written before it reads as day)
     {
@@ -761,11 +761,11 @@ bool HeadlessTest::RunReplayTest(Application &app)
                {"players", nlohmann::json::array({{{"slot", 0}, {"name", "Red"}}, {{"slot", 1}, {"name", "Blue"}}})},
                {"result", {{"outcome", "left"}, {"tick", kTurns * kTicksPerTurn}}}})
               .dump();
-    std::vector<uint8_t> mapBytes, balanceBytes;
+    std::vector<std::uint8_t> mapBytes, balanceBytes;
     MapFiles::Read(setup.mapPath, mapBytes);
     Assets::ReadBytes(LoaderResources::weaponBalance(), balanceBytes);
     data.files["maps/m26.json"] = mapBytes;
-    data.files["data/assets/data/weapon_balance.json"] = balanceBytes;
+    data.files["data/assets/data/weapon_balance.yaml"] = balanceBytes;
     const std::string path = (dir / "test.awr").string();
     std::string error;
     if (!Net::writeReplay(path, data, error))
@@ -803,12 +803,12 @@ bool HeadlessTest::RunReplayTest(Application &app)
         if (!mission.LoadMatch(played, map, entities, economy, pf))
             return false;
         setup.local = played.local;
-        const uint64_t finalSum = play(
-            [&](uint32_t turn, Net::TurnBundle &) {
+        const std::uint64_t finalSum = play(
+            [&](std::uint32_t turn, Net::TurnBundle &) {
                 player.ScheduleDue(sim, turn * kTicksPerTurn);
                 return false; // the player schedules the turn itself
             },
-            [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
+            [&](std::uint32_t tick, std::uint64_t sum) { player.Verify(tick, sum); });
         std::cout << "  - Replayed " << info.turns << " turns: " << recordedSums.size()
                   << " recorded checksums, first difference at " << player.MismatchTick() << ", final "
                   << (finalSum == recordedFinal ? "equal" : "DIFFERENT") << std::endl;
@@ -898,10 +898,10 @@ bool HeadlessTest::RunAiVehicleTest(Application &app)
         setup.seed = 4242;
         setup.local = 0;
         setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
-        setup.slots[1] = {true, Faction::Confederation, 1, 2, false, static_cast<uint8_t>(level)};
-        setup.slots[2] = {true, Faction::Resistance, 1, 3, false, static_cast<uint8_t>(level)};
+        setup.slots[1] = {true, Faction::Confederation, 1, 2, false, static_cast<std::uint8_t>(level)};
+        setup.slots[2] = {true, Faction::Resistance, 1, 3, false, static_cast<std::uint8_t>(level)};
         for (int i = 0; i < 3; ++i)
-            setup.startPosition[i] = static_cast<int8_t>(i);
+            setup.startPosition[i] = static_cast<std::int8_t>(i);
         if (!mission.LoadMatch(setup, map, entities, economy, pf))
             return false;
         gc.ResetForMission(mission, *app.m_hudController, entities, map);
@@ -1304,11 +1304,11 @@ bool HeadlessTest::RunMatchAiTest(Application &app)
     setup.slots[1] = {true, Faction::Confederation, 1, 2, false, 2};
     setup.slots[2] = {true, Faction::Resistance, 1, 3, false, 1};
     for (int i = 0; i < 3; ++i)
-        setup.startPosition[i] = static_cast<int8_t>(i);
+        setup.startPosition[i] = static_cast<std::int8_t>(i);
 
     struct Outcome
     {
-        std::vector<uint64_t> sums;
+        std::vector<std::uint64_t> sums;
         int aiBuildings {0}, aiUnits {0}, ais {0};
     };
     auto run = [&]() {
@@ -1345,7 +1345,7 @@ bool HeadlessTest::RunMatchAiTest(Application &app)
         MatchSetup local = setup;
         local.localOnly = true;
         if (!mission.LoadMatch(local, map, entities, economy, pf) || !mission.IsMatch() || mission.IsOnlineMatch()
-            || !mission.Restart(LoaderResources::kDefaultRoot, map, entities, economy, pf) || !mission.IsMatch()
+            || !mission.Restart(map, entities, economy, pf) || !mission.IsMatch()
             || mission.IsOnlineMatch())
         {
             std::cerr << "[Test] FAIL: a local match must load, stay local and restart" << std::endl;
@@ -1388,7 +1388,7 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
     bool ok = true;
 
     // Two computer allies against two: plays `ticks` ticks of the match
-    auto play = [&](const std::string &mapName, uint32_t seed, int ticks) {
+    auto play = [&](const std::string &mapName, std::uint32_t seed, int ticks) {
         MatchSetup setup;
         setup.mapPath = LoaderResources::MapPath(mapName);
         setup.seed = seed;
@@ -1400,11 +1400,11 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
             setup.slots[i]
                 = {true,
                    i % 2 ? Faction::Confederation : Faction::Resistance,
-                   static_cast<uint8_t>(i / 2),
-                   static_cast<uint8_t>(i + 1),
+                   static_cast<std::uint8_t>(i / 2),
+                   static_cast<std::uint8_t>(i + 1),
                    false,
                    2};
-            setup.startPosition[i] = static_cast<int8_t>(i);
+            setup.startPosition[i] = static_cast<std::int8_t>(i);
         }
         if (!mission.LoadMatch(setup, map, entities, economy, pf))
             return false;
@@ -1525,7 +1525,7 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
                     if (q == p || !hq[q] || !doorOf(*hq[q], gx, gy))
                         continue;
                     bool found = false;
-                    for (size_t k = 0; k < sides.size() && !found; ++k)
+                    for (std::size_t k = 0; k < sides.size() && !found; ++k)
                     {
                         std::vector<PathNode> path;
                         bool partial = false;
@@ -1603,7 +1603,7 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
     GameplayController &gc = *app.m_gameplayController;
     Simulation &sim = gc.simulation();
     const float dt = static_cast<float>(SIMULATION_TIMESTEP);
-    constexpr uint32_t kTicks = 1600;
+    constexpr std::uint32_t kTicks = 1600;
     bool ok = true;
 
     // A character's own sounds: the Fortress' machine gun names fire_mg_fortress (sound: of its weapon); the matches
@@ -1656,9 +1656,9 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
     }
 
     // Plays kTicks of the loaded match through the full game step. `before` runs ahead of every tick
-    auto play = [&](const std::function<void(uint32_t)> &before, const std::function<void(uint32_t, uint64_t)> &after) {
+    auto play = [&](const std::function<void(std::uint32_t)> &before, const std::function<void(std::uint32_t, std::uint64_t)> &after) {
         AppState state = mission.IsMatch() ? AppState::SkirmishPlaying : AppState::CampaignPlaying;
-        for (uint32_t tick = 0; tick < kTicks; ++tick)
+        for (std::uint32_t tick = 0; tick < kTicks; ++tick)
         {
             before(tick);
             gc.SimulationStep(
@@ -1677,7 +1677,7 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         for (const Entity &e : entities.GetAllEntities())
         {
             if (e.alive && e.owner == Players::Local() && !e.isBuilding)
-                o.ids.push_back(static_cast<uint32_t>(e.id));
+                o.ids.push_back(static_cast<std::uint32_t>(e.id));
             if (e.alive && e.isBuilding && e.type == UnitType::Headquarters
                 && Players::Hostile(e.owner, Players::Local()))
             {
@@ -1687,7 +1687,7 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         }
         o.x = tx;
         o.y = ty;
-        o.a = static_cast<int32_t>(OrderKind::AttackMove);
+        o.a = static_cast<std::int32_t>(OrderKind::AttackMove);
         sim.Issue(o);
     };
 
@@ -1698,23 +1698,23 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
             std::cerr << "[Test] Error: " << what << " did not load" << std::endl;
             return false;
         }
-        std::map<uint32_t, std::vector<SimCommand>> commands;
-        sim.SetRecordHook([&](uint32_t tick, const SimCommand &c) { commands[tick].push_back(c); });
+        std::map<std::uint32_t, std::vector<SimCommand>> commands;
+        sim.SetRecordHook([&](std::uint32_t tick, const SimCommand &c) { commands[tick].push_back(c); });
         ReplayRecorder recorder;
         recorder.Begin(info);
         play(
-            [&](uint32_t tick) {
+            [&](std::uint32_t tick) {
                 if (tick == 40 || tick == 700)
                     order();
             },
-            [&](uint32_t tick, uint64_t sum) { recorder.OnChecksum(tick, sum); });
+            [&](std::uint32_t tick, std::uint64_t sum) { recorder.OnChecksum(tick, sum); });
         sim.SetRecordHook(nullptr);
-        for (uint32_t t = 0; t < kTicks; ++t)
+        for (std::uint32_t t = 0; t < kTicks; ++t)
         {
             Net::TurnBundle b;
             b.turn = t;
             if (auto it = commands.find(t); it != commands.end())
-                b.players.push_back({static_cast<uint8_t>(info.setup.local), SimCommandCodec::Encode(it->second)});
+                b.players.push_back({static_cast<std::uint8_t>(info.setup.local), SimCommandCodec::Encode(it->second)});
             recorder.OnBundle(b);
         }
         const std::string path = recorder.Finish("victory", kTicks);
@@ -1728,15 +1728,15 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         MatchSetup played;
         good = good && player.PrepareMatch(-1, played, error);
         if (good && info.mode == "campaign")
-            good = mission.LoadMission(info.mission, LoaderResources::kDefaultRoot, map, entities, economy, pf);
+            good = mission.LoadMission(info.mission, map, entities, economy, pf);
         else if (good)
             good = mission.LoadMatch(played, map, entities, economy, pf);
         if (good)
         {
             gc.ResetForMission(mission, *app.m_hudController, entities, map);
             play(
-                [&](uint32_t tick) { player.ScheduleDue(sim, tick); },
-                [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
+                [&](std::uint32_t tick) { player.ScheduleDue(sim, tick); },
+                [&](std::uint32_t tick, std::uint64_t sum) { player.Verify(tick, sum); });
         }
         std::cout << "  - " << what << ": " << commands.size() << " ticks with commands, file " << listed.fileBytes
                   << " bytes (" << listed.mode << "), first difference at " << player.MismatchTick()
@@ -1808,7 +1808,7 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
                  "campaign mission 1",
                  info,
                  [&]() {
-                     if (!mission.LoadMission(0, LoaderResources::kDefaultRoot, map, entities, economy, pf))
+                     if (!mission.LoadMission(0, map, entities, economy, pf))
                          return false;
                      gc.ResetForMission(mission, *app.m_hudController, entities, map);
                      return true;
@@ -2559,7 +2559,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             int n = 0;
             connected = !path.empty() && path.back().x == tx && path.back().y == ty;
             PathNode prev {sx, sy}, lastStep {0, 0};
-            for (size_t i = 0; i < path.size(); ++i)
+            for (std::size_t i = 0; i < path.size(); ++i)
             {
                 PathNode step {path[i].x - prev.x, path[i].y - prev.y};
                 if (std::max(std::abs(step.x), std::abs(step.y)) != 1)
@@ -2609,7 +2609,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         }
         std::cout << "  - Firing delay: fixed " << fixedMin << ".." << fixedMax << ", random " << randMin << ".."
                   << randMax << std::endl;
-        app.m_entities->LoadCharacterConfigs("assets"); // back to the real data
+        app.m_entities->LoadCharacterConfigs(); // back to the real data
         if (fixedMin != fixedMax || std::abs(fixedMin - 0.8f) > 0.001f)
             return fail("fixed firing delay must not vary");
         if (randMin < 1.0f || randMax > 2.0f || randMax - randMin < 0.5f)
@@ -2633,7 +2633,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             for (int i = 0; i < 30 * 15; ++i)
             {
                 entities.Update(1.0f / 30.0f, map, pf);
-                for (size_t k = 0; k < ids.size(); ++k)
+                for (std::size_t k = 0; k < ids.size(); ++k)
                 {
                     const Unit *u = entities.GetUnit(ids[k]);
                     if (!u)
@@ -2911,7 +2911,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         order.ids.assign(group.begin(), group.end());
         order.x = 34 * TILE_WIDTH + TILE_WIDTH / 2;
         order.y = 13 * TILE_HEIGHT + TILE_HEIGHT / 2;
-        order.a = static_cast<int32_t>(OrderKind::AttackMove);
+        order.a = static_cast<std::int32_t>(OrderKind::AttackMove);
         order.b = 1;
         sim.Issue(order);
         SimContext ctx {entities, map, pf, *app.m_economy, ai};
@@ -3306,8 +3306,8 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
         ai.SetEnemyCredits(-50);
         const bool zeroed = ai.GetEnemyCredits() == 0;
         ai.SetEnemyCredits(12345);
-        const size_t thoughts = ai.GetThoughts().size();
-        const size_t now = ai.CurrentIntentions().size();
+        const std::size_t thoughts = ai.GetThoughts().size();
+        const std::size_t now = ai.CurrentIntentions().size();
         std::cout << "  - Debug control: credits clamp to 0=" << (zeroed ? "yes" : "no") << ", set 12345 -> "
                   << ai.GetEnemyCredits() << ", thoughts logged " << thoughts << ", intentions " << now << std::endl;
         if (!zeroed || ai.GetEnemyCredits() != 12345 || thoughts < 3 || now == 0)
@@ -3560,7 +3560,7 @@ bool HeadlessTest::RunMakeWayTest(Application &app)
         for (float t = 0.0f; t < 15.0f; t += dt)
             entities.Update(dt, map, pf);
         int home = 0;
-        for (size_t i = 0; i < plugs.size(); ++i)
+        for (std::size_t i = 0; i < plugs.size(); ++i)
             home += near(plugs[i], plugSpots[i].first, plugSpots[i].second, 0) ? 1 : 0;
         int across = 0;
         for (int id : group)
@@ -4005,7 +4005,7 @@ bool HeadlessTest::RunBurstTest(Application &app)
 bool HeadlessTest::RunDataSyncTest(Application &app)
 {
     std::cout << "[Test] Validating the session data overlay (network data sync)..." << std::endl;
-    const uint64_t own = NetMatch::AssetsHash();
+    const std::uint64_t own = NetMatch::AssetsHash();
     const std::vector<Net::DataEntry> manifest = NetMatch::DataManifest();
     if (manifest.size() != LoaderResources::NetHashFiles().size() + 1
         || manifest.back().path != LoaderResources::kManifestPath)
@@ -4031,15 +4031,15 @@ bool HeadlessTest::RunDataSyncTest(Application &app)
         return false;
     }
     std::string changed = original;
-    const size_t at = changed.find("max_hp:");
+    const std::size_t at = changed.find("max_hp:");
     if (at == std::string::npos)
     {
         std::cerr << "[Test] Error: no max_hp in " << unitFile << std::endl;
         return false;
     }
-    const size_t eol = changed.find('\n', at);
+    const std::size_t eol = changed.find('\n', at);
     changed.replace(at, eol - at, "max_hp: " + std::to_string(ownHp + 7));
-    Assets::SetSessionOverlay({{unitFile.substr(7), std::vector<uint8_t>(changed.begin(), changed.end())}});
+    Assets::SetSessionOverlay({{unitFile.substr(7), std::vector<std::uint8_t>(changed.begin(), changed.end())}});
     std::string read;
     app.ReloadGameData();
     if (!Assets::ReadText(unitFile, read) || read != changed || NetMatch::AssetsHash() == own
@@ -4116,7 +4116,7 @@ bool HeadlessTest::RunZeusTest(Application &app)
         foe->cooldownTimer = 1000.0f;
         zeus->targetEntityId = foeId;
         int shells = 0, rockets = 0;
-        size_t seen = 0;
+        std::size_t seen = 0;
         for (int i = 0; i < 300; ++i)
         {
             app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
@@ -4418,7 +4418,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     std::cout << "[Test] Validating all 8 campaign missions and authentic base positions..." << std::endl;
     for (int mid = 0; mid < 8; ++mid)
     {
-        if (!app.m_mission->LoadMission(mid, "assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
+        if (!app.m_mission->LoadMission(mid, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
         {
             std::cerr << "[Test] Failed to load Mission " << mid << "!" << std::endl;
             return false;
@@ -4430,15 +4430,15 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
         if (mid == 7)
         {
-            uint16_t wConf = app.m_map->GetWall(12, 24);
-            uint16_t wRes = app.m_map->GetWall(47, 14);
+            std::uint16_t wConf = app.m_map->GetWall(12, 24);
+            std::uint16_t wRes = app.m_map->GetWall(47, 14);
             if (wConf < 1001 || wRes < 1101)
             {
                 std::cerr << "[Test] Error: Walls on map m0 (mid 7) failed to load properly! wConf=" << wConf
                           << " wRes=" << wRes << std::endl;
                 return false;
             }
-            std::cout << "  - Validated defensive walls on Map m0: Confederation wall=" << wConf
+            std::cout << "  - Validated defensive walls on Map resistance_mission_7 (was m0): Confederation wall=" << wConf
                       << ", Resistance wall=" << wRes << std::endl;
         }
     }
@@ -4447,7 +4447,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     std::cout << "[Test] Validating that defense missions spawn their enemies in waves..." << std::endl;
     for (int mid : {1, 3})
     {
-        if (!app.m_mission->LoadMission(mid, "assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
+        if (!app.m_mission->LoadMission(mid, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
         {
             std::cerr << "[Test] Failed to load defense mission " << mid << "!" << std::endl;
             return false;
@@ -4493,7 +4493,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     for (int mid = 0; mid < 7; ++mid)
     {
         const bool loaded
-            = app.m_mission->LoadMission(mid, "assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder);
+            = app.m_mission->LoadMission(mid, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder);
         const auto &conf = Missions::confederation()[mid].data;
         bool ownBase = false;
         for (const auto &e : app.m_entities->GetAllEntities())
@@ -4504,7 +4504,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
         std::cout << "  - " << app.m_mission->GetMissionName() << " (" << conf.mapFile << ", Map "
                   << app.m_map->GetWidth() << "x" << app.m_map->GetHeight() << ") | Player HQ: ("
                   << app.m_mission->GetPlayerHqX() << "," << app.m_mission->GetPlayerHqY() << ")" << std::endl;
-        if (!loaded || app.m_map->GetWidth() <= 1 || conf.mapFile.rfind("map_mission_", 0) != 0
+        if (!loaded || app.m_map->GetWidth() <= 1
+            || (conf.mapFile.rfind("confederation_mission_", 0) != 0 && conf.mapFile.rfind("map_mission_", 0) != 0)
             || (mid != 3 && mid != 2 && !ownBase && conf.entities.empty()))
         {
             std::cerr << "[Test] Error: Confederation mission " << mid << " failed to load!" << std::endl;
@@ -4515,7 +4516,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     SetPlayerFaction(Faction::Resistance);
 
     // Load Mission 0 for full gameplay simulation
-    if (!app.m_mission->LoadMission(0, "assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
+    if (!app.m_mission->LoadMission(0, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
     {
         std::cerr << "[Test] Failed to load Mission 0!" << std::endl;
         return false;
@@ -4654,7 +4655,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // Test recruitment queue with structure-specific spawning
     app.m_economy->AddCredits(1000);
-    size_t prevUnitCount = app.m_entities->GetAllEntities().size();
+    std::size_t prevUnitCount = app.m_entities->GetAllEntities().size();
     app.m_economy->QueueUnit(0, 80, 0.05f, barracksId, *app.m_entities); // Resistance rifleman
     app.m_economy->QueueUnit(6, 220, 0.05f, factoryId, *app.m_entities); // Coyote
     if (app.m_economy->QueueUnit(6, 220, 0.05f, barracksId, *app.m_entities)
@@ -4679,7 +4680,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
     }
 
-    size_t newUnitCount = app.m_entities->GetAllEntities().size();
+    std::size_t newUnitCount = app.m_entities->GetAllEntities().size();
     if (newUnitCount < prevUnitCount + 2)
     {
         std::cerr << "[Test] Error: Units failed to spawn from designated Barracks and Factory!" << std::endl;
@@ -4786,7 +4787,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     // 7. Standalone Test Map (maps/testmap.json) + Closed Passage Partial Pathing & Unit Blocking
     std::cout << "[Test] Validating Standalone Test Map (testmap.json), Unit Blocking & Closed Passages..."
               << std::endl;
-    if (!app.m_mission->LoadTestMap("assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
+    if (!app.m_mission->LoadTestMap(*app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
     {
         std::cerr << "[Test] Error: Failed to load Standalone Test Map (testmap.json)!" << std::endl;
         return false;
@@ -4847,11 +4848,11 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // Verify no two living mobile units ever overlap on the same tile
     const auto &allEnts = app.m_entities->GetAllEntities();
-    for (size_t i = 0; i < allEnts.size(); ++i)
+    for (std::size_t i = 0; i < allEnts.size(); ++i)
     {
         if (!allEnts[i].alive || allEnts[i].state == ActionState::Die || allEnts[i].isBuilding)
             continue;
-        for (size_t j = i + 1; j < allEnts.size(); ++j)
+        for (std::size_t j = i + 1; j < allEnts.size(); ++j)
         {
             if (!allEnts[j].alive || allEnts[j].state == ActionState::Die || allEnts[j].isBuilding)
                 continue;
@@ -5773,13 +5774,13 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // A. Pinpoint high accuracy test when spread = 0
     spreadShooter->spreadAngle = 0.0f;
-    const size_t projZeroStart = app.m_entities->GetProjectiles().size();
+    const std::size_t projZeroStart = app.m_entities->GetProjectiles().size();
     for (int i = 0; i < 5; ++i)
     {
         app.m_entities->SpawnProjectileFromEntity(*spreadShooter, 50.0f, 50.0f, 200.0f, 50.0f, 0, *app.m_map);
     }
     const auto &projsZero = app.m_entities->GetProjectiles();
-    for (size_t i = projZeroStart; i < projsZero.size(); ++i)
+    for (std::size_t i = projZeroStart; i < projsZero.size(); ++i)
     {
         if (std::abs(projsZero[i].targetY - 50.0f) > 0.001f || std::abs(projsZero[i].targetX - 200.0f) > 0.001f)
         {
@@ -5791,7 +5792,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // B. Dispersion test with authentic weapon spread (unset -1.0f or positive angle)
     spreadShooter->spreadAngle = -1.0f;
-    const size_t projCountBefore = app.m_entities->GetProjectiles().size();
+    const std::size_t projCountBefore = app.m_entities->GetProjectiles().size();
     for (int i = 0; i < 10; ++i)
     {
         app.m_entities->SpawnProjectileFromEntity(*spreadShooter, 50.0f, 50.0f, 200.0f, 50.0f, 0, *app.m_map);
@@ -5803,7 +5804,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         return false;
     }
     std::set<int> distinctTargetYInts;
-    for (size_t i = projCountBefore; i < projs.size(); ++i)
+    for (std::size_t i = projCountBefore; i < projs.size(); ++i)
     {
         distinctTargetYInts.insert(static_cast<int>(std::round(projs[i].targetY * 10.0f)));
     }
@@ -6155,7 +6156,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     // B. Menu content: the campaign lists only its missions, a custom game can use any map of assets/maps
     if (MissionController::kCampaignMissionCount != 7
         || MissionController::GetAvailableMissions().size()
-               < static_cast<size_t>(MissionController::kCampaignMissionCount))
+               < static_cast<std::size_t>(MissionController::kCampaignMissionCount))
     {
         std::cerr << "[Test] Error: The campaign must consist of its 7 missions!" << std::endl;
         return false;
@@ -6189,7 +6190,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         }
     }
     const int serialBeforeRestart = app.m_mission->GetLoadSerial();
-    if (!app.m_mission->Restart("assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder)
+    if (!app.m_mission->Restart(*app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder)
         || app.m_mission->GetLoadSerial() == serialBeforeRestart || !app.m_mission->IsSkirmish())
     {
         std::cerr << "[Test] Error: Restarting a custom game failed!" << std::endl;
@@ -6630,7 +6631,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         << std::endl;
 
     // 1) Automatic AI Initialization on Map Load (via setOnLoaded hook)
-    if (!app.m_mission->LoadMission(7, "assets", *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
+    if (!app.m_mission->LoadMission(7, *app.m_map, *app.m_entities, *app.m_economy, *app.m_pathfinder))
     {
         std::cerr << "[Test] Error: Failed to load Mission 7 (Skirmish map)!" << std::endl;
         return false;
@@ -6665,7 +6666,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
                   << diagPath.size() << std::endl;
         return false;
     }
-    for (size_t i = 0; i < diagPath.size(); ++i)
+    for (std::size_t i = 0; i < diagPath.size(); ++i)
     {
         int expectedX = 11 + static_cast<int>(i);
         int expectedY = 11 + static_cast<int>(i);
@@ -6875,10 +6876,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
             SimCommand c;
             c.type = CommandType::OrderAt;
             c.player = owner;
-            c.ids = {static_cast<uint32_t>(id)};
+            c.ids = {static_cast<std::uint32_t>(id)};
             c.x = tx * TILE_WIDTH + TILE_WIDTH / 2;
             c.y = ty * TILE_HEIGHT + TILE_HEIGHT / 2;
-            c.a = static_cast<int32_t>(OrderKind::Move);
+            c.a = static_cast<std::int32_t>(OrderKind::Move);
             c.b = b;
             sim.Issue(std::move(c));
         };
@@ -7193,9 +7194,9 @@ bool HeadlessTest::run(Application &app, int numTicks)
     {
         std::cout << "[Test] Validating the voices of each language..." << std::endl;
         VoiceManager en, ru, other;
-        en.load("en", LoaderResources::kDefaultRoot);
-        ru.load("ru", LoaderResources::kDefaultRoot);
-        other.load("xx", LoaderResources::kDefaultRoot);
+        en.load("en");
+        ru.load("ru");
+        other.load("xx");
         static const char *const kLines[]
             = {"ack_select_infantry",
                "ack_move_vehicle",
@@ -7605,7 +7606,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         app.m_entities->Clear();
     }
 
-    // Damage multipliers by projectile kind and target class (data/weapon_balance.json)
+    // Damage multipliers by projectile kind and target class (data/weapon_balance.yaml)
     {
         WeaponBalance::Reload();
         const int bldg = WeaponBalance::Scale(100, ProjectileType::Bullet, TargetClass::Building);
@@ -7668,17 +7669,17 @@ bool HeadlessTest::run(Application &app, int numTicks)
             mixer.Configure(
                 nlohmann::json::parse(
                     R"({"events":{"boom":{"category":"impact","volume":1.0,"reverb":1.0,"max_instances":2}}})"));
-            std::vector<int16_t> pcm(2000);
-            uint32_t seed = 12345;
+            std::vector<std::int16_t> pcm(2000);
+            std::uint32_t seed = 12345;
             for (auto &v : pcm)
             {
                 seed = seed * 1664525u + 1013904223u;
-                v = static_cast<int16_t>((seed >> 16) % 20000) - 10000;
+                v = static_cast<std::int16_t>((seed >> 16) % 20000) - 10000;
             }
             mixer.AddClip("boom", pcm);
             mixer.SetReverb(reverb);
             mixer.Play("boom", 1.0f, 0.0f, 1000, muffle);
-            std::vector<int16_t> out(2 * 4096, 0);
+            std::vector<std::int16_t> out(2 * 4096, 0);
             mixer.Mix(out.data(), 4096);
             double diff = 0.0;
             for (int i = 1; i < 2000; ++i)
@@ -7822,7 +7823,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
         SimCommand cmdToggle;
         cmdToggle.type = CommandType::ToggleSiege;
         cmdToggle.player = player;
-        cmdToggle.ids = {static_cast<uint32_t>(rhinoId)};
+        cmdToggle.ids = {static_cast<std::uint32_t>(rhinoId)};
         sim.Apply(cmdToggle, ctx);
 
         if (rhino->state != ActionState::Transform)
@@ -7841,10 +7842,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
         SimCommand cmdOrder;
         cmdOrder.type = CommandType::OrderAt;
         cmdOrder.player = player;
-        cmdOrder.ids = {static_cast<uint32_t>(rhinoId)};
+        cmdOrder.ids = {static_cast<std::uint32_t>(rhinoId)};
         cmdOrder.x = 25 * TILE_WIDTH;
         cmdOrder.y = 25 * TILE_HEIGHT;
-        cmdOrder.a = static_cast<int32_t>(OrderKind::Move);
+        cmdOrder.a = static_cast<std::int32_t>(OrderKind::Move);
         cmdOrder.b = 0; // plain right click (not queued with shift)
         sim.Apply(cmdOrder, ctx);
 
@@ -7888,10 +7889,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
         Utility::VisualRandom(0.0f, 100.0f);
         Utility::VisualRandom(1, 10);
         Utility::Rng().Reseed(0x12345678u);
-        const uint32_t s1 = Utility::Rng()();
+        const std::uint32_t s1 = Utility::Rng()();
         Utility::VisualRandom(-5.0f, 5.0f);
         Utility::Rng().Reseed(0x12345678u);
-        const uint32_t s2 = Utility::Rng()();
+        const std::uint32_t s2 = Utility::Rng()();
         if (s1 != s2)
         {
             std::cerr << "[Test] Error: VisualRandom calls contaminated simulation PRNG!" << std::endl;

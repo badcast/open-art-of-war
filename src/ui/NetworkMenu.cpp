@@ -22,16 +22,16 @@ namespace col = ui::color;
 namespace
 {
 
-constexpr uint16_t kDefaultPort = 38100;
+constexpr std::uint16_t kDefaultPort = 38100;
 constexpr int kChatLines = 6;
 
-std::string AiLevelName(uint8_t level)
+std::string AiLevelName(std::uint8_t level)
 {
     static const char *const kNames[4] = {"Easy", "Medium", "Hard", "Hardcore"};
     return _(kNames[level & 3]);
 }
 
-std::string FactionName(uint8_t f)
+std::string FactionName(std::uint8_t f)
 {
     if (f == 0)
         return _("Resistance");
@@ -55,7 +55,7 @@ std::vector<std::string> ComboChoices(int kind)
             out.push_back(_(ArmyColorName(i)));
     else if (kind == 4)
         for (int i = 0; i < 4; ++i)
-            out.push_back(AiLevelName(static_cast<uint8_t>(i)));
+            out.push_back(AiLevelName(static_cast<std::uint8_t>(i)));
     else if (kind == 7)
     {
         out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"}; // the start credits form, see kHandicapPercent
@@ -104,7 +104,7 @@ struct SeatOption
 // Index into lobby.slots of the player holding the start position (-1: nobody)
 int SlotAtSpawn(const Net::LobbyState &lobby, int position)
 {
-    for (size_t i = 0; i < lobby.slots.size(); ++i)
+    for (std::size_t i = 0; i < lobby.slots.size(); ++i)
         if (lobby.slots[i].choice.spawn == position)
             return static_cast<int>(i);
     return -1;
@@ -125,7 +125,7 @@ std::vector<SeatOption> SeatOptions(const NetMatch &net, const Net::LobbyState &
             out.push_back({_("Occupy"), kSeatOccupy});
         out.push_back({_("Open"), kSeatOpen});
         for (int level = 0; level < 4; ++level)
-            out.push_back({std::string(_("AI")) + " - " + AiLevelName(static_cast<uint8_t>(level)), kSeatAi + level});
+            out.push_back({std::string(_("AI")) + " - " + AiLevelName(static_cast<std::uint8_t>(level)), kSeatAi + level});
         out.push_back({_("Blocked"), kSeatBlocked});
     }
     else if (free)
@@ -145,14 +145,14 @@ int SeatCurrent(const std::vector<SeatOption> &options, const Net::LobbyState &l
         code = lobby.slots[held].ai ? kSeatAi + (lobby.slots[held].aiLevel & 3) : 0;
     else if ((lobby.blockedMask >> position) & 1u)
         code = kSeatBlocked;
-    for (size_t i = 0; i < options.size(); ++i)
+    for (std::size_t i = 0; i < options.size(); ++i)
         if (options[i].code == code)
             return static_cast<int>(i);
     return -1;
 }
 
 // Team colours (index 0 = colour 1) other players of the room already have: nobody may pick them again
-std::vector<bool> TakenColors(const Net::LobbyState &lobby, uint8_t slot)
+std::vector<bool> TakenColors(const Net::LobbyState &lobby, std::uint8_t slot)
 {
     std::vector<bool> taken(Settings::kArmyColors, false);
     for (const Net::LobbySlot &o : lobby.slots)
@@ -163,7 +163,7 @@ std::vector<bool> TakenColors(const Net::LobbyState &lobby, uint8_t slot)
     return taken;
 }
 
-SDL_Color SlotColor(uint8_t color)
+SDL_Color SlotColor(std::uint8_t color)
 {
     return color == 0 ? col::TextDim : ArmyColor(color);
 }
@@ -214,7 +214,7 @@ void DrawField(
 
 void NetworkMenu::PushOptions(NetMatch &net)
 {
-    net.SetOptions(m_fog, m_prebuilt, static_cast<uint8_t>(std::clamp(m_credits, 0, 4)), m_night);
+    net.SetOptions(m_fog, m_prebuilt, static_cast<std::uint8_t>(std::clamp(m_credits, 0, 4)), m_night);
 }
 
 void NetworkMenu::Reset()
@@ -308,7 +308,7 @@ void NetworkMenu::RebuildMapsShown()
     m_mapTop = 0;
 }
 
-void NetworkMenu::EditText(InputManager &input, std::string &text, size_t maxLength)
+void NetworkMenu::EditText(InputManager &input, std::string &text, std::size_t maxLength)
 {
     for (int i = input.TakeBackspaces(); i > 0; --i)
         PopUtf8(text);
@@ -324,7 +324,7 @@ bool NetworkMenu::ParseAddress(const std::string &text)
     if (a.empty())
         return false;
     m_joinPort = kDefaultPort;
-    const size_t colon = a.rfind(':');
+    const std::size_t colon = a.rfind(':');
     if (colon != std::string::npos && a.find(':') == colon)
     { // one colon: host:port (IPv6 is not supported)
         const std::string port = a.substr(colon + 1);
@@ -333,7 +333,7 @@ bool NetworkMenu::ParseAddress(const std::string &text)
         const int p = std::stoi(port);
         if (p <= 0 || p > 65535)
             return false;
-        m_joinPort = static_cast<uint16_t>(p);
+        m_joinPort = static_cast<std::uint16_t>(p);
         a.resize(colon);
     }
     m_joinAddress = a;
@@ -602,7 +602,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     int myRow = -1;
     if (lobby)
     {
-        for (size_t i = 0; i < lobby->slots.size(); ++i)
+        for (std::size_t i = 0; i < lobby->slots.size(); ++i)
         {
             if (lobby->slots[i].slot == net.LocalSlot())
             {
@@ -744,7 +744,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     {
                         if (net.LocalChoice(own))
                         {
-                            own.spawn = static_cast<uint8_t>(row);
+                            own.spawn = static_cast<std::uint8_t>(row);
                             own.ready = false;
                             net.SetChoice(own);
                         }
@@ -752,11 +752,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     else if (code != SeatCurrent(options, *lobby, row) || SlotAtSpawn(*lobby, row) >= 0)
                     {
                         Net::OwnerSetSeat seat;
-                        seat.spawn = static_cast<uint8_t>(row);
+                        seat.spawn = static_cast<std::uint8_t>(row);
                         seat.kind = code == kSeatOpen      ? Net::OwnerSetSeat::Open
                                     : code == kSeatBlocked ? Net::OwnerSetSeat::Blocked
                                                            : Net::OwnerSetSeat::Ai;
-                        seat.level = code >= kSeatAi && code < kSeatBlocked ? static_cast<uint8_t>(code - kSeatAi) : 1;
+                        seat.level = code >= kSeatAi && code < kSeatBlocked ? static_cast<std::uint8_t>(code - kSeatAi) : 1;
                         net.SetSeat(seat);
                     }
                 }
@@ -771,12 +771,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         net.LocalChoice(choice); // edit what was last sent, not the room's lagging echo
                     if (kind == 1)
                     {
-                        choice.faction = picked == 0 ? Net::kRandom : static_cast<uint8_t>(picked - 1);
+                        choice.faction = picked == 0 ? Net::kRandom : static_cast<std::uint8_t>(picked - 1);
                         choice.ready = false;
                     }
                     if (kind == 2)
                     {
-                        choice.team = static_cast<uint8_t>(picked);
+                        choice.team = static_cast<std::uint8_t>(picked);
                         // Teams are the host's decision: a player's team goes through the room directly
                         if (!s.ai)
                         {
@@ -785,21 +785,21 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                             return NetworkAction::None;
                         }
                     }
-                    if (kind == 3 && TakenColors(*lobby, s.slot)[static_cast<size_t>(picked)]
+                    if (kind == 3 && TakenColors(*lobby, s.slot)[static_cast<std::size_t>(picked)]
                         && picked + 1 != choice.color)
                         return NetworkAction::None; // somebody else's colour: nothing changes
                     if (kind == 3)
                     {
-                        choice.color = static_cast<uint8_t>(picked + 1);
+                        choice.color = static_cast<std::uint8_t>(picked + 1);
                         choice.ready = false; // like faction and team: the owner never starts with an old colour
                     }
                     if (kind == 7 || kind == 8)
                     {
                         // The form (start credits) and the army size limit are the owner's decision, for every player
                         if (kind == 7)
-                            choice.handicap = static_cast<uint8_t>(picked);
+                            choice.handicap = static_cast<std::uint8_t>(picked);
                         else
-                            choice.armyCap = static_cast<uint8_t>(picked);
+                            choice.armyCap = static_cast<std::uint8_t>(picked);
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
@@ -923,10 +923,10 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         if (i >= 0 && i < static_cast<int>(m_mapsShown.size()))
         {
             // Only a map with a start position for everybody in the room
-            const size_t inRoom = lobby ? lobby->slots.size() : 1;
+            const std::size_t inRoom = lobby ? lobby->slots.size() : 1;
             if (MissionController::StartPositions(m_mapsShown[i].path).size() >= inRoom)
             {
-                for (size_t k = 0; k < m_maps.size(); ++k)
+                for (std::size_t k = 0; k < m_maps.size(); ++k)
                     if (m_maps[k].path == m_mapsShown[i].path)
                         m_mapIndex = static_cast<int>(k);
                 net.SetLobbyMap(m_mapsShown[i].path);
@@ -974,7 +974,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     // An open start position on the map: take it
     if (l.map.Contains(mx, my) && lobby)
     {
-        for (size_t i = 0; i < m_spots.size(); ++i)
+        for (std::size_t i = 0; i < m_spots.size(); ++i)
         {
             int sx = 0, sy = 0;
             if (!SpotOnScreen(l.map, m_mapW, m_mapH, m_spots[i].first, m_spots[i].second, sx, sy))
@@ -982,7 +982,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             if (std::abs(mx - sx) <= 14 && std::abs(my - sy) <= 14 && SlotAtSpawn(*lobby, static_cast<int>(i)) < 0
                 && !((lobby->blockedMask >> i) & 1u))
             {
-                next.spawn = static_cast<uint8_t>(i);
+                next.spawn = static_cast<std::uint8_t>(i);
                 next.ready = false;
             }
         }
@@ -1035,7 +1035,7 @@ void NetworkMenu::Render(
                     false);
             }
         }
-        auto nameOf = [&](uint8_t slot) {
+        auto nameOf = [&](std::uint8_t slot) {
             if (roster)
             {
                 for (const Net::RosterEntry &e : roster->players)
@@ -1211,7 +1211,7 @@ void NetworkMenu::Render(
                     l.Filter(k).Contains(m_mouseX, m_mouseY));
             }
             ui::DrawPanel(r, l.mapList, col::PanelSunken, col::Border);
-            const size_t inRoom = lobby ? lobby->slots.size() : 1;
+            const std::size_t inRoom = lobby ? lobby->slots.size() : 1;
             const int rows = l.MapRows();
             r.SetClipRect({l.mapList.x, l.mapList.y, l.mapList.w, l.mapList.h});
             for (int row = 0; row < rows && m_mapTop + row < static_cast<int>(m_mapsShown.size()); ++row)
@@ -1277,7 +1277,7 @@ void NetworkMenu::Render(
                     ph * scale};
                 SDL_RenderTexture(r.GetSdlRenderer(), tex, nullptr, &dst);
             }
-            for (size_t i = 0; i < m_spots.size() && i < lobby->spawnCount; ++i)
+            for (std::size_t i = 0; i < m_spots.size() && i < lobby->spawnCount; ++i)
             {
                 int sx = 0, sy = 0;
                 if (!SpotOnScreen(l.map, m_mapW, m_mapH, m_spots[i].first, m_spots[i].second, sx, sy))
@@ -1509,7 +1509,7 @@ void NetworkMenu::Render(
                     taken = TakenColors(*lobby, s.slot);
                     for (int i = 1; i <= Settings::kArmyColors; ++i)
                         swatches.push_back(ArmyColor(i));
-                    for (size_t i = 0; i < items.size() && i < taken.size(); ++i)
+                    for (std::size_t i = 0; i < items.size() && i < taken.size(); ++i)
                     {
                         if (taken[i] && static_cast<int>(i) != current)
                             items[i] += std::string(" (") + _("taken") + ")";
@@ -1591,7 +1591,7 @@ void NetworkMenu::Render(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
-        for (size_t i = 0; i < lan.size() && i < 8; ++i)
+        for (std::size_t i = 0; i < lan.size() && i < 8; ++i)
         {
             const UiRect row {l.list.x + 4, l.list.y + 4 + static_cast<int>(i) * 40, l.list.w - 8, 36};
             const bool sel = static_cast<int>(i) == m_lanSelected;

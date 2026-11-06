@@ -280,7 +280,7 @@ private:
     }
 
     // Noise symmetric under the chosen symmetry (the original point and its mirror image are averaged)
-    float field(float x, float y, float frequency, int octaves, uint32_t salt) const
+    float field(float x, float y, float frequency, int octaves, std::uint32_t salt) const
     {
         float value = OctaveNoise2D(x * frequency, y * frequency, octaves, 0.5f, m_seed + salt);
         if (m_sym.Active())
@@ -297,7 +297,7 @@ private:
     {
         if (values.empty())
             return 2.0f;
-        const size_t pos = static_cast<size_t>(std::clamp(1.0f - fraction, 0.0f, 1.0f) * (values.size() - 1));
+        const std::size_t pos = static_cast<std::size_t>(std::clamp(1.0f - fraction, 0.0f, 1.0f) * (values.size() - 1));
         std::nth_element(values.begin(), values.begin() + pos, values.end());
         return values[pos];
     }
@@ -339,7 +339,7 @@ private:
                     continue;
                 queue.assign(1, {sx, sy});
                 label[Idx(sx, sy)] = count;
-                for (size_t head = 0; head < queue.size(); ++head)
+                for (std::size_t head = 0; head < queue.size(); ++head)
                 {
                     const Point cur = queue[head];
                     static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -381,9 +381,9 @@ private:
                 m_bases.push_back({x, y});
             }
             float nearest = 1e9f;
-            for (size_t a = 0; a < m_bases.size(); ++a)
+            for (std::size_t a = 0; a < m_bases.size(); ++a)
             {
-                for (size_t b = a + 1; b < m_bases.size(); ++b)
+                for (std::size_t b = a + 1; b < m_bases.size(); ++b)
                 {
                     nearest = std::min(
                         nearest, std::hypot(float(m_bases[a].x - m_bases[b].x), float(m_bases[a].y - m_bases[b].y)));
@@ -583,12 +583,12 @@ private:
             if (!m_reserved[i])
                 eligible.push_back(value[i]);
         const float wanted = fraction * m_w * m_h;
-        const float threshold = Quantile(eligible, std::min(0.98f, wanted / std::max<size_t>(1, eligible.size())));
+        const float threshold = Quantile(eligible, std::min(0.98f, wanted / std::max<std::size_t>(1, eligible.size())));
         for (int i = 0; i < m_w * m_h; ++i)
             m_island[i] = !m_reserved[i] && value[i] > threshold ? 1 : 0;
 
         // Majority filter: smooth outlines
-        std::vector<uint8_t> smoothed(m_island.size());
+        std::vector<std::uint8_t> smoothed(m_island.size());
         for (int y = 0; y < m_h; ++y)
         {
             for (int x = 0; x < m_w; ++x)
@@ -637,7 +637,7 @@ private:
             };
             const int home = labelOf(m_bases[0]);
             int lost = -1;
-            for (size_t i = 1; i < m_bases.size() && lost < 0; ++i)
+            for (std::size_t i = 1; i < m_bases.size() && lost < 0; ++i)
             {
                 if (labelOf(m_bases[i]) != home)
                     lost = labelOf(m_bases[i]);
@@ -656,7 +656,7 @@ private:
                 }
             }
             int reached = -1;
-            for (size_t head = 0; head < queue.size() && reached < 0; ++head)
+            for (std::size_t head = 0; head < queue.size() && reached < 0; ++head)
             {
                 const int cur = queue[head];
                 static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -739,7 +739,7 @@ private:
                 }
             }
             int reached = -1;
-            for (size_t head = 0; head < queue.size() && reached < 0; ++head)
+            for (std::size_t head = 0; head < queue.size() && reached < 0; ++head)
             {
                 const int cur = queue[head];
                 static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -866,7 +866,7 @@ private:
             }
         }
         // The map edge does not count as open ground: islands touching it keep a deep core there
-        for (size_t head = 0; head < queue.size(); ++head)
+        for (std::size_t head = 0; head < queue.size(); ++head)
         {
             const Point cur = queue[head];
             static constexpr int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -915,14 +915,14 @@ private:
                     earthOpen.push_back(field(x, y, 0.07f, 3, 505));
             }
         }
-        const float openCorners = static_cast<float>(std::max<size_t>(1, earthOpen.size()));
+        const float openCorners = static_cast<float>(std::max<std::size_t>(1, earthOpen.size()));
         std::fill(m_corner.begin(), m_corner.end(), G);
 
         // Earth (on tileset 1 also sand) patches on the open ground; a ring of light grass keeps them off the dark
         // grass
         const float earthThreshold = Quantile(earthOpen, Percent(m_params.earthPercent));
         const float sandThreshold = m_tilesetId == 1 ? Quantile(earthOpen, 0.5f) : 2.0f;
-        std::vector<uint8_t> grassRing(cw * ch, 0);
+        std::vector<std::uint8_t> grassRing(cw * ch, 0);
         for (int y = 0; y < ch; ++y)
         {
             for (int x = 0; x < cw; ++x)
@@ -952,7 +952,7 @@ private:
             }
         }
         const float darkFraction
-            = Percent(m_params.darkGrassPercent) * openCorners / std::max<size_t>(1, darkOpen.size());
+            = Percent(m_params.darkGrassPercent) * openCorners / std::max<std::size_t>(1, darkOpen.size());
         const float darkThreshold = Quantile(darkOpen, std::min(1.0f, darkFraction));
         for (int y = 0; y < ch; ++y)
         {
@@ -1108,7 +1108,7 @@ private:
                 {
                     tile = PickFrom(variant->second);
                 }
-                m_doc.SetTile(x, y, static_cast<uint8_t>(tile));
+                m_doc.SetTile(x, y, static_cast<std::uint8_t>(tile));
             }
         }
     }
@@ -1117,7 +1117,7 @@ private:
     {
         m_doc.setPlayerStart(m_bases[0].x + 1, m_bases[0].y + 2);
         m_doc.setEnemyStart(m_bases[1].x + 1, m_bases[1].y + 2);
-        for (size_t i = 2; i < m_bases.size(); ++i)
+        for (std::size_t i = 2; i < m_bases.size(); ++i)
             m_doc.AddStartPos(m_bases[i].x + 1, m_bases[i].y + 2);
     }
 
@@ -1249,7 +1249,7 @@ private:
         for (int i = 0; i < m_w * m_h; ++i)
             if (m_island[i])
                 order.push_back(i);
-        for (size_t i = order.size(); i > 1; --i)
+        for (std::size_t i = order.size(); i > 1; --i)
             std::swap(order[i - 1], order[Pick(0, static_cast<int>(i) - 1)]);
         std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
             return std::min(m_depth[a], 3) > std::min(m_depth[b], 3);
@@ -1329,16 +1329,16 @@ private:
     int m_tilesetId;
     const TileSet &m_tileset;
     Rng m_rng;
-    uint32_t m_seed;
+    std::uint32_t m_seed;
     Symmetry m_sym;
 
     std::vector<Point> m_bases;
     int m_players {2};
     std::vector<FPoint> m_roadPoints;
-    std::vector<uint8_t> m_reserved; // kept free: bases, roads, clearings
-    std::vector<uint8_t> m_island;   // impassable island
+    std::vector<std::uint8_t> m_reserved; // kept free: bases, roads, clearings
+    std::vector<std::uint8_t> m_island;   // impassable island
     std::vector<int> m_depth;        // distance of an island tile from the open ground (0 = open)
-    std::vector<uint8_t> m_cover;    // covered by a decoration footprint
+    std::vector<std::uint8_t> m_cover;    // covered by a decoration footprint
     int m_decorArea {0};             // sum of the footprint areas
     int m_decorCount {0};
     int m_rockCount {0};        // rocks and stones among the decorations

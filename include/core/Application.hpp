@@ -109,15 +109,15 @@ public:
     // Network game from the command line (until the lobby screen exists): host on `port` and start the
     // match on `mapPath` once `players` have joined, or join address:port
     void HostNetworkGame(
-        uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
-    void JoinNetworkGame(const std::string &address, uint16_t port, const std::string &name);
+        std::uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
+    void JoinNetworkGame(const std::string &address, std::uint16_t port, const std::string &name);
     // The hosted game is listed on the server (reachable by its code through NAT hole punching)
-    void AnnounceNetworkGame(const std::string &server, uint16_t port);
+    void AnnounceNetworkGame(const std::string &server, std::uint16_t port);
     // Through a dedicated server (host:port): create a room (code empty) or join the room with `code`;
     // `players` / `mapPath` as for hostNetworkGame (the creator owns the room)
     void ServerNetworkGame(
         const std::string &server,
-        uint16_t port,
+        std::uint16_t port,
         const std::string &code,
         int players,
         const std::string &mapPath,
@@ -151,17 +151,17 @@ private:
     // Settings "Network statistics": ping, jitter, loss, traffic, turn buffer (network lobby and match)
     void RenderNetStats();
     // Network match: services the session, starts the match when its setup arrives
-    void UpdateNetwork(uint32_t nowMs);
+    void UpdateNetwork(std::uint32_t nowMs);
     bool InNetworkMatch() const;
-    void DriveNetworkBot(uint32_t tick);
+    void DriveNetworkBot(std::uint32_t tick);
     void RenderNetworkBanner();
     // Network match: notices who drops out / comes back / leaves (from the room's roster)
-    void TrackNetPlayers(uint32_t nowMs);
+    void TrackNetPlayers(std::uint32_t nowMs);
     // Short messages over the battlefield ("Player X has disconnected"), they fade after a few seconds
-    void PushNotice(const std::string &text, uint32_t nowMs);
+    void PushNotice(const std::string &text, std::uint32_t nowMs);
     void RenderNotices();
     // In-game chat of a network match: Enter opens the input line, Enter sends, Esc closes
-    void UpdateGameChat(uint32_t nowMs);
+    void UpdateGameChat(std::uint32_t nowMs);
     void RenderGameChat();
     void RenderMenuFade();
     // Tab held in a match: every player with faction, colour, name and efficiency points
@@ -197,8 +197,8 @@ private:
     bool m_debugMode {false};
     AppState m_state {AppState::SplashLogo};
     // Fade of the main menu out of black (RenderMenuFade)
-    static constexpr uint64_t kMenuFadeMs = 2000;
-    uint64_t m_menuFadeStartMs {0};
+    static constexpr std::uint64_t kMenuFadeMs = 2000;
+    std::uint64_t m_menuFadeStartMs {0};
     bool m_menuFadeWasMenu {false};
     float m_splashTimer {0.0f};
 
@@ -239,16 +239,16 @@ private:
     std::unique_ptr<Net::MasterClient> m_master;   // the dedicated server (internet tab)
     std::vector<LanGame> m_serverRooms;
     std::string m_serverStatus;
-    uint32_t m_serverListMs {0};
-    uint32_t m_serverFailedMs {0};                   // when the server connection failed (retried after kServerRetryMs)
-    static constexpr uint32_t kServerRetryMs = 3000; // room list refresh and server retry period
+    std::uint32_t m_serverListMs {0};
+    std::uint32_t m_serverFailedMs {0};                   // when the server connection failed (retried after kServerRetryMs)
+    static constexpr std::uint32_t kServerRetryMs = 3000; // room list refresh and server retry period
     bool m_serverJoinPending {false};                // waiting for the server's answer to create / find
     std::string m_serverOverride;                    // --server: instead of the environment's master host
-    uint16_t m_serverOverridePort {0};
+    std::uint16_t m_serverOverridePort {0};
     int m_cliServerAction {0}; // 1 create, 2 find by code (from the command line)
     std::string m_cliServerCode;
     bool m_netAuto {false}; // command-line game: ready by itself, the room starts by itself
-    uint32_t m_netAutoMs {0};
+    std::uint32_t m_netAutoMs {0};
     void UpdateServer();
     // --- Replay (.awr): a recorded network game played back through the simulation (ApplicationReplay.cpp)
     std::unique_ptr<ReplayPlayer> m_replay;
@@ -293,12 +293,12 @@ private:
     // --- The replay of a match of this computer alone (a custom game, a campaign mission): the commands of the
     //     player tick by tick, the world checksums and the camera, in the same file as a network match's
     std::unique_ptr<ReplayRecorder> m_localRecorder;
-    std::map<uint32_t, std::vector<SimCommand>> m_localCommands;
+    std::map<std::uint32_t, std::vector<SimCommand>> m_localCommands;
     int m_localRecordSerial {-1};
-    uint32_t m_localTicks {0};
+    std::uint32_t m_localTicks {0};
     float m_localViewX {-1e9f}, m_localViewY {-1e9f}, m_localViewZoom {0.0f};
     void UpdateLocalReplay(); // starts / ends the recording with the match
-    void LocalTickRan(uint32_t tick);
+    void LocalTickRan(std::uint32_t tick);
     void FinishLocalReplay(const std::string &outcome);
     // The observer of a replay sees the whole map (drawing only: the simulation's fog is part of the match)
     bool ReplayShowsAll() const
@@ -331,7 +331,7 @@ private:
     struct Notice
     {
         std::string text;
-        uint32_t untilMs {0};
+        std::uint32_t untilMs {0};
     };
     std::vector<Notice> m_notices;
     struct GameChat

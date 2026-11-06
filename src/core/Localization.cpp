@@ -15,9 +15,10 @@ namespace OpenArtOfWar
 
 std::string Localization::s_currentLanguage = "en";
 std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
+std::string Localization::s_domain = "openaow";
 bool Localization::s_initialized = false;
 
-void Localization::Init(const std::string &localeDir, const std::string &defaultLang)
+void Localization::Init(const std::string &localeDir, const std::string &defaultLang, const std::string &domain)
 {
     std::filesystem::path dir(Assets::RealDirectory(localeDir));
     if (!std::filesystem::exists(dir))
@@ -48,18 +49,26 @@ void Localization::Init(const std::string &localeDir, const std::string &default
         s_localeDir = localeDir;
     }
 
+    s_domain = domain.empty() ? "openaow" : domain;
+
     setlocale(LC_ALL, "");
 #if defined(LC_MESSAGES)
     setlocale(LC_MESSAGES, "");
 #endif
 
-    bindtextdomain("openaow", s_localeDir.c_str());
-    bind_textdomain_codeset("openaow", "UTF-8");
-    textdomain("openaow");
+    bindtextdomain(s_domain.c_str(), s_localeDir.c_str());
+    bind_textdomain_codeset(s_domain.c_str(), "UTF-8");
+    textdomain(s_domain.c_str());
+
+    if (s_domain != "openaow")
+    {
+        bindtextdomain("openaow", s_localeDir.c_str());
+        bind_textdomain_codeset("openaow", "UTF-8");
+    }
 
     s_initialized = true;
     SetLanguage(defaultLang.empty() ? "en" : defaultLang);
-    std::cout << "[Localization] Initialized gettext domain 'openaow' at " << s_localeDir
+    std::cout << "[Localization] Initialized gettext domain '" << s_domain << "' at " << s_localeDir
               << ", default language: " << s_currentLanguage << std::endl;
 }
 
@@ -89,6 +98,11 @@ const std::string &Localization::GetLanguage()
     return s_currentLanguage;
 }
 
+const std::string &Localization::GetDomain()
+{
+    return s_domain;
+}
+
 void Localization::ToggleLanguage()
 {
     if (s_currentLanguage == "en")
@@ -110,14 +124,19 @@ const char *Localization::Tr(const char *msgid)
 {
     if (!msgid || !msgid[0])
         return "";
-    return gettext(msgid);
+    const char *translation = gettext(msgid);
+    if (translation == msgid && s_domain != "openaow")
+    {
+        translation = dgettext("openaow", msgid);
+    }
+    return translation;
 }
 
 std::string Localization::Tr(const std::string &msgid)
 {
     if (msgid.empty())
         return "";
-    return std::string(gettext(msgid.c_str()));
+    return std::string(Tr(msgid.c_str()));
 }
 
 } // namespace OpenArtOfWar

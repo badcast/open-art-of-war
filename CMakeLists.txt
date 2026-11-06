@@ -178,8 +178,12 @@ if(MSGFMT_EXECUTABLE)
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES)
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES)
     add_custom_target(translations ALL
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/en.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/ru.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_en.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_ru.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow_character_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_character_editor_en.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow_character_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_character_editor_ru.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow_map_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_map_editor_en.po
+        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow_map_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_map_editor_ru.po
         COMMENT "Compiling gettext translation catalogs (.po -> .mo)..."
     )
 endif()

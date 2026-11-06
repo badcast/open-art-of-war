@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     // --name=<player> Single player: --map=<name|path> [--from-scratch] starts a custom game on that map
     bool netHost = false;
     std::string netJoin;
-    uint16_t netPort = 38100;
+    std::uint16_t netPort = 38100;
     int netPlayers = 2;
     std::string netMapName; // resolved through LoaderResources once the assets are found
     std::string netName = "Player";
@@ -107,15 +107,15 @@ int main(int argc, char *argv[])
         {
             netHost = true;
             if (arg.size() > 7)
-                netPort = static_cast<uint16_t>(std::stoi(arg.substr(7)));
+                netPort = static_cast<std::uint16_t>(std::stoi(arg.substr(7)));
         }
         if (arg.rfind("--join=", 0) == 0)
         {
             netJoin = arg.substr(7);
-            const size_t colon = netJoin.rfind(':');
+            const std::size_t colon = netJoin.rfind(':');
             if (colon != std::string::npos)
             {
-                netPort = static_cast<uint16_t>(std::stoi(netJoin.substr(colon + 1)));
+                netPort = static_cast<std::uint16_t>(std::stoi(netJoin.substr(colon + 1)));
                 netJoin.resize(colon);
             }
         }
@@ -216,11 +216,11 @@ int main(int argc, char *argv[])
             if (!netServer.empty())
             {
                 std::string host = netServer;
-                uint16_t port = 38100;
-                const size_t colon = host.rfind(':');
+                std::uint16_t port = 38100;
+                const std::size_t colon = host.rfind(':');
                 if (colon != std::string::npos)
                 {
-                    port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
+                    port = static_cast<std::uint16_t>(std::stoi(host.substr(colon + 1)));
                     host.resize(colon);
                 }
                 app.AnnounceNetworkGame(host, port);
@@ -233,11 +233,11 @@ int main(int argc, char *argv[])
         if (!restart && !netServer.empty() && (netServerCreate || !netServerCode.empty()))
         {
             std::string host = netServer;
-            uint16_t port = 38100;
-            const size_t colon = host.rfind(':');
+            std::uint16_t port = 38100;
+            const std::size_t colon = host.rfind(':');
             if (colon != std::string::npos)
             {
-                port = static_cast<uint16_t>(std::stoi(host.substr(colon + 1)));
+                port = static_cast<std::uint16_t>(std::stoi(host.substr(colon + 1)));
                 host.resize(colon);
             }
             app.ServerNetworkGame(

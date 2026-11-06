@@ -53,7 +53,7 @@ constexpr const char *kEffectNames[]
        "build_radius",
        "mine"};
 static_assert(
-    sizeof(kEffectNames) / sizeof(kEffectNames[0]) == static_cast<size_t>(ResearchEffect::Count),
+    sizeof(kEffectNames) / sizeof(kEffectNames[0]) == static_cast<std::size_t>(ResearchEffect::Count),
     "every effect needs a YAML name");
 
 // A faction's catalog: the built-in defaults overlaid with its YAML. The strings the defs point to live here.
@@ -78,7 +78,7 @@ void ApplyYaml(LoadedCatalog &c, const std::string &text)
             return fallback;
         }
     };
-    for (size_t i = 0; i < list.size() && i < static_cast<size_t>(kResearchCount); ++i)
+    for (std::size_t i = 0; i < list.size() && i < static_cast<std::size_t>(kResearchCount); ++i)
     {
         const YAML::Node n = list[i];
         ResearchDef &d = c.defs[i];

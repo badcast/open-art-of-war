@@ -147,7 +147,7 @@ void Application::EndMapLoading()
         // The connection keeps being served behind the loading screen (a silent peer times out on a slow
         // link); only the transport, this runs inside updateNetwork when a match starts
         if (m_net)
-            m_net->Update(static_cast<uint32_t>(SDL_GetTicks()));
+            m_net->Update(static_cast<std::uint32_t>(SDL_GetTicks()));
         SDL_Delay(16);
     }
     DrawLoadingFrame(m_mapLoadTitle, _("Ready"), 1.0f, m_mapLoadTexture, m_mapLoadW, m_mapLoadH);
@@ -159,7 +159,7 @@ void Application::RenderNetworkBanner()
     if (!InNetworkMatch()
         || !(m_state == AppState::SkirmishPlaying || m_state == AppState::Victory || m_state == AppState::Defeat))
         return;
-    const uint32_t tick = m_gameplayController->simulation().Tick();
+    const std::uint32_t tick = m_gameplayController->simulation().Tick();
     std::string text;
     SDL_Color color = ui::color::Accent;
     if (m_net->Desynced())
@@ -186,9 +186,9 @@ void Application::RenderNetworkBanner()
     }
     else if (m_net->TurnsAhead(tick) > 10)
     {
-        const uint32_t total = std::max<uint32_t>(1, m_net->TicksReceived());
+        const std::uint32_t total = std::max<std::uint32_t>(1, m_net->TicksReceived());
         text = std::string(_("Catching up with the match: "))
-               + std::to_string(std::min<uint32_t>(100, tick * 100 / total)) + "%";
+               + std::to_string(std::min<std::uint32_t>(100, tick * 100 / total)) + "%";
     }
     else if (m_net->StalledSeconds(SDL_GetTicks()) > 1.5f)
     {
@@ -204,7 +204,7 @@ void Application::RenderNetworkBanner()
         text, x + w / 2, y + 17, ui::FONT_BODY_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
 }
 
-void Application::TrackNetPlayers(uint32_t nowMs)
+void Application::TrackNetPlayers(std::uint32_t nowMs)
 {
     const Net::Roster *roster = m_net ? m_net->roster() : nullptr;
     // While this computer is the one cut off, the roster is stale: nothing to report about the others
@@ -217,7 +217,7 @@ void Application::TrackNetPlayers(uint32_t nowMs)
             now[e.slot] = &e;
     }
     char buf[200];
-    for (size_t slot = 0; slot < m_netPlayers.size(); ++slot)
+    for (std::size_t slot = 0; slot < m_netPlayers.size(); ++slot)
     {
         NetPlayer &p = m_netPlayers[slot];
         const Net::RosterEntry *e = now[slot];
@@ -266,10 +266,10 @@ void Application::TrackNetPlayers(uint32_t nowMs)
     }
 }
 
-void Application::PushNotice(const std::string &text, uint32_t nowMs)
+void Application::PushNotice(const std::string &text, std::uint32_t nowMs)
 {
-    constexpr uint32_t kShowMs = 7000;
-    constexpr size_t kMaxNotices = 5;
+    constexpr std::uint32_t kShowMs = 7000;
+    constexpr std::size_t kMaxNotices = 5;
     m_notices.push_back({text, nowMs + kShowMs});
     if (m_notices.size() > kMaxNotices)
         m_notices.erase(m_notices.begin(), m_notices.end() - kMaxNotices);
@@ -277,7 +277,7 @@ void Application::PushNotice(const std::string &text, uint32_t nowMs)
 
 void Application::RenderNotices()
 {
-    const uint32_t nowMs = SDL_GetTicks();
+    const std::uint32_t nowMs = SDL_GetTicks();
     m_notices.erase(
         std::remove_if(m_notices.begin(), m_notices.end(), [&](const Notice &n) { return nowMs >= n.untilMs; }),
         m_notices.end());
@@ -291,10 +291,10 @@ void Application::RenderNotices()
     for (const Notice &n : m_notices)
     {
         // The last second fades out
-        const uint32_t left = n.untilMs - nowMs;
+        const std::uint32_t left = n.untilMs - nowMs;
         const float alpha = std::min(1.0f, left / 1000.0f);
         auto fade = [&](SDL_Color c) {
-            return ui::WithAlpha(c, static_cast<uint8_t>(c.a * alpha));
+            return ui::WithAlpha(c, static_cast<std::uint8_t>(c.a * alpha));
         };
         const int w = m_fontRenderer->GetTextWidth(n.text, ui::FONT_BODY_BOLD) + 32;
         const int x = (viewW - w) / 2;
@@ -391,9 +391,9 @@ void Application::RenderScoreboard()
         std::string about;
         if (m_mission && !m_mission->GetMapTitle().empty())
             about = std::string(_("Map")) + ": " + m_mission->GetMapTitle() + "    ";
-        const uint32_t seconds
+        const std::uint32_t seconds
             = m_gameplayController
-                  ? static_cast<uint32_t>(m_gameplayController->simulation().Tick() / SIMULATION_TICK_RATE)
+                  ? static_cast<std::uint32_t>(m_gameplayController->simulation().Tick() / SIMULATION_TICK_RATE)
                   : 0u;
         char clock[32];
         if (seconds >= 3600)
@@ -476,12 +476,12 @@ void Application::RenderNetStats()
 {
     if (!m_settings.showNetStats || !m_net)
         return;
-    const uint32_t tick = m_netMatchLoaded ? m_gameplayController->simulation().Tick() : 0;
-    const NetMatch::Stats st = m_net->stats(static_cast<uint32_t>(SDL_GetTicks()), tick);
+    const std::uint32_t tick = m_netMatchLoaded ? m_gameplayController->simulation().Tick() : 0;
+    const NetMatch::Stats st = m_net->stats(static_cast<std::uint32_t>(SDL_GetTicks()), tick);
     if (!st.valid)
         return;
     namespace col = ui::color;
-    auto pingColor = [](uint32_t ms) {
+    auto pingColor = [](std::uint32_t ms) {
         return ms < 80 ? col::Ok : (ms < 160 ? col::Accent : col::Danger);
     };
     struct Line
@@ -554,7 +554,7 @@ void Application::RenderNetStats()
     const int h = static_cast<int>(lines.size()) * lineH + 8;
     m_renderer->FillRectScreen(x, y, w + 16, h, {8, 10, 14, 200});
     m_renderer->DrawRectScreen(x, y, w + 16, h, col::Border);
-    for (size_t i = 0; i < lines.size(); ++i)
+    for (std::size_t i = 0; i < lines.size(); ++i)
         m_fontRenderer->DrawString(
             lines[i].text,
             x + 8,
@@ -583,7 +583,7 @@ void PopUtf8Char(std::string &s)
 }
 } // namespace
 
-void Application::UpdateGameChat(uint32_t nowMs)
+void Application::UpdateGameChat(std::uint32_t nowMs)
 {
     const bool inMatch = m_net && !m_replay && m_mission && m_mission->IsOnlineMatch()
                          && (m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying
@@ -672,16 +672,16 @@ void Application::RenderGameChat()
 {
     if (m_gameChat.lines.empty() && !m_gameChat.open)
         return;
-    const uint32_t nowMs = SDL_GetTicks();
+    const std::uint32_t nowMs = SDL_GetTicks();
     const int viewW = m_camera->GetViewportWidth();
     const int boxW = std::min(560, viewW - 24);
     int y = m_windowH - 62 - static_cast<int>(m_gameChat.lines.size()) * 22;
     for (const Notice &n : m_gameChat.lines)
     {
-        const uint32_t left = n.untilMs > nowMs ? n.untilMs - nowMs : 0;
+        const std::uint32_t left = n.untilMs > nowMs ? n.untilMs - nowMs : 0;
         const float alpha = m_gameChat.open ? 1.0f : std::min(1.0f, left / 1000.0f);
         const auto fade = [&](SDL_Color c) {
-            return ui::WithAlpha(c, static_cast<uint8_t>(c.a * alpha));
+            return ui::WithAlpha(c, static_cast<std::uint8_t>(c.a * alpha));
         };
         m_renderer->FillRectScreen(12, y, boxW, 20, fade(ui::WithAlpha(ui::color::Panel, 200)));
         m_fontRenderer->DrawString(

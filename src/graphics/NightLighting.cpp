@@ -1,6 +1,7 @@
 #include "graphics/NightLighting.hpp"
 #include "core/AssetStore.hpp"
 #include "core/Config.hpp"
+#include "core/JsonFile.hpp"
 #include "game/TileMap.hpp"
 #include "graphics/Camera.hpp"
 #include <algorithm>
@@ -21,7 +22,7 @@ SDL_Color ReadColor(const nlohmann::json &j, const char *key, SDL_Color fallback
     const auto it = j.find(key);
     if (it == j.end() || !it->is_array() || it->size() < 3)
         return fallback;
-    auto c = [&](size_t i) {
+    auto c = [&](std::size_t i) {
         return static_cast<Uint8>(std::clamp((*it)[i].get<int>(), 0, 255));
     };
     return {c(0), c(1), c(2), 255};
@@ -47,7 +48,7 @@ bool NightConfig::Load(const std::string &path)
     }
     try
     {
-        const nlohmann::json j = nlohmann::json::parse(text, nullptr, true, true);
+        const nlohmann::json j = JsonFile::ReadFromString(text);
         nightColor = ReadColor(j, "night_color", nightColor);
         gpuBase = std::clamp(j.value("gpu_base", gpuBase), 0.2f, 1.0f);
         if (const auto e = j.find("effects"); e != j.end() && e->is_object())
@@ -112,7 +113,7 @@ void NightLighting::Shutdown()
 
 SDL_Texture *NightLighting::MakeSpot(SDL_Renderer *renderer, float softness)
 {
-    std::vector<uint32_t> pixels(static_cast<size_t>(kSpotSize) * kSpotSize);
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSpotSize) * kSpotSize);
     const float c = kSpotSize * 0.5f;
     for (int y = 0; y < kSpotSize; ++y)
     {
@@ -123,8 +124,8 @@ SDL_Texture *NightLighting::MakeSpot(SDL_Renderer *renderer, float softness)
                         dy = std::max(0.0f, std::fabs(y + 0.5f - c) - 0.5f);
             const float d = std::sqrt(dx * dx + dy * dy) / (c - 0.5f);
             const float f = std::pow(std::clamp(1.0f - d, 0.0f, 1.0f), softness);
-            const auto a = static_cast<uint32_t>(f * 255.0f + 0.5f);
-            pixels[static_cast<size_t>(y) * kSpotSize + x] = (a << 24) | 0x00FFFFFFu;
+            const auto a = static_cast<std::uint32_t>(f * 255.0f + 0.5f);
+            pixels[static_cast<std::size_t>(y) * kSpotSize + x] = (a << 24) | 0x00FFFFFFu;
         }
     }
     SDL_Texture *t

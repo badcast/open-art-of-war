@@ -12,9 +12,11 @@ class Localization
 public:
     static void Init(
         const std::string &localeDir = LoaderResources::LocaleDir(),
-        const std::string &defaultLang = LoaderResources::DefaultLanguage());
+        const std::string &defaultLang = LoaderResources::DefaultLanguage(),
+        const std::string &domain = "openaow");
     static void SetLanguage(const std::string &langCode);
     static const std::string &GetLanguage();
+    static const std::string &GetDomain();
     static void ToggleLanguage();
     static bool IsRussian();
 
@@ -24,6 +26,7 @@ public:
 private:
     static std::string s_currentLanguage;
     static std::string s_localeDir;
+    static std::string s_domain;
     static bool s_initialized;
 };
 

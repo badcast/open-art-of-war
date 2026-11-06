@@ -15,24 +15,24 @@ namespace OpenArtOfWar::Net
 namespace
 {
 
-constexpr size_t kBufferSize = 16 * 1024;
+constexpr std::size_t kBufferSize = 16 * 1024;
 
 SessionToken newToken()
 {
     static std::mt19937_64 rng {std::random_device {}()};
     SessionToken t {};
-    for (size_t i = 0; i < t.size(); i += 8)
+    for (std::size_t i = 0; i < t.size(); i += 8)
     {
-        const uint64_t v = rng();
-        for (size_t k = 0; k < 8 && i + k < t.size(); ++k)
-            t[i + k] = static_cast<uint8_t>(v >> (8 * k));
+        const std::uint64_t v = rng();
+        for (std::size_t k = 0; k < 8 && i + k < t.size(); ++k)
+            t[i + k] = static_cast<std::uint8_t>(v >> (8 * k));
     }
     return t;
 }
 
 bool isZero(const SessionToken &t)
 {
-    return std::all_of(t.begin(), t.end(), [](uint8_t b) { return b == 0; });
+    return std::all_of(t.begin(), t.end(), [](std::uint8_t b) { return b == 0; });
 }
 
 } // namespace
@@ -42,7 +42,7 @@ SessionHost::SessionHost(HostConfig config)
     , m_buffer(kBufferSize)
 {
     m_config.maxPlayers = std::clamp(m_config.maxPlayers, 1, kMaxPlayers);
-    m_inputDelay = std::max<uint8_t>(m_config.inputDelayMin, 1);
+    m_inputDelay = std::max<std::uint8_t>(m_config.inputDelayMin, 1);
 }
 
 SessionHost::~SessionHost()
@@ -68,7 +68,7 @@ void SessionHost::finishReplay(const std::string &reason)
     data.turns = m_turnLog;
     data.checksums = m_replayChecksums;
     nlohmann::json players = nlohmann::json::array();
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         if (m_seen[s].name.empty() && !m_slots[s].ai)
             continue;
@@ -116,22 +116,22 @@ void SessionHost::addTransport(std::unique_ptr<Transport> transport)
         m_transports.push_back(std::move(transport));
 }
 
-void SessionHost::sendTo(size_t connection, Channel channel, const uint8_t *data, size_t size)
+void SessionHost::sendTo(std::size_t connection, Channel channel, const std::uint8_t *data, std::size_t size)
 {
     const Connection &c = m_connections[connection];
     m_transports[c.transport]->send(c.peer, channel, data, size);
 }
 
-void SessionHost::broadcast(Channel channel, const uint8_t *data, size_t size)
+void SessionHost::broadcast(Channel channel, const std::uint8_t *data, std::size_t size)
 {
-    for (size_t i = 0; i < m_connections.size(); ++i)
+    for (std::size_t i = 0; i < m_connections.size(); ++i)
     {
         if (m_connections[i].slot >= 0)
             sendTo(i, channel, data, size);
     }
 }
 
-void SessionHost::reject(size_t connection, RejectReason reason, const std::string &detail)
+void SessionHost::reject(std::size_t connection, RejectReason reason, const std::string &detail)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, Reject {reason, detail});
@@ -143,7 +143,7 @@ void SessionHost::reject(size_t connection, RejectReason reason, const std::stri
 void SessionHost::broadcastRoster()
 {
     Roster roster;
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         if (m_slots[s].used)
             roster.players.push_back({s, m_slots[s].name, m_slots[s].connected || m_slots[s].ai});
@@ -153,7 +153,7 @@ void SessionHost::broadcastRoster()
     broadcast(Channel::Control, m_buffer.data(), w.finish());
 }
 
-void SessionHost::offerFile(uint64_t hash, std::vector<uint8_t> bytes)
+void SessionHost::offerFile(std::uint64_t hash, std::vector<std::uint8_t> bytes)
 {
     if (bytes.empty() || bytes.size() > kMaxFileBytes)
         return;
@@ -161,7 +161,7 @@ void SessionHost::offerFile(uint64_t hash, std::vector<uint8_t> bytes)
         std::remove_if(m_files.begin(), m_files.end(), [&](const auto &f) { return f.first == hash; }), m_files.end());
     m_files.emplace_back(hash, std::move(bytes));
     auto total = [&] {
-        size_t n = 0;
+        std::size_t n = 0;
         for (const auto &f : m_files)
             n += f.second.size();
         return n;
@@ -170,7 +170,7 @@ void SessionHost::offerFile(uint64_t hash, std::vector<uint8_t> bytes)
         m_files.erase(m_files.begin());
 }
 
-void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64_t mapHash)
+void SessionHost::setLobbyMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash)
 {
     if (m_running)
         return;
@@ -182,7 +182,7 @@ void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64
         return;
     m_lobby.map = map;
     m_lobby.mapHash = mapHash;
-    m_lobby.spawnCount = std::min<uint8_t>(spawnCount, kMaxPlayers);
+    m_lobby.spawnCount = std::min<std::uint8_t>(spawnCount, kMaxPlayers);
     // Another map: nobody is ready for it yet, blocked places are open again, everybody keeps a place of his own
     m_lobby.blockedMask = 0;
     for (SlotState &s : m_slots)
@@ -191,7 +191,7 @@ void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64
         if (s.used && s.choice.spawn != kRandom && s.choice.spawn >= m_lobby.spawnCount)
             s.choice.spawn = kRandom;
     }
-    for (uint8_t i = 0; i < kMaxPlayers; ++i)
+    for (std::uint8_t i = 0; i < kMaxPlayers; ++i)
     {
         if (m_slots[i].used && m_slots[i].choice.spawn == kRandom)
             m_slots[i].choice.spawn = freeSpawn();
@@ -199,9 +199,9 @@ void SessionHost::setLobbyMap(const std::string &map, uint8_t spawnCount, uint64
     broadcastLobby();
 }
 
-uint8_t SessionHost::freeSpawn() const
+std::uint8_t SessionHost::freeSpawn() const
 {
-    for (uint8_t n = 0; n < m_lobby.spawnCount && n < kMaxPlayers; ++n)
+    for (std::uint8_t n = 0; n < m_lobby.spawnCount && n < kMaxPlayers; ++n)
     {
         if (m_lobby.blockedMask & (1u << n))
             continue;
@@ -220,7 +220,7 @@ void SessionHost::setSeat(const OwnerSetSeat &change)
         || change.kind > OwnerSetSeat::Ai)
         return;
     int holder = -1;
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         if (m_slots[s].used && m_slots[s].choice.spawn == change.spawn)
             holder = s;
@@ -238,7 +238,7 @@ void SessionHost::setSeat(const OwnerSetSeat &change)
     // A person is sent out of the room
     if (holder >= 0 && !m_slots[holder].ai && m_slots[holder].connected)
     {
-        for (size_t i = 0; i < m_connections.size(); ++i)
+        for (std::size_t i = 0; i < m_connections.size(); ++i)
         {
             if (m_connections[i].slot == holder)
             {
@@ -250,13 +250,13 @@ void SessionHost::setSeat(const OwnerSetSeat &change)
     if (holder >= 0)
         m_slots[holder] = SlotState {};
     if (change.kind == OwnerSetSeat::Blocked)
-        m_lobby.blockedMask |= static_cast<uint8_t>(1u << change.spawn);
+        m_lobby.blockedMask |= static_cast<std::uint8_t>(1u << change.spawn);
     else
-        m_lobby.blockedMask &= static_cast<uint8_t>(~(1u << change.spawn));
+        m_lobby.blockedMask &= static_cast<std::uint8_t>(~(1u << change.spawn));
     if (change.kind == OwnerSetSeat::Ai)
     {
-        uint8_t slot = kRandom;
-        for (uint8_t s = 0; s < m_config.maxPlayers && slot == kRandom; ++s)
+        std::uint8_t slot = kRandom;
+        for (std::uint8_t s = 0; s < m_config.maxPlayers && slot == kRandom; ++s)
         {
             if (!m_slots[s].used)
                 slot = s;
@@ -268,8 +268,8 @@ void SessionHost::setSeat(const OwnerSetSeat &change)
             m_slots[slot].ai = true;
             m_slots[slot].name = "AI";
             m_slots[slot].aiLevel = change.level & 3;
-            m_slots[slot].choice.team = static_cast<uint8_t>(slot % 2);
-            m_slots[slot].choice.color = freeColor(slot, static_cast<uint8_t>(slot + 1));
+            m_slots[slot].choice.team = static_cast<std::uint8_t>(slot % 2);
+            m_slots[slot].choice.color = freeColor(slot, static_cast<std::uint8_t>(slot + 1));
             m_slots[slot].choice.ready = true;
             m_slots[slot].choice.spawn = change.spawn;
         }
@@ -278,7 +278,7 @@ void SessionHost::setSeat(const OwnerSetSeat &change)
     broadcastLobby();
 }
 
-void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit)
+void SessionHost::applyChoice(std::uint8_t slot, LobbyChoice choice, bool ownerEdit)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
@@ -287,7 +287,7 @@ void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit)
     {
         bool ok = choice.spawn != kRandom && choice.spawn < m_lobby.spawnCount
                   && !(m_lobby.blockedMask & (1u << choice.spawn));
-        for (uint8_t s = 0; ok && s < kMaxPlayers; ++s)
+        for (std::uint8_t s = 0; ok && s < kMaxPlayers; ++s)
             ok = !(s != slot && m_slots[s].used && m_slots[s].choice.spawn == choice.spawn);
         if (!ok)
             choice.spawn = m_slots[slot].choice.spawn;
@@ -306,13 +306,13 @@ void SessionHost::applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit)
     broadcastLobby();
 }
 
-uint8_t SessionHost::freeColor(uint8_t slot, uint8_t preferred) const
+std::uint8_t SessionHost::freeColor(std::uint8_t slot, std::uint8_t preferred) const
 {
-    constexpr uint8_t kColors = 8;
+    constexpr std::uint8_t kColors = 8;
     if (preferred < 1 || preferred > kColors)
         return preferred;
-    auto taken = [&](uint8_t color) {
-        for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    auto taken = [&](std::uint8_t color) {
+        for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
         {
             if (s != slot && m_slots[s].used && m_slots[s].choice.color == color)
                 return true;
@@ -321,7 +321,7 @@ uint8_t SessionHost::freeColor(uint8_t slot, uint8_t preferred) const
     };
     if (!taken(preferred))
         return preferred;
-    for (uint8_t c = 1; c <= kColors; ++c)
+    for (std::uint8_t c = 1; c <= kColors; ++c)
     {
         if (!taken(c))
             return c;
@@ -329,7 +329,7 @@ uint8_t SessionHost::freeColor(uint8_t slot, uint8_t preferred) const
     return preferred;
 }
 
-void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap)
+void SessionHost::setTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
@@ -341,7 +341,7 @@ void SessionHost::setTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t 
     broadcastLobby();
 }
 
-void SessionHost::setOptions(bool fogOfWar, bool prebuilt, uint8_t credits, bool night)
+void SessionHost::setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night)
 {
     if (m_running || credits > 4)
         return;
@@ -356,7 +356,7 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
 {
     if (m_running)
         return;
-    uint8_t slot = change.slot;
+    std::uint8_t slot = change.slot;
     if (slot == kRandom)
     {
         // A new computer player: the first free slot the map has a start position for
@@ -365,7 +365,7 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
             used += s.used ? 1 : 0;
         if (used >= std::min<int>(m_config.maxPlayers, m_lobby.spawnCount ? m_lobby.spawnCount : m_config.maxPlayers))
             return;
-        for (uint8_t s = 0; s < m_config.maxPlayers && slot == kRandom; ++s)
+        for (std::uint8_t s = 0; s < m_config.maxPlayers && slot == kRandom; ++s)
         {
             if (!m_slots[s].used)
                 slot = s;
@@ -397,8 +397,8 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
         choice.ready = true;
         if (change.slot == kRandom)
         {
-            choice.team = static_cast<uint8_t>(slot % 2);
-            choice.color = freeColor(slot, static_cast<uint8_t>(slot + 1));
+            choice.team = static_cast<std::uint8_t>(slot % 2);
+            choice.color = freeColor(slot, static_cast<std::uint8_t>(slot + 1));
             m_slots[slot].choice.color = choice.color;
         }
         m_slots[slot].choice.ready = true;
@@ -412,7 +412,7 @@ void SessionHost::setAiSlot(const OwnerSetAi &change)
 void SessionHost::broadcastLobby()
 {
     m_lobby.slots.clear();
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         if (m_slots[s].used)
             m_lobby.slots.push_back({s, m_slots[s].choice, m_slots[s].ai, m_slots[s].aiLevel});
@@ -441,17 +441,17 @@ bool SessionHost::everyoneReady(int minPlayers) const
     return n >= minPlayers;
 }
 
-void SessionHost::update(uint32_t nowMs)
+void SessionHost::update(std::uint32_t nowMs)
 {
-    for (size_t t = 0; t < m_transports.size(); ++t)
+    for (std::size_t t = 0; t < m_transports.size(); ++t)
     {
         m_events.clear();
         m_transports[t]->poll(m_events);
         for (const TransportEvent &e : m_events)
         {
             // The connection this event belongs to (a new one for a new peer)
-            size_t index = m_connections.size();
-            for (size_t i = 0; i < m_connections.size(); ++i)
+            std::size_t index = m_connections.size();
+            for (std::size_t i = 0; i < m_connections.size(); ++i)
             {
                 if (m_connections[i].transport == t && m_connections[i].peer == e.peer)
                 {
@@ -482,13 +482,13 @@ void SessionHost::update(uint32_t nowMs)
     m_connections.erase(
         std::remove_if(m_connections.begin(), m_connections.end(), [](const Connection &c) { return c.slot == -2; }),
         m_connections.end());
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         SlotState &slot = m_slots[s];
         if (!slot.used || !slot.connected)
             continue;
         slot.connection = m_connections.size();
-        for (size_t i = 0; i < m_connections.size(); ++i)
+        for (std::size_t i = 0; i < m_connections.size(); ++i)
         {
             if (m_connections[i].slot == s)
                 slot.connection = i;
@@ -508,7 +508,7 @@ void SessionHost::update(uint32_t nowMs)
             if (!slot.connected && nowMs - slot.goneMs > m_config.reconnectWindowMs)
             {
                 slot = SlotState {};
-                m_leftPending.push_back(static_cast<uint8_t>(&slot - m_slots.data()));
+                m_leftPending.push_back(static_cast<std::uint8_t>(&slot - m_slots.data()));
                 changed = true;
             }
             else
@@ -545,15 +545,15 @@ void SessionHost::update(uint32_t nowMs)
         setPaused(false, m_pausedBy, nowMs);
     // Close every turn that is due by the host's clock
     while (m_running && !m_paused
-           && static_cast<int64_t>(nowMs) - static_cast<int64_t>(m_startMs)
-                  >= static_cast<int64_t>(m_nextTurn) * m_config.turnMs)
+           && static_cast<std::int64_t>(nowMs) - static_cast<std::int64_t>(m_startMs)
+                  >= static_cast<std::int64_t>(m_nextTurn) * m_config.turnMs)
     {
         adaptInputDelay();
         closeTurn(m_nextTurn++);
     }
 }
 
-void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t nowMs)
+void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::uint32_t nowMs)
 {
     Connection &c = m_connections[connection];
     if (e.type == TransportEvent::Type::Connected)
@@ -597,15 +597,15 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
                 listed = listed || entry.path == m.path;
             if (listed && m_config.dataFile)
             {
-                std::vector<uint8_t> packed;
-                uint64_t hash = 0;
+                std::vector<std::uint8_t> packed;
+                std::uint64_t hash = 0;
                 if (m_config.dataFile(m.path, packed, hash) && packed.size() <= kMaxFileBytes)
                 {
                     answer.hash = hash;
                     answer.bytes = std::move(packed);
                 }
             }
-            std::vector<uint8_t> big(answer.bytes.size() + 256);
+            std::vector<std::uint8_t> big(answer.bytes.size() + 256);
             BitWriter w(big.data(), big.size());
             encode(w, answer);
             sendTo(connection, Channel::Bulk, big.data(), w.finish());
@@ -620,7 +620,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
         handleHello(connection, hello, nowMs);
         return;
     }
-    const uint8_t slot = static_cast<uint8_t>(c.slot);
+    const std::uint8_t slot = static_cast<std::uint8_t>(c.slot);
     switch (type)
     {
         case MsgType::Commands:
@@ -629,7 +629,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
             if (!decode(r, m) || !m_running)
                 return;
             // Too late for its turn: the next open one (nobody waits for a slow peer)
-            const uint32_t turn = std::max(m.turn, m_nextTurn);
+            const std::uint32_t turn = std::max(m.turn, m_nextTurn);
             if (turn > m_nextTurn + 64)
                 return; // nonsense far in the future
             // A late batch can land on a turn that already has one: the bundle carries one entry per batch
@@ -725,7 +725,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
                 if (f.first == m.hash)
                     answer.bytes = f.second;
             }
-            std::vector<uint8_t> big(answer.bytes.size() + 64);
+            std::vector<std::uint8_t> big(answer.bytes.size() + 64);
             BitWriter w(big.data(), big.size());
             encode(w, answer);
             // The bulk channel: a big file never holds up turns or the room
@@ -794,7 +794,7 @@ void SessionHost::handle(size_t connection, const TransportEvent &e, uint32_t no
     }
 }
 
-void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t nowMs)
+void SessionHost::handleHello(std::size_t connection, const Hello &hello, std::uint32_t nowMs)
 {
     if (hello.protocol != kProtocolVersion)
     {
@@ -820,7 +820,7 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
                 c.syncStartMs = nowMs;
             c.syncing = true;
             DataManifest manifest {m_config.dataManifest};
-            std::vector<uint8_t> big(m_config.dataManifest.size() * (kMaxDataPathLength + 16) + 64);
+            std::vector<std::uint8_t> big(m_config.dataManifest.size() * (kMaxDataPathLength + 16) + 64);
             BitWriter w(big.data(), big.size());
             encode(w, manifest);
             sendTo(connection, Channel::Control, big.data(), w.finish());
@@ -844,7 +844,7 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
         // connection takes the slot over and the stale one is dropped
         if (slot >= 0 && m_slots[slot].connected)
         {
-            for (size_t i = 0; i < m_connections.size(); ++i)
+            for (std::size_t i = 0; i < m_connections.size(); ++i)
             {
                 if (i != connection && m_connections[i].slot == slot)
                 {
@@ -894,8 +894,8 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
         m_slots[slot].used = true;
         m_slots[slot].token = newToken();
         // Defaults: random faction and start, alternating teams, an own colour
-        m_slots[slot].choice.team = static_cast<uint8_t>(slot % 2);
-        m_slots[slot].choice.color = freeColor(static_cast<uint8_t>(slot), static_cast<uint8_t>(slot + 1));
+        m_slots[slot].choice.team = static_cast<std::uint8_t>(slot % 2);
+        m_slots[slot].choice.color = freeColor(static_cast<std::uint8_t>(slot), static_cast<std::uint8_t>(slot + 1));
         m_slots[slot].choice.spawn = freeSpawn(); // the first open start position
     }
     SlotState &s = m_slots[slot];
@@ -918,7 +918,7 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
     }
 
     Welcome welcome;
-    welcome.slot = static_cast<uint8_t>(slot);
+    welcome.slot = static_cast<std::uint8_t>(slot);
     welcome.token = s.token;
     welcome.turnMs = m_config.turnMs;
     welcome.ticksPerTurn = m_config.ticksPerTurn;
@@ -934,12 +934,12 @@ void SessionHost::handleHello(size_t connection, const Hello &hello, uint32_t no
         BitWriter sw(m_buffer.data(), m_buffer.size());
         encode(sw, StartMatch {0, m_setup});
         sendTo(connection, Channel::Lockstep, m_buffer.data(), sw.finish());
-        for (const std::vector<uint8_t> &bundle : m_turnLog)
+        for (const std::vector<std::uint8_t> &bundle : m_turnLog)
             sendTo(connection, Channel::Lockstep, bundle.data(), bundle.size());
     }
 }
 
-void SessionHost::setPaused(bool paused, uint8_t bySlot, uint32_t nowMs)
+void SessionHost::setPaused(bool paused, std::uint8_t bySlot, std::uint32_t nowMs)
 {
     if (!m_running || paused == m_paused)
         return;
@@ -959,7 +959,7 @@ void SessionHost::setPaused(bool paused, uint8_t bySlot, uint32_t nowMs)
     broadcast(Channel::Lockstep, m_buffer.data(), w.finish());
 }
 
-void SessionHost::startMatch(std::vector<uint8_t> setup, uint32_t nowMs, uint32_t firstTurnDelayMs)
+void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowMs, std::uint32_t firstTurnDelayMs)
 {
     if (m_running)
         return;
@@ -987,18 +987,18 @@ void SessionHost::adaptInputDelay()
 {
     // Commands must reach the host before their turn closes: half the slowest round trip plus room
     // for jitter, in whole turns
-    uint32_t worst = 0;
+    std::uint32_t worst = 0;
     for (const Connection &c : m_connections)
     {
         if (c.slot >= 0)
             worst = std::max(worst, m_transports[c.transport]->roundTripMs(c.peer));
     }
-    const uint32_t needMs = worst / 2 + 30;
-    const uint32_t turns = (needMs + m_config.turnMs - 1) / m_config.turnMs;
-    m_inputDelay = static_cast<uint8_t>(std::clamp<uint32_t>(turns, m_config.inputDelayMin, m_config.inputDelayMax));
+    const std::uint32_t needMs = worst / 2 + 30;
+    const std::uint32_t turns = (needMs + m_config.turnMs - 1) / m_config.turnMs;
+    m_inputDelay = static_cast<std::uint8_t>(std::clamp<std::uint32_t>(turns, m_config.inputDelayMin, m_config.inputDelayMax));
 }
 
-void SessionHost::closeTurn(uint32_t turn)
+void SessionHost::closeTurn(std::uint32_t turn)
 {
     TurnBundle bundle;
     bundle.turn = turn;
@@ -1008,7 +1008,7 @@ void SessionHost::closeTurn(uint32_t turn)
         bundle.inputDelay = m_inputDelay;
         m_announcedDelay = m_inputDelay;
     }
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         SlotState &slot = m_slots[s];
         if (!slot.used)
@@ -1025,7 +1025,7 @@ void SessionHost::closeTurn(uint32_t turn)
     // What does not fit into this turn (more batches than a bundle holds, or more bytes than a packet) moves
     // on to the next turn instead of being lost; the turn itself always goes out, or the clients would wait
     // for it forever. Batches keep their order: the carried ones go before anything already queued.
-    std::vector<std::pair<uint8_t, std::vector<uint8_t>>> carry;
+    std::vector<std::pair<std::uint8_t, std::vector<std::uint8_t>>> carry;
     while (bundle.players.size() > kMaxBatchesPerTurn)
     {
         carry.emplace_back(bundle.players.back().slot, std::move(bundle.players.back().bytes));
@@ -1033,7 +1033,7 @@ void SessionHost::closeTurn(uint32_t turn)
     }
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, bundle);
-    size_t size = w.finish();
+    std::size_t size = w.finish();
     while (w.overflowed() && !bundle.players.empty())
     {
         carry.emplace_back(bundle.players.back().slot, std::move(bundle.players.back().bytes));
@@ -1058,7 +1058,7 @@ void SessionHost::closeTurn(uint32_t turn)
 std::vector<SessionHost::Player> SessionHost::players() const
 {
     std::vector<Player> out;
-    for (uint8_t s = 0; s < kMaxPlayers; ++s)
+    for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
     {
         const SlotState &slot = m_slots[s];
         if (!slot.used)
@@ -1098,9 +1098,9 @@ RoomInfo SessionHost::roomInfo() const
     room.gameVersion = m_config.identity.gameVersion;
     room.name = m_config.roomName;
     room.map = m_lobby.map;
-    room.players = static_cast<uint8_t>(m_running ? connectedCount() : playerCount());
+    room.players = static_cast<std::uint8_t>(m_running ? connectedCount() : playerCount());
     room.locked = !m_config.password.empty();
-    room.maxPlayers = static_cast<uint8_t>(
+    room.maxPlayers = static_cast<std::uint8_t>(
         std::min<int>(m_config.maxPlayers, m_lobby.spawnCount ? m_lobby.spawnCount : m_config.maxPlayers));
     room.running = m_running;
     return room;

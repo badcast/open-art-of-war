@@ -12,18 +12,18 @@ namespace
 
 std::string Trim(const std::string &s)
 {
-    size_t a = s.find_first_not_of(" \t\r");
+    std::size_t a = s.find_first_not_of(" \t\r");
     if (a == std::string::npos)
         return {};
-    size_t b = s.find_last_not_of(" \t\r");
+    std::size_t b = s.find_last_not_of(" \t\r");
     return s.substr(a, b - a + 1);
 }
 
 // Start of a trailing " # comment" outside quotes, npos when there is none
-size_t TrailingComment(const std::string &s)
+std::size_t TrailingComment(const std::string &s)
 {
     char quote = 0;
-    for (size_t i = 0; i < s.size(); ++i)
+    for (std::size_t i = 0; i < s.size(); ++i)
     {
         const char c = s[i];
         if (quote)
@@ -132,7 +132,7 @@ void CommentedYaml::Index()
     };
     std::vector<Level> stack;
     std::vector<std::string> pending;
-    for (size_t i = 0; i < m_lines.size(); ++i)
+    for (std::size_t i = 0; i < m_lines.size(); ++i)
     {
         const std::string &l = m_lines[i];
         const std::string t = Trim(l);
@@ -146,8 +146,8 @@ void CommentedYaml::Index()
             pending.push_back(Trim(t.substr(1)));
             continue;
         }
-        const size_t indent = l.find_first_not_of(' ');
-        const size_t colon = t.find(':');
+        const std::size_t indent = l.find_first_not_of(' ');
+        const std::size_t colon = t.find(':');
         if (t[0] == '-' || colon == std::string::npos || colon == 0)
         {
             pending.clear();
@@ -177,10 +177,10 @@ void CommentedYaml::Index()
 YAML::Node CommentedYaml::At(const std::string &path) const
 {
     YAML::Node n = m_node; // a handle onto the same data; read only through const lookups below
-    size_t start = 0;
+    std::size_t start = 0;
     while (start <= path.size() && n.IsDefined())
     {
-        const size_t dot = path.find('.', start);
+        const std::size_t dot = path.find('.', start);
         const std::string key = path.substr(start, dot == std::string::npos ? std::string::npos : dot - start);
         if (!key.empty())
         {
@@ -211,16 +211,16 @@ bool CommentedYaml::Set(const std::string &path, const std::string &valueText)
     if (it == m_lineOf.end())
         return false;
     const std::string old = m_lines[it->second];
-    const size_t colon = old.find(':');
+    const std::size_t colon = old.find(':');
     if (colon == std::string::npos)
         return false;
     // Everything after the value that must stay: " # comment"
     const std::string rest = old.substr(colon + 1);
-    const size_t c = TrailingComment(rest);
+    const std::size_t c = TrailingComment(rest);
     std::string tail;
     if (c != std::string::npos)
     {
-        size_t gap = c;
+        std::size_t gap = c;
         while (gap > 0 && rest[gap - 1] == ' ')
             --gap;
         tail = "  " + rest.substr(c);

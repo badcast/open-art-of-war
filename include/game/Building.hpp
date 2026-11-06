@@ -27,7 +27,7 @@ struct BuildingDelegates
 
 // One unit ordered at a Barracks / Factory
 // Most orders one Barracks / Factory holds at once
-constexpr size_t kMaxProductionQueue = 99;
+constexpr std::size_t kMaxProductionQueue = 99;
 
 struct ProductionItem
 {

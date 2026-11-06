@@ -1020,7 +1020,7 @@ bool HUDController::HandleHudClick(
         SimCommand c;
         c.type = CommandType::ToggleRepair;
         for (const Building *b : own)
-            c.ids.push_back(static_cast<uint32_t>(b->id));
+            c.ids.push_back(static_cast<std::uint32_t>(b->id));
         Issue(std::move(c));
         return true;
     }
@@ -1040,14 +1040,14 @@ bool HUDController::HandleHudClick(
         SimCommand c;
         c.type = CommandType::Demolish;
         for (const Building *b : own)
-            c.ids.push_back(static_cast<uint32_t>(b->id));
+            c.ids.push_back(static_cast<std::uint32_t>(b->id));
         // They are gone on the tick the command runs: out of the selection already
         selectedUnits.erase(
             std::remove_if(
                 selectedUnits.begin(),
                 selectedUnits.end(),
                 [&](int id) {
-                    return std::find(c.ids.begin(), c.ids.end(), static_cast<uint32_t>(id)) != c.ids.end();
+                    return std::find(c.ids.begin(), c.ids.end(), static_cast<std::uint32_t>(id)) != c.ids.end();
                 }),
             selectedUnits.end());
         Issue(std::move(c));
@@ -1210,7 +1210,7 @@ void HUDController::RenderGameHud(
                         continue;
                     }
                     // Walls as the local player knows them: under the fog of war the ones seen there last
-                    const uint16_t wall = fog ? map.ViewerWall(tx, ty) : map.GetWall(tx, ty);
+                    const std::uint16_t wall = fog ? map.ViewerWall(tx, ty) : map.GetWall(tx, ty);
                     if (wall > 0)
                     {
                         const PlayerId owner = fog ? map.ViewerWallOwner(tx, ty) : map.GetWallOwner(tx, ty);
@@ -1296,7 +1296,7 @@ void HUDController::RenderGameHud(
             }
 
             // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
-            const uint64_t nowMs = SDL_GetTicks();
+            const std::uint64_t nowMs = SDL_GetTicks();
             m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
             if (m_radarAlert.Active())
             {

@@ -1180,7 +1180,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
     for (Building *factory : availableFactories)
     {
-        const size_t before = m_vehicleQueue.size();
+        const std::size_t before = m_vehicleQueue.size();
         produce(factory, m_vehicleQueue, factoryBuildTime);
         if (m_vehicleQueue.size() != before)
             m_vehicleHoldSeconds = 0.0f; // a vehicle went out
@@ -1424,7 +1424,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
     std::vector<StormcastSlot> slots = AINavigataionStormcastView::ComputeGroupSlots(
         m_stagingX, m_stagingY, static_cast<int>(toStage.size()), map, &entities, toStage);
 
-    for (size_t i = 0; i < toStage.size() && i < slots.size(); ++i)
+    for (std::size_t i = 0; i < toStage.size() && i < slots.size(); ++i)
     {
         Unit *u = entities.GetUnit(toStage[i]);
         if (!u)
@@ -1599,7 +1599,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         for (int arch : m_currentPlan.archetypes)
         {
             const int wanted = SideArchetype(arch, side());
-            for (size_t i = 0; i < ready.size(); ++i)
+            for (std::size_t i = 0; i < ready.size(); ++i)
             {
                 const Unit *u = entities.GetUnit(ready[i]);
                 if (!used[i] && u && u->archetypeId == wanted)
@@ -1610,7 +1610,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
                 }
             }
         }
-        for (size_t i = 0; i < ready.size() && static_cast<int>(picked.size()) < required; ++i)
+        for (std::size_t i = 0; i < ready.size() && static_cast<int>(picked.size()) < required; ++i)
         {
             if (!used[i])
             {
@@ -1644,8 +1644,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     std::stable_sort(byType.begin(), byType.end(), [&](int a, int b) {
         return entities.GetUnit(a)->archetypeId < entities.GetUnit(b)->archetypeId;
     });
-    std::vector<std::vector<int>> members(static_cast<size_t>(groups));
-    for (size_t i = 0; i < byType.size(); ++i)
+    std::vector<std::vector<int>> members(static_cast<std::size_t>(groups));
+    for (std::size_t i = 0; i < byType.size(); ++i)
         members[i % groups].push_back(byType[i]); // mixed groups
     for (int g = 0; g < groups; ++g)
     {
@@ -2079,15 +2079,15 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         auto open = [&](int px, int py) {
             return px >= 0 && py >= 0 && px < mw && py < mh && map.IsPassable(px, py) && map.GetWall(px, py) == 0;
         };
-        std::vector<uint8_t> ring(static_cast<size_t>(mw) * mh, 0), inside(ring.size(), 0), outside(ring.size(), 0);
-        for (size_t i = 0; i < wallTiles.size(); ++i)
+        std::vector<std::uint8_t> ring(static_cast<std::size_t>(mw) * mh, 0), inside(ring.size(), 0), outside(ring.size(), 0);
+        for (std::size_t i = 0; i < wallTiles.size(); ++i)
             if (wallRow[i] == 0)
                 ring[idx(wallTiles[i].first, wallTiles[i].second)] = 1; // the outer row lies outside the ring
         auto distOf = [&](int px, int py) {
             return DetMath::Hypot(static_cast<float>(px - cx), static_cast<float>(py - cy));
         };
-        auto flood = [&](std::vector<uint8_t> &mark, std::vector<std::pair<int, int>> frontier, bool in) {
-            for (size_t i = 0; i < frontier.size(); ++i)
+        auto flood = [&](std::vector<std::uint8_t> &mark, std::vector<std::pair<int, int>> frontier, bool in) {
+            for (std::size_t i = 0; i < frontier.size(); ++i)
             {
                 const auto [fx, fy] = frontier[i];
                 for (int dy = -1; dy <= 1; ++dy)
@@ -2141,8 +2141,8 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         int skipped = 0;
         // The inner row decides (it links the inside with the outside the enemy comes from); the outer row only
         // goes where the inner one next to it stays
-        std::vector<uint8_t> kept(wallTiles.size(), 0);
-        for (size_t i = 0; i < wallTiles.size(); ++i)
+        std::vector<std::uint8_t> kept(wallTiles.size(), 0);
+        for (std::size_t i = 0; i < wallTiles.size(); ++i)
         {
             if (wallRow[i] != 0)
                 continue;
@@ -2161,18 +2161,18 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             }
             kept[i] = !knowsEnemy || (linksIn && linksOut);
         }
-        for (size_t i = 0; i < wallTiles.size(); ++i)
+        for (std::size_t i = 0; i < wallTiles.size(); ++i)
         {
             if (wallRow[i] == 0)
                 continue;
-            for (size_t j = 0; j < wallTiles.size() && !kept[i]; ++j)
+            for (std::size_t j = 0; j < wallTiles.size() && !kept[i]; ++j)
                 kept[i] = wallRow[j] == 0 && kept[j]
                           && std::max(
                                  std::abs(wallTiles[i].first - wallTiles[j].first),
                                  std::abs(wallTiles[i].second - wallTiles[j].second))
                                  <= 1;
         }
-        for (size_t i = 0; i < wallTiles.size(); ++i)
+        for (std::size_t i = 0; i < wallTiles.size(); ++i)
         {
             if (!kept[i])
             {

@@ -124,7 +124,7 @@ int ProjectileSpec::PickImpact(int seed) const
     if (impact.empty())
         return -1;
     const int n = static_cast<int>(impact.size());
-    return impact[static_cast<size_t>(((seed % n) + n) % n)];
+    return impact[static_cast<std::size_t>(((seed % n) + n) % n)];
 }
 
 int ProjectileSpec::PickGroundMark(int seed) const
@@ -132,7 +132,7 @@ int ProjectileSpec::PickGroundMark(int seed) const
     if (groundMarks.empty())
         return -1;
     const int n = static_cast<int>(groundMarks.size());
-    return groundMarks[static_cast<size_t>(((seed % n) + n) % n)];
+    return groundMarks[static_cast<std::size_t>(((seed % n) + n) % n)];
 }
 
 namespace Projectiles
@@ -141,7 +141,7 @@ namespace Projectiles
 const ProjectileSpec &Of(ProjectileType type)
 {
     const int i = static_cast<int>(type);
-    return Specs()[static_cast<size_t>(i >= 0 && i < kCount ? i : 0)];
+    return Specs()[static_cast<std::size_t>(i >= 0 && i < kCount ? i : 0)];
 }
 
 const char *KeyOf(ProjectileType type)
@@ -153,7 +153,7 @@ ProjectileType FromKey(const std::string &key)
 {
     for (int i = 0; i < kCount; ++i)
     {
-        if (key == Specs()[static_cast<size_t>(i)].key)
+        if (key == Specs()[static_cast<std::size_t>(i)].key)
             return static_cast<ProjectileType>(i);
     }
     return ProjectileType::Bullet;

@@ -141,7 +141,7 @@ std::string lower(const std::string &s)
 std::string lowerUtf8(const std::string &t)
 {
     std::string out;
-    for (size_t i = 0; i < t.size(); ++i)
+    for (std::size_t i = 0; i < t.size(); ++i)
     {
         const unsigned char c = static_cast<unsigned char>(t[i]);
         if (c == 0xD0 && i + 1 < t.size())
@@ -456,7 +456,7 @@ bool HUDController::UpdateResearchWindow(
                 if (!n.Contains(mx, my))
                     continue;
                 hitNode = true;
-                const uint32_t now = SDL_GetTicks();
+                const std::uint32_t now = SDL_GetTicks();
                 // Twice on the same technology starts it
                 if (m_researchClickNode == i && now - m_researchClickMs < 350)
                     TryStartResearch(i, economy, entities);

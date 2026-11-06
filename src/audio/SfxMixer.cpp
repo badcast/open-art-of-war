@@ -64,11 +64,11 @@ std::string EventOfFile(const std::string &path)
     if (name.size() < 5 || name.compare(name.size() - 4, 4, ".ogg") != 0)
         return {};
     name.resize(name.size() - 4);
-    const size_t us = name.find_last_of('_');
+    const std::size_t us = name.find_last_of('_');
     if (us != std::string::npos && us + 1 < name.size())
     {
         bool allDigits = true;
-        for (size_t i = us + 1; i < name.size(); ++i)
+        for (std::size_t i = us + 1; i < name.size(); ++i)
         {
             if (name[i] < '0' || name[i] > '9')
             {
@@ -100,7 +100,7 @@ SfxMixer::Category ParseCategory(const std::string &s)
 }
 
 // Ogg Vorbis -> mono int16 at SfxMixer::kRate
-bool DecodeOgg(const std::vector<uint8_t> &data, std::vector<int16_t> &out)
+bool DecodeOgg(const std::vector<std::uint8_t> &data, std::vector<std::int16_t> &out)
 {
     int channels = 0, rate = 0;
     short *pcm = nullptr;
@@ -110,25 +110,25 @@ bool DecodeOgg(const std::vector<uint8_t> &data, std::vector<int16_t> &out)
         std::free(pcm);
         return false;
     }
-    std::vector<float> mono(static_cast<size_t>(frames));
+    std::vector<float> mono(static_cast<std::size_t>(frames));
     for (int i = 0; i < frames; ++i)
     {
         float s = 0.0f;
         for (int c = 0; c < channels; ++c)
             s += pcm[i * channels + c];
-        mono[static_cast<size_t>(i)] = s / static_cast<float>(channels);
+        mono[static_cast<std::size_t>(i)] = s / static_cast<float>(channels);
     }
     std::free(pcm);
     const double ratio = static_cast<double>(rate) / SfxMixer::kRate;
-    const size_t n = static_cast<size_t>(frames / ratio);
+    const std::size_t n = static_cast<std::size_t>(frames / ratio);
     out.resize(n);
-    for (size_t i = 0; i < n; ++i)
+    for (std::size_t i = 0; i < n; ++i)
     {
         const double src = i * ratio;
-        const size_t a = std::min(static_cast<size_t>(src), mono.size() - 1);
-        const size_t b = std::min(a + 1, mono.size() - 1);
+        const std::size_t a = std::min(static_cast<std::size_t>(src), mono.size() - 1);
+        const std::size_t b = std::min(a + 1, mono.size() - 1);
         const float t = static_cast<float>(src - static_cast<double>(a));
-        out[i] = static_cast<int16_t>(std::clamp(mono[a] + (mono[b] - mono[a]) * t, -32768.0f, 32767.0f));
+        out[i] = static_cast<std::int16_t>(std::clamp(mono[a] + (mono[b] - mono[a]) * t, -32768.0f, 32767.0f));
     }
     return !out.empty();
 }
@@ -164,8 +164,8 @@ int SfxMixer::LoadClips(const std::vector<std::string> &files, bool onlyMissing)
             if (!it->second)
                 continue;
         }
-        std::vector<uint8_t> bytes;
-        std::vector<int16_t> pcm;
+        std::vector<std::uint8_t> bytes;
+        std::vector<std::int16_t> pcm;
         if (!Assets::ReadBytes(file, bytes) || !DecodeOgg(bytes, pcm))
         {
             std::cerr << "[SfxMixer] could not decode " << file << std::endl;
@@ -202,7 +202,7 @@ void SfxMixer::Configure(const nlohmann::json &doc)
             m_events.back().name = it.key();
             m_eventIndex[it.key()] = idx;
         }
-        EventConfig &c = m_events[static_cast<size_t>(idx)].cfg;
+        EventConfig &c = m_events[static_cast<std::size_t>(idx)].cfg;
         c.category = ParseCategory(e.value("category", std::string("ui")));
         c.volume = std::clamp(e.value("volume", 1.0f), 0.0f, 2.0f);
         c.pitchJitter = std::clamp(e.value("pitch_jitter", 0.0f), 0.0f, 12.0f);
@@ -217,7 +217,7 @@ void SfxMixer::Configure(const nlohmann::json &doc)
     }
 }
 
-void SfxMixer::AddClip(const std::string &event, std::vector<int16_t> pcm)
+void SfxMixer::AddClip(const std::string &event, std::vector<std::int16_t> pcm)
 {
     if (pcm.size() < 2)
         return;
@@ -234,7 +234,7 @@ void SfxMixer::AddClip(const std::string &event, std::vector<int16_t> pcm)
         m_eventIndex[event] = idx;
     }
     m_clips.push_back(std::move(pcm));
-    m_events[static_cast<size_t>(idx)].cfg.clips.push_back(static_cast<int>(m_clips.size()) - 1);
+    m_events[static_cast<std::size_t>(idx)].cfg.clips.push_back(static_cast<int>(m_clips.size()) - 1);
 }
 
 int SfxMixer::EventIndex(const std::string &event) const
@@ -247,17 +247,17 @@ bool SfxMixer::Has(const std::string &event) const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
-    return idx >= 0 && !m_events[static_cast<size_t>(idx)].cfg.clips.empty();
+    return idx >= 0 && !m_events[static_cast<std::size_t>(idx)].cfg.clips.empty();
 }
 
 const SfxMixer::EventConfig *SfxMixer::Config(const std::string &event) const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
-    return idx < 0 ? nullptr : &m_events[static_cast<size_t>(idx)].cfg;
+    return idx < 0 ? nullptr : &m_events[static_cast<std::size_t>(idx)].cfg;
 }
 
-size_t SfxMixer::EventCount() const
+std::size_t SfxMixer::EventCount() const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     return m_events.size();
@@ -271,9 +271,9 @@ int SfxMixer::InstancesLocked(int eventIdx) const
     return n;
 }
 
-bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle)
+bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, std::uint64_t nowMs, bool announcer, float muffle)
 {
-    EventState &ev = m_events[static_cast<size_t>(eventIdx)];
+    EventState &ev = m_events[static_cast<std::size_t>(eventIdx)];
     const EventConfig &c = ev.cfg;
     if (c.clips.empty() || gain <= 0.001f || c.volume <= 0.0f)
         return false;
@@ -281,7 +281,7 @@ bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, 
         return false; // the interface is silent
     if (!announcer)
     {
-        if (ev.played && c.minIntervalMs > 0 && nowMs - ev.lastPlayMs < static_cast<uint64_t>(c.minIntervalMs))
+        if (ev.played && c.minIntervalMs > 0 && nowMs - ev.lastPlayMs < static_cast<std::uint64_t>(c.minIntervalMs))
             return false;
         if (InstancesLocked(eventIdx) >= c.maxInstances)
             return false;
@@ -292,19 +292,19 @@ bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, 
         int victim = -1;
         for (int i = 0; i < static_cast<int>(m_voices.size()); ++i)
         {
-            const Voice &v = m_voices[static_cast<size_t>(i)];
+            const Voice &v = m_voices[static_cast<std::size_t>(i)];
             if (v.announcer || v.priority > c.priority)
                 continue;
-            if (victim < 0 || v.priority < m_voices[static_cast<size_t>(victim)].priority
-                || (v.priority == m_voices[static_cast<size_t>(victim)].priority
-                    && v.pos > m_voices[static_cast<size_t>(victim)].pos))
+            if (victim < 0 || v.priority < m_voices[static_cast<std::size_t>(victim)].priority
+                || (v.priority == m_voices[static_cast<std::size_t>(victim)].priority
+                    && v.pos > m_voices[static_cast<std::size_t>(victim)].pos))
                 victim = i;
         }
         if (victim < 0)
             return false;
         m_voices.erase(m_voices.begin() + victim);
     }
-    std::uniform_int_distribution<size_t> pickClip(0, c.clips.size() - 1);
+    std::uniform_int_distribution<std::size_t> pickClip(0, c.clips.size() - 1);
     Voice v;
     v.clip = c.clips[pickClip(m_rng)];
     if (c.pitchJitter > 0.0f)
@@ -336,30 +336,30 @@ bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, 
     return true;
 }
 
-bool SfxMixer::Play(const std::string &event, float gain, float pan, uint64_t nowMs, float muffle)
+bool SfxMixer::Play(const std::string &event, float gain, float pan, std::uint64_t nowMs, float muffle)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
     if (idx < 0)
         return false;
-    if (m_events[static_cast<size_t>(idx)].cfg.category == Category::Announcer)
+    if (m_events[static_cast<std::size_t>(idx)].cfg.category == Category::Announcer)
         return AnnounceLocked(idx, nowMs); // announcer lines always go through the queue
     return StartLocked(idx, gain, pan, nowMs, false, muffle);
 }
 
-bool SfxMixer::Announce(const std::string &event, uint64_t nowMs)
+bool SfxMixer::Announce(const std::string &event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
     return idx >= 0 && AnnounceLocked(idx, nowMs);
 }
 
-bool SfxMixer::AnnounceLocked(int idx, uint64_t nowMs)
+bool SfxMixer::AnnounceLocked(int idx, std::uint64_t nowMs)
 {
-    if (m_events[static_cast<size_t>(idx)].cfg.clips.empty() || m_interfaceMuted)
+    if (m_events[static_cast<std::size_t>(idx)].cfg.clips.empty() || m_interfaceMuted)
         return false;
-    const EventState &ev = m_events[static_cast<size_t>(idx)];
-    if (ev.played && ev.cfg.cooldownMs > 0 && nowMs - ev.lastPlayMs < static_cast<uint64_t>(ev.cfg.cooldownMs))
+    const EventState &ev = m_events[static_cast<std::size_t>(idx)];
+    if (ev.played && ev.cfg.cooldownMs > 0 && nowMs - ev.lastPlayMs < static_cast<std::uint64_t>(ev.cfg.cooldownMs))
         return false;
     if (std::find(m_announcerQueue.begin(), m_announcerQueue.end(), idx) != m_announcerQueue.end())
         return false;
@@ -374,7 +374,7 @@ bool SfxMixer::AnnounceLocked(int idx, uint64_t nowMs)
     return true;
 }
 
-void SfxMixer::Update(uint64_t nowMs)
+void SfxMixer::Update(std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     for (const Voice &v : m_voices)
@@ -394,8 +394,8 @@ void SfxMixer::Update(uint64_t nowMs)
 SfxMixer::Reverb::Reverb()
 {
     // Freeverb delay lengths (44.1 kHz); the right ear is a little longer, which spreads the tail
-    static constexpr size_t kCombLen[kCombs] = {1116, 1188, 1277, 1356};
-    static constexpr size_t kAllpassLen[kAllpass] = {556, 441};
+    static constexpr std::size_t kCombLen[kCombs] = {1116, 1188, 1277, 1356};
+    static constexpr std::size_t kAllpassLen[kAllpass] = {556, 441};
     for (int ch = 0; ch < 2; ++ch)
     {
         for (int i = 0; i < kCombs; ++i)
@@ -439,16 +439,16 @@ void SfxMixer::Reverb::Process(const float *in, float *outL, float *outR, int fr
     }
 }
 
-void SfxMixer::Mix(int16_t *out, int frames)
+void SfxMixer::Mix(std::int16_t *out, int frames)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     if (frames <= 0)
         return;
-    std::vector<float> acc(static_cast<size_t>(frames) * 2, 0.0f);
-    m_sendBus.assign(static_cast<size_t>(frames), 0.0f);
+    std::vector<float> acc(static_cast<std::size_t>(frames) * 2, 0.0f);
+    m_sendBus.assign(static_cast<std::size_t>(frames), 0.0f);
     for (Voice &v : m_voices)
     {
-        const std::vector<int16_t> &clip = m_clips[static_cast<size_t>(v.clip)];
+        const std::vector<std::int16_t> &clip = m_clips[static_cast<std::size_t>(v.clip)];
         const float vol = m_muted ? 0.0f : (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
         const float gl = v.gainL * vol, gr = v.gainR * vol;
         const float send = m_reverbOn ? v.reverbSend * vol : 0.0f;
@@ -456,7 +456,7 @@ void SfxMixer::Mix(int16_t *out, int frames)
         const double last = static_cast<double>(clip.size() - 1);
         for (int i = 0; i < frames && v.pos < last; ++i)
         {
-            const size_t a = static_cast<size_t>(v.pos);
+            const std::size_t a = static_cast<std::size_t>(v.pos);
             const float t = static_cast<float>(v.pos - static_cast<double>(a));
             const float s = clip[a] + (clip[a + 1] - clip[a]) * t;
             float l = s * gl, r = s * gr;
@@ -467,10 +467,10 @@ void SfxMixer::Mix(int16_t *out, int frames)
                 l = v.lpL;
                 r = v.lpR;
             }
-            acc[static_cast<size_t>(i) * 2] += l;
-            acc[static_cast<size_t>(i) * 2 + 1] += r;
+            acc[static_cast<std::size_t>(i) * 2] += l;
+            acc[static_cast<std::size_t>(i) * 2 + 1] += r;
             if (send > 0.0f)
-                m_sendBus[static_cast<size_t>(i)] += s * send;
+                m_sendBus[static_cast<std::size_t>(i)] += s * send;
             v.pos += v.step;
         }
     }
@@ -479,27 +479,27 @@ void SfxMixer::Mix(int16_t *out, int frames)
             m_voices.begin(),
             m_voices.end(),
             [this](const Voice &v) {
-                return v.pos >= static_cast<double>(m_clips[static_cast<size_t>(v.clip)].size() - 1);
+                return v.pos >= static_cast<double>(m_clips[static_cast<std::size_t>(v.clip)].size() - 1);
             }),
         m_voices.end());
     if (m_reverbOn)
     {
         // The tail goes on after the voices that fed it are gone
-        m_wetL.assign(static_cast<size_t>(frames), 0.0f);
-        m_wetR.assign(static_cast<size_t>(frames), 0.0f);
+        m_wetL.assign(static_cast<std::size_t>(frames), 0.0f);
+        m_wetR.assign(static_cast<std::size_t>(frames), 0.0f);
         m_reverb.Process(m_sendBus.data(), m_wetL.data(), m_wetR.data(), frames);
         for (int i = 0; i < frames; ++i)
         {
-            acc[static_cast<size_t>(i) * 2] += m_wetL[static_cast<size_t>(i)];
-            acc[static_cast<size_t>(i) * 2 + 1] += m_wetR[static_cast<size_t>(i)];
+            acc[static_cast<std::size_t>(i) * 2] += m_wetL[static_cast<std::size_t>(i)];
+            acc[static_cast<std::size_t>(i) * 2 + 1] += m_wetR[static_cast<std::size_t>(i)];
         }
     }
-    for (size_t i = 0; i < acc.size(); ++i)
+    for (std::size_t i = 0; i < acc.size(); ++i)
     {
         // Soft limit: many explosions at once saturate gently instead of clipping hard
         const float x = (static_cast<float>(out[i]) + acc[i]) / 32768.0f;
         const float y = x / (1.0f + 0.25f * std::fabs(x));
-        out[i] = static_cast<int16_t>(std::clamp(y * 1.25f * 32767.0f, -32768.0f, 32767.0f));
+        out[i] = static_cast<std::int16_t>(std::clamp(y * 1.25f * 32767.0f, -32768.0f, 32767.0f));
     }
 }
 
@@ -565,7 +565,7 @@ bool SfxMixer::AnnouncerBusy() const
     return false;
 }
 
-size_t SfxMixer::AnnouncerQueued() const
+std::size_t SfxMixer::AnnouncerQueued() const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     return m_announcerQueue.size();

@@ -58,8 +58,8 @@ int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target, P
     {
         int lo = 50, hi = 100;
         WeaponBalance::MovingTargetPercent(lo, hi);
-        const uint32_t roll = static_cast<uint32_t>(Utility::Random(lo, hi));
-        int finalDamage = static_cast<int>((static_cast<uint64_t>(baseDamage) * roll + 50u) / 100u);
+        const std::uint32_t roll = static_cast<std::uint32_t>(Utility::Random(lo, hi));
+        int finalDamage = static_cast<int>((static_cast<std::uint64_t>(baseDamage) * roll + 50u) / 100u);
         return ReduceDamageByArmor((finalDamage < 1) ? 1 : finalDamage, *target);
     }
     return ReduceDamageByArmor(baseDamage, *target);
@@ -172,17 +172,17 @@ static void HandleUnitDeathState(Unit *tu, bool isFlameDamage)
 EntityManager::EntityManager()
 {
     m_entities.Reserve(MAX_UNITS);
-    LoadCharacterConfigs(LoaderResources::kDefaultRoot);
+    LoadCharacterConfigs();
 }
 
-bool EntityManager::LoadCharacterConfigs(const std::string &assetRoot)
+bool EntityManager::LoadCharacterConfigs()
 {
     namespace fs = std::filesystem;
-    // The definition files are listed by name in main.json (characters.files)
-    const std::vector<std::string> files = LoaderResources::CharacterFiles(assetRoot);
+    // The definition files are listed by name in main.yaml (characters.files)
+    const std::vector<std::string> files = LoaderResources::CharacterFiles();
     if (files.empty())
     {
-        std::cerr << "[EntityManager] main.json lists no character files (characters.files)" << std::endl;
+        std::cerr << "[EntityManager] main.yaml lists no character files (characters.files)" << std::endl;
         return false;
     }
 
@@ -300,7 +300,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     bool hasRotTurret = getBool(combatNode, "has_rotating_turret", false);
     bool hasRotRadar = getBool(combatNode, "has_rotating_radar", false);
 
-    auto getSeqFloat = [](const YAML::Node &node, size_t idx, float def = 0.0f) -> float {
+    auto getSeqFloat = [](const YAML::Node &node, std::size_t idx, float def = 0.0f) -> float {
         if (node && node.IsSequence() && idx < node.size())
         {
             try
@@ -315,7 +315,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
 
     // Weapons live only in combat.weapons; weapons[0] is the main gun the unit / building fights with.
     // Fields a weapon leaves out come from `inherit` (the parent form's main gun for siege / upgrade forms).
-    auto parseWeapon = [&](const YAML::Node &w, const WeaponConfig &inherit, size_t index) {
+    auto parseWeapon = [&](const YAML::Node &w, const WeaponConfig &inherit, std::size_t index) {
         WeaponConfig wc = inherit;
         wc.name = getStr(w, "name", index == 0 ? inherit.name : "Weapon " + std::to_string(index + 1));
         wc.projectile = StringToProjectileType(getStr(w, "projectile", ProjectileTypeName(inherit.projectile)));
@@ -358,7 +358,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         const YAML::Node ws = combat ? combat["weapons"] : YAML::Node();
         if (ws && ws.IsSequence())
         {
-            for (size_t wi = 0; wi < ws.size(); ++wi)
+            for (std::size_t wi = 0; wi < ws.size(); ++wi)
             {
                 if (ws[wi].IsMap())
                     list.push_back(parseWeapon(ws[wi], wi == 0 ? inherit : list.front(), wi));
@@ -722,7 +722,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         cfg.buildRadius = bRadius;
         if (cfg.type == UnitType::Headquarters && faction != Faction::Neutral)
         {
-            m_factionBuildRadius[static_cast<size_t>(faction)] = bRadius;
+            m_factionBuildRadius[static_cast<std::size_t>(faction)] = bRadius;
             m_buildRadiusExtra = {};
         }
         cfg.wreckComposite = getInt(animNode, "wreck_composite", 0);
@@ -746,7 +746,7 @@ void EntityManager::RebuildBlueprints()
         list.clear();
         const std::vector<int> bpOrder
             = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
-        for (size_t slot = 0; slot < bpOrder.size(); ++slot)
+        for (std::size_t slot = 0; slot < bpOrder.size(); ++slot)
         {
             const int bIdx = bpOrder[slot];
             auto it = m_buildingConfigs.find(bIdx);
@@ -1266,7 +1266,7 @@ bool EntityManager::UpgradeUnitForm(int unitId, int newArchetype)
     const int oldHp = u->currentHp;
     u->archetypeId = newArchetype;
     CopyUnitConfig(*u, *cfg);
-    u->currentHp = std::max(1, static_cast<int>(static_cast<int64_t>(oldHp) * u->maxHp / oldMax));
+    u->currentHp = std::max(1, static_cast<int>(static_cast<std::int64_t>(oldHp) * u->maxHp / oldMax));
     u->turnTimer = 0.0f;
     u->turretTurnTimer = 0.0f;
     ApplyCompletedResearch(*u); // the technologies of the player apply to the new form too
@@ -1312,8 +1312,8 @@ int EntityManager::SpawnBuildingByIndex(
     if (m_entities.size() >= MAX_UNITS)
         return 0;
 
-    static const uint8_t s_widths[15] = {4, 3, 3, 4, 3, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2};
-    static const uint8_t s_heights[15] = {4, 3, 3, 3, 3, 2, 2, 2, 4, 3, 3, 3, 3, 2, 2};
+    static const std::uint8_t s_widths[15] = {4, 3, 3, 4, 3, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2};
+    static const std::uint8_t s_heights[15] = {4, 3, 3, 3, 3, 2, 2, 2, 4, 3, 3, 3, 3, 2, 2};
 
     auto b = std::make_unique<Building>();
     b->id = m_nextId++;
@@ -1487,7 +1487,7 @@ bool EntityManager::CanPlaceBuilding(
     // (the same for every player, human or computer)
     if (map.IsFogEnabled())
     {
-        const uint8_t team = Players::TeamOf(player);
+        const std::uint8_t team = Players::TeamOf(player);
         for (int ty = tileY; ty < tileY + height; ++ty)
         {
             for (int tx = tileX; tx < tileX + width; ++tx)
@@ -1591,13 +1591,13 @@ bool EntityManager::KeepsBaseOpen(
     int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const
 {
     const int W = map.GetWidth(), H = map.GetHeight();
-    std::vector<uint8_t> blocked(static_cast<size_t>(W) * H, 0);
+    std::vector<std::uint8_t> blocked(static_cast<std::size_t>(W) * H, 0);
     for (int y = 0; y < H; ++y)
     {
         for (int x = 0; x < W; ++x)
         {
             if (!map.IsPassable(x, y) || map.GetWall(x, y) > 0)
-                blocked[static_cast<size_t>(y) * W + x] = 1;
+                blocked[static_cast<std::size_t>(y) * W + x] = 1;
         }
     }
     // Where the units of the player come out: the headquarters and every unit producer
@@ -1614,7 +1614,7 @@ bool EntityManager::KeepsBaseOpen(
             for (int x = b->tileX; x < b->tileX + b->buildWidth; ++x)
             {
                 if (x >= 0 && y >= 0 && x < W && y < H)
-                    blocked[static_cast<size_t>(y) * W + x] = 1;
+                    blocked[static_cast<std::size_t>(y) * W + x] = 1;
             }
         }
         if (b->owner == player && (b->type == UnitType::Headquarters || b->IsUnitProducer()))
@@ -1627,13 +1627,13 @@ bool EntityManager::KeepsBaseOpen(
     if (anchors.empty())
         return true;
     const auto idx = [&](int x, int y) {
-        return static_cast<size_t>(y) * W + x;
+        return static_cast<std::size_t>(y) * W + x;
     };
     // A producer's exit stands on a free tile; the first anchor (the oldest building) is the one that is followed
     if (blocked[idx(anchors[0].first, anchors[0].second)])
         return true; // nothing to measure from
 
-    auto flood = [&](const std::vector<uint8_t> &block, std::vector<uint8_t> &seen) {
+    auto flood = [&](const std::vector<std::uint8_t> &block, std::vector<std::uint8_t> &seen) {
         seen.assign(block.size(), 0);
         std::vector<int> stack {anchors[0].second * W + anchors[0].first};
         seen[stack[0]] = 1;
@@ -1649,7 +1649,7 @@ bool EntityManager::KeepsBaseOpen(
             {
                 if (nx[k] < 0 || ny[k] < 0 || nx[k] >= W || ny[k] >= H)
                     continue;
-                const size_t n = idx(nx[k], ny[k]);
+                const std::size_t n = idx(nx[k], ny[k]);
                 if (block[n] || seen[n])
                     continue;
                 seen[n] = 1;
@@ -1659,9 +1659,9 @@ bool EntityManager::KeepsBaseOpen(
         return count;
     };
 
-    std::vector<uint8_t> before, after;
+    std::vector<std::uint8_t> before, after;
     const int reachBefore = flood(blocked, before);
-    std::vector<uint8_t> withNew = blocked;
+    std::vector<std::uint8_t> withNew = blocked;
     int footprintReached = 0;
     for (int y = tileY; y < tileY + height; ++y)
     {
@@ -1717,23 +1717,23 @@ bool EntityManager::HasBuildingType(UnitType type, PlayerId owner, bool mustBeCo
     return false;
 }
 
-uint16_t EntityManager::InternSound(const std::string &name)
+std::uint16_t EntityManager::InternSound(const std::string &name)
 {
     if (name.empty())
         return 0;
-    for (size_t i = 0; i < m_soundNames.size(); ++i)
+    for (std::size_t i = 0; i < m_soundNames.size(); ++i)
         if (m_soundNames[i] == name)
-            return static_cast<uint16_t>(i + 1);
+            return static_cast<std::uint16_t>(i + 1);
     if (m_soundNames.size() >= 0xFFFE)
         return 0;
     m_soundNames.push_back(name);
-    return static_cast<uint16_t>(m_soundNames.size());
+    return static_cast<std::uint16_t>(m_soundNames.size());
 }
 
 const WeaponConfig *EntityManager::FiringWeapon(const Entity &e) const
 {
     const std::vector<WeaponConfig> *list = nullptr;
-    size_t slot = 0;
+    std::size_t slot = 0;
     if (const Unit *u = e.AsUnit())
     {
         if (const UnitConfig *cfg = GetUnitConfig(u->archetypeId))
@@ -1940,10 +1940,10 @@ void EntityManager::ResolveUnitStacking(TileMap &map)
         }
     }
 
-    for (size_t i = 0; i < livingUnits.size(); ++i)
+    for (std::size_t i = 0; i < livingUnits.size(); ++i)
     {
         Unit *u1 = livingUnits[i];
-        for (size_t j = i + 1; j < livingUnits.size(); ++j)
+        for (std::size_t j = i + 1; j < livingUnits.size(); ++j)
         {
             Unit *u2 = livingUnits[j];
             if (u1->tileX == u2->tileX && u1->tileY == u2->tileY)
@@ -2201,7 +2201,7 @@ void EntityManager::IssueMoveOrder(
         std::vector<StormcastSlot> matchedSlots(validUnits.size());
         std::vector<bool> slotUsed(slots.size(), false);
 
-        for (size_t i = 0; i < validUnits.size(); ++i)
+        for (std::size_t i = 0; i < validUnits.size(); ++i)
         {
             const Unit *u = GetUnit(validUnits[i]);
             float relX = u ? (static_cast<float>(u->tileX) - unitCentroidX) : 0.0f;
@@ -2211,9 +2211,9 @@ void EntityManager::IssueMoveOrder(
             float idealX = slotCentroidX + relX;
             float idealY = slotCentroidY + relY;
 
-            size_t bestIdx = 0;
+            std::size_t bestIdx = 0;
             float bestDistSq = 1e18f;
-            for (size_t k = 0; k < slots.size(); ++k)
+            for (std::size_t k = 0; k < slots.size(); ++k)
             {
                 if (slotUsed[k])
                     continue;
@@ -2243,7 +2243,7 @@ void EntityManager::IssueMoveOrder(
     }
 
     std::vector<std::pair<int, int>> assignedEndTiles;
-    for (size_t i = 0; i < validUnits.size(); ++i)
+    for (std::size_t i = 0; i < validUnits.size(); ++i)
     {
         int uid = validUnits[i];
         Unit *u = GetUnit(uid);
@@ -2996,7 +2996,7 @@ void EntityManager::UpdateFogOfWar(TileMap &map)
             continue;
         if (entity.owner >= kMaxPlayers)
             continue;
-        const uint8_t team = Players::TeamOf(entity.owner);
+        const std::uint8_t team = Players::TeamOf(entity.owner);
 
         int sight = entity.sightRadius;
         if (sight <= 0)
@@ -3069,7 +3069,7 @@ bool EntityManager::IsEntityVisibleToPlayer(const Entity &entity, PlayerId obser
     if (Players::Slot(observer).human)
     {
         // Visible if ANY tile of the entity's WxH footprint is in the team's sight this tick
-        const uint8_t team = Players::TeamOf(observer);
+        const std::uint8_t team = Players::TeamOf(observer);
         for (int dy = 0; dy < h; ++dy)
         {
             for (int dx = 0; dx < w; ++dx)
@@ -3233,7 +3233,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
             {
                 for (int wx = minWX; wx <= maxWX; ++wx)
                 {
-                    uint16_t w = map.GetWall(wx, wy);
+                    std::uint16_t w = map.GetWall(wx, wy);
                     if (w == 0)
                         continue;
                     // Only walls toward the destination; never turn back to shoot a wall behind
@@ -4140,7 +4140,7 @@ void EntityManager::SpawnDeathExplosions(const Entity &e)
     const float cx = e.GetUnitCenterPixelX();
     const float cy = e.GetUnitCenterPixelY();
     auto pick = [](const std::vector<int> &list, int i) {
-        return list.empty() ? -1 : list[static_cast<size_t>(i) % list.size()];
+        return list.empty() ? -1 : list[static_cast<std::size_t>(i) % list.size()];
     };
     if (const Building *b = e.AsBuilding())
     {
@@ -4271,7 +4271,7 @@ void EntityManager::AddGroundMark(float x, float y, int composite, float seconds
 {
     if (composite <= 0 || seconds <= 0.0f)
         return;
-    constexpr size_t kMaxMarks = 400; // the oldest go first
+    constexpr std::size_t kMaxMarks = 400; // the oldest go first
     if (m_groundMarks.size() >= kMaxMarks)
         m_groundMarks.erase(m_groundMarks.begin());
     m_groundMarks.push_back({x, y, composite, seconds});
@@ -4415,9 +4415,9 @@ bool EntityManager::IsHostileBuildingShown(const Building &b, const TileMap &map
             inSight = map.GetFogState(tx, ty) == FogState::Visible;
         }
     }
-    const uint64_t key = (static_cast<uint64_t>(static_cast<uint32_t>(b.id)) << 32)
-                         | (static_cast<uint64_t>(static_cast<uint16_t>(b.tileY)) << 16)
-                         | static_cast<uint16_t>(b.tileX);
+    const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(b.id)) << 32)
+                         | (static_cast<std::uint64_t>(static_cast<std::uint16_t>(b.tileY)) << 16)
+                         | static_cast<std::uint16_t>(b.tileX);
     if (inSight)
         m_seenBuildings.insert(key);
     if (outInSight)
@@ -4474,7 +4474,7 @@ void EntityManager::Render(
         const MapDecoration *decor = nullptr; // the crown of a tree / rock (its ground layer went with the terrain)
     };
     std::vector<DepthItem> items;
-    items.reserve(m_entities.size() + static_cast<size_t>(std::max(0, endTileY - startTileY)));
+    items.reserve(m_entities.size() + static_cast<std::size_t>(std::max(0, endTileY - startTileY)));
     for (int ty = startTileY; ty < endTileY; ++ty)
     {
         items.push_back({static_cast<float>((ty + 1) * TILE_HEIGHT), 0, ty, nullptr, nullptr, true});
@@ -4621,8 +4621,8 @@ void EntityManager::Render(
                 const SDL_Color hc = Players::Hostile(b->owner, Players::Local())
                                          ? SDL_Color {240, 80, 70, 255}
                                          : SelectionHealthColor(hp); // (an opponent's health is not shown)
-                auto mix = [&](uint8_t c) {
-                    return static_cast<uint8_t>(255.0f + (c - 255.0f) * t);
+                auto mix = [&](std::uint8_t c) {
+                    return static_cast<std::uint8_t>(255.0f + (c - 255.0f) * t);
                 };
                 renderer.SetSpriteGlow({mix(hc.r), mix(hc.g), mix(hc.b), 255}, 0.12f + 0.28f * t);
             }

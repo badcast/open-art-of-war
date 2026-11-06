@@ -144,7 +144,7 @@ void CharacterEditor::DrawAnimGallery(float height)
                 if (target.IsSequence())
                 {
                     std::string list = "[";
-                    for (size_t i = 0; i < target.size(); ++i)
+                    for (std::size_t i = 0; i < target.size(); ++i)
                         list += target[i].Scalar() + ", ";
                     ok = y.Set(animPickPath, list + std::to_string(id) + "]");
                 }
@@ -186,7 +186,7 @@ void CharacterEditor::StartExplosionPreview(int preset)
     fxRestartTimer = 0.0f;
     const EffectsConfig &fx = EffectsConfig::Get();
     auto pick = [](const std::vector<int> &list, int i) {
-        return list.empty() ? -1 : list[static_cast<size_t>(i) % list.size()];
+        return list.empty() ? -1 : list[static_cast<std::size_t>(i) % list.size()];
     };
     static int seed = 0;
     ++seed;
@@ -476,7 +476,7 @@ void CharacterEditor::DrawWreckTabProperties()
         ImGui::TextUnformatted(_("Families"));
         FieldHint("Families");
         const int cur = static_cast<int>(effectsYaml.At(base + ".composite").as<int>(0));
-        for (size_t f = 0; f < std::size(kWreckFamilies); ++f)
+        for (std::size_t f = 0; f < std::size(kWreckFamilies); ++f)
         {
             if (f)
                 ImGui::SameLine();
@@ -544,7 +544,7 @@ void CharacterEditor::DrawWreckTabProperties()
             auto text = [](std::vector<int> v) {
                 std::sort(v.begin(), v.end());
                 std::string s = "[";
-                for (size_t i = 0; i < v.size(); ++i)
+                for (std::size_t i = 0; i < v.size(); ++i)
                     s += (i ? ", " : "") + std::to_string(v[i]);
                 return s + "]";
             };

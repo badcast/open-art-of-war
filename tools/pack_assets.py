@@ -2,7 +2,7 @@
 """Packs the contents of the assets directory into a blob (a tar archive compressed with zstd) together with its
 integrity certificate.
 
-Entries are stored relative to the assets directory ("maps/m0.json", "locale/en/...").
+Entries are stored relative to the assets directory ("maps/*.json", "locale/en/...").
 The game reads the blob with libarchive (see src/core/AssetStore.cpp).
 
 The certificate is the entry "certificate.sha256" inside the blob itself (there is no separate file): every packed
@@ -57,7 +57,7 @@ def add_entry(tar, key, data):
 
 
 def manifest_paths(node, key=""):
-    """Every file path named in main.json (the keys that hold names, not files, are skipped)"""
+    """Every file path named in main.yaml (the keys that hold names, not files, are skipped)"""
     if key in ("_comment", "version", "default_language", "fallback_language", "dir"):
         return
     if isinstance(node, str):
@@ -71,13 +71,26 @@ def manifest_paths(node, key=""):
 
 
 def check_manifest(assets_dir, keys):
-    """main.json must name only files that exist; files it does not name are reported"""
-    import json
-    with open(os.path.join(assets_dir, "main.json"), encoding="utf-8") as f:
-        named = set(manifest_paths(json.load(f)))
+    """main.yaml must name only files that exist; files it does not name are reported"""
+    manifest_yaml = os.path.join(assets_dir, "main.yaml")
+    manifest_json = os.path.join(assets_dir, "main.json")
+    if os.path.isfile(manifest_yaml):
+        import yaml
+        with open(manifest_yaml, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        manifest_name = "main.yaml"
+    elif os.path.isfile(manifest_json):
+        import json
+        with open(manifest_json, encoding="utf-8") as f:
+            data = json.load(f)
+        manifest_name = "main.json"
+    else:
+        raise SystemExit(f"pack_assets: neither main.yaml nor main.json found in {assets_dir}")
+
+    named = set(manifest_paths(data))
     missing = sorted(p for p in named if not os.path.isfile(os.path.join(assets_dir, p)))
     if missing:
-        raise SystemExit("pack_assets: main.json names missing files:\n  " + "\n  ".join(missing))
+        raise SystemExit(f"pack_assets: {manifest_name} names missing files:\n  " + "\n  ".join(missing))
     return len(named)
 
 
@@ -116,7 +129,7 @@ def main():
     tmp = output + ".tmp"
     compress(buf.getvalue(), tmp)
     os.replace(tmp, output)
-    print(f"pack_assets: {len(files)} files ({named} named in main.json) + {CERTIFICATE_NAME} -> {output}")
+    print(f"pack_assets: {len(files)} files ({named} named in main.yaml) + {CERTIFICATE_NAME} -> {output}")
     return 0
 
 

@@ -223,7 +223,7 @@ void testProtocol()
     {
         // Data sync messages
         DataManifest m, o;
-        m.files = {{"assets/characters/a.yaml", 0x1122334455667788ull}, {"assets/main.json", 7}};
+        m.files = {{"assets/characters/a.yaml", 0x1122334455667788ull}, {"assets/main.yaml", 7}};
         CHECK(roundTrip(m, MsgType::DataManifest, o));
         CHECK(o.files.size() == 2 && o.files[0].path == "assets/characters/a.yaml" && o.files[1].hash == 7);
         FilePathRequest q, qo;
@@ -468,7 +468,7 @@ void testEnetLoopback()
     ENetAddress any {};
     any.host = ENET_HOST_ANY;
     any.port = 0; // any free port
-    ENetHost *server = enet_host_create(&any, 4, static_cast<size_t>(Channel::Count), 0, 0);
+    ENetHost *server = enet_host_create(&any, 4, static_cast<std::size_t>(Channel::Count), 0, 0);
     CHECK(server != nullptr);
     if (!server)
         return;
@@ -476,7 +476,7 @@ void testEnetLoopback()
     ENetAddress bound {};
     enet_socket_get_address(server->socket, &bound);
 
-    ENetHost *client = enet_host_create(nullptr, 1, static_cast<size_t>(Channel::Count), 0, 0);
+    ENetHost *client = enet_host_create(nullptr, 1, static_cast<std::size_t>(Channel::Count), 0, 0);
     CHECK(client != nullptr);
     if (!client)
     {
@@ -487,7 +487,7 @@ void testEnetLoopback()
     ENetAddress target {};
     enet_address_set_host_ip(&target, "127.0.0.1");
     target.port = bound.port;
-    ENetPeer *peer = enet_host_connect(client, &target, static_cast<size_t>(Channel::Count), 0);
+    ENetPeer *peer = enet_host_connect(client, &target, static_cast<std::size_t>(Channel::Count), 0);
     CHECK(peer != nullptr);
 
     bool connected = false, received = false;
@@ -552,7 +552,7 @@ void testDataSync()
     HostConfig hc;
     hc.identity = testIdentity();
     hc.dataManifest = {{"assets/characters/a.yaml", 111}, {"assets/data/b.json", 222}};
-    hc.dataFile = [](const std::string &path, std::vector<uint8_t> &packed, uint64_t &hash) {
+    hc.dataFile = [](const std::string &path, std::vector<std::uint8_t> &packed, std::uint64_t &hash) {
         if (path != "assets/characters/a.yaml" && path != "assets/data/b.json")
             return false;
         packed = {9, 8, 7};
@@ -561,7 +561,7 @@ void testDataSync()
     };
     SessionHost host(hc);
     host.addTransport(hub.server());
-    uint32_t now = 0;
+    std::uint32_t now = 0;
     auto pump = [&](SessionClient &c, int rounds = 4) {
         for (int i = 0; i < rounds; ++i)
         {
@@ -635,9 +635,9 @@ void testServerReplay()
         std::vector<std::unique_ptr<SessionClient>> clients;
         for (int i = 0; i < 2; ++i)
             clients.push_back(std::make_unique<SessionClient>(hub.client(), clientConfig("R" + std::to_string(i))));
-        uint32_t now = 0;
-        auto step = [&](uint32_t ms) {
-            for (uint32_t t = 0; t < ms; t += 10)
+        std::uint32_t now = 0;
+        auto step = [&](std::uint32_t ms) {
+            for (std::uint32_t t = 0; t < ms; t += 10)
             {
                 now += 10;
                 for (auto &c : clients)
@@ -711,9 +711,9 @@ void testLockstepSession()
     std::vector<std::unique_ptr<SessionClient>> clients;
     for (int i = 0; i < 3; ++i)
         clients.push_back(std::make_unique<SessionClient>(hub.client(), clientConfig("P" + std::to_string(i))));
-    uint32_t now = 0;
-    auto step = [&](uint32_t ms) {
-        for (uint32_t t = 0; t < ms; t += 10)
+    std::uint32_t now = 0;
+    auto step = [&](std::uint32_t ms) {
+        for (std::uint32_t t = 0; t < ms; t += 10)
         {
             now += 10;
             for (auto &c : clients)
@@ -755,7 +755,7 @@ void testLockstepSession()
     step(20);
     bool started = true;
     for (auto &c : clients)
-        started = started && c->matchStarted() && c->matchSetup() == std::vector<uint8_t> {7, 7, 7};
+        started = started && c->matchStarted() && c->matchSetup() == std::vector<std::uint8_t> {7, 7, 7};
     CHECK(started);
 
     // Turn 2: client 1 and 2 send commands; client 0 sends for turn 0 when turn 0 is already gone (late)
@@ -771,12 +771,12 @@ void testLockstepSession()
     {
         const TurnBundle *b = c->turn(2);
         sameEverywhere
-            = sameEverywhere && b && b->players.size() == 2 && b->players[0].bytes == std::vector<uint8_t> {11};
+            = sameEverywhere && b && b->players.size() == 2 && b->players[0].bytes == std::vector<std::uint8_t> {11};
     }
     CHECK(sameEverywhere);
     // The late one is in exactly one later turn, the same for everybody
-    uint32_t lateTurn = 0;
-    for (uint32_t t = 3; t < clients[0]->turnsReceived(); ++t)
+    std::uint32_t lateTurn = 0;
+    for (std::uint32_t t = 3; t < clients[0]->turnsReceived(); ++t)
     {
         const TurnBundle *b = clients[0]->turn(t);
         if (b && !b->players.empty() && b->players[0].slot == 0)
@@ -790,13 +790,13 @@ void testLockstepSession()
     // A burst of late batches (a client catching up after a stall) is more than one bundle holds: the
     // rest moves on to the following turns in order, nothing is lost
     {
-        const uint32_t from = clients[0]->turnsReceived();
-        for (uint8_t i = 0; i < 40; ++i)
-            clients[1]->sendCommands(0, {static_cast<uint8_t>(100 + i)});
+        const std::uint32_t from = clients[0]->turnsReceived();
+        for (std::uint8_t i = 0; i < 40; ++i)
+            clients[1]->sendCommands(0, {static_cast<std::uint8_t>(100 + i)});
         step(800);
-        std::vector<uint8_t> seen;
+        std::vector<std::uint8_t> seen;
         bool sameOnAll = true;
-        for (uint32_t t = from; t < clients[0]->turnsReceived(); ++t)
+        for (std::uint32_t t = from; t < clients[0]->turnsReceived(); ++t)
         {
             const TurnBundle *b = clients[0]->turn(t);
             const TurnBundle *b2 = clients[2]->turn(t);
@@ -809,7 +809,7 @@ void testLockstepSession()
                     seen.push_back(p.bytes[0]);
         }
         bool inOrder = seen.size() == 40;
-        for (size_t i = 0; inOrder && i < seen.size(); ++i)
+        for (std::size_t i = 0; inOrder && i < seen.size(); ++i)
             inOrder = seen[i] == 100 + i;
         CHECK(inOrder);
         CHECK(sameOnAll);
@@ -819,7 +819,7 @@ void testLockstepSession()
     // A pause stops the turns for everybody; going on does not bring a burst of turns
     clients[1]->requestPause(true);
     step(20);
-    const uint32_t pausedAt = clients[0]->turnsReceived();
+    const std::uint32_t pausedAt = clients[0]->turnsReceived();
     CHECK(
         host.paused() && clients[2]->pauseState().paused && clients[2]->pauseState().bySlot == 1
         && clients[2]->pauseState().pausesLeft == 2);
@@ -843,7 +843,7 @@ void testLockstepSession()
 
     // Client 2 drops and comes back with its token: same slot, the match and every turn again
     const SessionToken token = clients[2]->token();
-    const uint32_t before = clients[0]->turnsReceived();
+    const std::uint32_t before = clients[0]->turnsReceived();
     clients[2].reset();
     step(30);
     CHECK(!host.players()[2].connected);
@@ -936,7 +936,7 @@ void testLobby()
     ca.color = 5;
     a->sendLobbyChoice(ca);
     pump();
-    const uint8_t bColor = a->lobby().slots[1].choice.color;
+    const std::uint8_t bColor = a->lobby().slots[1].choice.color;
     CHECK(bColor != 5);
     cb.color = 5;
     b->sendLobbyChoice(cb);
@@ -947,8 +947,8 @@ void testLobby()
     pump();
     CHECK(a->lobby().slots[1].choice.color == 6);
     // Teams are the owner's decision: B cannot move itself, the owner (A, the first player) can move B
-    const uint8_t bTeam = a->lobby().slots[1].choice.team;
-    cb.team = static_cast<uint8_t>((bTeam + 2) % 8);
+    const std::uint8_t bTeam = a->lobby().slots[1].choice.team;
+    cb.team = static_cast<std::uint8_t>((bTeam + 2) % 8);
     b->sendLobbyChoice(cb);
     pump();
     CHECK(a->lobby().slots[1].choice.team == bTeam);
@@ -993,19 +993,19 @@ void testLobby()
     CHECK(host.everyoneReady(2) && !host.everyoneReady(3));
     // A start position another player holds is refused: nobody shares one
     {
-        const uint8_t aSpawn = a->lobby().slots[0].choice.spawn;
+        const std::uint8_t aSpawn = a->lobby().slots[0].choice.spawn;
         cb.spawn = aSpawn;
         b->sendLobbyChoice(cb);
         pump();
         CHECK(a->lobby().slots[1].choice.spawn == 2 && a->lobby().slots[0].choice.spawn == aSpawn);
     }
     // A file the host offers comes to whoever asks; an unknown one comes back empty
-    host.offerFile(0xABCDEF, std::vector<uint8_t>(300000, 7));
+    host.offerFile(0xABCDEF, std::vector<std::uint8_t>(300000, 7));
     a->requestFile(0xABCDEF);
     a->requestFile(0x1234);
     pump();
-    uint64_t fileHash = 0;
-    std::vector<uint8_t> fileBytes;
+    std::uint64_t fileHash = 0;
+    std::vector<std::uint8_t> fileBytes;
     CHECK(
         a->takeFile(fileHash, fileBytes) && fileHash == 0xABCDEF && fileBytes.size() == 300000
         && fileBytes[299999] == 7);
@@ -1074,14 +1074,14 @@ void testLobby()
 
     // Seats: the owner opens, blocks or gives a start position to a computer player; a person there is sent out
     {
-        const uint8_t freeOne = host.lobby().slots.size() < 4 ? 3 : 2;
+        const std::uint8_t freeOne = host.lobby().slots.size() < 4 ? 3 : 2;
         // A blocked place is not taken by a joining player
         a->sendOwnerSetSeat(OwnerSetSeat {freeOne, OwnerSetSeat::Blocked, 1});
         pump();
         CHECK(a->lobby().blockedMask == (1u << freeOne));
         // A computer player on an open place
-        uint8_t openOne = 255;
-        for (uint8_t n = 0; n < 4 && openOne == 255; ++n)
+        std::uint8_t openOne = 255;
+        for (std::uint8_t n = 0; n < 4 && openOne == 255; ++n)
         {
             bool held = (a->lobby().blockedMask >> n) & 1u;
             for (const LobbySlot &ls : a->lobby().slots)
@@ -1104,8 +1104,8 @@ void testLobby()
             aiThere = aiThere || ls.ai;
         CHECK(!aiThere);
         // The person on the other place is sent out
-        const size_t before = host.playerCount();
-        uint8_t dSpawn = 255;
+        const std::size_t before = host.playerCount();
+        std::uint8_t dSpawn = 255;
         for (const LobbySlot &ls : a->lobby().slots)
             if (ls.slot != a->slot())
                 dSpawn = ls.choice.spawn;
@@ -1116,7 +1116,7 @@ void testLobby()
             host.update(0);
         CHECK(host.playerCount() == before - 1);
         // The owner cannot send himself out
-        const uint8_t mine = a->lobby().slots[0].choice.spawn;
+        const std::uint8_t mine = a->lobby().slots[0].choice.spawn;
         a->sendOwnerSetSeat(OwnerSetSeat {mine, OwnerSetSeat::Open, 1});
         pump();
         CHECK(a->lobby().slots.size() == 1);
@@ -1134,14 +1134,14 @@ void testEnetSession()
     HostConfig hc;
     hc.identity = testIdentity();
     SessionHost host(hc);
-    uint16_t port = 0;
+    std::uint16_t port = 0;
     std::string error;
     host.addTransport(createEnetServer(0, 8, &error, &port));
     CHECK(port != 0);
     SessionClient client(createEnetClient("127.0.0.1", port, &error), clientConfig("Remote"));
     const auto start = std::chrono::steady_clock::now();
     auto nowMs = [&] {
-        return static_cast<uint32_t>(
+        return static_cast<std::uint32_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
     bool started = false, sent = false;
@@ -1166,7 +1166,7 @@ void testEnetSession()
     CHECK(client.state() == SessionClient::State::Joined);
     CHECK(client.turnsReceived() > 5);
     const TurnBundle *t3 = client.turn(3);
-    CHECK(t3 && t3->players.size() == 1 && t3->players[0].bytes == std::vector<uint8_t> {42});
+    CHECK(t3 && t3->players.size() == 1 && t3->players[0].bytes == std::vector<std::uint8_t> {42});
     std::printf("  joined on port %u, %u turns over UDP\n", port, client.turnsReceived());
 }
 
@@ -1176,26 +1176,26 @@ void testDiscovery()
     std::printf("[discovery]\n");
     {
         RoomInfo info {"1.0", "Room", "assets/maps/m26.json", 3, 8, false};
-        const std::vector<uint8_t> bytes = encodeAnswer(77, 38101, info);
-        uint32_t nonce = 0;
-        uint16_t port = 0;
+        const std::vector<std::uint8_t> bytes = encodeAnswer(77, 38101, info);
+        std::uint32_t nonce = 0;
+        std::uint16_t port = 0;
         RoomInfo back;
         CHECK(
             decodeAnswer(bytes.data(), bytes.size(), nonce, port, back) && nonce == 77 && port == 38101
             && back.name == "Room" && back.players == 3);
-        for (size_t cut = 0; cut < bytes.size(); ++cut)
+        for (std::size_t cut = 0; cut < bytes.size(); ++cut)
             CHECK(!decodeAnswer(bytes.data(), cut, nonce, port, back));
-        const std::vector<uint8_t> probe = encodeProbe(5);
+        const std::vector<std::uint8_t> probe = encodeProbe(5);
         CHECK(decodeProbe(probe.data(), probe.size(), nonce) && nonce == 5);
         CHECK(!decodeProbe(bytes.data(), bytes.size(), nonce));
     }
-    const uint16_t base = 38170;
+    const std::uint16_t base = 38170;
     HostConfig hc;
     hc.identity = testIdentity();
     hc.roomName = "LAN party";
     SessionHost host(hc);
     std::string error;
-    auto server = createEnetServer(static_cast<uint16_t>(base + 1), 8, &error); // the second port of the span
+    auto server = createEnetServer(static_cast<std::uint16_t>(base + 1), 8, &error); // the second port of the span
     CHECK(server != nullptr);
     if (!server)
         return;
@@ -1205,7 +1205,7 @@ void testDiscovery()
     CHECK(browser.ok());
     const auto start = std::chrono::steady_clock::now();
     auto nowMs = [&] {
-        return static_cast<uint32_t>(
+        return static_cast<std::uint32_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
     while (nowMs() < 2500 && browser.rooms().empty())
@@ -1249,12 +1249,12 @@ void testRoomServer()
     CHECK(server.start(error));
     const auto start = std::chrono::steady_clock::now();
     auto nowMs = [&] {
-        return static_cast<uint32_t>(
+        return static_cast<std::uint32_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
-    auto spin = [&](const std::function<bool()> &done, uint32_t limitMs, const std::function<void()> &also = {}) {
+    auto spin = [&](const std::function<bool()> &done, std::uint32_t limitMs, const std::function<void()> &also = {}) {
         // done() may consume what it checks (takeRoom): ask it once per round
-        const uint32_t until = nowMs() + limitMs;
+        const std::uint32_t until = nowMs() + limitMs;
         while (nowMs() < until)
         {
             server.update(nowMs());
@@ -1339,19 +1339,19 @@ void testRoomServer()
     b.sendLobbyChoice(ready);
     spin([&] { return false; }, 200, clients);
     // The owner gives the room its map; the other player fetches it from the room
-    a.uploadFile(0x77, std::vector<uint8_t>(20000, 3));
+    a.uploadFile(0x77, std::vector<std::uint8_t>(20000, 3));
     b.uploadFile(0x88, {1}); // not the owner: ignored
     spin([&] { return false; }, 200, clients);
     b.requestFile(0x77);
     b.requestFile(0x88);
-    uint64_t fh = 0;
-    std::vector<uint8_t> fb, fb2;
+    std::uint64_t fh = 0;
+    std::vector<std::uint8_t> fb, fb2;
     CHECK(spin([&] { return b.takeFile(fh, fb); }, 3000, clients) && fh == 0x77 && fb.size() == 20000);
     CHECK(spin([&] { return b.takeFile(fh, fb2); }, 3000, clients) && fh == 0x88 && fb2.empty());
     b.sendOwnerStart({9}); // not the owner: ignored
     a.sendOwnerStart({4, 2}, 0);
     CHECK(spin([&] { return a.matchStarted() && b.matchStarted() && b.turnsReceived() > 3; }, 4000, clients));
-    CHECK(b.matchSetup() == std::vector<uint8_t>({4, 2}));
+    CHECK(b.matchSetup() == std::vector<std::uint8_t>({4, 2}));
     const std::string json = server.statusJson();
     CHECK(json.find(room.code) != std::string::npos && json.find("\"running\":true") != std::string::npos);
     std::printf(
@@ -1378,7 +1378,7 @@ void testHostedGame()
     hc.identity = testIdentity();
     hc.roomName = "Home game";
     SessionHost host(hc);
-    uint16_t gamePort = 0;
+    std::uint16_t gamePort = 0;
     auto socket = createEnetServer(0, 8, &error, &gamePort);
     Transport &hostSocket = *socket;
     host.addTransport(std::move(socket));
@@ -1386,7 +1386,7 @@ void testHostedGame()
     HostAnnouncer announcer("127.0.0.1", cfg.port, hostSocket, gamePort, "127.0.0.1");
     const auto start = std::chrono::steady_clock::now();
     auto nowMs = [&] {
-        return static_cast<uint32_t>(
+        return static_cast<std::uint32_t>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
     };
     auto tick = [&] {
@@ -1445,10 +1445,10 @@ void testPasswordAndLeave()
     hc.reconnectWindowMs = 300;
     SessionHost host(hc);
     host.addTransport(hub.server());
-    uint32_t now = 0;
+    std::uint32_t now = 0;
     std::vector<SessionClient *> all;
-    auto step = [&](uint32_t ms) {
-        for (uint32_t t = 0; t < ms; t += 10)
+    auto step = [&](std::uint32_t ms) {
+        for (std::uint32_t t = 0; t < ms; t += 10)
         {
             now += 10;
             for (SessionClient *c : all)
@@ -1493,7 +1493,7 @@ void testPasswordAndLeave()
     step(100);
     CHECK(host.matchRunning());
     all = {&b};
-    const uint8_t dSlot = d->slot();
+    const std::uint8_t dSlot = d->slot();
     d.reset(); // the connection just drops
     step(100);
     CHECK(host.playerCount() == 2); // still kept for a reconnect
@@ -1501,10 +1501,10 @@ void testPasswordAndLeave()
     CHECK(host.playerCount() == 1); // given up after the window
     // ... and the others hear of it in the turn stream, exactly once
     int leftAnnouncements = 0;
-    for (uint32_t t = 0; t < b.turnsReceived(); ++t)
+    for (std::uint32_t t = 0; t < b.turnsReceived(); ++t)
     {
         if (const TurnBundle *tb = b.turn(t))
-            for (uint8_t s : tb->left)
+            for (std::uint8_t s : tb->left)
                 leftAnnouncements += s == dSlot ? 1 : 0;
     }
     CHECK(leftAnnouncements == 1);

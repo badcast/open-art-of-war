@@ -26,7 +26,7 @@ void ReplayRecorder::Begin(Info info)
     m_info = std::move(info);
     m_turns.clear();
     m_checksums.clear();
-    m_startedAt = static_cast<int64_t>(std::time(nullptr));
+    m_startedAt = static_cast<std::int64_t>(std::time(nullptr));
     m_active = true;
 }
 
@@ -34,18 +34,18 @@ void ReplayRecorder::OnBundle(const Net::TurnBundle &bundle)
 {
     if (!m_active || m_turns.count(bundle.turn))
         return;
-    std::vector<uint8_t> bytes = Net::encodeTurn(bundle);
+    std::vector<std::uint8_t> bytes = Net::encodeTurn(bundle);
     if (!bytes.empty())
         m_turns[bundle.turn] = std::move(bytes);
 }
 
-void ReplayRecorder::OnChecksum(uint32_t tick, uint64_t hash)
+void ReplayRecorder::OnChecksum(std::uint32_t tick, std::uint64_t hash)
 {
     if (m_active)
         m_checksums[tick] = hash;
 }
 
-std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
+std::string ReplayRecorder::Finish(const std::string &outcome, std::uint32_t tick)
 {
     if (!m_active)
         return {};
@@ -54,7 +54,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
         return {}; // nothing was played
     // The turns must follow each other from 0; a gap (a bug) would make the file unplayable
     Net::ReplayData data;
-    uint32_t expected = 0;
+    std::uint32_t expected = 0;
     for (const auto &[turn, bytes] : m_turns)
     {
         if (turn != expected)
@@ -86,7 +86,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
              {"ai_level", p.aiLevel},
              {"spawn", s.startPosition[i]}});
     }
-    const uint32_t ticks = static_cast<uint32_t>(data.turns.size()) * m_info.ticksPerTurn;
+    const std::uint32_t ticks = static_cast<std::uint32_t>(data.turns.size()) * m_info.ticksPerTurn;
     nlohmann::json meta
         = {{"format", 1},
            {"game_version", OAOW_VERSION},
@@ -119,7 +119,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
     data.meta = meta.dump(2);
 
     // The map and the simulation data this match was played with: the file plays on its own
-    std::vector<uint8_t> bytes;
+    std::vector<std::uint8_t> bytes;
     const std::string mapFile = MapFiles::Resolve(raw.mapPath, raw.mapHash);
     if (!mapFile.empty() && MapFiles::Read(mapFile, bytes))
         data.files["maps/" + std::filesystem::path(raw.mapPath).filename().string()] = bytes;
@@ -131,7 +131,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
     {
         const std::string manifest = LoaderResources::NetManifestText();
         data.files["data/" + std::string(LoaderResources::kManifestPath)]
-            = std::vector<uint8_t>(manifest.begin(), manifest.end());
+            = std::vector<std::uint8_t>(manifest.begin(), manifest.end());
     }
 
     const std::string path

@@ -23,7 +23,7 @@ Renderer::~Renderer()
 }
 
 void Renderer::DrawAlphaMaskWorld(
-    const std::vector<uint8_t> &alpha,
+    const std::vector<std::uint8_t> &alpha,
     int w,
     int h,
     float worldX,
@@ -35,7 +35,7 @@ void Renderer::DrawAlphaMaskWorld(
     bool smooth)
 {
     PlainState();
-    if (w <= 0 || h <= 0 || alpha.size() < static_cast<size_t>(w) * h)
+    if (w <= 0 || h <= 0 || alpha.size() < static_cast<std::size_t>(w) * h)
         return;
     // The streaming texture only grows, so panning the camera does not reallocate it every frame
     if (!m_maskTexture || w > m_maskW || h > m_maskH)
@@ -51,12 +51,12 @@ void Renderer::DrawAlphaMaskWorld(
         SDL_SetTextureBlendMode(m_maskTexture, SDL_BLENDMODE_BLEND);
     }
     SDL_SetTextureScaleMode(m_maskTexture, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
-    const uint32_t rgb = (static_cast<uint32_t>(color.r) << 16) | (static_cast<uint32_t>(color.g) << 8) | color.b;
-    m_maskPixels.resize(static_cast<size_t>(w) * h);
-    for (size_t i = 0; i < m_maskPixels.size(); ++i)
-        m_maskPixels[i] = (static_cast<uint32_t>(alpha[i]) << 24) | rgb;
+    const std::uint32_t rgb = (static_cast<std::uint32_t>(color.r) << 16) | (static_cast<std::uint32_t>(color.g) << 8) | color.b;
+    m_maskPixels.resize(static_cast<std::size_t>(w) * h);
+    for (std::size_t i = 0; i < m_maskPixels.size(); ++i)
+        m_maskPixels[i] = (static_cast<std::uint32_t>(alpha[i]) << 24) | rgb;
     SDL_Rect region {0, 0, w, h};
-    SDL_UpdateTexture(m_maskTexture, &region, m_maskPixels.data(), w * static_cast<int>(sizeof(uint32_t)));
+    SDL_UpdateTexture(m_maskTexture, &region, m_maskPixels.data(), w * static_cast<int>(sizeof(std::uint32_t)));
 
     float sx = 0.0f, sy = 0.0f;
     camera.WorldToScreen(worldX, worldY, sx, sy);
@@ -836,7 +836,7 @@ void Renderer::DrawUnitWorld(
     static const int s_b53[6] = {1, 0, 2, 0, 1, 2};
     static const int s_b54[3] = {1, 0, 2};
 
-    uint8_t bMask = 0x07; // Bits 0, 1, 2 enabled by default
+    std::uint8_t bMask = 0x07; // Bits 0, 1, 2 enabled by default
     if (actionState == static_cast<int>(ActionState::Attack))
     {
         bMask |= (1 << 3) | (1 << 4) | (1 << 5);
@@ -848,7 +848,7 @@ void Renderer::DrawUnitWorld(
         if (!layer)
             continue;
 
-        uint8_t flag = layer->flag;
+        std::uint8_t flag = layer->flag;
         if (flag >= 6 || (bMask & (1 << flag)) == 0)
         {
             continue;
@@ -947,7 +947,7 @@ void Renderer::DrawSelectionBubble(
     if (!m_glowTexture)
     {
         constexpr int kSize = 128;
-        std::vector<uint32_t> px(static_cast<size_t>(kSize) * kSize);
+        std::vector<std::uint32_t> px(static_cast<std::size_t>(kSize) * kSize);
         for (int y = 0; y < kSize; ++y)
         {
             for (int x = 0; x < kSize; ++x)
@@ -962,14 +962,14 @@ void Renderer::DrawSelectionBubble(
                     a += std::exp(-rim * rim) * 0.75f;               // the glowing rim
                     a *= std::clamp((1.0f - r) / 0.10f, 0.0f, 1.0f); // soft outer edge
                 }
-                const uint8_t v = static_cast<uint8_t>(std::clamp(a, 0.0f, 1.0f) * 255.0f);
-                px[static_cast<size_t>(y) * kSize + x] = (static_cast<uint32_t>(v) << 24) | 0x00FFFFFFu;
+                const std::uint8_t v = static_cast<std::uint8_t>(std::clamp(a, 0.0f, 1.0f) * 255.0f);
+                px[static_cast<std::size_t>(y) * kSize + x] = (static_cast<std::uint32_t>(v) << 24) | 0x00FFFFFFu;
             }
         }
         m_glowTexture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, kSize, kSize);
         if (!m_glowTexture)
             return;
-        SDL_UpdateTexture(m_glowTexture, nullptr, px.data(), kSize * static_cast<int>(sizeof(uint32_t)));
+        SDL_UpdateTexture(m_glowTexture, nullptr, px.data(), kSize * static_cast<int>(sizeof(std::uint32_t)));
         SDL_SetTextureScaleMode(m_glowTexture, SDL_SCALEMODE_LINEAR);
     }
     // ~1.1 pulses per second
@@ -1032,8 +1032,8 @@ void Renderer::DrawRingScreen(float cx, float cy, float rx, float ry, float thic
     const SDL_FColor c {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f};
     std::vector<SDL_Vertex> vertices;
     std::vector<int> indices;
-    vertices.reserve(static_cast<size_t>(segments) * 2);
-    indices.reserve(static_cast<size_t>(segments) * 6);
+    vertices.reserve(static_cast<std::size_t>(segments) * 2);
+    indices.reserve(static_cast<std::size_t>(segments) * 6);
     for (int i = 0; i < segments; ++i)
     {
         const float a = 2.0f * static_cast<float>(M_PI) * static_cast<float>(i) / static_cast<float>(segments);
