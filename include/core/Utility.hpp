@@ -18,7 +18,7 @@ namespace OpenArtOfWar::Utility
 class RandomGenerator
 {
 public:
-    using result_type = uint32_t;
+    using result_type = std::uint32_t;
     static constexpr result_type min()
     {
         return 0;
@@ -28,12 +28,12 @@ public:
         return UINT32_MAX;
     }
 
-    explicit RandomGenerator(uint32_t seed = 0x9e3779b9u)
+    explicit RandomGenerator(std::uint32_t seed = 0x9e3779b9u)
     {
         Reseed(seed);
     }
 
-    void Reseed(uint32_t seed)
+    void Reseed(std::uint32_t seed)
     {
         m_state = seed ? seed : 0x9e3779b9u;
     }
@@ -61,8 +61,8 @@ public:
     {
         if (hi <= lo)
             return lo;
-        const uint64_t span = static_cast<uint64_t>(hi) - static_cast<uint64_t>(lo) + 1u;
-        return lo + static_cast<int>((static_cast<uint64_t>(Next()) * span) >> 32);
+        const std::uint64_t span = static_cast<std::uint64_t>(hi) - static_cast<std::uint64_t>(lo) + 1u;
+        return lo + static_cast<int>((static_cast<std::uint64_t>(Next()) * span) >> 32);
     }
     // [lo, hi]
     float Range(float lo, float hi)
@@ -157,26 +157,26 @@ inline float VisualRandomFloat(float lo, float hi)
 template <typename Container>
 inline const auto &Pick(const Container &items)
 {
-    return items[static_cast<size_t>(Random(0, static_cast<int>(items.size()) - 1))];
+    return items[static_cast<std::size_t>(Random(0, static_cast<int>(items.size()) - 1))];
 }
 
 template <typename Container>
 inline const auto &VisualPick(const Container &items)
 {
-    return items[static_cast<size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1))];
+    return items[static_cast<std::size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1))];
 }
 
 template <typename T>
 inline const T &Pick(std::initializer_list<T> items)
 {
-    const size_t idx = static_cast<size_t>(Random(0, static_cast<int>(items.size()) - 1));
+    const std::size_t idx = static_cast<std::size_t>(Random(0, static_cast<int>(items.size()) - 1));
     return *(items.begin() + idx);
 }
 
 template <typename T>
 inline const T &VisualPick(std::initializer_list<T> items)
 {
-    const size_t idx = static_cast<size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1));
+    const std::size_t idx = static_cast<std::size_t>(VisualRandom(0, static_cast<int>(items.size()) - 1));
     return *(items.begin() + idx);
 }
 

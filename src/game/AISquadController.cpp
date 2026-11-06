@@ -61,7 +61,7 @@ bool IsRangedSupport(int arch)
 
 // Cohesion radius for a group of n units. Big groups get a proportionally larger radius (a column of
 // 15 is naturally longer than 3 tiles), and narrow passages stretch any group into a line.
-float EffectiveLeash(const AITacticsConfig &t, size_t n, bool inCorridor)
+float EffectiveLeash(const AITacticsConfig &t, std::size_t n, bool inCorridor)
 {
     const float count = static_cast<float>(n);
     float leash = t.leashTiles + t.leashPerUnit * std::max(0.0f, count - 4.0f);
@@ -107,8 +107,8 @@ void ChokepointMap::Rebuild(const TileMap &map)
 {
     m_width = map.GetWidth();
     m_height = map.GetHeight();
-    m_choke.assign(static_cast<size_t>(m_width) * m_height, 0);
-    m_openWidth.assign(static_cast<size_t>(m_width) * m_height, 0);
+    m_choke.assign(static_cast<std::size_t>(m_width) * m_height, 0);
+    m_openWidth.assign(static_cast<std::size_t>(m_width) * m_height, 0);
     if (m_width <= 0 || m_height <= 0)
         return;
 
@@ -155,11 +155,11 @@ void ChokepointMap::Rebuild(const TileMap &map)
     }
 
     // A corridor tile is at most 2 tiles wide across and at least 3 tiles long along the passage
-    for (size_t i = 0; i < m_choke.size(); ++i)
+    for (std::size_t i = 0; i < m_choke.size(); ++i)
     {
         int narrow = std::min(runH[i], runV[i]);
         int along = std::max(runH[i], runV[i]);
-        m_openWidth[i] = static_cast<uint8_t>(std::min(narrow, 255));
+        m_openWidth[i] = static_cast<std::uint8_t>(std::min(narrow, 255));
         m_choke[i] = (narrow > 0 && narrow <= 2 && along >= 3) ? 1 : 0;
     }
 }
@@ -168,14 +168,14 @@ int ChokepointMap::OpenWidth(int x, int y) const
 {
     if (x < 0 || y < 0 || x >= m_width || y >= m_height)
         return 0;
-    return m_openWidth[static_cast<size_t>(y) * m_width + x];
+    return m_openWidth[static_cast<std::size_t>(y) * m_width + x];
 }
 
 bool ChokepointMap::IsChoke(int x, int y) const
 {
     if (x < 0 || y < 0 || x >= m_width || y >= m_height)
         return false;
-    return m_choke[static_cast<size_t>(y) * m_width + x] != 0;
+    return m_choke[static_cast<std::size_t>(y) * m_width + x] != 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,9 +520,9 @@ bool AISquadController::PlanRoute(
         return false;
     goalX = std::clamp(goalX, 0, w - 1);
     goalY = std::clamp(goalY, 0, h - 1);
-    const size_t n = static_cast<size_t>(w) * static_cast<size_t>(h);
+    const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
     auto at = [w](int x, int y) {
-        return static_cast<size_t>(y) * static_cast<size_t>(w) + static_cast<size_t>(x);
+        return static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x);
     };
 
     // Tuning (integer costs, a straight step = 10)
@@ -533,7 +533,7 @@ bool AISquadController::PlanRoute(
     constexpr int kHostileWall = 120;  // shooting through a wall segment ~ a twelve-tile detour
 
     // 0 open, 1 blocked, 2 hostile wall (passable at a price)
-    std::vector<uint8_t> kind(n, 0);
+    std::vector<std::uint8_t> kind(n, 0);
     for (int y = 0; y < h; ++y)
     {
         for (int x = 0; x < w; ++x)
@@ -610,7 +610,7 @@ bool AISquadController::PlanRoute(
         const auto [f, idx] = open.top();
         open.pop();
         const int x = idx % w, y = idx / w;
-        if (f - heuristic(x, y) > cost[static_cast<size_t>(idx)])
+        if (f - heuristic(x, y) > cost[static_cast<std::size_t>(idx)])
             continue; // stale
         if (isGoal(x, y))
         {
@@ -626,7 +626,7 @@ bool AISquadController::PlanRoute(
                 const int nx = x + dx, ny = y + dy;
                 if (nx < 0 || ny < 0 || nx >= w || ny >= h)
                     continue;
-                const uint8_t k = kind[at(nx, ny)];
+                const std::uint8_t k = kind[at(nx, ny)];
                 if (k == 1)
                     continue;
                 // No cutting corners past cliffs or buildings
@@ -634,8 +634,8 @@ bool AISquadController::PlanRoute(
                     continue;
                 const int step
                     = (dx != 0 && dy != 0 ? kDiagonal : kStraight) + extra[at(nx, ny)] + (k == 2 ? kHostileWall : 0);
-                const int g = cost[static_cast<size_t>(idx)] + step;
-                const size_t ni = at(nx, ny);
+                const int g = cost[static_cast<std::size_t>(idx)] + step;
+                const std::size_t ni = at(nx, ny);
                 if (g < cost[ni])
                 {
                     cost[ni] = g;
@@ -647,7 +647,7 @@ bool AISquadController::PlanRoute(
     }
     if (reached < 0)
         return false;
-    for (int i = reached; i >= 0 && i != static_cast<int>(at(startX, startY)); i = from[static_cast<size_t>(i)])
+    for (int i = reached; i >= 0 && i != static_cast<int>(at(startX, startY)); i = from[static_cast<std::size_t>(i)])
         outPath.push_back({i % w, i / w});
     std::reverse(outPath.begin(), outPath.end());
     return true;
@@ -842,7 +842,7 @@ void AISquadController::OrderMarch(
     }
     const int width = std::clamp(1 + left + right, 1, maxWidth);
     const int rowStep = width >= 2 ? 1 : 2; // a single file keeps a little more distance
-    for (size_t k = 0; k < ordered.size(); ++k)
+    for (std::size_t k = 0; k < ordered.size(); ++k)
     {
         const int row = static_cast<int>(k) / width;
         const int col = static_cast<int>(k) % width;

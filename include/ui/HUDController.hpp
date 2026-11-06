@@ -310,7 +310,7 @@ private:
     bool m_researchPanning {false};
     int m_researchScrollDrag {0}; // 1: the vertical scroll bar is held, 2: the horizontal one
     int m_researchPanX {0}, m_researchPanY {0};
-    uint32_t m_researchClickMs {0};
+    std::uint32_t m_researchClickMs {0};
     int m_researchClickNode {-1};
     // Starts the technology (messages as the cameo click gave them)
     void TryStartResearch(int index, Economy &economy, EntityManager &entities);

@@ -209,7 +209,7 @@ public:
     // Stretches an 8-bit alpha mask (w x h texels, row-major) in one color over a world rectangle,
     // with linear filtering so the texel edges blend smoothly (`smooth` false: hard texel edges)
     void DrawAlphaMaskWorld(
-        const std::vector<uint8_t> &alpha,
+        const std::vector<std::uint8_t> &alpha,
         int w,
         int h,
         float worldX,
@@ -260,7 +260,7 @@ private:
     SDL_Texture *m_glowTexture {nullptr}; // white radial falloff with a soft rim (selection bubble)
     int m_maskW {0};
     int m_maskH {0};
-    std::vector<uint32_t> m_maskPixels;
+    std::vector<std::uint32_t> m_maskPixels;
 };
 
 } // namespace OpenArtOfWar

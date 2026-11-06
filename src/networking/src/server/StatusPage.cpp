@@ -21,7 +21,7 @@ StatusPage::~StatusPage()
         enet_socket_destroy(m_impl->socket);
 }
 
-bool StatusPage::open(uint16_t port, const std::string &bindAddress, std::string &error)
+bool StatusPage::open(std::uint16_t port, const std::string &bindAddress, std::string &error)
 {
     m_impl->socket = enet_socket_create(ENET_SOCKET_TYPE_STREAM);
     if (m_impl->socket == ENET_SOCKET_NULL)

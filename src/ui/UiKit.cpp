@@ -483,7 +483,7 @@ void DrawComboList(
         if (i >= n)
             break;
         const UiRect item {list.x + 2, list.y + 2 + row * kComboItemH, list.w - (n > visible ? 10 : 4), kComboItemH};
-        const bool off = disabled && static_cast<size_t>(i) < disabled->size() && (*disabled)[static_cast<size_t>(i)]
+        const bool off = disabled && static_cast<std::size_t>(i) < disabled->size() && (*disabled)[static_cast<std::size_t>(i)]
                          && i != current;
         const bool hot = item.Contains(mouseX, mouseY) && !off;
         if (hot)
@@ -493,9 +493,9 @@ void DrawComboList(
         else if (hot)
             r.FillRectScreen(item.x, item.y, item.w, item.h, color::Hover);
         int textOffset = 10;
-        if (swatches && static_cast<size_t>(i) < swatches->size())
+        if (swatches && static_cast<std::size_t>(i) < swatches->size())
         {
-            SDL_Color sw = (*swatches)[static_cast<size_t>(i)];
+            SDL_Color sw = (*swatches)[static_cast<std::size_t>(i)];
             if (off)
                 sw.a = 110;
             const UiRect box {item.x + 8, item.CenterY() - 7, 14, 14};
@@ -505,7 +505,7 @@ void DrawComboList(
         }
         const SDL_Color textColor = i == current ? color::Accent : (off ? color::TextMuted : color::Text);
         font.DrawString(
-            FitText(font, items[static_cast<size_t>(i)], FONT_BODY, item.w - textOffset - 10),
+            FitText(font, items[static_cast<std::size_t>(i)], FONT_BODY, item.w - textOffset - 10),
             item.x + textOffset,
             item.CenterY(),
             FONT_BODY,
@@ -715,7 +715,7 @@ std::string FitText(const BitmapFontRenderer &font, const std::string &text, int
     while (!s.empty())
     {
         // Drop one UTF-8 code point from the end
-        size_t cut = s.size() - 1;
+        std::size_t cut = s.size() - 1;
         while (cut > 0 && (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80)
             --cut;
         s.erase(cut);

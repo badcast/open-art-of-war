@@ -52,7 +52,7 @@ CharacterEditor::MoveSample CharacterEditor::SampleMove(int archetype, float mov
     if (t < turnTimeL)
     { // turning around at the right end
         m.offsetX = leg * 0.5f;
-        m.facing = turnLeft[std::min(turnLeft.size() - 1, static_cast<size_t>(t / turnDelay))];
+        m.facing = turnLeft[std::min(turnLeft.size() - 1, static_cast<std::size_t>(t / turnDelay))];
         return m;
     }
     t -= turnTimeL;
@@ -66,7 +66,7 @@ CharacterEditor::MoveSample CharacterEditor::SampleMove(int archetype, float mov
     m.offsetX = -leg * 0.5f; // turning back at the left end
     m.facing = turnRight.empty()
                    ? 0
-                   : turnRight[std::min(turnRight.size() - 1, static_cast<size_t>(t / std::max(0.001f, turnDelay)))];
+                   : turnRight[std::min(turnRight.size() - 1, static_cast<std::size_t>(t / std::max(0.001f, turnDelay)))];
     return m;
 }
 
@@ -366,6 +366,9 @@ void CharacterEditor::DrawPreviewControls()
         ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.2f, 1.0f), "Muzzle: (%.1f, %.1f)", muzzleOffsetX, muzzleOffsetY);
     }
 
+    Hinted(ImGui::Checkbox(_("No Gizmos"), &noGizmos), "No Gizmos");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(noGizmos);
     Hinted(ImGui::Checkbox(_("Attack range (Red)"), &showAttackRange), "Attack range (Red)");
     ImGui::SameLine();
     Hinted(ImGui::Checkbox(_("Sight range (Green)"), &showSightRange), "Sight range (Green)");
@@ -373,6 +376,7 @@ void CharacterEditor::DrawPreviewControls()
     Hinted(ImGui::Checkbox(_("Build range (Purple)"), &showBuildRange), "Build range (Purple)");
     ImGui::SameLine();
     Hinted(ImGui::Checkbox(_("Radar range (Cyan)"), &showRadarRange), "Radar range (Cyan)");
+    ImGui::EndDisabled();
     ImGui::SameLine();
     Hinted(ImGui::Checkbox(_("Show ground (5x5)"), &showGround), "Show ground (5x5)");
     ImGui::SameLine();
@@ -437,17 +441,20 @@ void CharacterEditor::DrawCanvasGuides(const ImVec2 &min, const ImVec2 &size)
     const bool comparing = editorMode == EditorMode::Compare && compareDoc.IsDefined();
 
     // Screen position of world origin (0, 0)
-    float originScreenX = 0.0f;
-    float originScreenY = 0.0f;
-    camera->WorldToScreen(0.0f, 0.0f, originScreenX, originScreenY);
+    if (!noGizmos)
+    {
+        float originScreenX = 0.0f;
+        float originScreenY = 0.0f;
+        camera->WorldToScreen(0.0f, 0.0f, originScreenX, originScreenY);
 
-    if (originScreenX >= min.x && originScreenX <= max.x)
-    {
-        drawList->AddLine(ImVec2(originScreenX, min.y), ImVec2(originScreenX, max.y), IM_COL32(109, 151, 130, 80));
-    }
-    if (originScreenY >= min.y && originScreenY <= max.y)
-    {
-        drawList->AddLine(ImVec2(min.x, originScreenY), ImVec2(max.x, originScreenY), IM_COL32(109, 151, 130, 80));
+        if (originScreenX >= min.x && originScreenX <= max.x)
+        {
+            drawList->AddLine(ImVec2(originScreenX, min.y), ImVec2(originScreenX, max.y), IM_COL32(109, 151, 130, 80));
+        }
+        if (originScreenY >= min.y && originScreenY <= max.y)
+        {
+            drawList->AddLine(ImVec2(min.x, originScreenY), ImVec2(max.x, originScreenY), IM_COL32(109, 151, 130, 80));
+        }
     }
 
     // Prominent status banners on canvas
@@ -506,7 +513,7 @@ void CharacterEditor::DrawCanvasGuides(const ImVec2 &min, const ImVec2 &size)
     }
 
     // Targeting reticle for Attack mode
-    if (!comparing && document.IsDefined() && previewMode == PreviewMode::Attack)
+    if (!noGizmos && !comparing && document.IsDefined() && previewMode == PreviewMode::Attack)
     {
         float targetScreenX = 0.0f;
         float targetScreenY = 0.0f;

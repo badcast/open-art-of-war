@@ -71,7 +71,7 @@ Faction FactionOf(PlayerId id)
 {
     return id < kMaxPlayers ? table().slots[id].faction : Faction::Neutral;
 }
-uint8_t TeamOf(PlayerId id)
+std::uint8_t TeamOf(PlayerId id)
 {
     return id < kMaxPlayers ? table().slots[id].team : 0xFF;
 }

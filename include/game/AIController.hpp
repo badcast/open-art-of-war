@@ -157,7 +157,7 @@ public:
     // The player slot this AI commands (single player: set by init from the factions)
     void SetPlayer(PlayerId player);
     // The seed of the match (mixed with the slot by the caller): picks the style of the base
-    void SetSeed(uint32_t seed);
+    void SetSeed(std::uint32_t seed);
     const AIBaseStyle &BaseStyle() const
     {
         return m_style;
@@ -260,7 +260,7 @@ public:
         m_thoughts.clear();
         m_lastThoughtByKey.clear();
     }
-    size_t GetThoughtSerial() const
+    std::size_t GetThoughtSerial() const
     {
         return m_thoughtSerial;
     } // grows with every new thought
@@ -485,12 +485,12 @@ private:
     bool m_startingBaseRecorded {false};
 
     // Base layout: the style of this match, the roads and the ground
-    uint32_t m_seed {0};
+    std::uint32_t m_seed {0};
     AIBaseStyle m_style;
     bool m_territoryReady {false};
     int m_terrW {0}, m_terrH {0};
-    std::vector<uint8_t> m_road;      // 2: a road between two headquarters, 1: the band along it, 0: free
-    std::vector<uint8_t> m_ownGround; // 1: nearer to this player's headquarters than to any ally's
+    std::vector<std::uint8_t> m_road;      // 2: a road between two headquarters, 1: the band along it, 0: free
+    std::vector<std::uint8_t> m_ownGround; // 1: nearer to this player's headquarters than to any ally's
     std::vector<std::vector<std::pair<int, int>>> m_enemyRoads; // from this HQ to every enemy headquarters
     int m_homeX {-1}, m_homeY {-1};                             // centre of the own (first) headquarters
     float m_baseQuietSeconds {0.0f};                            // since a structure of the base was last attacked
@@ -509,7 +509,7 @@ private:
     int m_lastThreatId {0};
 
     std::deque<AIThought> m_thoughts;
-    size_t m_thoughtSerial {0};
+    std::size_t m_thoughtSerial {0};
     std::map<std::string, std::string> m_lastThoughtByKey;
 
     // Intel (ordered containers: the same iteration on every peer)

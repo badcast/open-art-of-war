@@ -36,7 +36,7 @@ class EntityContainer
 public:
     using Storage = std::vector<std::unique_ptr<Entity>>;
 
-    size_t size() const
+    std::size_t size() const
     {
         return m_items.size();
     }
@@ -44,7 +44,7 @@ public:
     {
         return m_items.empty();
     }
-    void Reserve(size_t n)
+    void Reserve(std::size_t n)
     {
         m_items.reserve(n);
     }
@@ -53,11 +53,11 @@ public:
         m_items.clear();
     }
 
-    Entity &operator[](size_t i)
+    Entity &operator[](std::size_t i)
     {
         return *m_items[i];
     }
-    const Entity &operator[](size_t i) const
+    const Entity &operator[](std::size_t i) const
     {
         return *m_items[i];
     }
@@ -339,8 +339,8 @@ struct WeaponConfig
     std::string sound;        // the shot (fire_sfx)
     std::string impactSound;  // where it hits (impact_sfx)
     float soundVolume {1.0f}; // times the event's own volume
-    uint16_t soundId {0};     // the interned events (EntityManager::SoundName)
-    uint16_t impactSoundId {0};
+    std::uint16_t soundId {0};     // the interned events (EntityManager::SoundName)
+    std::uint16_t impactSoundId {0};
 };
 
 // The sounds of a unit or a building of its own (the `sounds:` block of its character file)
@@ -349,8 +349,8 @@ struct CharacterSounds
     std::string death;   // when it is destroyed (empty: an explosion / the infantry death / a wall coming down)
     std::string damage;  // when a bullet hits it (empty: the bullet hit / the armour hit); a gun's impact_sfx wins
     float volume {1.0f}; // times every sound of it (its guns, its hits, its death)
-    uint16_t deathId {0};
-    uint16_t damageId {0};
+    std::uint16_t deathId {0};
+    std::uint16_t damageId {0};
 };
 
 struct UnitConfig
@@ -390,7 +390,7 @@ struct UnitConfig
     // siege.auto_deploy: when the unit goes into siege mode by itself (the computer always, a person's units while on
     // an attack-move). Far: when an enemy is beyond the normal range but within the siege range (needs a longer
     // siege range); Always: whenever an enemy is within the siege range; Off: by hand only.
-    enum class AutoSiege : uint8_t
+    enum class AutoSiege : std::uint8_t
     {
         Off,
         Far,
@@ -486,7 +486,7 @@ public:
         float initialProgress = 1.0f,
         PlayerId owner = kAutoOwner);
 
-    bool LoadCharacterConfigs(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+    bool LoadCharacterConfigs();
     // Parses one character YAML document (unit or building) and replaces its config; used by the
     // loader above and by the character editor to apply unsaved edits. Call rebuildBlueprints() after.
     // Taken by value: lookups of missing keys need a mutable node (pass YAML::Clone to keep yours intact).
@@ -603,7 +603,7 @@ public:
     // Drawing only
     struct LightSpot
     {
-        enum class Kind : uint8_t
+        enum class Kind : std::uint8_t
         {
             Explosion,
             FlameStart,  // where a flamethrower's jet leaves the gun
@@ -732,7 +732,7 @@ public:
     }
     // Sounds of the world, collected for the game's sound effects (only a picture: never part of the simulation).
     // Deaths are found by the sound side itself (entities that turned to Die).
-    enum class SoundCue : uint8_t
+    enum class SoundCue : std::uint8_t
     {
         FireRifle,
         FireMg,
@@ -753,11 +753,11 @@ public:
         float x {0.0f};
         float y {0.0f};
         PlayerId owner {kNoPlayer}; // who fired
-        uint16_t sound {0};         // the event of the character / weapon (SoundName), 0: the cue's own
+        std::uint16_t sound {0};         // the event of the character / weapon (SoundName), 0: the cue's own
         float gain {1.0f};          // the volume of the character / weapon
     };
     // The sound events named by the character files (0: none)
-    const std::string &SoundName(uint16_t id) const
+    const std::string &SoundName(std::uint16_t id) const
     {
         static const std::string kNone;
         return id > 0 && id <= m_soundNames.size() ? m_soundNames[id - 1] : kNone;
@@ -767,7 +767,7 @@ public:
     // The sounds of the wall segments of a side (the wall character of its faction; null: none loaded)
     const CharacterSounds *WallSoundsOf(Faction faction) const;
     // Changes whenever the world is cleared (entity ids start again)
-    uint32_t Generation() const
+    std::uint32_t Generation() const
     {
         return m_generation;
     }
@@ -827,7 +827,7 @@ private:
     std::array<bool, kMaxPlayers> m_eliminated {};      // players who have lost every building (UpdateElimination)
     std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
     bool m_flamethrowerUnlocked[kMaxPlayers] {};
-    mutable std::unordered_set<uint64_t>
+    mutable std::unordered_set<std::uint64_t>
         m_seenBuildings; // enemy structures the local player has seen (see isHostileBuildingShown)
     bool m_siegeUnlocked[kMaxPlayers] {};
 
@@ -863,26 +863,26 @@ private:
     };
     std::vector<GroundMark> m_groundMarks;
     std::vector<SoundCueEvent> m_soundCues;
-    uint32_t m_generation {0};
-    void Cue(SoundCue c, float x, float y, PlayerId owner, uint16_t sound = 0, float gain = 1.0f)
+    std::uint32_t m_generation {0};
+    void Cue(SoundCue c, float x, float y, PlayerId owner, std::uint16_t sound = 0, float gain = 1.0f)
     {
         if (m_soundCues.size() < 256) // nobody takes them (headless, editor): they stop piling up
             m_soundCues.push_back({c, x, y, owner, sound, gain});
     }
     std::vector<std::string> m_soundNames; // only grows: projectiles in flight keep their ids over a reload
-    uint16_t InternSound(const std::string &name);
+    std::uint16_t InternSound(const std::string &name);
     // The gun firing now: weapons[1] while a unit's second gun shoots, else the main one (null: none in the file)
     const WeaponConfig *FiringWeapon(const Entity &e) const;
     void AddGroundMark(float x, float y, int composite, float seconds);
 
 public:
     // Flamethrower jets on screen (tests)
-    size_t FlameBurstCount() const
+    std::size_t FlameBurstCount() const
     {
         return m_flameBursts.size();
     }
     // Craters on the ground (tests)
-    size_t GroundMarkCount() const
+    std::size_t GroundMarkCount() const
     {
         return m_groundMarks.size();
     }

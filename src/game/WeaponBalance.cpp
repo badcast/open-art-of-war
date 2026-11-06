@@ -25,7 +25,7 @@ Table Defaults()
     for (auto &row : t)
         row.fill(100);
     auto set = [&t](ProjectileType type, int inf, int veh, int bld, int wall) {
-        t[static_cast<size_t>(type)] = {inf, veh, bld, wall};
+        t[static_cast<std::size_t>(type)] = {inf, veh, bld, wall};
     };
     set(ProjectileType::Bullet, 125, 100, 80, 80);
     set(ProjectileType::Sniper, 150, 50, 40, 40);
@@ -83,7 +83,7 @@ bool LoadText(const std::string &jsonText)
                 if (!row.contains(kClassKeys[c]) || !row[kClassKeys[c]].is_number())
                     continue;
                 const double m = std::clamp(row[kClassKeys[c]].get<double>(), 0.0, 10.0);
-                t[static_cast<size_t>(kind)][static_cast<size_t>(c)] = static_cast<int>(std::lround(m * 100.0));
+                t[static_cast<std::size_t>(kind)][static_cast<std::size_t>(c)] = static_cast<int>(std::lround(m * 100.0));
             }
         }
     }
@@ -104,7 +104,7 @@ int Percent(ProjectileType type, TargetClass target)
 {
     static const bool loaded = (Reload(), true); // the file is read on first use
     (void) loaded;
-    return Storage()[static_cast<size_t>(type)][static_cast<size_t>(target)];
+    return Storage()[static_cast<std::size_t>(type)][static_cast<std::size_t>(target)];
 }
 
 int Scale(int damage, ProjectileType type, TargetClass target)

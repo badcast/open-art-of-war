@@ -554,13 +554,13 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     {}
 
     // Green Sight Radius (2px line width, tile isometric ground ellipse via RenderUtility::DrawTileRadius)
-    if (showSightRange && sightRangeTiles > 0.0f)
+    if (!noGizmos && showSightRange && sightRangeTiles > 0.0f)
     {
         DrawTileRadius(unitCenterX, unitCenterY, sightRangeTiles, SDL_Color {50, 230, 80, 240}, 2.0f);
     }
 
     // Purple Build Radius of a headquarters / command center (same ground ellipse as in the game's HUD)
-    if (showBuildRange && building)
+    if (!noGizmos && showBuildRange && building)
     {
         float buildRangeTiles = 0.0f;
         try
@@ -577,7 +577,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     }
 
     // Cyan radar range of a Radar Locator: how far the finished building sees (sight radius + radar range)
-    if (showRadarRange && building)
+    if (!noGizmos && showRadarRange && building)
     {
         float radarTiles = 0.0f;
         try
@@ -594,7 +594,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     }
 
     // Red Attack Radius (2px line width, tile isometric ground ellipse via RenderUtility::DrawTileRadius)
-    if (showAttackRange && attackRangeTiles > 0.0f)
+    if (!noGizmos && showAttackRange && attackRangeTiles > 0.0f)
     {
         DrawTileRadius(unitCenterX, unitCenterY, attackRangeTiles, SDL_Color {255, 60, 60, 240}, 2.0f);
     }
@@ -657,7 +657,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     }
 
     // Draw visual Pivot dot, barrel connection line, and yellow/orange Muzzle Crosshair in ALL preview modes!
-    if (!destroyed)
+    if (!noGizmos && !destroyed)
     {
         // Center pivot indicator (cyan dot)
         OpenArtOfWar::RenderUtility::DrawRadius(
@@ -683,8 +683,11 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     if (primary && !destroyed && previewMode == PreviewMode::Attack && YamlBool(combatNode, "can_attack", true))
     {
         // Draw line of fire toward directed target point
-        gameRenderer->DrawLineWorld(
-            muzzleX, muzzleY, targetWorldX, targetWorldY, *camera, SDL_Color {236, 111, 77, 90});
+        if (!noGizmos)
+        {
+            gameRenderer->DrawLineWorld(
+                muzzleX, muzzleY, targetWorldX, targetWorldY, *camera, SDL_Color {236, 111, 77, 90});
+        }
 
         // Muzzle flash on each shot
         const bool ownFlame = isInf && YamlString(MainWeapon(combatNode), "projectile", "bullet") == "flame";

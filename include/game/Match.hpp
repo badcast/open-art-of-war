@@ -18,10 +18,10 @@ constexpr int kDefaultCreditsIndex = 1;
 struct MatchSetup
 {
     std::string mapPath;                              // assets/maps/<name>.json
-    uint64_t mapHash {0};                             // of the map file everybody plays on
-    uint32_t seed {0};                                // gameplay random numbers (Simulation::reset)
+    std::uint64_t mapHash {0};                             // of the map file everybody plays on
+    std::uint32_t seed {0};                                // gameplay random numbers (Simulation::reset)
     std::array<PlayerSlot, kMaxPlayers> slots {};     // active ones take part
-    std::array<int8_t, kMaxPlayers> startPosition {}; // index into the map's start positions per slot
+    std::array<std::int8_t, kMaxPlayers> startPosition {}; // index into the map's start positions per slot
     PlayerId local {0};                               // this computer's slot
     int startingCredits {1500};
     bool fogOfWar {true};

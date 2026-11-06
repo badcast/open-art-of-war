@@ -54,7 +54,7 @@ constexpr int kCraterLast = 1800;
 std::string ListText(const std::vector<int> &v)
 {
     std::string s = "[";
-    for (size_t i = 0; i < v.size(); ++i)
+    for (std::size_t i = 0; i < v.size(); ++i)
         s += (i ? ", " : "") + std::to_string(v[i]);
     return s + "]";
 }
@@ -373,7 +373,7 @@ void CharacterEditor::DrawProjectileProperties()
         ImGui::TextUnformatted(_("Projectile sprites"));
         FieldHint("Projectile sprites");
         const int cur = projectilesYaml.At(base + ".sprite").as<int>(0);
-        for (size_t f = 0; f < std::size(kSpriteFamilies); ++f)
+        for (std::size_t f = 0; f < std::size(kSpriteFamilies); ++f)
         {
             if (f)
                 ImGui::SameLine();
@@ -408,7 +408,7 @@ void CharacterEditor::DrawProjectileProperties()
         changed |= EditYamlScalar(projectilesYaml, base + ".wall_destroyed", _("Wall destroyed"));
         // The chosen impacts as pictures
         const std::vector<int> impacts = ListOf(projectilesYaml.At(base + ".impact"));
-        for (size_t i = 0; i < impacts.size(); ++i)
+        for (std::size_t i = 0; i < impacts.size(); ++i)
         {
             if (i)
                 ImGui::SameLine();

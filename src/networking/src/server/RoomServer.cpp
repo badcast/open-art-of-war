@@ -35,10 +35,10 @@ struct RoomServer::Room
     std::string name;
     std::string gameVersion;
     bool listed {true};
-    uint16_t port {0};
+    std::uint16_t port {0};
     std::unique_ptr<SessionHost> host;
-    uint32_t createdMs {0};
-    uint32_t lastOccupiedMs {0};
+    std::uint32_t createdMs {0};
+    std::uint32_t lastOccupiedMs {0};
     bool everOccupied {false};
 };
 
@@ -57,18 +57,18 @@ bool RoomServer::start(std::string &error)
     m_master = createEnetServer(m_config.port, m_config.maxMasterClients, &error, nullptr, m_config.bindAddress);
     if (!m_master)
         return false;
-    m_master->setRawHandler([this](const std::string &ip, uint16_t port, const uint8_t *data, size_t size) {
+    m_master->setRawHandler([this](const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size) {
         handleRaw(ip, port, data, size);
     });
     return true;
 }
 
 // A game socket says hello with its token: that is its address as the internet sees it
-void RoomServer::handleRaw(const std::string &ip, uint16_t port, const uint8_t *data, size_t size)
+void RoomServer::handleRaw(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)
 {
     RawKind kind {};
-    const uint8_t *payload = nullptr;
-    size_t payloadSize = 0;
+    const std::uint8_t *payload = nullptr;
+    std::size_t payloadSize = 0;
     if (!decodeRaw(data, size, kind, payload, payloadSize) || kind != RawKind::Hello || payloadSize != 16)
         return;
     if (m_sockets.size() > 4096)
@@ -84,7 +84,7 @@ bool RoomServer::codeTaken(const std::string &code) const
            || std::any_of(m_hosted.begin(), m_hosted.end(), [&](const HostedGame &h) { return h.code == code; });
 }
 
-void RoomServer::sendMaster(PeerId peer, const BitWriter &w, size_t size)
+void RoomServer::sendMaster(PeerId peer, const BitWriter &w, std::size_t size)
 {
     (void) w;
     m_master->send(peer, Channel::Control, m_buffer.data(), size);
@@ -103,24 +103,24 @@ std::string RoomServer::newCode() const
     for (;;)
     {
         std::string code;
-        for (size_t i = 0; i < kRoomCodeLength; ++i)
+        for (std::size_t i = 0; i < kRoomCodeLength; ++i)
             code += kCodeAlphabet[rng() % (sizeof kCodeAlphabet - 1)];
         if (!codeTaken(code))
             return code;
     }
 }
 
-uint16_t RoomServer::freePort() const
+std::uint16_t RoomServer::freePort() const
 {
-    for (uint32_t p = m_config.roomPortFirst; p <= m_config.roomPortLast; ++p)
+    for (std::uint32_t p = m_config.roomPortFirst; p <= m_config.roomPortLast; ++p)
     {
         if (std::none_of(m_rooms.begin(), m_rooms.end(), [&](const auto &r) { return r->port == p; }))
-            return static_cast<uint16_t>(p);
+            return static_cast<std::uint16_t>(p);
     }
     return 0;
 }
 
-void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
+void RoomServer::handleMaster(const TransportEvent &e, std::uint32_t nowMs)
 {
     if (e.type == TransportEvent::Type::Connected)
     {
@@ -158,7 +158,7 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
             CreateRoom m;
             if (!decode(r, m))
                 return;
-            const uint16_t port = static_cast<int>(m_rooms.size()) < m_config.maxRooms ? freePort() : 0;
+            const std::uint16_t port = static_cast<int>(m_rooms.size()) < m_config.maxRooms ? freePort() : 0;
             if (port == 0)
             {
                 reject(e.peer, RejectReason::ServerFull);
@@ -304,7 +304,7 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
     }
 }
 
-void RoomServer::update(uint32_t nowMs)
+void RoomServer::update(std::uint32_t nowMs)
 {
     if (!m_master)
         return;
@@ -337,8 +337,8 @@ void RoomServer::update(uint32_t nowMs)
             m_rooms.begin(),
             m_rooms.end(),
             [&](const auto &room) {
-                const uint32_t idle = nowMs - room->lastOccupiedMs;
-                const uint32_t limit = !room->everOccupied ? m_config.unusedRoomTimeoutMs
+                const std::uint32_t idle = nowMs - room->lastOccupiedMs;
+                const std::uint32_t limit = !room->everOccupied ? m_config.unusedRoomTimeoutMs
                                                            : (room->host->matchRunning() ? m_config.idleRoomTimeoutMs
                                                                                          : m_config.emptyRoomTimeoutMs);
                 const bool close = idle > limit;

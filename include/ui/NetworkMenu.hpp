@@ -23,12 +23,12 @@ struct Settings;
 struct LanGame
 {
     std::string address;
-    uint16_t port {0};
+    std::uint16_t port {0};
     std::string name;
     std::string map;
     int players {0};
     int maxPlayers {0};
-    uint32_t pingMs {0};
+    std::uint32_t pingMs {0};
     std::string code;    // a room of the dedicated server
     bool locked {false}; // asks for a password
 };
@@ -129,7 +129,7 @@ public:
     {
         return m_joinAddress;
     }
-    uint16_t JoinPort() const
+    std::uint16_t JoinPort() const
     {
         return m_joinPort;
     }
@@ -250,7 +250,7 @@ private:
         const std::vector<LanGame> &lan,
         const std::vector<LanGame> &server);
     NetworkAction UpdateLobby(InputManager &input, int w, int h, NetMatch &net);
-    void EditText(InputManager &input, std::string &text, size_t maxLength);
+    void EditText(InputManager &input, std::string &text, std::size_t maxLength);
     bool ParseAddress(const std::string &text);
     // The map picture area: where a start position (tile) lands on the screen
     bool SpotOnScreen(const ui::UiRect &area, int mapW, int mapH, int tileX, int tileY, int &sx, int &sy) const;
@@ -261,7 +261,7 @@ private:
     int m_serverSelected {-1};
     std::string m_joinCode;
     std::string m_joinAddress;
-    uint16_t m_joinPort {0};
+    std::uint16_t m_joinPort {0};
     std::string m_notice;
     std::string m_chatInput;
     std::vector<std::string> m_chatLog;

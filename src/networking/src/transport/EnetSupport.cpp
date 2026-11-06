@@ -33,10 +33,10 @@ void shutdown()
         enet_deinitialize();
 }
 
-enet_uint32 enetChecksum(const ENetBuffer *buffers, size_t bufferCount)
+enet_uint32 enetChecksum(const ENetBuffer *buffers, std::size_t bufferCount)
 {
     std::uint32_t crc = 0;
-    for (size_t i = 0; i < bufferCount; ++i)
+    for (std::size_t i = 0; i < bufferCount; ++i)
         crc = crc32(buffers[i].data, buffers[i].dataLength, crc);
     return crc;
 }

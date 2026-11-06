@@ -15,7 +15,7 @@ namespace OpenArtOfWar
 class EnvironmentConfig
 {
 public:
-    // The path comes from assets/main.json (LoaderResources::environment())
+    // The path comes from assets/main.yaml (LoaderResources::environment())
     bool Load(const std::string &assetPath = LoaderResources::Environment());
     inline bool load(const std::string &assetPath = LoaderResources::Environment())
     {

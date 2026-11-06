@@ -37,11 +37,11 @@ public:
         std::string gameVersion;
         std::string map;     // the map's path as the room named it
         std::string outcome; // "victory", "defeat", "left", ... (a client's replay)
-        int64_t recordedAt {0};
-        uint64_t mapHash {0};
-        uint32_t turns {0};
-        uint32_t ticks {0}; // length of the playback
-        uint32_t ticksPerTurn {2};
+        std::int64_t recordedAt {0};
+        std::uint64_t mapHash {0};
+        std::uint32_t turns {0};
+        std::uint32_t ticks {0}; // length of the playback
+        std::uint32_t ticksPerTurn {2};
         int localSlot {-1};
         int protocol {0};
         bool carriesData {false};     // the file holds its map and simulation data
@@ -49,7 +49,7 @@ public:
         int mission {-1};             // campaign: the mission, the side of the player, the computer's difficulty
         int playerFaction {0};
         int difficulty {1};
-        uint64_t fileBytes {0}; // size of the file on disk
+        std::uint64_t fileBytes {0}; // size of the file on disk
         std::vector<Player> players;
     };
 
@@ -68,40 +68,40 @@ public:
     // map in place (a session overlay; the caller reloads the game data). False with `error` when the map is missing.
     bool PrepareMatch(int watchSlot, MatchSetup &out, std::string &error);
     // The turn that starts on `tick` goes into the simulation (call before the tick runs)
-    void ScheduleDue(Simulation &sim, uint32_t tick);
-    bool Finished(uint32_t tick) const
+    void ScheduleDue(Simulation &sim, std::uint32_t tick);
+    bool Finished(std::uint32_t tick) const
     {
         return tick >= m_info.ticks;
     }
     // After a tick: compares the world's checksum with the recorded one (at the ticks that have one)
-    void Verify(uint32_t tick, uint64_t checksum);
-    bool NeedsChecksum(uint32_t tick) const
+    void Verify(std::uint32_t tick, std::uint64_t checksum);
+    bool NeedsChecksum(std::uint32_t tick) const
     {
         return m_checksums.count(tick) != 0;
     }
     // First tick whose checksum differed from the recording; -1 while all matched
-    int64_t MismatchTick() const
+    std::int64_t MismatchTick() const
     {
         return m_mismatchTick;
     }
     // Where the player's camera was at `tick` (centre in world pixels, zoom); false when the file has no view of him
-    bool CameraOf(int slot, uint32_t tick, float &x, float &y, float &zoom) const;
+    bool CameraOf(int slot, std::uint32_t tick, float &x, float &y, float &zoom) const;
     // Back to the first turn (the world is set up again by the caller)
     void Rewind();
 
 private:
     struct View
     {
-        uint32_t tick {0};
+        std::uint32_t tick {0};
         float x {0.0f}, y {0.0f}, zoom {2.0f};
     };
     Info m_info;
-    std::vector<std::vector<uint8_t>> m_turns;
-    std::vector<uint8_t> m_setup;
-    std::map<uint32_t, uint64_t> m_checksums;
-    std::map<std::string, std::vector<uint8_t>> m_files;
+    std::vector<std::vector<std::uint8_t>> m_turns;
+    std::vector<std::uint8_t> m_setup;
+    std::map<std::uint32_t, std::uint64_t> m_checksums;
+    std::map<std::string, std::vector<std::uint8_t>> m_files;
     std::map<int, std::vector<View>> m_views; // by slot, ascending ticks
-    int64_t m_mismatchTick {-1};
+    std::int64_t m_mismatchTick {-1};
     bool m_overlayInstalled {false};
 };
 

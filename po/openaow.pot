@@ -2,4482 +2,2692 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OpenArtOfWar 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 23:00+0500\n"
-"PO-Revision-Date: 2026-10-24 23:00+0500\n"
+"POT-Creation-Date: 2026-11-06 13:40+0500\n"
+"PO-Revision-Date: 2026-11-06 13:40+0500\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
 
 msgid "MAIN MENU"
-msgstr ""
+msgstr "Main Menu"
 
 msgid "CAMPAIGN"
-msgstr ""
+msgstr "Campaign"
 
 msgid "CUSTOM GAME"
-msgstr ""
+msgstr "Custom Game"
 
 msgid "TEST MAP"
-msgstr ""
+msgstr "Test Map"
 
 msgid "SETTINGS"
-msgstr ""
+msgstr "Settings"
 
 msgid "HELP"
-msgstr ""
+msgstr "Help"
 
 msgid "ABOUT"
-msgstr ""
+msgstr "About"
 
 msgid "EXIT"
-msgstr ""
+msgstr "Exit"
 
 msgid "GAME PAUSED"
-msgstr ""
+msgstr "Game Paused"
 
 msgid "CONTINUE"
-msgstr ""
+msgstr "Continue"
 
 msgid "OBJECTIVES"
-msgstr ""
+msgstr "Objectives"
 
 msgid "RESTART MISSION"
-msgstr ""
+msgstr "Restart Mission"
 
 msgid " - OBJECTIVES"
-msgstr ""
+msgstr " - Objectives"
 
 msgid "PRIMARY OBJECTIVES:"
-msgstr ""
+msgstr "Primary Objectives:"
 
 msgid "OPERATION BRIEFING:"
-msgstr ""
+msgstr "Operation Briefing:"
 
 msgid " kW"
-msgstr ""
+msgstr " kW"
 
 msgid "SELECT CAMPAIGN MISSION"
-msgstr ""
+msgstr "Select Campaign Mission"
 
 msgid "OBJECTIVES:"
-msgstr ""
+msgstr "Objectives:"
 
 msgid "BRIEFING:"
-msgstr ""
+msgstr "Briefing:"
 
 msgid "START MISSION"
-msgstr ""
+msgstr "Start Mission"
 
 msgid "BACK"
-msgstr ""
+msgstr "Back"
 
 msgid "MISSION BRIEFING"
-msgstr ""
+msgstr "Mission Briefing"
 
 msgid "Sound & Music"
-msgstr ""
+msgstr "Sound & Music"
 
 msgid "Language"
-msgstr ""
+msgstr "Language"
 
 msgid "English"
-msgstr ""
-
-msgid "Russian"
-msgstr ""
+msgstr "English"
 
 msgid "ON"
-msgstr ""
+msgstr "ON"
 
 msgid "OFF"
-msgstr ""
+msgstr "OFF"
 
 msgid "HELP & CONTROLS"
-msgstr ""
+msgstr "Help & Controls"
 
 msgid "ABOUT GAME"
-msgstr ""
+msgstr "About Game"
 
 msgid "Version"
-msgstr ""
+msgstr "Version"
 
 msgid "Author"
-msgstr ""
+msgstr "Author"
 
 msgid "Porting: Modern C++17, SDL3, ImGui"
-msgstr ""
+msgstr "Porting: Modern C++17, SDL3, ImGui"
 
 msgid "Central Peru is occupied by the army of the Confederation."
-msgstr ""
+msgstr "Central Peru is occupied by the army of the Confederation."
 
 msgid "The Resistance stands ready to strike for freedom!"
-msgstr ""
+msgstr "The Resistance stands ready to strike for freedom!"
 
 msgid "RESEARCH"
-msgstr ""
+msgstr "Research"
 
 msgid "INFANTRY"
-msgstr ""
+msgstr "Infantry"
 
 msgid "VEHICLES"
-msgstr ""
+msgstr "Vehicles"
 
 msgid "ORDERS"
-msgstr ""
+msgstr "Orders"
 
 msgid "MENU"
-msgstr ""
+msgstr "Menu"
 
 msgid "READY"
-msgstr ""
+msgstr "Ready"
 
 msgid "LOCK"
-msgstr ""
+msgstr "Lock"
 
 msgid "Select building to construct"
-msgstr ""
+msgstr "Select building to construct"
 
 msgid "[RESEARCHED] "
-msgstr ""
+msgstr "[Researched] "
 
 msgid "Select technology to research"
-msgstr ""
+msgstr "Select technology to research"
 
 msgid "LABORATORY REQUIRED FOR RESEARCH!"
-msgstr ""
+msgstr "Laboratory required for research!"
 
 msgid "THIS TECHNOLOGY IS ALREADY RESEARCHED!"
-msgstr ""
+msgstr "This technology is already researched!"
 
 msgid "ANOTHER RESEARCH IS ALREADY IN PROGRESS!"
-msgstr ""
+msgstr "Another research is already in progress!"
 
 msgid "INSUFFICIENT CREDITS FOR RESEARCH!"
-msgstr ""
+msgstr "Insufficient credits for research!"
 
 msgid "RIFLEMAN"
-msgstr ""
+msgstr "Rifleman"
 
 msgid "Standard Resistance infantry rifleman"
-msgstr ""
+msgstr "Standard Resistance infantry rifleman"
 
 msgid "GRENADIER"
-msgstr ""
+msgstr "Grenadier"
 
 msgid "Heavy rocket soldier vs vehicles and walls"
-msgstr ""
+msgstr "Heavy rocket soldier vs vehicles and walls"
 
 msgid "SNIPER"
-msgstr ""
+msgstr "Sniper"
 
 msgid "Long-range sniper (Camouflage mode [G])"
-msgstr ""
+msgstr "Long-range sniper (Camouflage mode [G])"
 
 msgid "[BARRACKS REQUIRED] Construct Barracks to recruit "
-msgstr ""
+msgstr "[Barracks Required] Construct Barracks to recruit "
 
 msgid "BARRACKS REQUIRED FOR INFANTRY RECRUITMENT!"
-msgstr ""
+msgstr "Barracks required for infantry recruitment!"
 
 msgid "COYOTE"
-msgstr ""
+msgstr "Coyote"
 
 msgid "Fast scout buggy (spawns at Factory)"
-msgstr ""
+msgstr "Fast scout buggy (spawns at Factory)"
 
 msgid "ARMADILLO"
-msgstr ""
+msgstr "Armadillo"
 
 msgid "Main battle tank of Resistance"
-msgstr ""
+msgstr "Main battle tank of Resistance"
 
 msgid "RHINO"
-msgstr ""
+msgstr "Rhino"
 
 msgid "Heavy twin-cannon tank (Siege mode [G])"
-msgstr ""
+msgstr "Heavy twin-cannon tank (Siege mode [G])"
 
 msgid "PORCUPINE"
-msgstr ""
+msgstr "Porcupine"
 
 msgid "Multiple Launch Rocket System (MLRS)"
-msgstr ""
+msgstr "Multiple Launch Rocket System (MLRS)"
 
 msgid "[FACTORY REQUIRED] Construct Factory to build "
-msgstr ""
+msgstr "[Factory Required] Construct Factory to build "
 
 msgid "VEHICLE FACTORY REQUIRED FOR PRODUCTION!"
-msgstr ""
+msgstr "Vehicle Factory required for production!"
 
 msgid "ATTACK-MOVE"
-msgstr ""
+msgstr "Attack-Move"
 
 msgid "Units advance to destination, attacking all encountered enemies"
-msgstr ""
+msgstr "Units advance to destination, attacking all encountered enemies"
 
 msgid "SIEGE"
-msgstr ""
+msgstr "Siege"
 
 msgid "Toggle Siege mode for Sniper and Rhino"
-msgstr ""
+msgstr "Toggle Siege mode for Sniper and Rhino"
 
 msgid "STOP"
-msgstr ""
+msgstr "Stop"
 
 msgid "Immediately halt all orders and movement"
-msgstr ""
+msgstr "Immediately halt all orders and movement"
 
 msgid "DEFEND"
-msgstr ""
+msgstr "Defend"
 
 msgid "Hold current position and engage enemies in range"
-msgstr ""
+msgstr "Hold current position and engage enemies in range"
 
 msgid "GUARD"
-msgstr ""
+msgstr "GUARD"
 
 msgid "Stance: engage enemies in sight, chase them a short way, then return"
-msgstr ""
+msgstr "Stance: engage enemies in sight, chase them a short way, then return"
 
 msgid "HOLD GROUND"
-msgstr ""
+msgstr "HOLD GROUND"
 
 msgid "Stance: fire only at enemies in range, never leave the position"
-msgstr ""
+msgstr "Stance: fire only at enemies in range, never leave the position"
 
 msgid "PURSUE"
-msgstr ""
+msgstr "PURSUE"
 
 msgid "Stance: engage enemies in sight and chase them to the end (default)"
-msgstr ""
+msgstr "Stance: engage enemies in sight and chase them to the end (default)"
 
 msgid "REPAIR [R]"
-msgstr ""
+msgstr "REPAIR [R]"
 
 msgid "REPAIRING"
-msgstr ""
+msgstr "REPAIRING"
 
 msgid "MISSION ACCOMPLISHED!"
-msgstr ""
+msgstr "Mission Accomplished!"
 
 msgid "MISSION FAILED!"
-msgstr ""
+msgstr "Mission Failed!"
 
 msgid "HEADQUARTERS"
-msgstr ""
+msgstr "Headquarters"
 
 msgid "Resistance Command Center. Provides radar and logistics."
-msgstr ""
+msgstr "Resistance Command Center. Provides radar and logistics."
 
 msgid "POWER PLANT"
-msgstr ""
+msgstr "Power Plant"
 
 msgid "Power Plant (+100 kW). Supplies energy to factories and defenses."
-msgstr ""
+msgstr "Power Plant (+100 kW). Supplies energy to factories and defenses."
 
 msgid "BARRACKS"
-msgstr ""
+msgstr "Barracks"
 
 msgid "Infantry Training: Rifleman, Grenadier, Sniper."
-msgstr ""
+msgstr "Infantry Training: Rifleman, Grenadier, Sniper."
 
 msgid "FACTORY"
-msgstr ""
+msgstr "Factory"
 
 msgid "Vehicle Factory: Coyote, Armadillo, Rhino, and Porcupine MLRS."
-msgstr ""
+msgstr "Vehicle Factory: Coyote, Armadillo, Rhino, and Porcupine MLRS."
 
 msgid "RESEARCH LAB"
-msgstr ""
+msgstr "Research Lab"
 
 msgid "Scientific center for combat research upgrades (RESEARCH tab)."
-msgstr ""
+msgstr "Scientific center for combat research upgrades (RESEARCH tab)."
 
 msgid "BUNKER"
-msgstr ""
+msgstr "Bunker"
 
 msgid "Reinforced machine-gun bunker for perimeter defense."
-msgstr ""
+msgstr "Reinforced machine-gun bunker for perimeter defense."
 
 msgid "TURRET"
-msgstr ""
+msgstr "Turret"
 
 msgid "Watchtower with heavy machine gun and extended vision."
-msgstr ""
+msgstr "Watchtower with heavy machine gun and extended vision."
 
 msgid "WALL"
-msgstr ""
+msgstr "Wall"
 
 msgid "Reinforced concrete wall (1x1) to block enemy armor."
-msgstr ""
+msgstr "Reinforced concrete wall (1x1) to block enemy armor."
 
 msgid "Mission 1: The Return"
-msgstr ""
+msgstr "Mission 1: The Return"
 
 msgid "Map: m37 (Southern Jungle)"
-msgstr ""
+msgstr "Map: m37 (Southern Jungle)"
 
 msgid ""
 "- Establish base.\n"
 "- Destroy Confederation base."
 msgstr ""
+"- Establish base.\n"
+"- Destroy Confederation base."
 
 msgid "We can no longer endure this oppression! The Confederation only hides behind noble words while plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost and prepare to strike."
-msgstr ""
+msgstr "We can no longer endure this oppression! The Confederation only hides behind noble words while plundering the people of Peru. The time has come to reclaim our freedom! Establish a forward outpost and prepare to strike."
 
 msgid "Mission 2: Jungle"
-msgstr ""
+msgstr "Mission 2: Jungle"
 
 msgid "Map: m42 (Rainforest)"
-msgstr ""
+msgstr "Map: m42 (Rainforest)"
 
 msgid ""
 "- Capture the pass.\n"
 "- Repel counter-attacks and eliminate Confederation forces."
 msgstr ""
+"- Capture the pass.\n"
+"- Repel counter-attacks and eliminate Confederation forces."
 
 msgid "The central region of Peru is occupied by Confederation forces. Over three months they fortified the high ground. Launch a surprise strike through the dense jungle."
-msgstr ""
+msgstr "The central region of Peru is occupied by Confederation forces. Over three months they fortified the high ground. Launch a surprise strike through the dense jungle."
 
 msgid "Mission 3: Sabotage"
-msgstr ""
+msgstr "Mission 3: Sabotage"
 
 msgid "Map: m43 (River Valley)"
-msgstr ""
+msgstr "Map: m43 (River Valley)"
 
 msgid ""
 "- Guide sabotage squad.\n"
 "- Eliminate Confederation outposts in the sector."
 msgstr ""
+"- Guide sabotage squad.\n"
+"- Eliminate Confederation outposts in the sector."
 
 msgid "Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy ammo and fuel depots."
-msgstr ""
+msgstr "Our plan worked! Scouts report enemy supply convoys moving through the river valley. Cut off enemy ammo and fuel depots."
 
 msgid "Mission 4: The Gorge"
-msgstr ""
+msgstr "Mission 4: The Gorge"
 
 msgid "Map: m43 (Mountain Canyon)"
-msgstr ""
+msgstr "Map: m43 (Mountain Canyon)"
 
 msgid ""
 "- Break through mountain canyon.\n"
 "- Destroy Confederation defense fortifications."
 msgstr ""
+"- Break through mountain canyon.\n"
+"- Destroy Confederation defense fortifications."
 
 msgid "Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. Assault the fortifications!"
-msgstr ""
+msgstr "Our vanguard is approaching the mountain pass. The enemy has blocked the gorge with heavy turrets. Assault the fortifications!"
 
 msgid "Mission 5: Matter of Seconds"
-msgstr ""
+msgstr "Mission 5: Matter of Seconds"
 
 msgid "Map: m26 (Desert Outpost)"
-msgstr ""
+msgstr "Map: m26 (Desert Outpost)"
 
 msgid ""
 "- Defend the base and construct factories.\n"
 "- Eliminate enemy armor divisions."
 msgstr ""
+"- Defend the base and construct factories.\n"
+"- Eliminate enemy armor divisions."
 
 msgid "The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy armor to strike back."
-msgstr ""
+msgstr "The enemy attacks with armored tank divisions. Every second counts! Deploy factories and build heavy armor to strike back."
 
 msgid "Mission 6: Radio Station"
-msgstr ""
+msgstr "Mission 6: Radio Station"
 
 msgid "Map: m35 (Highland Plateau)"
-msgstr ""
+msgstr "Map: m35 (Highland Plateau)"
 
 msgid ""
 "- Capture the communications relay.\n"
 "- Annihilate Confederation plateau garrison."
 msgstr ""
+"- Capture the communications relay.\n"
+"- Annihilate Confederation plateau garrison."
 
 msgid "The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces and hold the plateau."
-msgstr ""
+msgstr "The strategic relay tower will allow intercepting Confederation command orders. Dislodge enemy forces and hold the plateau."
 
 msgid "Mission 7: Lima"
-msgstr ""
+msgstr "Mission 7: Lima"
 
 msgid "Map: m44 (Outskirts of Lima)"
-msgstr ""
+msgstr "Map: m44 (Outskirts of Lima)"
 
 msgid ""
 "- Assault the capital city of Lima.\n"
 "- Total destruction of Confederation Headquarters!"
 msgstr ""
+"- Assault the capital city of Lima.\n"
+"- Total destruction of Confederation Headquarters!"
 
 msgid "Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike for the liberation of Peru!"
-msgstr ""
+msgstr "Finally, we stand on the threshold of our freedom! Only one decisive battle remains! Today we strike for the liberation of Peru!"
 
 msgid "Mission 8: Skirmish"
-msgstr ""
+msgstr "Mission 8: Skirmish"
 
 msgid "Map: m0 (Training Ground)"
-msgstr ""
+msgstr "Map: m0 (Training Ground)"
 
 msgid ""
 "- Construct your base.\n"
 "- Destroy enemy forces."
 msgstr ""
+"- Construct your base.\n"
+"- Destroy enemy forces."
 
 msgid "Open skirmish for sector control. Test your strategy and tactics against fortified Confederation positions."
-msgstr ""
+msgstr "Open skirmish for sector control. Test your strategy and tactics against fortified Confederation positions."
 
 msgid "Mission 9: The Ford"
-msgstr ""
+msgstr "Mission 9: The Ford"
 
 msgid "Map: brod (The Ford Crossing)"
-msgstr ""
+msgstr "Map: brod (The Ford Crossing)"
 
 msgid ""
 "- Defend the river crossing.\n"
 "- Destroy Confederation fortress base."
 msgstr ""
+"- Defend the river crossing.\n"
+"- Destroy Confederation fortress base."
 
 msgid "The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post."
-msgstr ""
+msgstr "The river splits the sector in two. The only crossing point is the shallow ford in the center, heavily guarded by enemy bunkers. Breakthrough the river defense and eliminate the enemy command post."
 
 msgid "Mission 10: Canyon"
-msgstr ""
+msgstr "Mission 10: Canyon"
 
 msgid "Map: canyon (Desert Canyon)"
-msgstr ""
+msgstr "Map: canyon (Desert Canyon)"
 
 msgid ""
 "- Secure the canyon gorge.\n"
 "- Crush enemy armored units in the valley."
 msgstr ""
+"- Secure the canyon gorge.\n"
+"- Crush enemy armored units in the valley."
 
 msgid "Confederation armor is positioned in the narrow canyon passes. Maneuver through the rocky terrain and capture the sector."
-msgstr ""
+msgstr "Confederation armor is positioned in the narrow canyon passes. Maneuver through the rocky terrain and capture the sector."
 
 msgid "Mission 11: Oasis"
-msgstr ""
+msgstr "Mission 11: Oasis"
 
 msgid "Map: oasis (Desert Oasis)"
-msgstr ""
+msgstr "Map: oasis (Desert Oasis)"
 
 msgid ""
 "- Control strategic water oases.\n"
 "- Eradicate Confederation desert outpost."
 msgstr ""
+"- Control strategic water oases.\n"
+"- Eradicate Confederation desert outpost."
 
 msgid "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
-msgstr ""
-
-msgid "Open Art Of War Character Archetype Editor"
-msgstr ""
-
-msgid "SDL error: "
-msgstr ""
-
-msgid "SDL window error: "
-msgstr ""
-
-msgid "SDL renderer error: "
-msgstr ""
-
-msgid "Could not find the assets folder with graphics data."
-msgstr ""
-
-msgid "No YAML files found in assets/characters."
-msgstr ""
-
-msgid "Invalid YAML"
-msgstr ""
-
-msgid "The YAML root must be a map."
-msgstr ""
-
-msgid "Loaded: "
-msgstr ""
-
-msgid "Could not load YAML: "
-msgstr ""
-
-msgid "Could not open file for writing: "
-msgstr ""
-
-msgid "Failed to write file: "
-msgstr ""
-
-msgid "Saved: "
-msgstr ""
-
-msgid "YAML save error: "
-msgstr ""
+msgstr "Ancient desert oases provide vital resources in this barren expanse. Control the water wells and assault the enemy garrison."
 
 msgid "Ready"
-msgstr ""
-
-msgid "File"
-msgstr ""
-
-msgid "Save"
-msgstr ""
-
-msgid "Load selected"
-msgstr ""
-
-msgid "Refresh list"
-msgstr ""
-
-msgid "Archetypes"
-msgstr ""
-
-msgid "Properties"
-msgstr ""
-
-msgid "Select a YAML configuration from the list."
-msgstr ""
-
-msgid "Preview"
-msgstr ""
-
-msgid "Unsaved changes"
-msgstr ""
-
-msgid "General"
-msgstr ""
+msgstr "Ready"
 
 msgid "Name"
-msgstr ""
+msgstr "Name"
 
 msgid "Faction"
-msgstr ""
-
-msgid "Size and stats"
-msgstr ""
-
-msgid "Width (tiles)"
-msgstr ""
-
-msgid "Height (tiles)"
-msgstr ""
-
-msgid "Maximum health"
-msgstr ""
-
-msgid "Build radius (tiles)"
-msgstr ""
-
-msgid "Sight radius (tiles)"
-msgstr ""
-
-msgid "Move speed (pixels per tick)"
-msgstr ""
+msgstr "Faction"
 
 msgid "Production"
-msgstr ""
+msgstr "Production"
 
 msgid "Cost"
-msgstr ""
-
-msgid "Power (+/-)"
-msgstr ""
-
-msgid "Build time"
-msgstr ""
-
-msgid "Combat"
-msgstr ""
-
-msgid "Can attack"
-msgstr ""
-
-msgid "Damage"
-msgstr ""
-
-msgid "Cooldown (seconds)"
-msgstr ""
-
-msgid "Shots per burst"
-msgstr ""
-
-msgid "Projectile"
-msgstr ""
-
-msgid "Rotating turret"
-msgstr ""
-
-msgid "Rotating radar"
-msgstr ""
-
-msgid "Animation"
-msgstr ""
-
-msgid "Abilities"
-msgstr ""
-
-msgid "Siege archetype ID"
-msgstr ""
-
-msgid "Parent archetype ID"
-msgstr ""
-
-msgid "Filename for Save As"
-msgstr ""
-
-msgid "Save As"
-msgstr ""
-
-msgid "Reload file"
-msgstr ""
-
-msgid "Idle"
-msgstr ""
-
-msgid "Move"
-msgstr ""
-
-msgid "Attack"
-msgstr ""
-
-msgid "Death"
-msgstr ""
-
-msgid "Loop"
-msgstr ""
-
-msgid "Facing %d/7"
-msgstr ""
-
-msgid "Speed %.1fx"
-msgstr ""
-
-msgid "Attack range"
-msgstr ""
-
-msgid "Construction"
-msgstr ""
-
-msgid "Health"
-msgstr ""
-
-msgid "Powered"
-msgstr ""
+msgstr "Cost"
 
 msgid "Open Art Of War Map Editor - [openaow-mapeditor]"
-msgstr ""
+msgstr "Open Art Of War Map Editor - [openaow-mapeditor]"
 
 msgid "Undo action"
-msgstr ""
+msgstr "Undo action"
 
 msgid "Redo action"
-msgstr ""
+msgstr "Redo action"
 
 msgid "Map saved: "
-msgstr ""
+msgstr "Map saved: "
 
 msgid "Player start point (HQ): "
-msgstr ""
+msgstr "Player start point (HQ): "
 
 msgid "Enemy start point (HQ): "
-msgstr ""
+msgstr "Enemy start point (HQ): "
 
 msgid "Eyedropper: selected tile #"
-msgstr ""
+msgstr "Eyedropper: selected tile #"
 
 msgid "+30% Resources, +10% Speed"
-msgstr ""
+msgstr "+30% Resources, +10% Speed"
 
 msgid "-20% AI Resources"
-msgstr ""
+msgstr "-20% AI Resources"
 
 msgid "-50% AI Resources"
-msgstr ""
-
-msgid "AI Difficulty"
-msgstr ""
+msgstr "-50% AI Resources"
 
 msgid "ATTACK-MOVE [Q]: select target (LMB to confirm, RMB/ESC to cancel)"
-msgstr ""
+msgstr "Attack-move [Q]: pick a target (LMB to confirm, RMB / Esc to cancel)"
 
 msgid "Attack-move: units engage every enemy on the way"
-msgstr ""
+msgstr "Attack-move: units engage every enemy on the way"
 
 msgid "BUILD"
-msgstr ""
+msgstr "Build"
 
 msgid "Barracks"
-msgstr ""
+msgstr "Barracks"
 
 msgid "Cancel / game menu"
-msgstr ""
+msgstr "Cancel / game menu"
 
 msgid "Click or press Enter to begin"
-msgstr ""
+msgstr "Click or press Enter to begin"
 
 msgid "Click or press Enter to return to the main menu"
-msgstr ""
+msgstr "Click or press Enter to return to the main menu"
 
 msgid "Drag the map"
-msgstr ""
+msgstr "Drag the map"
 
 msgid "Easy"
-msgstr ""
+msgstr "Easy"
 
 msgid "FORTRESS FLAMETHROWER UPGRADE UNLOCKED!"
-msgstr ""
+msgstr "Fortress flamethrower upgrade unlocked!"
 
 msgid "Factory"
-msgstr ""
+msgstr "Factory"
 
 msgid "Fair AI, No Handicap"
-msgstr ""
+msgstr "Fair AI, No Handicap"
 
 msgid "Hard"
-msgstr ""
+msgstr "Hard"
 
 msgid "Hardcore"
-msgstr ""
+msgstr "Hardcore"
 
 msgid "Interface language"
-msgstr ""
+msgstr "Interface language"
 
 msgid "FREEDOM FOR LIBERTY"
-msgstr ""
+msgstr "FREEDOM FOR LIBERTY"
 
 msgid "LMB"
-msgstr ""
+msgstr "LMB"
 
 msgid "LMB - build, RMB / Esc - cancel"
-msgstr ""
+msgstr "LMB - build, RMB / Esc - cancel"
 
 msgid "MMB"
-msgstr ""
+msgstr "MMB"
 
 msgid "Medium"
-msgstr ""
+msgstr "Medium"
 
 msgid "Move, or attack the target under the cursor"
-msgstr ""
+msgstr "Move, or attack the target under the cursor"
 
 msgid "Music and sound effects"
-msgstr ""
+msgstr "Music and sound effects"
 
 msgid "POWER"
-msgstr ""
+msgstr "Power"
 
 msgid "RMB"
-msgstr ""
+msgstr "RMB"
 
 msgid "Scroll the camera"
-msgstr ""
+msgstr "Scroll the camera"
 
 msgid "Select unit / drag to box-select"
-msgstr ""
+msgstr "Select unit / drag to box-select"
 
 msgid "Select units and issue a command"
-msgstr ""
+msgstr "Select units and issue a command"
 
 msgid "Selected"
-msgstr ""
+msgstr "Selected"
 
 msgid "Siege mode for Sniper and Rhino"
-msgstr ""
+msgstr "Siege mode for Sniper and Rhino"
 
 msgid "TECH"
-msgstr ""
+msgstr "Tech"
 
 msgid "W A S D / Arrows"
-msgstr ""
+msgstr "W A S D / Arrows"
 
 msgid "Wheel"
-msgstr ""
+msgstr "Wheel"
 
 msgid "Zoom (over the map) / scroll lists (over the sidebar)"
-msgstr ""
+msgstr "Zoom (over the map) / scroll lists (over the sidebar)"
 
 msgid "queue"
-msgstr ""
-
-msgid "(none)"
-msgstr ""
-
-msgid "A fights in red team colors on the left, B in blue on the right."
-msgstr ""
-
-#, c-format
-msgid "A units: %d"
-msgstr ""
-
-msgid "A uses the current (unsaved) values; colors: green = better, red = worse."
-msgstr ""
-
-msgid "A vs B"
-msgstr ""
-
-msgid "A wins"
-msgstr ""
-
-#, c-format
-msgid "A wins %d (%.0f%%) | B wins %d (%.0f%%) | draws %d | avg %.1f s | survivors A %.1f, B %.1f"
-msgstr ""
-
-msgid "Alive"
-msgstr ""
-
-msgid "Attack range, tiles"
-msgstr ""
-
-msgid "B advances"
-msgstr ""
-
-#, c-format
-msgid "B units: %d"
-msgstr ""
-
-msgid "B wins"
-msgstr ""
-
-msgid "Battle started"
-msgstr ""
-
-#, c-format
-msgid "Battle time: %.1f s"
-msgstr ""
-
-#, c-format
-msgid "Battles: %d"
-msgstr ""
-
-msgid "Build time, s"
-msgstr ""
-
-msgid "Compare"
-msgstr ""
-
-msgid "Cooldown, s"
-msgstr ""
-
-msgid "DPS"
-msgstr ""
-
-msgid "DPS per 100 credits"
-msgstr ""
-
-msgid "Damage dealt"
-msgstr ""
-
-msgid "Damage per shot"
-msgstr ""
-
-msgid "Difference"
-msgstr ""
-
-#, c-format
-msgid "Distance: %d tiles"
-msgstr ""
-
-msgid "Draw"
-msgstr ""
-
-msgid "Fit view"
-msgstr ""
-
-msgid "Footprint, tiles"
-msgstr ""
-
-msgid "HP left"
-msgstr ""
-
-msgid "HP per 100 credits"
-msgstr ""
-
-msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Fit arena"
-msgstr ""
-
-msgid "Max HP"
-msgstr ""
-
-msgid "Min range, tiles"
-msgstr ""
-
-msgid "Mirror match (same as A)"
-msgstr ""
-
-msgid "Move speed"
-msgstr ""
-
-msgid "Opponent B"
-msgstr ""
-
-msgid "Parameter"
-msgstr ""
-
-msgid "Pause"
-msgstr ""
-
-msgid "Pick unit B to compare."
-msgstr ""
-
-msgid "Power, kW"
-msgstr ""
-
-msgid "Restart"
-msgstr ""
-
-msgid "Resume"
-msgstr ""
-
-msgid "Run batch (no rendering)"
-msgstr ""
-
-msgid "Save A first: swapping reloads both files"
-msgstr ""
-
-msgid "Side"
-msgstr ""
-
-msgid "Sight radius, tiles"
-msgstr ""
-
-msgid "Simulation"
-msgstr ""
-
-#, c-format
-msgid "Spacing %.0f px"
-msgstr ""
-
-msgid "Start battle"
-msgstr ""
-
-msgid "Step 0.1 s"
-msgstr ""
-
-msgid "Stop"
-msgstr ""
-
-msgid "Swap A <-> B"
-msgstr ""
-
-#, c-format
-msgid "Time limit %.0f s"
-msgstr ""
-
-msgid "Time to kill the other, s"
-msgstr ""
-
-msgid "current values, unsaved edits included"
-msgstr ""
+msgstr "queue"
 
 msgid "(RMB - cancel one)"
-msgstr ""
+msgstr "(RMB - cancel one)"
 
 msgid "Armored machine-gun carrier"
-msgstr ""
+msgstr "Armored machine-gun carrier"
 
 msgid "Build vehicles at the selected or primary Factory (RMB - cancel)"
-msgstr ""
+msgstr "Build vehicles at the selected or primary Factory (RMB - cancel)"
 
 msgid "CONFEDERACY"
-msgstr ""
+msgstr "CONFEDERACY"
 
 msgid "FLAMETHROWER"
-msgstr ""
+msgstr "FLAMETHROWER"
 
 msgid "FORTRESS"
-msgstr ""
+msgstr "FORTRESS"
 
 msgid "GRAD"
-msgstr ""
+msgstr "GRAD"
 
 msgid "HAMMER"
-msgstr ""
+msgstr "HAMMER"
 
 msgid "HEAVY ASSAULT"
-msgstr ""
+msgstr "HEAVY ASSAULT"
 
 msgid "HEAVY SHELLS"
-msgstr ""
+msgstr "HEAVY SHELLS"
 
 msgid "Heavy tank (Siege mode [G])"
-msgstr ""
+msgstr "Heavy tank (Siege mode [G])"
 
 msgid "INSUFFICIENT CREDITS!"
-msgstr ""
+msgstr "INSUFFICIENT CREDITS!"
 
 msgid "MARCH"
-msgstr ""
+msgstr "MARCH"
 
 msgid "Main battle tank of Confederation"
-msgstr ""
+msgstr "Main battle tank of Confederation"
 
 msgid "RESEARCH COMPLETE: "
-msgstr ""
+msgstr "RESEARCH COMPLETE: "
 
 msgid "RESISTANCE"
-msgstr ""
+msgstr "RESISTANCE"
 
 msgid "Recruit infantry at the selected or primary Barracks (RMB - cancel)"
-msgstr ""
+msgstr "Recruit infantry at the selected or primary Barracks (RMB - cancel)"
 
 msgid "Rocket infantry vs vehicles and walls"
-msgstr ""
+msgstr "Rocket infantry vs vehicles and walls"
 
 msgid "Short-range flame infantry vs infantry"
-msgstr ""
+msgstr "Short-range flame infantry vs infantry"
 
 msgid "Standard Confederation infantry rifleman"
-msgstr ""
+msgstr "Standard Confederation infantry rifleman"
 
 msgid "TECH CENTER REQUIRED FOR RESEARCH!"
-msgstr ""
+msgstr "TECH CENTER REQUIRED FOR RESEARCH!"
 
 msgid "ZEUS"
-msgstr ""
+msgstr "ZEUS"
 
 msgid "[LAB REQUIRED] Research is paused until a Laboratory is built"
-msgstr ""
+msgstr "[LAB REQUIRED] Research is paused until a Laboratory is built"
 
 msgid "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
-msgstr ""
-
-msgid " (default)"
-msgstr ""
-
-msgid "+ Add Weapon"
-msgstr ""
-
-msgid "Delay min / max (s)"
-msgstr ""
-
-msgid "Firing delay"
-msgstr ""
-
-msgid "Fixed"
-msgstr ""
-
-msgid "Heavy vehicle"
-msgstr ""
-
-msgid "In the game the wreck stays 120 s and sinks one stage at a time."
-msgstr ""
-
-msgid "Light vehicle"
-msgstr ""
-
-msgid "Muzzle: exit point [X=Forward along facing, Y=Lateral]."
-msgstr ""
-
-msgid "Muzzle: exit point on the rotating turret [X=Forward, Y=Lateral]."
-msgstr ""
-
-msgid "Preview corpse"
-msgstr ""
-
-msgid "Preview stage (-1 = play)"
-msgstr ""
-
-msgid "Preview wreck"
-msgstr ""
-
-msgid "Random (min - max)"
-msgstr ""
-
-#, c-format
-msgid "Random delay %.2f - %.2f s (average used above)"
-msgstr ""
-
-msgid "Rubble 2x2"
-msgstr ""
-
-msgid "Rubble 3x3"
-msgstr ""
-
-msgid "Rubble 4x4"
-msgstr ""
-
-msgid "Stages"
-msgstr ""
-
-msgid "Use default wreck"
-msgstr ""
-
-msgid "Vehicle"
-msgstr ""
-
-msgid "Wreck"
-msgstr ""
-
-#, c-format
-msgid "Wreck composite %d, %d stage(s)%s"
-msgstr ""
-
-msgid "(unknown)"
-msgstr ""
-
-msgid "Archetype"
-msgstr ""
-
-#, c-format
-msgid "Build menu icon: %d"
-msgstr ""
+msgstr "[TECH CENTER REQUIRED] Research is paused until a Tech Center is built"
 
 msgid "Building"
-msgstr ""
-
-#, c-format
-msgid "Faction: %s   Class: %s   Internal type: %s"
-msgstr ""
-
-#, c-format
-msgid "Faction: %s   Structure type: %s"
-msgstr ""
-
-#, c-format
-msgid "Produced in: %s (follows from the archetype)"
-msgstr ""
-
-#, c-format
-msgid "Sprites: archetype %d - idle sequence %d, move sequence %d"
-msgstr ""
-
-#, c-format
-msgid "Sprites: building %d of the game data"
-msgstr ""
+msgstr "Building"
 
 msgid "infantry"
-msgstr ""
+msgstr "infantry"
 
 msgid "vehicle"
-msgstr ""
+msgstr "vehicle"
 
 msgid "barracks"
-msgstr ""
+msgstr "barracks"
 
 msgid "factory"
-msgstr ""
+msgstr "factory"
 
 #. Character description (assets/characters, by id)
 msgid "bunker_conf.description"
-msgstr ""
+msgstr "Heavy reinforced concrete pillbox of the Confederation with an automated machine gun port."
 
 #. Character description (assets/characters, by id)
 msgid "command_center_conf.description"
-msgstr ""
+msgstr "Main headquarters of the Confederation forces. Coordinates operations, provides base credit supplies, and baseline power (+50 kW)."
 
 #. Character description (assets/characters, by id)
 msgid "infantry_center_conf.description"
-msgstr ""
+msgstr "Confederation regular infantry barracks: trains riflemen, heavy rocket assault troops, and flamethrowers."
 
 #. Character description (assets/characters, by id)
 msgid "missile_turret_conf.description"
-msgstr ""
+msgstr "Long-range automated missile defense turret of the Confederation with an independent rotating launcher."
 
 #. Character description (assets/characters, by id)
 msgid "power_generator_conf.description"
-msgstr ""
+msgstr "Heavy power plant (+100 kW). Supplies electricity to tank factories, tech centers, and missile turrets."
 
 #. Character description (assets/characters, by id)
 msgid "radar_locator_conf.description"
-msgstr ""
+msgstr "Confederation radar surveillance tower equipped with a rotating antenna for long-range area scanning."
 
 #. Character description (assets/characters, by id)
 msgid "tech_center_conf.description"
-msgstr ""
+msgstr "Advanced military research and technology complex: unlocks upgrades for Zeus tanks and Grad MLRS siege systems."
 
 #. Character description (assets/characters, by id)
 msgid "vehicle_factory_conf.description"
-msgstr ""
+msgstr "Heavy armor production facility: manufactures TM-40 Fortress vehicles, T-21 Hammer tanks, T-22 Zeus tanks, and Grad MLRS."
 
 #. Character description (assets/characters, by id)
 msgid "wall_conf.description"
-msgstr ""
+msgstr "Solid reinforced concrete wall of the Confederation military, designed to seal chokepoints and block invaders."
 
 #. Character description (assets/characters, by id)
 msgid "flamethrower_conf.description"
-msgstr ""
+msgstr "Specialist in clearing cover, bunkers, and foliage. Unleashes devastating damage with high-temperature flame streams."
 
 #. Character description (assets/characters, by id)
 msgid "fortress_conf.description"
-msgstr ""
+msgstr "Super-heavy assault vehicle of the Confederation with enhanced armor plating and flamethrower weaponry."
 
 #. Character description (assets/characters, by id)
 msgid "grad_conf.description"
-msgstr ""
+msgstr "Long-range multiple rocket launcher system. Capable of deploying stabilizing artillery outriggers in siege mode."
 
 #. Character description (assets/characters, by id)
 msgid "grad_conf_siege.description"
-msgstr ""
+msgstr "Deployed artillery battery of the Grad MLRS: maximum destruction range against enemy fortifications."
 
 #. Character description (assets/characters, by id)
 msgid "hammer_conf.description"
-msgstr ""
+msgstr "Main battle tank of the Confederation featuring a rapid-fire cannon and a 360-degree rotating turret."
 
 #. Character description (assets/characters, by id)
 msgid "heavy_assault_conf.description"
-msgstr ""
+msgstr "Confederation exo-suit trooper armed with an RPG launcher, specialized in breaching armored vehicles and bases."
 
 #. Character description (assets/characters, by id)
 msgid "rifleman_conf.description"
-msgstr ""
+msgstr "Regular infantry trooper of the Confederation wearing tactical body armor and armed with an automatic rifle."
 
 #. Character description (assets/characters, by id)
 msgid "zeus_conf.description"
-msgstr ""
+msgstr "Elite heavy tank of the Confederation featuring dual cannons and an overhead missile launcher turret."
 
 #. Character description (assets/characters, by id)
 msgid "barracks_res.description"
-msgstr ""
+msgstr "Field training encampment for recruiting guerrilla forces: Rifleman, Grenadier, Sniper. Fitted with a defensive machine gun."
 
 #. Character description (assets/characters, by id)
 msgid "bunker_res.description"
-msgstr ""
+msgstr "Resistance concrete machine gun bunker for base perimeter protection against enemy infantry and light scouts."
 
 #. Character description (assets/characters, by id)
 msgid "factory_res.description"
-msgstr ""
+msgstr "Military manufacturing facility: produces Coyote buggies, Armadillo tanks, Rhino heavy tanks, and Porcupine MLRS."
 
 #. Character description (assets/characters, by id)
 msgid "guard_tower_res.description"
-msgstr ""
+msgstr "Resistance watchtower armed with a heavy machine gun and granting an extended reconnaissance radius."
 
 #. Character description (assets/characters, by id)
 msgid "headquarters_res.description"
-msgstr ""
+msgstr "Main command center of the Resistance partisans. Provides supply lines, power generation (+50 kW), and tactical radar."
 
 #. Character description (assets/characters, by id)
 msgid "powerplant_res.description"
-msgstr ""
+msgstr "Electricity generator (+100 kW). Supplies essential power for factories, barracks, and defense towers."
 
 #. Character description (assets/characters, by id)
 msgid "research_lab_res.description"
-msgstr ""
+msgstr "Underground research and engineering laboratory to unlock heavy armor (Rhino, Porcupine) and specialized siege modes."
 
 #. Character description (assets/characters, by id)
 msgid "wall_res.description"
-msgstr ""
+msgstr "Destructible defensive barricade constructed from sandbags and barbed wire to delay hostile vehicles."
 
 #. Character description (assets/characters, by id)
 msgid "assault_tank_res.description"
-msgstr ""
+msgstr "Medium assault tank of the Resistance with balanced armor, a rapid-fire cannon, and a rotating turret."
 
 #. Character description (assets/characters, by id)
 msgid "coyote_res.description"
-msgstr ""
+msgstr "Fast reconnaissance buggy equipped with a 360-degree machine gun turret. Optimal for scouting and infantry clearing."
 
 #. Character description (assets/characters, by id)
 msgid "grenadier_res.description"
-msgstr ""
+msgstr "Heavy assault partisan launching explosive grenades against defense fortifications and infantry clusters."
 
 #. Character description (assets/characters, by id)
 msgid "heavy_tank_res.description"
-msgstr ""
+msgstr "Heavy breakthrough tank boasting reinforced frontal armor. Transforms into a long-range siege cannon once researched."
 
 #. Character description (assets/characters, by id)
 msgid "heavy_tank_res_siege.description"
-msgstr ""
+msgstr "Rhino siege position: anchors stabilizing outriggers and bombards enemy positions with heavy high-explosive shells."
 
 #. Character description (assets/characters, by id)
 msgid "mlrs_res.description"
-msgstr ""
+msgstr "Mobile multiple rocket launcher system. Unleashes catastrophic rocket salvos against enemy bases and wall zones."
 
 #. Character description (assets/characters, by id)
 msgid "rifleman_res.description"
-msgstr ""
+msgstr "Light infantry recruit of the Resistance, equipped with an assault rifle."
 
 #. Character description (assets/characters, by id)
 msgid "sniper_res.description"
-msgstr ""
+msgstr "Marksman with high effective firing range. Can deploy into a concealed prone position (siege mode [G])."
 
 #. Character description (assets/characters, by id)
 msgid "sniper_res_siege.description"
-msgstr ""
-
-#, c-format
-msgid "Description (po key %s):"
-msgstr ""
-
-#, c-format
-msgid "Siege description (po key %s):"
-msgstr ""
-
-msgid "(no translation yet - add it to po/en.po and po/ru.po)"
-msgstr ""
+msgstr "Prone sniper siege position: maximizes firing range and damage potential while stationary."
 
 msgid "SELECT MAP"
-msgstr ""
+msgstr "Select Map"
 
 msgid "START GAME"
-msgstr ""
+msgstr "Start Game"
 
 msgid "MAP SIZE:"
-msgstr ""
+msgstr "Map Size:"
 
 msgid ""
 "- Build up your base.\n"
 "- Destroy the enemy base and all enemy forces."
 msgstr ""
+"- Build up your base.\n"
+"- Destroy the enemy base and all enemy forces."
 
 msgid "DIFFICULTY"
-msgstr ""
+msgstr "Difficulty"
 
 msgid "VIDEO"
-msgstr ""
+msgstr "Video"
 
 msgid "GRAPHICS"
-msgstr ""
+msgstr "Graphics"
 
 msgid "AUDIO"
-msgstr ""
+msgstr "Audio"
 
 msgid "GAME"
-msgstr ""
+msgstr "Game"
 
 msgid "Window mode"
-msgstr ""
+msgstr "Window mode"
 
 msgid "Window, borderless fullscreen or exclusive fullscreen"
-msgstr ""
+msgstr "Window, borderless fullscreen or exclusive fullscreen"
 
 msgid "Windowed"
-msgstr ""
+msgstr "Windowed"
 
 msgid "Borderless"
-msgstr ""
+msgstr "Borderless"
 
 msgid "Fullscreen"
-msgstr ""
+msgstr "Fullscreen"
 
 msgid "Desktop"
-msgstr ""
+msgstr "Desktop"
 
 msgid "Resolution"
-msgstr ""
+msgstr "Resolution"
 
 msgid "Display mode of the monitor"
-msgstr ""
+msgstr "Display mode of the monitor"
 
 msgid "Size of the game window"
-msgstr ""
+msgstr "Size of the game window"
 
 msgid "VSync"
-msgstr ""
+msgstr "VSync"
 
 msgid "Wait for the monitor refresh, no tearing"
-msgstr ""
+msgstr "Wait for the monitor refresh, no tearing"
 
 msgid "FPS limit"
-msgstr ""
+msgstr "FPS limit"
 
 msgid "Cap on frames per second"
-msgstr ""
+msgstr "Cap on frames per second"
 
 msgid "Unlimited"
-msgstr ""
+msgstr "Unlimited"
 
 msgid "Show FPS"
-msgstr ""
+msgstr "Show FPS"
 
 msgid "Frame counter in the corner of the screen"
-msgstr ""
+msgstr "Frame counter in the corner of the screen"
 
 msgid "Graphics quality"
-msgstr ""
+msgstr "Graphics quality"
 
 msgid "Low"
-msgstr ""
+msgstr "Low"
 
 msgid "High"
-msgstr ""
+msgstr "High"
 
 msgid "Default zoom"
-msgstr ""
+msgstr "Default zoom"
 
 msgid "Map zoom when a mission starts"
-msgstr ""
+msgstr "Map zoom when a mission starts"
 
 msgid "Minimum zoom"
-msgstr ""
+msgstr "Minimum zoom"
 
 msgid "How far the mouse wheel zooms out"
-msgstr ""
+msgstr "How far the mouse wheel zooms out"
 
 msgid "Maximum zoom"
-msgstr ""
+msgstr "Maximum zoom"
 
 msgid "How far the mouse wheel zooms in"
-msgstr ""
+msgstr "How far the mouse wheel zooms in"
 
 msgid "Music volume"
-msgstr ""
+msgstr "Music volume"
 
 msgid "Volume of the soundtrack"
-msgstr ""
+msgstr "Volume of the soundtrack"
 
 msgid "Effects volume"
-msgstr ""
+msgstr "Effects volume"
 
 msgid "Volume of the sound effects"
-msgstr ""
+msgstr "Volume of the sound effects"
 
 msgid "DEFAULTS"
-msgstr ""
+msgstr "Defaults"
 
 msgid "KEEP THESE DISPLAY SETTINGS?"
-msgstr ""
+msgstr "Keep these display settings?"
 
 msgid "The previous settings come back automatically in"
-msgstr ""
+msgstr "The previous settings come back automatically in"
 
 msgid "s"
-msgstr ""
+msgstr "s"
 
 msgid "KEEP"
-msgstr ""
+msgstr "Keep"
 
 msgid "REVERT"
-msgstr ""
+msgstr "Revert"
 
 msgid "Sprites at 1/3 of the resolution"
-msgstr ""
+msgstr "Sprites at 1/3 of the resolution"
 
 msgid "Sprites at 1/2 of the resolution"
-msgstr ""
+msgstr "Sprites at 1/2 of the resolution"
 
 msgid "Smoothing"
-msgstr ""
+msgstr "Smoothing"
 
 msgid "Smooth scaling of the sprites instead of hard pixels"
-msgstr ""
+msgstr "Smooth scaling of the sprites instead of hard pixels"
 
 msgid "Original resolution"
-msgstr ""
+msgstr "Original resolution"
 
 msgid "MAP EDITOR"
-msgstr ""
+msgstr "MAP EDITOR"
 
 msgid "Map editor (openaow-mapeditor) not found next to the game"
-msgstr ""
+msgstr "Map editor (openaow-mapeditor) not found next to the game"
 
 # Research (original technology names and descriptions)
 msgid "POWER SUIT"
-msgstr ""
+msgstr "POWER SUIT"
 
 msgid "+2 armor for all infantry."
-msgstr ""
+msgstr "+2 armor for all infantry."
 
 msgid "BIO SUIT"
-msgstr ""
+msgstr "BIO SUIT"
 
 msgid ""
 "Health regeneration of all infantry is 3 times faster.\n"
 "Requires: Power Suit."
 msgstr ""
+"Health regeneration of all infantry is 3 times faster.\n"
+"Requires: Power Suit."
 
 msgid "RAPID FIRE"
-msgstr ""
+msgstr "RAPID FIRE"
 
 msgid "Rate of fire of Assault infantry +50%."
-msgstr ""
+msgstr "Rate of fire of Assault infantry +50%."
 
 msgid "ARMOR-PIERCING ROUNDS"
-msgstr ""
+msgstr "ARMOR-PIERCING ROUNDS"
 
 msgid "Damage of Assault infantry +40%."
-msgstr ""
+msgstr "Damage of Assault infantry +40%."
 
 msgid "IMPROVED SMALL ROCKETS"
-msgstr ""
+msgstr "IMPROVED SMALL ROCKETS"
 
 msgid "Damage of Heavy Assault infantry +40%."
-msgstr ""
+msgstr "Damage of Heavy Assault infantry +40%."
 
 msgid "LAVA FUEL MIX"
-msgstr ""
+msgstr "LAVA FUEL MIX"
 
 msgid "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
-msgstr ""
+msgstr "Unlocks Flamethrower infantry. Their fire does not hurt Confederation infantry and vehicles thanks to fireproof armor."
 
 msgid "FORTRESS UPGRADE"
-msgstr ""
+msgstr "FORTRESS UPGRADE"
 
 msgid ""
 "A heavy flamethrower is mounted on the TM-40 Fortress.\n"
 "Requires: Lava Fuel Mix."
 msgstr ""
+"A heavy flamethrower is mounted on the TM-40 Fortress.\n"
+"Requires: Lava Fuel Mix."
 
 msgid "Damage of Zeus and Hammer tanks +25%."
-msgstr ""
+msgstr "Damage of Zeus and Hammer tanks +25%."
 
 msgid "REINFORCED ENGINE"
-msgstr ""
+msgstr "REINFORCED ENGINE"
 
 msgid "Speed of all vehicles +1."
-msgstr ""
+msgstr "Speed of all vehicles +1."
 
 msgid "POWER ARMOR"
-msgstr ""
+msgstr "POWER ARMOR"
 
 msgid ""
 "+2 armor for all vehicles.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"+2 armor for all vehicles.\n"
+"Requires: Reinforced Engine."
 
 msgid "DAMAGE DIAGNOSTICS"
-msgstr ""
+msgstr "DAMAGE DIAGNOSTICS"
 
 msgid ""
 "Vehicle repair is 3 times faster.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"Vehicle repair is 3 times faster.\n"
+"Requires: Reinforced Engine."
 
 msgid "FAST RELOAD"
-msgstr ""
+msgstr "FAST RELOAD"
 
 msgid ""
 "Reload time of Zeus and Hammer tanks is shorter.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"Reload time of Zeus and Hammer tanks is shorter.\n"
+"Requires: Reinforced Engine."
 
 msgid "ROCKET LAUNCHER MOUNT"
-msgstr ""
+msgstr "ROCKET LAUNCHER MOUNT"
 
 msgid ""
 "A turret with heavy rockets is mounted on the Zeus tank.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"A turret with heavy rockets is mounted on the Zeus tank.\n"
+"Requires: Reinforced Engine."
 
 msgid "GRAD-5 MLRS"
-msgstr ""
+msgstr "GRAD-5 MLRS"
 
 msgid "Unlocks production of the Grad-5 multiple launch rocket system."
-msgstr ""
+msgstr "Unlocks production of the Grad-5 multiple launch rocket system."
 
 msgid "GRAD-10 MLRS"
-msgstr ""
+msgstr "GRAD-10 MLRS"
 
 msgid ""
 "Grad-5 upgrade: rocket range +15%, damage +30%.\n"
 "Requires: Grad-5 MLRS."
 msgstr ""
+"Grad-5 upgrade: rocket range +15%, damage +30%.\n"
+"Requires: Grad-5 MLRS."
 
 msgid "REINFORCED GENERATOR"
-msgstr ""
+msgstr "REINFORCED GENERATOR"
 
 msgid "Power output +30%."
-msgstr ""
+msgstr "Power output +30%."
 
 msgid "TITANIUM PLATING"
-msgstr ""
+msgstr "TITANIUM PLATING"
 
 msgid "Armor of all structures +50%."
-msgstr ""
+msgstr "Armor of all structures +50%."
 
 msgid "ACTIVE WALL ARMOR"
-msgstr ""
+msgstr "ACTIVE WALL ARMOR"
 
 msgid "Walls are twice as durable."
-msgstr ""
+msgstr "Walls are twice as durable."
 
 msgid "WARNING SYSTEM"
-msgstr ""
+msgstr "WARNING SYSTEM"
 
 msgid "Unlocks the construction of radar locators."
-msgstr ""
+msgstr "Unlocks the construction of radar locators."
 
 msgid "EXPRESS INFANTRY SCHOOL"
-msgstr ""
+msgstr "EXPRESS INFANTRY SCHOOL"
 
 msgid "Infantry training time -30%."
-msgstr ""
+msgstr "Infantry training time -30%."
 
 msgid "ASSEMBLY LINE UPGRADE"
-msgstr ""
+msgstr "ASSEMBLY LINE UPGRADE"
 
 msgid "Vehicle production time -30%."
-msgstr ""
+msgstr "Vehicle production time -30%."
 
 msgid "FINANCE DEPARTMENT"
-msgstr ""
+msgstr "FINANCE DEPARTMENT"
 
 msgid "Income +20%."
-msgstr ""
+msgstr "Income +20%."
 
 msgid "MOTIVATION SYSTEM"
-msgstr ""
+msgstr "MOTIVATION SYSTEM"
 
 msgid "Reward for every destroyed enemy unit +50%."
-msgstr ""
+msgstr "Reward for every destroyed enemy unit +50%."
 
 msgid "COMMUNICATION SYSTEM"
-msgstr ""
+msgstr "COMMUNICATION SYSTEM"
 
 msgid "Base building radius +25%."
-msgstr ""
+msgstr "Base building radius +25%."
 
 msgid "TITANIUM VEST"
-msgstr ""
+msgstr "TITANIUM VEST"
 
 msgid "+1 armor for all infantry."
-msgstr ""
+msgstr "+1 armor for all infantry."
 
 msgid "PERSONAL MEDKIT"
-msgstr ""
+msgstr "PERSONAL MEDKIT"
 
 msgid "Health regeneration of all infantry is 3 times faster."
-msgstr ""
+msgstr "Health regeneration of all infantry is 3 times faster."
 
 msgid "Rate of fire of riflemen +50%."
-msgstr ""
+msgstr "Rate of fire of riflemen +50%."
 
 msgid "STIMULANTS"
-msgstr ""
+msgstr "STIMULANTS"
 
 msgid "Speed of all infantry +1."
-msgstr ""
+msgstr "Speed of all infantry +1."
 
 msgid "LONG-RANGE ROCKETS"
-msgstr ""
+msgstr "LONG-RANGE ROCKETS"
 
 msgid "Grenadier vision and firing range +1."
-msgstr ""
+msgstr "Grenadier vision and firing range +1."
 
 msgid "SNIPERS"
-msgstr ""
+msgstr "SNIPERS"
 
 msgid "Unlocks Sniper infantry."
-msgstr ""
+msgstr "Unlocks Sniper infantry."
 
 msgid "HORNET-10 RIFLE"
-msgstr ""
+msgstr "HORNET-10 RIFLE"
 
 msgid ""
 "Sniper vision and firing range +2, damage +20%.\n"
 "Requires: Snipers."
 msgstr ""
+"Sniper vision and firing range +2, damage +20%.\n"
+"Requires: Snipers."
 
 msgid "HEAVY MACHINE GUN"
-msgstr ""
+msgstr "HEAVY MACHINE GUN"
 
 msgid "Damage of Coyote and Armadillo +15%."
-msgstr ""
+msgstr "Damage of Coyote and Armadillo +15%."
 
 msgid "TITANIUM ARMOR"
-msgstr ""
+msgstr "TITANIUM ARMOR"
 
 msgid ""
 "+1 armor for all vehicles.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"+1 armor for all vehicles.\n"
+"Requires: Reinforced Engine."
 
 msgid "REPAIR KIT"
-msgstr ""
+msgstr "REPAIR KIT"
 
 msgid ""
 "Reload time of the Rhino tank is shorter.\n"
 "Requires: Reinforced Engine."
 msgstr ""
+"Reload time of the Rhino tank is shorter.\n"
+"Requires: Reinforced Engine."
 
 msgid "SIEGE MODE"
-msgstr ""
+msgstr "SIEGE MODE"
 
 msgid "Allows the Rhino tank to switch to siege mode."
-msgstr ""
+msgstr "Allows the Rhino tank to switch to siege mode."
 
 msgid "PORCUPINE SAM LAUNCHER"
-msgstr ""
+msgstr "PORCUPINE SAM LAUNCHER"
 
 msgid "Unlocks production of the Porcupine rocket launcher."
-msgstr ""
+msgstr "Unlocks production of the Porcupine rocket launcher."
 
 msgid "PORCUPINE UPGRADE"
-msgstr ""
+msgstr "PORCUPINE UPGRADE"
 
 msgid ""
 "Porcupine upgrade: rocket range +2, damage +15%.\n"
 "Requires: Porcupine rocket launcher."
 msgstr ""
+"Porcupine upgrade: rocket range +2, damage +15%.\n"
+"Requires: Porcupine rocket launcher."
 
 msgid "ARMORED PLATING"
-msgstr ""
+msgstr "ARMORED PLATING"
 
 msgid "FROG MINE"
-msgstr ""
+msgstr "FROG MINE"
 
 msgid "Jumps and explodes in the air, hitting infantry and vehicles within 1 tile."
-msgstr ""
+msgstr "Jumps and explodes in the air, hitting infantry and vehicles within 1 tile."
 
 msgid "MONITOR LIZARD MINE"
-msgstr ""
+msgstr "MONITOR LIZARD MINE"
 
 msgid "A heavy mine that triggers only when a vehicle drives over it."
-msgstr ""
+msgstr "A heavy mine that triggers only when a vehicle drives over it."
 
 msgid "ACCELERATED INFANTRY COURSES"
-msgstr ""
+msgstr "ACCELERATED INFANTRY COURSES"
 
 msgid "PROPAGANDA DEPARTMENT"
-msgstr ""
+msgstr "PROPAGANDA DEPARTMENT"
 
 msgid "RESEARCH REQUIRED TO TRAIN THIS UNIT!"
-msgstr ""
+msgstr "RESEARCH REQUIRED TO TRAIN THIS UNIT!"
 
 msgid "RESEARCH REQUIRED TO BUILD THIS UNIT!"
-msgstr ""
+msgstr "RESEARCH REQUIRED TO BUILD THIS UNIT!"
 
 msgid "REQUIRES: "
-msgstr ""
+msgstr "REQUIRES: "
 
 msgid "[REQUIRES] "
-msgstr ""
+msgstr "[REQUIRES] "
 
 msgid "[RESEARCH REQUIRED] "
-msgstr ""
+msgstr "[RESEARCH REQUIRED] "
 
 msgid "RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"
-msgstr ""
+msgstr "RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"
 
 msgid "HQ BUILD RADIUS INCREASED (+25%)!"
-msgstr ""
+msgstr "HQ BUILD RADIUS INCREASED (+25%)!"
 
 msgid "DESTROY"
-msgstr ""
+msgstr "DESTROY"
 
 msgid "CONFIRM?"
-msgstr ""
+msgstr "CONFIRM?"
 
 msgid "Structure"
-msgstr ""
+msgstr "Structure"
 
 msgid "Render API"
-msgstr ""
+msgstr "Render API"
 
 msgid "Takes effect after the window is recreated"
-msgstr ""
+msgstr "Takes effect after the window is recreated"
 
 msgid "Graphics interface that draws the game"
-msgstr ""
+msgstr "Graphics interface that draws the game"
 
 msgid "Applied on the next start of the game"
-msgstr ""
+msgstr "Applied on the next start of the game"
 
 msgid "SWITCH RENDER API?"
-msgstr ""
+msgstr "SWITCH RENDER API?"
 
 msgid "The render API changes at the next start of the game: "
-msgstr ""
+msgstr "The render API changes at the next start of the game: "
 
 msgid "The window is recreated with this render API: "
-msgstr ""
+msgstr "The window is recreated with this render API: "
 
 msgid ". You get 15 seconds to keep it, otherwise the previous one returns."
-msgstr ""
+msgstr ". You get 15 seconds to keep it, otherwise the previous one returns."
 
 msgid "KEEP THIS RENDER API?"
-msgstr ""
+msgstr "Keep this render API?"
 
 msgid "Needs the SDL GPU render API"
-msgstr ""
+msgstr "Needs the SDL GPU render API"
 
 msgid "Color grading"
-msgstr ""
+msgstr "Color grading"
 
 msgid "Off"
-msgstr ""
+msgstr "Off"
 
 msgid "Natural"
-msgstr ""
+msgstr "Natural"
 
 msgid "Vivid"
-msgstr ""
+msgstr "Vivid"
 
 msgid "Cinematic"
-msgstr ""
+msgstr "Cinematic"
 
 msgid "Dusk"
-msgstr ""
+msgstr "Dusk"
 
 msgid "Night"
-msgstr ""
+msgstr "Night"
 
 msgid "The picture as drawn"
-msgstr ""
+msgstr "The picture as drawn"
 
 msgid "A little more contrast and colour"
-msgstr ""
+msgstr "A little more contrast and colour"
 
 msgid "Strong colours"
-msgstr ""
+msgstr "Strong colours"
 
 msgid "Muted colours, warm light, dark corners"
-msgstr ""
+msgstr "Muted colours, warm light, dark corners"
 
 msgid "Evening light"
-msgstr ""
+msgstr "Evening light"
 
 msgid "Night: explosions light up the dark"
-msgstr ""
+msgstr "Night: explosions light up the dark"
 
 msgid "Glow"
-msgstr ""
+msgstr "Glow"
 
 msgid "Explosions, shots and projectiles glow"
-msgstr ""
+msgstr "Explosions, shots and projectiles glow"
 
 msgid "Pixel filter"
-msgstr ""
+msgstr "Pixel filter"
 
 msgid "Crisp pixels with smooth edges when zoomed"
-msgstr ""
+msgstr "Crisp pixels with smooth edges when zoomed"
 
 msgid "Sharp"
-msgstr ""
+msgstr "Sharp"
 
 msgid "Standard"
-msgstr ""
-
-msgid "Army color"
-msgstr ""
+msgstr "Standard"
 
 msgid "Classic"
-msgstr ""
+msgstr "Classic"
 
 msgid "Blue"
-msgstr ""
+msgstr "Blue"
 
 msgid "Red"
-msgstr ""
+msgstr "Red"
 
 msgid "Green"
-msgstr ""
+msgstr "Green"
 
 msgid "Yellow"
-msgstr ""
+msgstr "Yellow"
 
 msgid "Purple"
-msgstr ""
+msgstr "Purple"
 
 msgid "Orange"
-msgstr ""
+msgstr "Orange"
 
 msgid "Cyan"
-msgstr ""
+msgstr "Cyan"
 
 msgid "White"
-msgstr ""
+msgstr "White"
 
 msgid "NETWORK GAME"
-msgstr ""
+msgstr "Network game"
 
 msgid "Random"
-msgstr ""
+msgstr "Random"
 
 msgid "Team"
-msgstr ""
+msgstr "Team"
 
 msgid "YOUR GAME"
-msgstr ""
+msgstr "Your game"
 
 msgid "GAME ROOM"
-msgstr ""
+msgstr "Game room"
 
 msgid "PLAYERS"
-msgstr ""
+msgstr "Players"
 
 msgid "NOT READY"
-msgstr ""
+msgstr "Not ready"
 
 msgid "START"
-msgstr ""
+msgstr "Start"
 
 msgid "LEAVE"
-msgstr ""
+msgstr "Leave"
 
 msgid "The host starts the game"
-msgstr ""
+msgstr "The host starts the game"
 
 msgid "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
-msgstr ""
+msgstr "Click a number on the map to start there, again to leave it to chance. Click your faction and colour to change them; the host sets the teams."
 
 msgid "Enter: chat"
-msgstr ""
+msgstr "Enter: chat"
 
 msgid "Connecting..."
-msgstr ""
+msgstr "Connecting..."
 
 msgid "CANCEL"
-msgstr ""
+msgstr "Cancel"
 
 msgid "Your name"
-msgstr ""
+msgstr "Your name"
 
 msgid "LOCAL NETWORK"
-msgstr ""
+msgstr "Local network"
 
 msgid "INTERNET"
-msgstr ""
+msgstr "Internet"
 
 msgid "Looking for games on the local network..."
-msgstr ""
+msgstr "Looking for games on the local network..."
 
 msgid "CREATE GAME"
-msgstr ""
+msgstr "Create game"
 
 msgid "JOIN"
-msgstr ""
+msgstr "Join"
 
 msgid "Enter an address: host or host:port"
-msgstr ""
+msgstr "Enter an address: host or host:port"
 
 msgid "Cannot create the game: "
-msgstr ""
+msgstr "Cannot create the game: "
 
 msgid "Cannot connect: "
-msgstr ""
+msgstr "Cannot connect: "
 
 msgid "The connection was lost"
-msgstr ""
+msgstr "The connection was lost"
 
 msgid "Not admitted: "
-msgstr ""
+msgstr "Not admitted: "
 
 msgid "Resistance"
-msgstr ""
+msgstr "Resistance"
 
 msgid "Confederation"
-msgstr ""
+msgstr "Confederation"
 
 msgid "CONNECT"
-msgstr ""
+msgstr "Connect"
 
 msgid "SERVER"
-msgstr ""
+msgstr "Server"
 
 msgid "REFRESH"
-msgstr ""
+msgstr "Refresh"
 
 msgid "No open rooms: create one, or join by code"
-msgstr ""
+msgstr "No open rooms: create one, or join by code"
 
 msgid "Room code"
-msgstr ""
+msgstr "Room code"
 
 msgid "JOIN BY CODE"
-msgstr ""
+msgstr "Join by code"
 
 msgid "CREATE ON SERVER"
-msgstr ""
+msgstr "Create on server"
 
 msgid "Direct connection: host or host:port (port 38100 by default; the host forwards UDP 38100)"
-msgstr ""
+msgstr "Direct connection: host or host:port (port 38100 by default; the host forwards UDP 38100)"
 
 msgid "A room code has six characters"
-msgstr ""
+msgstr "A room code has six characters"
 
 msgid "Server: "
-msgstr ""
+msgstr "Server: "
 
 msgid "connecting..."
-msgstr ""
+msgstr "connecting..."
 
 msgid "OUT OF SYNC at tick "
-msgstr ""
+msgstr "OUT OF SYNC at tick "
 
 msgid ": the players' games differ, the result is not reliable"
-msgstr ""
+msgstr ": the players' games differ, the result is not reliable"
 
 msgid "Connection lost: reconnecting..."
-msgstr ""
+msgstr "Connection lost: reconnecting..."
 
 msgid "Catching up with the match: "
-msgstr ""
+msgstr "Catching up with the match: "
 
 msgid "Waiting for the host..."
-msgstr ""
+msgstr "Waiting for the host..."
 
 msgid "Downloading the map..."
-msgstr ""
+msgstr "Downloading the map..."
 
 msgid "AI"
-msgstr ""
+msgstr "AI"
 
 msgid "+ AI PLAYER"
-msgstr ""
+msgstr "+ AI player"
 
 msgid "PAUSED by "
-msgstr ""
+msgstr "PAUSED by "
 
 msgid "P to go on"
-msgstr ""
+msgstr "P to go on"
 
 msgid "code"
-msgstr ""
-
-msgid "Technology name"
-msgstr ""
-
-msgid "Technology description"
-msgstr ""
-
-msgid "Research time (seconds)"
-msgstr ""
-
-msgid "How long the technology takes to research."
-msgstr ""
-
-msgid "Research cost (credits)"
-msgstr ""
-
-msgid "Icon: %d"
-msgstr ""
-
-msgid "Effect"
-msgstr ""
-
-msgid "Value"
-msgstr ""
-
-msgid "Second value"
-msgstr ""
-
-msgid "Unit A"
-msgstr ""
-
-msgid "Unit B"
-msgstr ""
+msgstr "code"
 
 msgid "Requires"
-msgstr ""
-
-msgid "Player only"
-msgstr ""
-
-msgid "Save research"
-msgstr ""
-
-msgid "Reload"
-msgstr ""
-
-msgid "Technology #%d"
-msgstr ""
-
-msgid "The research file could not be loaded."
-msgstr ""
-
-msgid "No research list in "
-msgstr ""
-
-msgid "Value / second value: see the effect list in game/Research.hpp"
-msgstr ""
+msgstr "Requires"
 
 msgid "Research"
-msgstr ""
-
-msgid "Shows the edited character on a canvas: idle, moving, attacking, dying."
-msgstr ""
-
-msgid "Puts the edited character (A) next to another one (B) and compares their numbers."
-msgstr ""
-
-msgid "Runs a battle of A against B with the game's combat rules."
-msgstr ""
-
-msgid "Edits the technology trees of both factions (assets/characters/research_*.yaml)."
-msgstr ""
-
-msgid "Standing still animation."
-msgstr ""
-
-msgid "Walking animation: the unit drives right, turns around and returns."
-msgstr ""
-
-msgid "Fires the weapons at the target point with the current weapon settings."
-msgstr ""
-
-msgid "Death animation of the unit or building."
-msgstr ""
-
-msgid "Shows the remains left after death, stage by stage."
-msgstr ""
-
-msgid "Plays the burning death variant of infantry."
-msgstr ""
-
-msgid "Back to the mobile form (hotkey G)."
-msgstr ""
-
-msgid "Switches the unit to its stationary siege form (hotkey G)."
-msgstr ""
-
-msgid "Restart the death animation again and again."
-msgstr ""
-
-msgid "Resets the camera position and zoom."
-msgstr ""
-
-msgid "Direction of the hull, 0-7 in 45 degree steps. Also set with the right mouse button on the canvas."
-msgstr ""
-
-msgid "Direction of the turret, 0-7. Also set with the left mouse button on the canvas."
-msgstr ""
-
-msgid "The turret follows the hull direction."
-msgstr ""
-
-msgid "Playback speed of the preview animations."
-msgstr ""
-
-msgid "Flight speed of bullets and shells in pixels per second (combat.bullet_speed)."
-msgstr ""
-
-msgid "Speed multiplier of shot and hit animations (combat.fx_speed)."
-msgstr ""
-
-msgid "Magnification of the canvas. The mouse wheel over the canvas does the same."
-msgstr ""
-
-msgid "Puts the target point back in front of the unit."
-msgstr ""
-
-msgid "Draws the attack range as a red circle (the minimum range is drawn inside it)."
-msgstr ""
-
-msgid "Draws the sight radius as a green circle."
-msgstr ""
-
-msgid "Draws a 5x5 tile grid under the character."
-msgstr ""
-
-msgid "Shows damage, DPS, range and burst figures over the canvas."
-msgstr ""
-
-msgid "Health shown in the preview: damaged units and buildings look different."
-msgstr ""
-
-msgid "Construction progress of the building shown in the preview."
-msgstr ""
-
-msgid "Building with or without power (radars and turrets stop without it)."
-msgstr ""
-
-msgid "Shows the siege form of the unit with its own stats and weapon."
-msgstr ""
-
-msgid "Filters the list by name, id, number or faction."
-msgstr ""
-
-msgid "Show units and buildings."
-msgstr ""
-
-msgid "Show units only."
-msgstr ""
-
-msgid "Show buildings only."
-msgstr ""
-
-msgid "Width of this panel in pixels. The splitter between the panels works too."
-msgstr ""
-
-msgid "Narrow panel."
-msgstr ""
-
-msgid "Medium panel."
-msgstr ""
-
-msgid "Wide panel."
-msgstr ""
-
-msgid "Identity of the character: id, name and what it is in the game."
-msgstr ""
-
-msgid "Footprint, health, sight and speed."
-msgstr ""
-
-msgid "Price, build time and power of the character."
-msgstr ""
-
-msgid "Settings shared by all weapons, and the weapons list."
-msgstr ""
-
-msgid "Which sprite sequences the game uses (derived from the archetype, read only)."
-msgstr ""
-
-msgid "Siege mode and upgraded / baseline forms."
-msgstr ""
-
-msgid "Unique text id of the configuration, e.g. rifleman_conf. The description in po/*.po is found by it."
-msgstr ""
-
-msgid "Name shown in the game."
-msgstr ""
-
-msgid "Kind of building. The faction, structure type and sprites follow from it."
-msgstr ""
-
-msgid "Kind of unit. The faction, class, production building and sprites follow from it."
-msgstr ""
-
-msgid "Width of the building on the map in tiles."
-msgstr ""
-
-msgid "Height of the building on the map in tiles."
-msgstr ""
-
-msgid "Health points of the unit or building."
-msgstr ""
-
-msgid "How far from this finished building new structures may be placed, in tiles."
-msgstr ""
-
-msgid "How far it sees, in tiles."
-msgstr ""
-
-msgid "Speed of the unit in internal simulation units."
-msgstr ""
-
-msgid "Price in credits."
-msgstr ""
-
-msgid "Positive: the building generates power. Negative: it consumes power."
-msgstr ""
-
-msgid "Seconds to train the unit or build the building."
-msgstr ""
-
-msgid "Icon of the building in the construction menu (cameo composite)."
-msgstr ""
-
-msgid "Whether the building shoots. If off, the weapons are ignored."
-msgstr ""
-
-msgid "Flight speed of projectiles in pixels per second. Used by the preview."
-msgstr ""
-
-msgid "Speed multiplier of the shot and hit animations in the preview."
-msgstr ""
-
-msgid "Random deviation of a shot in degrees. 0 = every shot hits the aimed point."
-msgstr ""
-
-msgid "The turret turns independently of the hull."
-msgstr ""
-
-msgid "The radar dish of the building rotates."
-msgstr ""
-
-msgid "Pivot of the turret relative to the hull centre in pixels (hull faces south)."
-msgstr ""
-
-msgid "Removes the custom value: the game default for this unit is used."
-msgstr ""
-
-msgid "Disabled weapons are neither used nor tested."
-msgstr ""
-
-msgid "Deletes this weapon from the list."
-msgstr ""
-
-msgid "Name of the weapon (information only)."
-msgstr ""
-
-msgid "Kind of projectile: decides the flight, the hit effect and the default spread."
-msgstr ""
-
-msgid "Damage of one shot."
-msgstr ""
-
-msgid "Maximum firing distance in tiles."
-msgstr ""
-
-msgid "Closer targets cannot be attacked (artillery). 0 = no limit."
-msgstr ""
-
-msgid "Fixed: the same pause after every attack. Random: a new pause between min and max each time."
-msgstr ""
-
-msgid "Shortest and longest pause between attack cycles in seconds."
-msgstr ""
-
-msgid "Pause between attack cycles in seconds."
-msgstr ""
-
-msgid "Shots in one attack cycle."
-msgstr ""
-
-msgid "Time between shots of one burst."
-msgstr ""
-
-msgid "Share of the damage dealt to targets next to the hit point. 0 = single target."
-msgstr ""
-
-msgid "Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways."
-msgstr ""
-
-msgid "The weapon only works after the matching technology is researched."
-msgstr ""
-
-msgid "The weapon is used only for targets closer than this."
-msgstr ""
-
-msgid "Adds a second weapon (e.g. a flamethrower for close targets)."
-msgstr ""
-
-msgid "Adds the main weapon."
-msgstr ""
-
-msgid "Preview only: pretend the research for the second weapon is done."
-msgstr ""
-
-msgid "Preview only: which weapon fires. Auto picks by distance."
-msgstr ""
-
-msgid "Preview the siege form (hotkey G)."
-msgstr ""
-
-msgid "The unit can switch to a stationary siege form."
-msgstr ""
-
-msgid "Archetype number of the siege form."
-msgstr ""
-
-msgid "For siege / baseline forms: the base unit they belong to."
-msgstr ""
-
-msgid "Stats and weapon of the siege form stored in this file."
-msgstr ""
-
-msgid "Whether the siege form is available."
-msgstr ""
-
-msgid "Archetype number of the siege form (14-18)."
-msgstr ""
-
-msgid "Name of the siege form."
-msgstr ""
-
-msgid "Sight radius in tiles."
-msgstr ""
-
-msgid "Speed in the siege form. 0 = cannot move."
-msgstr ""
-
-msgid "Creates a siege form with its own stats and weapon."
-msgstr ""
-
-msgid "Weapon of the unit before the research upgrade."
-msgstr ""
-
-msgid "Writes the character to its file (Ctrl+S)."
-msgstr ""
-
-msgid "File name inside assets/characters for a copy."
-msgstr ""
-
-msgid "Saves a copy under the typed file name and opens it."
-msgstr ""
-
-msgid "Discards unsaved edits and reads the file again."
-msgstr ""
-
-msgid "Shows the corpse left by the infantry."
-msgstr ""
-
-msgid "Number of burial stages of the wreck."
-msgstr ""
-
-msgid "Stage shown in the preview. -1 plays all the stages in a loop."
-msgstr ""
-
-msgid "Shows the wreck in the preview."
-msgstr ""
-
-msgid "Removes the custom wreck: the game default for this unit is used."
-msgstr ""
-
-msgid "Character to compare with or to fight against."
-msgstr ""
-
-msgid "Swaps the characters. Save A first: both files are reloaded."
-msgstr ""
-
-msgid "Distance between A and B on the canvas."
-msgstr ""
-
-msgid "Table of numbers: green = better, red = worse."
-msgstr ""
-
-msgid "How many units of A fight."
-msgstr ""
-
-msgid "How many units of B fight."
-msgstr ""
-
-msgid "Starting distance between the sides in tiles."
-msgstr ""
-
-msgid "B walks toward A from the start. Off: B stands and waits."
-msgstr ""
-
-msgid "The battle is a draw when this time runs out."
-msgstr ""
-
-msgid "Starts a battle with the current settings."
-msgstr ""
-
-msgid "Starts the battle again."
-msgstr ""
-
-msgid "Pauses the battle."
-msgstr ""
-
-msgid "Continues the battle."
-msgstr ""
-
-msgid "Advances a paused battle by 0.1 s."
-msgstr ""
-
-msgid "Ends the battle."
-msgstr ""
-
-msgid "Frames all the fighters."
-msgstr ""
-
-msgid "Speed of the battle."
-msgstr ""
-
-msgid "How many battles the batch runs."
-msgstr ""
-
-msgid "Runs many battles at once without drawing and shows the win statistics."
-msgstr ""
-
-msgid "Technology tree of the Confederation (Tech Center)."
-msgstr ""
-
-msgid "Technology tree of the Resistance (Laboratory)."
-msgstr ""
-
-msgid "Writes the tree to assets/characters/research_<faction>.yaml (Ctrl+S)."
-msgstr ""
-
-msgid "Name of the technology (a translation key from po/*.po)."
-msgstr ""
-
-msgid "Text shown in the game (a translation key from po/*.po)."
-msgstr ""
-
-msgid "Price of the technology in credits."
-msgstr ""
-
-msgid "Picture of the technology in the research menu."
-msgstr ""
-
-msgid "What the technology does. Value and second value depend on it."
-msgstr ""
-
-msgid "Main number of the effect: percent, points or tiles (see the effect)."
-msgstr ""
-
-msgid "Extra number of the effect, e.g. the damage bonus of range upgrades."
-msgstr ""
-
-msgid "The unit the effect is about. Siege forms count as their base unit."
-msgstr ""
-
-msgid "A second unit the effect is about (optional)."
-msgstr ""
-
-msgid "Technology that has to be researched first. The tree is drawn from it."
-msgstr ""
-
-msgid "The effect is meaningless for the AI, so the AI skips it."
-msgstr ""
-
-msgid "Browser of all sprites with their dependencies, and exports of the sprites for repacking the assets."
-msgstr ""
-
-msgid "Show the objects of every group."
-msgstr ""
-
-msgid "Show only units (sequences of the archetype, death animations, wrecks)."
-msgstr ""
-
-msgid "Show only buildings, walls and the construction scaffolding."
-msgstr ""
-
-msgid "Show only terrain: the tiles of the tilesets and the decorations of the maps."
-msgstr ""
-
-msgid "Show the rest: interface, effects, projectiles and sprites nobody uses."
-msgstr ""
-
-msgid "Filters the objects by name, faction, kind or number."
-msgstr ""
-
-msgid "Folder the files are written to (it is created when missing). Relative paths start at the current folder."
-msgstr ""
-
-msgid "Opens the system dialog to pick the output folder."
-msgstr ""
-
-msgid "Writes one PNG atlas and one JSON for every object, plus index.json."
-msgstr ""
-
-msgid "Writes the PNG atlas and the JSON of the object picked in the list."
-msgstr ""
-
-msgid "Include the sprites used by units."
-msgstr ""
-
-msgid "Include the sprites used by buildings and walls."
-msgstr ""
-
-msgid "Include the terrain tiles and map decorations."
-msgstr ""
-
-msgid "Include the interface, effects and all the other sprites."
-msgstr ""
-
-msgid "How many sprites are in a row of the big PNG. The cells are as large as the biggest sprite."
-msgstr ""
-
-msgid "One PNG with the chosen groups one after another instead of a file per group."
-msgstr ""
+msgstr "Research"
 
 msgid "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the cells."
-msgstr ""
-
-msgid "Sprite Tools"
-msgstr ""
-
-msgid "Terrain"
-msgstr ""
-
-msgid "Other"
-msgstr ""
-
-msgid "Search sprite objects"
-msgstr ""
-
-msgid "Output folder"
-msgstr ""
-
-msgid "Choose folder..."
-msgstr ""
-
-msgid "Export all objects"
-msgstr ""
-
-msgid "Export selected object"
-msgstr ""
-
-msgid "Export objects"
-msgstr ""
-
-msgid "SINGLE SPRITE EXPORT"
-msgstr ""
-
-msgid "Columns"
-msgstr ""
-
-msgid "All in one file"
-msgstr ""
-
-msgid "Export sprites"
-msgstr ""
-
-msgid "One PNG atlas and one JSON per object (unit, building, tileset) with all the sprites it depends on."
-msgstr ""
-
-msgid "Every sprite in the order of its id, in rows and columns of one big PNG per group."
-msgstr ""
-
-msgid "%d objects, %zu sprites"
-msgstr ""
-
-msgid "Pick an object in the list: its dependencies (sequences, composites, animations, sprites) are shown here."
-msgstr ""
-
-msgid "%zu sprites, %zu composites, %zu animations, %zu sequences, %zu buildings"
-msgstr ""
-
-msgid "The sprite data could not be loaded."
-msgstr ""
-
-msgid "Choose an output folder first."
-msgstr ""
-
-msgid "IMPORT SPRITES"
-msgstr ""
-
-msgid "WARNING: the import writes into assets/sprites and assets/data/sprites_graphics.json. Your data there may be overwritten."
-msgstr ""
-
-msgid "Reads the exported object files and single sprite files of a folder: the pixels of the sprites you edited go back to the sheets, edited table rows to sprites_graphics.json."
-msgstr ""
-
-msgid "Import folder"
-msgstr ""
-
-msgid "Choose import folder..."
-msgstr ""
-
-msgid "Import sprites"
-msgstr ""
-
-msgid "Overwrite assets?"
-msgstr ""
-
-msgid "The import overwrites the sprite sheets in assets/sprites and the tables in assets/data/sprites_graphics.json with what is in the folder. Your data there may be lost."
-msgstr ""
-
-msgid "Import and overwrite"
-msgstr ""
-
-msgid "Cancel"
-msgstr ""
-
-msgid "Select all shown"
-msgstr ""
-
-msgid "Clear selection"
-msgstr ""
-
-msgid "Selected: %zu (Ctrl+click: add, Shift+click: range)"
-msgstr ""
-
-msgid "Selected: %zu"
-msgstr ""
-
-msgid "Compress sprites"
-msgstr ""
-
-msgid "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."
-msgstr ""
-
-msgid "Opens the system dialog to pick the folder to import from."
-msgstr ""
+msgstr "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the cells."
 
 msgid "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
-msgstr ""
-
-msgid "Packed atlas"
-msgstr ""
+msgstr "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."
 
 msgid "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."
-msgstr ""
+msgstr "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."
 
 msgid "Starting the game..."
-msgstr ""
+msgstr "Starting the game..."
 
 msgid "Loading graphics..."
-msgstr ""
+msgstr "Loading graphics..."
 
 msgid "Preparing the renderer..."
-msgstr ""
+msgstr "Preparing the renderer..."
 
 msgid "Loading sound and music..."
-msgstr ""
+msgstr "Loading sound and music..."
 
 msgid "Loading units and buildings..."
-msgstr ""
+msgstr "Loading units and buildings..."
 
 msgid "Preparing the interface..."
-msgstr ""
+msgstr "Preparing the interface..."
 
 msgid "No other map has a start position for everybody in the room."
-msgstr ""
+msgstr "No other map has a start position for everybody in the room."
 
 msgid "Players on this map: "
-msgstr ""
+msgstr "Players on this map: "
 
 msgid "A map holds 8 players at most: no more start positions"
-msgstr ""
+msgstr "A map holds 8 players at most: no more start positions"
 
 msgid "Start position added: "
-msgstr ""
+msgstr "Start position added: "
 
 msgid "Start position removed: "
-msgstr ""
+msgstr "Start position removed: "
 
 msgid "players"
-msgstr ""
+msgstr "players"
 
 msgid "PREBUILT BASES"
-msgstr ""
+msgstr "PREBUILT BASES"
 
 msgid "FROM SCRATCH"
-msgstr ""
+msgstr "FROM SCRATCH"
 
 msgid "Color"
-msgstr ""
+msgstr "Color"
 
 msgid "Click: pick from a list. Arrows: step. Tab: next page"
-msgstr ""
+msgstr "Click: pick from a list. Arrows: step. Tab: next page"
 
 msgid "RESTART THE GAME?"
-msgstr ""
+msgstr "RESTART THE GAME?"
 
 msgid "The mission starts over: the progress made so far is lost."
-msgstr ""
+msgstr "The mission starts over: the progress made so far is lost."
 
 msgid "LEAVE THE MATCH?"
-msgstr ""
+msgstr "LEAVE THE MATCH?"
 
 msgid "You leave the match and return to the main menu. The other players go on without you."
-msgstr ""
+msgstr "You leave the match and return to the main menu. The other players go on without you."
 
 msgid "LEAVE THE GAME?"
-msgstr ""
+msgstr "LEAVE THE GAME?"
 
 msgid "You return to the main menu: the progress of this game is lost."
-msgstr ""
+msgstr "You return to the main menu: the progress of this game is lost."
 
 msgid "YES"
-msgstr ""
+msgstr "YES"
 
 msgid "NO"
-msgstr ""
+msgstr "NO"
 
 msgid "LEAVE THE ROOM?"
-msgstr ""
+msgstr "LEAVE THE ROOM?"
 
 msgid "You are the room owner. If you leave, the game may end for everybody in it."
-msgstr ""
+msgstr "You are the room owner. If you leave, the game may end for everybody in it."
 
 msgid "You leave the room. You can join it again while it is open."
-msgstr ""
+msgstr "You leave the room. You can join it again while it is open."
 
 msgid "Password"
-msgstr ""
+msgstr "Password"
 
 msgid "optional"
-msgstr ""
+msgstr "optional"
 
 msgid "Loading the map..."
-msgstr ""
-
-msgid "A player who is silent for this long (milliseconds) is dropped."
-msgstr ""
-
-msgid "A player who lost the connection can come back during this time (seconds)."
-msgstr ""
-
-msgid "AI level chosen when the game starts."
-msgstr ""
-
-msgid "API used when the preferred one does not work."
-msgstr ""
-
-msgid "Address of the server that lists the public games."
-msgstr ""
-
-msgid "All animations of the game. Click one to play it on the canvas, or to put it into a field after pressing Pick."
-msgstr ""
-
-msgid "Animation %d: %d frames"
-msgstr ""
-
-msgid "Animations"
-msgstr ""
-
-msgid "Apply"
-msgstr ""
-
-msgid "Building death"
-msgstr ""
-
-msgid "Burial seconds"
-msgstr ""
+msgstr "Loading the map..."
 
 msgid "Choose..."
-msgstr ""
-
-msgid "Click an animation to put it in the chosen field"
-msgstr ""
-
-msgid "Color of the fog."
-msgstr ""
-
-msgid "Color of the line (#RRGGBB)."
-msgstr ""
-
-msgid "Colors of all themes"
-msgstr ""
-
-msgid "Composite"
-msgstr ""
-
-msgid "Credits %.0f, +%.0f / s"
-msgstr ""
-
-msgid "Credits earned by minute"
-msgstr ""
-
-msgid "Darkness (0..255) of the places you have already seen but cannot see now."
-msgstr ""
-
-msgid "Darkness (0..255) of the places you have never seen."
-msgstr ""
-
-msgid "Default difficulty"
-msgstr ""
-
-msgid "Delete"
-msgstr ""
-
-msgid "Edits assets/data/game_environment.json: font, fog, construction, network, order lines."
-msgstr ""
+msgstr "Choose..."
 
 msgid "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). The canvas plays the result."
-msgstr ""
+msgstr "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). The canvas plays the result."
 
 msgid "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare the levels."
-msgstr ""
+msgstr "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare the levels."
 
 msgid "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the screens."
-msgstr ""
+msgstr "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the screens."
 
 msgid "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time (assets/characters/effects.yaml)."
-msgstr ""
-
-msgid "Environment"
-msgstr ""
-
-msgid "Every %.0f s, tier %.0f"
-msgstr ""
-
-msgid "Every this many game ticks the players compare their game state to detect a desync."
-msgstr ""
-
-msgid "Explosions"
-msgstr ""
-
-msgid "Families"
-msgstr ""
+msgstr "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time (assets/characters/effects.yaml)."
 
 msgid "File not found: a system font is used instead."
-msgstr ""
-
-msgid "Font files and sizes the game uses (section font of game_environment.json)."
-msgstr ""
-
-msgid "Frame time"
-msgstr ""
-
-msgid "Game UI"
-msgstr ""
-
-msgid "Game font"
-msgstr ""
-
-msgid "Groups up to %.0f, research %.0f s"
-msgstr ""
-
-msgid "Hints and disabled items"
-msgstr ""
-
-msgid "Hovered"
-msgstr ""
-
-msgid "How long (milliseconds) the game tries to connect two players directly."
-msgstr ""
-
-msgid "How long the preview of the whole burial takes (the game uses 'Burial seconds')."
-msgstr ""
-
-msgid "How many ports after the first one are searched for games in the local network."
-msgstr ""
-
-msgid "How many tiles around an enemy structure stay closed for building."
-msgstr ""
-
-msgid "How round the edge of the fog is (0 square, 1 smooth)."
-msgstr ""
-
-msgid "In the game the burial takes the time of 'Burial seconds' (the right panel)."
-msgstr ""
-
-msgid "Known wreck pictures of the game: a click sets the composite and the number of stages."
-msgstr ""
-
-msgid "Length of a network turn in milliseconds."
-msgstr ""
-
-msgid "Line of the wall being built."
-msgstr ""
-
-msgid "Line to the place a unit is moving to."
-msgstr ""
-
-msgid "Line to the target a unit attacks."
-msgstr ""
-
-msgid "Look of the fog of war."
-msgstr ""
-
-msgid "Menus"
-msgstr ""
-
-msgid "Moment of the burial to show."
-msgstr ""
-
-msgid "Network game settings."
-msgstr ""
-
-msgid "No power"
-msgstr ""
-
-msgid "Not a list of numbers: "
-msgstr ""
-
-msgid "Opacity of the order lines (0..1)."
-msgstr ""
-
-msgid "Opens the system dialog to pick a font file."
-msgstr ""
-
-msgid "Order lines and bars shown while Alt is held."
-msgstr ""
-
-msgid "Pause between waves (seconds)"
-msgstr ""
-
-msgid "Pick"
-msgstr ""
-
-msgid "Pick: click an animation"
-msgstr ""
-
-msgid "Play burial"
-msgstr ""
-
-msgid "Plays the blast again and again."
-msgstr ""
-
-msgid "Plays the blast again."
-msgstr ""
-
-msgid "Port of that server."
-msgstr ""
-
-msgid "Preferred graphics API (vulkan, opengl, opengles2, software)."
-msgstr ""
-
-msgid "Preview of a big building blowing up."
-msgstr ""
-
-msgid "Preview of a building up to 2x2 tiles blowing up."
-msgstr ""
-
-msgid "Preview of a dying vehicle: the blast and the second blast with the wreck."
-msgstr ""
-
-msgid "Preview of a power plant or tech center blowing up."
-msgstr ""
-
-msgid "Preview of the game interface with the colors of the file. Pick a theme on the right panel."
-msgstr ""
+msgstr "File not found: a system font is used instead."
 
 msgid "Radar"
-msgstr ""
-
-msgid "Replay"
-msgstr ""
-
-msgid "Researching"
-msgstr ""
-
-msgid "Resolution of the fog picture: pixels per map tile."
-msgstr ""
-
-msgid "Rules of placing buildings."
-msgstr ""
-
-msgid "Secondary text"
-msgstr ""
-
-msgid "Seconds"
-msgstr ""
-
-msgid "Settings"
-msgstr ""
-
-msgid "Size in pixels of headings."
-msgstr ""
-
-msgid "Size in pixels of normal text."
-msgstr ""
-
-msgid "Size in pixels of screen titles."
-msgstr ""
-
-msgid "Size in pixels of small text."
-msgstr ""
-
-msgid "Size in pixels of the big title on the main menu."
-msgstr ""
-
-msgid "Speed"
-msgstr ""
-
-msgid "Speed of the preview; the game always plays at normal speed."
-msgstr ""
-
-msgid "TCP port of the game."
-msgstr ""
-
-msgid "TTF/OTF file of headings and titles."
-msgstr ""
-
-msgid "TTF/OTF file of the normal text. A path inside the game folder or a full path."
-msgstr ""
-
-msgid "The biggest map (in kilobytes) a host sends to the players."
-msgstr ""
-
-msgid "The difficulty file could not be loaded."
-msgstr ""
-
-msgid "The effects file could not be loaded."
-msgstr ""
-
-msgid "The environment file could not be loaded."
-msgstr ""
+msgstr "Radar"
 
 msgid "The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."
-msgstr ""
-
-msgid "The interface file could not be loaded."
-msgstr ""
-
-msgid "The largest delay (in turns) between giving an order and carrying it out."
-msgstr ""
-
-msgid "The look of menus and of the game screen for each faction."
-msgstr ""
-
-msgid "The smallest delay (in turns) between giving an order and carrying it out."
-msgstr ""
-
-msgid "The wreck sinks stage by stage; uncheck to pick the moment by hand."
-msgstr ""
-
-msgid "Theme"
-msgstr ""
-
-msgid "Then click an animation in the list below to put its number into this field (lists get it added)."
-msgstr ""
-
-msgid "Thickness of the line in pixels."
-msgstr ""
-
-msgid "UDP port of the game."
-msgstr ""
-
-msgid "Units in wave N"
-msgstr ""
-
-msgid "Vehicle death"
-msgstr ""
-
-msgid "Waves %.0f..%.0f units"
-msgstr ""
-
-msgid "Which graphics API the game starts with."
-msgstr ""
-
-msgid "Wreck of each vehicle"
-msgstr ""
-
-msgid "Wrecks"
-msgstr ""
-
-msgid "Writes the file of this tab (Ctrl+S). Comments in the file are kept."
-msgstr ""
-
-msgid "minutes"
-msgstr ""
-
-msgid "wave number"
-msgstr ""
-
-msgid "Small building"
-msgstr ""
-
-msgid "Power building"
-msgstr ""
-
-msgid "Large building"
-msgstr ""
-
-msgid "Regular font file"
-msgstr ""
-
-msgid "Bold font file"
-msgstr ""
-
-msgid "Small text"
-msgstr ""
-
-msgid "Body text"
-msgstr ""
-
-msgid "Heading"
-msgstr ""
-
-msgid "Title"
-msgstr ""
-
-msgid "Big title"
-msgstr ""
-
-msgid "Save settings"
-msgstr ""
-
-msgid "Pick animation"
-msgstr ""
-
-msgid "Loop effect"
-msgstr ""
-
-msgid "Playback speed"
-msgstr ""
-
-msgid "Burial preview seconds"
-msgstr ""
-
-msgid "Burial time"
-msgstr ""
-
-msgid "UI theme"
-msgstr ""
-
-msgid "Choose font file"
-msgstr ""
-
-msgid "Needs the SDL GPU renderer (shader effects)"
-msgstr ""
+msgstr "The game reads the font files and sizes from here. A path may point outside the assets folder; a font that cannot be opened is replaced by a system one."
 
 msgid "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
-msgstr ""
+msgstr "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."
 
 msgid "Network statistics"
-msgstr ""
+msgstr "Network statistics"
 
 msgid "Network game: ping, jitter, packet loss and traffic in the corner"
-msgstr ""
+msgstr "Network game: ping, jitter, packet loss and traffic in the corner"
 
 msgid "NETWORK"
-msgstr ""
+msgstr "NETWORK"
 
 msgid "Hosting this game"
-msgstr ""
+msgstr "Hosting this game"
 
 msgid "Ping"
-msgstr ""
+msgstr "Ping"
 
 msgid "ms"
-msgstr ""
+msgstr "ms"
 
 msgid "Jitter"
-msgstr ""
+msgstr "Jitter"
 
 msgid "Packet loss"
-msgstr ""
+msgstr "Packet loss"
 
 msgid "Traffic out / in"
-msgstr ""
+msgstr "Traffic out / in"
 
 msgid "KB/s"
-msgstr ""
+msgstr "KB/s"
 
 msgid "Input delay"
-msgstr ""
+msgstr "Input delay"
 
 msgid "turn"
-msgstr ""
+msgstr "turn"
 
 msgid "Turns buffered"
-msgstr ""
+msgstr "Turns buffered"
 
 msgid "Waiting for the next turn"
-msgstr ""
+msgstr "Waiting for the next turn"
 
 msgid "disconnected"
-msgstr ""
+msgstr "disconnected"
 
 msgid "Reconnecting..."
-msgstr ""
+msgstr "Reconnecting..."
 
 msgid "DESYNC"
-msgstr ""
+msgstr "DESYNC"
 
 #, c-format
 msgid "Player %s has disconnected"
-msgstr ""
+msgstr "Player %s has disconnected"
 
 #, c-format
 msgid "Player %s is back"
-msgstr ""
+msgstr "Player %s is back"
 
 #, c-format
 msgid "Player %s did not come back"
-msgstr ""
+msgstr "Player %s did not come back"
 
 #, c-format
 msgid "The base of %s is destroyed"
-msgstr ""
+msgstr "The base of %s is destroyed"
 
 msgid "MATCH STATISTICS"
-msgstr ""
+msgstr "MATCH STATISTICS"
 
 msgid "Player"
-msgstr ""
+msgstr "Player"
 
 msgid "Efficiency"
-msgstr ""
+msgstr "Efficiency"
 
 msgid "Kills"
-msgstr ""
+msgstr "Kills"
 
 msgid "Losses"
-msgstr ""
+msgstr "Losses"
 
 msgid "left"
-msgstr ""
+msgstr "left"
 
 msgid "Efficiency: a point for every 10 credits of enemy forces destroyed"
-msgstr ""
+msgstr "Efficiency: a point for every 10 credits of enemy forces destroyed"
 
 msgid "taken"
-msgstr ""
+msgstr "taken"
 
 msgid "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
-msgstr ""
-
-msgid "Ordinary bullet of rifles and machine guns (projectile: bullet)."
-msgstr ""
-
-msgid "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."
-msgstr ""
-
-msgid "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."
-msgstr ""
-
-msgid "Rocket with a smoke trail; leaves a crater (projectile: rocket)."
-msgstr ""
-
-msgid "Flamethrower jet (projectile: flame)."
-msgstr ""
-
-msgid "Fires one shot now."
-msgstr ""
-
-msgid "Fires a shot every interval."
-msgstr ""
-
-msgid "Every shot turns one sprite direction further, so all directions of the sprite show in turn."
-msgstr ""
-
-msgid "Distance between the shooter and the target on the canvas."
-msgstr ""
-
-msgid "Direction of the shot on the canvas."
-msgstr ""
-
-msgid "Time between shots of the preview."
-msgstr ""
-
-msgid "Removes the craters from the canvas."
-msgstr ""
-
-msgid "Empties the list of hit animations (then no hit is drawn)."
-msgstr ""
+msgstr "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."
 
 msgid "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
-msgstr ""
-
-msgid "Pixels the projectile flies per simulation tick (20 ticks a second)."
-msgstr ""
-
-msgid "Projectile pictures of the game: a click sets the composite and its number of directions."
-msgstr ""
+msgstr "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."
 
 msgid "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
-msgstr ""
-
-msgid "How much faster the craters disappear on the canvas than in the game."
-msgstr ""
-
-msgid "Background color of the canvas (black by default)."
-msgstr ""
-
-msgid "Projectiles"
-msgstr ""
-
-msgid "Bullet"
-msgstr ""
-
-msgid "Sniper round"
-msgstr ""
-
-msgid "Shell"
-msgstr ""
-
-msgid "Rocket"
-msgstr ""
-
-msgid "Flame"
-msgstr ""
-
-msgid "Bullet tracer"
-msgstr ""
-
-msgid "Heavy tracer"
-msgstr ""
-
-msgid "Rocket with flame"
-msgstr ""
-
-msgid "Fire"
-msgstr ""
-
-msgid "All directions"
-msgstr ""
-
-msgid "Angle"
-msgstr ""
-
-msgid "Distance"
-msgstr ""
-
-msgid "Interval"
-msgstr ""
-
-msgid "Background"
-msgstr ""
-
-msgid "Clear craters"
-msgstr ""
-
-msgid "Clear impacts"
-msgstr ""
-
-msgid "Crater composites"
-msgstr ""
-
-msgid "Craters"
-msgstr ""
-
-msgid "Crater seconds"
-msgstr ""
-
-msgid "Directions"
-msgstr ""
-
-msgid "Flight"
-msgstr ""
-
-msgid "Ground marks"
-msgstr ""
-
-msgid "Hit effects"
-msgstr ""
-
-msgid "Hit-scan"
-msgstr ""
-
-msgid "Impact animations"
-msgstr ""
-
-msgid "Preview fade speed"
-msgstr ""
-
-msgid "Projectile sprites"
-msgstr ""
-
-msgid "Smoke trail"
-msgstr ""
-
-msgid "Speed (px per tick)"
-msgstr ""
-
-msgid "Spread (radians)"
-msgstr ""
-
-msgid "Sprite (composite)"
-msgstr ""
-
-msgid "Used by"
-msgstr ""
-
-msgid "Wall destroyed"
-msgstr ""
-
-msgid "Wall hit"
-msgstr ""
-
-msgid "The projectiles file could not be loaded."
-msgstr ""
-
-msgid "A flame is drawn as its own jet (animation 59), not as a sprite."
-msgstr ""
-
-msgid "MMB Drag: Pan | Wheel: Zoom | MMB 2x: Reset"
-msgstr ""
-
-#, c-format
-msgid "Animation %d"
-msgstr ""
+msgstr "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."
 
 msgid "Sound reverb"
-msgstr ""
+msgstr "Sound reverb"
 
 msgid "Echo of explosions and heavy guns"
-msgstr ""
+msgstr "Echo of explosions and heavy guns"
 
 msgid "Voice volume"
-msgstr ""
+msgstr "Voice volume"
 
 msgid "Volume of the unit replies and the announcer"
-msgstr ""
+msgstr "Volume of the unit replies and the announcer"
 
 #. Campaign mission dialogue (MissionDialogs.cpp): dialog.<res|conf>.<mission>.title / <line>.speaker / <line>.text
 msgid "dialog.res.1.title"
-msgstr ""
+msgstr "The Return"
 
 msgid "dialog.res.1.1.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.1.1.text"
-msgstr ""
+msgstr "Three months ago we left the valleys with nothing but our rifles. The Confederation called it a rout. Today we come back down the old smugglers' trail, and they still think the jungle is empty."
 
 msgid "dialog.res.1.2.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.1.2.text"
-msgstr ""
+msgstr "Scouts report a Confederation outpost by the river. Fresh concrete, two bunkers, a supply pad. They are building to stay."
 
 msgid "dialog.res.1.3.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.1.3.text"
-msgstr ""
+msgstr "Then we build faster. Raise a camp on the ridge, gather the volunteers from the villages and burn that outpost before their convoy arrives. Let the valleys hear that we are home."
 
 msgid "dialog.res.1.4.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.1.4.text"
-msgstr ""
+msgstr "Understood. The flag goes up tonight."
 
 msgid "dialog.res.2.title"
-msgstr ""
+msgstr "Jungle"
 
 msgid "dialog.res.2.1.speaker"
-msgstr ""
+msgstr "Captain Paz"
 
 msgid "dialog.res.2.1.text"
-msgstr ""
+msgstr "Commander, their engineers have cut a road through the rainforest. Heavy columns are already rolling toward our camp."
 
 msgid "dialog.res.2.2.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.2.2.text"
-msgstr ""
+msgstr "Good. A road through the swamp is a trap they built for themselves. Their tanks will sink to the tracks while our people move between the trees."
 
 msgid "dialog.res.2.3.speaker"
-msgstr ""
+msgstr "Captain Paz"
 
 msgid "dialog.res.2.3.text"
-msgstr ""
+msgstr "We do not have the guns to stop all of them."
 
 msgid "dialog.res.2.4.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.2.4.text"
-msgstr ""
+msgstr "We do not need to stop all of them, only to outlast them. Dig in, wall the approaches, mine the clearings and hold the camp until their waves break."
 
 msgid "dialog.res.3.title"
-msgstr ""
+msgstr "Sabotage"
 
 msgid "dialog.res.3.1.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.3.1.text"
-msgstr ""
+msgstr "Our first team never reached the fuel depot. Only their radio operator got out, and she brought the guard schedule with her."
 
 msgid "dialog.res.3.2.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.3.2.text"
-msgstr ""
+msgstr "Then their sacrifice bought us a door. The depot feeds every Confederation vehicle in the province. Without it their armour is scrap metal."
 
 msgid "dialog.res.3.3.speaker"
-msgstr ""
+msgstr "Engineer Benito"
 
 msgid "dialog.res.3.3.text"
-msgstr ""
+msgstr "The charges are ready, but the detonator only works at short range. Someone has to walk right up to their fence."
 
 msgid "dialog.res.3.4.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.3.4.text"
-msgstr ""
+msgstr "I will lead the second team myself. Quietly through their rear, and when the depot goes up, everyone attacks."
 
 msgid "dialog.res.4.title"
-msgstr ""
+msgstr "The Gorge"
 
 msgid "dialog.res.4.1.speaker"
-msgstr ""
+msgstr "Captain Paz"
 
 msgid "dialog.res.4.1.text"
-msgstr ""
+msgstr "The fuel fire is still burning. The Confederation is pulling a relief column through the mountain gorge: trucks, tanks and a mobile command post."
 
 msgid "dialog.res.4.2.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.4.2.text"
-msgstr ""
+msgstr "The gorge is narrow and they cannot turn around in it. Whoever holds the walls of that gorge decides who leaves it."
 
 msgid "dialog.res.4.3.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.4.3.text"
-msgstr ""
+msgstr "Their command post carries the maps of every garrison in Peru. If it gets through, they will know where to hit us next."
 
 msgid "dialog.res.4.4.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.4.4.text"
-msgstr ""
+msgstr "Then nothing gets through. Take positions above the road and let the column come to us."
 
 msgid "dialog.res.5.title"
-msgstr ""
+msgstr "Matter of Seconds"
 
 msgid "dialog.res.5.1.speaker"
-msgstr ""
+msgstr "Captain Paz"
 
 msgid "dialog.res.5.1.text"
-msgstr ""
+msgstr "A Confederation signal station sits 50 kilometres to the northeast of the nearest garrison. Their engineers are assembling the antenna right now."
 
 msgid "dialog.res.5.2.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.5.2.text"
-msgstr ""
+msgstr "Once it is up, they will call in every gunship on the continent. We strike before the first message leaves the mast."
 
 msgid "dialog.res.5.3.speaker"
-msgstr ""
+msgstr "Engineer Benito"
 
 msgid "dialog.res.5.3.text"
-msgstr ""
+msgstr "I cut their cable last night. That buys us a little time, but not much."
 
 msgid "dialog.res.5.4.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.5.4.text"
-msgstr ""
+msgstr "Then every second counts. Move!"
 
 msgid "dialog.res.6.title"
-msgstr ""
+msgstr "Radio Station"
 
 msgid "dialog.res.6.1.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.6.1.text"
-msgstr ""
+msgstr "We pulled a working radio set with their cipher keys out of the station ruins. With it we could read every Confederation order."
 
 msgid "dialog.res.6.2.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.6.2.text"
-msgstr ""
+msgstr "Only if it reaches our base. Captain Paz is bringing it in an armoured carrier across open ground."
 
 msgid "dialog.res.6.3.speaker"
-msgstr ""
+msgstr "Captain Paz"
 
 msgid "dialog.res.6.3.text"
-msgstr ""
+msgstr "They know what we carry. Every patrol in the region is hunting us."
 
 msgid "dialog.res.6.4.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.6.4.text"
-msgstr ""
+msgstr "Then we will draw them onto us. Hold the base, Captain, and bring that radio home in one piece."
 
 msgid "dialog.res.7.title"
-msgstr ""
+msgstr "Lima"
 
 msgid "dialog.res.7.1.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.7.1.text"
-msgstr ""
+msgstr "Twenty years ago the Confederation raised its flag over Lima and called it peace. Tonight we bring the war back to its doorstep."
 
 msgid "dialog.res.7.2.speaker"
-msgstr ""
+msgstr "Colonel Mayta"
 
 msgid "dialog.res.7.2.text"
-msgstr ""
+msgstr "The intercepted orders confirm it: every remaining garrison has fallen back to defend the capital."
 
 msgid "dialog.res.7.3.speaker"
-msgstr ""
+msgstr "Commander Quispe"
 
 msgid "dialog.res.7.3.text"
-msgstr ""
+msgstr "So they are all in one place. For everyone we lost in the jungle, for everyone still waiting in the villages: build, arm and take the city."
 
 msgid "dialog.res.7.4.speaker"
-msgstr ""
+msgstr "All"
 
 msgid "dialog.res.7.4.text"
-msgstr ""
+msgstr "For a free Peru!"
 
 msgid "dialog.conf.1.title"
-msgstr ""
+msgstr "Pukalpa"
 
 msgid "dialog.conf.1.1.speaker"
-msgstr ""
+msgstr "Narrator"
 
 msgid "dialog.conf.1.1.text"
-msgstr ""
+msgstr "2038. For twenty years the World Confederation has kept order on every continent. In the east of Peru, near the town of Pukalpa, that order has started to crack."
 
 msgid "dialog.conf.1.2.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.1.2.text"
-msgstr ""
+msgstr "General Hale, you were due to report an hour ago. The Senate wants this flare-up gone before the press hears about it."
 
 msgid "dialog.conf.1.3.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.1.3.text"
-msgstr ""
+msgstr "The rains washed out the roads, Senator. We are deploying now. Without satellite cover we will have to see this jungle with our own eyes."
 
 msgid "dialog.conf.1.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.1.4.text"
-msgstr ""
+msgstr "Lieutenant Kade, build the base, keep the perimeter tight and wait for the scouts. The rebels will test us before we are ready."
 
 msgid "dialog.conf.2.title"
-msgstr ""
+msgstr "Ukayali Shore"
 
 msgid "dialog.conf.2.1.speaker"
-msgstr ""
+msgstr "Lieutenant Kade"
 
 msgid "dialog.conf.2.1.text"
-msgstr ""
+msgstr "General, the scouts found a rebel camp on the Ukayali shore, 20 kilometres north of Pukalpa. Boats bring them food and fuel every night."
 
 msgid "dialog.conf.2.2.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.2.2.text"
-msgstr ""
+msgstr "Can we cut the river off?"
 
 msgid "dialog.conf.2.3.speaker"
-msgstr ""
+msgstr "Lieutenant Kade"
 
 msgid "dialog.conf.2.3.text"
-msgstr ""
+msgstr "Not from here. The bank is solid jungle. We go straight at the camp, or we let them grow."
 
 msgid "dialog.conf.2.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.2.4.text"
-msgstr ""
+msgstr "Then we go now, while they are still counting rifles. Their approaches will be mined: send the engineers first."
 
 msgid "dialog.conf.3.title"
-msgstr ""
+msgstr "Capture of Miguel"
 
 msgid "dialog.conf.3.1.speaker"
-msgstr ""
+msgstr "Operator Yara"
 
 msgid "dialog.conf.3.1.text"
-msgstr ""
+msgstr "General, prisoners from the river camp say the rebel leader is hiding at a jungle headquarters upstream."
 
 msgid "dialog.conf.3.2.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.3.2.text"
-msgstr ""
+msgstr "Prisoners say a lot of things. It could be bait to pull us deeper into the forest."
 
 msgid "dialog.conf.3.3.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.3.3.text"
-msgstr ""
+msgstr "Bait or not, the Senate wants a name in custody. A captured leader ends a rebellion faster than a hundred battles."
 
 msgid "dialog.conf.3.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.3.4.text"
-msgstr ""
+msgstr "Understood. Kade, the factory and the tech centre are yours. Heavy armour will not pass these trails: take their headquarters with what can."
 
 msgid "dialog.conf.4.title"
-msgstr ""
+msgstr "Outpost"
 
 msgid "dialog.conf.4.1.speaker"
-msgstr ""
+msgstr "Lieutenant Kade"
 
 msgid "dialog.conf.4.1.text"
-msgstr ""
+msgstr "The headquarters was empty, General. He got away by the river while we were breaking the gates."
 
 msgid "dialog.conf.4.2.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.4.2.text"
-msgstr ""
+msgstr "Then he is running toward the mountains. Yara, raise the forward squad."
 
 msgid "dialog.conf.4.3.speaker"
-msgstr ""
+msgstr "Operator Yara"
 
 msgid "dialog.conf.4.3.text"
-msgstr ""
+msgstr "Contact for a moment... gunfire, then something about a minefield. The channel is dead."
 
 msgid "dialog.conf.4.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.4.4.text"
-msgstr ""
+msgstr "So they are waiting for us at the pass. All units, battle order: wipe out that outpost and open the road."
 
 msgid "dialog.conf.5.title"
-msgstr ""
+msgstr "Meat Grinder"
 
 msgid "dialog.conf.5.1.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.5.1.text"
-msgstr ""
+msgstr "Senator, we took the outpost on schedule. We are digging in."
 
 msgid "dialog.conf.5.2.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.5.2.text"
-msgstr ""
+msgstr "The new satellite pictures are bad, General. Rebel units from the south are converging on your position. Many more than we counted."
 
 msgid "dialog.conf.5.3.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.5.3.text"
-msgstr ""
+msgstr "How long until reinforcements?"
 
 msgid "dialog.conf.5.4.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.5.4.text"
-msgstr ""
+msgstr "They are coming over the mountains. Hold until they arrive, whatever it costs."
 
 msgid "dialog.conf.6.title"
-msgstr ""
+msgstr "Gorge Assault"
 
 msgid "dialog.conf.6.1.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.6.1.text"
-msgstr ""
+msgstr "You held, General. The Senate has noticed. We have located the rebels' main fortress at the end of the gorge."
 
 msgid "dialog.conf.6.2.speaker"
-msgstr ""
+msgstr "Lieutenant Kade"
 
 msgid "dialog.conf.6.2.text"
-msgstr ""
+msgstr "The approaches are walled and mined. A frontal assault would cost us the whole brigade."
 
 msgid "dialog.conf.6.3.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.6.3.text"
-msgstr ""
+msgstr "Then we will not walk in. The tech centre can give us the Grad rocket launchers: in siege mode they reach over any wall."
 
 msgid "dialog.conf.6.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.6.4.text"
-msgstr ""
+msgstr "Build a solid defence first, then break the fortress from range."
 
 msgid "dialog.conf.7.title"
-msgstr ""
+msgstr "Last Stand"
 
 msgid "dialog.conf.7.1.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.7.1.text"
-msgstr ""
+msgstr "This is the hour, General. The rebels have pulled every last fighter into their final base. A reinforcement group is on its way to you."
 
 msgid "dialog.conf.7.2.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.7.2.text"
-msgstr ""
+msgstr "We are ready, Senator. Twenty years of order are not going to end in this jungle."
 
 msgid "dialog.conf.7.3.speaker"
-msgstr ""
+msgstr "Senator Brandt"
 
 msgid "dialog.conf.7.3.text"
-msgstr ""
+msgstr "Finish it, and the main peacekeeping army will take over from you."
 
 msgid "dialog.conf.7.4.speaker"
-msgstr ""
+msgstr "General Hale"
 
 msgid "dialog.conf.7.4.text"
-msgstr ""
+msgstr "For the Confederation. All units, advance!"
 
 msgid "ACKNOWLEDGED"
-msgstr ""
+msgstr "ACKNOWLEDGED"
 
 #. Network screen
 msgid "Type a message"
-msgstr ""
+msgstr "Type a message"
 
 msgid "Your name in the game"
-msgstr ""
+msgstr "Your name in the game"
 
 msgid "Optional"
-msgstr ""
+msgstr "Optional"
 
 msgid "Direct connection (the host forwards UDP port 38100)"
-msgstr ""
+msgstr "Direct connection (the host forwards UDP port 38100)"
 
 msgid "Address or address:port, e.g. 192.168.1.10"
-msgstr ""
+msgstr "Address or address:port, e.g. 192.168.1.10"
 
 msgid "6 characters"
-msgstr ""
+msgstr "6 characters"
 
 msgid "CREATE"
-msgstr ""
+msgstr "CREATE"
 
 msgid "Pick a game in the list first"
-msgstr ""
+msgstr "Pick a game in the list first"
 
 msgid "the game through the server"
-msgstr ""
+msgstr "the game through the server"
 
 msgid "Connecting to"
-msgstr ""
+msgstr "Connecting to"
 
 msgid "No answer: check the address, and that the host forwards UDP port 38100"
-msgstr ""
-
-msgid "The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."
-msgstr ""
+msgstr "No answer: check the address, and that the host forwards UDP port 38100"
 
 msgid "Gage Crossing"
-msgstr ""
+msgstr "Gage Crossing"
 
 msgid "Kings Ridge"
-msgstr ""
+msgstr "Kings Ridge"
 
 msgid "Dry Runs"
-msgstr ""
+msgstr "Dry Runs"
 
 msgid "The Ford"
-msgstr ""
+msgstr "The Ford"
 
 msgid "Generated Map 7142"
-msgstr ""
+msgstr "Generated Map 7142"
 
 msgid "Skirmish 10"
-msgstr ""
+msgstr "Skirmish 10"
 
 msgid "Skirmish 11"
-msgstr ""
+msgstr "Skirmish 11"
 
 msgid "Skirmish 12"
-msgstr ""
+msgstr "Skirmish 12"
 
 msgid "Skirmish 13"
-msgstr ""
+msgstr "Skirmish 13"
 
 msgid "Skirmish 14"
-msgstr ""
+msgstr "Skirmish 14"
 
 msgid "Skirmish 15"
-msgstr ""
+msgstr "Skirmish 15"
 
 msgid "Skirmish 2"
-msgstr ""
+msgstr "Skirmish 2"
 
 msgid "Skirmish 3"
-msgstr ""
+msgstr "Skirmish 3"
 
 msgid "Skirmish 4"
-msgstr ""
+msgstr "Skirmish 4"
 
 msgid "Skirmish 5"
-msgstr ""
+msgstr "Skirmish 5"
 
 msgid "Skirmish 6"
-msgstr ""
+msgstr "Skirmish 6"
 
 msgid "Skirmish 7"
-msgstr ""
+msgstr "Skirmish 7"
 
 msgid "Skirmish 9"
-msgstr ""
+msgstr "Skirmish 9"
 
 msgid "Test Polygon"
-msgstr ""
+msgstr "Test Polygon"
 
 msgid "YOU"
-msgstr ""
+msgstr "YOU"
 
 msgid "COMPUTER PLAYER"
-msgstr ""
+msgstr "COMPUTER PLAYER"
 
 msgid "Everybody is in one team: there is nobody to fight."
-msgstr ""
+msgstr "Everybody is in one team: there is nobody to fight."
 
 msgid "This map has no start position for everybody in the room."
-msgstr ""
+msgstr "This map has no start position for everybody in the room."
 
 msgid "IP address or hostname"
-msgstr ""
+msgstr "IP address or hostname"
 
 msgid "Edge scroll margin"
-msgstr ""
+msgstr "Edge scroll margin"
 
 msgid "Screen border thickness in pixels for scrolling with the mouse"
-msgstr ""
-
-msgid "Animator"
-msgstr ""
-
-msgid "Firing frame time"
-msgstr ""
-
-msgid "Pose after the first shot"
-msgstr ""
-
-msgid "The canvas shows the character; the values below change how the game plays its pictures. Ctrl+S writes them to the file."
-msgstr ""
-
-msgid "Buildings flash for a fixed time after a shot; their pictures have no timing in the file yet."
-msgstr ""
-
-msgid "(default %.3f s)"
-msgstr ""
-
-msgid "1. Idle"
-msgstr ""
-
-msgid "A still picture: nothing to time."
-msgstr ""
-
-msgid "2. Move"
-msgstr ""
-
-msgid "Walking frame time"
-msgstr ""
-
-msgid "Preview##animmove"
-msgstr ""
-
-msgid "3. Attack"
-msgstr ""
-
-msgid "This character does not attack."
-msgstr ""
-
-msgid "Pose after each next shot"
-msgstr ""
-
-msgid "Loop while firing"
-msgstr ""
-
-msgid "Once per shot"
-msgstr ""
-
-msgid "Once, hold the last frame"
-msgstr ""
-
-msgid "Muzzle flash"
-msgstr ""
-
-msgid "Flash frames (0 = all)"
-msgstr ""
-
-msgid "Preview##animattack"
-msgstr ""
-
-msgid "Reset timing"
-msgstr ""
-
-msgid "Volley"
-msgstr ""
-
-msgid "shot"
-msgstr ""
-
-msgid "pose"
-msgstr ""
-
-msgid "flash"
-msgstr ""
+msgstr "Screen border thickness in pixels for scrolling with the mouse"
 
 msgid "cooldown"
-msgstr ""
-
-msgid "The pose (%.2f s) ends before the next shot (%.2f s): the animation stops between shots."
-msgstr ""
-
-msgid "The first pose (%.2f s) ends before the second shot (%.2f s)."
-msgstr ""
-
-msgid "Infantry keeps firing while it has a target: with the looping flash the muzzle burns all the time. Use \"Once per shot\"."
-msgstr ""
-
-msgid "One volley: %d shot(s) over %.2f s, then %.2f s of cooldown."
-msgstr ""
-
-msgid "4. Die"
-msgstr ""
-
-msgid "Death sequences and the wreck are set in the Preview tab (Animation)."
-msgstr ""
-
-msgid "Preview##animdie"
-msgstr ""
+msgstr "cooldown"
 
 msgid "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."
-msgstr ""
-
-msgid "Seconds per frame of the walking animation (default 0.09)."
-msgstr ""
-
-msgid "Seconds per frame of the firing pose (default 0.07, some units 0.04). Off = the default."
-msgstr ""
+msgstr "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."
 
 msgid "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others 0.22 s)."
-msgstr ""
+msgstr "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others 0.22 s)."
 
 msgid "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as the burst delay, or the animation stops between shots."
-msgstr ""
+msgstr "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as the burst delay, or the animation stops between shots."
 
 msgid "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer shows until the next shot. Once, hold: plays once and stays on its last frame."
-msgstr ""
-
-msgid "How many frames of the flash animation play (0 = the whole animation)."
-msgstr ""
-
-msgid "Shows the walking animation on the canvas."
-msgstr ""
-
-msgid "Shows the firing animation on the canvas, volley after volley."
-msgstr ""
-
-msgid "Shows the death animation on the canvas."
-msgstr ""
-
-msgid "Removes the timing values from the animations: block: the game uses its defaults again."
-msgstr ""
+msgstr "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer shows until the next shot. Once, hold: plays once and stays on its last frame."
 
 msgid "The other side uses another network protocol: both need the same version of the game."
-msgstr ""
+msgstr "The other side uses another network protocol: both need the same version of the game."
 
 msgid "Different game version"
-msgstr ""
+msgstr "Different game version"
 
 msgid "the host plays"
-msgstr ""
+msgstr "the host plays"
 
 msgid "you have"
-msgstr ""
+msgstr "you have"
 
 msgid "Different game data: they still differ after the sync."
-msgstr ""
+msgstr "Different game data: they still differ after the sync."
 
 msgid "Different game data: the host cannot send its files (ask it to update, or join a game of the same version)."
-msgstr ""
+msgstr "Different game data: the host cannot send its files (ask it to update, or join a game of the same version)."
 
 msgid "The room is full"
-msgstr ""
+msgstr "The room is full"
 
 msgid "The match has already started"
-msgstr ""
+msgstr "The match has already started"
 
 msgid "Not allowed to join"
-msgstr ""
+msgstr "Not allowed to join"
 
 msgid "Wrong password"
-msgstr ""
+msgstr "Wrong password"
 
 msgid "No such room"
-msgstr ""
+msgstr "No such room"
 
 msgid "The server has no free room"
-msgstr ""
+msgstr "The server has no free room"
 
 msgid "Not ready yet"
-msgstr ""
+msgstr "Not ready yet"
 
 msgid "Your game data differ from the host's and could not be synced: "
-msgstr ""
+msgstr "Your game data differ from the host's and could not be synced: "
 
 msgid "(the game's file lists differ)"
-msgstr ""
+msgstr "(the game's file lists differ)"
 
 msgid "Downloading game data"
-msgstr ""
+msgstr "Downloading game data"
 
 msgid "(the data still differ after the sync)"
-msgstr ""
+msgstr "(the data still differ after the sync)"
 
 msgid "FOG OF WAR"
-msgstr ""
+msgstr "FOG OF WAR"
 
 msgid "OPEN REPLAY"
-msgstr ""
+msgstr "OPEN REPLAY"
 
 msgid "This replay was made by a newer version of the game"
-msgstr ""
+msgstr "This replay was made by a newer version of the game"
 
 msgid "The replay is damaged"
-msgstr ""
+msgstr "The replay is damaged"
 
 msgid "The replay is empty"
-msgstr ""
+msgstr "The replay is empty"
 
 msgid "Not a readable replay"
-msgstr ""
+msgstr "Not a readable replay"
 
 msgid "The map of this replay is missing"
-msgstr ""
+msgstr "The map of this replay is missing"
 
 msgid "Computer"
-msgstr ""
+msgstr "Computer"
 
 msgid "REPLAYS"
-msgstr ""
+msgstr "REPLAYS"
 
 msgid "No replays yet. Every network game you play is saved here."
-msgstr ""
+msgstr "No replays yet. Every network game you play is saved here."
 
 msgid "Victory"
-msgstr ""
+msgstr "Victory"
 
 msgid "Defeat"
-msgstr ""
+msgstr "Defeat"
 
 msgid "Recorded by the server"
-msgstr ""
+msgstr "Recorded by the server"
 
 msgid "Recorded by you"
-msgstr ""
+msgstr "Recorded by you"
 
 msgid "Game version"
-msgstr ""
+msgstr "Game version"
 
 msgid "team"
-msgstr ""
+msgstr "team"
 
 msgid "computer"
-msgstr ""
+msgstr "computer"
 
 msgid "The map of this replay is not on this computer"
-msgstr ""
+msgstr "The map of this replay is not on this computer"
 
 msgid "WATCH"
-msgstr ""
+msgstr "WATCH"
 
 msgid "The map of this replay could not be set up"
-msgstr ""
+msgstr "The map of this replay could not be set up"
 
 msgid "AGAIN"
-msgstr ""
+msgstr "AGAIN"
 
 msgid "PLAY"
-msgstr ""
+msgstr "PLAY"
 
 msgid "PAUSE"
-msgstr ""
+msgstr "PAUSE"
 
 msgid "View"
-msgstr ""
+msgstr "View"
 
 msgid "Observer (all)"
-msgstr ""
+msgstr "Observer (all)"
 
 msgid "FOLLOW: ON"
-msgstr ""
+msgstr "FOLLOW: ON"
 
 msgid "FOLLOW: OFF"
-msgstr ""
+msgstr "FOLLOW: OFF"
 
 msgid "This replay does not play back the same here (differs at tick"
-msgstr ""
+msgstr "This replay does not play back the same here (differs at tick"
 
 msgid "REPLAY FINISHED"
-msgstr ""
-
-msgid "Radar range (tiles)"
-msgstr ""
-
-msgid "How many tiles beyond its sight radius the finished locator sees."
-msgstr ""
-
-msgid "Radar range (Cyan)"
-msgstr ""
-
-msgid "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."
-msgstr ""
+msgstr "REPLAY FINISHED"
 
 msgid "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
-msgstr ""
+msgstr "NO HEADQUARTERS: NOTHING CAN BE BUILT!"
 
 msgid "PLAYER "
-msgstr ""
+msgstr "PLAYER "
 
 msgid "COMPUTER "
-msgstr ""
+msgstr "COMPUTER "
 
 msgid "IS OUT: NO BUILDINGS LEFT"
-msgstr ""
+msgstr "IS OUT: NO BUILDINGS LEFT"
 
 msgid "RESEARCH SIEGE MODE FIRST!"
-msgstr ""
-
-msgid "Auto deploy"
-msgstr ""
+msgstr "RESEARCH SIEGE MODE FIRST!"
 
 msgid "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
-msgstr ""
+msgstr "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."
 
 msgid "Position"
-msgstr ""
+msgstr "Position"
 
 msgid "Voice the interface"
-msgstr ""
+msgstr "Voice the interface"
 
 msgid "Interface volume"
-msgstr ""
+msgstr "Interface volume"
 
 msgid "Volume of the interface sounds: clicks, dialogs and alerts"
-msgstr ""
+msgstr "Volume of the interface sounds: clicks, dialogs and alerts"
 
 msgid "HEADQUARTERS REQUIRED TO BUILD!"
-msgstr ""
+msgstr "HEADQUARTERS REQUIRED TO BUILD!"
 
 msgid "Handicap"
-msgstr ""
+msgstr "Handicap"
 
 msgid "Pos."
-msgstr ""
+msgstr "Pos."
 
 msgid "None"
-msgstr ""
+msgstr "None"
 
 msgid "Colour"
-msgstr ""
+msgstr "Colour"
 
 msgid "Say"
-msgstr ""
+msgstr "Say"
 
 msgid "Search map..."
-msgstr ""
+msgstr "Search map..."
 
 msgid "Players"
-msgstr ""
+msgstr "Players"
 
 msgid "Size"
-msgstr ""
+msgstr "Size"
 
 msgid "Sort"
-msgstr ""
+msgstr "Sort"
 
 msgid "Any"
-msgstr ""
+msgstr "Any"
 
 msgid "Small"
-msgstr ""
+msgstr "Small"
 
 msgid "Large"
-msgstr ""
+msgstr "Large"
 
 msgid "No maps match."
-msgstr ""
+msgstr "No maps match."
 
 msgid "Place"
-msgstr ""
+msgstr "Place"
 
 msgid "Occupy"
-msgstr ""
+msgstr "Occupy"
 
 msgid "Open"
-msgstr ""
+msgstr "Open"
 
 msgid "Blocked"
-msgstr ""
+msgstr "Blocked"
 
 msgid "Army"
-msgstr ""
+msgstr "Army"
 
 msgid "START WITH A BASE"
-msgstr ""
+msgstr "START WITH A BASE"
 
 msgid "RANDOM"
-msgstr ""
+msgstr "RANDOM"
 
 msgid "The room owner freed your place"
-msgstr ""
+msgstr "The room owner freed your place"
 
 msgid "RESEARCH NEW TECHNOLOGIES"
-msgstr ""
+msgstr "RESEARCH NEW TECHNOLOGIES"
 
 msgid "Search technology..."
-msgstr ""
+msgstr "Search technology..."
 
 msgid "All"
-msgstr ""
+msgstr "All"
 
 msgid "Available"
-msgstr ""
+msgstr "Available"
 
 msgid "Researched"
-msgstr ""
+msgstr "Researched"
 
 msgid "Locked"
-msgstr ""
+msgstr "Locked"
 
 msgid "In progress"
-msgstr ""
+msgstr "In progress"
 
 msgid "Show"
-msgstr ""
+msgstr "Show"
 
 msgid "CLOSE"
-msgstr ""
+msgstr "CLOSE"
 
 msgid "RESEARCHED"
-msgstr ""
+msgstr "RESEARCHED"
 
 msgid "RESEARCHING"
-msgstr ""
+msgstr "RESEARCHING"
 
 msgid "LOCKED"
-msgstr ""
+msgstr "LOCKED"
 
 msgid "AVAILABLE"
-msgstr ""
+msgstr "AVAILABLE"
 
 msgid "Time"
-msgstr ""
+msgstr "Time"
 
 msgid "TECH CENTER - RESEARCH"
-msgstr ""
+msgstr "TECH CENTER - RESEARCH"
 
 msgid "LABORATORY - RESEARCH"
-msgstr ""
+msgstr "LABORATORY - RESEARCH"
 
 msgid "Build a Tech Center to start research"
-msgstr ""
+msgstr "Build a Tech Center to start research"
 
 msgid "Build a Laboratory to start research"
-msgstr ""
+msgstr "Build a Laboratory to start research"
 
 msgid "START RESEARCH"
-msgstr ""
-
-msgid "Fade seconds"
-msgstr ""
+msgstr "START RESEARCH"
 
 msgid "A watched match needs at least two computer players."
-msgstr ""
+msgstr "A watched match needs at least two computer players."
 
 msgid "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
-msgstr ""
+msgstr "(Shift - 5, Ctrl - 10; the infinity button repeats it)"
 
 msgid "Map"
-msgstr ""
+msgstr "Map"
 
 msgid "Watching"
-msgstr ""
+msgstr "Watching"
 
 msgid "STATS"
-msgstr ""
+msgstr "STATS"
 
 msgid "STATISTICS"
-msgstr ""
+msgstr "STATISTICS"
 
 msgid "Credits"
-msgstr ""
+msgstr "Credits"
 
 msgid "MB"
-msgstr ""
+msgstr "MB"
 
 msgid "KB"
-msgstr ""
+msgstr "KB"
 
 msgid "Custom game"
-msgstr ""
+msgstr "Custom game"
 
 msgid "Campaign"
-msgstr ""
+msgstr "Campaign"
 
 msgid "Network"
-msgstr ""
+msgstr "Network"
 
 msgid "Played"
-msgstr ""
-
-msgid "Shot sound"
-msgstr ""
-
-msgid "Impact sound"
-msgstr ""
-
-msgid "Sound volume"
-msgstr ""
-
-msgid "(by projectile)"
-msgstr ""
-
-msgid "Sounds"
-msgstr ""
-
-msgid "Death sound"
-msgstr ""
-
-msgid "(explosion / infantry death)"
-msgstr ""
-
-msgid "Volume of all its sounds"
-msgstr ""
-
-msgid "not in audio_sfx.json"
-msgstr ""
-
-msgid "Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg listed in main.json."
-msgstr ""
+msgstr "Played"
 
 msgid "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."
-msgstr ""
+msgstr "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."
 
 msgid "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."
-msgstr ""
-
-msgid "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."
-msgstr ""
-
-msgid "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."
-msgstr ""
+msgstr "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."
 
 msgid "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."
-msgstr ""
-
-msgid "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."
-msgstr ""
-
-msgid "Damage sound"
-msgstr ""
-
-msgid "(bullet / armour hit)"
-msgstr ""
+msgstr "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."
 
 msgid "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."
-msgstr ""
+msgstr "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."
 
 msgid "DAY"
-msgstr ""
+msgstr "DAY"
 
 msgid "NIGHT"
-msgstr ""
+msgstr "NIGHT"
 
 msgid "Ambient volume"
-msgstr ""
+msgstr "Ambient volume"
 
 msgid "Volume of the surroundings in a match: the forest by day or by night"
-msgstr ""
+msgstr "Volume of the surroundings in a match: the forest by day or by night"

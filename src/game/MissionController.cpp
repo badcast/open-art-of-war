@@ -200,7 +200,6 @@ void MissionController::SetDefensePacing(
 
 bool MissionController::LoadMission(
     int missionId,
-    const std::string &assetRoot,
     TileMap &map,
     EntityManager &entities,
     Economy &economy,
@@ -267,7 +266,7 @@ bool MissionController::LoadMission(
     };
 
     // 2. Load corresponding map
-    std::string mapPath = LoaderResources::MapPath(jmi.mapFile, assetRoot);
+    std::string mapPath = LoaderResources::MapPath(jmi.mapFile);
     if (!map.LoadMap(mapPath))
     {
         std::cerr << "[MissionController] Failed to load map: " << mapPath << std::endl;
@@ -531,7 +530,7 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
                 continue;
             teamAlive[Players::TeamOf(e.owner) % kMaxPlayers] = true;
         }
-        const uint8_t mine = Players::TeamOf(Players::Local()) % kMaxPlayers;
+        const std::uint8_t mine = Players::TeamOf(Players::Local()) % kMaxPlayers;
         int others = 0;
         for (int t = 0; t < kMaxPlayers; ++t)
             others += (t != mine && teamAlive[t]) ? 1 : 0;
@@ -647,7 +646,7 @@ bool MissionController::LoadTestPolygon(TileMap &map, EntityManager &entities, E
     // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
     // custom match before left its own slots, colours and local slot behind)
     SetPlayerFaction(PlayerFaction());
-    return LoadTestMap(LoaderResources::kDefaultRoot, map, entities, economy, pathfinder);
+    return LoadTestMap(map, entities, economy, pathfinder);
 }
 
 namespace
@@ -681,14 +680,17 @@ std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
                            || (doc.contains("units") && doc["units"].is_array() && !doc["units"].empty());
         maps.push_back(std::move(info));
     }
-    // m0, m26, ... first, map_mission_1, ... next, then map_skirmish_1, ... then everything else; numbers compare as
+    // confederation_mission_* first, resistance_mission_* next, then skirmish_*, then everything else; numbers compare as
     // numbers
     auto sortKey = [](const SkirmishMapInfo &m) {
         const std::string &n = m.name;
-        size_t digits = n.find_first_of("0123456789");
+        std::size_t digits = n.find_first_of("0123456789");
         std::string prefix = digits == std::string::npos ? n : n.substr(0, digits);
         const int number = digits == std::string::npos ? 0 : std::atoi(n.c_str() + digits);
-        const int group = prefix == "m" ? 0 : (prefix == "map_mission_" ? 1 : (prefix == "map_skirmish_" ? 2 : 3));
+        const int group = prefix.rfind("confederation_mission_", 0) == 0 ? 0
+                        : (prefix.rfind("resistance_mission_", 0) == 0   ? 1
+                           : (prefix.rfind("skirmish_", 0) == 0          ? 2
+                                                                         : 3));
         return std::make_tuple(group, prefix, number, n);
     };
     std::sort(maps.begin(), maps.end(), [&](const SkirmishMapInfo &a, const SkirmishMapInfo &b) {
@@ -757,7 +759,7 @@ bool FindBaseSite(
 std::vector<char> ReachableFrom(const TileMap &map, int startX, int startY)
 {
     const int w = map.GetWidth(), h = map.GetHeight();
-    std::vector<char> seen(static_cast<size_t>(w) * h, 0);
+    std::vector<char> seen(static_cast<std::size_t>(w) * h, 0);
     std::queue<std::pair<int, int>> queue;
     queue.push({startX, startY});
     seen[startY * w + startX] = 1;
@@ -790,7 +792,7 @@ public:
         , m_entities(entities)
         , m_w(map.GetWidth())
         , m_h(map.GetHeight())
-        , m_taken(static_cast<size_t>(m_w) * m_h, 0)
+        , m_taken(static_cast<std::size_t>(m_w) * m_h, 0)
     {}
 
     bool Place(int type, int cx, int cy, Faction faction, PlayerId owner, int &outX, int &outY)
@@ -906,7 +908,7 @@ std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &doc, int
             if (std::abs(p.first - x) < 6 && std::abs(p.second - y) < 6)
                 return; // the same spot
         }
-        if (out.size() < static_cast<size_t>(kMaxPlayers))
+        if (out.size() < static_cast<std::size_t>(kMaxPlayers))
             out.push_back({x, y});
     };
     if (doc.is_object() && doc.contains("start_positions") && doc["start_positions"].is_array())
@@ -1406,8 +1408,7 @@ bool MissionController::LoadMatch(
     return true;
 }
 
-bool MissionController::Restart(
-    const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+bool MissionController::Restart(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
     if (IsMatch() && m_matchSetup.localOnly)
     {
@@ -1418,11 +1419,10 @@ bool MissionController::Restart(
     {
         return LoadSkirmish(m_customMapPath, map, entities, economy, pathfinder, m_customPrebuilt);
     }
-    return LoadMission(m_currentMissionId, assetRoot, map, entities, economy, pathfinder);
+    return LoadMission(m_currentMissionId, map, entities, economy, pathfinder);
 }
 
-bool MissionController::LoadTestMap(
-    const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
+bool MissionController::LoadTestMap(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
     // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
     // custom match before left its own slots, colours and local slot behind)
@@ -1438,8 +1438,7 @@ bool MissionController::LoadTestMap(
     m_isVictory = false;
     m_isDefeat = false;
 
-    const std::string testMapPath
-        = LoaderResources::TestMap(assetRoot.empty() ? std::string(LoaderResources::kDefaultRoot) : assetRoot);
+    const std::string testMapPath = LoaderResources::TestMap();
     std::string mapText;
     bool haveTestMap = Assets::ReadText(testMapPath, mapText);
     if (!haveTestMap)

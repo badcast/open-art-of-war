@@ -33,10 +33,10 @@ struct MapSnapshot
     int width {0};
     int height {0};
     int tilesetId {0};
-    std::vector<uint8_t> baseTiles;
+    std::vector<std::uint8_t> baseTiles;
     std::vector<MapDecoration> decorations;
-    std::vector<uint16_t> wallGrid;
-    std::vector<int16_t> wallHp;
+    std::vector<std::uint16_t> wallGrid;
+    std::vector<std::int16_t> wallHp;
     std::vector<bool> passability;
     std::vector<EditorEntity> entities;
     int playerStartX {0};
@@ -51,7 +51,7 @@ class MapDocument
 public:
     MapDocument();
 
-    void NewMap(int width, int height, int tilesetId, uint8_t fillTile = 0);
+    void NewMap(int width, int height, int tilesetId, std::uint8_t fillTile = 0);
     bool LoadMap(const std::string &path);
     bool SaveMap(const std::string &path);
 
@@ -142,7 +142,7 @@ public:
 
     // More start positions (players 3..8 of a network game): a click on a free tile adds one, a click on an existing
     // one takes it away. The map holds as many players as it has start positions (the two above plus these).
-    static constexpr size_t kMaxExtraStarts = 6;
+    static constexpr std::size_t kMaxExtraStarts = 6;
     enum class StartToggle
     {
         Added,
@@ -151,7 +151,7 @@ public:
     };
     StartToggle ToggleExtraStart(int x, int y)
     {
-        for (size_t i = 0; i < m_extraStarts.size(); ++i)
+        for (std::size_t i = 0; i < m_extraStarts.size(); ++i)
         {
             if (m_extraStarts[i].first == x && m_extraStarts[i].second == y)
             {
@@ -196,10 +196,10 @@ public:
     }
 
     // Map Editing Tools
-    void SetTile(int x, int y, uint8_t tile);
-    void SetTileBrush(int x, int y, uint8_t tile, int brushSize = 1);
-    void FloodFill(int startX, int startY, uint8_t newTile);
-    void FillAll(uint8_t tile);
+    void SetTile(int x, int y, std::uint8_t tile);
+    void SetTileBrush(int x, int y, std::uint8_t tile, int brushSize = 1);
+    void FloodFill(int startX, int startY, std::uint8_t newTile);
+    void FillAll(std::uint8_t tile);
 
     void AddDecoration(int type, int x, int y);
     void RemoveDecoration(int x, int y);
@@ -265,7 +265,7 @@ private:
 
     std::vector<MapSnapshot> m_undoStack;
     std::vector<MapSnapshot> m_redoStack;
-    static constexpr size_t MAX_UNDO_LEVELS = 30;
+    static constexpr std::size_t MAX_UNDO_LEVELS = 30;
 };
 
 } // namespace OpenArtOfWar

@@ -75,7 +75,7 @@ SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
     }
 
     // SDL3 decodes PNG natively; all game art is PNG
-    std::vector<uint8_t> pngData;
+    std::vector<std::uint8_t> pngData;
     SDL_Surface *surface = nullptr;
     if (Assets::ReadBytes(filePath, pngData) && !pngData.empty())
     {
@@ -125,60 +125,60 @@ bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
         const auto &comp = j["composite_sprites"];
         for (const auto &r : comp["ranges"])
         {
-            m_compositeRanges.push_back({r[0].get<int16_t>(), r[1].get<int16_t>()});
+            m_compositeRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
         }
         for (const auto &p : comp["parts"])
         {
             m_compositeParts.push_back(
-                {p["child"].get<int16_t>(),
-                 p["ox"].get<int16_t>(),
-                 p["oy"].get<int16_t>(),
-                 static_cast<uint8_t>(p["is_comp"].get<int>())});
+                {p["child"].get<std::int16_t>(),
+                 p["ox"].get<std::int16_t>(),
+                 p["oy"].get<std::int16_t>(),
+                 static_cast<std::uint8_t>(p["is_comp"].get<int>())});
         }
 
         // 2. Animation sequences
         const auto &anim = j["anim_sequences"];
         for (const auto &r : anim["ranges"])
         {
-            m_animRanges.push_back({r[0].get<int16_t>(), r[1].get<int16_t>()});
+            m_animRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
         }
         for (const auto &f : anim["frames"])
         {
             m_animFrames.push_back(
-                {f["child"].get<int16_t>(),
-                 static_cast<int8_t>(f["ox"].get<int>()),
-                 static_cast<int8_t>(f["oy"].get<int>()),
-                 static_cast<uint8_t>(f["is_comp"].get<int>())});
+                {f["child"].get<std::int16_t>(),
+                 static_cast<std::int8_t>(f["ox"].get<int>()),
+                 static_cast<std::int8_t>(f["oy"].get<int>()),
+                 static_cast<std::uint8_t>(f["is_comp"].get<int>())});
         }
 
         // 3. Unit bodies
         const auto &ub = j["unit_bodies"];
         for (const auto &r : ub["ranges"])
         {
-            m_unitBodyRanges.push_back({r[0].get<int16_t>(), r[1].get<int16_t>()});
+            m_unitBodyRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
         }
         for (const auto &l : ub["layers"])
         {
             m_unitLayers.push_back(
-                {l["child"].get<int16_t>(),
-                 static_cast<int8_t>(l["ox"].get<int>()),
-                 static_cast<int8_t>(l["oy"].get<int>()),
-                 static_cast<uint8_t>(l["is_comp"].get<int>()),
-                 static_cast<uint8_t>(l["flag"].get<int>())});
+                {l["child"].get<std::int16_t>(),
+                 static_cast<std::int8_t>(l["ox"].get<int>()),
+                 static_cast<std::int8_t>(l["oy"].get<int>()),
+                 static_cast<std::uint8_t>(l["is_comp"].get<int>()),
+                 static_cast<std::uint8_t>(l["flag"].get<int>())});
         }
 
         // 4. Unit sequences
         const auto &us = j["unit_sequences"];
         for (const auto &r : us["ranges"])
         {
-            m_unitSequenceRanges.push_back({r[0].get<int16_t>(), r[1].get<int16_t>()});
+            m_unitSequenceRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
         }
         for (const auto &s : us["steps"])
         {
             m_unitSteps.push_back(
-                {s["body"].get<int16_t>(),
-                 static_cast<int8_t>(s["ox"].get<int>()),
-                 static_cast<int8_t>(s["oy"].get<int>())});
+                {s["body"].get<std::int16_t>(),
+                 static_cast<std::int8_t>(s["ox"].get<int>()),
+                 static_cast<std::int8_t>(s["oy"].get<int>())});
         }
 
         // 5. Buildings
@@ -186,34 +186,34 @@ bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
         const auto &ranges = bd["ranges"];
         const auto &widths = bd["widths"];
         const auto &heights = bd["heights"];
-        size_t bcount = ranges.size();
-        for (size_t i = 0; i < bcount; ++i)
+        std::size_t bcount = ranges.size();
+        for (std::size_t i = 0; i < bcount; ++i)
         {
             BuildingDef bdef;
-            bdef.start = ranges[i][0].get<int16_t>();
-            bdef.end = ranges[i][1].get<int16_t>();
-            bdef.width = (i < widths.size()) ? static_cast<uint8_t>(widths[i].get<int>()) : 1;
-            bdef.height = (i < heights.size()) ? static_cast<uint8_t>(heights[i].get<int>()) : 1;
+            bdef.start = ranges[i][0].get<std::int16_t>();
+            bdef.end = ranges[i][1].get<std::int16_t>();
+            bdef.width = (i < widths.size()) ? static_cast<std::uint8_t>(widths[i].get<int>()) : 1;
+            bdef.height = (i < heights.size()) ? static_cast<std::uint8_t>(heights[i].get<int>()) : 1;
             m_buildings.push_back(bdef);
         }
         for (const auto &p : bd["parts"])
         {
             m_buildingParts.push_back(
-                {p["child"].get<int16_t>(),
-                 p["ox"].get<int16_t>(),
-                 static_cast<int8_t>(p["oy"].get<int>()),
-                 static_cast<uint8_t>(p["is_comp"].get<int>()),
-                 static_cast<uint8_t>(p["layer"].get<int>()),
-                 p.contains("state") ? static_cast<uint8_t>(p["state"].get<int>()) : uint8_t {0}});
+                {p["child"].get<std::int16_t>(),
+                 p["ox"].get<std::int16_t>(),
+                 static_cast<std::int8_t>(p["oy"].get<int>()),
+                 static_cast<std::uint8_t>(p["is_comp"].get<int>()),
+                 static_cast<std::uint8_t>(p["layer"].get<int>()),
+                 p.contains("state") ? static_cast<std::uint8_t>(p["state"].get<int>()) : std::uint8_t {0}});
         }
 
         // 6. Tilesets
         for (const auto &ts : j["tilesets"])
         {
-            std::vector<int16_t> tlist;
+            std::vector<std::int16_t> tlist;
             for (const auto &val : ts)
             {
-                tlist.push_back(val.get<int16_t>());
+                tlist.push_back(val.get<std::int16_t>());
             }
             m_tilesetsList.push_back(std::move(tlist));
         }
@@ -222,17 +222,17 @@ bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
         {
             for (const auto &val : j["decor_offsets"])
             {
-                m_decorOffsets.push_back(val.get<int16_t>());
+                m_decorOffsets.push_back(val.get<std::int16_t>());
             }
         }
 
         // 7. Unit archetypes
         for (const auto &row : j["unit_archetypes"])
         {
-            std::vector<int16_t> rlist;
+            std::vector<std::int16_t> rlist;
             for (const auto &val : row)
             {
-                rlist.push_back(val.get<int16_t>());
+                rlist.push_back(val.get<std::int16_t>());
             }
             m_unitArchetypes.push_back(std::move(rlist));
         }
@@ -240,7 +240,7 @@ bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
         // 8. Decor animations
         for (const auto &val : j["decor_anims"])
         {
-            m_decorAnims.push_back(val.get<int16_t>());
+            m_decorAnims.push_back(val.get<std::int16_t>());
         }
 
         std::cout << "[TextureManager] Loaded graphics data: " << m_compositeRanges.size() << " composites, "
@@ -255,12 +255,12 @@ bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
     }
 }
 
-bool TextureManager::LoadAllAssets(const std::string &assetRoot)
+bool TextureManager::LoadAllAssets()
 {
-    std::cout << "[TextureManager] Loading game assets from: " << assetRoot << "..." << std::endl;
+    std::cout << "[TextureManager] Loading game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
 
     // 1. Load sprite frame definitions from sprites.json
-    std::string jsonPath = LoaderResources::SpriteFrames(assetRoot);
+    std::string jsonPath = LoaderResources::SpriteFrames();
     std::string sprites;
     if (Assets::ReadText(jsonPath, sprites))
     {
@@ -285,14 +285,13 @@ bool TextureManager::LoadAllAssets(const std::string &assetRoot)
         std::cerr << "[TextureManager] Warning: could not open " << jsonPath << std::endl;
     }
 
-    // 2. Load the sprite sheets listed in main.json and compute dynamic HD resolution scaling
+    // 2. Load the sprite sheets listed in main.yaml and compute dynamic HD resolution scaling
     const int sheetCount = LoaderResources::SpriteSheetCount();
-    m_assetRoot = assetRoot;
     m_spriteSheets.assign(sheetCount, nullptr);
     m_sheetScales.assign(sheetCount, 1.0f);
     for (int i = 0; i < sheetCount; ++i)
     {
-        m_spriteSheets[i] = LoadTexture(LoaderResources::SpriteSheet(i, assetRoot));
+        m_spriteSheets[i] = LoadTexture(LoaderResources::SpriteSheet(i));
         if (m_spriteSheets[i])
         {
             float tw = 0.0f, th = 0.0f;
@@ -305,11 +304,11 @@ bool TextureManager::LoadAllAssets(const std::string &assetRoot)
     }
 
     // 3. Load UI screens
-    for (const auto &[name, path] : LoaderResources::UiTextures(assetRoot))
+    for (const auto &[name, path] : LoaderResources::UiTextures())
         m_uiTextures[name] = LoadTexture(path);
 
     // 4. Load comprehensive graphics data (composites, animations, units, buildings, tilesets)
-    std::string gdataPath = LoaderResources::GraphicsData(assetRoot);
+    std::string gdataPath = LoaderResources::GraphicsData();
     LoadGraphicsData(gdataPath);
 
     std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
@@ -323,7 +322,7 @@ void TextureManager::CollectTerrainPages()
     std::vector<int> stack;
     for (const auto &tiles : m_tilesetsList)
     {
-        for (int16_t comp : tiles)
+        for (std::int16_t comp : tiles)
             stack.push_back(comp);
     }
     std::vector<bool> seen;
@@ -376,7 +375,7 @@ void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
     m_spriteScaleMode = sharpPixels ? SDL_SCALEMODE_LINEAR : m_terrainScaleMode;
     const SDL_ScaleMode mode = m_terrainScaleMode;
     const SDL_ScaleMode spriteMode = m_spriteScaleMode;
-    for (size_t i = 0; i < m_spriteSheets.size(); ++i)
+    for (std::size_t i = 0; i < m_spriteSheets.size(); ++i)
     {
         if (m_spriteSheets[i])
             SDL_SetTextureScaleMode(m_spriteSheets[i], m_terrainPages[i] ? mode : spriteMode);
@@ -385,7 +384,7 @@ void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
     {
         if (!tex)
             continue;
-        const size_t page = static_cast<size_t>(key >> 32);
+        const std::size_t page = static_cast<std::size_t>(key >> 32);
         const bool terrain = page < m_terrainPages.size() && m_terrainPages[page];
         SDL_SetTextureScaleMode(tex, terrain ? mode : spriteMode);
     }
@@ -447,10 +446,10 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
     if (page < 0 || page >= static_cast<int>(m_spriteSheets.size()))
         return nullptr;
 
-    const uint64_t key = (static_cast<uint64_t>(static_cast<uint32_t>(page)) << 32)
-                         | (static_cast<uint64_t>(static_cast<uint8_t>(team)) << 24)
-                         | (static_cast<uint64_t>(color.r) << 16) | (static_cast<uint64_t>(color.g) << 8)
-                         | static_cast<uint64_t>(color.b);
+    const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(page)) << 32)
+                         | (static_cast<std::uint64_t>(static_cast<std::uint8_t>(team)) << 24)
+                         | (static_cast<std::uint64_t>(color.r) << 16) | (static_cast<std::uint64_t>(color.g) << 8)
+                         | static_cast<std::uint64_t>(color.b);
     auto it = m_recoloredSheets.find(key);
     if (it != m_recoloredSheets.end())
         return it->second;
@@ -469,10 +468,10 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
 
     for (int y = 0; y < copy->h; ++y)
     {
-        uint8_t *row = static_cast<uint8_t *>(copy->pixels) + y * copy->pitch;
+        std::uint8_t *row = static_cast<std::uint8_t *>(copy->pixels) + y * copy->pitch;
         for (int x = 0; x < copy->w; ++x)
         {
-            uint8_t *px = row + x * 4; // RGBA32
+            std::uint8_t *px = row + x * 4; // RGBA32
             if (px[3] == 0)
                 continue;
             const float cr = px[0] / 255.0f;
@@ -500,9 +499,9 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
             const float outR = cr + (rr - cr) * w;
             const float outG = cg + (rg - cg) * w;
             const float outB = cb + (rb - cb) * w;
-            px[0] = static_cast<uint8_t>(std::clamp(outR * 255.0f + 0.5f, 0.0f, 255.0f));
-            px[1] = static_cast<uint8_t>(std::clamp(outG * 255.0f + 0.5f, 0.0f, 255.0f));
-            px[2] = static_cast<uint8_t>(std::clamp(outB * 255.0f + 0.5f, 0.0f, 255.0f));
+            px[0] = static_cast<std::uint8_t>(std::clamp(outR * 255.0f + 0.5f, 0.0f, 255.0f));
+            px[1] = static_cast<std::uint8_t>(std::clamp(outG * 255.0f + 0.5f, 0.0f, 255.0f));
+            px[2] = static_cast<std::uint8_t>(std::clamp(outB * 255.0f + 0.5f, 0.0f, 255.0f));
         }
     }
 
@@ -571,6 +570,24 @@ const SpriteFrame *TextureManager::GetSpriteFrame(int spriteId) const
         return &m_spriteFrames[spriteId];
     }
     return nullptr;
+}
+
+bool TextureManager::UpdateSpriteFrame(int spriteId, int page, int x, int y, int width, int height, int palette)
+{
+    if (spriteId >= 0 && spriteId < static_cast<int>(m_spriteFrames.size()))
+    {
+        m_spriteFrames[spriteId].page = page;
+        m_spriteFrames[spriteId].x = x;
+        m_spriteFrames[spriteId].y = y;
+        m_spriteFrames[spriteId].width = width;
+        m_spriteFrames[spriteId].height = height;
+        if (palette >= 0)
+        {
+            m_spriteFrames[spriteId].palette = palette;
+        }
+        return true;
+    }
+    return false;
 }
 
 IndexRange TextureManager::GetCompositeRange(int compId) const
@@ -672,8 +689,8 @@ SDL_Surface *TextureManager::SheetSurface(int page)
         m_sheetSurfaces.resize(sheetCount, nullptr);
     if (!m_sheetSurfaces[page])
     {
-        std::vector<uint8_t> png;
-        if (!Assets::ReadBytes(LoaderResources::SpriteSheet(page, m_assetRoot), png) || png.empty())
+        std::vector<std::uint8_t> png;
+        if (!Assets::ReadBytes(LoaderResources::SpriteSheet(page), png) || png.empty())
             return nullptr;
         SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
         if (!loaded)
@@ -712,10 +729,10 @@ void TextureManager::SumCompositeColor(
         const int y1 = std::min(surface->h, static_cast<int>((frame->y + frame->height) * scale));
         for (int y = y0; y < y1; ++y)
         {
-            const uint8_t *row = static_cast<const uint8_t *>(surface->pixels) + y * surface->pitch;
+            const std::uint8_t *row = static_cast<const std::uint8_t *>(surface->pixels) + y * surface->pitch;
             for (int x = x0; x < x1; ++x)
             {
-                const uint8_t *px = row + x * 4; // RGBA32: bytes are R, G, B, A
+                const std::uint8_t *px = row + x * 4; // RGBA32: bytes are R, G, B, A
                 if (px[3] < 128)
                     continue;
                 r += px[0];

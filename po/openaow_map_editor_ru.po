@@ -1,0 +1,79 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: OpenArtOfWar Map Editor 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-06 13:40+0500\n"
+"PO-Revision-Date: 2026-11-06 13:40+0500\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ru\n"
+
+msgid "File"
+msgstr "Файл"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Properties"
+msgstr "Параметры"
+
+msgid "Open Art Of War Map Editor - [openaow-mapeditor]"
+msgstr "Редактор карт Open Art Of War - [openaow-mapeditor]"
+
+msgid "Undo action"
+msgstr "Отмена действия (Undo)"
+
+msgid "Redo action"
+msgstr "Повтор действия (Redo)"
+
+msgid "Map saved: "
+msgstr "Карта сохранена: "
+
+msgid "Player start point (HQ): "
+msgstr "Стартовая точка игрока (HQ): "
+
+msgid "Enemy start point (HQ): "
+msgstr "Стартовая точка врага (HQ): "
+
+msgid "Eyedropper: selected tile #"
+msgstr "Пипетка: выбран тайл #"
+
+msgid "Building"
+msgstr "Здание"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "A map holds 8 players at most: no more start positions"
+msgstr "Карта вмещает не больше 8 игроков: больше точек старта нельзя"
+
+msgid "Start position added: "
+msgstr "Точка старта добавлена: "
+
+msgid "Start position removed: "
+msgstr "Точка старта убрана: "
+
+msgid "players"
+msgstr "игроков"
+
+msgid "View"
+msgstr "Вид"
+
+msgid "None"
+msgstr "Нет"
+
+msgid "Players"
+msgstr "Игроки"
+
+msgid "Place"
+msgstr "Место"
+
+msgid "Open"
+msgstr "Открыто"
+
+msgid "Blocked"
+msgstr "Заблокировано"
+
+msgid "unsaved"
+msgstr "не сохранено"

@@ -7,10 +7,10 @@ namespace OpenArtOfWar::Net
 
 namespace
 {
-constexpr uint32_t kConnectTimeoutMs = 6000;
+constexpr std::uint32_t kConnectTimeoutMs = 6000;
 } // namespace
 
-MasterClient::MasterClient(const std::string &host, uint16_t port)
+MasterClient::MasterClient(const std::string &host, std::uint16_t port)
 {
     m_creating = std::async(std::launch::async, [host, port]() {
         Created c;
@@ -29,9 +29,9 @@ void MasterClient::flush()
 }
 
 template <typename T>
-static std::vector<uint8_t> encodeMessage(const T &m)
+static std::vector<std::uint8_t> encodeMessage(const T &m)
 {
-    std::vector<uint8_t> buf(1024);
+    std::vector<std::uint8_t> buf(1024);
     BitWriter w(buf.data(), buf.size());
     encode(w, m);
     buf.resize(w.finish());
@@ -88,7 +88,7 @@ void MasterClient::findRoom(const std::string &code)
     flush();
 }
 
-void MasterClient::update(uint32_t nowMs)
+void MasterClient::update(std::uint32_t nowMs)
 {
     if (m_creating.valid() && m_creating.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {

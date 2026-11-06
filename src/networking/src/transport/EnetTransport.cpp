@@ -13,7 +13,7 @@ namespace OpenArtOfWar::Net
 namespace
 {
 
-constexpr size_t kChannels = static_cast<size_t>(Channel::Count);
+constexpr std::size_t kChannels = static_cast<std::size_t>(Channel::Count);
 
 enet_uint32 packetFlags(Channel c)
 {
@@ -80,7 +80,7 @@ public:
         m_pending = peer;
     }
 
-    void send(PeerId peer, Channel channel, const uint8_t *data, size_t size) override
+    void send(PeerId peer, Channel channel, const std::uint8_t *data, std::size_t size) override
     {
         auto it = m_peers.find(peer);
         if (it == m_peers.end())
@@ -124,7 +124,7 @@ public:
                         TransportEvent::Type::Received,
                         id,
                         ev.channelID < kChannels ? static_cast<Channel>(ev.channelID) : Channel::Control,
-                        std::vector<uint8_t>(ev.packet->data, ev.packet->data + ev.packet->dataLength)};
+                        std::vector<std::uint8_t>(ev.packet->data, ev.packet->data + ev.packet->dataLength)};
                     enet_packet_destroy(ev.packet);
                     out.push_back(std::move(e));
                     break;
@@ -144,7 +144,7 @@ public:
         enet_peer_disconnect_later(it->second, 0);
     }
 
-    uint32_t roundTripMs(PeerId peer) const override
+    std::uint32_t roundTripMs(PeerId peer) const override
     {
         auto it = m_peers.find(peer);
         return it == m_peers.end() ? 0 : it->second->roundTripTime;
@@ -185,7 +185,7 @@ public:
     }
 
     // A datagram that is not ENet's: a local network browser asking who is there
-    void sendRaw(const std::string &ip, uint16_t port, const std::vector<uint8_t> &data) override
+    void sendRaw(const std::string &ip, std::uint16_t port, const std::vector<std::uint8_t> &data) override
     {
         ENetAddress to {};
         // An address, or a name resolved once and kept
@@ -202,7 +202,7 @@ public:
         }
         to.port = port;
         ENetBuffer buffer;
-        buffer.data = const_cast<uint8_t *>(data.data());
+        buffer.data = const_cast<std::uint8_t *>(data.data());
         buffer.dataLength = data.size();
         enet_socket_send(m_host->socket, &to, &buffer, 1);
     }
@@ -212,7 +212,7 @@ public:
         m_raw = std::move(handler);
     }
 
-    bool connectTo(const std::string &hostName, uint16_t port) override
+    bool connectTo(const std::string &hostName, std::uint16_t port) override
     {
         if (!m_client || !m_peers.empty() || m_pending)
             return false;
@@ -233,8 +233,8 @@ public:
         (void) event;
         auto it = registry().find(host);
         RawKind kind {};
-        const uint8_t *payload = nullptr;
-        size_t payloadSize = 0;
+        const std::uint8_t *payload = nullptr;
+        std::size_t payloadSize = 0;
         if (decodeRaw(host->receivedData, host->receivedDataLength, kind, payload, payloadSize))
         {
             if (it != registry().end() && it->second->m_raw)
@@ -245,16 +245,16 @@ public:
             }
             return 1;
         }
-        uint32_t nonce = 0;
+        std::uint32_t nonce = 0;
         if (!decodeProbe(host->receivedData, host->receivedDataLength, nonce))
             return 0; // ENet's own
         if (it == registry().end() || it->second->m_client || !it->second->m_hasRoom)
             return 1;
         ENetAddress bound {};
         enet_socket_get_address(host->socket, &bound);
-        const std::vector<uint8_t> answer = encodeAnswer(nonce, bound.port, it->second->m_room);
+        const std::vector<std::uint8_t> answer = encodeAnswer(nonce, bound.port, it->second->m_room);
         ENetBuffer buffer;
-        buffer.data = const_cast<uint8_t *>(answer.data());
+        buffer.data = const_cast<std::uint8_t *>(answer.data());
         buffer.dataLength = answer.size();
         enet_socket_send(host->socket, &host->receivedAddress, &buffer, 1);
         return 1;
@@ -276,7 +276,7 @@ private:
 } // namespace
 
 std::unique_ptr<Transport> createEnetServer(
-    uint16_t port, int maxPeers, std::string *error, uint16_t *boundPort, const std::string &bindAddress)
+    std::uint16_t port, int maxPeers, std::string *error, std::uint16_t *boundPort, const std::string &bindAddress)
 {
     if (!initialize())
     {
@@ -295,7 +295,7 @@ std::unique_ptr<Transport> createEnetServer(
         return nullptr;
     }
     address.port = port;
-    ENetHost *host = enet_host_create(&address, static_cast<size_t>(maxPeers), kChannels, 0, 0);
+    ENetHost *host = enet_host_create(&address, static_cast<std::size_t>(maxPeers), kChannels, 0, 0);
     if (!host)
     {
         shutdown();
@@ -342,15 +342,15 @@ namespace
 constexpr char kRawMagic[8] = {'O', 'A', 'O', 'W', 'R', 'A', 'W', '1'};
 } // namespace
 
-std::vector<uint8_t> encodeRaw(RawKind kind, const std::vector<uint8_t> &payload)
+std::vector<std::uint8_t> encodeRaw(RawKind kind, const std::vector<std::uint8_t> &payload)
 {
-    std::vector<uint8_t> out(kRawMagic, kRawMagic + 8);
-    out.push_back(static_cast<uint8_t>(kind));
+    std::vector<std::uint8_t> out(kRawMagic, kRawMagic + 8);
+    out.push_back(static_cast<std::uint8_t>(kind));
     out.insert(out.end(), payload.begin(), payload.end());
     return out;
 }
 
-bool decodeRaw(const uint8_t *data, size_t size, RawKind &kind, const uint8_t *&payload, size_t &payloadSize)
+bool decodeRaw(const std::uint8_t *data, std::size_t size, RawKind &kind, const std::uint8_t *&payload, std::size_t &payloadSize)
 {
     if (size < 9 || std::memcmp(data, kRawMagic, 8) != 0)
         return false;
@@ -360,7 +360,7 @@ bool decodeRaw(const uint8_t *data, size_t size, RawKind &kind, const uint8_t *&
     return true;
 }
 
-std::unique_ptr<Transport> createEnetClient(const std::string &hostName, uint16_t port, std::string *error)
+std::unique_ptr<Transport> createEnetClient(const std::string &hostName, std::uint16_t port, std::string *error)
 {
     if (!initialize())
     {

@@ -28,7 +28,7 @@ constexpr double MENU_TICK_RATE = 10.0;                            // 10 TPS
 constexpr double MENU_TIMESTEP = 1.0 / MENU_TICK_RATE;             // 100ms
 
 // Factions
-enum class Faction : uint8_t
+enum class Faction : std::uint8_t
 {
     Resistance = 0,    // Red (Resistance - Peruvian guerrillas, red palette Sheet 9 / Sheets 12..13)
     Confederation = 1, // Blue (Confederation - regular army, blue palette Sheet 8 / Sheets 10..11)
@@ -36,7 +36,7 @@ enum class Faction : uint8_t
 };
 
 // Unit FSM Action States
-enum class ActionState : uint8_t
+enum class ActionState : std::uint8_t
 {
     Idle = 0,
     Move = 1,
@@ -48,7 +48,7 @@ enum class ActionState : uint8_t
 };
 
 // Unit Archetypes
-enum class UnitType : uint8_t
+enum class UnitType : std::uint8_t
 {
     // Units: one value per unit (numbers kept from the original data). Siege / baseline forms share their unit's type.
     // Resistance

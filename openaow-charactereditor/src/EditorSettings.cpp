@@ -27,7 +27,7 @@ bool IsInt(const std::string &s)
 {
     if (s.empty())
         return false;
-    size_t i = (s[0] == '-' || s[0] == '+') ? 1 : 0;
+    std::size_t i = (s[0] == '-' || s[0] == '+') ? 1 : 0;
     if (i >= s.size())
         return false;
     for (; i < s.size(); ++i)
@@ -52,7 +52,7 @@ bool IsHexColor(const std::string &s)
         return false;
     if (s[0] != '#')
         return false;
-    for (size_t i = 1; i < s.size(); ++i)
+    for (std::size_t i = 1; i < s.size(); ++i)
         if (!std::isxdigit(static_cast<unsigned char>(s[i])))
             return false;
     return true;
@@ -118,7 +118,7 @@ std::string Pretty(const std::string &key)
 
 std::string LastKey(const std::string &path)
 {
-    const size_t dot = path.rfind('.');
+    const std::size_t dot = path.rfind('.');
     return dot == std::string::npos ? path : path.substr(dot + 1);
 }
 
@@ -243,7 +243,7 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
             if (!ImGui::IsAnyItemActive() || buf[0] == '\0')
             {
                 std::string joined;
-                for (size_t i = 0; i < n.size(); ++i)
+                for (std::size_t i = 0; i < n.size(); ++i)
                 {
                     if (i)
                         joined += ", ";

@@ -96,9 +96,9 @@ BarLayout MakeBar(int viewW, bool replay)
     return l;
 }
 
-std::string Clock(uint32_t ticks)
+std::string Clock(std::uint32_t ticks)
 {
-    const uint32_t s = ticks / 20;
+    const std::uint32_t s = ticks / 20;
     char buf[24];
     std::snprintf(buf, sizeof buf, "%u:%02u", s / 60, s % 60);
     return buf;
@@ -166,7 +166,7 @@ bool Application::StartReplay(int watchSlot)
     BeginMapLoading(TitleOf(setup.mapPath), setup.mapPath);
     const bool loaded
         = campaign ? m_mission->LoadMission(
-                         rinfo.mission, LoaderResources::kDefaultRoot, *m_map, *m_entities, *m_economy, *m_pathfinder)
+                         rinfo.mission, *m_map, *m_entities, *m_economy, *m_pathfinder)
                    : m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder);
     if (!loaded)
     {
@@ -329,7 +329,7 @@ void Application::UpdateReplayInput(double frameTime)
 {
     Simulation &sim = m_gameplayController->simulation();
     const bool replay = m_replay != nullptr;
-    const uint32_t total = replay ? m_replay->info().ticks : 0u;
+    const std::uint32_t total = replay ? m_replay->info().ticks : 0u;
     m_replayUi.finished = replay && sim.Tick() >= total;
 
     // Keys
@@ -452,7 +452,7 @@ void Application::UpdateReplayInput(double frameTime)
             next = viewPlayers.empty() ? -1 : viewPlayers.front().slot;
         else
         {
-            for (size_t i = 0; i < viewPlayers.size(); ++i)
+            for (std::size_t i = 0; i < viewPlayers.size(); ++i)
                 if (viewPlayers[i].slot == m_replayUi.watch)
                     next = i + 1 < viewPlayers.size() ? viewPlayers[i + 1].slot : -1;
         }
@@ -550,7 +550,7 @@ void Application::UpdateReplay(double frameTime)
     if (!m_replay || m_state != AppState::SkirmishPlaying)
         return;
     Simulation &sim = m_gameplayController->simulation();
-    const uint32_t total = m_replay->info().ticks;
+    const std::uint32_t total = m_replay->info().ticks;
     constexpr double kStep = SIMULATION_TIMESTEP;
     if (!m_replayUi.paused && sim.Tick() < total)
         m_replayUi.accumulator += frameTime * kSpeeds[m_replayUi.speed];
@@ -563,7 +563,7 @@ void Application::UpdateReplay(double frameTime)
     int ran = 0;
     while (m_replayUi.accumulator >= kStep && sim.Tick() < total && m_state == AppState::SkirmishPlaying)
     {
-        const uint32_t tick = sim.Tick();
+        const std::uint32_t tick = sim.Tick();
         m_gameplayController->SetSimulationHold(false);
         m_replay->ScheduleDue(sim, tick);
         Update(static_cast<float>(kStep));
@@ -609,8 +609,8 @@ void Application::RenderReplayBar()
     const BarLayout l = MakeBar(viewW, replay);
     const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
     Simulation &sim = m_gameplayController->simulation();
-    const uint32_t total = replay ? std::max<uint32_t>(1, m_replay->info().ticks) : 1u;
-    const uint32_t tick = replay ? std::min(sim.Tick(), total) : sim.Tick();
+    const std::uint32_t total = replay ? std::max<std::uint32_t>(1, m_replay->info().ticks) : 1u;
+    const std::uint32_t tick = replay ? std::min(sim.Tick(), total) : sim.Tick();
     const std::vector<ObserverPlayer> players = ObserverPlayers();
 
     if (m_replayUi.stats)
@@ -864,7 +864,7 @@ void Application::UpdateLocalReplay()
         setup.local = Players::Local();
         setup.slots[setup.local] = {true, PlayerFaction(), 0, 0, true, 1};
         setup.slots[setup.local == 0 ? 1 : 0]
-            = {true, AiFaction(), 1, 0, false, static_cast<uint8_t>(std::clamp(m_settings.difficulty, 0, 3))};
+            = {true, AiFaction(), 1, 0, false, static_cast<std::uint8_t>(std::clamp(m_settings.difficulty, 0, 3))};
         info.mode = "campaign";
         info.mission = missionId;
         info.playerFaction = static_cast<int>(PlayerFaction());
@@ -881,7 +881,7 @@ void Application::UpdateLocalReplay()
     if (setup.local < kMaxPlayers && setup.slots[setup.local].human)
         info.names[setup.local] = m_settings.playerName;
     info.ticksPerTurn = 1;
-    info.turnMs = static_cast<uint32_t>(SIMULATION_TIMESTEP * 1000.0);
+    info.turnMs = static_cast<std::uint32_t>(SIMULATION_TIMESTEP * 1000.0);
     info.assetsHash = NetMatch::AssetsHash();
     if (!m_localRecorder)
         m_localRecorder = std::make_unique<ReplayRecorder>();
@@ -890,7 +890,7 @@ void Application::UpdateLocalReplay()
     m_localViewX = m_localViewY = -1e9f;
     m_localViewZoom = 0.0f;
     Simulation *simPtr = &sim;
-    sim.SetRecordHook([this, simPtr](uint32_t tick, const SimCommand &c) {
+    sim.SetRecordHook([this, simPtr](std::uint32_t tick, const SimCommand &c) {
         (void) simPtr;
         SimCommand copy = c;
         copy.debug = false;
@@ -900,7 +900,7 @@ void Application::UpdateLocalReplay()
 }
 
 // After `tick` of the recorded match ran: the world checksum and (now and then) the player's camera
-void Application::LocalTickRan(uint32_t tick)
+void Application::LocalTickRan(std::uint32_t tick)
 {
     if (!m_localRecorder || !m_localRecorder->Active())
         return;
@@ -926,7 +926,7 @@ void Application::LocalTickRan(uint32_t tick)
             c.player = Players::Local();
             c.x = static_cast<int>(x);
             c.y = static_cast<int>(y);
-            c.a = static_cast<int32_t>(zoom * 100.0f + 0.5f); // (as a network match sends it)
+            c.a = static_cast<std::int32_t>(zoom * 100.0f + 0.5f); // (as a network match sends it)
             m_localCommands[tick].push_back(std::move(c));
         }
     }
@@ -939,7 +939,7 @@ void Application::FinishLocalReplay(const std::string &outcome)
     if (!m_localRecorder || !m_localRecorder->Active())
         return;
     // One turn per tick, each with what the player did on it
-    for (uint32_t t = 0; t < m_localTicks; ++t)
+    for (std::uint32_t t = 0; t < m_localTicks; ++t)
     {
         Net::TurnBundle bundle;
         bundle.turn = t;

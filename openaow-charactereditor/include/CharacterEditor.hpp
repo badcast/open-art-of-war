@@ -32,6 +32,7 @@ struct PreviewSprite
 
 enum class SpriteDetailTab
 {
+    PointEditor,
     Tree,
     ExportPreview,
     LoadedSprites
@@ -41,6 +42,21 @@ enum class PreviewSourceMode
 {
     Object,
     SingleSprites
+};
+
+enum class PointEditorDragMode
+{
+    None,
+    MoveRect,
+    ResizeN,
+    ResizeS,
+    ResizeE,
+    ResizeW,
+    ResizeNW,
+    ResizeNE,
+    ResizeSW,
+    ResizeSE,
+    DrawBox
 };
 
 class CharacterEditor
@@ -210,6 +226,14 @@ private:
     void DrawSpritePreviewCanvas(const ImVec2 &size);
     bool ExportCurrentPreview(std::string &report);
     void DrawLoadedSprites();
+    int FindSpriteObjectForActiveCharacter() const;
+    void SyncSpriteObjectFromActive();
+    void OnSpriteObjectSelected(int objIdx);
+    void OnSpriteModified(const RawSprite &s);
+    bool SaveSpritesJson();
+    bool RevertSpritesJson();
+    void SyncTextureFramesFromCatalog();
+    void DrawPointEditor();
 
     // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
@@ -301,6 +325,7 @@ private:
     int previewHealthPercent {100};
     bool dirty {false};
     bool loopPreview {true};
+    bool noGizmos {true};
     bool showAttackRange {true};
     bool showSightRange {true};
     bool showBuildRange {true};
@@ -465,8 +490,25 @@ private:
     std::array<char, 512> spriteInDir {}; // folder the import reads
     bool importConfirm {false};           // ask before the import overwrites the assets
 
+    // Point Editor & sprites.json State
+    bool spritesJsonDirty {false};
+    int pointEditorSpriteId {-1};
+    int pointEditorNudgeStep {1};
+    int pointEditorShiftAllDx {0};
+    int pointEditorShiftAllDy {0};
+    float pointEditorZoom {2.0f};
+    ImVec2 pointEditorPan {0.0f, 0.0f};
+    int pointEditorFramedSpriteId {-1};
+    PointEditorDragMode pointEditorDragMode {PointEditorDragMode::None};
+    ImVec2 pointEditorDragStartMouse {0.0f, 0.0f};
+    int pointEditorOrigX {0};
+    int pointEditorOrigY {0};
+    int pointEditorOrigW {0};
+    int pointEditorOrigH {0};
+    bool pointEditorShowGrid {true};
+
     // Sprite Tools Preview State
-    SpriteDetailTab spriteDetailTab {SpriteDetailTab::Tree};
+    SpriteDetailTab spriteDetailTab {SpriteDetailTab::PointEditor};
     PreviewSourceMode previewSourceMode {PreviewSourceMode::Object};
     int previewForObject {-1};
     std::vector<PreviewSprite> previewSprites;

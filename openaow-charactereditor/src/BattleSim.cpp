@@ -50,7 +50,7 @@ bool BattleSim::start(
     m_entities = std::make_unique<OpenArtOfWar::EntityManager>();
     m_entities->SetTextureManager(textures);
     m_entities->SetUnlimitedPower(true);
-    if (!m_entities->LoadCharacterConfigs(assetsRoot.string()))
+    if (!m_entities->LoadCharacterConfigs())
     {
         error = "Could not load character configs";
         return false;

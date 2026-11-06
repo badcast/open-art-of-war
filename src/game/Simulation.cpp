@@ -30,23 +30,23 @@ bool Alive(const Entity *e)
 // FNV-1a, 64 bit
 struct Hasher
 {
-    uint64_t h {0xcbf29ce484222325ull};
-    void Bytes(const void *p, size_t n)
+    std::uint64_t h {0xcbf29ce484222325ull};
+    void Bytes(const void *p, std::size_t n)
     {
-        const auto *b = static_cast<const uint8_t *>(p);
-        for (size_t i = 0; i < n; ++i)
+        const auto *b = static_cast<const std::uint8_t *>(p);
+        for (std::size_t i = 0; i < n; ++i)
         {
             h ^= b[i];
             h *= 0x100000001b3ull;
         }
     }
-    void I32(int32_t v)
+    void I32(std::int32_t v)
     {
         Bytes(&v, sizeof v);
     }
     void F32(float v)
     { // the exact bits: peers in sync have bit-identical floats
-        uint32_t u;
+        std::uint32_t u;
         std::memcpy(&u, &v, sizeof u);
         Bytes(&u, sizeof u);
     }
@@ -76,7 +76,7 @@ const AITacticsConfig &Simulation::GroupTactics()
     return t;
 }
 
-void Simulation::Reset(uint32_t seed)
+void Simulation::Reset(std::uint32_t seed)
 {
     Utility::Rng().Reseed(seed);
     m_tick = 0;
@@ -142,7 +142,7 @@ void Simulation::Issue(SimCommand command)
     Schedule(m_tick, std::move(command));
 }
 
-void Simulation::Schedule(uint32_t tick, SimCommand command)
+void Simulation::Schedule(std::uint32_t tick, SimCommand command)
 {
     std::sort(command.ids.begin(), command.ids.end());
     command.ids.erase(std::unique(command.ids.begin(), command.ids.end()), command.ids.end());
@@ -173,7 +173,7 @@ void Simulation::ApplyCommands(SimContext &ctx)
 std::vector<int> Simulation::OwnUnits(const SimCommand &cmd, const SimContext &ctx) const
 {
     std::vector<int> out;
-    for (uint32_t id : cmd.ids)
+    for (std::uint32_t id : cmd.ids)
     {
         const Entity *e = ctx.entities.GetEntity(static_cast<int>(id));
         if (e && e->alive && !e->isBuilding && (cmd.debug || e->owner == cmd.player))
@@ -394,7 +394,7 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             break;
         }
         case CommandType::SetRally:
-            for (uint32_t id : cmd.ids)
+            for (std::uint32_t id : cmd.ids)
             {
                 Building *b = entities.GetBuilding(static_cast<int>(id));
                 if (b && b->alive && b->IsUnitProducer() && b->owner == cmd.player)
@@ -545,7 +545,7 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
         case CommandType::Demolish:
         {
             int refund = 0;
-            for (uint32_t id : cmd.ids)
+            for (std::uint32_t id : cmd.ids)
             {
                 const Building *b = entities.GetBuilding(static_cast<int>(id));
                 if (Alive(b) && b->owner == cmd.player)
@@ -559,7 +559,7 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
         {
             std::vector<Building *> own;
             bool anyIdle = false;
-            for (uint32_t id : cmd.ids)
+            for (std::uint32_t id : cmd.ids)
             {
                 Building *b = entities.GetBuilding(static_cast<int>(id));
                 if (Alive(b) && b->owner == cmd.player && b->rawBuildingType < 15 && b->CanBeRepaired())
@@ -651,24 +651,24 @@ std::vector<SimEvent> Simulation::TakeEvents()
     return out;
 }
 
-uint64_t Simulation::Checksum(const SimContext &ctx) const
+std::uint64_t Simulation::Checksum(const SimContext &ctx) const
 {
-    uint64_t sections[kChecksumSections];
+    std::uint64_t sections[kChecksumSections];
     return ChecksumSections(ctx, sections);
 }
 
-uint64_t Simulation::ChecksumSections(const SimContext &ctx, uint64_t (&sections)[kChecksumSections]) const
+std::uint64_t Simulation::ChecksumSections(const SimContext &ctx, std::uint64_t (&sections)[kChecksumSections]) const
 {
     Hasher h;
-    h.I32(static_cast<int32_t>(m_tick));
+    h.I32(static_cast<std::int32_t>(m_tick));
     for (const Entity &e : ctx.entities.GetAllEntities())
     {
         h.I32(e.id);
-        h.I32(static_cast<int32_t>(e.type));
-        h.I32(static_cast<int32_t>(e.faction));
+        h.I32(static_cast<std::int32_t>(e.type));
+        h.I32(static_cast<std::int32_t>(e.faction));
         h.I32(e.owner);
         h.I32(e.alive ? 1 : 0);
-        h.I32(static_cast<int32_t>(e.state));
+        h.I32(static_cast<std::int32_t>(e.state));
         h.I32(e.tileX);
         h.I32(e.tileY);
         h.F32(e.subX);
@@ -686,12 +686,12 @@ uint64_t Simulation::ChecksumSections(const SimContext &ctx, uint64_t (&sections
         {
             h.I32(u->orderX);
             h.I32(u->orderY);
-            h.I32(static_cast<int32_t>(u->stance));
+            h.I32(static_cast<std::int32_t>(u->stance));
             h.I32(u->stanceHomeX);
             h.I32(u->stanceHomeY);
             h.I32(u->stanceReturning ? 1 : 0);
             h.I32(u->orderedTargetId);
-            h.I32(static_cast<int32_t>(u->orderQueue.size()));
+            h.I32(static_cast<std::int32_t>(u->orderQueue.size()));
             for (const Unit::QueuedOrder &q : u->orderQueue)
             {
                 h.I32(q.kind);

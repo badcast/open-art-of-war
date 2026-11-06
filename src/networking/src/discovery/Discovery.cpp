@@ -22,10 +22,10 @@ namespace
 
 constexpr char kProbeMagic[8] = {'O', 'A', 'O', 'W', 'D', 'I', 'S', 'C'};
 constexpr char kAnswerMagic[8] = {'O', 'A', 'O', 'W', 'R', 'O', 'O', 'M'};
-constexpr uint8_t kDiscoveryVersion = 2;
-constexpr size_t kMaxLength = 64;
+constexpr std::uint8_t kDiscoveryVersion = 2;
+constexpr std::size_t kMaxLength = 64;
 
-bool hasMagic(const uint8_t *data, size_t size, const char (&magic)[8])
+bool hasMagic(const std::uint8_t *data, std::size_t size, const char (&magic)[8])
 {
     return size >= 8 && std::memcmp(data, magic, 8) == 0;
 }
@@ -41,9 +41,9 @@ std::string dotted(enet_uint32 host)
 
 } // namespace
 
-std::vector<uint8_t> encodeProbe(uint32_t nonce)
+std::vector<std::uint8_t> encodeProbe(std::uint32_t nonce)
 {
-    std::vector<uint8_t> buf(16);
+    std::vector<std::uint8_t> buf(16);
     std::memcpy(buf.data(), kProbeMagic, 8);
     BitWriter w(buf.data() + 8, buf.size() - 8);
     w.writeU8(kDiscoveryVersion);
@@ -52,7 +52,7 @@ std::vector<uint8_t> encodeProbe(uint32_t nonce)
     return buf;
 }
 
-bool decodeProbe(const uint8_t *data, size_t size, uint32_t &nonce)
+bool decodeProbe(const std::uint8_t *data, std::size_t size, std::uint32_t &nonce)
 {
     if (!hasMagic(data, size, kProbeMagic))
         return false;
@@ -63,9 +63,9 @@ bool decodeProbe(const uint8_t *data, size_t size, uint32_t &nonce)
     return !r.failed();
 }
 
-std::vector<uint8_t> encodeAnswer(uint32_t nonce, uint16_t port, const RoomInfo &info)
+std::vector<std::uint8_t> encodeAnswer(std::uint32_t nonce, std::uint16_t port, const RoomInfo &info)
 {
-    std::vector<uint8_t> buf(512);
+    std::vector<std::uint8_t> buf(512);
     std::memcpy(buf.data(), kAnswerMagic, 8);
     BitWriter w(buf.data() + 8, buf.size() - 8);
     w.writeU8(kDiscoveryVersion);
@@ -82,7 +82,7 @@ std::vector<uint8_t> encodeAnswer(uint32_t nonce, uint16_t port, const RoomInfo 
     return buf;
 }
 
-bool decodeAnswer(const uint8_t *data, size_t size, uint32_t &nonce, uint16_t &port, RoomInfo &info)
+bool decodeAnswer(const std::uint8_t *data, std::size_t size, std::uint32_t &nonce, std::uint16_t &port, RoomInfo &info)
 {
     if (!hasMagic(data, size, kAnswerMagic))
         return false;
@@ -134,11 +134,11 @@ struct LanBrowser::Impl
 {
     Session session;
     ENetSocket socket {ENET_SOCKET_NULL};
-    uint16_t basePort {0};
-    uint32_t nonce {0};
-    uint32_t lastProbeMs {0};
+    std::uint16_t basePort {0};
+    std::uint32_t nonce {0};
+    std::uint32_t lastProbeMs {0};
     bool probedOnce {false};
-    std::map<uint32_t, uint32_t> sentAt; // nonce -> time
+    std::map<std::uint32_t, std::uint32_t> sentAt; // nonce -> time
 
     // Where the probes go: the limited broadcast, every IPv4 interface's own broadcast address and
     // this computer itself (games hosted here)
@@ -165,7 +165,7 @@ struct LanBrowser::Impl
     }
 };
 
-LanBrowser::LanBrowser(uint16_t basePort)
+LanBrowser::LanBrowser(std::uint16_t basePort)
     : m_impl(std::make_unique<Impl>())
 {
     m_impl->basePort = basePort;
@@ -193,7 +193,7 @@ bool LanBrowser::ok() const
     return m_impl->socket != ENET_SOCKET_NULL;
 }
 
-void LanBrowser::update(uint32_t nowMs)
+void LanBrowser::update(std::uint32_t nowMs)
 {
     if (!ok())
         return;
@@ -202,17 +202,17 @@ void LanBrowser::update(uint32_t nowMs)
     {
         d.probedOnce = true;
         d.lastProbeMs = nowMs;
-        const uint32_t nonce = ++d.nonce;
+        const std::uint32_t nonce = ++d.nonce;
         d.sentAt[nonce] = nowMs;
         while (d.sentAt.size() > 8)
             d.sentAt.erase(d.sentAt.begin());
-        const std::vector<uint8_t> probe = encodeProbe(nonce);
+        const std::vector<std::uint8_t> probe = encodeProbe(nonce);
         ENetBuffer buffer;
-        buffer.data = const_cast<uint8_t *>(probe.data());
+        buffer.data = const_cast<std::uint8_t *>(probe.data());
         buffer.dataLength = probe.size();
         for (enet_uint32 host : d.targets())
         {
-            for (uint16_t p = 0; p < kDiscoveryPortSpan; ++p)
+            for (std::uint16_t p = 0; p < kDiscoveryPortSpan; ++p)
             {
                 ENetAddress to {};
                 to.host = host;
@@ -221,7 +221,7 @@ void LanBrowser::update(uint32_t nowMs)
             }
         }
     }
-    uint8_t data[600];
+    std::uint8_t data[600];
     for (int guard = 0; guard < 64; ++guard)
     {
         ENetAddress from {};
@@ -231,10 +231,10 @@ void LanBrowser::update(uint32_t nowMs)
         const int got = enet_socket_receive(d.socket, &from, &buffer, 1);
         if (got <= 0)
             break;
-        uint32_t nonce = 0;
-        uint16_t port = 0;
+        std::uint32_t nonce = 0;
+        std::uint16_t port = 0;
         RoomInfo info;
-        if (!decodeAnswer(data, static_cast<size_t>(got), nonce, port, info))
+        if (!decodeAnswer(data, static_cast<std::size_t>(got), nonce, port, info))
             continue;
         const std::string address = dotted(from.host);
         auto it = std::find_if(m_rooms.begin(), m_rooms.end(), [&](const FoundRoom &r) {

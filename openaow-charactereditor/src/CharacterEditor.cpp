@@ -34,7 +34,8 @@ bool CharacterEditor::Init()
         status = _("Could not find the assets folder with graphics data.");
         return false;
     }
-    OpenArtOfWar::Localization::Init((assetsRoot / "locale").string(), "en");
+    OpenArtOfWar::LoaderResources::SetAssetRoot(assetsRoot.string());
+    OpenArtOfWar::Localization::Init((assetsRoot / "locale").string(), "en", "openaow_character_editor");
     charactersDir = assetsRoot / "characters";
 
     window = SDL_CreateWindow(_("Open Art Of War Character Archetype Editor"), 1500, 900, SDL_WINDOW_RESIZABLE);
@@ -64,7 +65,7 @@ bool CharacterEditor::Init()
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
-    const fs::path fontPath = OpenArtOfWar::LoaderResources::FontRegular(assetsRoot.string());
+    const fs::path fontPath = OpenArtOfWar::LoaderResources::FontRegular();
     if (fs::exists(fontPath))
     {
         io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 15.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
@@ -86,7 +87,7 @@ bool CharacterEditor::Init()
     ImGui_ImplSDLRenderer3_Init(renderer);
 
     textures = std::make_unique<OpenArtOfWar::TextureManager>(renderer);
-    textures->LoadAllAssets(assetsRoot.string());
+    textures->LoadAllAssets();
     gameRenderer = std::make_unique<OpenArtOfWar::Renderer>(renderer, textures.get());
     shaderEffects = std::make_unique<OpenArtOfWar::ShaderEffects>();
     if (shaderEffects->Init(renderer))
@@ -149,6 +150,8 @@ int CharacterEditor::run()
             {
                 if (editorMode == EditorMode::Research)
                     SaveResearch();
+                else if (editorMode == EditorMode::SpriteTools)
+                    SaveSpritesJson();
                 else if (
                     editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
                     || editorMode == EditorMode::Projectiles || editorMode == EditorMode::GameUi
@@ -387,6 +390,7 @@ bool CharacterEditor::loadFile(const fs::path &path)
             targetWorldX = std::cos(ang) * 120.0f;
             targetWorldY = std::sin(ang) * 120.0f;
         }
+        SyncSpriteObjectFromActive();
         return true;
     }
     catch (const std::exception &error)
@@ -682,7 +686,7 @@ const std::vector<std::pair<std::string, std::string>> &CharacterEditor::SfxEven
     // (JSON is YAML too: the events and their categories, sorted by name)
     try
     {
-        const YAML::Node doc = YAML::LoadFile(OpenArtOfWar::LoaderResources::SfxConfig(assetsRoot.string()));
+        const YAML::Node doc = YAML::LoadFile(OpenArtOfWar::LoaderResources::SfxConfig());
         const YAML::Node events = doc["events"];
         const std::string defCategory = YamlString(doc["defaults"], "category", "ui");
         if (events && events.IsMap())

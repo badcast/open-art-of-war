@@ -41,7 +41,7 @@ struct RadarAlertConfig
         if (section.contains("color") && section["color"].is_array() && section["color"].size() >= 3)
         {
             const auto &c = section["color"];
-            auto channel = [&](size_t i, int fallback) {
+            auto channel = [&](std::size_t i, int fallback) {
                 return static_cast<Uint8>(
                     std::clamp(i < c.size() && c[i].is_number() ? c[i].get<int>() : fallback, 0, 255));
             };
@@ -68,7 +68,7 @@ public:
     RadarAlertConfig config;
 
     // Once per radar frame: is an enemy on the radar now, and where (map tiles)
-    void Update(uint64_t nowMs, bool enemyOnRadar, float tileX, float tileY)
+    void Update(std::uint64_t nowMs, bool enemyOnRadar, float tileX, float tileY)
     {
         if (enemyOnRadar)
         {
@@ -99,7 +99,7 @@ public:
     }
 
     // When the current / last alarm went off (0: never)
-    uint64_t StartMs() const
+    std::uint64_t StartMs() const
     {
         return m_startMs;
     }
@@ -120,7 +120,7 @@ public:
         return m_tileY;
     }
     // Seconds since the alarm went off
-    float Elapsed(uint64_t nowMs) const
+    float Elapsed(std::uint64_t nowMs) const
     {
         return static_cast<float>(nowMs - m_startMs) / 1000.0f;
     }
@@ -132,7 +132,7 @@ public:
         return std::max(config.blinkSeconds, waves);
     }
     // Flash phase: true in the "on" half of each blink, while the radar flashes
-    bool BlinkOn(uint64_t nowMs) const
+    bool BlinkOn(std::uint64_t nowMs) const
     {
         const float t = Elapsed(nowMs);
         if (!m_active || t >= config.blinkSeconds)
@@ -141,7 +141,7 @@ public:
         return cycles - static_cast<float>(static_cast<int>(cycles)) < 0.5f;
     }
     // Wave `i`: false when it has not started yet or is over; else its radius and opacity (0..1)
-    bool Wave(int i, uint64_t nowMs, float &radiusPx, float &opacity) const
+    bool Wave(int i, std::uint64_t nowMs, float &radiusPx, float &opacity) const
     {
         if (!m_active || i < 0 || i >= config.waveCount)
             return false;
@@ -158,8 +158,8 @@ private:
     bool m_active {false};
     bool m_armed {true};
     bool m_seenEnemy {false};
-    uint64_t m_startMs {0};
-    uint64_t m_lastEnemyMs {0};
+    std::uint64_t m_startMs {0};
+    std::uint64_t m_lastEnemyMs {0};
     float m_tileX {0.0f};
     float m_tileY {0.0f};
 };

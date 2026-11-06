@@ -39,7 +39,7 @@ struct ResearchProgress
 // Something the interface wants to hear about (it is not part of the world)
 struct SimEvent
 {
-    enum class Type : uint8_t
+    enum class Type : std::uint8_t
     {
         ResearchCompleted,
         PlayerEliminated // a player of a match lost every building (value unused)
@@ -59,11 +59,11 @@ class Simulation
 public:
     Simulation() = default;
 
-    static constexpr uint32_t kDefaultSeed = 0x9e3779b9u;
+    static constexpr std::uint32_t kDefaultSeed = 0x9e3779b9u;
 
     // A new match / mission. `seed` starts the gameplay random numbers (shot spread, damage rolls, ...):
     // every peer of a network game uses the host's seed, so they all roll the same numbers.
-    void Reset(uint32_t seed = kDefaultSeed);
+    void Reset(std::uint32_t seed = kDefaultSeed);
 
     // A match of several players: seeds the random numbers and gives every other player an economy
     // (the local player's is SimContext::economy)
@@ -85,12 +85,12 @@ public:
         m_sink = std::move(sink);
     }
     // A match of this computer alone being recorded: every command issued, with the tick it applies on
-    void SetRecordHook(std::function<void(uint32_t tick, const SimCommand &)> hook)
+    void SetRecordHook(std::function<void(std::uint32_t tick, const SimCommand &)> hook)
     {
         m_record = std::move(hook);
     }
     // Turn bundle of a network game: applied on `tick`
-    void Schedule(uint32_t tick, SimCommand command);
+    void Schedule(std::uint32_t tick, SimCommand command);
 
     // One tick: due commands in a fixed order, then the research timers
     void ApplyCommands(SimContext &ctx);
@@ -99,13 +99,13 @@ public:
     void UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints);
     // Shift-queued orders: units whose current order is done start their next one
     void UpdateOrderQueues(SimContext &ctx);
-    static constexpr size_t kMaxQueuedOrders = 16;
+    static constexpr std::size_t kMaxQueuedOrders = 16;
     void EndTick()
     {
         ++m_tick;
     }
 
-    uint32_t Tick() const
+    std::uint32_t Tick() const
     {
         return m_tick;
     }
@@ -141,12 +141,12 @@ public:
     }
 
     // 64-bit checksum of the world: equal on every peer of a network game as long as they are in sync
-    uint64_t Checksum(const SimContext &ctx) const;
+    std::uint64_t Checksum(const SimContext &ctx) const;
 
     // The same checksum, plus the running hash after each part (entities, credits, walls, research): the first
     // part that differs between two peers shows where they diverged. Debug aid (OAOW_NET_TRACE)
     static constexpr int kChecksumSections = 4;
-    uint64_t ChecksumSections(const SimContext &ctx, uint64_t (&sections)[kChecksumSections]) const;
+    std::uint64_t ChecksumSections(const SimContext &ctx, std::uint64_t (&sections)[kChecksumSections]) const;
 
     // Settings of the player-commanded marches (shared by every side)
     static const AITacticsConfig &GroupTactics();
@@ -162,17 +162,17 @@ private:
     bool MarchAsGroup(
         PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx);
 
-    uint32_t m_tick {0};
+    std::uint32_t m_tick {0};
     std::vector<TimedCommand> m_pending;
     std::function<void(SimCommand)> m_sink;
-    std::function<void(uint32_t, const SimCommand &)> m_record;
+    std::function<void(std::uint32_t, const SimCommand &)> m_record;
     std::vector<TimedCommand> m_log;
     bool m_recording {true};
     std::array<AISquadController, kMaxPlayers> m_squads;
     std::array<ResearchProgress, kMaxPlayers> m_research;
     std::vector<SimEvent> m_events;
     std::array<Economy, kMaxPlayers> m_economies;
-    uint32_t m_economyMask {0}; // players whose economy lives here
+    std::uint32_t m_economyMask {0}; // players whose economy lives here
 };
 
 } // namespace OpenArtOfWar

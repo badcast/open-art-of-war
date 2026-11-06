@@ -72,7 +72,7 @@ private:
     bool m_aiCreditsEditing {false};
     int m_thoughtFilter {0}; // 0 = all categories
     bool m_thoughtAutoScroll {true};
-    size_t m_thoughtsSeen {0};
+    std::size_t m_thoughtsSeen {0};
 };
 
 } // namespace OpenArtOfWar

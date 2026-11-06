@@ -286,7 +286,7 @@ CharacterStats ComputeStats(YAML::Node doc, bool siege)
     if (combat["weapons"] && combat["weapons"].IsSequence())
     {
         bool first = true;
-        for (size_t i = 0; i < combat["weapons"].size(); ++i)
+        for (std::size_t i = 0; i < combat["weapons"].size(); ++i)
         {
             YAML::Node w = combat["weapons"][i];
             if (!YamlBool(w, "enabled", true))

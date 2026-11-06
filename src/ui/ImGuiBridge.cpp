@@ -19,8 +19,8 @@ SDL_Renderer *s_renderer = nullptr;
 bool s_initialized = false;
 bool s_frameActive = false;
 
-std::vector<uint8_t> s_fontDataRegular;
-std::vector<uint8_t> s_fontDataBold;
+std::vector<std::uint8_t> s_fontDataRegular;
+std::vector<std::uint8_t> s_fontDataBold;
 ImFont *s_fonts[7] = {nullptr};
 
 ImVec4 ToVec4(SDL_Color c)
@@ -48,6 +48,7 @@ bool ImGuiBridge::Init(SDL_Window *window, SDL_Renderer *renderer)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
+    io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     // Load fonts with full Cyrillic support

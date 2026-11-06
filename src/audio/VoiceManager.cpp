@@ -9,22 +9,21 @@
 namespace OpenArtOfWar
 {
 
-bool VoiceManager::Load(const std::string &language, const std::string &assetRoot)
+bool VoiceManager::Load(const std::string &language)
 {
-    m_root = assetRoot;
     // A fresh set is prepared off to the side and swapped in, so the audio thread never mixes a half-loaded one
     auto mixer = std::make_unique<SfxMixer>();
     std::string text;
-    if (Assets::ReadText(LoaderResources::VoicesConfig(assetRoot), text))
+    if (Assets::ReadText(LoaderResources::VoicesConfig(), text))
         mixer->Configure(JsonFile::ReadFromString(text));
     else
-        std::cerr << "[VoiceManager] " << LoaderResources::VoicesConfig(assetRoot)
+        std::cerr << "[VoiceManager] " << LoaderResources::VoicesConfig()
                   << " not found: voices play with default settings" << std::endl;
-    int lines = mixer->LoadClips(LoaderResources::VoiceClips(language, assetRoot));
+    int lines = mixer->LoadClips(LoaderResources::VoiceClips(language));
     const std::string fallback = LoaderResources::VoicesFallbackLanguage();
     int borrowed = 0;
     if (language != fallback)
-        borrowed = mixer->LoadClips(LoaderResources::VoiceClips(fallback, assetRoot), true);
+        borrowed = mixer->LoadClips(LoaderResources::VoiceClips(fallback), true);
     mixer->SetVoiceVolume(m_volume);
     mixer->SetFxVolume(m_volume); // whatever the category: every line of this mixer is a voice
     mixer->SetMuted(m_muted);
@@ -34,7 +33,7 @@ bool VoiceManager::Load(const std::string &language, const std::string &assetRoo
         m_mixer = std::move(mixer);
     }
     m_language = language;
-    m_lines = static_cast<size_t>(lines + borrowed);
+    m_lines = static_cast<std::size_t>(lines + borrowed);
     std::cout << "[VoiceManager] " << lines << " voice lines in '" << language << "'";
     if (borrowed > 0)
         std::cout << ", " << borrowed << " from '" << fallback << "'";
@@ -46,29 +45,29 @@ void VoiceManager::SetLanguage(const std::string &language)
 {
     if (language == m_language && m_mixer)
         return;
-    load(language, m_root.empty() ? LoaderResources::kDefaultRoot : m_root);
+    load(language);
 }
 
-bool VoiceManager::Play(const std::string &event, uint64_t nowMs)
+bool VoiceManager::Play(const std::string &event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     return m_mixer && m_mixer->Play(event, 1.0f, 0.0f, nowMs);
 }
 
-bool VoiceManager::Announce(const std::string &event, uint64_t nowMs)
+bool VoiceManager::Announce(const std::string &event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     return m_mixer && m_mixer->Announce(event, nowMs);
 }
 
-void VoiceManager::Update(uint64_t nowMs)
+void VoiceManager::Update(std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     if (m_mixer)
         m_mixer->Update(nowMs);
 }
 
-void VoiceManager::Mix(int16_t *out, int frames)
+void VoiceManager::Mix(std::int16_t *out, int frames)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     if (m_mixer)

@@ -40,7 +40,7 @@ struct UnitDelegates
 };
 
 // What a unit without orders does about enemies (the player sets it per unit, the computer by the unit's role)
-enum class UnitStance : uint8_t
+enum class UnitStance : std::uint8_t
 {
     PursueAndReturn = 0, // engages what it sees, chases a limited distance, then walks back to where it stood
     HoldGround = 1,      // fires only at what is in range and never walks off by itself
@@ -199,7 +199,7 @@ public:
     float yieldHomeTimer {0.0f};
     int yieldHomeTries {0};
     std::vector<PathNode> path;
-    size_t pathIndex {0};
+    std::size_t pathIndex {0};
 
     Unit();
     ~Unit() override = default;

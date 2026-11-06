@@ -23,6 +23,10 @@ void CharacterEditor::SetEditorMode(EditorMode mode)
     if (editorMode == mode)
         return;
     editorMode = mode;
+    if (mode == EditorMode::SpriteTools)
+    {
+        SyncSpriteObjectFromActive();
+    }
     if (mode == EditorMode::Simulation)
     {
         if (battle.Active())
@@ -45,8 +49,8 @@ bool CharacterEditor::LoadCompare(int index)
         return false;
     try
     {
-        compareDoc = YAML::LoadFile(files[static_cast<size_t>(index)].path.string());
-        comparePath = files[static_cast<size_t>(index)].path;
+        compareDoc = YAML::LoadFile(files[static_cast<std::size_t>(index)].path.string());
+        comparePath = files[static_cast<std::size_t>(index)].path;
         compareOffsets = ReadVisualOffsets(compareDoc);
         return true;
     }
@@ -77,7 +81,7 @@ void CharacterEditor::DrawOpponentPicker(bool allowMirror)
         {
             LoadCompare(-1);
         }
-        for (size_t i = 0; i < files.size(); ++i)
+        for (std::size_t i = 0; i < files.size(); ++i)
         {
             const auto &f = files[i];
             std::string label = (f.type == "building" ? "[B#" : "[#") + std::to_string(f.numericId) + "] " + f.name
@@ -102,7 +106,7 @@ void CharacterEditor::DrawCompareControls()
         const fs::path previousB = comparePath;
         if (loadFile(previousB))
         {
-            for (size_t i = 0; i < files.size(); ++i)
+            for (std::size_t i = 0; i < files.size(); ++i)
             {
                 if (files[i].path == previousA)
                     LoadCompare(static_cast<int>(i));

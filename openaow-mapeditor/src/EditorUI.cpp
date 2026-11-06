@@ -547,7 +547,7 @@ void EditorUI::RenderMenuBar(MapDocument &doc, Camera &camera)
             if (ImGui::MenuItem("Fill map with the selected tile"))
             {
                 doc.PushUndoSnapshot();
-                doc.FillAll(static_cast<uint8_t>(m_selectedTile));
+                doc.FillAll(static_cast<std::uint8_t>(m_selectedTile));
                 ShowToast("Whole map filled with tile #" + std::to_string(m_selectedTile));
             }
             if (ImGui::MenuItem("Recompute passability"))
@@ -756,7 +756,7 @@ void EditorUI::RenderPalettePanel(MapDocument &doc, TextureManager &texManager, 
                 if (ImGui::Button("Fill all"))
                 {
                     doc.PushUndoSnapshot();
-                    doc.FillAll(static_cast<uint8_t>(m_selectedTile));
+                    doc.FillAll(static_cast<std::uint8_t>(m_selectedTile));
                 }
 
                 ImGui::Separator();
@@ -876,7 +876,7 @@ void EditorUI::RenderPalettePanel(MapDocument &doc, TextureManager &texManager, 
                        "30: Tree trunk"};
 
                 ImGui::BeginChild("DecorListScroll", ImVec2(0, 360), true);
-                for (size_t i = 0; i < sizeof(decorNames) / sizeof(decorNames[0]); ++i)
+                for (std::size_t i = 0; i < sizeof(decorNames) / sizeof(decorNames[0]); ++i)
                 {
                     int dtype = 0;
                     std::sscanf(decorNames[i], "%d", &dtype);
@@ -1330,7 +1330,7 @@ void EditorUI::RenderMiniMapWindow(MapDocument &doc, Camera &camera)
             {
                 for (int x = 0; x < mapW; x += step)
                 {
-                    uint8_t t = doc.GetTileMap().GetBaseTile(x, y);
+                    std::uint8_t t = doc.GetTileMap().GetBaseTile(x, y);
                     ImU32 col = TileCollision::IsBlocked(doc.GetTilesetId(), t)
                                     ? IM_COL32(40, 70, 40, 255)
                                     : (t >= 26 ? IM_COL32(110, 95, 80, 255)
@@ -1415,9 +1415,9 @@ void EditorUI::RenderStatusBar(const MapDocument &doc, const Camera &camera)
 
         if (m_hoverTileX >= 0 && m_hoverTileY >= 0 && m_hoverTileX < doc.GetWidth() && m_hoverTileY < doc.GetHeight())
         {
-            uint8_t t = doc.GetTileMap().GetBaseTile(m_hoverTileX, m_hoverTileY);
+            std::uint8_t t = doc.GetTileMap().GetBaseTile(m_hoverTileX, m_hoverTileY);
             bool pass = doc.GetTileMap().IsPassable(m_hoverTileX, m_hoverTileY);
-            uint16_t w = doc.GetTileMap().GetWall(m_hoverTileX, m_hoverTileY);
+            std::uint16_t w = doc.GetTileMap().GetWall(m_hoverTileX, m_hoverTileY);
 
             ImGui::Text(
                 "Cell: (%d, %d) | Tile #%d [%s] | Wall: %s | Tool: %s | Map: %dx%d | Zoom: %d%%",
@@ -1550,7 +1550,7 @@ void EditorUI::RenderOpenModal(MapDocument &doc)
         ImGui::InputText("Search / Filter", m_openSearchFilter, sizeof(m_openSearchFilter));
 
         ImGui::BeginChild("OpenMapsList", ImVec2(0, 240), true);
-        for (size_t i = 0; i < m_availableMaps.size(); ++i)
+        for (std::size_t i = 0; i < m_availableMaps.size(); ++i)
         {
             const auto &m = m_availableMaps[i];
             if (m_openSearchFilter[0] != '\0')
@@ -1663,7 +1663,7 @@ void EditorUI::RenderNewMapModal(MapDocument &doc)
         if (ImGui::Button("Create map", ImVec2(160, 36)))
         {
             doc.PushUndoSnapshot();
-            doc.NewMap(m_newMapWidth, m_newMapHeight, m_newMapTileset, static_cast<uint8_t>(m_newMapFillTile));
+            doc.NewMap(m_newMapWidth, m_newMapHeight, m_newMapTileset, static_cast<std::uint8_t>(m_newMapFillTile));
             ShowToast("New map created " + std::to_string(m_newMapWidth) + "x" + std::to_string(m_newMapHeight));
             ImGui::CloseCurrentPopup();
         }
@@ -1754,7 +1754,7 @@ void EditorUI::RenderGeneratorModal(MapDocument &doc)
             int seedInt = static_cast<int>(m_genParams.seed);
             if (ImGui::InputInt("Seed", &seedInt))
             {
-                m_genParams.seed = static_cast<uint32_t>(seedInt);
+                m_genParams.seed = static_cast<std::uint32_t>(seedInt);
             }
         }
 

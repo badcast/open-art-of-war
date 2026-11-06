@@ -370,7 +370,7 @@ void Unit::UpdateTransformation(float deltaTime, const UnitDelegates &delegates)
                 const int oldMax = std::max(1, maxHp);
                 const int oldHp = currentHp;
                 maxHp = cfg->maxHp;
-                currentHp = std::clamp(static_cast<int>(static_cast<int64_t>(oldHp) * maxHp / oldMax), 1, maxHp);
+                currentHp = std::clamp(static_cast<int>(static_cast<std::int64_t>(oldHp) * maxHp / oldMax), 1, maxHp);
                 attackDamage = cfg->attackDamage;
                 attackRange = cfg->attackRange;
                 attackCooldown = cfg->attackCooldown;
@@ -1204,7 +1204,7 @@ bool Unit::RequestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates
 
     // Our road ahead: the chain moves off it, not along it (where it would be in the way again)
     auto roadCost = [&](int x, int y) {
-        for (size_t i = pathIndex; i < path.size() && i < pathIndex + 6; ++i)
+        for (std::size_t i = pathIndex; i < path.size() && i < pathIndex + 6; ++i)
         {
             if (path[i].x == x && path[i].y == y)
                 return i == pathIndex + 1 ? 20 : 8;
@@ -1288,7 +1288,7 @@ bool Unit::RequestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates
     std::vector<int> chain; // node indices from the free tile back to the blocker
     for (int i = found; i >= 0; i = nodes[i].parent)
         chain.push_back(i);
-    for (size_t k = 1; k < chain.size(); ++k)
+    for (std::size_t k = 1; k < chain.size(); ++k)
     {
         const Node &from = nodes[chain[k]];
         const Node &to = nodes[chain[k - 1]];
@@ -1379,7 +1379,7 @@ void Unit::UpdateYieldHome(float deltaTime, Pathfinder &pathfinder, const UnitDe
     std::vector<PathNode> back;
     bool partial = false;
     if (pathfinder.FindPath(tileX, tileY, yieldHomeX, yieldHomeY, back, id, &partial) && !back.empty() && !partial
-        && back.size() <= static_cast<size_t>(kMaxDistance + 4))
+        && back.size() <= static_cast<std::size_t>(kMaxDistance + 4))
     {
         path = std::move(back);
         pathIndex = 0;
@@ -1858,8 +1858,8 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
                     continue;
-                const uint32_t h = static_cast<uint32_t>(id) * 73856093u ^ static_cast<uint32_t>(x) * 19349663u
-                                   ^ static_cast<uint32_t>(y) * 83492791u;
+                const std::uint32_t h = static_cast<std::uint32_t>(id) * 73856093u ^ static_cast<std::uint32_t>(x) * 19349663u
+                                   ^ static_cast<std::uint32_t>(y) * 83492791u;
                 if (((h >> 7) & 1u) == 0u)
                     continue; // this one is left alone
                 const int d = std::abs(x - tileX) + std::abs(y - tileY);

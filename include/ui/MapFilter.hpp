@@ -14,7 +14,7 @@ namespace OpenArtOfWar::ui
 inline std::string LowerText(const std::string &t)
 {
     std::string out;
-    for (size_t i = 0; i < t.size(); ++i)
+    for (std::size_t i = 0; i < t.size(); ++i)
     {
         const unsigned char c = static_cast<unsigned char>(t[i]);
         if (c == 0xD0 && i + 1 < t.size())

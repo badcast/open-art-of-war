@@ -215,7 +215,7 @@ private:
         int width {0};
         int height {0};
         int tilesetId {0};
-        size_t fileSize {0};
+        std::size_t fileSize {0};
     };
     std::vector<MapFileInfo> m_availableMaps;
     char m_openSearchFilter[64] {""};

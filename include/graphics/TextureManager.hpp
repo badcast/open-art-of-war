@@ -24,58 +24,58 @@ struct SpriteFrame
 
 struct IndexRange
 {
-    int16_t start {0};
-    int16_t end {-1};
+    std::int16_t start {0};
+    std::int16_t end {-1};
 };
 
 struct CompositePart
 {
-    int16_t child {0};
-    int16_t ox {0};
-    int16_t oy {0};
-    uint8_t isComp {0};
+    std::int16_t child {0};
+    std::int16_t ox {0};
+    std::int16_t oy {0};
+    std::uint8_t isComp {0};
 };
 
 struct AnimFrame
 {
-    int16_t child {0};
-    int8_t ox {0};
-    int8_t oy {0};
-    uint8_t isComp {0};
+    std::int16_t child {0};
+    std::int8_t ox {0};
+    std::int8_t oy {0};
+    std::uint8_t isComp {0};
 };
 
 struct UnitLayer
 {
-    int16_t child {0};
-    int8_t ox {0};
-    int8_t oy {0};
-    uint8_t isComp {0};
-    uint8_t flag {0};
+    std::int16_t child {0};
+    std::int8_t ox {0};
+    std::int8_t oy {0};
+    std::uint8_t isComp {0};
+    std::uint8_t flag {0};
 };
 
 struct UnitSequenceStep
 {
-    int16_t bodyId {0};
-    int8_t ox {0};
-    int8_t oy {0};
+    std::int16_t bodyId {0};
+    std::int8_t ox {0};
+    std::int8_t oy {0};
 };
 
 struct BuildingPart
 {
-    int16_t child {0};
-    int16_t ox {0};
-    int8_t oy {0};
-    uint8_t isComp {0};
-    uint8_t layer {0};
-    uint8_t state {0};
+    std::int16_t child {0};
+    std::int16_t ox {0};
+    std::int8_t oy {0};
+    std::uint8_t isComp {0};
+    std::uint8_t layer {0};
+    std::uint8_t state {0};
 };
 
 struct BuildingDef
 {
-    int16_t start {0};
-    int16_t end {-1};
-    uint8_t width {1};
-    uint8_t height {1};
+    std::int16_t start {0};
+    std::int16_t end {-1};
+    std::uint8_t width {1};
+    std::uint8_t height {1};
 };
 
 class TextureManager
@@ -84,7 +84,7 @@ public:
     TextureManager(SDL_Renderer *renderer);
     ~TextureManager();
 
-    bool LoadAllAssets(const std::string &assetRoot = LoaderResources::kDefaultRoot);
+    bool LoadAllAssets();
     SDL_Texture *LoadTexture(const std::string &filePath);
 
     // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).
@@ -105,6 +105,7 @@ public:
     SDL_Texture *GetTileset(int index) const;
     SDL_Texture *GetUiTexture(const std::string &name) const;
     const SpriteFrame *GetSpriteFrame(int spriteId) const;
+    bool UpdateSpriteFrame(int spriteId, int page, int x, int y, int width, int height, int palette = -1);
 
     // Average color of a map tile's picture (for minimap-like previews); computed from the sprite sheet
     // pixels on first use and cached
@@ -133,7 +134,7 @@ public:
     // Where the rotating turret layer sits for a hull facing (idle sequence, first step), relative to
     // the unit's draw origin; false when the unit has no turret layer
     bool GetTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const;
-    const std::vector<int16_t> &GetDecorAnims() const
+    const std::vector<std::int16_t> &GetDecorAnims() const
     {
         return m_decorAnims;
     }
@@ -148,11 +149,10 @@ private:
     SDL_Renderer *m_renderer {nullptr};
     std::unordered_map<std::string, SDL_Texture *> m_textureCache;
     std::vector<SDL_Texture *> m_spriteSheets;
-    std::unordered_map<uint64_t, SDL_Texture *> m_recoloredSheets;
+    std::unordered_map<std::uint64_t, SDL_Texture *> m_recoloredSheets;
     SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
     SDL_ScaleMode m_spriteScaleMode {SDL_SCALEMODE_NEAREST};
     std::vector<float> m_sheetScales;
-    std::string m_assetRoot;
     std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only
     std::unordered_map<int, SDL_Color> m_tileColors;
     std::vector<SDL_Texture *> m_tilesets;
@@ -177,10 +177,10 @@ private:
     std::vector<BuildingDef> m_buildings;
     std::vector<BuildingPart> m_buildingParts;
 
-    std::vector<std::vector<int16_t>> m_tilesetsList;
-    std::vector<int16_t> m_decorOffsets;
-    std::vector<std::vector<int16_t>> m_unitArchetypes;
-    std::vector<int16_t> m_decorAnims;
+    std::vector<std::vector<std::int16_t>> m_tilesetsList;
+    std::vector<std::int16_t> m_decorOffsets;
+    std::vector<std::vector<std::int16_t>> m_unitArchetypes;
+    std::vector<std::int16_t> m_decorAnims;
 };
 
 } // namespace OpenArtOfWar

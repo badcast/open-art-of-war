@@ -15,7 +15,7 @@ namespace
 
 namespace fs = std::filesystem;
 
-// The font file named in assets/main.json, as it is (the working directory is the folder that holds "assets",
+// The font file named in assets/main.yaml, as it is (the working directory is the folder that holds "assets",
 // Assets::Init): no other folder and no system font is looked at
 std::string ResolveFontPath(const std::string &path, bool bold)
 {
@@ -47,7 +47,7 @@ BitmapFontRenderer::BitmapFontRenderer(
     auto openFont = [&](bool packed, bool bold, const std::string &path, float size) {
         if (!packed)
             return TTF_OpenFont(path.c_str(), size);
-        const std::vector<uint8_t> &data = bold ? m_fontDataBold : m_fontDataRegular;
+        const std::vector<std::uint8_t> &data = bold ? m_fontDataBold : m_fontDataRegular;
         return TTF_OpenFontIO(SDL_IOFromConstMem(data.data(), data.size()), true, size);
     };
 
@@ -65,7 +65,7 @@ BitmapFontRenderer::BitmapFontRenderer(
         const bool regularFailed = !m_fontSmall || !m_fontMedium;
         std::cerr << "[BitmapFontRenderer] Warning: Could not open the " << (regularFailed ? "regular" : "bold")
                   << " font \"" << (regularFailed ? regPath : bldPath)
-                  << "\" (fonts in assets/main.json): " << SDL_GetError() << std::endl;
+                  << "\" (fonts in assets/main.yaml): " << SDL_GetError() << std::endl;
     }
     else
     {
@@ -150,8 +150,8 @@ CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int s
         return {nullptr, 0, 0, 0};
     }
 
-    uint32_t colorKey = (static_cast<uint32_t>(color.r) << 24) | (static_cast<uint32_t>(color.g) << 16)
-                        | (static_cast<uint32_t>(color.b) << 8) | (static_cast<uint32_t>(color.a));
+    std::uint32_t colorKey = (static_cast<std::uint32_t>(color.r) << 24) | (static_cast<std::uint32_t>(color.g) << 16)
+                        | (static_cast<std::uint32_t>(color.b) << 8) | (static_cast<std::uint32_t>(color.a));
     TextCacheKey key {text, scale, colorKey};
 
     auto it = m_cache.find(key);

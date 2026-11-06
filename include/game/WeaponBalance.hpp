@@ -9,7 +9,7 @@ class Entity;
 
 // Damage multipliers by projectile kind and class of the target: assets/data/weapon_balance.json. Every value has the
 // built-in default, so a missing file changes nothing but the defaults. Part of the network assets check.
-enum class TargetClass : uint8_t
+enum class TargetClass : std::uint8_t
 {
     Infantry,
     Vehicle,

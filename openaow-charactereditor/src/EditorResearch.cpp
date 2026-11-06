@@ -24,7 +24,7 @@ constexpr float kGapY = 14.0f;
 
 int NeedsOf(const YAML::Node &list, int index)
 {
-    return YamlInt(list[static_cast<size_t>(index)], "needs", -1);
+    return YamlInt(list[static_cast<std::size_t>(index)], "needs", -1);
 }
 
 // `candidate` already depends on `index` (directly or through its chain): making `index` need it would loop
@@ -207,7 +207,7 @@ void CharacterEditor::DrawResearchTree()
 
     for (int i = 0; i < count; ++i)
     {
-        const YAML::Node n = list[static_cast<size_t>(i)];
+        const YAML::Node n = list[static_cast<std::size_t>(i)];
         const ImVec2 p = nodePos(i);
         ImGui::SetCursorScreenPos(p);
         ImGui::PushID(i);
@@ -265,7 +265,7 @@ void CharacterEditor::DrawResearchProperties()
     const int count = static_cast<int>(list.size());
     researchSelected = std::clamp(researchSelected, 0, count - 1);
     const int i = researchSelected;
-    YAML::Node n = list[static_cast<size_t>(i)];
+    YAML::Node n = list[static_cast<std::size_t>(i)];
     bool changed = false;
 
     ImGui::TextWrapped("%s", researchPath[f].string().c_str());
@@ -363,7 +363,7 @@ void CharacterEditor::DrawResearchProperties()
     // Requirement: the tree is built from it
     const int need = YamlInt(n, "needs", -1);
     auto techLabel = [&](int t) {
-        return "#" + std::to_string(t) + " " + _(YamlString(list[static_cast<size_t>(t)], "name", "?").c_str());
+        return "#" + std::to_string(t) + " " + _(YamlString(list[static_cast<std::size_t>(t)], "name", "?").c_str());
     };
     const std::string needPreview = (need >= 0 && need < count) ? techLabel(need) : std::string(_("(none)"));
     if (Hinted(ImGui::BeginCombo(_("Requires"), needPreview.c_str()), "Requires"))

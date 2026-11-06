@@ -95,7 +95,7 @@ MapDocument::MapDocument()
     NewMap(60, 40, 0, 0);
 }
 
-void MapDocument::NewMap(int width, int height, int tilesetId, uint8_t fillTile)
+void MapDocument::NewMap(int width, int height, int tilesetId, std::uint8_t fillTile)
 {
     width = std::clamp(width, 10, MAX_MAP_SIZE);
     height = std::clamp(height, 10, MAX_MAP_SIZE);
@@ -199,7 +199,7 @@ bool MapDocument::LoadMap(const std::string &path)
     m_extraStarts.clear();
     if (j.contains("start_positions") && j["start_positions"].is_array() && j["start_positions"].size() > 2)
     {
-        for (size_t i = 2; i < j["start_positions"].size() && m_extraStarts.size() < kMaxExtraStarts; ++i)
+        for (std::size_t i = 2; i < j["start_positions"].size() && m_extraStarts.size() < kMaxExtraStarts; ++i)
         {
             const auto &p = j["start_positions"][i];
             if (!p.is_object())
@@ -285,7 +285,7 @@ bool MapDocument::SaveMap(const std::string &path)
     {
         for (int x = 0; x < w; ++x)
         {
-            uint8_t t = m_map.GetBaseTile(x, y);
+            std::uint8_t t = m_map.GetBaseTile(x, y);
             if (curTile < 0)
             {
                 curTile = t;
@@ -325,7 +325,7 @@ bool MapDocument::SaveMap(const std::string &path)
         nlohmann::json rowChunks = nlohmann::json::array();
         for (int chunkIdx = 0; chunkIdx < numChunks; ++chunkIdx)
         {
-            uint32_t mask = 0;
+            std::uint32_t mask = 0;
             for (int bit = 0; bit < 32; ++bit)
             {
                 int x = chunkIdx * 32 + bit;
@@ -424,7 +424,7 @@ bool MapDocument::SaveMap(const std::string &path)
     return true;
 }
 
-void MapDocument::SetTile(int x, int y, uint8_t tile)
+void MapDocument::SetTile(int x, int y, std::uint8_t tile)
 {
     if (x < 0 || x >= m_map.GetWidth() || y < 0 || y >= m_map.GetHeight())
         return;
@@ -479,7 +479,7 @@ void MapDocument::RefreshPassability(int x, int y)
     m_map.SetPassable(x, y, open);
 }
 
-void MapDocument::SetTileBrush(int x, int y, uint8_t tile, int brushSize)
+void MapDocument::SetTileBrush(int x, int y, std::uint8_t tile, int brushSize)
 {
     brushSize = std::clamp(brushSize, 1, 3);
     const int start = -(brushSize - 1) / 2;
@@ -492,14 +492,14 @@ void MapDocument::SetTileBrush(int x, int y, uint8_t tile, int brushSize)
     }
 }
 
-void MapDocument::FloodFill(int startX, int startY, uint8_t newTile)
+void MapDocument::FloodFill(int startX, int startY, std::uint8_t newTile)
 {
     int w = m_map.GetWidth();
     int h = m_map.GetHeight();
     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
         return;
 
-    uint8_t targetTile = m_map.GetBaseTile(startX, startY);
+    std::uint8_t targetTile = m_map.GetBaseTile(startX, startY);
     if (targetTile == newTile)
         return;
 
@@ -534,7 +534,7 @@ void MapDocument::FloodFill(int startX, int startY, uint8_t newTile)
     }
 }
 
-void MapDocument::FillAll(uint8_t tile)
+void MapDocument::FillAll(std::uint8_t tile)
 {
     int w = m_map.GetWidth();
     int h = m_map.GetHeight();
@@ -885,7 +885,7 @@ void MapDocument::AutoRecalculatePassability()
     {
         for (int x = 0; x < w; ++x)
         {
-            uint8_t t = m_map.GetBaseTile(x, y);
+            std::uint8_t t = m_map.GetBaseTile(x, y);
             bool passable = !TileCollision::IsBlocked(m_map.GetTilesetId(), t);
             if (m_map.GetWall(x, y) > 0)
                 passable = false;
@@ -945,7 +945,7 @@ MapSnapshot MapDocument::CreateSnapshot() const
             int idx = y * snap.width + x;
             snap.baseTiles[idx] = m_map.GetBaseTile(x, y);
             snap.wallGrid[idx] = m_map.GetWall(x, y);
-            snap.wallHp[idx] = static_cast<int16_t>(m_map.GetWallHp(x, y));
+            snap.wallHp[idx] = static_cast<std::int16_t>(m_map.GetWallHp(x, y));
             snap.passability[idx] = m_map.IsPassable(x, y);
         }
     }
@@ -1005,9 +1005,9 @@ std::pair<int, int> MapDocument::GetStartPos(int playerIndex) const
         return {m_playerStartX, m_playerStartY};
     if (playerIndex == 1)
         return {m_enemyStartX, m_enemyStartY};
-    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size())
+    if (playerIndex >= 2 && static_cast<std::size_t>(playerIndex - 2) < m_extraStarts.size())
     {
-        return m_extraStarts[static_cast<size_t>(playerIndex - 2)];
+        return m_extraStarts[static_cast<std::size_t>(playerIndex - 2)];
     }
     return {-1, -1};
 }
@@ -1030,9 +1030,9 @@ bool MapDocument::SetStartPos(int playerIndex, int x, int y)
         m_modified = true;
         return true;
     }
-    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size())
+    if (playerIndex >= 2 && static_cast<std::size_t>(playerIndex - 2) < m_extraStarts.size())
     {
-        m_extraStarts[static_cast<size_t>(playerIndex - 2)] = {x, y};
+        m_extraStarts[static_cast<std::size_t>(playerIndex - 2)] = {x, y};
         m_modified = true;
         return true;
     }
@@ -1045,7 +1045,7 @@ int MapDocument::FindStartPosAt(int x, int y) const
         return 0;
     if (m_enemyStartX == x && m_enemyStartY == y)
         return 1;
-    for (size_t i = 0; i < m_extraStarts.size(); ++i)
+    for (std::size_t i = 0; i < m_extraStarts.size(); ++i)
     {
         if (m_extraStarts[i].first == x && m_extraStarts[i].second == y)
         {
@@ -1068,7 +1068,7 @@ bool MapDocument::AddStartPos(int x, int y)
 
 bool MapDocument::RemoveStartPos(int playerIndex)
 {
-    if (playerIndex >= 2 && static_cast<size_t>(playerIndex - 2) < m_extraStarts.size())
+    if (playerIndex >= 2 && static_cast<std::size_t>(playerIndex - 2) < m_extraStarts.size())
     {
         m_extraStarts.erase(m_extraStarts.begin() + static_cast<std::ptrdiff_t>(playerIndex - 2));
         m_modified = true;

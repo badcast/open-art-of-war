@@ -48,7 +48,7 @@ void CharacterEditor::DrawEditor()
             {
                 if (selectedIndex >= 0 && selectedIndex < static_cast<int>(files.size()))
                 {
-                    loadFile(files[static_cast<size_t>(selectedIndex)].path);
+                    loadFile(files[static_cast<std::size_t>(selectedIndex)].path);
                 }
             }
             if (ImGui::MenuItem(_("Refresh list")))
@@ -174,7 +174,7 @@ void CharacterEditor::DrawEditor()
     auto renderGroup = [&](FactionGroup &group) {
         if (group.units.empty() && group.buildings.empty())
             return;
-        size_t totalCount = group.units.size() + group.buildings.size();
+        std::size_t totalCount = group.units.size() + group.buildings.size();
         std::string headerLabel = group.title + " (" + std::to_string(totalCount) + ")";
         if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -373,6 +373,13 @@ void CharacterEditor::DrawEditor()
             ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
         const bool canvasActive = ImGui::IsItemActive();
         const bool canvasHovered = ImGui::IsItemHovered();
+
+        // Zooming canvas with mouse wheel scroll
+        if (canvasHovered && io.MouseWheel != 0.0f)
+        {
+            const float factor = (io.MouseWheel > 0.0f) ? 1.15f : (1.0f / 1.15f);
+            previewZoom = std::clamp(previewZoom * factor, 0.25f, 8.0f);
+        }
 
         // 1. Panning canvas with MMB (Middle Mouse Button) or Space + Drag
         if (canvasActive
@@ -669,7 +676,9 @@ void CharacterEditor::DrawProperties()
             const std::string text = _(key);
             ImGui::TextDisabled(_("Description (po key %s):"), key.c_str());
             ImGui::TextWrapped(
-                "%s", text == key ? _("(no translation yet - add it to po/en.po and po/ru.po)") : text.c_str());
+                "%s",
+                text == key ? _("(no translation yet - add it to po/openaow_en.po and po/openaow_ru.po)")
+                            : text.c_str());
         }
         changed |= DrawIdentity(isBuilding);
     }
@@ -859,7 +868,7 @@ void CharacterEditor::DrawProperties()
         YAML::Node weapons = combat["weapons"];
         if (weapons && weapons.IsSequence() && weapons.size() > 0)
         {
-            for (size_t wi = 0; wi < weapons.size(); ++wi)
+            for (std::size_t wi = 0; wi < weapons.size(); ++wi)
             {
                 YAML::Node w = weapons[wi];
                 if (!w.IsMap())
@@ -882,7 +891,7 @@ void CharacterEditor::DrawProperties()
                         if (Hinted(ImGui::Button(_("Remove Weapon")), "Remove Weapon"))
                         {
                             YAML::Node newWeapons(YAML::NodeType::Sequence);
-                            for (size_t k = 0; k < weapons.size(); ++k)
+                            for (std::size_t k = 0; k < weapons.size(); ++k)
                             {
                                 if (k != wi)
                                     newWeapons.push_back(weapons[k]);
@@ -1174,7 +1183,8 @@ void CharacterEditor::DrawProperties()
                         ImGui::TextDisabled(_("Siege description (po key %s):"), key.c_str());
                         ImGui::TextWrapped(
                             "%s",
-                            text == key ? _("(no translation yet - add it to po/en.po and po/ru.po)") : text.c_str());
+                            text == key ? _("(no translation yet - add it to po/openaow_en.po and po/openaow_ru.po)")
+                                        : text.c_str());
                     }
 
                     YAML::Node sStats = abilities["siege"]["stats"];
@@ -1284,8 +1294,8 @@ void CharacterEditor::DrawProperties()
         }
         ImGui::TextDisabled(
             "%s",
-            _("Events and their volume, pitch, range: assets/data/audio_sfx.json; clips: audio/sfx/<event>_<n>.ogg "
-              "listed in main.json."));
+            _("Events and their volume, pitch, range: assets/data/audio_sfx.yaml; clips: audio/sfx/<event>_<n>.ogg "
+              "listed in main.yaml."));
     }
 
     if (changed)

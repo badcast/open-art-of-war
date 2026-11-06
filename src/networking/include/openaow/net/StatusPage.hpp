@@ -17,7 +17,7 @@ public:
     StatusPage(const StatusPage &) = delete;
     StatusPage &operator=(const StatusPage &) = delete;
 
-    bool open(uint16_t port, const std::string &bindAddress, std::string &error);
+    bool open(std::uint16_t port, const std::string &bindAddress, std::string &error);
     void serve(const std::string &json);
 
 private:

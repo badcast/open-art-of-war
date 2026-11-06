@@ -27,13 +27,13 @@ SoundEngine::~SoundEngine()
     Cleanup();
 }
 
-bool SoundEngine::Init(const std::string &assetRoot)
+bool SoundEngine::Init()
 {
     if (m_initialized)
         return true;
 
     std::string tracklistText;
-    if (Assets::ReadText(LoaderResources::Tracklist(assetRoot), tracklistText))
+    if (Assets::ReadText(LoaderResources::Tracklist(), tracklistText))
     {
         const nlohmann::json tracklist = nlohmann::json::parse(tracklistText, nullptr, false);
         if (tracklist.is_object())
@@ -44,7 +44,7 @@ bool SoundEngine::Init(const std::string &assetRoot)
                 const std::string filename = item["filename"].get<std::string>();
                 if (filename.empty())
                     return false;
-                track.path = LoaderResources::AudioFile(filename, assetRoot);
+                track.path = LoaderResources::AudioFile(filename);
                 track.name = item.contains("name") && item["name"].is_string()
                                  ? item["name"].get<std::string>()
                                  : filename.substr(0, filename.rfind('.'));
@@ -107,9 +107,8 @@ bool SoundEngine::Init(const std::string &assetRoot)
     m_lock = SDL_CreateMutex();
     SDL_ResumeAudioStreamDevice(m_stream);
 
-    m_assetRoot = assetRoot;
     // Sound effects: their own stream, fed by the mixer (decoded once at start)
-    m_sfx.LoadBank(LoaderResources::SfxConfig(assetRoot), LoaderResources::SfxClips(assetRoot));
+    m_sfx.LoadBank(LoaderResources::SfxConfig(), LoaderResources::SfxClips());
     m_sfx.SetFxVolume(m_fxVolume);
     m_sfx.SetVoiceVolume(m_voiceVolume);
     m_sfx.SetUiVolume(m_uiVolume);
@@ -175,7 +174,7 @@ void SDLCALL SoundEngine::FeedSfx(void *userdata, SDL_AudioStream *stream, int a
     const int frames = additionalAmount / 4; // stereo int16
     if (frames <= 0)
         return;
-    self->m_sfxBuffer.assign(static_cast<size_t>(frames) * 2, 0);
+    self->m_sfxBuffer.assign(static_cast<std::size_t>(frames) * 2, 0);
     self->m_sfx.Mix(self->m_sfxBuffer.data(), frames);
     self->m_voices.Mix(self->m_sfxBuffer.data(), frames); // the voices on top
     SDL_PutAudioStreamData(stream, self->m_sfxBuffer.data(), frames * 4);
@@ -189,7 +188,7 @@ SoundEngine::FeedAmbient(void *userdata, SDL_AudioStream *stream, int additional
         return;
     const int channels = self->m_ambientChannels;
     const int framesWanted = additionalAmount / static_cast<int>(sizeof(short) * channels) + 1;
-    self->m_ambientPcm.resize(static_cast<size_t>(framesWanted * channels));
+    self->m_ambientPcm.resize(static_cast<std::size_t>(framesWanted * channels));
     int produced = 0;
     bool rewound = false; // a file that gives nothing even from its start stops here instead of spinning
     while (produced < framesWanted)
@@ -218,7 +217,7 @@ void SoundEngine::PlayAmbient(bool night)
 {
     if (!m_initialized)
         return;
-    const std::string path = LoaderResources::Ambient(night, m_assetRoot);
+    const std::string path = LoaderResources::Ambient(night);
     if (path == m_ambientPath && m_ambientStream)
         return;
     StopAmbient();
@@ -284,7 +283,7 @@ void SDLCALL SoundEngine::FeedAudio(void *userdata, SDL_AudioStream *stream, int
     {
         const int channels = self->m_channels;
         int framesWanted = additionalAmount / static_cast<int>(sizeof(short) * channels) + 1;
-        self->m_pcm.resize(static_cast<size_t>(framesWanted * channels));
+        self->m_pcm.resize(static_cast<std::size_t>(framesWanted * channels));
         int produced = 0;
         while (produced < framesWanted)
         {
@@ -333,7 +332,7 @@ bool SoundEngine::LoadTrack(const Track &track, bool loop)
     if (!m_initialized)
         return false;
     // The decoder reads straight from this buffer, so it lives as long as the decoder does
-    std::vector<uint8_t> oggData;
+    std::vector<std::uint8_t> oggData;
     int error = 0;
     stb_vorbis *decoder = nullptr;
     if (Assets::ReadBytes(track.path, oggData) && !oggData.empty())
@@ -414,7 +413,7 @@ void SoundEngine::AdvanceGameTrack()
         }
         m_nextGameTrack = 0;
     }
-    const size_t index = m_shuffledTracks[m_nextGameTrack++];
+    const std::size_t index = m_shuffledTracks[m_nextGameTrack++];
     m_lastGameTrack = index;
     if (LoadTrack(m_gameTracks[index], false))
     {
@@ -520,7 +519,7 @@ std::string SoundEngine::GetCurrentTrackName() const
         return {};
     if (m_currentTrack == 0 && m_hasMenuTrack)
         return m_menuTrack.name;
-    const size_t i = static_cast<size_t>(m_currentTrack - 1);
+    const std::size_t i = static_cast<std::size_t>(m_currentTrack - 1);
     return i < m_gameTracks.size() ? m_gameTracks[i].name : std::string();
 }
 
@@ -697,7 +696,7 @@ void SoundEngine::SetVoiceLanguage(const std::string &language)
 {
     if (!m_initialized || language == m_voices.Language())
         return;
-    m_voices.load(language, m_assetRoot.empty() ? LoaderResources::kDefaultRoot : m_assetRoot);
+    m_voices.load(language);
 }
 
 void SoundEngine::ToggleMute()

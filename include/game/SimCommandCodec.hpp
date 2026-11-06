@@ -14,11 +14,11 @@ namespace OpenArtOfWar
 namespace SimCommandCodec
 {
 
-constexpr size_t kMaxCommandsPerTurn = 64;
-constexpr size_t kMaxIdsPerCommand = 512;
+constexpr std::size_t kMaxCommandsPerTurn = 64;
+constexpr std::size_t kMaxIdsPerCommand = 512;
 
-std::vector<uint8_t> Encode(const std::vector<SimCommand> &commands);
-bool Decode(const uint8_t *data, size_t size, PlayerId player, std::vector<SimCommand> &out);
+std::vector<std::uint8_t> Encode(const std::vector<SimCommand> &commands);
+bool Decode(const std::uint8_t *data, std::size_t size, PlayerId player, std::vector<SimCommand> &out);
 
 } // namespace SimCommandCodec
 } // namespace OpenArtOfWar

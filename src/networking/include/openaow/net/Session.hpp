@@ -23,8 +23,8 @@ namespace OpenArtOfWar::Net
 struct GameIdentity
 {
     std::string gameVersion;
-    uint64_t simBuildId {0};
-    uint64_t assetsHash {0};
+    std::uint64_t simBuildId {0};
+    std::uint64_t assetsHash {0};
 };
 
 struct HostConfig
@@ -34,21 +34,21 @@ struct HostConfig
     // A room of the dedicated server: nobody plays on the host, the room's owner (the first player in it)
     // picks the map and starts the match with OwnerSetMap / OwnerStart
     bool ownerControls {false};
-    uint16_t turnMs {100};
-    uint8_t ticksPerTurn {2};
-    uint8_t inputDelayMin {1};
-    uint8_t inputDelayMax {6};
+    std::uint16_t turnMs {100};
+    std::uint8_t ticksPerTurn {2};
+    std::uint8_t inputDelayMin {1};
+    std::uint8_t inputDelayMax {6};
     int maxPlayers {kMaxPlayers};
-    uint8_t pausesPerPlayer {3};
-    uint32_t maxPauseMs {120000};       // a pause ends by itself after this
-    uint32_t reconnectWindowMs {60000}; // a player who dropped out of a running match is given up after this
+    std::uint8_t pausesPerPlayer {3};
+    std::uint32_t maxPauseMs {120000};       // a pause ends by itself after this
+    std::uint32_t reconnectWindowMs {60000}; // a player who dropped out of a running match is given up after this
     std::string password;               // joining asks for it (empty: open)
     // The data files of the simulation this host plays with (path, hash). A client whose data differ and that can
     // sync (Hello::canSync) is sent this list and may ask for the files; empty: such a client is turned away.
     std::vector<DataEntry> dataManifest;
     // Answers a file request: the file of `path` compressed (at most kMaxFileBytes) and the hash of its bytes; false
     // when the host does not serve it. Only paths of dataManifest are asked.
-    std::function<bool(const std::string &path, std::vector<uint8_t> &packed, uint64_t &hash)> dataFile;
+    std::function<bool(const std::string &path, std::vector<std::uint8_t> &packed, std::uint64_t &hash)> dataFile;
     // A dedicated server's room keeps the replay of every match here (empty: no recording) and tells what happens
     // (who connects from which address, the replay saved) to `log`
     std::string replayDir;
@@ -65,15 +65,15 @@ public:
     void addTransport(std::unique_ptr<Transport> transport);
 
     // Everything that arrived; closes the turns that are due. `nowMs`: any steadily rising clock.
-    void update(uint32_t nowMs);
+    void update(std::uint32_t nowMs);
 
     // The room: the map (and how many start positions it has) and everybody's picks
-    void setLobbyMap(const std::string &map, uint8_t spawnCount, uint64_t mapHash = 0);
+    void setLobbyMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
     // A file the room hands out on request (the game's compressed map); a dedicated room gets them from
     // its owner. At most kMaxStoredFiles / kMaxStoredBytes are kept, the oldest go first.
-    void offerFile(uint64_t hash, std::vector<uint8_t> bytes);
-    static constexpr size_t kMaxStoredFiles = 8;
-    static constexpr size_t kMaxStoredBytes = 4 * 1024 * 1024;
+    void offerFile(std::uint64_t hash, std::vector<std::uint8_t> bytes);
+    static constexpr std::size_t kMaxStoredFiles = 8;
+    static constexpr std::size_t kMaxStoredBytes = 4 * 1024 * 1024;
     const LobbyState &lobby() const
     {
         return m_lobby;
@@ -81,16 +81,16 @@ public:
     // Computer players: add (slot kRandom: the first free one), change or remove (see OwnerSetAi)
     void setAiSlot(const OwnerSetAi &change);
     // The team of a player in the room (the host / room owner decides teams, see OwnerSetTeam)
-    void setTeam(uint8_t slot, uint8_t team, uint8_t handicap, uint8_t armyCap = 7);
+    void setTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap = 7);
     // What a start position holds (see OwnerSetSeat): the host / room owner decides
     void setSeat(const OwnerSetSeat &change);
     // Match options of the room (the host / room owner decides, everybody sees them in the lobby)
-    void setOptions(bool fogOfWar, bool prebuilt, uint8_t credits, bool night);
+    void setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
     bool everyoneReady(int minPlayers) const;
 
     // Sends the match setup to everybody; turn 0 closes `firstTurnDelayMs` later
-    void startMatch(std::vector<uint8_t> setup, uint32_t nowMs, uint32_t firstTurnDelayMs = 3000);
+    void startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowMs, std::uint32_t firstTurnDelayMs = 3000);
     bool matchRunning() const
     {
         return m_running;
@@ -102,10 +102,10 @@ public:
 
     struct Player
     {
-        uint8_t slot {0};
+        std::uint8_t slot {0};
         std::string name;
         bool connected {false};
-        uint32_t rttMs {0};
+        std::uint32_t rttMs {0};
     };
     std::vector<Player> players() const;
     int playerCount() const;
@@ -113,7 +113,7 @@ public:
     // The slot that may decide for the room (lowest connected), -1 when nobody is there
     int ownerSlot() const;
     RoomInfo roomInfo() const;
-    uint8_t inputDelay() const
+    std::uint8_t inputDelay() const
     {
         return m_inputDelay;
     }
@@ -122,11 +122,11 @@ public:
     {
         return m_desynced;
     }
-    uint32_t desyncTick() const
+    std::uint32_t desyncTick() const
     {
         return m_desyncTick;
     }
-    uint32_t nextTurn() const
+    std::uint32_t nextTurn() const
     {
         return m_nextTurn;
     }
@@ -134,11 +134,11 @@ public:
 private:
     struct Connection
     {
-        size_t transport {0};
+        std::size_t transport {0};
         PeerId peer {0};
         int slot {-1};        // -1: not through the handshake yet
         bool syncing {false}; // its data differ: it may fetch the manifest's files before saying hello again
-        uint32_t syncStartMs {0};
+        std::uint32_t syncStartMs {0};
     };
     struct SlotState
     {
@@ -146,53 +146,53 @@ private:
         bool connected {false};
         std::string name;
         SessionToken token {};
-        size_t connection {0};
-        std::map<uint32_t, std::vector<std::vector<uint8_t>>> commands; // turn -> batches of encoded commands
+        std::size_t connection {0};
+        std::map<std::uint32_t, std::vector<std::vector<std::uint8_t>>> commands; // turn -> batches of encoded commands
         LobbyChoice choice;
-        uint8_t pausesLeft {0};
+        std::uint8_t pausesLeft {0};
         bool ai {false};
-        uint8_t aiLevel {1};
-        uint32_t goneMs {0}; // when the connection was lost (a running match keeps the slot for a while)
+        std::uint8_t aiLevel {1};
+        std::uint32_t goneMs {0}; // when the connection was lost (a running match keeps the slot for a while)
     };
 
     // A team colour (1..8) nobody else in the room has: `preferred` when it is free, else the first free one.
     // The classic look (0) and anything else is left as it is.
-    uint8_t freeColor(uint8_t slot, uint8_t preferred) const;
+    std::uint8_t freeColor(std::uint8_t slot, std::uint8_t preferred) const;
     // The first start position of the map nobody holds and nobody blocked (kRandom: none)
-    uint8_t freeSpawn() const;
-    void handle(size_t connection, const TransportEvent &e, uint32_t nowMs);
-    void handleHello(size_t connection, const Hello &hello, uint32_t nowMs);
-    void sendTo(size_t connection, Channel channel, const uint8_t *data, size_t size);
-    void broadcast(Channel channel, const uint8_t *data, size_t size);
+    std::uint8_t freeSpawn() const;
+    void handle(std::size_t connection, const TransportEvent &e, std::uint32_t nowMs);
+    void handleHello(std::size_t connection, const Hello &hello, std::uint32_t nowMs);
+    void sendTo(std::size_t connection, Channel channel, const std::uint8_t *data, std::size_t size);
+    void broadcast(Channel channel, const std::uint8_t *data, std::size_t size);
     void broadcastRoster();
     void broadcastLobby();
     // `ownerEdit`: the room owner sets it (computer players); a player cannot change his own handicap
-    void applyChoice(uint8_t slot, LobbyChoice choice, bool ownerEdit = false);
-    void setPaused(bool paused, uint8_t bySlot, uint32_t nowMs);
+    void applyChoice(std::uint8_t slot, LobbyChoice choice, bool ownerEdit = false);
+    void setPaused(bool paused, std::uint8_t bySlot, std::uint32_t nowMs);
     bool m_paused {false};
-    uint32_t m_pauseStartMs {0};
-    uint8_t m_pausedBy {0};
-    std::vector<std::pair<uint64_t, std::vector<uint8_t>>> m_files; // offered files, oldest first
-    void closeTurn(uint32_t turn);
+    std::uint32_t m_pauseStartMs {0};
+    std::uint8_t m_pausedBy {0};
+    std::vector<std::pair<std::uint64_t, std::vector<std::uint8_t>>> m_files; // offered files, oldest first
+    void closeTurn(std::uint32_t turn);
     void adaptInputDelay();
-    void reject(size_t connection, RejectReason reason, const std::string &detail);
+    void reject(std::size_t connection, RejectReason reason, const std::string &detail);
 
     HostConfig m_config;
     std::vector<std::unique_ptr<Transport>> m_transports;
     std::vector<Connection> m_connections;
     std::array<SlotState, kMaxPlayers> m_slots {};
     bool m_running {false};
-    uint32_t m_startMs {0};
-    uint32_t m_nextTurn {0};
-    uint8_t m_inputDelay {2};
-    uint8_t m_announcedDelay {0};
-    std::map<uint32_t, std::map<uint8_t, uint64_t>> m_hashes; // tick -> slot -> checksum
+    std::uint32_t m_startMs {0};
+    std::uint32_t m_nextTurn {0};
+    std::uint8_t m_inputDelay {2};
+    std::uint8_t m_announcedDelay {0};
+    std::map<std::uint32_t, std::map<std::uint8_t, std::uint64_t>> m_hashes; // tick -> slot -> checksum
     LobbyState m_lobby;
-    std::vector<uint8_t> m_setup;                // of the running match (for players coming back)
-    std::vector<std::vector<uint8_t>> m_turnLog; // every closed turn, encoded (ditto)
-    std::vector<uint8_t> m_leftPending;          // slots given up in the match, announced with the next turn
+    std::vector<std::uint8_t> m_setup;                // of the running match (for players coming back)
+    std::vector<std::vector<std::uint8_t>> m_turnLog; // every closed turn, encoded (ditto)
+    std::vector<std::uint8_t> m_leftPending;          // slots given up in the match, announced with the next turn
     bool m_desynced {false};
-    uint32_t m_desyncTick {0};
+    std::uint32_t m_desyncTick {0};
     // Replay of the running match (see HostConfig::replayDir)
     struct SeenPlayer
     {
@@ -200,14 +200,14 @@ private:
         std::vector<std::string> addresses; // every address the slot connected from, in order
     };
     std::array<SeenPlayer, kMaxPlayers> m_seen {};
-    std::vector<std::pair<uint32_t, uint64_t>> m_replayChecksums; // ticks every connected player agrees on
+    std::vector<std::pair<std::uint32_t, std::uint64_t>> m_replayChecksums; // ticks every connected player agrees on
     std::int64_t m_replayStartedAt {0};
     bool m_replayOpen {false};
     void logLine(const std::string &line) const;
     void finishReplay(const std::string &reason);
     std::vector<TransportEvent> m_events;
-    std::vector<uint8_t> m_buffer;
-    static constexpr uint32_t kMaxSyncMs = 30000;
+    std::vector<std::uint8_t> m_buffer;
+    static constexpr std::uint32_t kMaxSyncMs = 30000;
     static constexpr int kMaxSyncing = 4;
 };
 
@@ -233,7 +233,7 @@ public:
 
     SessionClient(std::unique_ptr<Transport> transport, ClientConfig config);
 
-    void update(uint32_t nowMs);
+    void update(std::uint32_t nowMs);
 
     State state() const
     {
@@ -247,7 +247,7 @@ public:
     {
         return m_reject.detail;
     }
-    uint8_t slot() const
+    std::uint8_t slot() const
     {
         return m_welcome.slot;
     }
@@ -255,11 +255,11 @@ public:
     {
         return m_welcome.token;
     }
-    uint16_t turnMs() const
+    std::uint16_t turnMs() const
     {
         return m_welcome.turnMs;
     }
-    uint8_t ticksPerTurn() const
+    std::uint8_t ticksPerTurn() const
     {
         return m_welcome.ticksPerTurn;
     }
@@ -273,20 +273,20 @@ public:
     }
     void sendLobbyChoice(const LobbyChoice &choice);
     // Dedicated server rooms, the owner only
-    void sendOwnerSetMap(const std::string &map, uint8_t spawnCount, uint64_t mapHash = 0);
+    void sendOwnerSetMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
     // Files: ask the room for one / give the dedicated room one to hand out (owner)
-    void requestFile(uint64_t hash);
-    void uploadFile(uint64_t hash, const std::vector<uint8_t> &bytes);
+    void requestFile(std::uint64_t hash);
+    void uploadFile(std::uint64_t hash, const std::vector<std::uint8_t> &bytes);
     // A file that arrived (empty bytes: the room does not have it); false when none is waiting
-    bool takeFile(uint64_t &hash, std::vector<uint8_t> &bytes);
+    bool takeFile(std::uint64_t &hash, std::vector<std::uint8_t> &bytes);
     // Data sync (joining a host whose simulation data differ): the host's list, once it arrived
     bool takeDataManifest(std::vector<DataEntry> &files);
     void requestDataFile(const std::string &path);
     // A data file that arrived (empty bytes: the host does not serve it); false when none is waiting
     bool takeDataFile(FilePathData &out);
     // Says hello again with the data hash the client has now (after the fetched files were installed)
-    void sayHelloAgain(uint64_t assetsHash);
-    void sendOwnerStart(const std::vector<uint8_t> &setup, uint32_t firstTurnDelayMs = 3000);
+    void sayHelloAgain(std::uint64_t assetsHash);
+    void sendOwnerStart(const std::vector<std::uint8_t> &setup, std::uint32_t firstTurnDelayMs = 3000);
     void sendOwnerSetAi(const OwnerSetAi &change);
     void sendOwnerSetTeam(const OwnerSetTeam &change);
     void sendOwnerSetOptions(const OwnerSetOptions &change);
@@ -298,33 +298,33 @@ public:
         return m_started;
     }
     // Grows with every StartMatch (a reconnect brings the match again, from its start)
-    uint32_t matchStarts() const
+    std::uint32_t matchStarts() const
     {
         return m_starts;
     }
-    const std::vector<uint8_t> &matchSetup() const
+    const std::vector<std::uint8_t> &matchSetup() const
     {
         return m_setup;
     }
 
     // Commands of the local player for `turn` (one message per turn; empty turns need not be sent)
-    void sendCommands(uint32_t turn, const std::vector<uint8_t> &bytes);
+    void sendCommands(std::uint32_t turn, const std::vector<std::uint8_t> &bytes);
     // The turn as the host closed it, nullptr when it has not arrived yet
-    const TurnBundle *turn(uint32_t turn) const;
+    const TurnBundle *turn(std::uint32_t turn) const;
     // Turns before `turn` are done with
-    void dropTurnsBefore(uint32_t turn);
+    void dropTurnsBefore(std::uint32_t turn);
     // The newest turn received + 1 (how far the client may run)
-    uint32_t turnsReceived() const
+    std::uint32_t turnsReceived() const
     {
         return m_turnsReceived;
     }
     // Turns between issuing a command and running it (set by the host)
-    uint8_t inputDelay() const
+    std::uint8_t inputDelay() const
     {
         return m_inputDelay;
     }
 
-    void sendWorldHash(uint32_t tick, uint64_t hash);
+    void sendWorldHash(std::uint32_t tick, std::uint64_t hash);
 
     // Pause for everybody (a limited number of times) / go on (anybody)
     void requestPause(bool pause);
@@ -336,7 +336,7 @@ public:
     {
         return m_desynced;
     }
-    uint32_t desyncTick() const
+    std::uint32_t desyncTick() const
     {
         return m_desyncTick;
     }
@@ -344,7 +344,7 @@ public:
     void sendChat(const std::string &text, bool teamOnly);
     std::vector<Chat> takeChat();
 
-    uint32_t roundTripMs() const;
+    std::uint32_t roundTripMs() const;
     // Round trip, jitter, loss and traffic of the link to the host / server
     LinkStats linkStats() const;
     // Leaves the host (the connection ends as if it had dropped)
@@ -354,7 +354,7 @@ public:
 
 private:
     void handle(const TransportEvent &e);
-    void send(Channel channel, const uint8_t *data, size_t size);
+    void send(Channel channel, const std::uint8_t *data, std::size_t size);
 
     std::unique_ptr<Transport> m_transport;
     ClientConfig m_config;
@@ -364,13 +364,13 @@ private:
     Roster m_roster;
     LobbyState m_lobby;
     bool m_started {false};
-    uint32_t m_starts {0};
-    std::vector<uint8_t> m_setup;
-    std::map<uint32_t, TurnBundle> m_turns;
-    uint32_t m_turnsReceived {0};
-    uint8_t m_inputDelay {2};
+    std::uint32_t m_starts {0};
+    std::vector<std::uint8_t> m_setup;
+    std::map<std::uint32_t, TurnBundle> m_turns;
+    std::uint32_t m_turnsReceived {0};
+    std::uint8_t m_inputDelay {2};
     bool m_desynced {false};
-    uint32_t m_desyncTick {0};
+    std::uint32_t m_desyncTick {0};
     PauseState m_pause;
     std::vector<Chat> m_chat;
     std::vector<FileData> m_files;
@@ -378,7 +378,7 @@ private:
     std::vector<DataEntry> m_manifest;
     std::vector<FilePathData> m_dataFiles;
     std::vector<TransportEvent> m_events;
-    std::vector<uint8_t> m_buffer;
+    std::vector<std::uint8_t> m_buffer;
 };
 
 } // namespace OpenArtOfWar::Net

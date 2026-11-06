@@ -26,7 +26,7 @@ bool EnvironmentConfig::Load(const std::string &assetPath)
     m_dirty = false;
     std::string text;
     const bool found = Assets::ReadText(assetPath, text);
-    m_root = nlohmann::json::parse(text, nullptr, false, true);
+    m_root = JsonFile::ReadFromString(text);
     if (!found || !m_root.is_object())
         m_root = nlohmann::json::object();
 

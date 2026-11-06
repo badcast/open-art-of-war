@@ -56,7 +56,6 @@ public:
 
     bool LoadMission(
         int missionId,
-        const std::string &assetRoot,
         TileMap &map,
         EntityManager &entities,
         Economy &economy,
@@ -97,13 +96,11 @@ public:
     static std::vector<std::pair<int, int>> StartPositions(const std::string &mapPath);
 
     // Starts the current mission or custom game map over
-    bool Restart(
-        const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+    bool Restart(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
     bool LoadTestPolygon(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
-    bool LoadTestMap(
-        const std::string &assetRoot, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
+    bool LoadTestMap(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
     void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
 

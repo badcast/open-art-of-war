@@ -87,8 +87,8 @@ public:
 private:
     int m_width {0};
     int m_height {0};
-    std::vector<uint8_t> m_choke;
-    std::vector<uint8_t> m_openWidth;
+    std::vector<std::uint8_t> m_choke;
+    std::vector<std::uint8_t> m_openWidth;
 };
 
 enum class AISquadState

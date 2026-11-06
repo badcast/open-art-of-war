@@ -80,15 +80,15 @@ bool TileMap::LoadMap(const std::string &jsonPath)
                         int spanCount = eRanges[r][1] - eRanges[r][0];
                         if (spanCount > 1)
                         {
-                            uint32_t hash
-                                = (static_cast<uint32_t>(curX) * 73856093u ^ static_cast<uint32_t>(curY) * 19349663u);
-                            int varIdx = static_cast<int>(hash % static_cast<uint32_t>(spanCount));
+                            std::uint32_t hash
+                                = (static_cast<std::uint32_t>(curX) * 73856093u ^ static_cast<std::uint32_t>(curY) * 19349663u);
+                            int varIdx = static_cast<int>(hash % static_cast<std::uint32_t>(spanCount));
                             finalTile = eRanges[r][0] + varIdx;
                         }
                         break;
                     }
                 }
-                m_baseTiles[curY][curX] = static_cast<uint8_t>(finalTile);
+                m_baseTiles[curY][curX] = static_cast<std::uint8_t>(finalTile);
                 if (TileCollision::IsBlocked(m_tilesetId, finalTile))
                 {
                     m_passable[curY][curX] = false; // The sprite of this tile blocks movement
@@ -114,7 +114,7 @@ bool TileMap::LoadMap(const std::string &jsonPath)
         m_decorations.push_back(dec);
         if (dec.y >= 0 && dec.y < m_height && dec.x >= 0 && dec.x < m_width)
         {
-            m_decorGrid[dec.y][dec.x] = static_cast<uint16_t>(dec.type + 1);
+            m_decorGrid[dec.y][dec.x] = static_cast<std::uint16_t>(dec.type + 1);
             m_passable[dec.y][dec.x] = false;
         }
     }
@@ -129,7 +129,7 @@ bool TileMap::LoadMap(const std::string &jsonPath)
         int chunkIdx = 0;
         for (const auto &chunkVal : rowChunks)
         {
-            uint32_t mask = chunkVal.get<uint32_t>();
+            std::uint32_t mask = chunkVal.get<std::uint32_t>();
             for (int bit = 0; bit < 32; ++bit)
             {
                 int x = chunkIdx * 32 + bit;
@@ -276,8 +276,8 @@ void TileMap::InitBlankArena(int width, int height, int tilesetId)
     {
         for (int x = 0; x < MAX_MAP_SIZE; ++x)
         {
-            uint32_t hash = (static_cast<uint32_t>(x) * 73856093u ^ static_cast<uint32_t>(y) * 19349663u);
-            m_baseTiles[y][x] = static_cast<uint8_t>(hash % 10);
+            std::uint32_t hash = (static_cast<std::uint32_t>(x) * 73856093u ^ static_cast<std::uint32_t>(y) * 19349663u);
+            m_baseTiles[y][x] = static_cast<std::uint8_t>(hash % 10);
             m_decorGrid[y][x] = 0;
             m_wallGrid[y][x] = 0;
             m_wallRubbleGrid[y][x] = 0;
@@ -337,14 +337,14 @@ void TileMap::SetWall(int tileX, int tileY, Faction faction, int hpPercent, Play
     }
     int damageTier = std::clamp((100 - hpPercent) / 20, 0, 4); // 0=100%, 1=80%, 2=60%, 3=40%, 4=20%
     int base = (faction == Faction::Resistance) ? 1101 : 1001;
-    m_wallGrid[tileY][tileX] = static_cast<uint16_t>(base + damageTier * 20);
-    m_wallHp[tileY][tileX] = static_cast<int16_t>((150 * std::clamp(hpPercent, 1, 100)) / 100);
+    m_wallGrid[tileY][tileX] = static_cast<std::uint16_t>(base + damageTier * 20);
+    m_wallHp[tileY][tileX] = static_cast<std::int16_t>((150 * std::clamp(hpPercent, 1, 100)) / 100);
     m_wallOwner[tileY][tileX] = owner == kNoPlayer ? Players::OwnerOf(faction) : owner;
     m_wallRubbleGrid[tileY][tileX] = 0; // Clear any old ruins when a new wall is erected!
     m_passable[tileY][tileX] = false;
 }
 
-uint16_t TileMap::GetWall(int tileX, int tileY) const
+std::uint16_t TileMap::GetWall(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
         return 0;
@@ -376,7 +376,7 @@ Faction TileMap::GetWallFaction(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
         return Faction::Neutral;
-    uint16_t w = m_wallGrid[tileY][tileX];
+    std::uint16_t w = m_wallGrid[tileY][tileX];
     if (w >= 1101)
         return Faction::Resistance;
     if (w >= 1001)
@@ -384,7 +384,7 @@ Faction TileMap::GetWallFaction(int tileX, int tileY) const
     return Faction::Neutral;
 }
 
-uint16_t TileMap::GetWallRubble(int tileX, int tileY) const
+std::uint16_t TileMap::GetWallRubble(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
         return 0;
@@ -425,18 +425,18 @@ void TileMap::DamageWall(int tileX, int tileY, int damage)
     }
     else
     {
-        uint16_t base = (m_wallGrid[tileY][tileX] >= 1101) ? 1101 : 1001;
+        std::uint16_t base = (m_wallGrid[tileY][tileX] >= 1101) ? 1101 : 1001;
         float hpRatio = static_cast<float>(m_wallHp[tileY][tileX]) / 150.0f;
         int damageTier = std::clamp(static_cast<int>((1.0f - hpRatio) * 5.0f), 0, 4);
-        m_wallGrid[tileY][tileX] = static_cast<uint16_t>(base + damageTier * 20);
+        m_wallGrid[tileY][tileX] = static_cast<std::uint16_t>(base + damageTier * 20);
     }
 }
 
 namespace
 {
-inline uint8_t TeamBit(uint8_t team)
+inline std::uint8_t TeamBit(std::uint8_t team)
 {
-    return static_cast<uint8_t>(1u << (team & 7));
+    return static_cast<std::uint8_t>(1u << (team & 7));
 }
 } // namespace
 
@@ -468,7 +468,7 @@ bool TileMap::ViewerSeesLive(int x, int y) const
     return !m_hasFog || m_fog[y][x] == FogState::Visible;
 }
 
-uint16_t TileMap::ViewerWall(int tileX, int tileY) const
+std::uint16_t TileMap::ViewerWall(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height || m_fog[tileY][tileX] == FogState::Hidden)
         return 0;
@@ -482,7 +482,7 @@ PlayerId TileMap::ViewerWallOwner(int tileX, int tileY) const
     return ViewerSeesLive(tileX, tileY) ? m_wallOwner[tileY][tileX] : m_seenWallOwner[tileY][tileX];
 }
 
-bool TileMap::IsVisibleTo(int tileX, int tileY, uint8_t team) const
+bool TileMap::IsVisibleTo(int tileX, int tileY, std::uint8_t team) const
 {
     if (!m_hasFog)
         return true;
@@ -505,9 +505,9 @@ void TileMap::ResetAllFog(FogState state)
     }
 }
 
-void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, uint8_t team)
+void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, std::uint8_t team)
 {
-    const uint8_t bit = TeamBit(team);
+    const std::uint8_t bit = TeamBit(team);
     const bool viewer = (team & 7) == m_viewerTeam;
     int r2 = radius * radius;
     int minX = std::max(0, centerTileX - radius);
@@ -531,9 +531,9 @@ void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, uint8_t t
     }
 }
 
-void TileMap::RevealRect(int tileX, int tileY, int width, int height, uint8_t team)
+void TileMap::RevealRect(int tileX, int tileY, int width, int height, std::uint8_t team)
 {
-    const uint8_t bit = TeamBit(team);
+    const std::uint8_t bit = TeamBit(team);
     const bool viewer = (team & 7) == m_viewerTeam;
     for (int y = std::max(0, tileY); y < std::min(m_height, tileY + height); ++y)
     {
@@ -633,7 +633,7 @@ void TileMap::RenderWallRubble(Renderer &renderer, const Camera &camera, bool fo
                 continue;
             // Under the fog of war the viewer sees the rubble as it was when the tile was last in sight
             const bool live = !fogEnabled || ViewerSeesLive(tx, ty);
-            uint16_t rubble = live ? m_wallRubbleGrid[ty][tx] : m_seenRubble[ty][tx];
+            std::uint16_t rubble = live ? m_wallRubbleGrid[ty][tx] : m_seenRubble[ty][tx];
             if (rubble > 0)
             {
                 renderer.DrawCompositeWorld(
@@ -703,7 +703,7 @@ namespace
 {
 
 // Separable box blur, run twice (close to a Gaussian): rounds off the staircase of tile edges
-void BlurMask(std::vector<uint8_t> &img, std::vector<uint8_t> &tmp, int w, int h, int radius)
+void BlurMask(std::vector<std::uint8_t> &img, std::vector<std::uint8_t> &tmp, int w, int h, int radius)
 {
     if (radius <= 0)
         return;
@@ -713,13 +713,13 @@ void BlurMask(std::vector<uint8_t> &img, std::vector<uint8_t> &tmp, int w, int h
     {
         for (int y = 0; y < h; ++y)
         {
-            const uint8_t *row = &img[static_cast<size_t>(y) * w];
+            const std::uint8_t *row = &img[static_cast<std::size_t>(y) * w];
             int sum = 0;
             for (int k = -radius; k <= radius; ++k)
                 sum += row[std::clamp(k, 0, w - 1)];
             for (int x = 0; x < w; ++x)
             {
-                tmp[static_cast<size_t>(y) * w + x] = static_cast<uint8_t>(sum / window);
+                tmp[static_cast<std::size_t>(y) * w + x] = static_cast<std::uint8_t>(sum / window);
                 sum += row[std::min(x + radius + 1, w - 1)] - row[std::max(x - radius, 0)];
             }
         }
@@ -727,12 +727,12 @@ void BlurMask(std::vector<uint8_t> &img, std::vector<uint8_t> &tmp, int w, int h
         {
             int sum = 0;
             for (int k = -radius; k <= radius; ++k)
-                sum += tmp[static_cast<size_t>(std::clamp(k, 0, h - 1)) * w + x];
+                sum += tmp[static_cast<std::size_t>(std::clamp(k, 0, h - 1)) * w + x];
             for (int y = 0; y < h; ++y)
             {
-                img[static_cast<size_t>(y) * w + x] = static_cast<uint8_t>(sum / window);
-                sum += tmp[static_cast<size_t>(std::min(y + radius + 1, h - 1)) * w + x]
-                       - tmp[static_cast<size_t>(std::max(y - radius, 0)) * w + x];
+                img[static_cast<std::size_t>(y) * w + x] = static_cast<std::uint8_t>(sum / window);
+                sum += tmp[static_cast<std::size_t>(std::min(y + radius + 1, h - 1)) * w + x]
+                       - tmp[static_cast<std::size_t>(std::max(y - radius, 0)) * w + x];
             }
         }
     }
@@ -764,7 +764,7 @@ void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) c
 
     const int w = tilesW * s;
     const int h = tilesH * s;
-    m_fogMask.assign(static_cast<size_t>(w) * h, 0);
+    m_fogMask.assign(static_cast<std::size_t>(w) * h, 0);
     for (int ty = 0; ty < tilesH; ++ty)
     {
         for (int tx = 0; tx < tilesW; ++tx)
@@ -772,14 +772,14 @@ void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) c
             const int mx = std::clamp(x0 + tx, 0, m_width - 1); // beyond the map edge: repeat the border
             const int my = std::clamp(y0 + ty, 0, m_height - 1);
             const FogState fog = m_fog[my][mx];
-            const uint8_t a = fog == FogState::Hidden     ? static_cast<uint8_t>(m_fogStyle.hiddenAlpha)
-                              : fog == FogState::Explored ? static_cast<uint8_t>(m_fogStyle.exploredAlpha)
+            const std::uint8_t a = fog == FogState::Hidden     ? static_cast<std::uint8_t>(m_fogStyle.hiddenAlpha)
+                              : fog == FogState::Explored ? static_cast<std::uint8_t>(m_fogStyle.exploredAlpha)
                                                           : 0;
             if (a == 0)
                 continue;
             for (int py = 0; py < s; ++py)
             {
-                std::fill_n(&m_fogMask[static_cast<size_t>(ty * s + py) * w + tx * s], s, a);
+                std::fill_n(&m_fogMask[static_cast<std::size_t>(ty * s + py) * w + tx * s], s, a);
             }
         }
     }
@@ -845,7 +845,7 @@ void TileMap::RenderWallRow(
         // not in sight) the viewer sees the wall as it was when the tile was last in sight: walls built, damaged or
         // destroyed there since stay unknown
         const bool live = !fogEnabled || ViewerSeesLive(tx, ty);
-        uint16_t wval = live ? m_wallGrid[ty][tx] : m_seenWall[ty][tx];
+        std::uint16_t wval = live ? m_wallGrid[ty][tx] : m_seenWall[ty][tx];
         if (wval >= 1001 && wval <= 1200)
         {
             int wallBase = (wval >= 1101) ? 25 : 15;
@@ -870,14 +870,14 @@ void TileMap::RenderWallRow(
     renderer.SetDrawOwner(kNoPlayer);
 }
 
-uint8_t TileMap::GetBaseTile(int x, int y) const
+std::uint8_t TileMap::GetBaseTile(int x, int y) const
 {
     if (x < 0 || x >= m_width || y < 0 || y >= m_height)
         return 0;
     return m_baseTiles[y][x];
 }
 
-void TileMap::SetBaseTile(int x, int y, uint8_t tile)
+void TileMap::SetBaseTile(int x, int y, std::uint8_t tile)
 {
     if (x >= 0 && x < m_width && y >= 0 && y < m_height)
     {
@@ -913,7 +913,7 @@ void TileMap::AddDecoration(int type, int x, int y)
     dec.x = x;
     dec.y = y;
     m_decorations.push_back(dec);
-    m_decorGrid[y][x] = static_cast<uint16_t>(type + 1);
+    m_decorGrid[y][x] = static_cast<std::uint16_t>(type + 1);
     m_passable[y][x] = false;
 }
 
@@ -935,7 +935,7 @@ void TileMap::RemoveDecorationAt(int x, int y)
     }
 }
 
-uint16_t TileMap::GetDecorGrid(int x, int y) const
+std::uint16_t TileMap::GetDecorGrid(int x, int y) const
 {
     if (x < 0 || x >= m_width || y < 0 || y >= m_height)
         return 0;

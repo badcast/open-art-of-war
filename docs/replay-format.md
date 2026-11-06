@@ -23,7 +23,7 @@ addresses of each player in its replay's `replay.json`. Both are private data of
 | `turns.bin` | Repeated `u32 length (LE)` + an encoded `TurnBundle` message (`Net::encodeTurn`), turn 0, 1, 2, ... |
 | `checksums.bin` | Repeated `u32 tick` + `u64 world checksum` (LE), every 20 ticks |
 | `maps/<name>.json` | Client file: the map the match was played on |
-| `data/assets/<path>` | Client file: the simulation data files (`net_hash` of `main.json`, plus the manifest). Playing the file puts them into a session overlay, so a replay keeps playing the way it was recorded after the game's data change |
+| `data/assets/<path>` | Client file: the simulation data files (`net_hash` of `main.yaml`, plus the manifest). Playing the file puts them into a session overlay, so a replay keeps playing the way it was recorded after the game's data change |
 
 A server file has no `maps/` and `data/` entries (the server does not know the game's files): the map with the same
 `map_hash` must be on the computer that plays it.

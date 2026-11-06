@@ -84,6 +84,13 @@ public:
     {
         return rawSprites;
     }
+    std::vector<RawSprite> &SpritesMut()
+    {
+        return rawSprites;
+    }
+    bool SetSpriteRect(int spriteId, int x, int y, int w, int h, int page = -1, int palette = -1);
+    bool SaveSpritesJson(const fs::path &assetsRoot, std::string &error) const;
+    bool ReloadSpritesJson(const fs::path &assetsRoot, std::string &error);
     const std::vector<SpriteObject> &Objects() const
     {
         return objs;
@@ -114,7 +121,7 @@ private:
     nlohmann::json gd; // sprites_graphics.json
     std::vector<RawSprite> rawSprites;
     std::vector<SpriteObject> objs;
-    std::vector<uint8_t> spriteGroup; // per sprite id
+    std::vector<std::uint8_t> spriteGroup; // per sprite id
     int compCount {0}, animCount {0}, bodyCount {0}, seqCount {0}, buildingCount {0};
 };
 

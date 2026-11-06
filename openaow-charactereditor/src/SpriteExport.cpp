@@ -46,7 +46,7 @@ public:
         SDL_Surface *result = nullptr;
         char name[32];
         std::snprintf(name, sizeof name, "sheet_%02d.png", page);
-        std::vector<uint8_t> bytes;
+        std::vector<std::uint8_t> bytes;
         if (OpenArtOfWar::Assets::ReadBytes((assets / "sprites" / name).string(), bytes) && !bytes.empty())
         {
             SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(bytes.data(), bytes.size()), true);
@@ -139,10 +139,10 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
         maxW = std::max(maxW, p.src.w + pad);
         maxH = std::max(maxH, p.src.h + pad);
     }
-    std::vector<size_t> order(items.size());
-    for (size_t i = 0; i < order.size(); ++i)
+    std::vector<std::size_t> order(items.size());
+    for (std::size_t i = 0; i < order.size(); ++i)
         order[i] = i;
-    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
         const int ha = std::max(items[a].src.w, items[a].src.h), hb = std::max(items[b].src.w, items[b].src.h);
         if (ha != hb)
             return ha > hb;
@@ -160,11 +160,11 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
         Result r;
         r.pos.assign(items.size(), SDL_Rect {0, 0, 0, 0});
         std::vector<SDL_Rect> free {{0, 0, binW, kMaxImageSide}};
-        for (size_t idx : order)
+        for (std::size_t idx : order)
         {
             const int w = items[idx].src.w + pad, h = items[idx].src.h + pad;
             int best = -1, bestShort = INT32_MAX, bestLong = INT32_MAX;
-            for (size_t f = 0; f < free.size(); ++f)
+            for (std::size_t f = 0; f < free.size(); ++f)
             {
                 if (free[f].w < w || free[f].h < h)
                     continue;
@@ -179,7 +179,7 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
             }
             if (best < 0)
                 return r; // does not fit
-            const SDL_Rect placed {free[static_cast<size_t>(best)].x, free[static_cast<size_t>(best)].y, w, h};
+            const SDL_Rect placed {free[static_cast<std::size_t>(best)].x, free[static_cast<std::size_t>(best)].y, w, h};
             r.pos[idx] = placed;
             r.w = std::max(r.w, placed.x + items[idx].src.w);
             r.h = std::max(r.h, placed.y + items[idx].src.h);
@@ -204,10 +204,10 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
             }
             // Drop the free rectangles that lie inside another one
             free.clear();
-            for (size_t i = 0; i < next.size(); ++i)
+            for (std::size_t i = 0; i < next.size(); ++i)
             {
                 bool inside = false;
-                for (size_t j = 0; j < next.size() && !inside; ++j)
+                for (std::size_t j = 0; j < next.size() && !inside; ++j)
                 {
                     inside = i != j && next[i].x >= next[j].x && next[i].y >= next[j].y
                              && next[i].x + next[i].w <= next[j].x + next[j].w
@@ -246,7 +246,7 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
     }
     width = std::max(1, best.w);
     height = std::max(1, best.h);
-    for (size_t i = 0; i < items.size(); ++i)
+    for (std::size_t i = 0; i < items.size(); ++i)
     {
         items[i].x = best.pos[i].x;
         items[i].y = best.pos[i].y;
@@ -258,11 +258,11 @@ std::vector<Placed> PackMaxRects(std::vector<Placed> items, int &width, int &hei
 // one that was left alone even when other sprites share the same pixels of the sheet
 std::string HashRect(const SDL_Surface *surface, int x, int y, int w, int h)
 {
-    uint64_t hash = 1469598103934665603ull;
+    std::uint64_t hash = 1469598103934665603ull;
     for (int row = 0; row < h; ++row)
     {
-        const uint8_t *p
-            = static_cast<const uint8_t *>(surface->pixels) + static_cast<size_t>(y + row) * surface->pitch + x * 4;
+        const std::uint8_t *p
+            = static_cast<const std::uint8_t *>(surface->pixels) + static_cast<std::size_t>(y + row) * surface->pitch + x * 4;
         for (int i = 0; i < w * 4; ++i)
             hash = (hash ^ p[i]) * 1099511628211ull;
     }
@@ -306,13 +306,13 @@ std::vector<int> PickObjectThumbnails(const SpriteCatalog &catalog, const fs::pa
             return it->second;
         long long count = 0;
         SDL_Rect r;
-        if (sheets.rect(catalog.Sprites()[static_cast<size_t>(id)], r))
+        if (sheets.rect(catalog.Sprites()[static_cast<std::size_t>(id)], r))
         {
-            SDL_Surface *sheet = sheets.Get(catalog.Sprites()[static_cast<size_t>(id)].page);
+            SDL_Surface *sheet = sheets.Get(catalog.Sprites()[static_cast<std::size_t>(id)].page);
             for (int y = r.y; y < r.y + r.h; ++y)
             {
-                const uint8_t *row
-                    = static_cast<const uint8_t *>(sheet->pixels) + static_cast<size_t>(y) * sheet->pitch;
+                const std::uint8_t *row
+                    = static_cast<const std::uint8_t *>(sheet->pixels) + static_cast<std::size_t>(y) * sheet->pitch;
                 for (int x = r.x; x < r.x + r.w; ++x)
                     count += row[x * 4 + 3] >= 250 ? 1 : 0;
             }
@@ -320,7 +320,7 @@ std::vector<int> PickObjectThumbnails(const SpriteCatalog &catalog, const fs::pa
         return solid[id] = count;
     };
     std::vector<int> result(catalog.Objects().size(), -1);
-    for (size_t i = 0; i < catalog.Objects().size(); ++i)
+    for (std::size_t i = 0; i < catalog.Objects().size(); ++i)
     {
         long long best = 0;
         const SpriteObject &o = catalog.Objects()[i];
@@ -363,7 +363,7 @@ bool ExportSpriteObjects(
     {
         if (objectIndex < 0 || objectIndex >= static_cast<int>(catalog.Objects().size()))
             continue;
-        const SpriteObject &o = catalog.Objects()[static_cast<size_t>(objectIndex)];
+        const SpriteObject &o = catalog.Objects()[static_cast<std::size_t>(objectIndex)];
         ++number;
 
         std::vector<Placed> items;
@@ -371,7 +371,7 @@ bool ExportSpriteObjects(
         {
             Placed p;
             p.id = id;
-            if (sheets.rect(catalog.Sprites()[static_cast<size_t>(id)], p.src))
+            if (sheets.rect(catalog.Sprites()[static_cast<std::size_t>(id)], p.src))
                 items.push_back(p);
         }
         int w = 1, h = 1;
@@ -401,10 +401,10 @@ bool ExportSpriteObjects(
             SDL_FillSurfaceRect(atlas, nullptr, 0);
             for (const Placed &p : items)
             {
-                SDL_Surface *sheet = sheets.Get(catalog.Sprites()[static_cast<size_t>(p.id)].page);
+                SDL_Surface *sheet = sheets.Get(catalog.Sprites()[static_cast<std::size_t>(p.id)].page);
                 SDL_Rect dst {p.x, p.y, p.src.w, p.src.h};
                 SDL_BlitSurface(sheet, &p.src, atlas, &dst);
-                const RawSprite &s = catalog.Sprites()[static_cast<size_t>(p.id)];
+                const RawSprite &s = catalog.Sprites()[static_cast<std::size_t>(p.id)];
                 json item
                     = SpriteJson(s, p.src, sheets.Scale(s.page), HashRect(sheet, p.src.x, p.src.y, p.src.w, p.src.h));
                 item["atlas_rect"] = {{"x", p.x}, {"y", p.y}, {"w", p.src.w}, {"h", p.src.h}};
@@ -482,7 +482,7 @@ bool WriteGrid(
     {
         Placed p;
         p.id = id;
-        if (!sheets.rect(catalog.Sprites()[static_cast<size_t>(id)], p.src))
+        if (!sheets.rect(catalog.Sprites()[static_cast<std::size_t>(id)], p.src))
             continue;
         cellW = std::max(cellW, p.src.w);
         cellH = std::max(cellH, p.src.h);
@@ -508,7 +508,7 @@ bool WriteGrid(
         json packedSprites = json::array();
         for (const Placed &p : items)
         { // items stay in the order of their ids
-            const RawSprite &s = catalog.Sprites()[static_cast<size_t>(p.id)];
+            const RawSprite &s = catalog.Sprites()[static_cast<std::size_t>(p.id)];
             SDL_Rect dst {p.x, p.y, p.src.w, p.src.h};
             SDL_BlitSurface(sheets.Get(s.page), &p.src, atlas, &dst);
             json item = SpriteJson(
@@ -542,17 +542,17 @@ bool WriteGrid(
     }
     const int cols = std::clamp(columns, 1, static_cast<int>(items.size()));
     const int rows = (static_cast<int>(items.size()) + cols - 1) / cols;
-    std::vector<int> rowH(static_cast<size_t>(rows), 0);
-    std::vector<long long> rowW(static_cast<size_t>(rows), 0);
-    for (size_t i = 0; i < items.size(); ++i)
+    std::vector<int> rowH(static_cast<std::size_t>(rows), 0);
+    std::vector<long long> rowW(static_cast<std::size_t>(rows), 0);
+    for (std::size_t i = 0; i < items.size(); ++i)
     {
-        const size_t r = i / static_cast<size_t>(cols);
+        const std::size_t r = i / static_cast<std::size_t>(cols);
         rowH[r] = std::max(rowH[r], items[i].src.h);
         rowW[r] += items[i].src.w;
     }
-    std::vector<long long> rowY(static_cast<size_t>(rows), 0);
+    std::vector<long long> rowY(static_cast<std::size_t>(rows), 0);
     long long sumH = 0, maxW = 0;
-    for (size_t r = 0; r < rowH.size(); ++r)
+    for (std::size_t r = 0; r < rowH.size(); ++r)
     {
         rowY[r] = sumH;
         sumH += rowH[r];
@@ -575,7 +575,7 @@ bool WriteGrid(
     SDL_FillSurfaceRect(image, nullptr, 0);
     json sprites = json::array();
     long long cursorX = 0;
-    for (size_t i = 0; i < items.size(); ++i)
+    for (std::size_t i = 0; i < items.size(); ++i)
     {
         Placed &p = items[i];
         const int col = static_cast<int>(i) % cols, row = static_cast<int>(i) / cols;
@@ -584,7 +584,7 @@ bool WriteGrid(
             if (col == 0)
                 cursorX = 0;
             p.x = static_cast<int>(cursorX);
-            p.y = static_cast<int>(rowY[static_cast<size_t>(row)]);
+            p.y = static_cast<int>(rowY[static_cast<std::size_t>(row)]);
             cursorX += p.src.w;
         }
         else
@@ -592,7 +592,7 @@ bool WriteGrid(
             p.x = col * cellW;
             p.y = row * cellH;
         }
-        const RawSprite &s = catalog.Sprites()[static_cast<size_t>(p.id)];
+        const RawSprite &s = catalog.Sprites()[static_cast<std::size_t>(p.id)];
         SDL_Rect dst {p.x, p.y, p.src.w, p.src.h};
         SDL_BlitSurface(sheets.Get(s.page), &p.src, image, &dst);
         json item = SpriteJson(
@@ -760,7 +760,7 @@ bool ExportCustomAtlas(
     {
         if (item.id < 0 || item.id >= static_cast<int>(catalog.Sprites().size()))
             continue;
-        const RawSprite &s = catalog.Sprites()[static_cast<size_t>(item.id)];
+        const RawSprite &s = catalog.Sprites()[static_cast<std::size_t>(item.id)];
         Placed p;
         p.id = item.id;
         if (!sheets.rect(s, p.src))
@@ -805,7 +805,7 @@ bool ExportCustomAtlas(
     json sprites = json::array();
     for (const auto &p : validItems)
     {
-        const RawSprite &s = catalog.Sprites()[static_cast<size_t>(p.id)];
+        const RawSprite &s = catalog.Sprites()[static_cast<std::size_t>(p.id)];
         SDL_Surface *sheet = sheets.Get(s.page);
         SDL_Rect dst {p.x, p.y, p.src.w, p.src.h};
         SDL_BlitSurface(sheet, &p.src, atlas, &dst);
@@ -865,7 +865,7 @@ std::vector<CustomAtlasItem> PackCustomMaxRects(std::vector<CustomAtlasItem> ite
         placedItems.push_back(p);
     }
     placedItems = PackMaxRects(std::move(placedItems), width, height, pad);
-    for (size_t i = 0; i < items.size() && i < placedItems.size(); ++i)
+    for (std::size_t i = 0; i < items.size() && i < placedItems.size(); ++i)
     {
         items[i].x = placedItems[i].x;
         items[i].y = placedItems[i].y;
@@ -887,7 +887,7 @@ namespace
 
 SDL_Surface *LoadRgba(const fs::path &path)
 {
-    std::vector<uint8_t> bytes;
+    std::vector<std::uint8_t> bytes;
     if (!OpenArtOfWar::Assets::ReadBytes(path.string(), bytes) || bytes.empty())
         return nullptr;
     SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(bytes.data(), bytes.size()), true);
@@ -910,9 +910,9 @@ bool Differs(const SDL_Surface *a, int ax, int ay, const SDL_Surface *b, int bx,
 {
     for (int y = 0; y < h; ++y)
     {
-        const uint8_t *ra = static_cast<const uint8_t *>(a->pixels) + static_cast<size_t>(ay + y) * a->pitch + ax * 4;
-        const uint8_t *rb = static_cast<const uint8_t *>(b->pixels) + static_cast<size_t>(by + y) * b->pitch + bx * 4;
-        if (std::memcmp(ra, rb, static_cast<size_t>(w) * 4) != 0)
+        const std::uint8_t *ra = static_cast<const std::uint8_t *>(a->pixels) + static_cast<std::size_t>(ay + y) * a->pitch + ax * 4;
+        const std::uint8_t *rb = static_cast<const std::uint8_t *>(b->pixels) + static_cast<std::size_t>(by + y) * b->pitch + bx * 4;
+        if (std::memcmp(ra, rb, static_cast<std::size_t>(w) * 4) != 0)
             return true;
     }
     return false;
@@ -924,12 +924,12 @@ bool Paste(const SDL_Surface *src, int sx, int sy, SDL_Surface *dst, int dx, int
     bool changed = false;
     for (int y = 0; y < h; ++y)
     {
-        const uint8_t *from
-            = static_cast<const uint8_t *>(src->pixels) + static_cast<size_t>(sy + y) * src->pitch + sx * 4;
-        uint8_t *to = static_cast<uint8_t *>(dst->pixels) + static_cast<size_t>(dy + y) * dst->pitch + dx * 4;
-        if (std::memcmp(from, to, static_cast<size_t>(w) * 4) != 0)
+        const std::uint8_t *from
+            = static_cast<const std::uint8_t *>(src->pixels) + static_cast<std::size_t>(sy + y) * src->pitch + sx * 4;
+        std::uint8_t *to = static_cast<std::uint8_t *>(dst->pixels) + static_cast<std::size_t>(dy + y) * dst->pitch + dx * 4;
+        if (std::memcmp(from, to, static_cast<std::size_t>(w) * 4) != 0)
         {
-            std::memcpy(to, from, static_cast<size_t>(w) * 4);
+            std::memcpy(to, from, static_cast<std::size_t>(w) * 4);
             changed = true;
         }
     }
@@ -1044,8 +1044,8 @@ bool ImportSpriteFolder(const fs::path &assetsRoot, const fs::path &inDir, std::
             ++tables.skipped;
             return;
         }
-        const int first = ranges[static_cast<size_t>(id)][0].get<int>(),
-                  last = ranges[static_cast<size_t>(id)][1].get<int>();
+        const int first = ranges[static_cast<std::size_t>(id)][0].get<int>(),
+                  last = ranges[static_cast<std::size_t>(id)][1].get<int>();
         if (!rows.is_array() || static_cast<int>(rows.size()) != last - first + 1)
         {
             ++tables.skipped;
@@ -1053,9 +1053,9 @@ bool ImportSpriteFolder(const fs::path &assetsRoot, const fs::path &inDir, std::
         }
         for (int i = 0; i < static_cast<int>(rows.size()); ++i)
         {
-            json &item = gd[table][items][static_cast<size_t>(first + i)];
-            const json &orig = gdOriginal[table][items][static_cast<size_t>(first + i)];
-            if (edit(item, orig, rows[static_cast<size_t>(i)]))
+            json &item = gd[table][items][static_cast<std::size_t>(first + i)];
+            const json &orig = gdOriginal[table][items][static_cast<std::size_t>(first + i)];
+            if (edit(item, orig, rows[static_cast<std::size_t>(i)]))
             {
                 ++tables.changed;
                 gdChanged = true;
@@ -1229,18 +1229,18 @@ bool ImportSpriteFolder(const fs::path &assetsRoot, const fs::path &inDir, std::
                 });
                 if (loadGd() && id >= 0 && id < static_cast<int>(gd["buildings"]["widths"].size()))
                 {
-                    if (b.contains("width") && gdOriginal["buildings"]["widths"][static_cast<size_t>(id)] != b["width"]
-                        && gd["buildings"]["widths"][static_cast<size_t>(id)] != b["width"])
+                    if (b.contains("width") && gdOriginal["buildings"]["widths"][static_cast<std::size_t>(id)] != b["width"]
+                        && gd["buildings"]["widths"][static_cast<std::size_t>(id)] != b["width"])
                     {
-                        gd["buildings"]["widths"][static_cast<size_t>(id)] = b["width"];
+                        gd["buildings"]["widths"][static_cast<std::size_t>(id)] = b["width"];
                         ++tables.changed;
                         gdChanged = true;
                     }
                     if (b.contains("height")
-                        && gdOriginal["buildings"]["heights"][static_cast<size_t>(id)] != b["height"]
-                        && gd["buildings"]["heights"][static_cast<size_t>(id)] != b["height"])
+                        && gdOriginal["buildings"]["heights"][static_cast<std::size_t>(id)] != b["height"]
+                        && gd["buildings"]["heights"][static_cast<std::size_t>(id)] != b["height"])
                     {
-                        gd["buildings"]["heights"][static_cast<size_t>(id)] = b["height"];
+                        gd["buildings"]["heights"][static_cast<std::size_t>(id)] = b["height"];
                         ++tables.changed;
                         gdChanged = true;
                     }

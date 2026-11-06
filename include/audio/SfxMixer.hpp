@@ -47,7 +47,7 @@ class SfxMixer
 public:
     static constexpr int kRate = 44100;
 
-    enum class Category : uint8_t
+    enum class Category : std::uint8_t
     {
         Weapon,
         Impact,
@@ -81,22 +81,22 @@ public:
     // Event settings from JSON ({"defaults": {...}, "events": {name: {...}}, "voices": n})
     void Configure(const nlohmann::json &doc);
     // A clip of an event (mono, kRate); tests and loadBank
-    void AddClip(const std::string &event, std::vector<int16_t> pcm);
+    void AddClip(const std::string &event, std::vector<std::int16_t> pcm);
 
     bool Has(const std::string &event) const;
     const EventConfig *Config(const std::string &event) const;
-    size_t EventCount() const;
+    std::size_t EventCount() const;
 
     // Starts one of the event's clips; `gain` 0..1 (distance), `pan` -1..1. False when the event is
     // unknown, silent or held back by its limits.
     // `muffle` 0..1 (SfxPlacement::muffle) rolls the highs off with a low-pass filter.
-    bool Play(const std::string &event, float gain, float pan, uint64_t nowMs, float muffle = 0.0f);
+    bool Play(const std::string &event, float gain, float pan, std::uint64_t nowMs, float muffle = 0.0f);
     // Queues an announcer line (dropped while its cooldown runs or when it is queued already)
-    bool Announce(const std::string &event, uint64_t nowMs);
+    bool Announce(const std::string &event, std::uint64_t nowMs);
     // Starts the next announcer line once the current one is over; call once per frame
-    void Update(uint64_t nowMs);
+    void Update(std::uint64_t nowMs);
     // Adds `frames` stereo frames (interleaved int16) of everything playing
-    void Mix(int16_t *out, int frames);
+    void Mix(std::int16_t *out, int frames);
     void StopAll();
 
     void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
@@ -110,7 +110,7 @@ public:
 
     int ActiveVoices() const;
     bool AnnouncerBusy() const;
-    size_t AnnouncerQueued() const;
+    std::size_t AnnouncerQueued() const;
 
 private:
     struct Voice
@@ -138,13 +138,13 @@ private:
         struct Comb
         {
             std::vector<float> buf;
-            size_t pos {0};
+            std::size_t pos {0};
             float store {0.0f};
         };
         struct Allpass
         {
             std::vector<float> buf;
-            size_t pos {0};
+            std::size_t pos {0};
         };
         Comb comb[2][kCombs];
         Allpass allpass[2][kAllpass];
@@ -155,17 +155,17 @@ private:
     {
         EventConfig cfg;
         std::string name;
-        uint64_t lastPlayMs {0};
+        std::uint64_t lastPlayMs {0};
         bool played {false};
     };
 
     int EventIndex(const std::string &event) const;
-    bool StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle = 0.0f);
-    bool AnnounceLocked(int eventIdx, uint64_t nowMs);
+    bool StartLocked(int eventIdx, float gain, float pan, std::uint64_t nowMs, bool announcer, float muffle = 0.0f);
+    bool AnnounceLocked(int eventIdx, std::uint64_t nowMs);
     int InstancesLocked(int eventIdx) const;
 
     mutable std::mutex m_lock;
-    std::vector<std::vector<int16_t>> m_clips;
+    std::vector<std::vector<std::int16_t>> m_clips;
     std::vector<EventState> m_events;
     std::map<std::string, int> m_eventIndex;
     nlohmann::json m_defaults = nlohmann::json::object();

@@ -57,7 +57,7 @@ namespace OpenArtOfWar
 
 // Developer aid (OAOW_NET_BOT=1): the local player sends all of its units at the nearest enemy
 // headquarters every 5 seconds, so two headless peers have real command traffic and fights to agree on
-void Application::DriveNetworkBot(uint32_t tick)
+void Application::DriveNetworkBot(std::uint32_t tick)
 {
     static const bool bot = DebugEnv("OAOW_NET_BOT") != nullptr;
     if (!bot)
@@ -125,14 +125,14 @@ void Application::DriveNetworkBot(uint32_t tick)
     SimCommand order;
     order.type = CommandType::OrderAt;
     order.player = me;
-    order.a = static_cast<int32_t>(OrderKind::AttackMove);
+    order.a = static_cast<std::int32_t>(OrderKind::AttackMove);
     int targetX = -1, targetY = -1;
     for (const Entity &e : m_entities->GetAllEntities())
     {
         if (!e.alive || e.state == ActionState::Die)
             continue;
         if (e.owner == me && !e.isBuilding)
-            order.ids.push_back(static_cast<uint32_t>(e.id));
+            order.ids.push_back(static_cast<std::uint32_t>(e.id));
         if (targetX < 0 && e.isBuilding && e.type == UnitType::Headquarters && Players::Hostile(e.owner, me))
         {
             targetX = e.tileX * TILE_WIDTH + TILE_WIDTH / 2;
@@ -193,7 +193,7 @@ void Application::ReloadGameData()
 {
     if (!m_entities || !m_map)
         return;
-    m_entities->LoadCharacterConfigs(LoaderResources::kDefaultRoot);
+    m_entities->LoadCharacterConfigs();
     ReloadResearchCatalogs();
     Projectiles::reload();
     WeaponBalance::Reload();
@@ -233,9 +233,9 @@ void Application::UpdateServer()
     const nlohmann::json &net = m_env.Section("network");
     const std::string host
         = !m_serverOverride.empty() ? m_serverOverride : net.value("master_host", std::string("openaow.imister.tech"));
-    const uint16_t port
-        = m_serverOverridePort ? m_serverOverridePort : static_cast<uint16_t>(net.value("master_port", 38100));
-    const uint32_t now = SDL_GetTicks();
+    const std::uint16_t port
+        = m_serverOverridePort ? m_serverOverridePort : static_cast<std::uint16_t>(net.value("master_port", 38100));
+    const std::uint32_t now = SDL_GetTicks();
     if (!m_master)
     {
         m_master = std::make_unique<Net::MasterClient>(host, port);
@@ -337,7 +337,7 @@ void Application::UpdateNetworkMenu()
             SDL_StopTextInput(m_window);
         m_textInput = wantText;
     }
-    const uint16_t port = static_cast<uint16_t>(m_env.Section("network").value("udp_port", 38100));
+    const std::uint16_t port = static_cast<std::uint16_t>(m_env.Section("network").value("udp_port", 38100));
     // Games on the local network while browsing (games of another version are left out)
     if (!m_net)
     {
@@ -395,7 +395,7 @@ void Application::UpdateNetworkMenu()
                     m_serverOverride.empty() ? netEnv.value("master_host", std::string("openaow.imister.tech"))
                                              : m_serverOverride,
                     m_serverOverridePort ? m_serverOverridePort
-                                         : static_cast<uint16_t>(netEnv.value("master_port", 38100)));
+                                         : static_cast<std::uint16_t>(netEnv.value("master_port", 38100)));
             }
             break;
         }
@@ -477,7 +477,7 @@ bool Application::InNetworkMatch() const
 }
 
 void Application::HostNetworkGame(
-    uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
+    std::uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
 {
     m_net = std::make_unique<NetMatch>();
     std::string error;
@@ -496,13 +496,13 @@ void Application::HostNetworkGame(
     std::cout << "[Net] Hosting on UDP " << port << ", waiting for " << m_netWantedPlayers << " players" << std::endl;
 }
 
-void Application::AnnounceNetworkGame(const std::string &server, uint16_t port)
+void Application::AnnounceNetworkGame(const std::string &server, std::uint16_t port)
 {
     if (m_net)
         m_net->Announce(server, port);
 }
 
-void Application::JoinNetworkGame(const std::string &address, uint16_t port, const std::string &name)
+void Application::JoinNetworkGame(const std::string &address, std::uint16_t port, const std::string &name)
 {
     m_net = std::make_unique<NetMatch>();
     std::string error;
@@ -519,7 +519,7 @@ void Application::JoinNetworkGame(const std::string &address, uint16_t port, con
 
 void Application::ServerNetworkGame(
     const std::string &server,
-    uint16_t port,
+    std::uint16_t port,
     const std::string &code,
     int players,
     const std::string &mapPath,
@@ -541,7 +541,7 @@ void Application::ServerNetworkGame(
               << std::endl;
 }
 
-void Application::UpdateNetwork(uint32_t nowMs)
+void Application::UpdateNetwork(std::uint32_t nowMs)
 {
     if (!m_net)
     {
@@ -582,12 +582,12 @@ void Application::UpdateNetwork(uint32_t nowMs)
                 if (s.slot == m_net->LocalSlot() && m_net->LocalChoice(mine) && !mine.ready && m_net->MapReady())
                 {
                     if (factionBySlot)
-                        mine.faction = static_cast<uint8_t>(
+                        mine.faction = static_cast<std::uint8_t>(
                             m_net->LocalSlot() % 2 == 0 ? Faction::Resistance : Faction::Confederation);
                     // OAOW_NET_FACTION=0|1: this faction for everybody (players of one faction)
                     if (const char *forced = DebugEnv("OAOW_NET_FACTION");
                         forced && (forced[0] == '0' || forced[0] == '1'))
-                        mine.faction = static_cast<uint8_t>(forced[0] - '0');
+                        mine.faction = static_cast<std::uint8_t>(forced[0] - '0');
                     mine.ready = true;
                     m_net->SetChoice(mine);
                 }
@@ -621,7 +621,7 @@ void Application::UpdateNetwork(uint32_t nowMs)
         m_gameplayController->ResetForMission(*m_mission, *m_hudController, *m_entities, *m_map);
         m_net->Attach(m_gameplayController->simulation());
         m_net->SetReconnectWindow(
-            static_cast<uint32_t>(m_env.Section("network").value("reconnect_window_s", 60)) * 1000u);
+            static_cast<std::uint32_t>(m_env.Section("network").value("reconnect_window_s", 60)) * 1000u);
         m_state = AppState::SkirmishPlaying;
         m_camera->SetZoom(m_settings.zoomDefault);
         m_camera->CenterOn(m_mission->GetPlayerHqX() * TILE_WIDTH, m_mission->GetPlayerHqY() * TILE_HEIGHT);

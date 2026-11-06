@@ -167,8 +167,8 @@ public:
 
 private:
     const bool *m_keystates {nullptr};
-    uint8_t m_prevKeystates[SDL_SCANCODE_COUNT] {0};
-    uint8_t m_keysJustPressed[SDL_SCANCODE_COUNT] {0};
+    std::uint8_t m_prevKeystates[SDL_SCANCODE_COUNT] {0};
+    std::uint8_t m_keysJustPressed[SDL_SCANCODE_COUNT] {0};
 
     int m_mouseScreenX {0};
     int m_mouseScreenY {0};
