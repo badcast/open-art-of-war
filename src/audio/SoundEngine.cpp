@@ -181,7 +181,8 @@ void SDLCALL SoundEngine::FeedSfx(void *userdata, SDL_AudioStream *stream, int a
     SDL_PutAudioStreamData(stream, self->m_sfxBuffer.data(), frames * 4);
 }
 
-void SDLCALL SoundEngine::FeedAmbient(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
+void SDLCALL
+SoundEngine::FeedAmbient(void *userdata, SDL_AudioStream *stream, int additionalAmount, int /*totalAmount*/)
 {
     auto *self = static_cast<SoundEngine *>(userdata);
     if (!self->m_ambientDecoder || additionalAmount <= 0)
@@ -209,7 +210,8 @@ void SDLCALL SoundEngine::FeedAmbient(void *userdata, SDL_AudioStream *stream, i
         rewound = true; // the end: round again (a loop)
     }
     if (produced > 0)
-        SDL_PutAudioStreamData(stream, self->m_ambientPcm.data(), produced * channels * static_cast<int>(sizeof(short)));
+        SDL_PutAudioStreamData(
+            stream, self->m_ambientPcm.data(), produced * channels * static_cast<int>(sizeof(short)));
 }
 
 void SoundEngine::PlayAmbient(bool night)
@@ -227,7 +229,8 @@ void SoundEngine::PlayAmbient(bool night)
         return;
     }
     int error = 0;
-    m_ambientDecoder = stb_vorbis_open_memory(m_ambientOgg.data(), static_cast<int>(m_ambientOgg.size()), &error, nullptr);
+    m_ambientDecoder
+        = stb_vorbis_open_memory(m_ambientOgg.data(), static_cast<int>(m_ambientOgg.size()), &error, nullptr);
     if (!m_ambientDecoder)
     {
         std::cerr << "[SoundEngine] Warning: could not decode " << path << " (stb_vorbis error " << error << ")"
@@ -238,7 +241,8 @@ void SoundEngine::PlayAmbient(bool night)
     const stb_vorbis_info info = stb_vorbis_get_info(m_ambientDecoder);
     m_ambientChannels = std::clamp(info.channels, 1, 2);
     SDL_AudioSpec spec {SDL_AUDIO_S16, m_ambientChannels, static_cast<int>(info.sample_rate)};
-    m_ambientStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SoundEngine::FeedAmbient, this);
+    m_ambientStream
+        = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &SoundEngine::FeedAmbient, this);
     if (!m_ambientStream)
     {
         std::cerr << "[SoundEngine] Warning: no stream for the ambient sound: " << SDL_GetError() << std::endl;

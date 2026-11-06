@@ -38,7 +38,7 @@ public:
     // The interface goes silent (a replay): UI sounds, alerts, unit replies and the announcer; battle sounds and the
     // music stay
     void SetInterfaceMuted(bool muted);
-    void SetReverb(bool enabled); // reverb of explosions and heavy guns
+    void SetReverb(bool enabled);    // reverb of explosions and heavy guns
     void SetFxVolume(int volume);    // 0..128: weapons and impacts
     void SetUiVolume(int volume);    // 0..128: interface clicks, dialogs and alerts
     void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer

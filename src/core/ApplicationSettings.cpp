@@ -91,7 +91,9 @@ void Application::ApplyGraphics()
         m_effects->SetNightExposureScale(1.0f / m_nightLighting->Config().gpuBase);
     if (m_effects)
         m_effects->Configure(
-            m_night ? ColorGrade::Night : static_cast<ColorGrade>(m_settings.colorGrade), m_settings.glow, m_settings.sharpPixels);
+            m_night ? ColorGrade::Night : static_cast<ColorGrade>(m_settings.colorGrade),
+            m_settings.glow,
+            m_settings.sharpPixels);
     // The pixel-art filter blends texel edges itself and needs linear samples to do it
     if (m_texManager)
         m_texManager->SetSpriteFiltering(m_settings.smoothing, effects && m_settings.sharpPixels);

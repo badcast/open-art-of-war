@@ -20,48 +20,54 @@
 #include <mutex>
 #include <string>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
 namespace fs = std::filesystem;
 
 // Tooltip of the last widget: `key` is the widget label (msgid) or its ##id; widgets without a hint get none
-void FieldHint(const char* key);
+void FieldHint(const char *key);
 
 // Shows the hint of a widget just drawn and passes its result on: if (hinted(ImGui::Button(_("Idle")), "Idle")) ...
-inline bool Hinted(bool result, const char* key) {
+inline bool Hinted(bool result, const char *key)
+{
     FieldHint(key);
     return result;
 }
 
 // Result of the folder dialog (SDL calls back on its own thread)
-struct FolderPick {
+struct FolderPick
+{
     std::mutex mutex;
     std::string path;
-    bool ready{false};
+    bool ready {false};
 };
 
-struct CharacterFile {
+struct CharacterFile
+{
     fs::path path;
     std::string name;
     std::string faction;
     std::string type;
-    int numericId{-1};
+    int numericId {-1};
     std::string stringId;
 };
 
-enum class PreviewMode {
+enum class PreviewMode
+{
     Idle,
     Move,
     Attack,
     Die,
-    Wreck   // the remains left behind, stage by stage
+    Wreck // the remains left behind, stage by stage
 };
 
 // Wreck (hull remains) composite families: first composite of the family and the number of burial stages
-struct WreckFamily {
+struct WreckFamily
+{
     int composite;
     int stages;
-    const char* label; // gettext msgid
+    const char *label; // gettext msgid
 };
 
 inline const WreckFamily kWreckFamilies[] = {
@@ -76,76 +82,82 @@ inline const WreckFamily kWreckFamilies[] = {
 fs::path FindAssetRoot();
 
 template <typename T>
-inline T YamlValue(const YAML::Node& node, const char* key, T fallback = {}) {
-    try {
+inline T YamlValue(const YAML::Node &node, const char *key, T fallback = {})
+{
+    try
+    {
         return node[key].as<T>(fallback);
-    } catch (...) {
+    }
+    catch (...)
+    {
         return fallback;
     }
 }
 
-std::string YamlString(const YAML::Node& node, const char* key, const std::string& fallback = {});
+std::string YamlString(const YAML::Node &node, const char *key, const std::string &fallback = {});
 
-int YamlInt(const YAML::Node& node, const char* key, int fallback = 0);
+int YamlInt(const YAML::Node &node, const char *key, int fallback = 0);
 
-float YamlFloat(const YAML::Node& node, const char* key, float fallback = 0.0f);
+float YamlFloat(const YAML::Node &node, const char *key, float fallback = 0.0f);
 
-bool YamlBool(const YAML::Node& node, const char* key, bool fallback = false);
+bool YamlBool(const YAML::Node &node, const char *key, bool fallback = false);
 
 // The main gun of a combat block: combat.weapons[0]; an undefined node when there are no weapons.
 // Damage, range, delay, projectile and muzzle live only in weapons (combat keeps turret / FX settings).
-YAML::Node MainWeapon(const YAML::Node& combat);
+YAML::Node MainWeapon(const YAML::Node &combat);
 
 // Same, creating weapons[0] for editing when the block has none yet
 YAML::Node EnsureMainWeapon(YAML::Node combat);
 
-bool WeaponRandomDelay(const YAML::Node& w);
+bool WeaponRandomDelay(const YAML::Node &w);
 
 // Delay between attack cycles: fixed `cooldown`, or random in [cooldown_min, cooldown_max].
 // sample=false gives the average (for DPS figures), sample=true draws one delay (for the shot simulation).
-float WeaponCooldown(const YAML::Node& w, bool sample, float fallback = 1.0f);
+float WeaponCooldown(const YAML::Node &w, bool sample, float fallback = 1.0f);
 
 // Files store only archetype_id / building_index; faction, class and internal type are what the game
 // derives from them (OpenArtOfWar::Utility tables), never typed in by hand
-bool DocIsBuilding(const YAML::Node& doc);
+bool DocIsBuilding(const YAML::Node &doc);
 
-OpenArtOfWar::Faction DocFaction(const YAML::Node& doc);
+OpenArtOfWar::Faction DocFaction(const YAML::Node &doc);
 
 // Wreck of a character: from its YAML (animations.wreck_composite / wreck_stages) or the game's default
-void WreckOf(const YAML::Node& doc, int& composite, int& stages);
+void WreckOf(const YAML::Node &doc, int &composite, int &stages);
 
-void GetDefaultTurretOffset(int archetypeId, bool isBuilding, float& outX, float& outY);
+void GetDefaultTurretOffset(int archetypeId, bool isBuilding, float &outX, float &outY);
 
 // Muzzle (localePosition) and turret pivot offsets of one character, read from its YAML
-struct VisualOffsets {
-    float muzzleX{0.0f};
-    float muzzleY{0.0f};
-    float turretX{0.0f};
-    float turretY{0.0f};
-    bool customTurret{false};
+struct VisualOffsets
+{
+    float muzzleX {0.0f};
+    float muzzleY {0.0f};
+    float turretX {0.0f};
+    float turretY {0.0f};
+    bool customTurret {false};
 };
 
 // Takes the node by value: yaml-cpp lookups of missing keys need a mutable node
 VisualOffsets ReadVisualOffsets(YAML::Node doc);
 
 // Combat and economy figures used by Compare mode
-struct CharacterStats {
-    bool building{false};
+struct CharacterStats
+{
+    bool building {false};
     std::string name;
-    float hp{0.0f};
-    float damage{0.0f};
-    int burst{1};
-    float cooldown{0.0f};
-    float dps{0.0f};
-    float range{0.0f};
-    float minRange{0.0f};
-    float sight{0.0f};
-    float speed{0.0f};
-    float cost{0.0f};
-    float buildTime{0.0f};
-    float power{0.0f};
-    int width{1};
-    int height{1};
+    float hp {0.0f};
+    float damage {0.0f};
+    int burst {1};
+    float cooldown {0.0f};
+    float dps {0.0f};
+    float range {0.0f};
+    float minRange {0.0f};
+    float sight {0.0f};
+    float speed {0.0f};
+    float cost {0.0f};
+    float buildTime {0.0f};
+    float power {0.0f};
+    int width {1};
+    int height {1};
 };
 
 // Damage per second of one weapon: a burst of N shots every (cooldown + burst span)
@@ -154,33 +166,36 @@ float WeaponDps(YAML::Node weapon);
 CharacterStats ComputeStats(YAML::Node doc, bool siege);
 
 // Timing of the pictures (animations: block of a character file); the same defaults and rules as the game
-struct AnimTiming {
-    float moveFrame{0.09f};    // seconds per walking frame
-    float attackFrame{-1.0f};  // seconds per firing-pose frame (< 0: the archetype's default)
-    float attackPose{-1.0f};   // the firing pose lasts this long after the first shot of a volley (< 0: by projectile)
-    float burstPose{0.15f};    // ... after every later shot of a burst
-    int flashMode{0};          // 0 loops, 1 once, 2 once and holds
-    int flashFrames{0};        // 0 = the whole animation
+struct AnimTiming
+{
+    float moveFrame {0.09f};   // seconds per walking frame
+    float attackFrame {-1.0f}; // seconds per firing-pose frame (< 0: the archetype's default)
+    float attackPose {-1.0f};  // the firing pose lasts this long after the first shot of a volley (< 0: by projectile)
+    float burstPose {0.15f};   // ... after every later shot of a burst
+    int flashMode {0};         // 0 loops, 1 once, 2 once and holds
+    int flashFrames {0};       // 0 = the whole animation
 };
-AnimTiming ReadAnimTiming(const YAML::Node& doc);
+AnimTiming ReadAnimTiming(const YAML::Node &doc);
 // Seconds per firing-pose frame with the archetype's default applied
-float AttackFrameTime(const AnimTiming& t, int archetypeId);
+float AttackFrameTime(const AnimTiming &t, int archetypeId);
 // Default length of the firing pose after the first shot: by projectile (hit-scan 0.12 s, others 0.22 s)
-float DefaultAttackPose(const std::string& projectile);
+float DefaultAttackPose(const std::string &projectile);
 
-enum class EditorMode {
+enum class EditorMode
+{
     Preview,
     Compare,
     Simulation,
-    Research,  // technology trees of both factions
-    Explosions, // how buildings and vehicles blow up (assets/characters/effects.yaml)
-    Wrecks,     // the remains they leave (the same file)
-    Projectiles, // how bullets, sniper rounds, shells, rockets and flames fly and hit (assets/characters/projectiles.yaml)
-    GameUi,     // colors of the interface (assets/characters/game_ui.yaml)
-    Environment, // fog, construction, network, overlay and font (assets/data/game_environment.json)
+    Research,     // technology trees of both factions
+    Explosions,   // how buildings and vehicles blow up (assets/characters/effects.yaml)
+    Wrecks,       // the remains they leave (the same file)
+    Projectiles,  // how bullets, sniper rounds, shells, rockets and flames fly and hit
+                  // (assets/characters/projectiles.yaml)
+    GameUi,       // colors of the interface (assets/characters/game_ui.yaml)
+    Environment,  // fog, construction, network, overlay and font (assets/data/game_environment.json)
     AiDifficulty, // AI levels (assets/characters/difficulty.yaml)
-    Animator,   // timing of the pictures of the selected character: pose, muzzle flash, burst
-    SpriteTools // sprite browser and exports for repacking the assets
+    Animator,     // timing of the pictures of the selected character: pose, muzzle flash, burst
+    SpriteTools   // sprite browser and exports for repacking the assets
 };
 
 } // namespace CharEditor

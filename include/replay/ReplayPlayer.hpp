@@ -32,10 +32,10 @@ public:
     };
     struct Info
     {
-        std::string file; // path on disk
+        std::string file;   // path on disk
         std::string source; // "client" or "server"
         std::string gameVersion;
-        std::string map; // the map's path as the room named it
+        std::string map;     // the map's path as the room named it
         std::string outcome; // "victory", "defeat", "left", ... (a client's replay)
         int64_t recordedAt {0};
         uint64_t mapHash {0};
@@ -44,12 +44,12 @@ public:
         uint32_t ticksPerTurn {2};
         int localSlot {-1};
         int protocol {0};
-        bool carriesData {false}; // the file holds its map and simulation data
+        bool carriesData {false};     // the file holds its map and simulation data
         std::string mode {"network"}; // "network", "custom" or "campaign"
         int mission {-1};             // campaign: the mission, the side of the player, the computer's difficulty
         int playerFaction {0};
         int difficulty {1};
-        uint64_t fileBytes {0};       // size of the file on disk
+        uint64_t fileBytes {0}; // size of the file on disk
         std::vector<Player> players;
     };
 

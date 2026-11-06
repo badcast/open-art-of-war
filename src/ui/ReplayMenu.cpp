@@ -275,8 +275,7 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
         int y = l.details.y + 14;
         const int x = l.details.x + 16;
         auto line = [&](const std::string &text, SDL_Color color, int scale = ui::FONT_BODY) {
-            font.DrawString(
-                ui::FitText(font, text, scale, l.details.w - 32), x, y, scale, color, false);
+            font.DrawString(ui::FitText(font, text, scale, l.details.w - 32), x, y, scale, color, false);
             y += font.GetTextHeight(scale) + 6;
         };
         if (!e.ok)
@@ -290,11 +289,13 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             line(MapName(in.map), col::Accent, ui::FONT_H2);
             line(ModeName(in.mode), ModeColor(in.mode), ui::FONT_BODY_BOLD);
             line(std::string(_("Played")) + ": " + FormatDuration(in.ticks), col::Text, ui::FONT_BODY_BOLD);
-            line(FormatTime(in.recordedAt) + "   " + std::string(_("Size")) + ": " + FormatSize(in.fileBytes), col::TextDim);
-            std::string result = in.outcome == "victory"    ? _("Victory")
-                                 : in.outcome == "defeat"   ? _("Defeat")
-                                 : in.outcome.empty()       ? ""
-                                                            : in.outcome;
+            line(
+                FormatTime(in.recordedAt) + "   " + std::string(_("Size")) + ": " + FormatSize(in.fileBytes),
+                col::TextDim);
+            std::string result = in.outcome == "victory"  ? _("Victory")
+                                 : in.outcome == "defeat" ? _("Defeat")
+                                 : in.outcome.empty()     ? ""
+                                                          : in.outcome;
             line(
                 std::string(in.source == "server" ? _("Recorded by the server") : _("Recorded by you"))
                     + (result.empty() ? "" : "  -  " + result),
@@ -305,8 +306,8 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             y += 24;
             for (const ReplayPlayer::Player &p : in.players)
             {
-                std::string text = p.name + "  -  " + FactionName(p.faction) + ", " + _("team") + " "
-                                   + std::to_string(p.team + 1);
+                std::string text
+                    = p.name + "  -  " + FactionName(p.faction) + ", " + _("team") + " " + std::to_string(p.team + 1);
                 if (!p.human)
                     text += "  (" + std::string(_("computer")) + ")";
                 line(text, p.slot == in.localSlot ? col::Text : col::TextDim, ui::FONT_SMALL_BOLD);
@@ -329,7 +330,8 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             col::Danger,
             false,
             Anchor::HCENTER | Anchor::VCENTER);
-    ui::DrawButton(renderer, font, l.backBtn, _("BACK"), ui::ButtonStyle::Secondary, l.backBtn.Contains(m_mouseX, m_mouseY));
+    ui::DrawButton(
+        renderer, font, l.backBtn, _("BACK"), ui::ButtonStyle::Secondary, l.backBtn.Contains(m_mouseX, m_mouseY));
     ui::DrawButton(
         renderer,
         font,

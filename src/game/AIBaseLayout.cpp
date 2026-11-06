@@ -70,8 +70,8 @@ std::string AIBaseStyle::Describe() const
 {
     static const char *const kLayouts[] = {"compact", "along the road", "fanned out"};
     std::ostringstream s;
-    s << "Base style: " << kLayouts[layout] << (mirror ? ", mirrored" : "") << ", turned "
-      << static_cast<int>(turnDeg) << " deg, " << (labEarly ? "laboratory early" : "laboratory after the factory")
+    s << "Base style: " << kLayouts[layout] << (mirror ? ", mirrored" : "") << ", turned " << static_cast<int>(turnDeg)
+      << " deg, " << (labEarly ? "laboratory early" : "laboratory after the factory")
       << (barracksFirst ? ", two barracks first" : "") << ", " << sparePower << " spare power, "
       << (towersOnly ? "towers instead of walls" : std::to_string(wallThickness) + "-row walls") << ", gates "
       << gateWidth << " wide, line +" << lineOffset << (bunkerHeavy ? ", bunkers first" : "");
@@ -330,7 +330,8 @@ bool AIController::KeepsWayOut(
         for (const auto &e : entities.GetAllEntities())
         {
             const Building *b = e.AsBuilding();
-            if (b && b->alive && b->state != ActionState::Die && b->owner == m_player && b->type == UnitType::Headquarters
+            if (b && b->alive && b->state != ActionState::Die && b->owner == m_player
+                && b->type == UnitType::Headquarters
                 && touches(after, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
                 return false;
         }
@@ -452,9 +453,8 @@ bool AIController::FindCoreSite(
                 ring.push_back({score, px, py});
             }
         }
-        std::stable_sort(ring.begin(), ring.end(), [](const Candidate &a, const Candidate &b) {
-            return a.score > b.score;
-        });
+        std::stable_sort(
+            ring.begin(), ring.end(), [](const Candidate &a, const Candidate &b) { return a.score > b.score; });
         // The worst side of a ring is still taken before the next ring (compact), but not a spot facing away
         // from where the building wants to be when the next ring has better ones: only the better half counts
         int tried = 0;
@@ -476,7 +476,11 @@ bool AIController::FindCoreSite(
 }
 
 bool AIController::PlanPassageWalls(
-    int cx, int cy, int hqRadius, const TileMap &map, const EntityManager &entities,
+    int cx,
+    int cy,
+    int hqRadius,
+    const TileMap &map,
+    const EntityManager &entities,
     std::vector<std::pair<int, int>> &wallTiles)
 {
     const int mw = map.GetWidth(), mh = map.GetHeight();

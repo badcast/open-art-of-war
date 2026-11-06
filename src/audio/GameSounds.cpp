@@ -105,7 +105,8 @@ void GameSounds::Update(
             sound.PlaySfx(event, std::min(1.0f, gain));
             return;
         }
-        const SfxPlacement p = PlaceSfx(x, y, viewX, viewY, viewW, viewH, cfg->rangeTiles * TILE_WIDTH, zoom, cfg->minGain);
+        const SfxPlacement p
+            = PlaceSfx(x, y, viewX, viewY, viewW, viewH, cfg->rangeTiles * TILE_WIDTH, zoom, cfg->minGain);
         if (p.audible)
             sound.PlaySfx(event, p.gain * gain, p.pan, p.muffle);
     };
@@ -163,8 +164,11 @@ void GameSounds::Update(
             if (Hearable(map, fogEnabled, x, y, e.owner))
             {
                 const CharacterSounds *own = entities.SoundsOf(e); // its own death sound and volume, if it has them
-                at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge), x, y,
-                   own ? entities.SoundName(own->deathId) : std::string(), own ? own->volume : 1.0f);
+                at(b ? WorldSfx::ExplodeLarge : (Infantry(e) ? WorldSfx::DeathInfantry : WorldSfx::ExplodeLarge),
+                   x,
+                   y,
+                   own ? entities.SoundName(own->deathId) : std::string(),
+                   own ? own->volume : 1.0f);
             }
             if (e.owner == mine && !b)
                 sound.Announce(Announcement::UnitLost);

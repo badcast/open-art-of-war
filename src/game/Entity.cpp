@@ -11,8 +11,7 @@ Entity::Entity(bool isBuildingVal)
 
 float Entity::NextCooldown() const
 {
-    return attackCooldownMax > attackCooldown ? Utility::Random(attackCooldown, attackCooldownMax)
-                                              : attackCooldown;
+    return attackCooldownMax > attackCooldown ? Utility::Random(attackCooldown, attackCooldownMax) : attackCooldown;
 }
 
 void Entity::GetMuzzlePoint(float &outX, float &outY) const

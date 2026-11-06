@@ -501,7 +501,8 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             const int count = std::clamp(cmd.c, 1, 20);
             for (int i = 0; i < count; ++i)
             {
-                if (!economy.QueueUnit(cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities))
+                if (!economy.QueueUnit(
+                        cmd.a, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, cmd.b, entities))
                     break;
             }
             break;

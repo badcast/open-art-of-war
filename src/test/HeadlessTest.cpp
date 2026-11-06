@@ -524,10 +524,15 @@ bool HeadlessTest::RunTechTest(Application &app)
         auto cueOf = [&](Faction f, int arch) {
             entities.Clear();
             const PlayerId owner = Players::OwnerOf(f);
-            const PlayerId enemy = Players::OwnerOf(f == Faction::Resistance ? Faction::Confederation : Faction::Resistance);
+            const PlayerId enemy
+                = Players::OwnerOf(f == Faction::Resistance ? Faction::Confederation : Faction::Resistance);
             entities.SpawnUnitByArchetype(arch, 20, 20, f, owner);
             const int target = entities.SpawnUnitByArchetype(
-                f == Faction::Resistance ? 1 : 0, 24, 20, f == Faction::Resistance ? Faction::Confederation : Faction::Resistance, enemy);
+                f == Faction::Resistance ? 1 : 0,
+                24,
+                20,
+                f == Faction::Resistance ? Faction::Confederation : Faction::Resistance,
+                enemy);
             if (Unit *t = entities.GetUnit(target))
             {
                 t->moveSpeed = 0.0f;
@@ -539,7 +544,15 @@ bool HeadlessTest::RunTechTest(Application &app)
             if (std::getenv("OAOW_TEST_VERBOSE"))
                 for (const Entity &e : entities.GetAllEntities())
                     if (const Unit *dbg = e.AsUnit())
-                        std::cout << "    arch " << dbg->archetypeId << " owner " << int(dbg->owner) << " at " << dbg->tileX << "," << dbg->tileY << " state " << int(dbg->state) << " target " << dbg->targetEntityId << " hp " << dbg->currentHp << " range " << dbg->attackRange << " dmg " << dbg->attackDamage << " cd " << dbg->cooldownTimer << " facing " << dbg->facingDirection << " turnDelay " << dbg->turnStepDelay << " rotTurret " << dbg->hasRotatingTurret << " burst " << dbg->burstShotsRemaining << " attackAnim " << dbg->attackAnimTimer << " engaged " << dbg->isDirectEngaged << " waiting " << dbg->waitingForPath << " hold " << dbg->HoldsGround() << " turnTimer " << dbg->turnTimer << " siege " << dbg->isSiegeMode << std::endl;
+                        std::cout << "    arch " << dbg->archetypeId << " owner " << int(dbg->owner) << " at "
+                                  << dbg->tileX << "," << dbg->tileY << " state " << int(dbg->state) << " target "
+                                  << dbg->targetEntityId << " hp " << dbg->currentHp << " range " << dbg->attackRange
+                                  << " dmg " << dbg->attackDamage << " cd " << dbg->cooldownTimer << " facing "
+                                  << dbg->facingDirection << " turnDelay " << dbg->turnStepDelay << " rotTurret "
+                                  << dbg->hasRotatingTurret << " burst " << dbg->burstShotsRemaining << " attackAnim "
+                                  << dbg->attackAnimTimer << " engaged " << dbg->isDirectEngaged << " waiting "
+                                  << dbg->waitingForPath << " hold " << dbg->HoldsGround() << " turnTimer "
+                                  << dbg->turnTimer << " siege " << dbg->isSiegeMode << std::endl;
             std::set<int> cues;
             for (const auto &c : entities.TakeSoundCues())
                 cues.insert(static_cast<int>(c.cue));
@@ -593,8 +606,9 @@ bool HeadlessTest::RunTechTest(Application &app)
                 return false;
             }
         }
-        if (app.m_sound && (!app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)
-                            || app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)->clips.empty()))
+        if (app.m_sound
+            && (!app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)
+                || app.m_sound->SfxConfig(WorldSfx::FireCannonHigh)->clips.empty()))
         {
             std::cerr << "[Test] FAILED: the event fire_cannon_high needs its clip" << std::endl;
             return false;
@@ -738,14 +752,15 @@ bool HeadlessTest::RunReplayTest(Application &app)
     data.setup = NetMatch::EncodeSetup(setup);
     data.turns = recordedTurns;
     data.checksums = recordedSums;
-    data.meta = nlohmann::json({{"format", 1},
-                                {"source", "client"},
-                                {"ticks_per_turn", kTicksPerTurn},
-                                {"local_slot", 0},
-                                {"players", nlohmann::json::array({{{"slot", 0}, {"name", "Red"}},
-                                                                   {{"slot", 1}, {"name", "Blue"}}})},
-                                {"result", {{"outcome", "left"}, {"tick", kTurns * kTicksPerTurn}}}})
-                    .dump();
+    data.meta
+        = nlohmann::json(
+              {{"format", 1},
+               {"source", "client"},
+               {"ticks_per_turn", kTicksPerTurn},
+               {"local_slot", 0},
+               {"players", nlohmann::json::array({{{"slot", 0}, {"name", "Red"}}, {{"slot", 1}, {"name", "Blue"}}})},
+               {"result", {{"outcome", "left"}, {"tick", kTurns * kTicksPerTurn}}}})
+              .dump();
     std::vector<uint8_t> mapBytes, balanceBytes;
     MapFiles::Read(setup.mapPath, mapBytes);
     Assets::ReadBytes(LoaderResources::weaponBalance(), balanceBytes);
@@ -951,8 +966,8 @@ bool HeadlessTest::RunAiVehicleTest(Application &app)
                         ++idle;
                         std::vector<PathNode> probe;
                         bool partial = false;
-                        const bool ok = pf.FindPath(
-                            u->tileX, u->tileY, mai->m_stagingX, mai->m_stagingY, probe, u->id, &partial);
+                        const bool ok
+                            = pf.FindPath(u->tileX, u->tileY, mai->m_stagingX, mai->m_stagingY, probe, u->id, &partial);
                         (ok ? found : (partial && !probe.empty() ? partialOnly : none))++;
                     }
                     std::cout << "    t=" << tick / 20 << "s ai " << int(mai->m_player) << ": idle " << idle
@@ -997,9 +1012,13 @@ bool HeadlessTest::RunAiVehicleTest(Application &app)
             for (auto &mai : gc.m_matchAis)
             {
                 std::cout << "    [ai " << int(mai->m_player) << "] credits " << mai->m_credits << " vehicleQueue "
-                          << mai->m_vehicleQueue.size() << " infantryQueue " << mai->m_infantryQueue.size()
-                          << " wave " << mai->m_waveCount << " plan " << mai->m_currentPlan.archetypes.size() << " ready "
-                          << mai->m_readyUnits << " units " << std::count_if(entities.GetAllEntities().begin(), entities.GetAllEntities().end(), [&](const Entity &e) { return e.alive && !e.isBuilding && e.owner == mai->m_player; })
+                          << mai->m_vehicleQueue.size() << " infantryQueue " << mai->m_infantryQueue.size() << " wave "
+                          << mai->m_waveCount << " plan " << mai->m_currentPlan.archetypes.size() << " ready "
+                          << mai->m_readyUnits << " units "
+                          << std::count_if(
+                                 entities.GetAllEntities().begin(),
+                                 entities.GetAllEntities().end(),
+                                 [&](const Entity &e) { return e.alive && !e.isBuilding && e.owner == mai->m_player; })
                           << " lab " << mai->m_hasLab << " researchActive " << mai->m_researchActive << " idx "
                           << mai->m_researchIndex << std::endl;
             }
@@ -1192,7 +1211,7 @@ bool HeadlessTest::RunBuildRulesTest(Application &app)
         if (!ResearchBuildingPowered(res, entities))
             return fail("a powered laboratory must count for research");
         entities.Clear();
-        (void)hq2;
+        (void) hq2;
         map.InitBlankArena(60, 40, 0);
     }
 
@@ -1378,8 +1397,13 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
         setup.startingCredits = 10000;
         for (int i = 0; i < 4; ++i)
         {
-            setup.slots[i] = {true, i % 2 ? Faction::Confederation : Faction::Resistance,
-                              static_cast<uint8_t>(i / 2), static_cast<uint8_t>(i + 1), false, 2};
+            setup.slots[i]
+                = {true,
+                   i % 2 ? Faction::Confederation : Faction::Resistance,
+                   static_cast<uint8_t>(i / 2),
+                   static_cast<uint8_t>(i + 1),
+                   false,
+                   2};
             setup.startPosition[i] = static_cast<int8_t>(i);
         }
         if (!mission.LoadMatch(setup, map, entities, economy, pf))
@@ -1446,7 +1470,8 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
                           << ai->PowerBalance(entities, false) << " kW)" << std::endl;
             }
             bool hasLab = entities.HasBuildingType(UnitType::ResearchLab, p, false);
-            for (const AIStructurePlan &plan : ai->m_startingBuildings) // one the enemy destroyed counts (it comes back)
+            for (const AIStructurePlan &plan :
+                 ai->m_startingBuildings) // one the enemy destroyed counts (it comes back)
                 hasLab = hasLab || (plan.type == UnitType::ResearchLab && plan.destroyed);
             // (a base the enemy has wiped out builds nothing: it does not count)
             const bool hasHq = entities.HasBuildingType(UnitType::Headquarters, p, true);
@@ -1470,8 +1495,8 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
                     const float tx = ai->m_playerHqX - cx, ty = ai->m_playerHqY - cy;
                     const Building *b = e.AsBuilding();
                     const float ox = b->tileX + b->buildWidth * 0.5f - cx, oy = b->tileY + b->buildHeight * 0.5f - cy;
-                    const float facing = (ox * tx + oy * ty)
-                                         / std::max(0.01f, DetMath::Hypot(ox, oy) * DetMath::Hypot(tx, ty));
+                    const float facing
+                        = (ox * tx + oy * ty) / std::max(0.01f, DetMath::Hypot(ox, oy) * DetMath::Hypot(tx, ty));
                     ++power;
                     if (facing > 0.55f)
                         ++frontPower;
@@ -1505,7 +1530,8 @@ bool HeadlessTest::RunAiBaseLayoutTest(Application &app)
                         std::vector<PathNode> path;
                         bool partial = false;
                         pf.SetIgnoreUnitsOnce();
-                        found = pf.FindPath(sides[k].first, sides[k].second, gx, gy, path, 0, &partial, true) && !partial;
+                        found
+                            = pf.FindPath(sides[k].first, sides[k].second, gx, gy, path, 0, &partial, true) && !partial;
                     }
                     ++checked;
                     if (!found)
@@ -1597,8 +1623,14 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         std::string heard, hitHeard;
         if (Entity *f = entities.GetEntity(fortress))
         {
-            entities.SpawnProjectileFromEntity(*f, f->GetUnitCenterPixelX(), f->GetUnitCenterPixelY(), 9 * TILE_WIDTH,
-                                               5 * TILE_HEIGHT, target, *app.m_map);
+            entities.SpawnProjectileFromEntity(
+                *f,
+                f->GetUnitCenterPixelX(),
+                f->GetUnitCenterPixelY(),
+                9 * TILE_WIDTH,
+                5 * TILE_HEIGHT,
+                target,
+                *app.m_map);
             for (const auto &c : entities.TakeSoundCues())
             {
                 if (c.cue == EntityManager::SoundCue::FireMg)
@@ -1629,7 +1661,8 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         for (uint32_t tick = 0; tick < kTicks; ++tick)
         {
             before(tick);
-            gc.SimulationStep(dt, map, pf, entities, economy, *app.m_aiController, mission, *app.m_hudController, state);
+            gc.SimulationStep(
+                dt, map, pf, entities, economy, *app.m_aiController, mission, *app.m_hudController, state);
             SimContext ctx {entities, map, pf, economy, *app.m_aiController};
             if (tick % NetMatch::kHashIntervalTicks == 0)
                 after(tick, sim.Checksum(ctx));
@@ -1645,7 +1678,8 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         {
             if (e.alive && e.owner == Players::Local() && !e.isBuilding)
                 o.ids.push_back(static_cast<uint32_t>(e.id));
-            if (e.alive && e.isBuilding && e.type == UnitType::Headquarters && Players::Hostile(e.owner, Players::Local()))
+            if (e.alive && e.isBuilding && e.type == UnitType::Headquarters
+                && Players::Hostile(e.owner, Players::Local()))
             {
                 tx = e.tileX * TILE_WIDTH;
                 ty = e.tileY * TILE_HEIGHT;
@@ -1668,8 +1702,12 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         sim.SetRecordHook([&](uint32_t tick, const SimCommand &c) { commands[tick].push_back(c); });
         ReplayRecorder recorder;
         recorder.Begin(info);
-        play([&](uint32_t tick) { if (tick == 40 || tick == 700) order(); },
-             [&](uint32_t tick, uint64_t sum) { recorder.OnChecksum(tick, sum); });
+        play(
+            [&](uint32_t tick) {
+                if (tick == 40 || tick == 700)
+                    order();
+            },
+            [&](uint32_t tick, uint64_t sum) { recorder.OnChecksum(tick, sum); });
         sim.SetRecordHook(nullptr);
         for (uint32_t t = 0; t < kTicks; ++t)
         {
@@ -1685,8 +1723,8 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         std::string error;
         bool good = !path.empty() && player.Load(path, error);
         ReplayPlayer::Info listed;
-        good = good && ReplayPlayer::ReadInfo(path, listed, error) && listed.fileBytes > 0
-               && listed.mode == info.mode && player.info().ticks == kTicks;
+        good = good && ReplayPlayer::ReadInfo(path, listed, error) && listed.fileBytes > 0 && listed.mode == info.mode
+               && player.info().ticks == kTicks;
         MatchSetup played;
         good = good && player.PrepareMatch(-1, played, error);
         if (good && info.mode == "campaign")
@@ -1696,12 +1734,13 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         if (good)
         {
             gc.ResetForMission(mission, *app.m_hudController, entities, map);
-            play([&](uint32_t tick) { player.ScheduleDue(sim, tick); },
-                 [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
+            play(
+                [&](uint32_t tick) { player.ScheduleDue(sim, tick); },
+                [&](uint32_t tick, uint64_t sum) { player.Verify(tick, sum); });
         }
-        std::cout << "  - " << what << ": " << commands.size() << " ticks with commands, file "
-                  << listed.fileBytes << " bytes (" << listed.mode << "), first difference at "
-                  << player.MismatchTick() << (error.empty() ? "" : " - " + error) << std::endl;
+        std::cout << "  - " << what << ": " << commands.size() << " ticks with commands, file " << listed.fileBytes
+                  << " bytes (" << listed.mode << "), first difference at " << player.MismatchTick()
+                  << (error.empty() ? "" : " - " + error) << std::endl;
         std::error_code ec;
         // (OAOW_TEST_KEEP_REPLAYS=<dir>: the files are kept there, to be played in the game)
         if (const char *keep = std::getenv("OAOW_TEST_KEEP_REPLAYS"); keep && !path.empty())
@@ -1735,12 +1774,16 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         info.ticksPerTurn = 1;
         info.turnMs = 50;
         info.mode = "custom";
-        ok = check("custom game", info, [&]() {
-                 if (!mission.LoadMatch(setup, map, entities, economy, pf))
-                     return false;
-                 gc.ResetForMission(mission, *app.m_hudController, entities, map);
-                 return true;
-             }) && ok;
+        ok = check(
+                 "custom game",
+                 info,
+                 [&]() {
+                     if (!mission.LoadMatch(setup, map, entities, economy, pf))
+                         return false;
+                     gc.ResetForMission(mission, *app.m_hudController, entities, map);
+                     return true;
+                 })
+             && ok;
     }
     // The first campaign mission of the Resistance
     {
@@ -1761,12 +1804,16 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         info.mission = 0;
         info.playerFaction = static_cast<int>(Faction::Resistance);
         info.difficulty = 1;
-        ok = check("campaign mission 1", info, [&]() {
-                 if (!mission.LoadMission(0, LoaderResources::kDefaultRoot, map, entities, economy, pf))
-                     return false;
-                 gc.ResetForMission(mission, *app.m_hudController, entities, map);
-                 return true;
-             }) && ok;
+        ok = check(
+                 "campaign mission 1",
+                 info,
+                 [&]() {
+                     if (!mission.LoadMission(0, LoaderResources::kDefaultRoot, map, entities, economy, pf))
+                         return false;
+                     gc.ResetForMission(mission, *app.m_hudController, entities, map);
+                     return true;
+                 })
+             && ok;
     }
 
     SetPlayerFaction(Faction::Resistance);
@@ -2617,7 +2664,7 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             const int id = entities.SpawnUnitByArchetype(arch, 10, 10, Faction::Resistance);
             Unit *u = entities.GetUnit(id);
             if (u->moveSpeed <= 0.0f)
-                continue; // an immobile gun (the Grad) does not drive anywhere
+                continue;           // an immobile gun (the Grad) does not drive anywhere
             u->facingDirection = 4; // moving left
             u->turretFacing = 4;
             entities.IssueMoveOrder({id}, 16, 10, pf, false);
@@ -2739,8 +2786,9 @@ bool HeadlessTest::RunAiBehaviourTest(Application &app)
             || rhinoNormal->autoSiege != UnitConfig::AutoSiege::Far)
             return fail("auto_deploy must read always for the Grad and far for the Rhino");
         const float inRange = std::max(2.0f, gradNormal->attackRange - 1.0f);
-        auto aiFar = siegeRun(aiGrad, ai, false, true, inRange, 4.0f, true); // an enemy in range: deploys, packs up after
-        auto aiNear = siegeRun(aiGrad, ai, false, true, 5.0f, 4.0f, false);  // close by: deploys as well (always)
+        auto aiFar
+            = siegeRun(aiGrad, ai, false, true, inRange, 4.0f, true); // an enemy in range: deploys, packs up after
+        auto aiNear = siegeRun(aiGrad, ai, false, true, 5.0f, 4.0f, false); // close by: deploys as well (always)
         auto rhinoLocked = siegeRun(10, Faction::Resistance, true, false, 8.0f, 4.0f, false);
         auto rhinoQ = siegeRun(10, Faction::Resistance, true, true, 8.0f, 4.0f, false);
         auto rhinoPlain = siegeRun(10, Faction::Resistance, false, true, 8.0f, 4.0f, false);
@@ -4038,7 +4086,8 @@ bool HeadlessTest::RunZeusTest(Application &app)
             {
                 app.m_entities->Update(dt, *app.m_map, *app.m_pathfinder);
                 for (const auto &c : app.m_entities->TakeSoundCues())
-                    shots += c.cue == EntityManager::SoundCue::FireCannonHigh || c.cue == EntityManager::SoundCue::FireCannon
+                    shots += c.cue == EntityManager::SoundCue::FireCannonHigh
+                             || c.cue == EntityManager::SoundCue::FireCannon
                              || c.cue == EntityManager::SoundCue::FireRocket;
             }
             const Unit *z = app.m_entities->GetUnit(zeusId);
@@ -4057,7 +4106,8 @@ bool HeadlessTest::RunZeusTest(Application &app)
     {
         fresh();
         const int zeusId = app.m_entities->SpawnUnitByArchetype(11, 20, 20, Faction::Confederation);
-        const int foeId = app.m_entities->SpawnUnitByArchetype(0, 20 + static_cast<int>(tiles), 20, Faction::Resistance);
+        const int foeId
+            = app.m_entities->SpawnUnitByArchetype(0, 20 + static_cast<int>(tiles), 20, Faction::Resistance);
         Unit *zeus = app.m_entities->GetUnit(zeusId);
         Entity *foe = app.m_entities->GetEntity(foeId);
         if (!zeus || !foe)
@@ -4899,8 +4949,7 @@ bool HeadlessTest::run(Application &app, int numTicks)
     }
     // Test proportional HP retention when damaged
     rhino->currentHp = 310; // 50% damaged
-    std::cout << "  - Rhino siege deployment animation, HP & splash synced (620 HP, 15% splash)."
-              << std::endl;
+    std::cout << "  - Rhino siege deployment animation, HP & splash synced (620 HP, 15% splash)." << std::endl;
 
     // Test undeployment back to mobile mode
     app.m_entities->ToggleSiegeMode({rhinoId});
@@ -4964,8 +5013,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
     app.m_entities->Update(1.0f, *app.m_map, *app.m_pathfinder);
     if (rhino->autoSiegeCooldownTimer >= 3.5f || rhino->autoSiegeCooldownTimer <= 0.0f)
     {
-        std::cerr << "[Test] Error: autoSiegeCooldownTimer did not decay! timer="
-                  << rhino->autoSiegeCooldownTimer << std::endl;
+        std::cerr << "[Test] Error: autoSiegeCooldownTimer did not decay! timer=" << rhino->autoSiegeCooldownTimer
+                  << std::endl;
         return false;
     }
     rhino->autoSiegeCooldownTimer = 0.0f;
@@ -5210,7 +5259,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
                 app.m_entities->Update(0.05f, *app.m_map, *app.m_pathfinder);
             if (app.m_map->GetWall(53, 20) > 0 && app.m_map->GetWallHp(53, 20) >= before)
             {
-                std::cerr << "[Test] Error: a shell did not damage an own wall that was ordered destroyed!" << std::endl;
+                std::cerr << "[Test] Error: a shell did not damage an own wall that was ordered destroyed!"
+                          << std::endl;
                 return false;
             }
             std::cout << "  - Shell damages an own wall ordered destroyed." << std::endl;
@@ -5227,7 +5277,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
         const Unit *grad = app.m_entities->GetUnit(gradId);
         const Unit *gradSiege = app.m_entities->GetUnit(gradSiegeId);
         if (!grad || !gradSiege || grad->burstCount != 1 || std::abs(grad->attackRange - 6.0f) > 0.01f
-            || gradSiege->burstCount != 6 || std::abs(gradSiege->attackRange - 13.0f) > 0.01f || grad->moveSpeed <= 0.0f)
+            || gradSiege->burstCount != 6 || std::abs(gradSiege->attackRange - 13.0f) > 0.01f
+            || grad->moveSpeed <= 0.0f)
         {
             std::cerr << "[Test] Error: Grad forms: walking 1 rocket / range 6 and siege 6 rockets / range 13 expected!"
                       << std::endl;
@@ -5331,7 +5382,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
     for (int i = 0; i < 4; ++i)
         app.m_entities->Update(0.05f, *app.m_map, *app.m_pathfinder);
     // With the upgrade a Fortress that knows its target closes in to the flame's reach instead of shooting from afar
-    if (fortress->projectile == ProjectileType::Flame || (fortress->state != ActionState::Move && fortress->path.empty()))
+    if (fortress->projectile == ProjectileType::Flame
+        || (fortress->state != ActionState::Move && fortress->path.empty()))
     {
         std::cerr << "[Test] Error: Fortress with the upgrade did not close in on a target 3 tiles away!" << std::endl;
         return false;
@@ -5777,8 +5829,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
     const auto *grenadierCfg = app.m_entities->GetUnitConfig(2);
     const auto *heavyAssaultCfg = app.m_entities->GetUnitConfig(3);
 
-    // The numbers are the designer's to tune (character files); what must hold is that a unit's splash is the one of its
-    // main weapon, for every unit that has a splash
+    // The numbers are the designer's to tune (character files); what must hold is that a unit's splash is the one of
+    // its main weapon, for every unit that has a splash
     for (const UnitConfig *cfg :
          {hammerCfg, zeusCfg, rhinoCfg, rhinoSiegeCfg, gradCfg, mlrsCfg, grenadierCfg, heavyAssaultCfg})
     {
@@ -7537,7 +7589,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
         app.m_map->RevealArea(60, 10, 40, Players::TeamOf(owner));
         app.m_entities->SetBuildRadius(16);
         app.m_entities->SpawnBuildingByIndex(8, 5, 5, Faction::Resistance, 1.0f); // finished HQ
-        const int second = app.m_entities->SpawnBuildingByIndex(8, 50, 5, Faction::Resistance, 0.3f); // under construction
+        const int second
+            = app.m_entities->SpawnBuildingByIndex(8, 50, 5, Faction::Resistance, 0.3f); // under construction
         const bool underConstruction = app.m_entities->CanPlaceBuilding(52, 10, 1, 1, *app.m_map, owner);
         if (Building *b = app.m_entities->GetEntity(second) ? app.m_entities->GetEntity(second)->AsBuilding() : nullptr)
             b->buildProgress = 1.0f;
@@ -7590,8 +7643,9 @@ bool HeadlessTest::run(Application &app, int numTicks)
         }
         {
             SfxMixer cfg;
-            cfg.Configure(nlohmann::json::parse(
-                R"({"events":{"fire_x":{"category":"weapon","positional":true,"min_gain":0.07}}})"));
+            cfg.Configure(
+                nlohmann::json::parse(
+                    R"({"events":{"fire_x":{"category":"weapon","positional":true,"min_gain":0.07}}})"));
             const SfxMixer::EventConfig *c = cfg.Config("fire_x");
             if (!c || c->minGain < 0.0699f || c->minGain > 0.0701f)
             {
@@ -7611,8 +7665,9 @@ bool HeadlessTest::run(Application &app, int numTicks)
         // A loud noise burst: the muffled copy has far less energy of change (highs), reverb leaves a tail
         auto render = [](float muffle, bool reverb, int &tailPeak) {
             SfxMixer mixer;
-            mixer.Configure(nlohmann::json::parse(
-                R"({"events":{"boom":{"category":"impact","volume":1.0,"reverb":1.0,"max_instances":2}}})"));
+            mixer.Configure(
+                nlohmann::json::parse(
+                    R"({"events":{"boom":{"category":"impact","volume":1.0,"reverb":1.0,"max_instances":2}}})"));
             std::vector<int16_t> pcm(2000);
             uint32_t seed = 12345;
             for (auto &v : pcm)
@@ -7639,8 +7694,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
         render(0.0f, true, tailWet);
         if (!(dull < clean * 0.6) || tailDry != 0 || tailWet <= 0)
         {
-            std::cerr << "[Test] Error: low-pass/reverb broken: roughness " << clean << " -> " << dull
-                      << ", dry tail " << tailDry << ", reverb tail " << tailWet << std::endl;
+            std::cerr << "[Test] Error: low-pass/reverb broken: roughness " << clean << " -> " << dull << ", dry tail "
+                      << tailDry << ", reverb tail " << tailWet << std::endl;
             return false;
         }
         std::cout << "  - Low-pass roughness " << clean << " -> " << dull << ", reverb tail peak " << tailWet
@@ -7722,7 +7777,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // 29. Validating Rhino / Siege transformation order queue, OrderFinished determinism and turret shifts
     {
-        std::cout << "[Test] Validating Rhino / Siege transformation determinism, order queue and turret shifts..." << std::endl;
+        std::cout << "[Test] Validating Rhino / Siege transformation determinism, order queue and turret shifts..."
+                  << std::endl;
         EntityManager &entities = *app.m_entities;
         TileMap &map = *app.m_map;
         Pathfinder &pf = *app.m_pathfinder;
@@ -7750,13 +7806,15 @@ bool HeadlessTest::run(Application &app, int numTicks)
         EntityManager::TurretShift(10, 2, sx, sy);
         if (sx != 0.0f || sy != 0.0f)
         {
-            std::cerr << "[Test] Error: Rhino facing 2 (reference) turret shift mismatch! (" << sx << "," << sy << ")" << std::endl;
+            std::cerr << "[Test] Error: Rhino facing 2 (reference) turret shift mismatch! (" << sx << "," << sy << ")"
+                      << std::endl;
             return false;
         }
         EntityManager::TurretShift(10, 6, sx, sy);
         if (sx != 0.0f || sy != 7.0f)
         {
-            std::cerr << "[Test] Error: Rhino facing 6 turret shift mismatch! (" << sx << "," << sy << ") expected (0, 7)" << std::endl;
+            std::cerr << "[Test] Error: Rhino facing 6 turret shift mismatch! (" << sx << "," << sy
+                      << ") expected (0, 7)" << std::endl;
             return false;
         }
 
@@ -7774,7 +7832,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
         }
         if (rhino->OrderFinished())
         {
-            std::cerr << "[Test] Error: Rhino OrderFinished() evaluated to true while in ActionState::Transform!" << std::endl;
+            std::cerr << "[Test] Error: Rhino OrderFinished() evaluated to true while in ActionState::Transform!"
+                      << std::endl;
             return false;
         }
 
@@ -7839,7 +7898,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
             return false;
         }
 
-        std::cout << "  - Rhino siege order queuing during transformation and turret anchor determinism verified." << std::endl;
+        std::cout << "  - Rhino siege order queuing during transformation and turret anchor determinism verified."
+                  << std::endl;
     }
 
     return true;

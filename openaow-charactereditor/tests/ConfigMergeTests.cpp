@@ -5,13 +5,24 @@
 #include <fstream>
 using namespace CharEditor;
 int fails = 0;
-#define CHECK(c) do { if(!(c)) { std::printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #c); ++fails; } } while(0)
-int main(int, char** argv) {
+#define CHECK(c)                                                    \
+    do                                                              \
+    {                                                               \
+        if (!(c))                                                   \
+        {                                                           \
+            std::printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #c); \
+            ++fails;                                                \
+        }                                                           \
+    } while (0)
+int main(int, char **argv)
+{
     // 1. Field added on disk after load (new game version), editor changed another field
     YAML::Node base = YAML::Load("stats: {max_hp: 30, move_speed: 1.5}\ncombat: {weapons: [{damage: 5}]}\n");
     YAML::Node mine = YAML::Clone(base);
     mine["stats"]["max_hp"] = 45;
-    YAML::Node disk = YAML::Load("stats: {max_hp: 30, move_speed: 1.5, armor_class: heavy}\ncombat: {weapons: [{damage: 5}]}\nnew_section: {x: 1}\n");
+    YAML::Node disk = YAML::Load(
+        "stats: {max_hp: 30, move_speed: 1.5, armor_class: heavy}\ncombat: {weapons: [{damage: 5}]}\nnew_section: {x: "
+        "1}\n");
     YAML::Node m = MergeYamlEdits(base, mine, disk);
     CHECK(m["stats"]["max_hp"].as<int>() == 45);
     CHECK(m["stats"]["armor_class"].as<std::string>() == "heavy");
@@ -36,13 +47,21 @@ int main(int, char** argv) {
     CHECK(jr["fog"]["alpha"] == 100 && jr["fog"]["rounding"] == 0.5 && jr["radar_alert"]["wave_count"] == 3);
     // 5. CommentedYaml: comments and lines added on disk survive a save
     const std::string path = std::string(argv[0]) + ".commented.yaml";
-    { std::ofstream o(path); o << "# Easy level\neasy:\n  income: 10 # per second\n  waves: 3\n"; }
-    CommentedYaml y; std::string err;
+    {
+        std::ofstream o(path);
+        o << "# Easy level\neasy:\n  income: 10 # per second\n  waves: 3\n";
+    }
+    CommentedYaml y;
+    std::string err;
     CHECK(y.load(path, err));
     CHECK(y.Set("easy.income", "12"));
-    { std::ofstream o(path); o << "# Easy level\neasy:\n  income: 10 # per second\n  waves: 3\n  # added later\n  tactics: rush\n"; }
+    {
+        std::ofstream o(path);
+        o << "# Easy level\neasy:\n  income: 10 # per second\n  waves: 3\n  # added later\n  tactics: rush\n";
+    }
     CHECK(y.Save(err));
-    std::ifstream in(path); std::string txt((std::istreambuf_iterator<char>(in)), {});
+    std::ifstream in(path);
+    std::string txt((std::istreambuf_iterator<char>(in)), {});
     CHECK(txt.find("income: 12  # per second") != std::string::npos);
     CHECK(txt.find("tactics: rush") != std::string::npos && txt.find("# added later") != std::string::npos);
     std::printf("%s\n", fails ? "FAILED" : "all merge checks passed");

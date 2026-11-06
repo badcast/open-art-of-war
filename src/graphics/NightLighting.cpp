@@ -21,7 +21,9 @@ SDL_Color ReadColor(const nlohmann::json &j, const char *key, SDL_Color fallback
     const auto it = j.find(key);
     if (it == j.end() || !it->is_array() || it->size() < 3)
         return fallback;
-    auto c = [&](size_t i) { return static_cast<Uint8>(std::clamp((*it)[i].get<int>(), 0, 255)); };
+    auto c = [&](size_t i) {
+        return static_cast<Uint8>(std::clamp((*it)[i].get<int>(), 0, 255));
+    };
     return {c(0), c(1), c(2), 255};
 }
 
@@ -117,14 +119,16 @@ SDL_Texture *NightLighting::MakeSpot(SDL_Renderer *renderer, float softness)
         for (int x = 0; x < kSpotSize; ++x)
         {
             // (pixel centres: the four middle pixels are all at the full light)
-            const float dx = std::max(0.0f, std::fabs(x + 0.5f - c) - 0.5f), dy = std::max(0.0f, std::fabs(y + 0.5f - c) - 0.5f);
+            const float dx = std::max(0.0f, std::fabs(x + 0.5f - c) - 0.5f),
+                        dy = std::max(0.0f, std::fabs(y + 0.5f - c) - 0.5f);
             const float d = std::sqrt(dx * dx + dy * dy) / (c - 0.5f);
             const float f = std::pow(std::clamp(1.0f - d, 0.0f, 1.0f), softness);
             const auto a = static_cast<uint32_t>(f * 255.0f + 0.5f);
             pixels[static_cast<size_t>(y) * kSpotSize + x] = (a << 24) | 0x00FFFFFFu;
         }
     }
-    SDL_Texture *t = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, kSpotSize, kSpotSize);
+    SDL_Texture *t
+        = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, kSpotSize, kSpotSize);
     if (!t)
         return nullptr;
     SDL_UpdateTexture(t, nullptr, pixels.data(), kSpotSize * 4);
@@ -181,7 +185,8 @@ void NightLighting::DrawRect(
         return;
     // The footprint itself at full light
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
-    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, static_cast<Uint8>(std::clamp(core, 0.0f, 1.0f) * 255.0f));
+    SDL_SetRenderDrawColor(
+        renderer, color.r, color.g, color.b, static_cast<Uint8>(std::clamp(core, 0.0f, 1.0f) * 255.0f));
     SDL_RenderFillRect(renderer, &rect);
     if (spread <= 0.0f)
         return;
@@ -196,13 +201,13 @@ void NightLighting::DrawRect(
         SDL_FRect src, dst;
     };
     const Piece pieces[8] = {
-        {{0, 0, h, h}, {x0 - s, y0 - s, s, s}},           // corners
+        {{0, 0, h, h}, {x0 - s, y0 - s, s, s}}, // corners
         {{h, 0, h, h}, {x1, y0 - s, s, s}},
         {{0, h, h, h}, {x0 - s, y1, s, s}},
         {{h, h, h, h}, {x1, y1, s, s}},
-        {{h - 0.5f, 0, 1, h}, {x0, y0 - s, rect.w, s}},   // top, bottom
+        {{h - 0.5f, 0, 1, h}, {x0, y0 - s, rect.w, s}}, // top, bottom
         {{h - 0.5f, h, 1, h}, {x0, y1, rect.w, s}},
-        {{0, h - 0.5f, h, 1}, {x0 - s, y0, s, rect.h}},   // left, right
+        {{0, h - 0.5f, h, 1}, {x0 - s, y0, s, rect.h}}, // left, right
         {{h, h - 0.5f, h, 1}, {x1, y0, s, rect.h}},
     };
     for (const Piece &p : pieces)
@@ -226,9 +231,9 @@ void NightLighting::Apply(
     const bool clipped = SDL_RenderClipEnabled(renderer) && SDL_GetRenderClipRect(renderer, &clip);
     SDL_SetRenderClipRect(renderer, nullptr);
     const NightConfig &c = m_config;
-    const SDL_Color base = gpu ? SDL_Color {static_cast<Uint8>(c.gpuBase * 255.0f), static_cast<Uint8>(c.gpuBase * 255.0f),
-                                            static_cast<Uint8>(c.gpuBase * 255.0f), 255}
-                               : c.nightColor;
+    const SDL_Color base
+        = gpu ? SDL_Color {static_cast<Uint8>(c.gpuBase * 255.0f), static_cast<Uint8>(c.gpuBase * 255.0f), static_cast<Uint8>(c.gpuBase * 255.0f), 255}
+              : c.nightColor;
 
     // The light map: the night, and every light added onto it
     SDL_SetRenderTarget(renderer, m_light);
@@ -266,12 +271,12 @@ void NightLighting::Apply(
     }
     for (const EntityManager::LightSpot &l : lights)
     {
-        const NightConfig::Spot *spot = l.kind == Kind::Explosion    ? &c.explosion
-                                        : l.kind == Kind::FlameStart ? &c.flameStart
-                                        : l.kind == Kind::FlameEnd   ? &c.flameEnd
-                                        : l.kind == Kind::Projectile ? &c.projectile
+        const NightConfig::Spot *spot = l.kind == Kind::Explosion     ? &c.explosion
+                                        : l.kind == Kind::FlameStart  ? &c.flameStart
+                                        : l.kind == Kind::FlameEnd    ? &c.flameEnd
+                                        : l.kind == Kind::Projectile  ? &c.projectile
                                         : l.kind == Kind::MuzzleFlash ? &c.muzzleFlash
-                                                                     : nullptr;
+                                                                      : nullptr;
         if (!spot)
             continue;
         float k = spot->intensity;

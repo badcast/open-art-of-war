@@ -157,16 +157,17 @@ bool Application::StartReplay(int watchSlot)
     if (campaign)
     {
         // A campaign mission: its side and the computer's difficulty, then the mission sets the world up
-        SetPlayerFaction(rinfo.playerFaction == static_cast<int>(Faction::Confederation) ? Faction::Confederation
-                                                                                         : Faction::Resistance);
+        SetPlayerFaction(
+            rinfo.playerFaction == static_cast<int>(Faction::Confederation) ? Faction::Confederation
+                                                                            : Faction::Resistance);
         m_aiController->SetDifficulty(static_cast<AIDifficulty>(std::clamp(rinfo.difficulty, 0, 3)));
     }
     ReloadGameData(); // the match plays with the data it was recorded with
     BeginMapLoading(TitleOf(setup.mapPath), setup.mapPath);
-    const bool loaded = campaign
-                            ? m_mission->LoadMission(rinfo.mission, LoaderResources::kDefaultRoot, *m_map, *m_entities,
-                                                     *m_economy, *m_pathfinder)
-                            : m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder);
+    const bool loaded
+        = campaign ? m_mission->LoadMission(
+                         rinfo.mission, LoaderResources::kDefaultRoot, *m_map, *m_entities, *m_economy, *m_pathfinder)
+                   : m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder);
     if (!loaded)
     {
         EndMapLoading();
@@ -222,7 +223,8 @@ void Application::CloseReplay()
     m_replay.reset(); // takes the recorded data away
     m_replayUi = ReplayUi {};
     if (had && m_aiController)
-        m_aiController->SetDifficulty(static_cast<AIDifficulty>(m_settings.difficulty)); // (a campaign replay set its own)
+        m_aiController->SetDifficulty(
+            static_cast<AIDifficulty>(m_settings.difficulty)); // (a campaign replay set its own)
     if (had)
         ReloadGameData(); // the player's own data again
 }
@@ -339,8 +341,9 @@ void Application::UpdateReplayInput(double frameTime)
             LeaveObserver();
         return;
     }
-    bool togglePause = m_input->IsKeyJustPressed(SDL_SCANCODE_SPACE)
-                       || (!replay && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)));
+    bool togglePause
+        = m_input->IsKeyJustPressed(SDL_SCANCODE_SPACE)
+          || (!replay && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)));
     bool restart = replay && m_input->IsKeyJustPressed(SDL_SCANCODE_HOME);
     int speedStep = 0;
     if (m_input->IsKeyJustPressed(SDL_SCANCODE_EQUALS) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_PLUS))
@@ -366,7 +369,16 @@ void Application::UpdateReplayInput(double frameTime)
         int picked = -1;
         float lx, ly;
         const bool clicked = m_input->WasLeftClickIssued(lx, ly);
-        ui::ComboUpdate(cs, bar.view, static_cast<int>(viewPlayers.size()) + 1, m_windowH, mx, my, clicked, m_input->ConsumeWheel(), picked);
+        ui::ComboUpdate(
+            cs,
+            bar.view,
+            static_cast<int>(viewPlayers.size()) + 1,
+            m_windowH,
+            mx,
+            my,
+            clicked,
+            m_input->ConsumeWheel(),
+            picked);
         m_replayUi.comboScroll = cs.scroll;
         if (cs.open < 0)
             m_replayUi.comboOpen = -1;
@@ -580,8 +592,8 @@ void Application::UpdateReplay(double frameTime)
     const bool finished = sim.Tick() >= total;
     if (finished && !m_replayUi.finished)
     {
-        std::cout << "[Replay] Finished at tick " << sim.Tick() << (m_replay->MismatchTick() >= 0 ? ", OUT OF SYNC" : ", in sync")
-                  << std::endl;
+        std::cout << "[Replay] Finished at tick " << sim.Tick()
+                  << (m_replay->MismatchTick() >= 0 ? ", OUT OF SYNC" : ", in sync") << std::endl;
         if (DebugEnv("OAOW_REPLAY_EXIT"))
             m_running = false;
     }
@@ -606,7 +618,9 @@ void Application::RenderReplayBar()
 
     ui::FillVerticalGradient(*m_renderer, l.bar, ui::WithAlpha(col::Panel, 245), ui::WithAlpha(col::PanelSunken, 230));
     m_renderer->FillRectScreen(0, kBarHeight - 1, viewW, 1, col::Border);
-    auto hot = [&](const ui::UiRect &r) { return r.Contains(mx, my); };
+    auto hot = [&](const ui::UiRect &r) {
+        return r.Contains(mx, my);
+    };
     ui::DrawButton(
         *m_renderer,
         *m_fontRenderer,
@@ -618,7 +632,13 @@ void Application::RenderReplayBar()
     char speed[16];
     std::snprintf(speed, sizeof speed, "x%g", kSpeeds[m_replayUi.speed]);
     m_fontRenderer->DrawString(
-        speed, l.speed.CenterX(), l.speed.CenterY(), ui::FONT_BODY_BOLD, col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
+        speed,
+        l.speed.CenterX(),
+        l.speed.CenterY(),
+        ui::FONT_BODY_BOLD,
+        col::Text,
+        false,
+        Anchor::HCENTER | Anchor::VCENTER);
     ui::DrawButton(*m_renderer, *m_fontRenderer, l.faster, "+", ui::ButtonStyle::Secondary, hot(l.faster));
     if (replay)
         ui::DrawButton(*m_renderer, *m_fontRenderer, l.restart, "|<", ui::ButtonStyle::Secondary, hot(l.restart));
@@ -719,7 +739,8 @@ void Application::RenderReplayBar()
         ui::ComboState cs;
         cs.open = 0;
         cs.scroll = m_replayUi.comboScroll;
-        ui::DrawComboList(*m_renderer, *m_fontRenderer, l.view, items, current, cs, m_windowH, mx, my, nullptr, &swatches);
+        ui::DrawComboList(
+            *m_renderer, *m_fontRenderer, l.view, items, current, cs, m_windowH, mx, my, nullptr, &swatches);
     }
 }
 
@@ -748,7 +769,12 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
              {colLosses, _("Losses")},
              {colResearch, _("Research")}})
         m_fontRenderer->DrawString(
-            ui::FitText(*m_fontRenderer, text, ui::FONT_SMALL_BOLD, 96), x + cx, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
+            ui::FitText(*m_fontRenderer, text, ui::FONT_SMALL_BOLD, 96),
+            x + cx,
+            hy,
+            ui::FONT_SMALL_BOLD,
+            col::TextDim,
+            false);
     int ry = y + headH;
     for (const ObserverPlayer &p : players)
     {
@@ -760,7 +786,12 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
         m_renderer->DrawRectScreen(x + colName, cy - 7, 14, 14, col::Border);
         auto text = [&](int cx, const std::string &t, SDL_Color c, int width) {
             m_fontRenderer->DrawString(
-                ui::FitText(*m_fontRenderer, t, ui::FONT_BODY, width), x + cx, cy, ui::FONT_BODY, c, false,
+                ui::FitText(*m_fontRenderer, t, ui::FONT_BODY, width),
+                x + cx,
+                cy,
+                ui::FONT_BODY,
+                c,
+                false,
                 Anchor::LEFT | Anchor::VCENTER);
         };
         text(colName + 22, p.name, col::Text, colCredits - colName - 30);
@@ -785,8 +816,8 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
         {
             const float ratio = std::clamp(r.timer / std::max(0.01f, r.duration), 0.0f, 1.0f);
             ui::DrawProgressBar(*m_renderer, {x + colResearch, cy + 8, barW, 4}, ratio, col::Info);
-            research += "  " + std::string(_(researchDef(Players::FactionOf(id), r.active).name))
-                        + "  " + std::to_string(static_cast<int>(ratio * 100.0f)) + "%";
+            research += "  " + std::string(_(researchDef(Players::FactionOf(id), r.active).name)) + "  "
+                        + std::to_string(static_cast<int>(ratio * 100.0f)) + "%";
         }
         text(colResearch, research, r.active >= 0 ? col::Info : col::TextDim, barW);
         ry += rowH;
@@ -797,8 +828,8 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
 void Application::UpdateLocalReplay()
 {
     const bool inMatch = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
-                         || m_state == AppState::Paused || m_state == AppState::Briefing
-                         || m_state == AppState::Victory || m_state == AppState::Defeat;
+                         || m_state == AppState::Paused || m_state == AppState::Briefing || m_state == AppState::Victory
+                         || m_state == AppState::Defeat;
     const bool recording = m_localRecorder && m_localRecorder->Active();
     if (recording && (!inMatch || m_replay || m_net || m_mission->GetLoadSerial() != m_localRecordSerial))
         FinishLocalReplay("left");
@@ -823,16 +854,17 @@ void Application::UpdateLocalReplay()
         setup = m_mission->matchSetup();
         info.mode = "custom";
     }
-    else if (!m_mission->IsMatch() && !m_mission->IsSkirmish() && missionId >= 0
-             && missionId < MissionController::kCampaignMissionCount)
+    else if (
+        !m_mission->IsMatch() && !m_mission->IsSkirmish() && missionId >= 0
+        && missionId < MissionController::kCampaignMissionCount)
     {
         // A campaign mission: the setup only names the map and the two sides (the mission sets the world up)
         const auto &campaign = Missions::Campaign(PlayerFaction());
         setup.mapPath = LoaderResources::MapPath(campaign[missionId].data.mapFile);
         setup.local = Players::Local();
         setup.slots[setup.local] = {true, PlayerFaction(), 0, 0, true, 1};
-        setup.slots[setup.local == 0 ? 1 : 0] = {true, AiFaction(), 1, 0, false,
-                                                 static_cast<uint8_t>(std::clamp(m_settings.difficulty, 0, 3))};
+        setup.slots[setup.local == 0 ? 1 : 0]
+            = {true, AiFaction(), 1, 0, false, static_cast<uint8_t>(std::clamp(m_settings.difficulty, 0, 3))};
         info.mode = "campaign";
         info.mission = missionId;
         info.playerFaction = static_cast<int>(PlayerFaction());

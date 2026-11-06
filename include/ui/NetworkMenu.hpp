@@ -200,8 +200,8 @@ private:
         {
             return Row(i);
         }
-        // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army size,
-        // ready; each is a share of the width of the table
+        // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army
+        // size, ready; each is a share of the width of the table
         ui::UiRect Col(int i, int k) const
         {
             static constexpr int kShare[7] = {24, 17, 8, 8, 12, 13, 18};
@@ -268,7 +268,7 @@ private:
     std::vector<SkirmishMapInfo> m_maps;      // every map
     std::vector<SkirmishMapInfo> m_mapsShown; // after the search and the filters
     ui::MapFilter m_mapFilter;
-    int m_mapTop {0};                         // first visible row of the map list
+    int m_mapTop {0}; // first visible row of the map list
     void RebuildMapsShown();
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"

@@ -219,10 +219,10 @@ inline const ArchetypeInfo *archetypeInfo(int archetypeId)
 {
     return GetArchetypeInfo(archetypeId);
 }
-const char *UnitClassName(int archetypeId);          // "infantry" / "vehicle"
-const char *ProducedIn(int archetypeId);             // "barracks" / "factory"
-float DefaultTurnStepDelay(int archetypeId);         // seconds per 45-degree hull turn (0 for infantry)
-float DefaultTurretTurnStepDelay(int archetypeId);   // seconds per 45-degree turret turn (0 for infantry)
+const char *UnitClassName(int archetypeId);        // "infantry" / "vehicle"
+const char *ProducedIn(int archetypeId);           // "barracks" / "factory"
+float DefaultTurnStepDelay(int archetypeId);       // seconds per 45-degree hull turn (0 for infantry)
+float DefaultTurretTurnStepDelay(int archetypeId); // seconds per 45-degree turret turn (0 for infantry)
 
 struct BuildingKindInfo
 {

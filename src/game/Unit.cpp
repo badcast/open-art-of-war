@@ -924,7 +924,8 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
         // D0. A crowd of friends shuts the tile for the moment: ask the same road again a few times (a short pause
         //     each) before planning a way around, which can lead the unit in a big circle
         if (blocker && blocker->alive && blocker->state != ActionState::Die && !Players::Hostile(blocker->owner, owner)
-            && blockRetries < kBlockRetries && targetEntityId == 0) // (a unit closing in on a target keeps looking for its firing spot)
+            && blockRetries < kBlockRetries
+            && targetEntityId == 0) // (a unit closing in on a target keeps looking for its firing spot)
         {
             if (blockRetryTimer <= 0.0f)
             {
@@ -2144,8 +2145,8 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             // team's sight: the unit walks on to where it last saw them and fires only once they are in sight again
             const bool keepTarget = (targetEntityId == orderedTargetId || target->isBuilding) && moveSpeed > 0.0f
                                     && !isSiegeMode && !HoldsGround() && lastSeenTargetX >= 0;
-            const bool reachedLastSeen
-                = !target->isBuilding && std::abs(tileX - lastSeenTargetX) <= 1 && std::abs(tileY - lastSeenTargetY) <= 1;
+            const bool reachedLastSeen = !target->isBuilding && std::abs(tileX - lastSeenTargetX) <= 1
+                                         && std::abs(tileY - lastSeenTargetY) <= 1;
             if (!keepTarget || reachedLastSeen)
             {
                 targetEntityId = 0;

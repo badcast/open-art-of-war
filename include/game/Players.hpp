@@ -21,7 +21,7 @@ struct PlayerSlot
     uint8_t team {0};
     uint8_t color {0}; // army colour (0 = the faction's classic sheets)
     bool human {false};
-    uint8_t aiLevel {1}; // computer player: 0 easy .. 3 hardcore
+    uint8_t aiLevel {1};  // computer player: 0 easy .. 3 hardcore
     uint8_t handicap {0}; // start credits: index into kHandicapPercent (0 = none)
     uint8_t armyCap {7};  // most units alive at once: index into kArmyCapUnits (7 = unlimited)
 };

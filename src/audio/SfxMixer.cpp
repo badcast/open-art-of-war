@@ -14,7 +14,15 @@ namespace OpenArtOfWar
 {
 
 SfxPlacement PlaceSfx(
-    float worldX, float worldY, float viewX, float viewY, float viewW, float viewH, float rangePx, float zoom, float minGain)
+    float worldX,
+    float worldY,
+    float viewX,
+    float viewY,
+    float viewW,
+    float viewH,
+    float rangePx,
+    float zoom,
+    float minGain)
 {
     SfxPlacement p;
     // Distance from the view rectangle (0 inside)
@@ -263,8 +271,7 @@ int SfxMixer::InstancesLocked(int eventIdx) const
     return n;
 }
 
-bool SfxMixer::StartLocked(
-    int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle)
+bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, uint64_t nowMs, bool announcer, float muffle)
 {
     EventState &ev = m_events[static_cast<size_t>(eventIdx)];
     const EventConfig &c = ev.cfg;
@@ -406,7 +413,7 @@ void SfxMixer::Reverb::Process(const float *in, float *outL, float *outR, int fr
     for (int i = 0; i < frames; ++i)
     {
         const float x = in[i] * 0.03f;
-        float* out[2] = {outL, outR};
+        float *out[2] = {outL, outR};
         for (int ch = 0; ch < 2; ++ch)
         {
             float y = 0.0f;

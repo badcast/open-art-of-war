@@ -109,7 +109,8 @@ std::string replayFileName(const std::string &mapName, std::int64_t when)
     std::string map;
     for (char c : fs::path(mapName).stem().string())
     {
-        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+        const bool ok
+            = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
         map += ok ? c : '_';
     }
     if (map.empty())
@@ -147,8 +148,7 @@ bool writeReplay(const std::string &path, const ReplayData &data, std::string &e
         archive_write_free(a);
         return false;
     }
-    bool ok = addEntry(
-        a, kMetaName, reinterpret_cast<const std::uint8_t *>(data.meta.data()), data.meta.size(), error);
+    bool ok = addEntry(a, kMetaName, reinterpret_cast<const std::uint8_t *>(data.meta.data()), data.meta.size(), error);
     ok = ok && addEntry(a, kSetupName, data.setup.data(), data.setup.size(), error);
     if (ok)
     {

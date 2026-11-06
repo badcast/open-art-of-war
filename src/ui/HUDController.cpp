@@ -356,7 +356,8 @@ UiRect InfinityBtn(const UiRect &cell)
 }
 void DrawInfinity(Renderer &r, const UiRect &b, bool on, bool hovered)
 {
-    r.FillRectScreen(b.x, b.y, b.w, b.h, on ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
+    r.FillRectScreen(
+        b.x, b.y, b.w, b.h, on ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
     r.DrawRectScreen(b.x, b.y, b.w, b.h, on ? col::Accent : (hovered ? col::BorderStrong : col::Border));
     // two rings side by side: the infinity sign
     const SDL_Color c = on ? col::Accent : col::TextDim;
@@ -520,8 +521,8 @@ void HUDController::Update(
             AnnounceResearch(e.value);
         else if (e.type == SimEvent::Type::PlayerEliminated)
             SetNotification(
-                std::string(Players::Slot(e.player).human ? _("PLAYER ") : _("COMPUTER ")) + std::to_string(e.player + 1)
-                + " " + _("IS OUT: NO BUILDINGS LEFT"));
+                std::string(Players::Slot(e.player).human ? _("PLAYER ") : _("COMPUTER "))
+                + std::to_string(e.player + 1) + " " + _("IS OUT: NO BUILDINGS LEFT"));
     }
 
     // Validate & auto-assign primary barracks and factory if needed
@@ -775,7 +776,8 @@ void HUDController::ActivateCell(
                 SoundRequests::Play("ui_error");
                 SetNotification(_("HEADQUARTERS REQUIRED TO BUILD!"));
             }
-            else if (index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6
+            else if (
+                index < static_cast<int>(blueprints.size()) && blueprints[index].buildingIndex == 6
                 && !IsRadarUnlocked(Players::Local()))
             {
                 SoundRequests::Play("ui_error");
@@ -1388,486 +1390,504 @@ void HUDController::RenderGameHud(
     // A replay's observer has no buildings to command: only the radar, the header and the menu stay
     if (!m_observer)
     {
-    ui::DrawButton(
-        renderer,
-        fontRenderer,
-        l.researchBtn,
-        ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, l.researchBtn.w - 12),
-        ui::ButtonStyle::Secondary,
-        l.researchBtn.Contains(mx, my));
-    // --- Tabs ----------------------------------------------------------------------------------
-    for (int t = 0; t < TabCount; ++t)
-    {
-        const UiRect &tr = l.tabs[t];
-        bool active = (t == m_activeTab);
-        bool hovered = tr.Contains(mx, my);
-        if (hovered)
-            SoundRequests::MarkHover();
-        renderer.FillRectScreen(
-            tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-        renderer.DrawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
-        if (active)
-            renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
-
-        if (TabIcon(t) >= 0)
+        ui::DrawButton(
+            renderer,
+            fontRenderer,
+            l.researchBtn,
+            ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, l.researchBtn.w - 12),
+            ui::ButtonStyle::Secondary,
+            l.researchBtn.Contains(mx, my));
+        // --- Tabs ----------------------------------------------------------------------------------
+        for (int t = 0; t < TabCount; ++t)
         {
-            renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
-            float s = 0.75f;
-            int iw = static_cast<int>(kCameoW * s);
-            renderer.SetDrawOwner(Players::Local());
-            renderer.SetStructureFaction(PlayerFaction());
-            renderer.DrawCompositeScreen(TabIcon(t), tr.CenterX() - iw / 2, tr.y + 6, s, PlayerFaction());
-            renderer.SetStructureFaction(Faction::Neutral);
-            renderer.SetDrawOwner(kNoPlayer);
-            renderer.ResetClipRect();
-            if (!active)
-                renderer.FillRectScreen(
-                    tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
-        }
-        else
-        {
-            DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
-        }
-    }
+            const UiRect &tr = l.tabs[t];
+            bool active = (t == m_activeTab);
+            bool hovered = tr.Contains(mx, my);
+            if (hovered)
+                SoundRequests::MarkHover();
+            renderer.FillRectScreen(
+                tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
+            renderer.DrawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
+            if (active)
+                renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
 
-    // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
-    int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
-    int &scroll = m_scrollRow[m_activeTab];
-    scroll = std::clamp(scroll, 0, maxScroll);
-    {
-        ui::DrawCaption(fontRenderer, renderer, l.strip.x, l.strip.y + 4, _(kTabNames[m_activeTab]));
-
-        if (m_activeTab == TabInfantry || m_activeTab == TabVehicles)
-        {
-            bool inf = (m_activeTab == TabInfantry);
-            int primary = inf ? m_primaryBarracksId : m_primaryFactoryId;
-            auto list = entities.GetBuildingsByType(inf ? UnitType::Barracks : UnitType::Factory, Players::Local());
-            if (!list.empty())
+            if (TabIcon(t) >= 0)
             {
-                std::string label = std::string(inf ? _("Barracks") : _("Factory")) + " #" + std::to_string(primary);
-                if (list.size() > 1)
-                    label += "  \xE2\x80\xBA";
-                bool hot = list.size() > 1 && l.primaryBtn.Contains(mx, my);
+                renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
+                float s = 0.75f;
+                int iw = static_cast<int>(kCameoW * s);
+                renderer.SetDrawOwner(Players::Local());
+                renderer.SetStructureFaction(PlayerFaction());
+                renderer.DrawCompositeScreen(TabIcon(t), tr.CenterX() - iw / 2, tr.y + 6, s, PlayerFaction());
+                renderer.SetStructureFaction(Faction::Neutral);
+                renderer.SetDrawOwner(kNoPlayer);
+                renderer.ResetClipRect();
+                if (!active)
+                    renderer.FillRectScreen(
+                        tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
+            }
+            else
+            {
+                DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
+            }
+        }
+
+        // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
+        int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
+        int &scroll = m_scrollRow[m_activeTab];
+        scroll = std::clamp(scroll, 0, maxScroll);
+        {
+            ui::DrawCaption(fontRenderer, renderer, l.strip.x, l.strip.y + 4, _(kTabNames[m_activeTab]));
+
+            if (m_activeTab == TabInfantry || m_activeTab == TabVehicles)
+            {
+                bool inf = (m_activeTab == TabInfantry);
+                int primary = inf ? m_primaryBarracksId : m_primaryFactoryId;
+                auto list = entities.GetBuildingsByType(inf ? UnitType::Barracks : UnitType::Factory, Players::Local());
+                if (!list.empty())
+                {
+                    std::string label
+                        = std::string(inf ? _("Barracks") : _("Factory")) + " #" + std::to_string(primary);
+                    if (list.size() > 1)
+                        label += "  \xE2\x80\xBA";
+                    bool hot = list.size() > 1 && l.primaryBtn.Contains(mx, my);
+                    fontRenderer.DrawString(
+                        ui::FitText(fontRenderer, label, ui::FONT_SMALL, l.primaryBtn.w),
+                        l.primaryBtn.Right(),
+                        l.primaryBtn.CenterY(),
+                        ui::FONT_SMALL,
+                        hot ? col::Accent : col::TextDim,
+                        false,
+                        Anchor::RIGHT | Anchor::VCENTER);
+                }
+            }
+            else if (m_activeTab == TabOrders)
+            {
+                int selected = 0;
+                for (const auto &e : entities.GetAllEntities())
+                {
+                    if (e.alive && e.selected && !e.isBuilding)
+                        ++selected;
+                }
+                std::string label = std::string(_("Selected")) + ": " + std::to_string(selected);
                 fontRenderer.DrawString(
-                    ui::FitText(fontRenderer, label, ui::FONT_SMALL, l.primaryBtn.w),
+                    label,
                     l.primaryBtn.Right(),
                     l.primaryBtn.CenterY(),
                     ui::FONT_SMALL,
-                    hot ? col::Accent : col::TextDim,
+                    col::TextDim,
                     false,
                     Anchor::RIGHT | Anchor::VCENTER);
             }
-        }
-        else if (m_activeTab == TabOrders)
-        {
-            int selected = 0;
-            for (const auto &e : entities.GetAllEntities())
+
+            if (maxScroll > 0)
             {
-                if (e.alive && e.selected && !e.isBuilding)
-                    ++selected;
-            }
-            std::string label = std::string(_("Selected")) + ": " + std::to_string(selected);
-            fontRenderer.DrawString(
-                label,
-                l.primaryBtn.Right(),
-                l.primaryBtn.CenterY(),
-                ui::FONT_SMALL,
-                col::TextDim,
-                false,
-                Anchor::RIGHT | Anchor::VCENTER);
-        }
-
-        if (maxScroll > 0)
-        {
-            auto arrow = [&](const UiRect &r, bool up, bool enabled) {
-                bool hot = enabled && r.Contains(mx, my);
-                renderer.FillRectScreen(r.x, r.y, r.w, r.h, hot ? col::Hover : col::PanelRaised);
-                renderer.DrawRectScreen(r.x, r.y, r.w, r.h, hot ? col::BorderStrong : col::Border);
-                SDL_Color c = enabled ? (hot ? col::Accent : col::Text) : col::TextMuted;
-                for (int i = 0; i < 5; ++i)
-                {
-                    int yy = up ? (r.CenterY() - 2 + i) : (r.CenterY() + 2 - i);
-                    renderer.FillRectScreen(r.CenterX() - i, yy, 2 * i + 1, 1, c);
-                }
-            };
-            arrow(l.scrollUp, true, scroll > 0);
-            arrow(l.scrollDown, false, scroll < maxScroll);
-        }
-    }
-
-    // --- Cameo grid -----------------------------------------------------------------------------------
-    std::string hoverTitle;
-    std::string hoverText;
-    bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
-    bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
-    bool hasLab = HasResearchBuilding(Players::Local(), entities);
-    const bool noHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true); // nothing can be built
-    // Orders shown on unit cards come from the buildings that would train them
-    auto queuedAt = [&](UnitType buildingType) {
-        std::vector<const Building *> out;
-        for (int id : ProductionTargets(buildingType, entities, selected))
-            out.push_back(entities.GetBuilding(id));
-        return out;
-    };
-    const std::vector<const Building *> barracksTargets = queuedAt(UnitType::Barracks);
-    const std::vector<const Building *> factoryTargets = queuedAt(UnitType::Factory);
-
-    renderer.SetClipRect({l.grid.x, l.grid.y, l.grid.w, l.grid.h});
-    int count = ItemCountForTab(m_activeTab);
-    for (int i = 0; i < count; ++i)
-    {
-        UiRect c = l.Cell(i, scroll);
-        if (c.Bottom() < l.grid.y || c.y > l.grid.Bottom())
-            continue;
-        bool hovered = c.Contains(mx, my) && l.grid.Contains(mx, my);
-        if (hovered)
-            SoundRequests::MarkHover();
-
-        switch (m_activeTab)
-        {
-            case TabBuild:
-            {
-                const auto &bp = EntityManager::GetBlueprints()[i];
-                bool selected = (m_buildMode && m_selectedBlueprint == i);
-                bool canAfford = economy.CanAfford(bp.creditCost);
-                const bool radarLocked = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq;
-                DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected && !noHq, radarLocked);
-                DrawCostTag(
-                    renderer,
-                    fontRenderer,
-                    c,
-                    "$" + std::to_string(bp.creditCost),
-                    canAfford ? col::Accent : col::Danger);
-                std::string pw = (bp.powerCost >= 0 ? "+" : "") + std::to_string(bp.powerCost);
-                fontRenderer.DrawString(
-                    pw,
-                    c.x + 6,
-                    c.y + 5,
-                    ui::FONT_SMALL_BOLD,
-                    bp.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255},
-                    true);
-                if (hovered)
-                {
-                    hoverTitle = std::string(_(bp.name)) + "  $" + std::to_string(bp.creditCost) + ", " + pw + _(" kW");
-                    hoverText = _(bp.desc);
-                }
-                break;
-            }
-            case TabInfantry:
-            case TabVehicles:
-            {
-                bool inf = (m_activeTab == TabInfantry);
-                const UnitCameoDef &def = unitCatalog(inf).items[i];
-                const auto &producers = inf ? barracksTargets : factoryTargets;
-                const bool unlocked = IsUnitUnlocked(Players::Local(), def.archetype);
-                bool available = (inf ? hasBarracks : hasFactory) && unlocked;
-                int cost = UnitCost(def, entities);
-                std::string name = _(UnitName(def, entities));
-                DrawCameo(renderer, fontRenderer, c, def.compId, name, hovered, false, !available);
-
-                int queued = 0;
-                float progress = -1.0f; // most advanced order of this unit currently in training
-                for (const Building *b : producers)
-                {
-                    for (const auto &q : b->productionQueue)
+                auto arrow = [&](const UiRect &r, bool up, bool enabled) {
+                    bool hot = enabled && r.Contains(mx, my);
+                    renderer.FillRectScreen(r.x, r.y, r.w, r.h, hot ? col::Hover : col::PanelRaised);
+                    renderer.DrawRectScreen(r.x, r.y, r.w, r.h, hot ? col::BorderStrong : col::Border);
+                    SDL_Color c = enabled ? (hot ? col::Accent : col::Text) : col::TextMuted;
+                    for (int i = 0; i < 5; ++i)
                     {
-                        if (q.archetype == def.archetype)
-                            ++queued;
+                        int yy = up ? (r.CenterY() - 2 + i) : (r.CenterY() + 2 - i);
+                        renderer.FillRectScreen(r.CenterX() - i, yy, 2 * i + 1, 1, c);
                     }
-                    if (!b->productionQueue.empty() && b->productionQueue.front().archetype == def.archetype)
-                    {
-                        progress = std::max(progress, b->CurrentProductionProgress());
-                    }
-                }
-                if (!available)
+                };
+                arrow(l.scrollUp, true, scroll > 0);
+                arrow(l.scrollDown, false, scroll < maxScroll);
+            }
+        }
+
+        // --- Cameo grid -----------------------------------------------------------------------------------
+        std::string hoverTitle;
+        std::string hoverText;
+        bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
+        bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
+        bool hasLab = HasResearchBuilding(Players::Local(), entities);
+        const bool noHq
+            = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true); // nothing can be built
+        // Orders shown on unit cards come from the buildings that would train them
+        auto queuedAt = [&](UnitType buildingType) {
+            std::vector<const Building *> out;
+            for (int id : ProductionTargets(buildingType, entities, selected))
+                out.push_back(entities.GetBuilding(id));
+            return out;
+        };
+        const std::vector<const Building *> barracksTargets = queuedAt(UnitType::Barracks);
+        const std::vector<const Building *> factoryTargets = queuedAt(UnitType::Factory);
+
+        renderer.SetClipRect({l.grid.x, l.grid.y, l.grid.w, l.grid.h});
+        int count = ItemCountForTab(m_activeTab);
+        for (int i = 0; i < count; ++i)
+        {
+            UiRect c = l.Cell(i, scroll);
+            if (c.Bottom() < l.grid.y || c.y > l.grid.Bottom())
+                continue;
+            bool hovered = c.Contains(mx, my) && l.grid.Contains(mx, my);
+            if (hovered)
+                SoundRequests::MarkHover();
+
+            switch (m_activeTab)
+            {
+                case TabBuild:
                 {
-                    DrawLockBadge(renderer, fontRenderer, c);
-                }
-                else
-                {
+                    const auto &bp = EntityManager::GetBlueprints()[i];
+                    bool selected = (m_buildMode && m_selectedBlueprint == i);
+                    bool canAfford = economy.CanAfford(bp.creditCost);
+                    const bool radarLocked = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq;
+                    DrawCameo(
+                        renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected && !noHq, radarLocked);
                     DrawCostTag(
                         renderer,
                         fontRenderer,
                         c,
-                        "$" + std::to_string(cost),
-                        economy.CanAfford(cost) ? col::Accent : col::Danger);
-                    if (progress >= 0.0f)
+                        "$" + std::to_string(bp.creditCost),
+                        canAfford ? col::Accent : col::Danger);
+                    std::string pw = (bp.powerCost >= 0 ? "+" : "") + std::to_string(bp.powerCost);
+                    fontRenderer.DrawString(
+                        pw,
+                        c.x + 6,
+                        c.y + 5,
+                        ui::FONT_SMALL_BOLD,
+                        bp.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255},
+                        true);
+                    if (hovered)
                     {
-                        DrawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
+                        hoverTitle
+                            = std::string(_(bp.name)) + "  $" + std::to_string(bp.creditCost) + ", " + pw + _(" kW");
+                        hoverText = _(bp.desc);
                     }
-                    if (queued > 0)
-                    {
-                        std::string badge = "\xC3\x97" + std::to_string(queued);
-                        renderer.FillRectScreen(
-                            c.x + 3,
-                            c.y + 3,
-                            fontRenderer.GetTextWidth(badge, ui::FONT_SMALL_BOLD) + 10,
-                            18,
-                            col::Accent);
-                        fontRenderer.DrawString(badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
-                    }
+                    break;
                 }
-                if (available)
+                case TabInfantry:
+                case TabVehicles:
                 {
-                    bool repeating = false;
-                    for (const Building *pb : producers)
-                        repeating = repeating || pb->repeatArchetype == def.archetype;
-                    const UiRect inf8 = InfinityBtn(c);
-                    DrawInfinity(renderer, inf8, repeating, inf8.Contains(mx, my));
-                }
-                if (hovered)
-                {
-                    hoverTitle = name + "  $" + std::to_string(cost);
-                    if (!unlocked)
+                    bool inf = (m_activeTab == TabInfantry);
+                    const UnitCameoDef &def = unitCatalog(inf).items[i];
+                    const auto &producers = inf ? barracksTargets : factoryTargets;
+                    const bool unlocked = IsUnitUnlocked(Players::Local(), def.archetype);
+                    bool available = (inf ? hasBarracks : hasFactory) && unlocked;
+                    int cost = UnitCost(def, entities);
+                    std::string name = _(UnitName(def, entities));
+                    DrawCameo(renderer, fontRenderer, c, def.compId, name, hovered, false, !available);
+
+                    int queued = 0;
+                    float progress = -1.0f; // most advanced order of this unit currently in training
+                    for (const Building *b : producers)
                     {
-                        hoverText = std::string(_("[RESEARCH REQUIRED] "))
-                                    + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), def.archetype))
-                                            .name);
+                        for (const auto &q : b->productionQueue)
+                        {
+                            if (q.archetype == def.archetype)
+                                ++queued;
+                        }
+                        if (!b->productionQueue.empty() && b->productionQueue.front().archetype == def.archetype)
+                        {
+                            progress = std::max(progress, b->CurrentProductionProgress());
+                        }
                     }
-                    else if (!available)
+                    if (!available)
                     {
-                        hoverText = inf ? _("[BARRACKS REQUIRED] Construct Barracks to recruit ") + name
-                                        : _("[FACTORY REQUIRED] Construct Factory to build ") + name;
+                        DrawLockBadge(renderer, fontRenderer, c);
                     }
                     else
                     {
-                        hoverText = _(UnitDesc(def, entities));
+                        DrawCostTag(
+                            renderer,
+                            fontRenderer,
+                            c,
+                            "$" + std::to_string(cost),
+                            economy.CanAfford(cost) ? col::Accent : col::Danger);
+                        if (progress >= 0.0f)
+                        {
+                            DrawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
+                        }
                         if (queued > 0)
-                            hoverText += std::string("  ") + _("(RMB - cancel one)");
-                        hoverText += std::string("  ") + _("(Shift - 5, Ctrl - 10; the infinity button repeats it)");
+                        {
+                            std::string badge = "\xC3\x97" + std::to_string(queued);
+                            renderer.FillRectScreen(
+                                c.x + 3,
+                                c.y + 3,
+                                fontRenderer.GetTextWidth(badge, ui::FONT_SMALL_BOLD) + 10,
+                                18,
+                                col::Accent);
+                            fontRenderer.DrawString(
+                                badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
+                        }
                     }
-                }
-                break;
-            }
-            case TabOrders:
-            {
-                const auto &o = kOrders[i];
-                bool active = (i == 0 && m_attackMoveMode);
-                if (i >= kFirstStanceOrder)
-                {
-                    // Lit when every selected own unit has this stance
-                    const auto wanted = static_cast<UnitStance>(i - kFirstStanceOrder);
-                    bool any = false, all = true;
-                    for (const auto &e : entities.GetAllEntities())
+                    if (available)
                     {
-                        const Unit *u = e.AsUnit();
-                        if (!u || !u->alive || !u->selected || u->owner != Players::Local())
-                            continue;
-                        any = true;
-                        all = all && u->stance == wanted;
+                        bool repeating = false;
+                        for (const Building *pb : producers)
+                            repeating = repeating || pb->repeatArchetype == def.archetype;
+                        const UiRect inf8 = InfinityBtn(c);
+                        DrawInfinity(renderer, inf8, repeating, inf8.Contains(mx, my));
                     }
-                    active = any && all;
+                    if (hovered)
+                    {
+                        hoverTitle = name + "  $" + std::to_string(cost);
+                        if (!unlocked)
+                        {
+                            hoverText
+                                = std::string(_("[RESEARCH REQUIRED] "))
+                                  + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), def.archetype))
+                                          .name);
+                        }
+                        else if (!available)
+                        {
+                            hoverText = inf ? _("[BARRACKS REQUIRED] Construct Barracks to recruit ") + name
+                                            : _("[FACTORY REQUIRED] Construct Factory to build ") + name;
+                        }
+                        else
+                        {
+                            hoverText = _(UnitDesc(def, entities));
+                            if (queued > 0)
+                                hoverText += std::string("  ") + _("(RMB - cancel one)");
+                            hoverText
+                                += std::string("  ") + _("(Shift - 5, Ctrl - 10; the infinity button repeats it)");
+                        }
+                    }
+                    break;
                 }
-                renderer.FillRectScreen(
-                    c.x,
-                    c.y,
-                    c.w,
-                    c.h,
-                    active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
-                renderer.DrawRectScreen(
-                    c.x, c.y, c.w, c.h, active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
-                fontRenderer.DrawString(
-                    ui::FitText(fontRenderer, _(o.name), ui::FONT_BODY_BOLD, c.w - 16),
-                    c.CenterX(),
-                    c.CenterY() + 6,
-                    ui::FONT_BODY_BOLD,
-                    active ? col::Accent : col::Text,
-                    false,
-                    Anchor::HCENTER | Anchor::VCENTER);
-                if (o.key[0] != '\0')
+                case TabOrders:
                 {
-                    UiRect chip {c.x + 6, c.y + 6, 22, 22};
-                    renderer.FillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelSunken);
-                    renderer.DrawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
+                    const auto &o = kOrders[i];
+                    bool active = (i == 0 && m_attackMoveMode);
+                    if (i >= kFirstStanceOrder)
+                    {
+                        // Lit when every selected own unit has this stance
+                        const auto wanted = static_cast<UnitStance>(i - kFirstStanceOrder);
+                        bool any = false, all = true;
+                        for (const auto &e : entities.GetAllEntities())
+                        {
+                            const Unit *u = e.AsUnit();
+                            if (!u || !u->alive || !u->selected || u->owner != Players::Local())
+                                continue;
+                            any = true;
+                            all = all && u->stance == wanted;
+                        }
+                        active = any && all;
+                    }
+                    renderer.FillRectScreen(
+                        c.x,
+                        c.y,
+                        c.w,
+                        c.h,
+                        active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
+                    renderer.DrawRectScreen(
+                        c.x, c.y, c.w, c.h, active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
                     fontRenderer.DrawString(
-                        o.key,
-                        chip.CenterX(),
-                        chip.CenterY(),
+                        ui::FitText(fontRenderer, _(o.name), ui::FONT_BODY_BOLD, c.w - 16),
+                        c.CenterX(),
+                        c.CenterY() + 6,
+                        ui::FONT_BODY_BOLD,
+                        active ? col::Accent : col::Text,
+                        false,
+                        Anchor::HCENTER | Anchor::VCENTER);
+                    if (o.key[0] != '\0')
+                    {
+                        UiRect chip {c.x + 6, c.y + 6, 22, 22};
+                        renderer.FillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelSunken);
+                        renderer.DrawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
+                        fontRenderer.DrawString(
+                            o.key,
+                            chip.CenterX(),
+                            chip.CenterY(),
+                            ui::FONT_SMALL_BOLD,
+                            col::Accent,
+                            false,
+                            Anchor::HCENTER | Anchor::VCENTER);
+                    }
+                    if (hovered)
+                    {
+                        hoverTitle = _(o.name);
+                        if (o.key[0] != '\0')
+                            hoverTitle += std::string("  [") + o.key + "]";
+                        hoverText = _(o.desc);
+                    }
+                    break;
+                }
+            }
+        }
+        renderer.ResetClipRect();
+
+        // Scroll position hint on the right edge of the grid
+        if (maxScroll > 0)
+        {
+            int trackX = l.panel.Right() - 5;
+            renderer.FillRectScreen(trackX, l.grid.y, 2, l.grid.h, col::PanelRaised);
+            int rows = maxScroll + l.VisibleRows();
+            int thumbH = std::max(16, l.grid.h * l.VisibleRows() / rows);
+            int thumbY = l.grid.y + (l.grid.h - thumbH) * scroll / maxScroll;
+            renderer.FillRectScreen(trackX, thumbY, 2, thumbH, col::Accent);
+        }
+
+        // --- Info box -------------------------------------------------------------------------------------
+        {
+            const UiRect &ib = l.info;
+            ui::DrawPanel(renderer, ib, col::PanelSunken, col::Border);
+            int textW = ib.w - 20;
+
+            if (!m_hudNotification.empty())
+            {
+                renderer.FillRectScreen(ib.x, ib.y, 3, ib.h, col::Accent);
+                fontRenderer.DrawTextWrapped(
+                    m_hudNotification, ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL_BOLD, col::Accent, false);
+            }
+            else if (!hoverTitle.empty())
+            {
+                fontRenderer.DrawString(
+                    ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textW),
+                    ib.x + 10,
+                    ib.y + 7,
+                    ui::FONT_SMALL_BOLD,
+                    col::Text,
+                    false);
+                fontRenderer.DrawTextWrapped(
+                    hoverText, ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
+            }
+            else if (
+                m_buildMode && m_selectedBlueprint >= 0
+                && m_selectedBlueprint < static_cast<int>(EntityManager::GetBlueprints().size()))
+            {
+                fontRenderer.DrawString(
+                    _(EntityManager::GetBlueprints()[m_selectedBlueprint].name),
+                    ib.x + 10,
+                    ib.y + 7,
+                    ui::FONT_SMALL_BOLD,
+                    col::Accent,
+                    false);
+                fontRenderer.DrawTextWrapped(
+                    _("LMB - build, RMB / Esc - cancel"),
+                    ib.x + 10,
+                    ib.y + 26,
+                    textW,
+                    ui::FONT_SMALL,
+                    col::TextDim,
+                    false);
+            }
+            else if (
+                const Building *busy = [&]() -> const Building * {
+                    const auto &list = (m_activeTab == TabVehicles) ? factoryTargets : barracksTargets;
+                    for (const Building *b : list)
+                    {
+                        if (!b->productionQueue.empty())
+                            return b;
+                    }
+                    return nullptr;
+                }();
+                busy && (m_activeTab == TabInfantry || m_activeTab == TabVehicles))
+            {
+                const auto &item = busy->productionQueue.front();
+                std::string what = _("Production");
+                if (const auto *cfg = entities.GetUnitConfig(item.archetype))
+                    what = _(cfg->name);
+                float prog = busy->CurrentProductionProgress();
+                std::string line = what + "  " + std::to_string(static_cast<int>(prog * 100.0f)) + "%";
+                if (busy->productionQueue.size() > 1)
+                {
+                    line += "   " + std::string(_("queue")) + ": " + std::to_string(busy->productionQueue.size() - 1);
+                }
+                fontRenderer.DrawString(
+                    ui::FitText(fontRenderer, line, ui::FONT_SMALL_BOLD, textW),
+                    ib.x + 10,
+                    ib.y + 7,
+                    ui::FONT_SMALL_BOLD,
+                    col::Text,
+                    false);
+                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 30, textW, 8}, prog, col::Accent);
+            }
+            else if (const auto own = OwnSelectedBuildings(entities, selected); !own.empty())
+            {
+                const Building *b = own.front();
+                std::string title = _("Structure");
+                if (const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType))
+                    title = _(cfg->name);
+                if (own.size() > 1)
+                    title += "  x" + std::to_string(own.size());
+                fontRenderer.DrawString(
+                    ui::FitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textW),
+                    ib.x + 10,
+                    ib.y + 7,
+                    ui::FONT_SMALL_BOLD,
+                    col::Text,
+                    false);
+                const float hp = b->maxHp > 0 ? static_cast<float>(b->currentHp) / b->maxHp : 1.0f;
+                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 28, textW, 6}, hp, hp > 0.35f ? col::Ok : col::Danger);
+                fontRenderer.DrawString(
+                    std::to_string(b->currentHp) + " / " + std::to_string(b->maxHp),
+                    ib.x + 10,
+                    ib.y + 40,
+                    ui::FONT_SMALL,
+                    col::TextDim,
+                    false);
+            }
+            else
+            {
+                static const char *const kTabHints[TabCount] = {
+                    "Select building to construct",
+                    "Recruit infantry at the selected or primary Barracks (RMB - cancel)",
+                    "Build vehicles at the selected or primary Factory (RMB - cancel)",
+                    "Select units and issue a command",
+                };
+                fontRenderer.DrawTextWrapped(
+                    _(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
+            }
+
+            if (const auto ownSel = OwnSelectedBuildings(entities, selected); !ownSel.empty())
+            {
+                bool anyDamaged = false, allRepairing = true;
+                for (const Building *b : ownSel)
+                {
+                    if (b->CanBeRepaired())
+                    {
+                        anyDamaged = true;
+                        allRepairing = allRepairing && b->repairing;
+                    }
+                }
+                if (anyDamaged)
+                {
+                    const UiRect rb = RepairBtn(ib);
+                    const bool on = allRepairing;
+                    const bool hotR = rb.Contains(mx, my);
+                    renderer.FillRectScreen(
+                        rb.x,
+                        rb.y,
+                        rb.w,
+                        rb.h,
+                        on ? SDL_Color {60, 44, 20, 255} : (hotR ? col::Hover : col::PanelRaised));
+                    renderer.DrawRectScreen(rb.x, rb.y, rb.w, rb.h, on ? col::Accent : col::BorderStrong);
+                    fontRenderer.DrawString(
+                        on ? _("REPAIRING") : _("REPAIR [R]"),
+                        rb.CenterX(),
+                        rb.CenterY(),
                         ui::FONT_SMALL_BOLD,
-                        col::Accent,
+                        on ? col::Accent : col::Text,
                         false,
                         Anchor::HCENTER | Anchor::VCENTER);
                 }
-                if (hovered)
-                {
-                    hoverTitle = _(o.name);
-                    if (o.key[0] != '\0')
-                        hoverTitle += std::string("  [") + o.key + "]";
-                    hoverText = _(o.desc);
-                }
-                break;
             }
-        }
-    }
-    renderer.ResetClipRect();
-
-    // Scroll position hint on the right edge of the grid
-    if (maxScroll > 0)
-    {
-        int trackX = l.panel.Right() - 5;
-        renderer.FillRectScreen(trackX, l.grid.y, 2, l.grid.h, col::PanelRaised);
-        int rows = maxScroll + l.VisibleRows();
-        int thumbH = std::max(16, l.grid.h * l.VisibleRows() / rows);
-        int thumbY = l.grid.y + (l.grid.h - thumbH) * scroll / maxScroll;
-        renderer.FillRectScreen(trackX, thumbY, 2, thumbH, col::Accent);
-    }
-
-    // --- Info box -------------------------------------------------------------------------------------
-    {
-        const UiRect &ib = l.info;
-        ui::DrawPanel(renderer, ib, col::PanelSunken, col::Border);
-        int textW = ib.w - 20;
-
-        if (!m_hudNotification.empty())
-        {
-            renderer.FillRectScreen(ib.x, ib.y, 3, ib.h, col::Accent);
-            fontRenderer.DrawTextWrapped(
-                m_hudNotification, ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL_BOLD, col::Accent, false);
-        }
-        else if (!hoverTitle.empty())
-        {
-            fontRenderer.DrawString(
-                ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textW),
-                ib.x + 10,
-                ib.y + 7,
-                ui::FONT_SMALL_BOLD,
-                col::Text,
-                false);
-            fontRenderer.DrawTextWrapped(hoverText, ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
-        }
-        else if (
-            m_buildMode && m_selectedBlueprint >= 0
-            && m_selectedBlueprint < static_cast<int>(EntityManager::GetBlueprints().size()))
-        {
-            fontRenderer.DrawString(
-                _(EntityManager::GetBlueprints()[m_selectedBlueprint].name),
-                ib.x + 10,
-                ib.y + 7,
-                ui::FONT_SMALL_BOLD,
-                col::Accent,
-                false);
-            fontRenderer.DrawTextWrapped(
-                _("LMB - build, RMB / Esc - cancel"), ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
-        }
-        else if (
-            const Building *busy = [&]() -> const Building * {
-                const auto &list = (m_activeTab == TabVehicles) ? factoryTargets : barracksTargets;
-                for (const Building *b : list)
-                {
-                    if (!b->productionQueue.empty())
-                        return b;
-                }
-                return nullptr;
-            }();
-            busy && (m_activeTab == TabInfantry || m_activeTab == TabVehicles))
-        {
-            const auto &item = busy->productionQueue.front();
-            std::string what = _("Production");
-            if (const auto *cfg = entities.GetUnitConfig(item.archetype))
-                what = _(cfg->name);
-            float prog = busy->CurrentProductionProgress();
-            std::string line = what + "  " + std::to_string(static_cast<int>(prog * 100.0f)) + "%";
-            if (busy->productionQueue.size() > 1)
+            if (!OwnSelectedBuildings(entities, selected).empty())
             {
-                line += "   " + std::string(_("queue")) + ": " + std::to_string(busy->productionQueue.size() - 1);
-            }
-            fontRenderer.DrawString(
-                ui::FitText(fontRenderer, line, ui::FONT_SMALL_BOLD, textW),
-                ib.x + 10,
-                ib.y + 7,
-                ui::FONT_SMALL_BOLD,
-                col::Text,
-                false);
-            ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 30, textW, 8}, prog, col::Accent);
-        }
-        else if (const auto own = OwnSelectedBuildings(entities, selected); !own.empty())
-        {
-            const Building *b = own.front();
-            std::string title = _("Structure");
-            if (const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType))
-                title = _(cfg->name);
-            if (own.size() > 1)
-                title += "  x" + std::to_string(own.size());
-            fontRenderer.DrawString(
-                ui::FitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textW),
-                ib.x + 10,
-                ib.y + 7,
-                ui::FONT_SMALL_BOLD,
-                col::Text,
-                false);
-            const float hp = b->maxHp > 0 ? static_cast<float>(b->currentHp) / b->maxHp : 1.0f;
-            ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 28, textW, 6}, hp, hp > 0.35f ? col::Ok : col::Danger);
-            fontRenderer.DrawString(
-                std::to_string(b->currentHp) + " / " + std::to_string(b->maxHp),
-                ib.x + 10,
-                ib.y + 40,
-                ui::FONT_SMALL,
-                col::TextDim,
-                false);
-        }
-        else
-        {
-            static const char *const kTabHints[TabCount] = {
-                "Select building to construct",
-                "Recruit infantry at the selected or primary Barracks (RMB - cancel)",
-                "Build vehicles at the selected or primary Factory (RMB - cancel)",
-                "Select units and issue a command",
-            };
-            fontRenderer.DrawTextWrapped(
-                _(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
-        }
-
-        if (const auto ownSel = OwnSelectedBuildings(entities, selected); !ownSel.empty())
-        {
-            bool anyDamaged = false, allRepairing = true;
-            for (const Building *b : ownSel)
-            {
-                if (b->CanBeRepaired())
-                {
-                    anyDamaged = true;
-                    allRepairing = allRepairing && b->repairing;
-                }
-            }
-            if (anyDamaged)
-            {
-                const UiRect rb = RepairBtn(ib);
-                const bool on = allRepairing;
-                const bool hotR = rb.Contains(mx, my);
+                const UiRect db = DestroyBtn(ib);
+                const bool armed = m_destroyArmed > 0.0f;
+                const bool hot = db.Contains(mx, my);
                 renderer.FillRectScreen(
-                    rb.x, rb.y, rb.w, rb.h, on ? SDL_Color {60, 44, 20, 255} : (hotR ? col::Hover : col::PanelRaised));
-                renderer.DrawRectScreen(rb.x, rb.y, rb.w, rb.h, on ? col::Accent : col::BorderStrong);
+                    db.x,
+                    db.y,
+                    db.w,
+                    db.h,
+                    armed ? col::Danger : (hot ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
+                renderer.DrawRectScreen(db.x, db.y, db.w, db.h, col::Danger);
                 fontRenderer.DrawString(
-                    on ? _("REPAIRING") : _("REPAIR [R]"),
-                    rb.CenterX(),
-                    rb.CenterY(),
+                    armed ? _("CONFIRM?") : _("DESTROY"),
+                    db.CenterX(),
+                    db.CenterY(),
                     ui::FONT_SMALL_BOLD,
-                    on ? col::Accent : col::Text,
+                    armed ? col::Text : col::Danger,
                     false,
                     Anchor::HCENTER | Anchor::VCENTER);
             }
         }
-        if (!OwnSelectedBuildings(entities, selected).empty())
-        {
-            const UiRect db = DestroyBtn(ib);
-            const bool armed = m_destroyArmed > 0.0f;
-            const bool hot = db.Contains(mx, my);
-            renderer.FillRectScreen(
-                db.x,
-                db.y,
-                db.w,
-                db.h,
-                armed ? col::Danger : (hot ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
-            renderer.DrawRectScreen(db.x, db.y, db.w, db.h, col::Danger);
-            fontRenderer.DrawString(
-                armed ? _("CONFIRM?") : _("DESTROY"),
-                db.CenterX(),
-                db.CenterY(),
-                ui::FONT_SMALL_BOLD,
-                armed ? col::Text : col::Danger,
-                false,
-                Anchor::HCENTER | Anchor::VCENTER);
-        }
-    }
     }
 }
 

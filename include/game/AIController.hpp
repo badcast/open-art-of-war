@@ -111,7 +111,7 @@ struct AIDefenseSite
     int tileX {0};
     int tileY {0};
     bool done {false};
-    int attempts {0}; // build steps the spot was taken by units (they move on; terrain and buildings do not)
+    int attempts {0};   // build steps the spot was taken by units (they move on; terrain and buildings do not)
     bool exact {false}; // the spot was chosen with every check already: built right there or not at all
 };
 
@@ -126,16 +126,16 @@ struct AIBaseStyle
         Fan      // they spread to the sides, a little apart
     };
     Layout layout {Compact};
-    float turnDeg {0.0f};      // the barracks / factory sides turn by this much around the HQ
-    bool mirror {false};       // barracks and factory swap sides
-    bool labEarly {false};     // the laboratory comes before the factory
+    float turnDeg {0.0f};       // the barracks / factory sides turn by this much around the HQ
+    bool mirror {false};        // barracks and factory swap sides
+    bool labEarly {false};      // the laboratory comes before the factory
     bool barracksFirst {false}; // a second barracks before the first factory
-    int sparePower {40};       // power kept spare before another consumer
-    int wallThickness {2};     // rows of a wall across a passage
-    int gateWidth {3};         // tiles left open in it for the road
-    int lineOffset {0};        // the wall line this many tiles farther out than the nearest place allowed
-    bool towersOnly {false};   // hardly any walls: the money goes into towers and bunkers
-    bool bunkerHeavy {false};  // more bunkers than towers
+    int sparePower {40};        // power kept spare before another consumer
+    int wallThickness {2};      // rows of a wall across a passage
+    int gateWidth {3};          // tiles left open in it for the road
+    int lineOffset {0};         // the wall line this many tiles farther out than the nearest place allowed
+    bool towersOnly {false};    // hardly any walls: the money goes into towers and bunkers
+    bool bunkerHeavy {false};   // more bunkers than towers
     std::string Describe() const;
 };
 
@@ -371,12 +371,16 @@ private:
         int minRing,
         const TileMap &map,
         const EntityManager &entities,
-        int crowding = 0,        // 0: a gap around it, 1: side by side, 2: also on the band along a road
+        int crowding = 0, // 0: a gap around it, 1: side by side, 2: also on the band along a road
         bool needsExit = false) const;
     // Walls across the narrowest passage on each road to an enemy, gates on the road, towers behind them; true
     // when at least one passage was closed (else the caller falls back to an arc in front of the base)
     bool PlanPassageWalls(
-        int cx, int cy, int hqRadius, const TileMap &map, const EntityManager &entities,
+        int cx,
+        int cy,
+        int hqRadius,
+        const TileMap &map,
+        const EntityManager &entities,
         std::vector<std::pair<int, int>> &wallTiles);
     // Hard / Hardcore: repairs buildings that are not under fire, paid from the AI treasury
     void UpdateRepairs(float deltaTime, EntityManager &entities);
@@ -446,7 +450,7 @@ private:
     std::vector<int> m_vehicleQueue;
     float m_waveCooldown {0.0f};
     float m_waveAssemblyTimer {0.0f};
-    bool m_factoryReady {false};     // a finished factory was seen (the wave plan is made again once, with vehicles)
+    bool m_factoryReady {false};       // a finished factory was seen (the wave plan is made again once, with vehicles)
     float m_vehicleHoldSeconds {0.0f}; // how long the barracks have been saving credits for the next vehicle
     int m_readyUnits {0};
     bool m_hasProduction {true};
@@ -488,8 +492,8 @@ private:
     std::vector<uint8_t> m_road;      // 2: a road between two headquarters, 1: the band along it, 0: free
     std::vector<uint8_t> m_ownGround; // 1: nearer to this player's headquarters than to any ally's
     std::vector<std::vector<std::pair<int, int>>> m_enemyRoads; // from this HQ to every enemy headquarters
-    int m_homeX {-1}, m_homeY {-1}; // centre of the own (first) headquarters
-    float m_baseQuietSeconds {0.0f}; // since a structure of the base was last attacked
+    int m_homeX {-1}, m_homeY {-1};                             // centre of the own (first) headquarters
+    float m_baseQuietSeconds {0.0f};                            // since a structure of the base was last attacked
 
     // Skirmish base builder
     bool m_skirmish {false};
@@ -526,7 +530,7 @@ private:
     // Waves that broke nothing: Hard / Hardcore send more groups and more troops after them (as far as the treasury
     // allows), one that destroys a structure resets it
     int m_failedWaves {0};
-    int m_trackedWave {0};           // the wave being watched (0: none)
+    int m_trackedWave {0};            // the wave being watched (0: none)
     int m_trackedBuildingsKilled {0}; // enemy structures destroyed before it left
     bool Escalates() const;
     int EscalationTroops() const;

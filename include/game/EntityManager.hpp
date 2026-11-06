@@ -428,9 +428,9 @@ struct BuildingConfig
     int height {3};
     int maxHp {1200};
     int sightRadius {6};
-    int burstCount {1};          // shots of one volley (a Missile Turret fires 2 rockets)
-    float burstDelay {0.1f};     // seconds between them
-    float bulletSpeed {0.0f};    // combat.bullet_speed, px/s of rockets and shells (0: the projectile kind's own)
+    int burstCount {1};       // shots of one volley (a Missile Turret fires 2 rockets)
+    float burstDelay {0.1f};  // seconds between them
+    float bulletSpeed {0.0f}; // combat.bullet_speed, px/s of rockets and shells (0: the projectile kind's own)
     int radarRange {0}; // stats.radar_range: tiles the finished building sees beyond its sight radius (Radar Locator)
     int creditCost {400};
     int powerCost {0}; // >0 produces, <0 consumes
@@ -558,7 +558,8 @@ public:
     // Keeps Unit::turretShiftX/Y in line with the turret layer of the unit's current hull sprite
     void UpdateTurretShift(Unit &u) const;
     static void TurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY);
-    static inline void GetDeterministicTurretShift(int archetypeId, int facingDirection, float &outShiftX, float &outShiftY)
+    static inline void GetDeterministicTurretShift(
+        int archetypeId, int facingDirection, float &outShiftX, float &outShiftY)
     {
         TurretShift(archetypeId, facingDirection, outShiftX, outShiftY);
     }
@@ -605,9 +606,9 @@ public:
         enum class Kind : uint8_t
         {
             Explosion,
-            FlameStart, // where a flamethrower's jet leaves the gun
-            FlameEnd,   // where it lands
-            Projectile, // a rocket or a shell in flight
+            FlameStart,  // where a flamethrower's jet leaves the gun
+            FlameEnd,    // where it lands
+            Projectile,  // a rocket or a shell in flight
             MuzzleFlash, // a shot leaving the gun (`age` in seconds)
             Building
         };
@@ -823,7 +824,7 @@ private:
     // Puts a living entity into its death (state, death animation, explosions, frees a building's tiles)
     void KillEntity(Entity &e, TileMap &map);
     std::array<int, 2> m_factionBuildRadius {16, 16};   // build_radius of each faction's headquarters, before research
-    std::array<bool, kMaxPlayers> m_eliminated {};       // players who have lost every building (UpdateElimination)
+    std::array<bool, kMaxPlayers> m_eliminated {};      // players who have lost every building (UpdateElimination)
     std::array<int, kMaxPlayers> m_buildRadiusExtra {}; // tiles each player's technologies add
     bool m_flamethrowerUnlocked[kMaxPlayers] {};
     mutable std::unordered_set<uint64_t>

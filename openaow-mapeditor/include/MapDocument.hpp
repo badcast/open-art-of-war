@@ -7,106 +7,193 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
-namespace OpenArtOfWar {
+namespace OpenArtOfWar
+{
 
 class TextureManager;
 
-struct EditorEntity {
-    int id{0};
-    int type{0};            // Building type (0..16) or Unit archetype (0..18)
-    bool isBuilding{false};
-    bool selected{false};
-    Faction faction{Faction::Resistance};
-    int tileX{0};
-    int tileY{0};
-    int buildWidth{1};
-    int buildHeight{1};
-    int facing{0};          // 0..7
+struct EditorEntity
+{
+    int id {0};
+    int type {0}; // Building type (0..16) or Unit archetype (0..18)
+    bool isBuilding {false};
+    bool selected {false};
+    Faction faction {Faction::Resistance};
+    int tileX {0};
+    int tileY {0};
+    int buildWidth {1};
+    int buildHeight {1};
+    int facing {0}; // 0..7
     std::string name;
     nlohmann::json mapData = nlohmann::json::object();
 };
 
-struct MapSnapshot {
-    int width{0};
-    int height{0};
-    int tilesetId{0};
+struct MapSnapshot
+{
+    int width {0};
+    int height {0};
+    int tilesetId {0};
     std::vector<uint8_t> baseTiles;
     std::vector<MapDecoration> decorations;
     std::vector<uint16_t> wallGrid;
     std::vector<int16_t> wallHp;
     std::vector<bool> passability;
     std::vector<EditorEntity> entities;
-    int playerStartX{0};
-    int playerStartY{0};
-    int enemyStartX{0};
-    int enemyStartY{0};
+    int playerStartX {0};
+    int playerStartY {0};
+    int enemyStartX {0};
+    int enemyStartY {0};
     std::vector<std::pair<int, int>> extraStarts;
 };
 
-class MapDocument {
+class MapDocument
+{
 public:
     MapDocument();
 
     void NewMap(int width, int height, int tilesetId, uint8_t fillTile = 0);
-    bool LoadMap(const std::string& path);
-    bool SaveMap(const std::string& path);
+    bool LoadMap(const std::string &path);
+    bool SaveMap(const std::string &path);
 
     // Decoration footprints come from the sprite data; without it every decoration covers one tile
-    void SetTextureManager(const TextureManager* textures) { m_textures = textures; }
+    void SetTextureManager(const TextureManager *textures)
+    {
+        m_textures = textures;
+    }
 
     // Getters
-    TileMap& GetTileMap() { return m_map; }
-    const TileMap& GetTileMap() const { return m_map; }
+    TileMap &GetTileMap()
+    {
+        return m_map;
+    }
+    const TileMap &GetTileMap() const
+    {
+        return m_map;
+    }
 
-    int GetWidth() const { return m_map.GetWidth(); }
-    int GetHeight() const { return m_map.GetHeight(); }
-    int GetTilesetId() const { return m_map.GetTilesetId(); }
-    const std::string& GetName() const { return m_name; }
-    void SetName(const std::string& name) { m_name = name; m_modified = true; }
+    int GetWidth() const
+    {
+        return m_map.GetWidth();
+    }
+    int GetHeight() const
+    {
+        return m_map.GetHeight();
+    }
+    int GetTilesetId() const
+    {
+        return m_map.GetTilesetId();
+    }
+    const std::string &GetName() const
+    {
+        return m_name;
+    }
+    void SetName(const std::string &name)
+    {
+        m_name = name;
+        m_modified = true;
+    }
     // In-game title of the map ("title" key of the map file), empty when it has none
-    std::string GetTitle() const { return m_mapData.is_object() ? m_mapData.value("title", std::string()) : std::string(); }
-    const std::string& GetFilePath() const { return m_filePath; }
-    bool IsModified() const { return m_modified; }
-    void SetModified(bool mod) { m_modified = mod; }
+    std::string GetTitle() const
+    {
+        return m_mapData.is_object() ? m_mapData.value("title", std::string()) : std::string();
+    }
+    const std::string &GetFilePath() const
+    {
+        return m_filePath;
+    }
+    bool IsModified() const
+    {
+        return m_modified;
+    }
+    void SetModified(bool mod)
+    {
+        m_modified = mod;
+    }
 
-    int GetPlayerStartX() const { return m_playerStartX; }
-    int GetPlayerStartY() const { return m_playerStartY; }
-    void setPlayerStart(int x, int y) { m_playerStartX = x; m_playerStartY = y; m_modified = true; }
+    int GetPlayerStartX() const
+    {
+        return m_playerStartX;
+    }
+    int GetPlayerStartY() const
+    {
+        return m_playerStartY;
+    }
+    void setPlayerStart(int x, int y)
+    {
+        m_playerStartX = x;
+        m_playerStartY = y;
+        m_modified = true;
+    }
 
-    int GetEnemyStartX() const { return m_enemyStartX; }
-    int GetEnemyStartY() const { return m_enemyStartY; }
-    void setEnemyStart(int x, int y) { m_enemyStartX = x; m_enemyStartY = y; m_modified = true; }
+    int GetEnemyStartX() const
+    {
+        return m_enemyStartX;
+    }
+    int GetEnemyStartY() const
+    {
+        return m_enemyStartY;
+    }
+    void setEnemyStart(int x, int y)
+    {
+        m_enemyStartX = x;
+        m_enemyStartY = y;
+        m_modified = true;
+    }
 
     // More start positions (players 3..8 of a network game): a click on a free tile adds one, a click on an existing
     // one takes it away. The map holds as many players as it has start positions (the two above plus these).
     static constexpr size_t kMaxExtraStarts = 6;
-    enum class StartToggle { Added, Removed, Full };
-    StartToggle ToggleExtraStart(int x, int y) {
-        for (size_t i = 0; i < m_extraStarts.size(); ++i) {
-            if (m_extraStarts[i].first == x && m_extraStarts[i].second == y) {
+    enum class StartToggle
+    {
+        Added,
+        Removed,
+        Full
+    };
+    StartToggle ToggleExtraStart(int x, int y)
+    {
+        for (size_t i = 0; i < m_extraStarts.size(); ++i)
+        {
+            if (m_extraStarts[i].first == x && m_extraStarts[i].second == y)
+            {
                 m_extraStarts.erase(m_extraStarts.begin() + static_cast<std::ptrdiff_t>(i));
                 m_modified = true;
                 return StartToggle::Removed;
             }
         }
-        if (m_extraStarts.size() >= kMaxExtraStarts) return StartToggle::Full;
+        if (m_extraStarts.size() >= kMaxExtraStarts)
+            return StartToggle::Full;
         m_extraStarts.push_back({x, y});
         m_modified = true;
         return StartToggle::Added;
     }
-    const std::vector<std::pair<int, int>>& GetExtraStarts() const { return m_extraStarts; }
+    const std::vector<std::pair<int, int>> &GetExtraStarts() const
+    {
+        return m_extraStarts;
+    }
 
     // Uniform Player Start Management (Players 1..8)
-    int GetPlayerCount() const { return 2 + static_cast<int>(m_extraStarts.size()); }
+    int GetPlayerCount() const
+    {
+        return 2 + static_cast<int>(m_extraStarts.size());
+    }
     std::pair<int, int> GetStartPos(int playerIndex) const;
     bool SetStartPos(int playerIndex, int x, int y);
     int FindStartPosAt(int x, int y) const;
     bool AddStartPos(int x, int y);
     bool RemoveStartPos(int playerIndex);
-    bool MoveStartPos(int playerIndex, int newX, int newY) { return SetStartPos(playerIndex, newX, newY); }
+    bool MoveStartPos(int playerIndex, int newX, int newY)
+    {
+        return SetStartPos(playerIndex, newX, newY);
+    }
 
-    const std::vector<EditorEntity>& GetEntities() const { return m_entities; }
-    std::vector<EditorEntity>& GetEntities() { return m_entities; }
+    const std::vector<EditorEntity> &GetEntities() const
+    {
+        return m_entities;
+    }
+    std::vector<EditorEntity> &GetEntities()
+    {
+        return m_entities;
+    }
 
     // Map Editing Tools
     void SetTile(int x, int y, uint8_t tile);
@@ -131,8 +218,8 @@ public:
     int CountSelectedUnits() const;
     int SetSelectedUnitFacing(int facing);
     void RemoveEntityAt(int x, int y);
-    const EditorEntity* GetEntityAt(int x, int y) const;
-    EditorEntity* GetEntityAt(int x, int y);
+    const EditorEntity *GetEntityAt(int x, int y) const;
+    EditorEntity *GetEntityAt(int x, int y);
 
     void SetPassable(int x, int y, bool passable);
     void TogglePassable(int x, int y);
@@ -142,8 +229,14 @@ public:
     void PushUndoSnapshot();
     bool Undo();
     bool Redo();
-    bool CanUndo() const { return !m_undoStack.empty(); }
-    bool CanRedo() const { return !m_redoStack.empty(); }
+    bool CanUndo() const
+    {
+        return !m_undoStack.empty();
+    }
+    bool CanRedo() const
+    {
+        return !m_redoStack.empty();
+    }
 
     void ClearAll();
 
@@ -152,22 +245,22 @@ private:
     std::pair<int, int> DecorationSize(int type) const;
     bool CoveredByDecoration(int x, int y) const;
     MapSnapshot CreateSnapshot() const;
-    void RestoreSnapshot(const MapSnapshot& snap);
+    void RestoreSnapshot(const MapSnapshot &snap);
 
-    const TextureManager* m_textures{nullptr};
+    const TextureManager *m_textures {nullptr};
     TileMap m_map;
-    std::string m_name{"untitled"};
-    std::string m_filePath{""};
-    nlohmann::json m_mapData{nlohmann::json::object()};
-    bool m_modified{false};
+    std::string m_name {"untitled"};
+    std::string m_filePath {""};
+    nlohmann::json m_mapData {nlohmann::json::object()};
+    bool m_modified {false};
 
-    int m_playerStartX{6};
-    int m_playerStartY{7};
-    int m_enemyStartX{44};
-    int m_enemyStartY{1};
+    int m_playerStartX {6};
+    int m_playerStartY {7};
+    int m_enemyStartX {44};
+    int m_enemyStartY {1};
     std::vector<std::pair<int, int>> m_extraStarts;
 
-    int m_nextEntityId{1};
+    int m_nextEntityId {1};
     std::vector<EditorEntity> m_entities;
 
     std::vector<MapSnapshot> m_undoStack;

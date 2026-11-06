@@ -698,7 +698,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         const int id = m_combo.open, row = id / 10, kind = id % 10;
         const bool isMapList = false;
         const bool valid = optionList || isMapList ? net.ControlsRoom()
-                                                           : (lobby && row < std::min<int>(lobby->spawnCount, kMaxPlayers));
+                                                   : (lobby && row < std::min<int>(lobby->spawnCount, kMaxPlayers));
         if (!valid)
         {
             m_combo.open = -1;
@@ -710,11 +710,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             if (ui::ComboUpdate(
                     m_combo,
                     comboField(id),
-                    isMapList          ? static_cast<int>(m_maps.size())
-                    : id == kTimeCombo ? static_cast<int>(ui::TimeOfDayChoices().size())
+                    isMapList             ? static_cast<int>(m_maps.size())
+                    : id == kTimeCombo    ? static_cast<int>(ui::TimeOfDayChoices().size())
                     : id == kCreditsCombo ? static_cast<int>(ui::CreditsChoices().size())
-                    : kind == 0        ? static_cast<int>(SeatOptions(net, *lobby, row).size())
-                                       : static_cast<int>(ComboChoices(kind).size()),
+                    : kind == 0           ? static_cast<int>(SeatOptions(net, *lobby, row).size())
+                                          : static_cast<int>(ComboChoices(kind).size()),
                     h,
                     mx,
                     my,
@@ -753,7 +753,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     {
                         Net::OwnerSetSeat seat;
                         seat.spawn = static_cast<uint8_t>(row);
-                        seat.kind = code == kSeatOpen ? Net::OwnerSetSeat::Open
+                        seat.kind = code == kSeatOpen      ? Net::OwnerSetSeat::Open
                                     : code == kSeatBlocked ? Net::OwnerSetSeat::Blocked
                                                            : Net::OwnerSetSeat::Ai;
                         seat.level = code >= kSeatAi && code < kSeatBlocked ? static_cast<uint8_t>(code - kSeatAi) : 1;
@@ -1027,7 +1027,12 @@ void NetworkMenu::Render(
             {
                 const UiRect c = l.Col(0, k);
                 font.DrawString(
-                    ui::FitText(font, names[k], ui::FONT_SMALL, c.w), c.x + 2, l.players.y + 2, ui::FONT_SMALL, col::TextMuted, false);
+                    ui::FitText(font, names[k], ui::FONT_SMALL, c.w),
+                    c.x + 2,
+                    l.players.y + 2,
+                    ui::FONT_SMALL,
+                    col::TextMuted,
+                    false);
             }
         }
         auto nameOf = [&](uint8_t slot) {
@@ -1051,7 +1056,10 @@ void NetworkMenu::Render(
                 const bool me = s && !s->ai && s->slot == net->LocalSlot();
                 const bool editable = s && (me || (s->ai && net->ControlsRoom()));
                 ui::DrawPanel(
-                    r, row, me ? col::Hover : (blocked ? col::PanelSunken : col::PanelRaised), me ? col::Accent : col::Border);
+                    r,
+                    row,
+                    me ? col::Hover : (blocked ? col::PanelSunken : col::PanelRaised),
+                    me ? col::Accent : col::Border);
                 font.DrawString(
                     std::to_string(i + 1),
                     row.x + 15,
@@ -1063,9 +1071,11 @@ void NetworkMenu::Render(
                 // The type of the place: a drop-down list when this viewer may change it
                 const UiRect tc = l.TypeCell(i);
                 const std::vector<SeatOption> options = SeatOptions(*net, *lobby, i);
-                const std::string typeText = s ? (s->ai ? std::string(_("AI")) + " - " + AiLevelName(s->aiLevel) : nameOf(s->slot))
-                                               : (blocked ? std::string(_("Blocked")) : std::string(_("Open")));
-                const SDL_Color typeColor = s ? (s->ai ? col::Info : col::Text) : (blocked ? col::Danger : col::TextDim);
+                const std::string typeText
+                    = s ? (s->ai ? std::string(_("AI")) + " - " + AiLevelName(s->aiLevel) : nameOf(s->slot))
+                        : (blocked ? std::string(_("Blocked")) : std::string(_("Open")));
+                const SDL_Color typeColor
+                    = s ? (s->ai ? col::Info : col::Text) : (blocked ? col::Danger : col::TextDim);
                 if (!options.empty())
                 {
                     ui::DrawComboField(
@@ -1094,11 +1104,22 @@ void NetworkMenu::Render(
                 auto cell = [&](const UiRect &c, const std::string &text) {
                     ui::DrawPanel(r, c, col::PanelSunken, col::Border);
                     font.DrawString(
-                        text, c.CenterX(), c.CenterY(), ui::FONT_SMALL, col::Text, false, Anchor::HCENTER | Anchor::VCENTER);
+                        text,
+                        c.CenterX(),
+                        c.CenterY(),
+                        ui::FONT_SMALL,
+                        col::Text,
+                        false,
+                        Anchor::HCENTER | Anchor::VCENTER);
                 };
                 auto combo = [&](const UiRect &c, int kind, const std::string &text) {
                     ui::DrawComboField(
-                        r, font, c, text, m_combo.open == i * 10 + kind, m_combo.open < 0 && c.Contains(m_mouseX, m_mouseY));
+                        r,
+                        font,
+                        c,
+                        text,
+                        m_combo.open == i * 10 + kind,
+                        m_combo.open < 0 && c.Contains(m_mouseX, m_mouseY));
                 };
                 Net::LobbyChoice choice = s->choice;
                 if (me)
@@ -1181,7 +1202,11 @@ void NetworkMenu::Render(
                     r,
                     font,
                     l.Filter(k),
-                    ui::FitText(font, items[std::clamp(idx, 0, static_cast<int>(items.size()) - 1)], ui::FONT_SMALL, l.Filter(k).w - 34),
+                    ui::FitText(
+                        font,
+                        items[std::clamp(idx, 0, static_cast<int>(items.size()) - 1)],
+                        ui::FONT_SMALL,
+                        l.Filter(k).w - 34),
                     m_combo.open == kFilterPlayers + k,
                     l.Filter(k).Contains(m_mouseX, m_mouseY));
             }
@@ -1196,7 +1221,12 @@ void NetworkMenu::Render(
                 const bool selected = lobby && m.path == lobby->map;
                 const bool unfit = MissionController::StartPositions(m.path).size() < inRoom;
                 const bool hot = net->ControlsRoom() && it.Contains(m_mouseX, m_mouseY);
-                r.FillRectScreen(it.x + 2, it.y, it.w - 4, it.h, selected ? col::Hover : (hot ? col::PanelRaised : col::PanelSunken));
+                r.FillRectScreen(
+                    it.x + 2,
+                    it.y,
+                    it.w - 4,
+                    it.h,
+                    selected ? col::Hover : (hot ? col::PanelRaised : col::PanelSunken));
                 if (selected)
                     r.FillRectScreen(it.x + 2, it.y, 3, it.h, col::Accent);
                 font.DrawString(
@@ -1421,15 +1451,25 @@ void NetworkMenu::Render(
             {
                 const std::vector<int> counts = ui::MapFilter::PlayerCounts(m_maps);
                 const auto cur = std::find(counts.begin(), counts.end(), m_mapFilter.players);
-                const int current = id == kFilterPlayers ? (cur == counts.end() ? 0 : static_cast<int>(cur - counts.begin()))
-                                    : id == kFilterSize  ? m_mapFilter.size
-                                                         : m_mapFilter.sort;
+                const int current = id == kFilterPlayers
+                                        ? (cur == counts.end() ? 0 : static_cast<int>(cur - counts.begin()))
+                                    : id == kFilterSize ? m_mapFilter.size
+                                                        : m_mapFilter.sort;
                 ui::DrawComboList(
-                    r, font, l.Filter(id - kFilterPlayers), MapFilterChoices(id, m_maps), current, m_combo, h, m_mouseX, m_mouseY);
+                    r,
+                    font,
+                    l.Filter(id - kFilterPlayers),
+                    MapFilterChoices(id, m_maps),
+                    current,
+                    m_combo,
+                    h,
+                    m_mouseX,
+                    m_mouseY);
             }
             else if (id == kCreditsCombo)
             {
-                ui::DrawComboList(r, font, l.creditsBtn, ui::CreditsChoices(), m_credits, m_combo, h, m_mouseX, m_mouseY);
+                ui::DrawComboList(
+                    r, font, l.creditsBtn, ui::CreditsChoices(), m_credits, m_combo, h, m_mouseX, m_mouseY);
             }
             else if (id == kTimeCombo)
             {

@@ -103,7 +103,7 @@ void Reload()
 int Percent(ProjectileType type, TargetClass target)
 {
     static const bool loaded = (Reload(), true); // the file is read on first use
-    (void)loaded;
+    (void) loaded;
     return Storage()[static_cast<size_t>(type)][static_cast<size_t>(target)];
 }
 

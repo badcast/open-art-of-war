@@ -566,7 +566,7 @@ AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFacto
 
     int size = std::min(t.waveMaxSize, t.waveBaseSize + t.waveGrowth * (plan.waveNumber - 1));
     size = std::clamp(static_cast<int>(std::lround(size * m_debugConfig.waveSpawnMultiplier)), 1, 30);
-    size = std::max(size, kMinAttackWave); // the AI never sends a handful: at least ten troops march
+    size = std::max(size, kMinAttackWave);          // the AI never sends a handful: at least ten troops march
     size = std::min(30, size + EscalationTroops()); // waves that broke nothing: more troops (what the money allows)
 
     const int n = plan.waveNumber;
@@ -1058,8 +1058,10 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     }
 
     if (hasHq) // the income is the headquarters': every finished one, up to three
-        m_credits += m_creditsPerSec
-                     * std::min(Economy::kMaxIncomeHeadquarters, entities.CountBuildingType(UnitType::Headquarters, m_player, true));
+        m_credits
+            += m_creditsPerSec
+               * std::min(
+                   Economy::kMaxIncomeHeadquarters, entities.CountBuildingType(UnitType::Headquarters, m_player, true));
 
     // Units lost while assembling are replaced so the wave can still reach 100% strength
     int planned = static_cast<int>(m_currentPlan.archetypes.size());
@@ -1127,7 +1129,8 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             ThinkOnce(
                 "locked" + std::to_string(arch),
                 "WAVE",
-                std::string(lockedCfg ? lockedCfg->name : "A unit") + " is not researched yet: training another instead");
+                std::string(lockedCfg ? lockedCfg->name : "A unit")
+                    + " is not researched yet: training another instead");
             queue.front() = arch = instead;
         }
         int cost = costOf(arch);
@@ -1949,8 +1952,9 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
     const float threatAngle = DetMath::Atan2(tdy, tdx);
     // The line of defense: as far out as the building zone allows (a wall near the HQ would close the base in)
     const float maxD = static_cast<float>(entities.GetBuildRadius(m_player)) - 0.5f;
-    const float wallRadius
-        = std::max(static_cast<float>(hqRadius + 4), std::min(static_cast<float>(hqRadius + 10 + m_style.lineOffset), maxD - 1.0f));
+    const float wallRadius = std::max(
+        static_cast<float>(hqRadius + 4),
+        std::min(static_cast<float>(hqRadius + 10 + m_style.lineOffset), maxD - 1.0f));
     auto ringTile = [&](float radius, float angleOffsetDeg, int &x, int &y) {
         const float a = threatAngle + angleOffsetDeg * static_cast<float>(M_PI) / 180.0f;
         x = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * radius)), 1, map.GetWidth() - 2);
@@ -1990,7 +1994,8 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         }
         if (m_gateX[0] < 0)
             ringTile(wallRadius, 0.0f, m_gateX[0], m_gateY[0]);
-        const float gateAngle = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
+        const float gateAngle
+            = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
         auto angleDiff = [](float a, float b) {
             return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
         };
@@ -2000,8 +2005,10 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         for (float side : {firstSide, -firstSide})
         {
             const float a = gateAngle + side * rad30;
-            const int gx = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
-            const int gy = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
+            const int gx
+                = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
+            const int gy
+                = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
             if (map.IsPassable(gx, gy))
             {
                 m_gateX[1] = gx;
@@ -2031,7 +2038,8 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
                 }
                 // A road to an ally or the band of one stays open (an extra opening), so does an ally's ground;
                 // nothing walks over rock or water anyway
-                if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy) || map.GetWall(wx, wy) > 0)
+                if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy)
+                    || map.GetWall(wx, wy) > 0)
                     continue;
                 wallTiles.emplace_back(wx, wy);
                 wallRow.push_back(row);
@@ -2159,8 +2167,10 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
                 continue;
             for (size_t j = 0; j < wallTiles.size() && !kept[i]; ++j)
                 kept[i] = wallRow[j] == 0 && kept[j]
-                          && std::max(std::abs(wallTiles[i].first - wallTiles[j].first),
-                                      std::abs(wallTiles[i].second - wallTiles[j].second)) <= 1;
+                          && std::max(
+                                 std::abs(wallTiles[i].first - wallTiles[j].first),
+                                 std::abs(wallTiles[i].second - wallTiles[j].second))
+                                 <= 1;
         }
         for (size_t i = 0; i < wallTiles.size(); ++i)
         {
@@ -2221,9 +2231,15 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     const BuildingConfig *cfg = entities.GetBuildingConfig(index);
     const int w = cfg ? cfg->width : 2;
     const int h = cfg ? cfg->height : 2;
-    static const char *const kKindNames[] = {
-        "tower", "bunker", "wall", "laboratory (behind the HQ)", "power plant (behind the HQ)", "barracks", "factory",
-        "headquarters"};
+    static const char *const kKindNames[]
+        = {"tower",
+           "bunker",
+           "wall",
+           "laboratory (behind the HQ)",
+           "power plant (behind the HQ)",
+           "barracks",
+           "factory",
+           "headquarters"};
     // Foresight: a building that takes power goes up only when the finished plants carry it as well; else it waits
     // and the next step raises a power plant (a base in the dark trains, researches and shoots nothing)
     const int power = entities.BuildingPower(index);
@@ -2602,7 +2618,8 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
     // The base is ready for another headquarters (more income): everything works, the defense stands, there is
     // money to spare and the base has had peace for a minute
     auto baseReady = [&]() {
-        if (!full || hqCount >= Economy::kMaxIncomeHeadquarters || barracksDone == 0 || factoryDone == 0 || labDone == 0)
+        if (!full || hqCount >= Economy::kMaxIncomeHeadquarters || barracksDone == 0 || factoryDone == 0
+            || labDone == 0)
             return false;
         if (produced < consumed + sparePower || m_baseQuietSeconds < 60.0f)
             return false;
@@ -2627,24 +2644,36 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
     if (plannedBalance < 0)
         wants.push_back({AIDefenseSite::PowerPlant, 0, "Power is short: a power plant comes first"});
     else if (m_powerNeeded > 0 && plannedBalance < m_powerNeeded)
-        wants.push_back({AIDefenseSite::PowerPlant, 0, "The next building would leave the base without power: a power plant first"});
+        wants.push_back(
+            {AIDefenseSite::PowerPlant,
+             0,
+             "The next building would leave the base without power: a power plant first"});
     if (barracksCount == 0)
         wants.push_back({AIDefenseSite::Barracks, 0, "No barracks: raising one to start training troops"});
     if (needLab && m_style.labEarly)
-        wants.push_back({AIDefenseSite::Lab, kTroopReserve / 2, "No laboratory: research needs one (early in this base's plan)"});
+        wants.push_back(
+            {AIDefenseSite::Lab, kTroopReserve / 2, "No laboratory: research needs one (early in this base's plan)"});
     if (full && m_style.barracksFirst && barracksCount < 2 && factoryCount == 0)
-        wants.push_back({AIDefenseSite::Barracks, kTroopReserve / 2, "A second barracks before the factory: infantry first"});
+        wants.push_back(
+            {AIDefenseSite::Barracks, kTroopReserve / 2, "A second barracks before the factory: infantry first"});
     if (factoryCount == 0)
         wants.push_back({AIDefenseSite::Factory, kTroopReserve / 2, "No factory: building one for vehicles"});
     if (needLab)
         wants.push_back({AIDefenseSite::Lab, kTroopReserve / 2, "No laboratory: research needs one"});
     // (spare power after the laboratory: the plants would take the back of the base it belongs in)
     if (produced - consumed < sparePower && m_credits >= powerCost + kTroopReserve)
-        wants.push_back({AIDefenseSite::PowerPlant, kTroopReserve, "Credits to spare: an extra power plant for the next buildings"});
+        wants.push_back(
+            {AIDefenseSite::PowerPlant,
+             kTroopReserve,
+             "Credits to spare: an extra power plant for the next buildings"});
     if (baseReady())
-        wants.push_back({AIDefenseSite::Headquarters, 2 * kTroopReserve, "The base is ready and quiet: another headquarters for more income"});
+        wants.push_back(
+            {AIDefenseSite::Headquarters,
+             2 * kTroopReserve,
+             "The base is ready and quiet: another headquarters for more income"});
     if (full && barracksCount < kMaxProduction && barracksCount <= factoryCount)
-        wants.push_back({AIDefenseSite::Barracks, kTroopReserve, "Credits to spare: another barracks to raise the army faster"});
+        wants.push_back(
+            {AIDefenseSite::Barracks, kTroopReserve, "Credits to spare: another barracks to raise the army faster"});
     if (full && factoryCount < kMaxProduction)
         wants.push_back({AIDefenseSite::Factory, kTroopReserve, "Credits to spare: another factory for more vehicles"});
 
@@ -2710,14 +2739,15 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
 
         int x = 0, y = 0;
         bool found = false;
-        const bool needsExit = kind == AIDefenseSite::Barracks || kind == AIDefenseSite::Factory
-                               || kind == AIDefenseSite::Headquarters;
+        const bool needsExit
+            = kind == AIDefenseSite::Barracks || kind == AIDefenseSite::Factory || kind == AIDefenseSite::Headquarters;
         // A gap around it first, then side by side, then also on the band along a road (never on the road itself)
         for (int crowding = 0; crowding < 3 && !found; ++crowding)
         {
             found = FindCoreSite(x, y, w, h, ox, oy, rear, minRing, map, entities, crowding, needsExit);
             if (!found && rear && kind != AIDefenseSite::PowerPlant)
-                found = FindCoreSite(x, y, w, h, ox, oy, false, minRing, map, entities, crowding, needsExit); // the back is full
+                found = FindCoreSite(
+                    x, y, w, h, ox, oy, false, minRing, map, entities, crowding, needsExit); // the back is full
             if (!found && kind == AIDefenseSite::PowerPlant)
             {
                 // The back is full: the sides of the base, never its front
@@ -2731,7 +2761,8 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
         }
         if (!found)
         {
-            ThinkOnce("core" + std::to_string(kind), "BUILD", std::string(want.why) + " (no room that keeps the base open)");
+            ThinkOnce(
+                "core" + std::to_string(kind), "BUILD", std::string(want.why) + " (no room that keeps the base open)");
             continue;
         }
         AIDefenseSite site;

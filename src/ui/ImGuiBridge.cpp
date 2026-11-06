@@ -307,11 +307,7 @@ bool ImGuiBridge::Button(const char *label, ButtonStyle style, const ImVec2 &siz
 }
 
 void ImGuiBridge::DrawPanel(
-    const char *str_id,
-    const ImVec2 &size,
-    const std::function<void()> &drawContent,
-    ImU32 fillCol,
-    ImU32 borderCol)
+    const char *str_id, const ImVec2 &size, const std::function<void()> &drawContent, ImU32 fillCol, ImU32 borderCol)
 {
     int pushedColors = 0;
     if (fillCol != 0)
@@ -372,8 +368,7 @@ int ImGuiBridge::DrawConfirmModal(ui::ConfirmState &state, int windowW, int wind
     if (!ImGui::IsPopupOpen(popupId.c_str()))
         ImGui::OpenPopup(popupId.c_str());
 
-    ImGui::SetNextWindowPos(
-        ImVec2(windowW * 0.5f, windowH * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(ImVec2(windowW * 0.5f, windowH * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(460.0f, 0.0f), ImGuiCond_Always);
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove;

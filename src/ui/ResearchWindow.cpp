@@ -31,8 +31,8 @@ namespace
 // m_researchScale, the window itself keeps its size
 constexpr int kNodeW0 = 270;
 constexpr int kNodeH0 = 66;
-constexpr float kIconScale0 = 0.9f;   // the icon of a technology in the tree (the picture is about 64 px)
-constexpr int kIconBox0 = 62;         // ... and the room it takes on the left of the node
+constexpr float kIconScale0 = 0.9f;       // the icon of a technology in the tree (the picture is about 64 px)
+constexpr int kIconBox0 = 62;             // ... and the room it takes on the left of the node
 constexpr float kDetailsIconScale = 1.3f; // the icon of the selected technology
 constexpr int kGapX0 = 34;
 constexpr int kGapY0 = 10;
@@ -311,7 +311,15 @@ bool HUDController::UpdateResearchWindow(
     {
         int picked = -1;
         if (ui::ComboUpdate(
-                m_researchCombo, l.filter, static_cast<int>(filterChoices().size()), windowH, mx, my, leftClicked, wheel, picked))
+                m_researchCombo,
+                l.filter,
+                static_cast<int>(filterChoices().size()),
+                windowH,
+                mx,
+                my,
+                leftClicked,
+                wheel,
+                picked))
         {
             if (picked >= 0)
                 m_researchFilter = picked;
@@ -441,7 +449,8 @@ bool HUDController::UpdateResearchWindow(
             {
                 const UiRect n {
                     l.tree.x + 8 + tree.depth[i] * (kNodeW + kGapX) - static_cast<int>(m_researchScrollX),
-                    l.tree.y + 8 + static_cast<int>(tree.row[i] * (kNodeH + kGapY)) - static_cast<int>(m_researchScrollY),
+                    l.tree.y + 8 + static_cast<int>(tree.row[i] * (kNodeH + kGapY))
+                        - static_cast<int>(m_researchScrollY),
                     kNodeW,
                     kNodeH};
                 if (!n.Contains(mx, my))
@@ -592,13 +601,16 @@ void HUDController::RenderResearchWindow(
         const bool selected = i == m_researchSel;
         const bool hovered = n.Contains(mx, my) && l.tree.Contains(mx, my);
         const bool lit = matches(i);
-        SDL_Color fill = st == State::Done ? SDL_Color {28, 52, 38, 255}
-                         : st == State::Active ? SDL_Color {26, 44, 66, 255}
+        SDL_Color fill = st == State::Done        ? SDL_Color {28, 52, 38, 255}
+                         : st == State::Active    ? SDL_Color {26, 44, 66, 255}
                          : st == State::Available ? SDL_Color {36, 40, 30, 255}
                                                   : SDL_Color {24, 26, 32, 255};
         if (hovered)
-            fill = {static_cast<Uint8>(fill.r + 14), static_cast<Uint8>(fill.g + 14), static_cast<Uint8>(fill.b + 14), 255};
-        SDL_Color edge = st == State::Done ? col::Ok : (st == State::Active ? col::Info : (st == State::Available ? col::Accent : col::Border));
+            fill = {
+                static_cast<Uint8>(fill.r + 14), static_cast<Uint8>(fill.g + 14), static_cast<Uint8>(fill.b + 14), 255};
+        SDL_Color edge = st == State::Done
+                             ? col::Ok
+                             : (st == State::Active ? col::Info : (st == State::Available ? col::Accent : col::Border));
         renderer.FillRectScreen(n.x, n.y, n.w, n.h, fill);
         renderer.DrawRectScreen(n.x, n.y, n.w, n.h, selected ? col::Text : edge);
         if (selected)
@@ -626,13 +638,17 @@ void HUDController::RenderResearchWindow(
             textX,
             n.CenterY() + 2,
             ui::FONT_SMALL,
-            st == State::Done ? col::Ok
+            st == State::Done     ? col::Ok
             : st == State::Active ? col::Info
             : st == State::Locked ? col::TextDim
                                   : (economy.CanAfford(r.cost) ? col::Accent : col::Danger),
             false);
         if (st == State::Active && progress)
-            ui::DrawProgressBar(renderer, {n.x + 4, n.Bottom() - 6, n.w - 8, 4}, progress->timer / std::max(0.1f, progress->duration), col::Info);
+            ui::DrawProgressBar(
+                renderer,
+                {n.x + 4, n.Bottom() - 6, n.w - 8, 4},
+                progress->timer / std::max(0.1f, progress->duration),
+                col::Info);
         if (!lit)
             renderer.FillRectScreen(n.x, n.y, n.w, n.h, {8, 10, 14, 170}); // not what the search / filter asks for
     }
@@ -641,10 +657,20 @@ void HUDController::RenderResearchWindow(
         const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
         const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
         const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
-        ui::DrawScrollBar(renderer, vTrack, m_researchScrollY, treeH, static_cast<float>(l.tree.h),
-                          m_researchScrollDrag == 1 || ui::OnScrollTrack(vTrack, mx, my));
-        ui::DrawScrollBar(renderer, hTrack, m_researchScrollX, treeW, static_cast<float>(l.tree.w),
-                          m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
+        ui::DrawScrollBar(
+            renderer,
+            vTrack,
+            m_researchScrollY,
+            treeH,
+            static_cast<float>(l.tree.h),
+            m_researchScrollDrag == 1 || ui::OnScrollTrack(vTrack, mx, my));
+        ui::DrawScrollBar(
+            renderer,
+            hTrack,
+            m_researchScrollX,
+            treeW,
+            static_cast<float>(l.tree.w),
+            m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
     }
     ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, l.zoomIn.Contains(mx, my));
     ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, l.zoomOut.Contains(mx, my));
@@ -700,7 +726,8 @@ void HUDController::RenderResearchWindow(
             l.details.CenterX(),
             l.startBtn.y - 40,
             ui::FONT_BODY_BOLD,
-            st == State::Done ? col::Ok : (st == State::Active ? col::Info : (st == State::Locked ? col::TextDim : col::Accent)),
+            st == State::Done ? col::Ok
+                              : (st == State::Active ? col::Info : (st == State::Locked ? col::TextDim : col::Accent)),
             false,
             Anchor::HCENTER | Anchor::VCENTER);
         if (st == State::Active && progress)
@@ -709,7 +736,8 @@ void HUDController::RenderResearchWindow(
                 {x, l.startBtn.y - 28, w, 8},
                 progress->timer / std::max(0.1f, progress->duration),
                 col::Info);
-        const bool canStart = st == State::Available && hasLab && economy.CanAfford(r.cost) && progress && progress->active < 0;
+        const bool canStart
+            = st == State::Available && hasLab && economy.CanAfford(r.cost) && progress && progress->active < 0;
         ui::DrawButton(
             renderer,
             font,
