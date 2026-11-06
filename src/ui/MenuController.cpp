@@ -33,9 +33,9 @@
 namespace OpenArtOfWar
 {
 
-using ui::UiRect;
 using ui::LowerText;
 using ui::PopLastUtf8;
+using ui::UiRect;
 namespace col = ui::color;
 
 namespace
@@ -169,7 +169,8 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole screen
     int contentY = l.dialog.y + 52 + 16;
     int footerY = l.dialog.Bottom() - 64;
-    l.list = {l.dialog.x + 20, contentY, std::clamp(static_cast<int>(l.dialog.w * 0.27f), 300, 460), footerY - contentY - 8};
+    l.list = {
+        l.dialog.x + 20, contentY, std::clamp(static_cast<int>(l.dialog.w * 0.27f), 300, 460), footerY - contentY - 8};
     int n = std::max(1, missionCount);
     l.itemH = std::clamp((l.list.h - (n - 1) * l.itemGap) / n, 26, 44);
     l.details = {l.list.Right() + 16, contentY, l.dialog.Right() - 20 - (l.list.Right() + 16), l.list.h};
@@ -1429,10 +1430,10 @@ bool MenuController::UpdateCampaignSelect(
             return CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10);
         if (id >= kComboMapPlayers && id <= kComboMapSort)
             return MapFilterBtn(l, id - kComboMapPlayers);
-        return id == kComboSide ? l.sideBtn[0]
+        return id == kComboSide      ? l.sideBtn[0]
                : id == kComboCredits ? l.creditsBtn
-               : id == kComboTime ? l.timeBtn
-               : l.difficultyBtn;
+               : id == kComboTime    ? l.timeBtn
+                                     : l.difficultyBtn;
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
@@ -1760,8 +1761,7 @@ void MenuController::UpdateSettingsScreen(
             = m_inGameSettingsOpen
                   ? std::string(_("The render API changes at the next start of the game: "))
                         + RenderBackend::Label(name)
-                  : std::string(_("The window is recreated with this render API: "))
-                        + RenderBackend::Label(name)
+                  : std::string(_("The window is recreated with this render API: ")) + RenderBackend::Label(name)
                         + std::string(_(". You get 15 seconds to keep it, otherwise the previous one returns."));
     };
     auto rows = [&]() {
@@ -2772,13 +2772,30 @@ void MenuController::RenderCampaignMissionSelect(
             m_combo.open == kComboTime,
             l.timeBtn.Contains(m_mouseX, m_mouseY));
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
-        ui::DrawCaption(fontRenderer, renderer, x, d.y + 80, std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u)) + ")");
+        ui::DrawCaption(
+            fontRenderer,
+            renderer,
+            x,
+            d.y + 80,
+            std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u))
+                + ")");
         // Column captions, the same order as in the network room
         for (const auto &[kind, text] : std::initializer_list<std::pair<int, const char *>> {
-                 {0, _("Place")}, {1, _("Faction")}, {2, _("Team")}, {3, _("Colour")}, {7, _("Handicap")}, {8, _("Army")}})
+                 {0, _("Place")},
+                 {1, _("Faction")},
+                 {2, _("Team")},
+                 {3, _("Colour")},
+                 {7, _("Handicap")},
+                 {8, _("Army")}})
         {
             const UiRect cell = CustomCell(d, 0, kind);
-            fontRenderer.DrawString(ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w), cell.x + 2, d.y + 100, ui::FONT_SMALL, col::TextMuted, false);
+            fontRenderer.DrawString(
+                ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w),
+                cell.x + 2,
+                d.y + 100,
+                ui::FONT_SMALL,
+                col::TextMuted,
+                false);
         }
         const int places = std::min(info.players, kMaxPlayers);
         for (int i = 0; i < places; ++i)
@@ -2822,12 +2839,14 @@ void MenuController::RenderCampaignMissionSelect(
             else
                 combo(
                     0,
-                    std::string(_("AI")) + " - " + DifficultyName(static_cast<AIDifficulty>(std::clamp(cs.level, 0, 3))),
+                    std::string(_("AI")) + " - "
+                        + DifficultyName(static_cast<AIDifficulty>(std::clamp(cs.level, 0, 3))),
                     col::Info);
             combo(
                 1,
-                si == 0 ? (m_sideRandom ? _("Random")
-                                        : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
+                si == 0 ? (m_sideRandom
+                               ? _("Random")
+                               : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
                         : (cs.faction == 0 ? _("Random") : (cs.faction == 1 ? _("Resistance") : _("Confederation"))));
             combo(2, std::to_string(cs.team + 1));
             combo(7, cs.handicap == 0 ? std::string("-") : HandicapText(cs.handicap));
@@ -2866,12 +2885,26 @@ void MenuController::RenderCampaignMissionSelect(
                     renderer.DrawLineScreen(sx - 7, sy + 7, sx + 7, sy - 7, col::Danger);
                 }
                 fontRenderer.DrawString(
-                    std::to_string(n + 1), sx, sy, ui::FONT_SMALL_BOLD, col::AccentText, false, Anchor::HCENTER | Anchor::VCENTER);
+                    std::to_string(n + 1),
+                    sx,
+                    sy,
+                    ui::FONT_SMALL_BOLD,
+                    col::AccentText,
+                    false,
+                    Anchor::HCENTER | Anchor::VCENTER);
             }
         }
         const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
         DrawTextSection(
-            renderer, fontRenderer, l.fogCheckbox.x, l.baseCheckbox.Bottom() + 14, l.fogCheckbox.w, _("MAP SIZE:"), size, col::Ok, ui::FONT_BODY);
+            renderer,
+            fontRenderer,
+            l.fogCheckbox.x,
+            l.baseCheckbox.Bottom() + 14,
+            l.fogCheckbox.w,
+            _("MAP SIZE:"),
+            size,
+            col::Ok,
+            ui::FONT_BODY);
         ui::DrawCheckbox(
             renderer,
             fontRenderer,
@@ -2980,14 +3013,12 @@ void MenuController::RenderCampaignMissionSelect(
     { // the open list, over everything
         const int id = m_combo.open;
         const UiRect field
-            = id >= kComboSlot
-                  ? CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10)
-                  : (id >= kComboMapPlayers && id <= kComboMapSort
-                         ? MapFilterBtn(l, id - kComboMapPlayers)
-                         : id == kComboSide ? l.sideBtn[0]
-                         : id == kComboCredits ? l.creditsBtn
-                         : id == kComboTime ? l.timeBtn
-                         : l.difficultyBtn);
+            = id >= kComboSlot ? CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10)
+                               : (id >= kComboMapPlayers && id <= kComboMapSort ? MapFilterBtn(l, id - kComboMapPlayers)
+                                  : id == kComboSide                            ? l.sideBtn[0]
+                                  : id == kComboCredits                         ? l.creditsBtn
+                                  : id == kComboTime                            ? l.timeBtn
+                                                                                : l.difficultyBtn);
         std::vector<std::string> items = CampaignComboOptions(id);
         std::vector<bool> taken;
         std::vector<SDL_Color> swatches;
@@ -3107,7 +3138,9 @@ int MenuController::CampaignComboCurrent(int id) const
         if (kind == 0)
         {
             const std::vector<int> codes = CustomSeatCodes(row);
-            const int now = si == 0 ? 1 : (si > 0 ? 3 + std::clamp(m_customSlots[si].level, 0, 3) : (((m_customBlocked >> row) & 1u) ? 7 : 2));
+            const int now = si == 0 ? 1
+                                    : (si > 0 ? 3 + std::clamp(m_customSlots[si].level, 0, 3)
+                                              : (((m_customBlocked >> row) & 1u) ? 7 : 2));
             for (size_t i = 0; i < codes.size(); ++i)
                 if (codes[i] == now)
                     return static_cast<int>(i);
@@ -3261,7 +3294,8 @@ int MenuController::CustomSlotAt(int position) const
 std::vector<int> MenuController::CustomSeatCodes(int position) const
 {
     if (CustomSlotAt(position) == 0)
-        return {1, 2, 3, 4, 5, 6, 7}; // the person's own place: he stays, or leaves it (Open / a computer player / blocked) and watches
+        return {1, 2, 3, 4, 5, 6, 7}; // the person's own place: he stays, or leaves it (Open / a computer player /
+                                      // blocked) and watches
     if (CustomSlotAt(position) < 0)
         return {1, 2, 3, 4, 5, 6, 7}; // you / open / four computer levels / blocked
     return {1, 2, 3, 4, 5, 6, 7};
@@ -3283,8 +3317,9 @@ void MenuController::SetCustomSeat(int position, int code)
         m_customSlots[0].position = position;
         m_customSpectator = false;
         // While he watched, a computer player may have taken his colour
-        if (const std::vector<bool> taken = CustomTakenColors(0);
-            m_customSlots[0].color >= 1 && m_customSlots[0].color <= Settings::kArmyColors && taken[m_customSlots[0].color - 1])
+        if (const std::vector<bool> taken = CustomTakenColors(0); m_customSlots[0].color >= 1
+                                                                  && m_customSlots[0].color <= Settings::kArmyColors
+                                                                  && taken[m_customSlots[0].color - 1])
         {
             for (int c = 0; c < static_cast<int>(taken.size()); ++c)
             {

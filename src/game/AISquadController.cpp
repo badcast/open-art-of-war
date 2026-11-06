@@ -332,7 +332,7 @@ void AISquadController::OrderLeg(
     const AISquad &sq, const std::vector<int> &ids, int x, int y, EntityManager &entities, Pathfinder &pathfinder)
 {
     // The computer always goes by auto-attack (units answer fire on the way); a plain Move is only for a retreat
-    (void)sq;
+    (void) sq;
     entities.IssueAttackMoveOrder(ids, x, y, pathfinder);
     CapDetours(sq, entities, pathfinder.GetMap());
 }
@@ -410,8 +410,7 @@ void AISquadController::UpdateFocusTarget(AISquad &sq, TileMap &map, EntityManag
         return;
     const float zone = std::max(static_cast<float>(leader->sightRadius), leader->attackRange);
     auto distToLeader = [&](const Entity &e) {
-        return DetMath::Hypot(
-            static_cast<float>(e.tileX - leader->tileX), static_cast<float>(e.tileY - leader->tileY));
+        return DetMath::Hypot(static_cast<float>(e.tileX - leader->tileX), static_cast<float>(e.tileY - leader->tileY));
     };
     auto usable = [&](const Entity &e) {
         return e.alive && e.state != ActionState::Die && e.faction != Faction::Neutral

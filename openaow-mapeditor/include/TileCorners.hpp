@@ -4,50 +4,47 @@
 // Ground material in the corners of terrain tiles 0..210, four letters in the order NW NE SW SE:
 // G light grass, D dark grass, E earth, W water, S sand (tileset 1 only).
 
-namespace OpenArtOfWar::TileCorners {
+namespace OpenArtOfWar::TileCorners
+{
 
 constexpr int kGroundTiles = 211;
 
-constexpr const char* kTileset0[kGroundTiles] = {
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE",
-    "EEEE", "EEEE", "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "DDDD", "DDDD",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
-    "GDDD", "DGDD", "DDDG", "DDGD", "GDGD", "GDGD", "DGDG", "DGDG", "DGDG", "GGDD", "GGDD", "GGDD",
-    "DDGG", "DDGG", "DDGG", "DDDG", "DDGD", "GDDD", "DGDD", "DGGG", "GDGG", "GGGD", "GGDG", "GGGG",
-    "GGGG", "GGGG", "EGEG", "EGEG", "EGEG", "GEGE", "GEGE", "EEGG", "EEGG", "EEGG", "GGEE", "GGEE",
-    "GGEE", "EEEG", "EEGE", "EGEE", "GEEE", "GGGE", "GGEG", "EGGG", "GEGG", "WDWD", "WDWD", "DWDW",
-    "DWDW", "DDWW", "DDWW", "WWDD", "WWDD", "WWDD", "DWWW", "WDWW", "WWWD", "WWDW", "DDDW", "DDWD",
-    "WDDD", "DWDD", "WWWW", "DDDW", "DDDD", "DWDW", "DDDD", "WWWW", "DWDD", "WWDD", "WWWW", "WWWW",
-    "DWWW", "WWWW", "WWDD", "DDWW", "DWDW", "WDWD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DWDW", "DWDW", "WDWD", "WDWD", "WDWD", "DDWW", "DDWW",
-    "DDDD", "WWDD", "WDWD", "WWDW", "DDWW", "WDWD", "WDDD", "DWDD", "DDDW", "DDWD", "WWDW", "WWWD",
-    "DWWW", "DDWW", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "GGGG", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "EEEE",
+constexpr const char *kTileset0[kGroundTiles] = {
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD", "DDDD", "DDDD",
+    "DDDD", "DDDD", "DDDD", "DDDD", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "WWWW", "WWWW",
+    "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "WWWW", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
+    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "GDDD", "DGDD", "DDDG", "DDGD", "GDGD", "GDGD", "DGDG", "DGDG",
+    "DGDG", "GGDD", "GGDD", "GGDD", "DDGG", "DDGG", "DDGG", "DDDG", "DDGD", "GDDD", "DGDD", "DGGG", "GDGG", "GGGD",
+    "GGDG", "GGGG", "GGGG", "GGGG", "EGEG", "EGEG", "EGEG", "GEGE", "GEGE", "EEGG", "EEGG", "EEGG", "GGEE", "GGEE",
+    "GGEE", "EEEG", "EEGE", "EGEE", "GEEE", "GGGE", "GGEG", "EGGG", "GEGG", "WDWD", "WDWD", "DWDW", "DWDW", "DDWW",
+    "DDWW", "WWDD", "WWDD", "WWDD", "DWWW", "WDWW", "WWWD", "WWDW", "DDDW", "DDWD", "WDDD", "DWDD", "WWWW", "DDDW",
+    "DDDD", "DWDW", "DDDD", "WWWW", "DWDD", "WWDD", "WWWW", "WWWW", "DWWW", "WWWW", "WWDD", "DDWW", "DWDW", "WDWD",
+    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DWDW", "DWDW", "WDWD",
+    "WDWD", "WDWD", "DDWW", "DDWW", "DDDD", "WWDD", "WDWD", "WWDW", "DDWW", "WDWD", "WDDD", "DWDD", "DDDW", "DDWD",
+    "WWDW", "WWWD", "DWWW", "DDWW", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD", "DDDD",
+    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
+    "EEEE",
 };
 
-constexpr const char* kTileset1[kGroundTiles] = {
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS",
-    "SSSS", "SSSS", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "WWWW", "WWWW", "WWWW",
-    "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "GDDD", "DGDD", "DDDG",
-    "DDGD", "GDGD", "GDGD", "DGDG", "DGDG", "DGDG", "GGDD", "GGDD", "GGDD", "DDGG", "DDGG", "DDGG",
-    "DDDG", "DDGD", "GDDD", "DGDD", "DGGG", "GDGG", "GGGD", "GGDG", "GGGG", "GGGG", "GGGG", "EGEG",
-    "EGEG", "EGEG", "GEGE", "GEGE", "GEGE", "EEGG", "EEGG", "EEGG", "GGEE", "GGEE", "GGEE", "EEEG",
-    "EEGE", "EGEE", "GEEE", "GGGE", "GGEG", "EGGG", "GEGG", "GGGG", "GGGG", "GGGG", "SGSG", "SGSG",
-    "SGSG", "GSGS", "GSGS", "GSGS", "SSGG", "SSGG", "SSGG", "GGSS", "GGSS", "GGSS", "SSSG", "SSGS",
-    "SGSS", "GSSS", "GGGS", "GGSG", "SGGG", "GSGG", "WDWD", "WDWD", "DWDW", "DWDW", "DDWW", "DDWW",
-    "DDWW", "WWDD", "WWDD", "WWDD", "DWWW", "WDWW", "WWWD", "WWDW", "DDDW", "DDWD", "WDDD", "DWDD",
-    "WWWW", "GSSG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "DGDE", "EEEE", "EEEE", "EEEE", "EEEE", "SEEE", "ESEE", "ESSS", "SSSS", "SSSE", "SSSS", "SSSS",
-    "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "GGGG",
-    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
-    "DDDD", "DDDD", "DDDD", "EEEE", "EEEE", "EEEE", "EEEE",
+constexpr const char *kTileset1[kGroundTiles] = {
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD", "DDDD", "DDDD",
+    "DDDD", "DDDD", "DDDD", "DDDD", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "EEEE", "EEEE",
+    "EEEE", "EEEE", "EEEE", "EEEE", "EEEE", "WWWW", "WWWW", "WWWW", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD", "DDDD",
+    "DDDD", "DDDD", "DDDD", "GDDD", "DGDD", "DDDG", "DDGD", "GDGD", "GDGD", "DGDG", "DGDG", "DGDG", "GGDD", "GGDD",
+    "GGDD", "DDGG", "DDGG", "DDGG", "DDDG", "DDGD", "GDDD", "DGDD", "DGGG", "GDGG", "GGGD", "GGDG", "GGGG", "GGGG",
+    "GGGG", "EGEG", "EGEG", "EGEG", "GEGE", "GEGE", "GEGE", "EEGG", "EEGG", "EEGG", "GGEE", "GGEE", "GGEE", "EEEG",
+    "EEGE", "EGEE", "GEEE", "GGGE", "GGEG", "EGGG", "GEGG", "GGGG", "GGGG", "GGGG", "SGSG", "SGSG", "SGSG", "GSGS",
+    "GSGS", "GSGS", "SSGG", "SSGG", "SSGG", "GGSS", "GGSS", "GGSS", "SSSG", "SSGS", "SGSS", "GSSS", "GGGS", "GGSG",
+    "SGGG", "GSGG", "WDWD", "WDWD", "DWDW", "DWDW", "DDWW", "DDWW", "DDWW", "WWDD", "WWDD", "WWDD", "DWWW", "WDWW",
+    "WWWD", "WWDW", "DDDW", "DDWD", "WDDD", "DWDD", "WWWW", "GSSG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "DGDE", "EEEE", "EEEE", "EEEE", "EEEE", "SEEE", "ESEE", "ESSS", "SSSS", "SSSE", "SSSS", "SSSS", "SSSS", "SSSS",
+    "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "SSSS", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG",
+    "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "GGGG", "DDDD", "DDDD", "DDDD", "EEEE", "EEEE", "EEEE",
+    "EEEE",
 };
 
 } // namespace OpenArtOfWar::TileCorners

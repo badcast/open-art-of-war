@@ -8,25 +8,30 @@
 #include <cstdio>
 #include <fstream>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
-namespace {
+namespace
+{
 
 using Json = nlohmann::ordered_json;
 
 // Called by SDL (possibly from another thread) when the file dialog closes
-void SDLCALL OnFontChosen(void* userdata, const char* const* list, int /*filter*/) {
-    auto* pick = static_cast<FolderPick*>(userdata);
+void SDLCALL OnFontChosen(void *userdata, const char *const *list, int /*filter*/)
+{
+    auto *pick = static_cast<FolderPick *>(userdata);
     std::lock_guard<std::mutex> lock(pick->mutex);
-    if (list && list[0]) {
+    if (list && list[0])
+    {
         pick->path = list[0];
         pick->ready = true;
     }
 }
 
-struct EnvHint {
-    const char* path;
-    const char* text;
+struct EnvHint
+{
+    const char *path;
+    const char *text;
 };
 
 // Tooltips of the keys of game_environment.json (msgids translated in po/*.po)
@@ -40,7 +45,8 @@ const EnvHint kEnvHints[] = {
     {"fog.rounding", "How round the edge of the fog is (0 square, 1 smooth)."},
     {"fog.texels_per_tile", "Resolution of the fog picture: pixels per map tile."},
     {"network", "Network game settings."},
-    {"network.hash_interval_ticks", "Every this many game ticks the players compare their game state to detect a desync."},
+    {"network.hash_interval_ticks",
+     "Every this many game ticks the players compare their game state to detect a desync."},
     {"network.input_delay_max_turns", "The largest delay (in turns) between giving an order and carrying it out."},
     {"network.input_delay_min_turns", "The smallest delay (in turns) between giving an order and carrying it out."},
     {"network.lan_probe_ports", "How many ports after the first one are searched for games in the local network."},
@@ -69,52 +75,68 @@ const EnvHint kEnvHints[] = {
     {"render.fallback", "API used when the preferred one does not work."},
 };
 
-const char* envHint(const std::string& path) {
-    for (const EnvHint& h : kEnvHints) if (path == h.path) return h.text;
+const char *envHint(const std::string &path)
+{
+    for (const EnvHint &h : kEnvHints)
+        if (path == h.path)
+            return h.text;
     return nullptr;
 }
 
-bool HiddenKey(const std::string& path) {
-    return path == "font" || path == "render.probed" || path == "render.probe_key" || path == "render.init_pending" ||
-           path == "render.confirm_from";
+bool HiddenKey(const std::string &path)
+{
+    return path == "font" || path == "render.probed" || path == "render.probe_key" || path == "render.init_pending"
+           || path == "render.confirm_from";
 }
 
-std::string Pretty(const std::string& key) {
+std::string Pretty(const std::string &key)
+{
     std::string s = key;
-    for (char& c : s) if (c == '_') c = ' ';
-    if (!s.empty()) s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
+    for (char &c : s)
+        if (c == '_')
+            c = ' ';
+    if (!s.empty())
+        s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
     return s;
 }
 
 } // namespace
 
-void CharacterEditor::EnsureEnvironment() {
-    if (envTried) return;
+void CharacterEditor::EnsureEnvironment()
+{
+    if (envTried)
+        return;
     envTried = true;
     envPath = assetsRoot / "data" / "game_environment.json";
     std::ifstream in(envPath);
-    if (!in) {
+    if (!in)
+    {
         status = std::string(_("Could not load YAML: ")) + envPath.string();
         return;
     }
     envJson = Json::parse(in, nullptr, false, true);
     envLoaded = envJson.is_object();
     envBase = envJson;
-    if (!envLoaded) status = std::string(_("Could not load YAML: ")) + envPath.string();
+    if (!envLoaded)
+        status = std::string(_("Could not load YAML: ")) + envPath.string();
     envDirty = false;
 }
 
-bool CharacterEditor::SaveEnvironment() {
-    if (!envLoaded) return false;
+bool CharacterEditor::SaveEnvironment()
+{
+    if (!envLoaded)
+        return false;
     // Only the editor's changes on top of the file as it is now (sections it does not show stay)
     Json disk;
     {
         std::ifstream in(envPath);
-        if (in) disk = Json::parse(in, nullptr, false, true);
+        if (in)
+            disk = Json::parse(in, nullptr, false, true);
     }
     Json merged = disk.is_object() ? MergeJsonEdits(envBase, envJson, disk) : envJson;
     std::string error;
-    if (!WriteFileAtomic(envPath, merged.dump(2) + "\n", error)) {
+    if (!WriteFileAtomic(envPath, merged.dump(2) + "\n", error))
+    {
         status = error;
         return false;
     }
@@ -126,16 +148,20 @@ bool CharacterEditor::SaveEnvironment() {
     return true;
 }
 
-bool CharacterEditor::EditEnvJson(Json& node, const std::string& path, int depth) {
+bool CharacterEditor::EditEnvJson(Json &node, const std::string &path, int depth)
+{
     bool changed = false;
-    for (auto it = node.begin(); it != node.end(); ++it) {
+    for (auto it = node.begin(); it != node.end(); ++it)
+    {
         const std::string key = it.key();
         const std::string sub = path.empty() ? key : path + "." + key;
-        if (HiddenKey(sub)) continue;
-        Json& v = it.value();
-        const char* hint = envHint(sub);
+        if (HiddenKey(sub))
+            continue;
+        Json &v = it.value();
+        const char *hint = envHint(sub);
         auto tip = [&]() {
-            if (hint && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
+            if (hint && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort))
+            {
                 ImGui::BeginTooltip();
                 ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
                 ImGui::TextUnformatted(_(hint));
@@ -145,63 +171,111 @@ bool CharacterEditor::EditEnvJson(Json& node, const std::string& path, int depth
         };
         ImGui::PushID(sub.c_str());
         const std::string label = Pretty(key);
-        if (v.is_object()) {
+        if (v.is_object())
+        {
             ImGui::SetNextItemOpen(depth < 1, ImGuiCond_Once);
             const bool open = ImGui::TreeNodeEx((label + "##" + sub).c_str(), ImGuiTreeNodeFlags_Framed);
             tip();
-            if (open) {
+            if (open)
+            {
                 changed |= EditEnvJson(v, sub, depth + 1);
                 ImGui::TreePop();
             }
-        } else if (v.is_boolean()) {
+        }
+        else if (v.is_boolean())
+        {
             bool b = v.get<bool>();
-            if (ImGui::Checkbox(label.c_str(), &b)) { v = b; changed = true; }
-            tip();
-        } else if (v.is_number_integer()) {
-            int n = v.get<int>();
-            ImGui::SetNextItemWidth(160.0f);
-            if (ImGui::DragInt(label.c_str(), &n, 1.0f)) { v = n; changed = true; }
-            tip();
-        } else if (v.is_number_float()) {
-            float f = v.get<float>();
-            ImGui::SetNextItemWidth(160.0f);
-            if (ImGui::DragFloat(label.c_str(), &f, 0.01f, 0.0f, 0.0f, "%.3g")) { v = f; changed = true; }
-            tip();
-        } else if (v.is_array() && v.size() == 3 && v[0].is_number_integer() && key == "color") {
-            float c[3] = {v[0].get<int>() / 255.0f, v[1].get<int>() / 255.0f, v[2].get<int>() / 255.0f};
-            if (ImGui::ColorEdit3(label.c_str(), c)) {
-                for (int i = 0; i < 3; ++i) v[i] = static_cast<int>(c[i] * 255.0f + 0.5f);
+            if (ImGui::Checkbox(label.c_str(), &b))
+            {
+                v = b;
                 changed = true;
             }
             tip();
-        } else if (v.is_string()) {
+        }
+        else if (v.is_number_integer())
+        {
+            int n = v.get<int>();
+            ImGui::SetNextItemWidth(160.0f);
+            if (ImGui::DragInt(label.c_str(), &n, 1.0f))
+            {
+                v = n;
+                changed = true;
+            }
+            tip();
+        }
+        else if (v.is_number_float())
+        {
+            float f = v.get<float>();
+            ImGui::SetNextItemWidth(160.0f);
+            if (ImGui::DragFloat(label.c_str(), &f, 0.01f, 0.0f, 0.0f, "%.3g"))
+            {
+                v = f;
+                changed = true;
+            }
+            tip();
+        }
+        else if (v.is_array() && v.size() == 3 && v[0].is_number_integer() && key == "color")
+        {
+            float c[3] = {v[0].get<int>() / 255.0f, v[1].get<int>() / 255.0f, v[2].get<int>() / 255.0f};
+            if (ImGui::ColorEdit3(label.c_str(), c))
+            {
+                for (int i = 0; i < 3; ++i)
+                    v[i] = static_cast<int>(c[i] * 255.0f + 0.5f);
+                changed = true;
+            }
+            tip();
+        }
+        else if (v.is_string())
+        {
             const std::string s = v.get<std::string>();
             const bool hex = s.size() >= 7 && s[0] == '#';
             ImGui::SetNextItemWidth(220.0f);
-            if (hex) {
+            if (hex)
+            {
                 unsigned r = 255, g = 255, b = 255, a = 255;
                 std::sscanf(s.c_str() + 1, "%2x%2x%2x", &r, &g, &b);
-                if (s.size() >= 9) std::sscanf(s.c_str() + 7, "%2x", &a);
+                if (s.size() >= 9)
+                    std::sscanf(s.c_str() + 7, "%2x", &a);
                 float c[4] = {r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f};
-                if (ImGui::ColorEdit4(label.c_str(), c, ImGuiColorEditFlags_AlphaBar)) {
+                if (ImGui::ColorEdit4(label.c_str(), c, ImGuiColorEditFlags_AlphaBar))
+                {
                     char buf[16];
                     if (s.size() >= 9)
-                        std::snprintf(buf, sizeof buf, "#%02X%02X%02X%02X", int(c[0] * 255 + 0.5f), int(c[1] * 255 + 0.5f), int(c[2] * 255 + 0.5f), int(c[3] * 255 + 0.5f));
+                        std::snprintf(
+                            buf,
+                            sizeof buf,
+                            "#%02X%02X%02X%02X",
+                            int(c[0] * 255 + 0.5f),
+                            int(c[1] * 255 + 0.5f),
+                            int(c[2] * 255 + 0.5f),
+                            int(c[3] * 255 + 0.5f));
                     else
-                        std::snprintf(buf, sizeof buf, "#%02X%02X%02X", int(c[0] * 255 + 0.5f), int(c[1] * 255 + 0.5f), int(c[2] * 255 + 0.5f));
+                        std::snprintf(
+                            buf,
+                            sizeof buf,
+                            "#%02X%02X%02X",
+                            int(c[0] * 255 + 0.5f),
+                            int(c[1] * 255 + 0.5f),
+                            int(c[2] * 255 + 0.5f));
                     v = std::string(buf);
                     changed = true;
                 }
-            } else {
-                auto& buf = envTextBuffers[sub];
-                if (!ImGui::IsAnyItemActive()) std::snprintf(buf.data(), buf.size(), "%s", s.c_str());
-                if (ImGui::InputText(label.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            }
+            else
+            {
+                auto &buf = envTextBuffers[sub];
+                if (!ImGui::IsAnyItemActive())
+                    std::snprintf(buf.data(), buf.size(), "%s", s.c_str());
+                if (ImGui::InputText(label.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+                {
                     v = std::string(buf.data());
                     changed = true;
                 }
             }
             tip();
-        } else {
+        }
+        else
+        {
             ImGui::TextDisabled("%s", label.c_str());
         }
         ImGui::PopID();
@@ -209,16 +283,22 @@ bool CharacterEditor::EditEnvJson(Json& node, const std::string& path, int depth
     return changed;
 }
 
-SDL_Texture* CharacterEditor::FontPreview(const std::string& path, float size, const std::string& text) {
+SDL_Texture *CharacterEditor::FontPreview(const std::string &path, float size, const std::string &text)
+{
     const std::string key = path + "|" + std::to_string(size) + "|" + text;
     auto it = fontPreviews.find(key);
-    if (it != fontPreviews.end()) return it->second;
-    SDL_Texture* tex = nullptr;
+    if (it != fontPreviews.end())
+        return it->second;
+    SDL_Texture *tex = nullptr;
     fs::path resolved(path);
-    if (resolved.is_relative()) resolved = assetsRoot.parent_path() / resolved;
-    if (TTF_WasInit() || TTF_Init()) {
-        if (TTF_Font* font = TTF_OpenFont(resolved.string().c_str(), size)) {
-            if (SDL_Surface* surf = TTF_RenderText_Blended(font, text.c_str(), 0, SDL_Color{255, 255, 255, 255})) {
+    if (resolved.is_relative())
+        resolved = assetsRoot.parent_path() / resolved;
+    if (TTF_WasInit() || TTF_Init())
+    {
+        if (TTF_Font *font = TTF_OpenFont(resolved.string().c_str(), size))
+        {
+            if (SDL_Surface *surf = TTF_RenderText_Blended(font, text.c_str(), 0, SDL_Color {255, 255, 255, 255}))
+            {
                 tex = SDL_CreateTextureFromSurface(renderer, surf);
                 SDL_DestroySurface(surf);
             }
@@ -229,77 +309,97 @@ SDL_Texture* CharacterEditor::FontPreview(const std::string& path, float size, c
     return tex;
 }
 
-void CharacterEditor::DrawEnvironment() {
+void CharacterEditor::DrawEnvironment()
+{
     EnsureEnvironment();
-    if (!envLoaded) {
+    if (!envLoaded)
+    {
         ImGui::TextWrapped("%s", _("The environment file could not be loaded."));
         return;
     }
-    Json& font = envJson["font"];
-    if (!font.is_object()) font = Json::object();
+    Json &font = envJson["font"];
+    if (!font.is_object())
+        font = Json::object();
     ImGui::TextUnformatted(_("Game font"));
     FieldHint("Game font");
-    ImGui::TextWrapped("%s", _("The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."));
+    ImGui::TextWrapped(
+        "%s", _("The font files come from assets/main.json (fonts.regular, fonts.bold); the sizes are set here."));
     bool changed = false;
     const std::string root = assetsRoot.string();
     const std::string regular = OpenArtOfWar::LoaderResources::FontRegular(root);
     const std::string bold = OpenArtOfWar::LoaderResources::FontBold(root);
     ImGui::TextDisabled("%s", regular.c_str());
     ImGui::TextDisabled("%s", bold.c_str());
-    struct SizeRow {
-        const char* key;
-        const char* label;
+    struct SizeRow
+    {
+        const char *key;
+        const char *label;
         int def;
         bool bold;
     };
-    static const SizeRow kSizes[] = {{"size_small", "Small text", 13, false}, {"size_medium", "Body text", 16, false},
-                                     {"size_large", "Heading", 22, true},     {"size_title", "Title", 30, true},
-                                     {"size_hero", "Big title", 48, true}};
-    for (const SizeRow& row : kSizes) {
+    static const SizeRow kSizes[]
+        = {{"size_small", "Small text", 13, false},
+           {"size_medium", "Body text", 16, false},
+           {"size_large", "Heading", 22, true},
+           {"size_title", "Title", 30, true},
+           {"size_hero", "Big title", 48, true}};
+    for (const SizeRow &row : kSizes)
+    {
         int size = font.value(row.key, row.def);
         ImGui::PushID(row.key);
         ImGui::SetNextItemWidth(120.0f);
-        if (Hinted(ImGui::DragInt(_(row.label), &size, 0.2f, 6, 120), row.label)) {
+        if (Hinted(ImGui::DragInt(_(row.label), &size, 0.2f, 6, 120), row.label))
+        {
             font[row.key] = std::clamp(size, 6, 120);
             changed = true;
         }
         ImGui::PopID();
-        SDL_Texture* tex = FontPreview(row.bold ? bold : regular, static_cast<float>(size),
-                                       "Open Art Of War - Свобода ради свободы 0123456789");
-        if (tex) {
+        SDL_Texture *tex = FontPreview(
+            row.bold ? bold : regular, static_cast<float>(size), "Open Art Of War - Свобода ради свободы 0123456789");
+        if (tex)
+        {
             float w = 0.0f, h = 0.0f;
             SDL_GetTextureSize(tex, &w, &h);
             ImGui::Image(reinterpret_cast<ImTextureID>(tex), ImVec2(w, h));
         }
     }
-    if (changed) envDirty = true;
+    if (changed)
+        envDirty = true;
     ImGui::Separator();
-    if (Hinted(ImGui::Button(_("Save")), "Save settings")) SaveEnvironment();
+    if (Hinted(ImGui::Button(_("Save")), "Save settings"))
+        SaveEnvironment();
     ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Reload")), "Reload")) {
+    if (Hinted(ImGui::Button(_("Reload")), "Reload"))
+    {
         envTried = false;
         EnsureEnvironment();
     }
-    if (envDirty) {
+    if (envDirty)
+    {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
     }
     ImGui::TextDisabled("assets/data/game_environment.json");
 }
 
-void CharacterEditor::DrawEnvironmentProperties() {
+void CharacterEditor::DrawEnvironmentProperties()
+{
     EnsureEnvironment();
-    if (!envLoaded) {
+    if (!envLoaded)
+    {
         ImGui::TextWrapped("%s", _("The environment file could not be loaded."));
         return;
     }
-    if (Hinted(ImGui::Button(_("Save")), "Save settings")) SaveEnvironment();
-    if (envDirty) {
+    if (Hinted(ImGui::Button(_("Save")), "Save settings"))
+        SaveEnvironment();
+    if (envDirty)
+    {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
     }
     ImGui::Separator();
-    if (EditEnvJson(envJson, std::string(), 0)) envDirty = true;
+    if (EditEnvJson(envJson, std::string(), 0))
+        envDirty = true;
 }
 
 } // namespace CharEditor

@@ -24,12 +24,9 @@ namespace OpenArtOfWar
 DebugOverlay::DebugOverlay(SDL_Window *window, SDL_Renderer *renderer)
     : m_window(window)
     , m_renderer(renderer)
-{
-}
+{}
 
-DebugOverlay::~DebugOverlay()
-{
-}
+DebugOverlay::~DebugOverlay() {}
 
 void DebugOverlay::ProcessEvent(const SDL_Event &event)
 {

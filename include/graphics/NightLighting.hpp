@@ -41,7 +41,7 @@ struct NightConfig
     float buildingCoreIntensity {0.45f}; // over the footprint itself
     float buildingSoftness {1.6f};
     SDL_Color buildingColor {255, 214, 160, 255};
-    float buildingUnpowered {0.0f};     // times the light of a building without power (0: its lights go out)
+    float buildingUnpowered {0.0f};         // times the light of a building without power (0: its lights go out)
     float buildingUnderConstruction {0.0f}; // times the light of a building not yet finished
 
     // Reads the file (missing values keep their defaults); false: not found / not readable

@@ -1365,7 +1365,8 @@ bool MissionController::LoadMatch(
                 if (q == p || !setup.slots[q].active || setup.slots[q].team == slot.team || qs < 0
                     || qs >= static_cast<int>(spots.size()))
                     continue;
-                const float dx = static_cast<float>(spots[qs].first - cx), dy = static_cast<float>(spots[qs].second - cy);
+                const float dx = static_cast<float>(spots[qs].first - cx),
+                            dy = static_cast<float>(spots[qs].second - cy);
                 const float d = DetMath::Hypot(dx, dy);
                 if (d > 0.5f && d < best)
                 {
@@ -1374,7 +1375,8 @@ bool MissionController::LoadMatch(
                     ey = dy / d;
                 }
             }
-            const int px = cx - static_cast<int>(std::lround(ex * 5.0f)), py = cy - static_cast<int>(std::lround(ey * 5.0f));
+            const int px = cx - static_cast<int>(std::lround(ex * 5.0f)),
+                      py = cy - static_cast<int>(std::lround(ey * 5.0f));
             if (!planner.Place(base.power, px, py, slot.faction, p, unusedX, unusedY))
                 planner.Place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
         }

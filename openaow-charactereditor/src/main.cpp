@@ -11,32 +11,45 @@
 #endif
 
 // Without a window: openaow-charactereditor --export-sprites <folder>            one atlas + JSON per object
-//                   openaow-charactereditor --export-single <folder> [columns [packed]]   every sprite on one grid (or packed atlas) per group
-//                   openaow-charactereditor --import-sprites <folder> [assets]   put them back (OVERWRITES assets/sprites)
-static int ExportWithoutWindow(const std::string& mode, const std::string& folder, int columns, const std::string& assets = {},
-                               bool packed = false) {
+//                   openaow-charactereditor --export-single <folder> [columns [packed]]   every sprite on one grid (or
+//                   packed atlas) per group openaow-charactereditor --import-sprites <folder> [assets]   put them back
+//                   (OVERWRITES assets/sprites)
+static int ExportWithoutWindow(
+    const std::string &mode,
+    const std::string &folder,
+    int columns,
+    const std::string &assets = {},
+    bool packed = false)
+{
     const CharEditor::fs::path root = assets.empty() ? CharEditor::FindAssetRoot() : CharEditor::fs::path(assets);
-    if (root.empty()) {
+    if (root.empty())
+    {
         std::cerr << "Could not find the assets folder with graphics data.\n";
         return 1;
     }
     std::string report;
-    if (mode == "--import-sprites") {
+    if (mode == "--import-sprites")
+    {
         const bool ok = CharEditor::ImportSpriteFolder(root, folder, report);
         (ok ? std::cout : std::cerr) << report << '\n';
         return ok ? 0 : 1;
     }
     CharEditor::SpriteCatalog catalog;
-    if (!catalog.load(root, report)) {
+    if (!catalog.load(root, report))
+    {
         std::cerr << report << '\n';
         return 1;
     }
     bool ok = false;
-    if (mode == "--export-sprites") {
+    if (mode == "--export-sprites")
+    {
         std::vector<int> all(catalog.Objects().size());
-        for (size_t i = 0; i < all.size(); ++i) all[i] = static_cast<int>(i);
+        for (size_t i = 0; i < all.size(); ++i)
+            all[i] = static_cast<int>(i);
         ok = CharEditor::ExportSpriteObjects(catalog, root, folder, all, report);
-    } else {
+    }
+    else
+    {
         CharEditor::SingleExportOptions options;
         options.columns = columns;
         options.packed = packed;
@@ -46,7 +59,7 @@ static int ExportWithoutWindow(const std::string& mode, const std::string& folde
     return ok ? 0 : 1;
 }
 
-static const char* const kHelp = R"(Usage: openaow-charactereditor [command]
+static const char *const kHelp = R"(Usage: openaow-charactereditor [command]
 
 Editor of the units and buildings in assets/characters/*.yaml (and of effects, projectiles, the game UI,
 the environment, AI difficulty and sprites). Without a command it opens the editor window.
@@ -61,34 +74,46 @@ Commands without a window:
   --help, -h                                     this text
 )";
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
 #if defined(_WIN32)
-    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+    if (AttachConsole(ATTACH_PARENT_PROCESS))
+    {
         HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (hOut == NULL || hOut == INVALID_HANDLE_VALUE || GetFileType(hOut) == FILE_TYPE_UNKNOWN) {
+        if (hOut == NULL || hOut == INVALID_HANDLE_VALUE || GetFileType(hOut) == FILE_TYPE_UNKNOWN)
+        {
             FILE *fp = nullptr;
             freopen_s(&fp, "CONOUT$", "w", stdout);
         }
         HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-        if (hErr == NULL || hErr == INVALID_HANDLE_VALUE || GetFileType(hErr) == FILE_TYPE_UNKNOWN) {
+        if (hErr == NULL || hErr == INVALID_HANDLE_VALUE || GetFileType(hErr) == FILE_TYPE_UNKNOWN)
+        {
             FILE *fp = nullptr;
             freopen_s(&fp, "CONOUT$", "w", stderr);
         }
     }
 #endif
-    if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+    if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h"))
+    {
         std::cout << kHelp;
         return 0;
     }
-    if (argc >= 3 && (std::string(argv[1]) == "--export-sprites" || std::string(argv[1]) == "--export-single")) {
-        return ExportWithoutWindow(argv[1], argv[2], argc >= 4 ? std::max(1, std::atoi(argv[3])) : 64, {},
-                                   argc >= 5 && std::string(argv[4]) == "packed");
+    if (argc >= 3 && (std::string(argv[1]) == "--export-sprites" || std::string(argv[1]) == "--export-single"))
+    {
+        return ExportWithoutWindow(
+            argv[1],
+            argv[2],
+            argc >= 4 ? std::max(1, std::atoi(argv[3])) : 64,
+            {},
+            argc >= 5 && std::string(argv[4]) == "packed");
     }
-    if (argc >= 3 && std::string(argv[1]) == "--import-sprites") {
+    if (argc >= 3 && std::string(argv[1]) == "--import-sprites")
+    {
         return ExportWithoutWindow(argv[1], argv[2], 64, argc >= 4 ? argv[3] : "");
     }
     CharEditor::CharacterEditor editor;
-    if (!editor.Init()) {
+    if (!editor.Init())
+    {
         std::cerr << editor.ErrorMessage() << '\n';
         return 1;
     }

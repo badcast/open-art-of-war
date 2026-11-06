@@ -374,7 +374,9 @@ void testReplayFile()
     bad.files["../evil.json"] = {1};
     CHECK(!writeReplay((dir / "bad.awr").string(), bad, error));
     CHECK(!validReplayFileName("maps/../x") && !validReplayFileName("/maps/x") && !validReplayFileName("other/x"));
-    CHECK(!validReplayFileName("data/a b") && !validReplayFileName("data//x") && validReplayFileName("data/a/b-c_d.yaml"));
+    CHECK(
+        !validReplayFileName("data/a b") && !validReplayFileName("data//x")
+        && validReplayFileName("data/a/b-c_d.yaml"));
     // Truncated, garbage and missing files are refused without a crash
     {
         std::ifstream in(path, std::ios::binary);
@@ -624,7 +626,9 @@ void testServerReplay()
     hc.reconnectWindowMs = 500;
     hc.replayDir = (dir / "replay").string();
     std::vector<std::string> log;
-    hc.log = [&log](const std::string &line) { log.push_back(line); };
+    hc.log = [&log](const std::string &line) {
+        log.push_back(line);
+    };
     {
         SessionHost host(hc);
         host.addTransport(hub.server());
@@ -644,9 +648,9 @@ void testServerReplay()
         };
         step(50);
         host.setLobbyMap("assets/maps/m26.json", 2, 77);
-        host.startMatch(std::vector<std::uint8_t>{5, 6, 7}, now, 100);
+        host.startMatch(std::vector<std::uint8_t> {5, 6, 7}, now, 100);
         step(300);
-        clients[0]->sendCommands(3, std::vector<std::uint8_t>{1, 2});
+        clients[0]->sendCommands(3, std::vector<std::uint8_t> {1, 2});
         step(300);
         for (auto &c : clients)
             c->sendWorldHash(20, 0xC0FFEE);
@@ -664,7 +668,7 @@ void testServerReplay()
     ReplayData data;
     std::string error;
     CHECK(readReplay(path, data, error));
-    CHECK((data.setup == std::vector<std::uint8_t>{5, 6, 7}));
+    CHECK((data.setup == std::vector<std::uint8_t> {5, 6, 7}));
     CHECK(data.turns.size() >= 5);
     TurnBundle first;
     CHECK(!data.turns.empty() && decodeTurn(data.turns[0].data(), data.turns[0].size(), first) && first.turn == 0);
@@ -674,7 +678,7 @@ void testServerReplay()
         TurnBundle b;
         if (decodeTurn(t.data(), t.size(), b))
             for (const auto &p : b.players)
-                hasCommands = hasCommands || (p.bytes == std::vector<std::uint8_t>{1, 2});
+                hasCommands = hasCommands || (p.bytes == std::vector<std::uint8_t> {1, 2});
     }
     CHECK(hasCommands);
     CHECK(data.checksums.size() == 1 && data.checksums[0].first == 20 && data.checksums[0].second == 0xC0FFEE);
@@ -683,7 +687,9 @@ void testServerReplay()
     bool loggedAddress = false, loggedSave = false;
     for (const std::string &line : log)
     {
-        loggedAddress = loggedAddress || (line.find("player joined") != std::string::npos && line.find("loopback") != std::string::npos);
+        loggedAddress
+            = loggedAddress
+              || (line.find("player joined") != std::string::npos && line.find("loopback") != std::string::npos);
         loggedSave = loggedSave || line.find("replay saved") != std::string::npos;
     }
     CHECK(loggedAddress && loggedSave);

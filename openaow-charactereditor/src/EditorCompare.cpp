@@ -15,55 +15,75 @@
 #include <unordered_map>
 #include <vector>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
-void CharacterEditor::SetEditorMode(EditorMode mode) {
-    if (editorMode == mode) return;
+void CharacterEditor::SetEditorMode(EditorMode mode)
+{
+    if (editorMode == mode)
+        return;
     editorMode = mode;
-    if (mode == EditorMode::Simulation) {
-        if (battle.Active()) FrameBattleCamera();
-    } else {
+    if (mode == EditorMode::Simulation)
+    {
+        if (battle.Active())
+            FrameBattleCamera();
+    }
+    else
+    {
         cameraPanX = 0.0f;
         cameraPanY = 0.0f;
         previewZoom = 2.0f;
     }
 }
 
-bool CharacterEditor::LoadCompare(int index) {
+bool CharacterEditor::LoadCompare(int index)
+{
     compareIndex = index;
     compareDoc = YAML::Node();
     comparePath.clear();
-    if (index < 0 || index >= static_cast<int>(files.size())) return false;
-    try {
+    if (index < 0 || index >= static_cast<int>(files.size()))
+        return false;
+    try
+    {
         compareDoc = YAML::LoadFile(files[static_cast<size_t>(index)].path.string());
         comparePath = files[static_cast<size_t>(index)].path;
         compareOffsets = ReadVisualOffsets(compareDoc);
         return true;
-    } catch (const std::exception& error) {
+    }
+    catch (const std::exception &error)
+    {
         compareDoc = YAML::Node();
         status = std::string(_("Could not load YAML: ")) + error.what();
         return false;
     }
 }
 
-void CharacterEditor::DrawOpponentPicker(bool allowMirror) {
+void CharacterEditor::DrawOpponentPicker(bool allowMirror)
+{
     std::string current = _("(none)");
-    if (compareDoc.IsDefined()) {
-        current = YamlString(compareDoc, "name", comparePath.stem().string()) + " (" +
-                  OpenArtOfWar::Utility::FactionName(DocFaction(compareDoc)) + ")";
-    } else if (allowMirror) {
+    if (compareDoc.IsDefined())
+    {
+        current = YamlString(compareDoc, "name", comparePath.stem().string()) + " ("
+                  + OpenArtOfWar::Utility::FactionName(DocFaction(compareDoc)) + ")";
+    }
+    else if (allowMirror)
+    {
         current = _("Mirror match (same as A)");
     }
     ImGui::SetNextItemWidth(280.0f);
-    if (Hinted(ImGui::BeginCombo(_("Opponent B"), current.c_str()), "Opponent B")) {
-        if (allowMirror && ImGui::Selectable(_("Mirror match (same as A)"), !compareDoc.IsDefined())) {
+    if (Hinted(ImGui::BeginCombo(_("Opponent B"), current.c_str()), "Opponent B"))
+    {
+        if (allowMirror && ImGui::Selectable(_("Mirror match (same as A)"), !compareDoc.IsDefined()))
+        {
             LoadCompare(-1);
         }
-        for (size_t i = 0; i < files.size(); ++i) {
-            const auto& f = files[i];
-            std::string label = (f.type == "building" ? "[B#" : "[#") + std::to_string(f.numericId) + "] " +
-                                f.name + " (" + f.faction + ")";
-            if (ImGui::Selectable(label.c_str(), compareIndex == static_cast<int>(i))) {
+        for (size_t i = 0; i < files.size(); ++i)
+        {
+            const auto &f = files[i];
+            std::string label = (f.type == "building" ? "[B#" : "[#") + std::to_string(f.numericId) + "] " + f.name
+                                + " (" + f.faction + ")";
+            if (ImGui::Selectable(label.c_str(), compareIndex == static_cast<int>(i)))
+            {
                 LoadCompare(static_cast<int>(i));
             }
         }
@@ -71,21 +91,27 @@ void CharacterEditor::DrawOpponentPicker(bool allowMirror) {
     }
 }
 
-void CharacterEditor::DrawCompareControls() {
+void CharacterEditor::DrawCompareControls()
+{
     DrawOpponentPicker(false);
     ImGui::SameLine();
     ImGui::BeginDisabled(!compareDoc.IsDefined() || dirty);
-    if (Hinted(ImGui::Button(_("Swap A <-> B")), "Swap A <-> B")) {
+    if (Hinted(ImGui::Button(_("Swap A <-> B")), "Swap A <-> B"))
+    {
         const fs::path previousA = activePath;
         const fs::path previousB = comparePath;
-        if (loadFile(previousB)) {
-            for (size_t i = 0; i < files.size(); ++i) {
-                if (files[i].path == previousA) LoadCompare(static_cast<int>(i));
+        if (loadFile(previousB))
+        {
+            for (size_t i = 0; i < files.size(); ++i)
+            {
+                if (files[i].path == previousA)
+                    LoadCompare(static_cast<int>(i));
             }
         }
     }
     ImGui::EndDisabled();
-    if (dirty && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+    if (dirty && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
         ImGui::SetTooltip("%s", _("Save A first: swapping reloads both files"));
     }
     ImGui::SameLine();
@@ -93,26 +119,34 @@ void CharacterEditor::DrawCompareControls() {
     Hinted(ImGui::SliderFloat("##spacing", &compareSpacing, 40.0f, 200.0f, _("Spacing %.0f px")), "##spacing");
 }
 
-void CharacterEditor::DrawCompareTable() {
-    if (!compareDoc.IsDefined()) {
+void CharacterEditor::DrawCompareTable()
+{
+    if (!compareDoc.IsDefined())
+    {
         ImGui::TextDisabled("%s", _("Pick unit B to compare."));
         return;
     }
-    if (!Hinted(ImGui::CollapsingHeader(_("A vs B"), ImGuiTreeNodeFlags_DefaultOpen), "A vs B")) return;
+    if (!Hinted(ImGui::CollapsingHeader(_("A vs B"), ImGuiTreeNodeFlags_DefaultOpen), "A vs B"))
+        return;
 
     const CharacterStats a = ComputeStats(document, testSiegeMode);
     const CharacterStats b = ComputeStats(compareDoc, testSiegeMode);
 
     // better: +1 higher is better, -1 lower is better, 0 informational
-    struct Row {
-        const char* label;
+    struct Row
+    {
+        const char *label;
         float va;
         float vb;
         int better;
-        const char* fmt;
+        const char *fmt;
     };
-    auto ttk = [](float hp, float dps) { return dps > 0.01f ? hp / dps : -1.0f; };
-    auto per100 = [](float v, float cost) { return cost > 0.0f ? v * 100.0f / cost : 0.0f; };
+    auto ttk = [](float hp, float dps) {
+        return dps > 0.01f ? hp / dps : -1.0f;
+    };
+    auto per100 = [](float v, float cost) {
+        return cost > 0.0f ? v * 100.0f / cost : 0.0f;
+    };
     std::vector<Row> rows = {
         {_("Max HP"), a.hp, b.hp, 1, "%.0f"},
         {_("Damage per shot"), a.damage, b.damage, 1, "%.0f"},
@@ -128,17 +162,25 @@ void CharacterEditor::DrawCompareTable() {
         {_("DPS per 100 credits"), per100(a.dps, a.cost), per100(b.dps, b.cost), 1, "%.1f"},
         {_("Time to kill the other, s"), ttk(b.hp, a.dps), ttk(a.hp, b.dps), -1, "%.1f"},
     };
-    if (a.minRange > 0.0f || b.minRange > 0.0f) {
-        rows.insert(rows.begin() + 6, Row{_("Min range, tiles"), a.minRange, b.minRange, -1, "%.1f"});
+    if (a.minRange > 0.0f || b.minRange > 0.0f)
+    {
+        rows.insert(rows.begin() + 6, Row {_("Min range, tiles"), a.minRange, b.minRange, -1, "%.1f"});
     }
-    if (a.building || b.building) {
+    if (a.building || b.building)
+    {
         rows.push_back({_("Power, kW"), a.power, b.power, 0, "%+.0f"});
-        rows.push_back({_("Footprint, tiles"), static_cast<float>(a.width * a.height),
-                        static_cast<float>(b.width * b.height), 0, "%.0f"});
+        rows.push_back(
+            {_("Footprint, tiles"),
+             static_cast<float>(a.width * a.height),
+             static_cast<float>(b.width * b.height),
+             0,
+             "%.0f"});
     }
 
-    const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
-    if (ImGui::BeginTable("compare-table", 4, flags)) {
+    const ImGuiTableFlags flags
+        = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
+    if (ImGui::BeginTable("compare-table", 4, flags))
+    {
         ImGui::TableSetupColumn(_("Parameter"), ImGuiTableColumnFlags_WidthStretch, 2.0f);
         ImGui::TableSetupColumn((std::string("A: ") + a.name).c_str(), ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn((std::string("B: ") + b.name).c_str(), ImGuiTableColumnFlags_WidthStretch, 1.2f);
@@ -148,31 +190,48 @@ void CharacterEditor::DrawCompareTable() {
         const ImVec4 good(0.45f, 0.9f, 0.5f, 1.0f);
         const ImVec4 bad(0.95f, 0.45f, 0.4f, 1.0f);
         const ImVec4 plain(0.85f, 0.88f, 0.9f, 1.0f);
-        for (const Row& r : rows) {
+        for (const Row &r : rows)
+        {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(r.label);
 
             const bool na = r.va < 0.0f || r.vb < 0.0f; // e.g. no damage -> no time to kill
             ImVec4 ca = plain, cb = plain;
-            if (r.better != 0 && !na && std::abs(r.va - r.vb) > 0.001f) {
+            if (r.better != 0 && !na && std::abs(r.va - r.vb) > 0.001f)
+            {
                 const bool aBetter = (r.better > 0) ? (r.va > r.vb) : (r.va < r.vb);
                 ca = aBetter ? good : bad;
                 cb = aBetter ? bad : good;
             }
             char buf[64];
             ImGui::TableNextColumn();
-            if (r.va < 0.0f) ImGui::TextDisabled("-");
-            else { std::snprintf(buf, sizeof(buf), r.fmt, r.va); ImGui::TextColored(ca, "%s", buf); }
-            ImGui::TableNextColumn();
-            if (r.vb < 0.0f) ImGui::TextDisabled("-");
-            else { std::snprintf(buf, sizeof(buf), r.fmt, r.vb); ImGui::TextColored(cb, "%s", buf); }
-            ImGui::TableNextColumn();
-            if (na) {
+            if (r.va < 0.0f)
                 ImGui::TextDisabled("-");
-            } else if (std::abs(r.vb) > 0.001f) {
+            else
+            {
+                std::snprintf(buf, sizeof(buf), r.fmt, r.va);
+                ImGui::TextColored(ca, "%s", buf);
+            }
+            ImGui::TableNextColumn();
+            if (r.vb < 0.0f)
+                ImGui::TextDisabled("-");
+            else
+            {
+                std::snprintf(buf, sizeof(buf), r.fmt, r.vb);
+                ImGui::TextColored(cb, "%s", buf);
+            }
+            ImGui::TableNextColumn();
+            if (na)
+            {
+                ImGui::TextDisabled("-");
+            }
+            else if (std::abs(r.vb) > 0.001f)
+            {
                 ImGui::TextDisabled("%+.0f%%", (r.va - r.vb) / std::abs(r.vb) * 100.0f);
-            } else {
+            }
+            else
+            {
                 ImGui::TextDisabled("%+.2f", r.va - r.vb);
             }
         }
@@ -181,47 +240,58 @@ void CharacterEditor::DrawCompareTable() {
     ImGui::TextDisabled("%s", _("A uses the current (unsaved) values; colors: green = better, red = worse."));
 }
 
-void CharacterEditor::FrameBattleCamera() {
+void CharacterEditor::FrameBattleCamera()
+{
     const SDL_FRect area = battle.BattleAreaPx();
     cameraPanX = area.x + area.w * 0.5f;
     cameraPanY = area.y + area.h * 0.5f;
-    const float fit = std::min(static_cast<float>(previewRect.w) / area.w,
-                               static_cast<float>(previewRect.h) / area.h);
+    const float fit = std::min(static_cast<float>(previewRect.w) / area.w, static_cast<float>(previewRect.h) / area.h);
     previewZoom = std::clamp(fit, 0.75f, 3.0f);
 }
 
-void CharacterEditor::StartBattle() {
+void CharacterEditor::StartBattle()
+{
     std::string error;
     YAML::Node opponent = compareDoc.IsDefined() ? compareDoc : document;
-    if (battle.start(battleSetup, assetsRoot, textures.get(), document, opponent, error)) {
+    if (battle.start(battleSetup, assetsRoot, textures.get(), document, opponent, error))
+    {
         battlePaused = false;
         FrameBattleCamera();
         status = _("Battle started");
-    } else {
+    }
+    else
+    {
         status = error;
     }
 }
 
-void CharacterEditor::RunBattleBatch() {
+void CharacterEditor::RunBattleBatch()
+{
     YAML::Node opponent = compareDoc.IsDefined() ? compareDoc : document;
     BattleBatchResult r;
-    for (int i = 0; i < battleBatchRuns; ++i) {
+    for (int i = 0; i < battleBatchRuns; ++i)
+    {
         BattleSim sim;
         std::string error;
-        if (!sim.start(battleSetup, assetsRoot, textures.get(), document, opponent, error)) {
+        if (!sim.start(battleSetup, assetsRoot, textures.get(), document, opponent, error))
+        {
             status = error;
             return;
         }
         sim.RunToEnd();
         ++r.runs;
-        if (sim.Winner() == 1) ++r.winsA;
-        else if (sim.Winner() == 2) ++r.winsB;
-        else ++r.draws;
+        if (sim.Winner() == 1)
+            ++r.winsA;
+        else if (sim.Winner() == 2)
+            ++r.winsB;
+        else
+            ++r.draws;
         r.avgTime += sim.Time();
         r.avgAliveA += static_cast<float>(sim.SideA().alive);
         r.avgAliveB += static_cast<float>(sim.SideB().alive);
     }
-    if (r.runs > 0) {
+    if (r.runs > 0)
+    {
         r.avgTime /= static_cast<float>(r.runs);
         r.avgAliveA /= static_cast<float>(r.runs);
         r.avgAliveB /= static_cast<float>(r.runs);
@@ -229,8 +299,10 @@ void CharacterEditor::RunBattleBatch() {
     batchResult = r;
 }
 
-void CharacterEditor::DrawSimulationControls() {
-    if (!document.IsDefined()) {
+void CharacterEditor::DrawSimulationControls()
+{
+    if (!document.IsDefined())
+    {
         ImGui::TextWrapped("%s", _("Select a YAML configuration from the list."));
         return;
     }
@@ -250,37 +322,48 @@ void CharacterEditor::DrawSimulationControls() {
     Hinted(ImGui::Checkbox(_("B advances"), &battleSetup.bAdvances), "B advances");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140.0f);
-    Hinted(ImGui::SliderFloat("##timeLimit", &battleSetup.timeLimit, 30.0f, 600.0f, _("Time limit %.0f s")), "##timeLimit");
+    Hinted(
+        ImGui::SliderFloat("##timeLimit", &battleSetup.timeLimit, 30.0f, 600.0f, _("Time limit %.0f s")),
+        "##timeLimit");
 
-    if (Hinted(ImGui::Button(battle.Active() ? _("Restart") : _("Start battle")), battle.Active() ? "Restart" : "Start battle")) StartBattle();
+    if (Hinted(
+            ImGui::Button(battle.Active() ? _("Restart") : _("Start battle")),
+            battle.Active() ? "Restart" : "Start battle"))
+        StartBattle();
     ImGui::SameLine();
     ImGui::BeginDisabled(!battle.Active());
-    if (Hinted(ImGui::Button(battlePaused ? _("Resume") : _("Pause")), battlePaused ? "Resume" : "Pause")) battlePaused = !battlePaused;
+    if (Hinted(ImGui::Button(battlePaused ? _("Resume") : _("Pause")), battlePaused ? "Resume" : "Pause"))
+        battlePaused = !battlePaused;
     ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Step 0.1 s")), "Step 0.1 s")) {
+    if (Hinted(ImGui::Button(_("Step 0.1 s")), "Step 0.1 s"))
+    {
         battlePaused = true;
         battle.Update(0.1f);
     }
     ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Stop")), "Stop")) battle.stop();
+    if (Hinted(ImGui::Button(_("Stop")), "Stop"))
+        battle.stop();
     ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Fit view")), "Fit view")) FrameBattleCamera();
+    if (Hinted(ImGui::Button(_("Fit view")), "Fit view"))
+        FrameBattleCamera();
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(110.0f);
     Hinted(ImGui::SliderFloat("##simSpeed", &playbackSpeed, 0.1f, 4.0f, _("Speed %.1fx")), "##simSpeed");
 
-    if (battle.Active()) {
-        const auto& a = battle.SideA();
-        const auto& b = battle.SideB();
-        if (ImGui::BeginTable("battle-table", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
+    if (battle.Active())
+    {
+        const auto &a = battle.SideA();
+        const auto &b = battle.SideB();
+        if (ImGui::BeginTable("battle-table", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV))
+        {
             ImGui::TableSetupColumn(_("Side"));
             ImGui::TableSetupColumn(_("Alive"));
             ImGui::TableSetupColumn(_("HP left"));
             ImGui::TableSetupColumn(_("Damage dealt"));
             ImGui::TableSetupColumn(_("DPS"));
             ImGui::TableHeadersRow();
-            auto row = [&](const char* label, const BattleSim::Side& s, ImVec4 color) {
+            auto row = [&](const char *label, const BattleSim::Side &s, ImVec4 color) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::TextColored(color, "%s", label);
@@ -299,10 +382,13 @@ void CharacterEditor::DrawSimulationControls() {
             row(labelB.c_str(), b, ImVec4(0.5f, 0.75f, 1.0f, 1.0f));
             ImGui::EndTable();
         }
-        if (battle.Finished()) {
-            const char* result = battle.Winner() == 1 ? _("A wins") : battle.Winner() == 2 ? _("B wins") : _("Draw");
+        if (battle.Finished())
+        {
+            const char *result = battle.Winner() == 1 ? _("A wins") : battle.Winner() == 2 ? _("B wins") : _("Draw");
             ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "%s  (%.1f s)", result, battle.Time());
-        } else {
+        }
+        else
+        {
             ImGui::Text(_("Battle time: %.1f s"), battle.Time());
         }
     }
@@ -310,12 +396,21 @@ void CharacterEditor::DrawSimulationControls() {
     ImGui::SetNextItemWidth(150.0f);
     Hinted(ImGui::SliderInt("##batchRuns", &battleBatchRuns, 5, 100, _("Battles: %d")), "##batchRuns");
     ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Run batch (no rendering)")), "Run batch (no rendering)")) RunBattleBatch();
-    if (batchResult.runs > 0) {
+    if (Hinted(ImGui::Button(_("Run batch (no rendering)")), "Run batch (no rendering)"))
+        RunBattleBatch();
+    if (batchResult.runs > 0)
+    {
         const float n = static_cast<float>(batchResult.runs);
-        ImGui::Text(_("A wins %d (%.0f%%) | B wins %d (%.0f%%) | draws %d | avg %.1f s | survivors A %.1f, B %.1f"),
-                    batchResult.winsA, batchResult.winsA * 100.0f / n, batchResult.winsB, batchResult.winsB * 100.0f / n,
-                    batchResult.draws, batchResult.avgTime, batchResult.avgAliveA, batchResult.avgAliveB);
+        ImGui::Text(
+            _("A wins %d (%.0f%%) | B wins %d (%.0f%%) | draws %d | avg %.1f s | survivors A %.1f, B %.1f"),
+            batchResult.winsA,
+            batchResult.winsA * 100.0f / n,
+            batchResult.winsB,
+            batchResult.winsB * 100.0f / n,
+            batchResult.draws,
+            batchResult.avgTime,
+            batchResult.avgAliveA,
+            batchResult.avgAliveB);
     }
 }
 

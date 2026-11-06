@@ -66,11 +66,12 @@ enum class MsgType : std::uint8_t
     PauseRequest = 20, // client -> host: pause / go on
     PauseState = 21,   // host -> clients: paused or not, by whom
     // Room owner (dedicated server rooms: the first player decides what the host would)
-    OwnerSetMap = 24,  // client -> room: the map and its start position count
-    OwnerStart = 25,   // client -> room: the resolved match setup to start with
-    OwnerSetAi = 26,   // client -> room: add, change or remove a computer player
-    OwnerSetTeam = 27, // client -> room: the team of a player (only the host / room owner decides teams)
-    OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits, time of day)
+    OwnerSetMap = 24,     // client -> room: the map and its start position count
+    OwnerStart = 25,      // client -> room: the resolved match setup to start with
+    OwnerSetAi = 26,      // client -> room: add, change or remove a computer player
+    OwnerSetTeam = 27,    // client -> room: the team of a player (only the host / room owner decides teams)
+    OwnerSetOptions = 28, // client -> room: the match options (fog of war, prebuilt bases, starting credits, time of
+                          // day)
     OwnerSetSeat = 29,    // client -> room: a start position is made open, blocked or taken by a computer player
     // Realtime
     Heartbeat = 32,
@@ -198,7 +199,7 @@ struct LobbyChoice
     uint8_t color {0};         // 0..15
     uint8_t spawn {kRandom};   // start position 0..7 or kRandom
     uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
-    uint8_t armyCap {7};       // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
+    uint8_t armyCap {7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
     bool ready {false};
 };
 
@@ -223,7 +224,7 @@ struct OwnerSetAi
 struct OwnerSetTeam
 {
     uint8_t slot {0};
-    uint8_t team {0}; // 0..7
+    uint8_t team {0};     // 0..7
     uint8_t handicap {0}; // 0..5, see LobbyChoice
     uint8_t armyCap {7};  // 0..7, see LobbyChoice
 };
@@ -235,9 +236,10 @@ struct LobbyState
     uint8_t spawnCount {2}; // start positions of the map
     bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
-    uint8_t credits {1};    // index into the game's list of starting credits (0..4)
-    bool night {false};     // time of day of the match (day / night)
-    uint8_t blockedMask {0}; // start positions nobody may take (bit per position): neither a player nor a computer player
+    uint8_t credits {1}; // index into the game's list of starting credits (0..4)
+    bool night {false};  // time of day of the match (day / night)
+    uint8_t blockedMask {
+        0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
 };
 

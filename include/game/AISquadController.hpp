@@ -261,7 +261,8 @@ private:
     // instead, everyone else waits (`map` may be null: then nobody breaches)
     void CapDetours(const AISquad &sq, EntityManager &entities, const TileMap *map = nullptr);
     void ReleaseUnit(AISquad &sq, int unitId, EntityManager &entities);
-    // The group picks one target (priority tier, then nearest to the leader) and every member that can reach it fires at it
+    // The group picks one target (priority tier, then nearest to the leader) and every member that can reach it fires
+    // at it
     void UpdateFocusTarget(AISquad &sq, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     void SetState(AISquad &sq, AISquadState state);
     void RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);

@@ -81,25 +81,25 @@ void SessionHost::finishReplay(const std::string &reason)
     }
     const std::int64_t endedAt = static_cast<std::int64_t>(std::time(nullptr));
     const std::uint32_t tpt = std::max<std::uint32_t>(1, m_config.ticksPerTurn);
-    nlohmann::json meta = {
-        {"format", 1},
-        {"game_version", m_config.identity.gameVersion},
-        {"protocol", kProtocolVersion},
-        {"source", "server"},
-        {"recorded_at", m_replayStartedAt},
-        {"ended_at", endedAt},
-        {"map", m_lobby.map},
-        {"map_hash", m_lobby.mapHash},
-        {"assets_hash", m_config.identity.assetsHash},
-        {"turn_ms", m_config.turnMs},
-        {"ticks_per_turn", tpt},
-        {"turns", data.turns.size()},
-        {"ticks", data.turns.size() * tpt},
-        {"players", players},
-        {"desynced", m_desynced},
-        {"desync_tick", m_desyncTick},
-        {"end_reason", reason},
-        {"checksum_interval", 20}};
+    nlohmann::json meta
+        = {{"format", 1},
+           {"game_version", m_config.identity.gameVersion},
+           {"protocol", kProtocolVersion},
+           {"source", "server"},
+           {"recorded_at", m_replayStartedAt},
+           {"ended_at", endedAt},
+           {"map", m_lobby.map},
+           {"map_hash", m_lobby.mapHash},
+           {"assets_hash", m_config.identity.assetsHash},
+           {"turn_ms", m_config.turnMs},
+           {"ticks_per_turn", tpt},
+           {"turns", data.turns.size()},
+           {"ticks", data.turns.size() * tpt},
+           {"players", players},
+           {"desynced", m_desynced},
+           {"desync_tick", m_desyncTick},
+           {"end_reason", reason},
+           {"checksum_interval", 20}};
     data.meta = meta.dump(2);
     const std::string path
         = (std::filesystem::path(m_config.replayDir) / replayFileName(m_lobby.map, m_replayStartedAt)).string();
@@ -216,7 +216,8 @@ uint8_t SessionHost::freeSpawn() const
 
 void SessionHost::setSeat(const OwnerSetSeat &change)
 {
-    if (m_running || change.spawn >= m_lobby.spawnCount || change.spawn >= kMaxPlayers || change.kind > OwnerSetSeat::Ai)
+    if (m_running || change.spawn >= m_lobby.spawnCount || change.spawn >= kMaxPlayers
+        || change.kind > OwnerSetSeat::Ai)
         return;
     int holder = -1;
     for (uint8_t s = 0; s < kMaxPlayers; ++s)

@@ -47,13 +47,13 @@ struct Settings
     bool sharpPixels {false}; // pixel-art anti-aliased upscaling instead of plain nearest / linear
 
     // Audio
-    int musicVolume {96};  // 0..128
-    int fxVolume {128};    // 0..128
-    int voiceVolume {128}; // 0..128: unit replies and the announcer
+    int musicVolume {96};   // 0..128
+    int fxVolume {128};     // 0..128
+    int voiceVolume {128};  // 0..128: unit replies and the announcer
     int ambientVolume {96}; // 0..128: the sound of the surroundings in a match (day / night loop)
-    int uiVolume {128};    // 0..128: interface clicks, dialogs and alerts
+    int uiVolume {128};     // 0..128: interface clicks, dialogs and alerts
     bool muted {false};
-    bool reverb {true};    // reverb of explosions and heavy guns
+    bool reverb {true}; // reverb of explosions and heavy guns
 
     // Network game
     std::string playerName {};

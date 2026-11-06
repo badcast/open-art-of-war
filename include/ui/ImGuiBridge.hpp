@@ -16,21 +16,21 @@ struct ConfirmState;
 
 enum class UiFont
 {
-    Small,      // 13px Regular
-    Body,       // 16px Regular (Default)
-    SmallBold,  // 13px Bold
-    BodyBold,   // 16px Bold
-    H2,         // 22px Bold
-    H1,         // 30px Bold
-    Hero        // 48px Bold
+    Small,     // 13px Regular
+    Body,      // 16px Regular (Default)
+    SmallBold, // 13px Bold
+    BodyBold,  // 16px Bold
+    H2,        // 22px Bold
+    H1,        // 30px Bold
+    Hero       // 48px Bold
 };
 
 enum class ButtonStyle
 {
-    Primary,    // Accent border and highlighted background
-    Secondary,  // Standard raised panel with neutral border
-    Danger,     // Red border and hazard highlight
-    Ghost       // Transparent background with hover highlight
+    Primary,   // Accent border and highlighted background
+    Secondary, // Standard raised panel with neutral border
+    Danger,    // Red border and hazard highlight
+    Ghost      // Transparent background with hover highlight
 };
 
 class ImGuiBridge
@@ -68,11 +68,7 @@ public:
         ImU32 fillCol = 0,
         ImU32 borderCol = 0);
 
-    static void ProgressBar(
-        float ratio,
-        const ImVec2 &size,
-        ImU32 fillColor = 0,
-        const char *overlayText = nullptr);
+    static void ProgressBar(float ratio, const ImVec2 &size, ImU32 fillColor = 0, const char *overlayText = nullptr);
 
     static bool Checkbox(const char *label, bool *v, bool enabled = true);
 

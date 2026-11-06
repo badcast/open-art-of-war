@@ -59,8 +59,8 @@ struct ResearchDef
     int value2;
     int archA; // archetypes the effect is about (siege / baseline forms count as their base), -1 = none
     int archB;
-    int needs;       // index of the technology that has to be researched first, -1 = none
-    bool playerOnly; // effect only makes sense for the player (e.g. HQ build radius)
+    int needs;             // index of the technology that has to be researched first, -1 = none
+    bool playerOnly;       // effect only makes sense for the player (e.g. HQ build radius)
     float seconds {60.0f}; // how long the technology takes to research (research_seconds in the YAML)
 };
 

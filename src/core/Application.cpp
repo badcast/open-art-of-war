@@ -507,103 +507,104 @@ void Application::Run()
             }
             else
             {
-            const bool net = InNetworkMatch();
-            Simulation &sim = m_gameplayController->simulation();
-            // P / Pause: everybody stops (a few times per player), anybody goes on
-            if (net && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)))
-            {
-                m_net->TogglePause();
-            }
-            const uint32_t nowMs = SDL_GetTicks();
-            auto playing = [&] {
-                return m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
-            };
-            // One tick of a network match: only when its turn is here; checksums go out after it
-            auto netTick = [&]() {
-                const uint32_t tick = sim.Tick();
-                if (!m_net->CanRunTick(tick))
-                    return false;
-                DriveNetworkBot(tick);
-                Update(static_cast<float>(SIMULATION_TIMESTEP));
-                if (sim.Tick() != tick)
+                const bool net = InNetworkMatch();
+                Simulation &sim = m_gameplayController->simulation();
+                // P / Pause: everybody stops (a few times per player), anybody goes on
+                if (net && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)))
                 {
-                    uint64_t checksum = 0;
-                    if (tick % NetMatch::kHashIntervalTicks == 0)
+                    m_net->TogglePause();
+                }
+                const uint32_t nowMs = SDL_GetTicks();
+                auto playing = [&] {
+                    return m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
+                };
+                // One tick of a network match: only when its turn is here; checksums go out after it
+                auto netTick = [&]() {
+                    const uint32_t tick = sim.Tick();
+                    if (!m_net->CanRunTick(tick))
+                        return false;
+                    DriveNetworkBot(tick);
+                    Update(static_cast<float>(SIMULATION_TIMESTEP));
+                    if (sim.Tick() != tick)
                     {
-                        SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
-                        uint64_t sections[Simulation::kChecksumSections];
-                        checksum = sim.ChecksumSections(ctx, sections);
-                        static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
-                        if (trace)
+                        uint64_t checksum = 0;
+                        if (tick % NetMatch::kHashIntervalTicks == 0)
                         {
-                            std::printf(
-                                "[Net] tick %u parts entities %016llx credits %016llx walls %016llx research %016llx\n",
-                                tick,
-                                static_cast<unsigned long long>(sections[0]),
-                                static_cast<unsigned long long>(sections[1]),
-                                static_cast<unsigned long long>(sections[2]),
-                                static_cast<unsigned long long>(sections[3]));
-                            std::fflush(stdout);
+                            SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
+                            uint64_t sections[Simulation::kChecksumSections];
+                            checksum = sim.ChecksumSections(ctx, sections);
+                            static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
+                            if (trace)
+                            {
+                                std::printf(
+                                    "[Net] tick %u parts entities %016llx credits %016llx walls %016llx research "
+                                    "%016llx\n",
+                                    tick,
+                                    static_cast<unsigned long long>(sections[0]),
+                                    static_cast<unsigned long long>(sections[1]),
+                                    static_cast<unsigned long long>(sections[2]),
+                                    static_cast<unsigned long long>(sections[3]));
+                                std::fflush(stdout);
+                            }
+                        }
+                        if (tick % NetMatch::kViewIntervalTicks == 0 && m_camera)
+                        {
+                            const float zoom = std::max(0.01f, m_camera->GetZoom());
+                            m_net->SendView(
+                                m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f,
+                                m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f,
+                                zoom);
+                        }
+                        m_net->AfterTick(tick, checksum);
+                        m_net->NoteTickRan(nowMs);
+                        // Tests (OAOW_NET_DROP_AT=<tick>): the connection drops once at that tick
+                        static const long dropAt
+                            = DebugEnv("OAOW_NET_DROP_AT") ? std::atol(DebugEnv("OAOW_NET_DROP_AT")) : -1;
+                        static bool dropped = false;
+                        if (!dropped && dropAt >= 0 && tick == static_cast<uint32_t>(dropAt))
+                        {
+                            dropped = true;
+                            std::cerr << "[Net] Test: dropping the connection at tick " << tick << std::endl;
+                            m_net->DropConnection();
                         }
                     }
-                    if (tick % NetMatch::kViewIntervalTicks == 0 && m_camera)
-                    {
-                        const float zoom = std::max(0.01f, m_camera->GetZoom());
-                        m_net->SendView(
-                            m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f,
-                            m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f,
-                            zoom);
-                    }
-                    m_net->AfterTick(tick, checksum);
-                    m_net->NoteTickRan(nowMs);
-                    // Tests (OAOW_NET_DROP_AT=<tick>): the connection drops once at that tick
-                    static const long dropAt
-                        = DebugEnv("OAOW_NET_DROP_AT") ? std::atol(DebugEnv("OAOW_NET_DROP_AT")) : -1;
-                    static bool dropped = false;
-                    if (!dropped && dropAt >= 0 && tick == static_cast<uint32_t>(dropAt))
-                    {
-                        dropped = true;
-                        std::cerr << "[Net] Test: dropping the connection at tick " << tick << std::endl;
-                        m_net->DropConnection();
-                    }
-                }
-                return true;
-            };
-            if (net && m_net->TurnsAhead(sim.Tick()) > 10)
-            {
-                // Far behind (back after a reconnect): play the turns through as fast as a frame allows
-                const auto deadline = clock::now() + std::chrono::milliseconds(25);
-                while (clock::now() < deadline && playing() && m_net->TurnsAhead(sim.Tick()) > 2 && netTick())
+                    return true;
+                };
+                if (net && m_net->TurnsAhead(sim.Tick()) > 10)
                 {
-                }
-                accumulator = 0.0;
-            }
-            else if (net)
-            {
-                // Slightly behind the host: an extra tick this frame
-                if (m_net->TurnsAhead(sim.Tick()) > 2)
-                    accumulator += SIMULATION_TIMESTEP;
-                while (accumulator >= SIMULATION_TIMESTEP && playing())
-                {
-                    if (!netTick())
+                    // Far behind (back after a reconnect): play the turns through as fast as a frame allows
+                    const auto deadline = clock::now() + std::chrono::milliseconds(25);
+                    while (clock::now() < deadline && playing() && m_net->TurnsAhead(sim.Tick()) > 2 && netTick())
                     {
-                        // Waiting for the host's turn: hold the time back instead of piling it up
-                        accumulator = std::min(accumulator, SIMULATION_TIMESTEP);
-                        break;
                     }
-                    accumulator -= SIMULATION_TIMESTEP;
+                    accumulator = 0.0;
                 }
-            }
-            else
-            {
-                while (accumulator >= SIMULATION_TIMESTEP)
+                else if (net)
                 {
-                    Update(static_cast<float>(SIMULATION_TIMESTEP));
-                    accumulator -= SIMULATION_TIMESTEP;
-                    if (!playing())
-                        break;
+                    // Slightly behind the host: an extra tick this frame
+                    if (m_net->TurnsAhead(sim.Tick()) > 2)
+                        accumulator += SIMULATION_TIMESTEP;
+                    while (accumulator >= SIMULATION_TIMESTEP && playing())
+                    {
+                        if (!netTick())
+                        {
+                            // Waiting for the host's turn: hold the time back instead of piling it up
+                            accumulator = std::min(accumulator, SIMULATION_TIMESTEP);
+                            break;
+                        }
+                        accumulator -= SIMULATION_TIMESTEP;
+                    }
                 }
-            }
+                else
+                {
+                    while (accumulator >= SIMULATION_TIMESTEP)
+                    {
+                        Update(static_cast<float>(SIMULATION_TIMESTEP));
+                        accumulator -= SIMULATION_TIMESTEP;
+                        if (!playing())
+                            break;
+                    }
+                }
             }
         }
         else
@@ -728,8 +729,8 @@ void Application::Update(float deltaTime)
 
     // A custom match without a person: watched with the whole map, nothing the viewer does reaches the world
     {
-        const bool playing = m_state == AppState::SkirmishPlaying || m_state == AppState::Paused
-                             || m_state == AppState::Briefing;
+        const bool playing
+            = m_state == AppState::SkirmishPlaying || m_state == AppState::Paused || m_state == AppState::Briefing;
         const bool spectate = playing && !m_replay && !m_net && m_menuController->IsSpectatorMatch();
         if (spectate != m_spectating)
         {
@@ -742,8 +743,8 @@ void Application::Update(float deltaTime)
                 m_replaySetup = m_mission->matchSetup();
             if (m_sound)
                 m_sound->SetInterfaceMuted(spectate); // the computer players' units do not answer the viewer
-            m_gameplayController->simulation().SetCommandSink(spectate ? std::function<void(SimCommand)>([](SimCommand) {})
-                                                                      : std::function<void(SimCommand)>());
+            m_gameplayController->simulation().SetCommandSink(
+                spectate ? std::function<void(SimCommand)>([](SimCommand) {}) : std::function<void(SimCommand)>());
         }
     }
 
@@ -1137,7 +1138,8 @@ void Application::Render()
 #else
         const bool overlayNoFog = false;
 #endif
-        bool disableFog = overlayNoFog || m_gameplayController->IsRevealFog() || !m_map->IsFogEnabled() || ReplayShowsAll();
+        bool disableFog
+            = overlayNoFog || m_gameplayController->IsRevealFog() || !m_map->IsFogEnabled() || ReplayShowsAll();
         int globalAnimTick = static_cast<int>(m_globalAnimTimer * 8.0f);
         m_map->RenderTerrain(*m_renderer, worldCam, !disableFog, globalAnimTick);
 
@@ -1234,12 +1236,12 @@ void Application::Render()
         // Order lines of the selected units (of every unit in sight while Alt is held); not for a viewer of computer
         // players: their orders are theirs
         if (!m_spectating)
-        m_gameplayController->RenderOrderLines(
-            *m_renderer,
-            *m_camera,
-            *m_entities,
-            *m_map,
-            m_input->isKeyPressed(SDL_SCANCODE_LALT) || m_input->isKeyPressed(SDL_SCANCODE_RALT));
+            m_gameplayController->RenderOrderLines(
+                *m_renderer,
+                *m_camera,
+                *m_entities,
+                *m_map,
+                m_input->isKeyPressed(SDL_SCANCODE_LALT) || m_input->isKeyPressed(SDL_SCANCODE_RALT));
 
         // Render Debug Navigation (Paths, Waypoints, Combat/Wall Targets)
         m_gameplayController->RenderDebugNavigation(*m_renderer, *m_camera, *m_entities, *m_map);

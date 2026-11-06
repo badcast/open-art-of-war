@@ -8,91 +8,114 @@
 #include <string>
 #include <vector>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
 namespace fs = std::filesystem;
 
 // What the single sprite export splits the sprites into; a sprite belongs to the first group that uses it
-enum class SpriteGroup { Units = 0, Buildings, Terrain, Other };
+enum class SpriteGroup
+{
+    Units = 0,
+    Buildings,
+    Terrain,
+    Other
+};
 constexpr int kSpriteGroupCount = 4;
-const char* SpriteGroupName(SpriteGroup group); // gettext msgid, e.g. "Units"
-const char* SpriteGroupSlug(SpriteGroup group); // file name part, e.g. "units"
+const char *SpriteGroupName(SpriteGroup group); // gettext msgid, e.g. "Units"
+const char *SpriteGroupSlug(SpriteGroup group); // file name part, e.g. "units"
 
 // One rectangle of a sprite sheet (assets/characters/sprites.json)
-struct RawSprite {
-    int id{0};
-    int page{0};
-    int x{0};
-    int y{0};
-    int w{0};
-    int h{0};
-    int palette{0};
+struct RawSprite
+{
+    int id {0};
+    int page {0};
+    int x {0};
+    int y {0};
+    int w {0};
+    int h {0};
+    int palette {0};
 };
 
-enum class SpriteObjectKind { Unit, Building, Tileset, Misc };
+enum class SpriteObjectKind
+{
+    Unit,
+    Building,
+    Tileset,
+    Misc
+};
 
 // One thing of the game with everything it is drawn from: the roots of its dependency tree and the closure of
 // what they use. Sprites, composites and animations may be shared by several objects.
-struct SpriteObject {
-    SpriteObjectKind kind{SpriteObjectKind::Misc};
-    SpriteGroup group{SpriteGroup::Other};
-    std::string kindName;  // "unit" / "building" / "tileset" / "misc"
-    std::string faction;   // "Resistance" / "Confederation" / "Neutral"
-    int id{0};             // archetype id / building index / tileset number / serial of a misc object
+struct SpriteObject
+{
+    SpriteObjectKind kind {SpriteObjectKind::Misc};
+    SpriteGroup group {SpriteGroup::Other};
+    std::string kindName; // "unit" / "building" / "tileset" / "misc"
+    std::string faction;  // "Resistance" / "Confederation" / "Neutral"
+    int id {0};           // archetype id / building index / tileset number / serial of a misc object
     std::string name;
     std::string slug;
     std::vector<int> rootSequences, rootComposites, rootAnims, rootBuildings;
-    int thumbSequence{-1};  // units: the sequence that shows the object best (standing, facing the viewer)
+    int thumbSequence {-1}; // units: the sequence that shows the object best (standing, facing the viewer)
     std::set<int> sequences, bodies, composites, anims, buildings, sprites;
 };
 
 // A line of the dependency tree shown in the editor
-struct DepNode {
+struct DepNode
+{
     std::string label;
     std::string kind; // "sequence" "step" "body" "layer" "part" "composite" "anim" "building" "sprite"
-    int id{-1};
-    int ox{0};
-    int oy{0};
+    int id {-1};
+    int ox {0};
+    int oy {0};
     std::vector<DepNode> children;
 };
 
 // The sprite data of the game (sprites.json + sprites_graphics.json) grouped into objects. No SDL, no ImGui:
 // it can be checked without a window.
-class SpriteCatalog {
+class SpriteCatalog
+{
 public:
     // `assetsRoot` is the assets folder (with characters/, data/, sprites/)
-    bool load(const fs::path& assetsRoot, std::string& error);
+    bool load(const fs::path &assetsRoot, std::string &error);
 
-    const std::vector<RawSprite>& Sprites() const { return rawSprites; }
-    const std::vector<SpriteObject>& Objects() const { return objs; }
+    const std::vector<RawSprite> &Sprites() const
+    {
+        return rawSprites;
+    }
+    const std::vector<SpriteObject> &Objects() const
+    {
+        return objs;
+    }
     SpriteGroup GroupOfSprite(int spriteId) const;
     // The sprites one unit sequence is drawn from
     std::set<int> SpritesOfSequence(int sequenceId) const;
 
     // Dependency tree of an object (depth is limited; shared parts are shown where they are used)
-    DepNode tree(const SpriteObject& object) const;
+    DepNode tree(const SpriteObject &object) const;
     // Everything the object is made of as JSON: roots and the raw tables of sequences, bodies, composites,
     // animations and buildings, enough to rebuild the graphics data of the object
-    nlohmann::json Describe(const SpriteObject& object) const;
+    nlohmann::json Describe(const SpriteObject &object) const;
 
 private:
-    void CollectComposite(int id, SpriteObject& out, int depth) const;
-    void CollectAnim(int id, SpriteObject& out, int depth) const;
-    void CollectBody(int id, SpriteObject& out) const;
-    void CollectSequence(int id, SpriteObject& out) const;
-    void CollectBuilding(int id, SpriteObject& out) const;
-    void CollectChild(int kind, int id, SpriteObject& out, int depth) const;
-    void Finish(SpriteObject& object) const;
+    void CollectComposite(int id, SpriteObject &out, int depth) const;
+    void CollectAnim(int id, SpriteObject &out, int depth) const;
+    void CollectBody(int id, SpriteObject &out) const;
+    void CollectSequence(int id, SpriteObject &out) const;
+    void CollectBuilding(int id, SpriteObject &out) const;
+    void CollectChild(int kind, int id, SpriteObject &out, int depth) const;
+    void Finish(SpriteObject &object) const;
 
     DepNode CompositeNode(int id, int depth) const;
     DepNode AnimNode(int id) const;
     DepNode ChildNode(int kind, int id, int ox, int oy, int depth) const;
 
-    nlohmann::json gd;                       // sprites_graphics.json
+    nlohmann::json gd; // sprites_graphics.json
     std::vector<RawSprite> rawSprites;
     std::vector<SpriteObject> objs;
-    std::vector<uint8_t> spriteGroup;        // per sprite id
-    int compCount{0}, animCount{0}, bodyCount{0}, seqCount{0}, buildingCount{0};
+    std::vector<uint8_t> spriteGroup; // per sprite id
+    int compCount {0}, animCount {0}, bodyCount {0}, seqCount {0}, buildingCount {0};
 };
 
 // Digest of one entry of the graphics tables as exported (without its "digest" field): the import applies an entry
@@ -100,6 +123,6 @@ private:
 std::string GraphicsDigest(nlohmann::json entry);
 
 // Lower case letters and digits, the rest becomes '_' ("TM-40 Fortress" -> "tm_40_fortress")
-std::string SpriteSlug(const std::string& text);
+std::string SpriteSlug(const std::string &text);
 
 } // namespace CharEditor

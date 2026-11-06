@@ -69,7 +69,7 @@ public:
         bool positional {false};
         float rangeTiles {12.0f};
         float minGain {0.0f}; // positional: quietest it is heard when farther than the range (0: silent there)
-        float reverb {0.0f}; // 0..1 send into the shared room reverb (explosions, heavy guns)
+        float reverb {0.0f};  // 0..1 send into the shared room reverb (explosions, heavy guns)
         std::vector<int> clips;
     };
 

@@ -92,11 +92,11 @@ bool ReplyFromRequest(const char *request, UnitReply &out)
         const char *text;
         UnitReply reply;
     };
-    static const Entry kEntries[] = {
-        {"@select", UnitReply::Select},
-        {"@move", UnitReply::Move},
-        {"@attack", UnitReply::Attack},
-        {"@hold", UnitReply::Hold}};
+    static const Entry kEntries[]
+        = {{"@select", UnitReply::Select},
+           {"@move", UnitReply::Move},
+           {"@attack", UnitReply::Attack},
+           {"@hold", UnitReply::Hold}};
     for (const Entry &e : kEntries)
     {
         if (std::strcmp(request, e.text) == 0)

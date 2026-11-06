@@ -8,29 +8,43 @@
 #include <utility>
 #include <vector>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
 // A YAML file edited without losing its comments: values are replaced in the text, the document is parsed
 // again from it. Keys are addressed by a dotted path ("easy.tactics.leash_tiles"); only "key: value" lines of
 // maps are supported (no lists of maps), which is all the settings files use.
-class CommentedYaml {
+class CommentedYaml
+{
 public:
-    bool load(const std::filesystem::path& path, std::string& error);
-    bool Save(std::string& error);
+    bool load(const std::filesystem::path &path, std::string &error);
+    bool Save(std::string &error);
 
-    bool Loaded() const { return m_loaded; }
-    bool Dirty() const { return m_dirty; }
-    const std::filesystem::path& Path() const { return m_path; }
-    const YAML::Node& Root() const { return m_node; }
+    bool Loaded() const
+    {
+        return m_loaded;
+    }
+    bool Dirty() const
+    {
+        return m_dirty;
+    }
+    const std::filesystem::path &Path() const
+    {
+        return m_path;
+    }
+    const YAML::Node &Root() const
+    {
+        return m_node;
+    }
     std::string text() const;
 
     // Node at the path; an undefined node when there is none
-    YAML::Node At(const std::string& path) const;
+    YAML::Node At(const std::string &path) const;
     // The comment lines right above the key
-    std::string Comment(const std::string& path) const;
+    std::string Comment(const std::string &path) const;
     // Replaces the value of a "key: value" line; valueText is YAML ("12", "true", "\"name\"", "[1, 2]").
     // False (nothing changed) when the key has no value line or the result would not parse.
-    bool Set(const std::string& path, const std::string& valueText);
+    bool Set(const std::string &path, const std::string &valueText);
 
 private:
     void Index();
@@ -43,8 +57,8 @@ private:
     std::map<std::string, int> m_lineOf;
     std::map<std::string, std::string> m_comments;
     YAML::Node m_node;
-    bool m_loaded{false};
-    bool m_dirty{false};
+    bool m_loaded {false};
+    bool m_dirty {false};
 };
 
 } // namespace CharEditor

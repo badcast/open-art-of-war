@@ -80,8 +80,8 @@ public:
     // How far the turret layer moves away from where it sits with the hull facing south (the facing the
     // offsets are tuned with in the character editor); kept up to date by EntityManager from sprite data
     int moveFireTargetId {0};
-    bool autoDeployed {false};    // went into siege mode by itself (packs up again by itself)
-    float siegeQuietTimer {0.0f}; // time in auto siege mode without anything to shoot at
+    bool autoDeployed {false};           // went into siege mode by itself (packs up again by itself)
+    float siegeQuietTimer {0.0f};        // time in auto siege mode without anything to shoot at
     float autoSiegeCooldownTimer {0.0f}; // cooldown after auto-packing before auto-deploying again
     float turretShiftX {0.0f};
     float turretShiftY {0.0f};
@@ -102,7 +102,7 @@ public:
     int stanceHomeX {-1};
     int stanceHomeY {-1};
     bool stanceReturning {false};
-    int orderedTargetId {0};       // target of the player's explicit attack order: a stance never drops it
+    int orderedTargetId {0}; // target of the player's explicit attack order: a stance never drops it
     // Where the current target was last in sight of the team (tiles): an ordered target that drops out of sight
     // (the rest of the group died, the enemy moved off) is looked for there instead of being forgotten
     int lastSeenTargetX {-1};
@@ -194,7 +194,7 @@ public:
     float blockRetryTimer {0.0f};
     static constexpr int kBlockRetries = 3;
     static constexpr float kBlockRetryPause = 0.25f;
-    int yieldHomeX {-1};          // where a unit without orders stood before it stepped aside (it walks back)
+    int yieldHomeX {-1}; // where a unit without orders stood before it stepped aside (it walks back)
     int yieldHomeY {-1};
     float yieldHomeTimer {0.0f};
     int yieldHomeTries {0};

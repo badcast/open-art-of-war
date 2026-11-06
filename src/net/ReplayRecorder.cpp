@@ -87,29 +87,29 @@ std::string ReplayRecorder::Finish(const std::string &outcome, uint32_t tick)
              {"spawn", s.startPosition[i]}});
     }
     const uint32_t ticks = static_cast<uint32_t>(data.turns.size()) * m_info.ticksPerTurn;
-    nlohmann::json meta = {
-        {"format", 1},
-        {"game_version", OAOW_VERSION},
-        {"protocol", Net::kProtocolVersion},
-        {"source", "client"},
-        {"recorded_at", m_startedAt},
-        {"map", raw.mapPath},
-        {"map_hash", raw.mapHash},
-        {"assets_hash", m_info.assetsHash},
-        {"seed", raw.seed},
-        {"turn_ms", m_info.turnMs},
-        {"ticks_per_turn", m_info.ticksPerTurn},
-        {"turns", data.turns.size()},
-        {"ticks", ticks},
-        {"players", players},
-        {"starting_credits", raw.startingCredits},
-        {"fog", raw.fogOfWar},
-        {"prebuilt", raw.prebuilt},
-        {"night", raw.night},
-        {"local_slot", s.local},
-        {"result", {{"outcome", outcome}, {"tick", tick}}},
-        {"checksum_interval", NetMatch::kHashIntervalTicks},
-        {"mode", m_info.mode}};
+    nlohmann::json meta
+        = {{"format", 1},
+           {"game_version", OAOW_VERSION},
+           {"protocol", Net::kProtocolVersion},
+           {"source", "client"},
+           {"recorded_at", m_startedAt},
+           {"map", raw.mapPath},
+           {"map_hash", raw.mapHash},
+           {"assets_hash", m_info.assetsHash},
+           {"seed", raw.seed},
+           {"turn_ms", m_info.turnMs},
+           {"ticks_per_turn", m_info.ticksPerTurn},
+           {"turns", data.turns.size()},
+           {"ticks", ticks},
+           {"players", players},
+           {"starting_credits", raw.startingCredits},
+           {"fog", raw.fogOfWar},
+           {"prebuilt", raw.prebuilt},
+           {"night", raw.night},
+           {"local_slot", s.local},
+           {"result", {{"outcome", outcome}, {"tick", tick}}},
+           {"checksum_interval", NetMatch::kHashIntervalTicks},
+           {"mode", m_info.mode}};
     if (m_info.mode == "campaign")
     {
         meta["mission"] = m_info.mission;

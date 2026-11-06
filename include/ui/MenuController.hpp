@@ -304,8 +304,8 @@ private:
     {
         int faction {0}; // computer players: 0 random, 1 Resistance, 2 Confederation (the person's comes from the side)
         int team {0};
-        int color {1}; // 1..8
-        int level {1}; // computer player: 0 easy .. 3 hardcore
+        int color {1};    // 1..8
+        int level {1};    // computer player: 0 easy .. 3 hardcore
         int handicap {0}; // start credits form (kHandicapPercent index); 0 = none
         int position {0}; // start position of the map (0-based), never shared by two players
         int armyCap {7};  // army size limit: index into kArmyCapUnits (7 = unlimited)
@@ -319,11 +319,11 @@ private:
     std::vector<int> CustomSeatCodes(int position) const;
     bool m_customSpectator {false}; // the person's place is Open: the match of the computer players is only watched
     bool m_spectatorMatch {false};  // the match that was started has no person
-    bool m_sideRandom {false}; // the person's side is drawn when the match starts
+    bool m_sideRandom {false};      // the person's side is drawn when the match starts
     // Puts something on a start position: 1 the person, 2 nobody, 3..6 a computer player (level 0..3), 7 blocked
     void SetCustomSeat(int position, int code);
-    std::string m_spotsPath;                         // map whose start positions m_spots holds
-    std::vector<std::pair<int, int>> m_spots;        // start positions of that map (tiles), for the numbers on its picture
+    std::string m_spotsPath;                  // map whose start positions m_spots holds
+    std::vector<std::pair<int, int>> m_spots; // start positions of that map (tiles), for the numbers on its picture
     std::vector<bool> CustomTakenColors(int row) const;
     int m_skirmishTop {0};
     AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update            //
@@ -333,7 +333,8 @@ private:
     static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboCredits = 103, kComboTime = 107;
     static constexpr int kComboMapPlayers = 104, kComboMapSize = 105, kComboMapSort = 106; // filters over the map list
     std::vector<int> MapPlayerCounts() const; // 0 (any) and the player counts of the maps
-    static constexpr int kComboSlot = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
+    static constexpr int kComboSlot
+        = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);

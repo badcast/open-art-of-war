@@ -140,8 +140,9 @@ public:
     // Geometric Primitives (World Space)
     void FillRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color);
     void DrawRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color);
-    // Selection effect: a soft glowing bubble (an ellipse of half sizes `halfW` x `halfH` world pixels around the centre
-    // point) in `color`, pulsing; `brighten` > 0 adds a light veil over the object (additive), so a building glows
+    // Selection effect: a soft glowing bubble (an ellipse of half sizes `halfW` x `halfH` world pixels around the
+    // centre point) in `color`, pulsing; `brighten` > 0 adds a light veil over the object (additive), so a building
+    // glows
     void DrawSelectionBubble(
         float centerX, float centerY, float halfW, float halfH, const Camera &camera, SDL_Color color, float brighten);
     void DrawLineWorld(float wx1, float wy1, float wx2, float wy2, const Camera &camera, SDL_Color color);
@@ -249,7 +250,7 @@ private:
     float m_drawAlpha {1.0f};
     SDL_Color m_glowColor {255, 255, 255, 255};
     float m_glowStrength {0.0f};
-    int m_structureTeam {0};   // see setStructureFaction
+    int m_structureTeam {0};                                             // see setStructureFaction
     std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
     bool m_tintedSheet[64] {}; // sheets whose colour mod carries an army colour right now
 

@@ -391,9 +391,10 @@ void Application::RenderScoreboard()
         std::string about;
         if (m_mission && !m_mission->GetMapTitle().empty())
             about = std::string(_("Map")) + ": " + m_mission->GetMapTitle() + "    ";
-        const uint32_t seconds = m_gameplayController
-                                     ? static_cast<uint32_t>(m_gameplayController->simulation().Tick() / SIMULATION_TICK_RATE)
-                                     : 0u;
+        const uint32_t seconds
+            = m_gameplayController
+                  ? static_cast<uint32_t>(m_gameplayController->simulation().Tick() / SIMULATION_TICK_RATE)
+                  : 0u;
         char clock[32];
         if (seconds >= 3600)
             std::snprintf(clock, sizeof clock, "%u:%02u:%02u", seconds / 3600, seconds / 60 % 60, seconds % 60);
@@ -401,8 +402,12 @@ void Application::RenderScoreboard()
             std::snprintf(clock, sizeof clock, "%u:%02u", seconds / 60, seconds % 60);
         about += std::string(_("Time")) + ": " + clock;
         m_fontRenderer->DrawString(
-            ui::FitText(*m_fontRenderer, about, ui::FONT_BODY, w - 2 * colName), x + colName, y + 40, ui::FONT_BODY,
-            col::TextDim, false);
+            ui::FitText(*m_fontRenderer, about, ui::FONT_BODY, w - 2 * colName),
+            x + colName,
+            y + 40,
+            ui::FONT_BODY,
+            col::TextDim,
+            false);
     }
     const int hy = y + 64;
     m_fontRenderer->DrawString(_("Player"), x + colName + 22, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
@@ -617,12 +622,11 @@ void Application::UpdateGameChat(uint32_t nowMs)
     }
     m_gameChat.lines.erase(
         std::remove_if(
-            m_gameChat.lines.begin(),
-            m_gameChat.lines.end(),
-            [&](const Notice &n) { return nowMs >= n.untilMs; }),
+            m_gameChat.lines.begin(), m_gameChat.lines.end(), [&](const Notice &n) { return nowMs >= n.untilMs; }),
         m_gameChat.lines.end());
 
-    const bool enter = m_input->IsKeyJustPressed(SDL_SCANCODE_RETURN) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_ENTER);
+    const bool enter
+        = m_input->IsKeyJustPressed(SDL_SCANCODE_RETURN) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_ENTER);
     auto close = [&]() {
         m_gameChat.open = false;
         m_gameChat.input.clear();
@@ -676,7 +680,9 @@ void Application::RenderGameChat()
     {
         const uint32_t left = n.untilMs > nowMs ? n.untilMs - nowMs : 0;
         const float alpha = m_gameChat.open ? 1.0f : std::min(1.0f, left / 1000.0f);
-        const auto fade = [&](SDL_Color c) { return ui::WithAlpha(c, static_cast<uint8_t>(c.a * alpha)); };
+        const auto fade = [&](SDL_Color c) {
+            return ui::WithAlpha(c, static_cast<uint8_t>(c.a * alpha));
+        };
         m_renderer->FillRectScreen(12, y, boxW, 20, fade(ui::WithAlpha(ui::color::Panel, 200)));
         m_fontRenderer->DrawString(
             ui::FitText(*m_fontRenderer, n.text, ui::FONT_SMALL_BOLD, boxW - 12),

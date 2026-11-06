@@ -169,9 +169,9 @@ private:
     // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat
     void UpdateSounds();
     std::unique_ptr<GameSounds> m_gameSounds;
-    float m_endScreenTimer {0.0f}; // seconds on the Victory / Defeat screen
+    float m_endScreenTimer {0.0f};                      // seconds on the Victory / Defeat screen
     static constexpr float kEndScreenInputDelay = 2.0f; // input is ignored this long after the match ends
-    AppState m_soundState {AppState::SplashLogo}; // the state the last updateSounds saw
+    AppState m_soundState {AppState::SplashLogo};       // the state the last updateSounds saw
     // Draws the loading screen right now (for work that blocks the main loop: start-up, loading a match); the window
     // stays alive. `progress` 0..1, negative for an unknown length. Nothing in headless mode.
     void ShowLoading(const std::string &status, float progress);
@@ -257,7 +257,7 @@ private:
     struct ReplayUi
     {
         bool paused {false};
-        int speed {1}; // index into the speeds
+        int speed {1};  // index into the speeds
         int watch {-1}; // slot whose view is shown; -1: the observer sees everything
         bool follow {false};
         bool finished {false};
@@ -267,10 +267,10 @@ private:
         bool interfaceSound {false}; // "Voice the interface": off at the start of every replay, the interface is silent
         int comboOpen {-1};          // the view combobox: -1 closed, else it is open
         int comboScroll {0};
-        bool stats {false}; // the table of every player is shown
-    } m_replayUi; // also the bar of a custom match watched without playing (m_spectating)
+        bool stats {false};         // the table of every player is shown
+    } m_replayUi;                   // also the bar of a custom match watched without playing (m_spectating)
     bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
-    std::string m_pendingReplay; // a file dropped on the window / given on the command line, opened when possible
+    std::string m_pendingReplay;    // a file dropped on the window / given on the command line, opened when possible
     bool StartReplay(int watchSlot);
     void CloseReplay();
     void ReplayWatch(int slot);

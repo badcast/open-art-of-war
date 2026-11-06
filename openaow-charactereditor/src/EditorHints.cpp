@@ -2,18 +2,23 @@
 
 #include <cstring>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
-namespace {
+namespace
+{
 
 // Field label (the msgid of the widget, or its ##id) -> hint (a msgid translated in po/*.po)
-struct Hint {
-    const char* key;
-    const char* text;
+struct Hint
+{
+    const char *key;
+    const char *text;
 };
 
 const Hint kHints[] = {
-    {"Projectiles", "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave (assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."},
+    {"Projectiles",
+     "How bullets, sniper rounds, shells, rockets and flames fly and hit, and the craters they leave "
+     "(assets/characters/projectiles.yaml). The canvas fires the chosen kind again and again."},
     {"Bullet", "Ordinary bullet of rifles and machine guns (projectile: bullet)."},
     {"Sniper round", "The sniper's round: hit-scan like a bullet, with its own tracer and hit (projectile: sniper)."},
     {"Shell", "Cannon shell: flies, hits where it lands, splashes and leaves a crater (projectile: shell)."},
@@ -27,21 +32,37 @@ const Hint kHints[] = {
     {"Shot interval", "Time between shots of the preview."},
     {"Clear craters", "Removes the craters from the canvas."},
     {"Clear impacts", "Empties the list of hit animations (then no hit is drawn)."},
-    {"Hit-scan", "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, deals its damage where it lands and splashes."},
+    {"Hit-scan",
+     "On: the damage is dealt when the shot is fired, the projectile only flies for the eye (bullets). Off: it flies, "
+     "deals its damage where it lands and splashes."},
     {"Speed (px per tick)", "Pixels the projectile flies per simulation tick (20 ticks a second)."},
     {"Projectile sprites", "Projectile pictures of the game: a click sets the composite and its number of directions."},
-    {"Craters", "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for every impact."},
+    {"Craters",
+     "Small craters of the game. A click adds one to the list or takes it out; a crater is picked from the list for "
+     "every impact."},
     {"Preview fade speed", "How much faster the craters disappear on the canvas than in the game."},
     {"Canvas background", "Background color of the canvas (black by default)."},
-    {"Army color", "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks tabs). Classic shows the original sheets."},
-    {"Explosions", "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). The canvas plays the result."},
-    {"Wrecks", "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time (assets/characters/effects.yaml)."},
-    {"Game UI", "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the screens."},
+    {"Army color",
+     "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks "
+     "tabs). Classic shows the original sheets."},
+    {"Explosions",
+     "Edits how buildings and vehicles blow up: animations, delays, chains of blasts (assets/characters/effects.yaml). "
+     "The canvas plays the result."},
+    {"Wrecks",
+     "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time "
+     "(assets/characters/effects.yaml)."},
+    {"Game UI",
+     "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the "
+     "screens."},
     {"Environment", "Edits assets/data/game_environment.json: font, fog, construction, network, order lines."},
-    {"AI Difficulty", "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare the levels."},
+    {"AI Difficulty",
+     "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare "
+     "the levels."},
     {"Save settings", "Writes the file of this tab (Ctrl+S). Comments in the file are kept."},
-    {"Pick animation", "Then click an animation in the list below to put its number into this field (lists get it added)."},
-    {"Animations", "All animations of the game. Click one to play it on the canvas, or to put it into a field after pressing Pick."},
+    {"Pick animation",
+     "Then click an animation in the list below to put its number into this field (lists get it added)."},
+    {"Animations",
+     "All animations of the game. Click one to play it on the canvas, or to put it into a field after pressing Pick."},
     {"Replay", "Plays the blast again."},
     {"Loop effect", "Plays the blast again and again."},
     {"Playback speed", "Speed of the preview; the game always plays at normal speed."},
@@ -50,7 +71,9 @@ const Hint kHints[] = {
     {"Power building", "Preview of a power plant or tech center blowing up."},
     {"Large building", "Preview of a big building blowing up."},
     {"Families", "Known wreck pictures of the game: a click sets the composite and the number of stages."},
-    {"Fade seconds", "After the burial time the remains fade out: their transparency rises linearly over this many seconds, then they are gone (0: they vanish at once)."},
+    {"Fade seconds",
+     "After the burial time the remains fade out: their transparency rises linearly over this many seconds, then they "
+     "are gone (0: they vanish at once)."},
     {"Play burial", "The wreck sinks stage by stage; uncheck to pick the moment by hand."},
     {"Burial preview seconds", "How long the preview of the whole burial takes (the game uses 'Burial seconds')."},
     {"Burial time", "Moment of the burial to show."},
@@ -91,7 +114,9 @@ const Hint kHints[] = {
     {"Sight range (Green)", "Draws the sight radius as a green circle."},
     {"Radar range (tiles)", "How many tiles beyond its sight radius the finished locator sees."},
     {"Radar range (Cyan)", "Draws the whole sight of a radar locator (sight radius + radar range) as a cyan circle."},
-    {"Auto deploy", "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one is in siege range."},
+    {"Auto deploy",
+     "When the unit goes into siege mode by itself: never, when an enemy is beyond the normal range, or whenever one "
+     "is in siege range."},
     {"Build range (Purple)", "Draws the build radius of a headquarters / command center as a purple circle."},
     {"Show ground (5x5)", "Draws a 5x5 tile grid under the character."},
     {"Combat HUD", "Shows damage, DPS, range and burst figures over the canvas."},
@@ -141,13 +166,22 @@ const Hint kHints[] = {
     {"Remove Weapon", "Deletes this weapon from the list."},
     {"Weapon Name", "Name of the weapon (information only)."},
     {"Projectile", "Kind of projectile: decides the flight, the hit effect and the default spread."},
-    {"Shot sound", "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set there). Empty: the sound of the projectile kind (fire_sfx)."},
-    {"Impact sound", "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind (impact_sfx)."},
+    {"Shot sound",
+     "The sound of this gun's shot: an event of assets/data/audio_sfx.json (its volume, pitch and range are set "
+     "there). Empty: the sound of the projectile kind (fire_sfx)."},
+    {"Impact sound",
+     "The sound where this gun's shot hits: an event of audio_sfx.json. Empty: the sound of the projectile kind "
+     "(impact_sfx)."},
     {"Sound volume", "Times the volume of this gun's sounds (sound_volume, 1.0 = as the event says)."},
     {"Sounds", "The sounds of the character itself (the sounds: block); its guns have theirs in the weapons."},
-    {"Death sound", "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry death, or a wall coming down (the wall file sounds for every wall segment of its side)."},
-    {"Damage sound", "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."},
-    {"Volume of all its sounds", "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."},
+    {"Death sound",
+     "The sound when it is destroyed: an event of audio_sfx.json (sounds.death). Empty: an explosion, the infantry "
+     "death, or a wall coming down (the wall file sounds for every wall segment of its side)."},
+    {"Damage sound",
+     "The sound when a bullet hits it: an event of audio_sfx.json (sounds.damage). A gun's own impact sound wins; "
+     "shells, rockets and flames keep their own hit sound. Empty: the bullet hit (infantry) or the armour hit."},
+    {"Volume of all its sounds",
+     "Times the volume of every sound of the character: shots, hits, death (sounds.volume)."},
     {"Damage per shot", "Damage of one shot."},
     {"Attack range (tiles)", "Maximum firing distance in tiles."},
     {"Minimum range (tiles)", "Closer targets cannot be attacked (artillery). 0 = no limit."},
@@ -156,8 +190,10 @@ const Hint kHints[] = {
     {"Cooldown (seconds)", "Pause between attack cycles in seconds."},
     {"Burst count", "Shots in one attack cycle."},
     {"Burst delay (seconds)", "Time between shots of one burst."},
-    {"Splash Damage (%) [2x2 tile area]", "Share of the damage dealt to targets next to the hit point. 0 = single target."},
-    {"Weapon Muzzle (X, Y)", "Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways."},
+    {"Splash Damage (%) [2x2 tile area]",
+     "Share of the damage dealt to targets next to the hit point. 0 = single target."},
+    {"Weapon Muzzle (X, Y)",
+     "Where projectiles leave the barrel, relative to the hull (or turret): X forward, Y sideways."},
     {"Requires Laboratory Research", "The weapon only works after the matching technology is researched."},
     {"Max distance trigger (tiles, <=1.5 for flame)", "The weapon is used only for targets closer than this."},
     {"+ Add Auxiliary Weapon (e.g. Flame Tower)", "Adds a second weapon (e.g. a flamethrower for close targets)."},
@@ -178,7 +214,8 @@ const Hint kHints[] = {
     {"Damage", "Damage of one shot."},
     {"Attack range", "Maximum firing distance in tiles."},
     {"Burst delay", "Time between shots of one burst."},
-    {"+ Add Full Embedded Siege Configuration (Rhino/Grad style)", "Creates a siege form with its own stats and weapon."},
+    {"+ Add Full Embedded Siege Configuration (Rhino/Grad style)",
+     "Creates a siege form with its own stats and weapon."},
     {"Embedded Upgrade / Baseline Configuration", "Weapon of the unit before the research upgrade."},
     {"Save", "Writes the character to its file (Ctrl+S)."},
     {"Filename for Save As", "File name inside assets/characters for a copy."},
@@ -224,34 +261,47 @@ const Hint kHints[] = {
     {"Unit B", "A second unit the effect is about (optional)."},
     {"Requires", "Technology that has to be researched first. The tree is drawn from it."},
     {"Player only", "The effect is meaningless for the AI, so the AI skips it."},
-    {"Animator", "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."},
+    {"Animator",
+     "Timing of the pictures of the selected character: walking and firing frame times, how long the firing pose and "
+     "the muzzle flash last, and a timeline of one volley. Saved in the animations: block of its file."},
     {"Walking frame time", "Seconds per frame of the walking animation (default 0.09)."},
     {"Firing frame time", "Seconds per frame of the firing pose (default 0.07, some units 0.04). Off = the default."},
-    {"Pose after the first shot", "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others 0.22 s)."},
-    {"Pose after each next shot", "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as the burst delay, or the animation stops between shots."},
-    {"Muzzle flash", "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer shows until the next shot. Once, hold: plays once and stays on its last frame."},
+    {"Pose after the first shot",
+     "How long the firing pose lasts after the first shot of a volley. Off = by projectile (hit-scan 0.12 s, others "
+     "0.22 s)."},
+    {"Pose after each next shot",
+     "How long the firing pose lasts after every later shot of a burst. For a long burst keep it at least as long as "
+     "the burst delay, or the animation stops between shots."},
+    {"Muzzle flash",
+     "Loop: the flash layer repeats for as long as the unit fires. Once: it plays once per shot, then the idle layer "
+     "shows until the next shot. Once, hold: plays once and stays on its last frame."},
     {"Flash frames", "How many frames of the flash animation play (0 = the whole animation)."},
     {"Preview walk", "Shows the walking animation on the canvas."},
     {"Preview attack", "Shows the firing animation on the canvas, volley after volley."},
     {"Preview death", "Shows the death animation on the canvas."},
     {"Reset timing", "Removes the timing values from the animations: block: the game uses its defaults again."},
-    {"Sprite Tools", "Browser of all sprites with their dependencies, and exports of the sprites for repacking the assets."},
+    {"Sprite Tools",
+     "Browser of all sprites with their dependencies, and exports of the sprites for repacking the assets."},
     {"All##sprf", "Show the objects of every group."},
     {"Units##sprf", "Show only units (sequences of the archetype, death animations, wrecks)."},
     {"Buildings##sprf", "Show only buildings, walls and the construction scaffolding."},
     {"Terrain##sprf", "Show only terrain: the tiles of the tilesets and the decorations of the maps."},
     {"Other##sprf", "Show the rest: interface, effects, projectiles and sprites nobody uses."},
     {"Search sprite objects", "Filters the objects by name, faction, kind or number."},
-    {"Output folder", "Folder the files are written to (it is created when missing). Relative paths start at the current folder."},
+    {"Output folder",
+     "Folder the files are written to (it is created when missing). Relative paths start at the current folder."},
     {"Choose folder...", "Opens the system dialog to pick the output folder."},
     {"Export all objects", "Writes one PNG atlas and one JSON for every object, plus index.json."},
     {"Export selected object", "Writes the PNG atlas and the JSON of the object picked in the list."},
-    {"Preview Object", "Opens and visualizes the sprite atlas of the selected object in the interactive layout editor."},
+    {"Preview Object",
+     "Opens and visualizes the sprite atlas of the selected object in the interactive layout editor."},
     {"Preview Sprites", "Opens and visualizes the single sprites export in the interactive layout editor."},
     {"Line (Strip)", "Arranges all sprites along a single horizontal line (strip) with spacing."},
     {"Grid", "Arranges sprites into a clean grid of rows and columns."},
     {"Pack (MaxRects)", "Packs sprites tightly to minimize empty space without any overlapping."},
-    {"By Object", "Distributes and groups sprites into labeled blocks by their owning object (or object sequences/parts), allowing you to inspect and move entire objects and their sprites together."},
+    {"By Object",
+     "Distributes and groups sprites into labeled blocks by their owning object (or object sequences/parts), allowing "
+     "you to inspect and move entire objects and their sprites together."},
     {"Scatter", "Spreads sprites out across the canvas area to visually unclutter dense clusters."},
     {"Separate Overlaps", "Automatically pushes overlapping sprites apart until no collisions remain."},
     {"Fit View", "Fits and centers the atlas in the preview canvas."},
@@ -268,23 +318,39 @@ const Hint kHints[] = {
     {"Other##sprx", "Include the interface, effects and all the other sprites."},
     {"Columns", "How many sprites are in a row of the big PNG. The cells are as large as the biggest sprite."},
     {"All in one file", "One PNG with the chosen groups one after another instead of a file per group."},
-    {"Compress sprites", "Packs the sprites tightly: no empty space around small sprites, a row is as high as its tallest sprite."},
-    {"Export sprites", "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the cells."},
-    {"Import folder", "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."},
+    {"Compress sprites",
+     "Packs the sprites tightly: no empty space around small sprites, a row is as high as its tallest sprite."},
+    {"Export sprites",
+     "Writes every sprite of the chosen groups in the order of its id as rows and columns of a PNG, with a JSON of the "
+     "cells."},
+    {"Import folder",
+     "Folder with the files of a previous export (the object .json files and the sprites_*.json files)."},
     {"Choose import folder...", "Opens the system dialog to pick the folder to import from."},
-    {"Import sprites", "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and assets/data/sprites_graphics.json, you are asked first."},
-    {"Packed atlas", "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller than a grid. Columns and Compress are ignored."},
-    {"Dependencies", "Shows the dependency tree of the selected object (sequences, bodies, composites, animations, sprites)."},
-    {"Export Preview", "Interactive atlas layout editor where you can arrange, pack, group by object, and export sprites."},
-    {"Loaded Sprites", "Shows where each sprite was loaded from (sheet_XX.png file, sprites.json coordinates, HD scale, and objects using it) with an interactive sheet cutout map."},
+    {"Import sprites",
+     "Writes the edited sprites and table rows back into the assets. It overwrites assets/sprites and "
+     "assets/data/sprites_graphics.json, you are asked first."},
+    {"Packed atlas",
+     "Fits the sprites of a group into each other's empty space (largest first) and crops the picture: much smaller "
+     "than a grid. Columns and Compress are ignored."},
+    {"Dependencies",
+     "Shows the dependency tree of the selected object (sequences, bodies, composites, animations, sprites)."},
+    {"Export Preview",
+     "Interactive atlas layout editor where you can arrange, pack, group by object, and export sprites."},
+    {"Loaded Sprites",
+     "Shows where each sprite was loaded from (sheet_XX.png file, sprites.json coordinates, HD scale, and objects "
+     "using it) with an interactive sheet cutout map."},
 };
 
 } // namespace
 
-void FieldHint(const char* key) {
-    if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) return;
-    for (const Hint& h : kHints) {
-        if (std::strcmp(h.key, key) != 0) continue;
+void FieldHint(const char *key)
+{
+    if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort))
+        return;
+    for (const Hint &h : kHints)
+    {
+        if (std::strcmp(h.key, key) != 0)
+            continue;
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
         ImGui::TextUnformatted(_(h.text));

@@ -259,7 +259,9 @@ bool ReplayPlayer::PrepareMatch(int watchSlot, MatchSetup &out, std::string &err
     out.mapPath = file;
     out.localOnly = false;
     // Whom to watch: the asked slot, else the recorded player, else the first human
-    auto has = [&](int slot) { return slot >= 0 && slot < kMaxPlayers && out.slots[slot].active; };
+    auto has = [&](int slot) {
+        return slot >= 0 && slot < kMaxPlayers && out.slots[slot].active;
+    };
     int local = has(watchSlot) ? watchSlot : (has(m_info.localSlot) ? m_info.localSlot : -1);
     for (int i = 0; local < 0 && i < kMaxPlayers; ++i)
         if (out.slots[i].active && out.slots[i].human)

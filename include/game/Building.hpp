@@ -46,8 +46,8 @@ public:
     int rawBuildingType {-1}; // 0..14 if building, 15..29 if wall
     int buildWidth {1};
     int buildHeight {1};
-    int burstCount {1};         // shots of one volley
-    float burstDelay {0.1f};    // seconds between them
+    int burstCount {1};      // shots of one volley
+    float burstDelay {0.1f}; // seconds between them
     int burstShotsRemaining {0};
     float burstTimer {0.0f};
     int radarRange {0};         // tiles seen beyond sightRadius once finished (Radar Locator)
@@ -63,7 +63,7 @@ public:
     static constexpr float kRepairSeconds = 180.0f;
     static constexpr float kRepairCostShare = 0.30f;
     bool repairing {false};
-    int repeatArchetype {-1}; // a unit this producer trains again and again (-1: off)
+    int repeatArchetype {-1};      // a unit this producer trains again and again (-1: off)
     float repairHpAccum {0.0f};    // fractions of a hit point healed so far
     float repairCreditDebt {0.0f}; // fractions of a credit owed so far
     // One repair step: heals, returns the credits it costs (never more than `budget`); stops by itself

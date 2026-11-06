@@ -24,5 +24,8 @@ _script_path=$(dirname "$(readlink -f "$0")")
 
 format_file "${_script_path}/include"
 format_file "${_script_path}/src"
+format_file "${_script_path}/openaow-charactereditor"
+format_file "${_script_path}/openaow-mapeditor"
+format_file "${_script_path}/openaow-server"
 
 echo "format success"

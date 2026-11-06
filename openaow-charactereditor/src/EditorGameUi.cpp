@@ -3,51 +3,80 @@
 #include <algorithm>
 #include <cstdio>
 
-namespace CharEditor {
+namespace CharEditor
+{
 
-namespace {
+namespace
+{
 
-const char* const kThemeKeys[3] = {"neutral", "resistance", "confederation"};
-const char* const kThemeLabels[3] = {"Menus", "Resistance", "Confederation"};
+const char *const kThemeKeys[3] = {"neutral", "resistance", "confederation"};
+const char *const kThemeLabels[3] = {"Menus", "Resistance", "Confederation"};
 
-struct ThemeField {
-    const char* key;
-    const char* label;
+struct ThemeField
+{
+    const char *key;
+    const char *label;
 };
 const ThemeField kThemeFields[] = {
-    {"panel", "Panel"},           {"panel_raised", "Raised panel"}, {"panel_sunken", "Sunken panel"},
-    {"border", "Border"},         {"border_strong", "Strong border"}, {"hover", "Hover"},
-    {"accent", "Accent"},         {"accent_deep", "Deep accent"},   {"accent_text", "Text on accent"},
+    {"panel", "Panel"},
+    {"panel_raised", "Raised panel"},
+    {"panel_sunken", "Sunken panel"},
+    {"border", "Border"},
+    {"border_strong", "Strong border"},
+    {"hover", "Hover"},
+    {"accent", "Accent"},
+    {"accent_deep", "Deep accent"},
+    {"accent_text", "Text on accent"},
 };
 const ThemeField kFixedFields[] = {
-    {"backdrop", "Backdrop"}, {"scrim", "Dimming"}, {"text", "Text"},         {"text_dim", "Secondary text"},
-    {"text_muted", "Hints"},  {"danger", "Danger"}, {"danger_deep", "Danger fill"}, {"ok", "OK"}, {"info", "Info"},
+    {"backdrop", "Backdrop"},
+    {"scrim", "Dimming"},
+    {"text", "Text"},
+    {"text_dim", "Secondary text"},
+    {"text_muted", "Hints"},
+    {"danger", "Danger"},
+    {"danger_deep", "Danger fill"},
+    {"ok", "OK"},
+    {"info", "Info"},
 };
 
-ImU32 ParseColor(const YAML::Node& n, ImU32 fallback) {
-    if (!n.IsDefined() || !n.IsScalar()) return fallback;
-    const std::string& s = n.Scalar();
+ImU32 ParseColor(const YAML::Node &n, ImU32 fallback)
+{
+    if (!n.IsDefined() || !n.IsScalar())
+        return fallback;
+    const std::string &s = n.Scalar();
     unsigned r = 0, g = 0, b = 0, a = 255;
-    if (s.size() < 7 || s[0] != '#' || std::sscanf(s.c_str() + 1, "%2x%2x%2x", &r, &g, &b) != 3) return fallback;
-    if (s.size() >= 9) std::sscanf(s.c_str() + 7, "%2x", &a);
+    if (s.size() < 7 || s[0] != '#' || std::sscanf(s.c_str() + 1, "%2x%2x%2x", &r, &g, &b) != 3)
+        return fallback;
+    if (s.size() >= 9)
+        std::sscanf(s.c_str() + 7, "%2x", &a);
     return IM_COL32(r, g, b, a);
 }
 
 } // namespace
 
-void CharacterEditor::EnsureUi() {
-    if (uiTried) return;
+void CharacterEditor::EnsureUi()
+{
+    if (uiTried)
+        return;
     uiTried = true;
     LoadYamlFile(uiYaml, "game_ui.yaml");
 }
 
-void CharacterEditor::DrawGameUi() {
+void CharacterEditor::DrawGameUi()
+{
     EnsureUi();
-    ImGui::TextWrapped("%s", _("Preview of the game interface with the colors of the file. Pick a theme on the right panel."));
-    if (!uiYaml.Loaded()) return;
+    ImGui::TextWrapped(
+        "%s", _("Preview of the game interface with the colors of the file. Pick a theme on the right panel."));
+    if (!uiYaml.Loaded())
+        return;
     const std::string tp = std::string("themes.") + kThemeKeys[uiTheme];
-    auto themeColor = [&](const char* key, ImU32 fb) { return ParseColor(uiYaml.At(tp + "." + key), fb); };
-    auto fixedColor = [&](const char* key, ImU32 fb) { return ParseColor(uiYaml.At(std::string("colors.") + key), fb); };
+    auto themeColor = [&](const char *key, ImU32 fb) {
+        return ParseColor(uiYaml.At(tp + "." + key), fb);
+    };
+    auto fixedColor = [&](const char *key, ImU32 fb) {
+        return ParseColor(uiYaml.At(std::string("colors.") + key), fb);
+    };
 
     const ImU32 backdrop = fixedColor("backdrop", IM_COL32(8, 10, 14, 255));
     const ImU32 text = fixedColor("text", IM_COL32(226, 231, 238, 255));
@@ -71,7 +100,7 @@ void CharacterEditor::DrawGameUi() {
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = ImGui::GetContentRegionAvail();
     ImGui::InvisibleButton("ui-mock", size);
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImDrawList *dl = ImGui::GetWindowDrawList();
     const ImVec2 end(origin.x + size.x, origin.y + size.y);
     dl->PushClipRect(origin, end, true);
     dl->AddRectFilled(origin, end, backdrop);
@@ -80,12 +109,14 @@ void CharacterEditor::DrawGameUi() {
         dl->AddRectFilled(a, b, fill, 3.0f);
         dl->AddRect(a, b, line, 3.0f);
     };
-    auto button = [&](ImVec2 a, ImVec2 b, const char* label, int style, bool hot) {
+    auto button = [&](ImVec2 a, ImVec2 b, const char *label, int style, bool hot) {
         ImU32 fill = style == 0 ? accent : style == 1 ? raised : style == 2 ? dangerDeep : 0;
         ImU32 line = style == 0 ? accent : style == 2 ? danger : border;
         ImU32 ink = style == 0 ? accentText : style == 2 ? danger : text;
-        if (hot) fill = style == 0 ? accentDeep : hover;
-        if (fill) dl->AddRectFilled(a, b, fill, 3.0f);
+        if (hot)
+            fill = style == 0 ? accentDeep : hover;
+        if (fill)
+            dl->AddRectFilled(a, b, fill, 3.0f);
         dl->AddRect(a, b, hot ? borderStrong : line, 3.0f);
         const ImVec2 ts = ImGui::CalcTextSize(label);
         dl->AddText(ImVec2((a.x + b.x - ts.x) * 0.5f, (a.y + b.y - ts.y) * 0.5f), ink, label);
@@ -107,7 +138,8 @@ void CharacterEditor::DrawGameUi() {
     y += 28.0f;
     plate(ImVec2(d0.x + 14.0f, y), ImVec2(d1.x - 14.0f, y + 28.0f), sunken, border);
     dl->AddText(ImVec2(d0.x + 22.0f, y + 6.0f), text, _("English"));
-    dl->AddTriangleFilled(ImVec2(d1.x - 34.0f, y + 10.0f), ImVec2(d1.x - 22.0f, y + 10.0f), ImVec2(d1.x - 28.0f, y + 18.0f), textDim);
+    dl->AddTriangleFilled(
+        ImVec2(d1.x - 34.0f, y + 10.0f), ImVec2(d1.x - 22.0f, y + 10.0f), ImVec2(d1.x - 28.0f, y + 18.0f), textDim);
     y += 40.0f;
     const float bw = (dw - 14.0f * 2 - 8.0f) * 0.5f;
     button(ImVec2(d0.x + 14.0f, y), ImVec2(d0.x + 14.0f + bw, y + 32.0f), _("Apply"), 0, false);
@@ -130,7 +162,8 @@ void CharacterEditor::DrawGameUi() {
     dl->AddText(ImVec2(s0.x + 18.0f, s0.y + 18.0f), textMuted, _("Radar"));
     dl->AddText(ImVec2(s0.x + 14.0f, s0.y + 140.0f), accent, "CREDITS 2000");
     const float cell = (sw - 20.0f - 18.0f) / 4.0f;
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 8; ++i)
+    {
         const float cx = s0.x + 10.0f + static_cast<float>(i % 4) * (cell + 6.0f);
         const float cy = s0.y + 168.0f + static_cast<float>(i / 4) * (cell + 6.0f);
         plate(ImVec2(cx, cy), ImVec2(cx + cell, cy + cell), i == 1 ? hover : raised, i == 1 ? accent : border);
@@ -142,9 +175,11 @@ void CharacterEditor::DrawGameUi() {
     dl->PopClipRect();
 }
 
-void CharacterEditor::DrawGameUiProperties() {
+void CharacterEditor::DrawGameUiProperties()
+{
     EnsureUi();
-    if (!uiYaml.Loaded()) {
+    if (!uiYaml.Loaded())
+    {
         ImGui::TextWrapped("%s", _("The interface file could not be loaded."));
         return;
     }
@@ -152,15 +187,21 @@ void CharacterEditor::DrawGameUiProperties() {
     ImGui::Separator();
     ImGui::TextUnformatted(_("Theme"));
     FieldHint("UI theme");
-    for (int i = 0; i < 3; ++i) {
-        if (i) ImGui::SameLine();
-        if (Hinted(ImGui::RadioButton(_(kThemeLabels[i]), uiTheme == i), kThemeLabels[i])) uiTheme = i;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i)
+            ImGui::SameLine();
+        if (Hinted(ImGui::RadioButton(_(kThemeLabels[i]), uiTheme == i), kThemeLabels[i]))
+            uiTheme = i;
     }
     ImGui::Spacing();
     const std::string tp = std::string("themes.") + kThemeKeys[uiTheme];
-    for (const ThemeField& f : kThemeFields) EditYamlScalar(uiYaml, tp + "." + f.key, _(f.label));
-    if (ImGui::CollapsingHeader(_("Colors of all themes"), ImGuiTreeNodeFlags_DefaultOpen)) {
-        for (const ThemeField& f : kFixedFields) EditYamlScalar(uiYaml, std::string("colors.") + f.key, _(f.label));
+    for (const ThemeField &f : kThemeFields)
+        EditYamlScalar(uiYaml, tp + "." + f.key, _(f.label));
+    if (ImGui::CollapsingHeader(_("Colors of all themes"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (const ThemeField &f : kFixedFields)
+            EditYamlScalar(uiYaml, std::string("colors.") + f.key, _(f.label));
     }
 }
 

@@ -58,11 +58,23 @@ public:
     }
     // Returns true while the window takes the input of this frame
     bool UpdateResearchWindow(
-        InputManager &input, int mx, int my, bool leftClicked, int windowW, int windowH, Economy &economy,
+        InputManager &input,
+        int mx,
+        int my,
+        bool leftClicked,
+        int windowW,
+        int windowH,
+        Economy &economy,
         EntityManager &entities);
     void RenderResearchWindow(
-        Renderer &renderer, BitmapFontRenderer &fontRenderer, const Economy &economy, const EntityManager &entities,
-        int mx, int my, int windowW, int windowH);
+        Renderer &renderer,
+        BitmapFontRenderer &fontRenderer,
+        const Economy &economy,
+        const EntityManager &entities,
+        int mx,
+        int my,
+        int windowW,
+        int windowH);
 
     // `events`: what the simulation reported this tick (research done, ...)
     void Update(float deltaTime, EntityManager &entities, Economy &economy, const std::vector<SimEvent> &events);
@@ -319,12 +331,12 @@ private:
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
-    bool m_observer {false}; // watching a replay
+    bool m_observer {false};                      // watching a replay
     static constexpr int kObserverBarHeight = 64; // the bar of a replay / a watched match over the screen
-    bool m_showAll {false}; // a replay's observer sees the whole map
-    mutable RadarAlert m_radarAlert; // updated while the radar is drawn
-    int m_radarZoom {1};             // 1 = whole map, up to kRadarMaxZoom
-    bool m_radarDragging {false};    // camera follows the mouse on the radar: the zoomed view holds still meanwhile
+    bool m_showAll {false};                       // a replay's observer sees the whole map
+    mutable RadarAlert m_radarAlert;              // updated while the radar is drawn
+    int m_radarZoom {1};                          // 1 = whole map, up to kRadarMaxZoom
+    bool m_radarDragging {false}; // camera follows the mouse on the radar: the zoomed view holds still meanwhile
     mutable float m_radarCenterX {-1.0f}; // tile at the middle of a zoomed radar
     mutable float m_radarCenterY {-1.0f};
 

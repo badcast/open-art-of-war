@@ -3,25 +3,30 @@
 #include <cmath>
 #include <cstdint>
 
-namespace OpenArtOfWar::MapNoise {
+namespace OpenArtOfWar::MapNoise
+{
 
 // Lightweight coherent gradient noise
-inline float Fade(float t) {
+inline float Fade(float t)
+{
     return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
 }
 
-inline float Lerp(float a, float b, float t) {
+inline float Lerp(float a, float b, float t)
+{
     return a + t * (b - a);
 }
 
-inline float grad(int hash, float x, float y) {
+inline float grad(int hash, float x, float y)
+{
     int h = hash & 7;
     float u = h < 4 ? x : y;
     float v = h < 4 ? y : x;
     return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
 }
 
-inline float SampleNoise2D(float x, float y, uint32_t seed) {
+inline float SampleNoise2D(float x, float y, uint32_t seed)
+{
     int X = static_cast<int>(std::floor(x)) & 255;
     int Y = static_cast<int>(std::floor(y)) & 255;
 
@@ -42,18 +47,20 @@ inline float SampleNoise2D(float x, float y, uint32_t seed) {
     int ba = hash(X + 1, Y);
     int bb = hash(X + 1, Y + 1);
 
-    float res = Lerp(Lerp(grad(aa, x, y), grad(ba, x - 1, y), u),
-                     Lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u), v);
+    float res
+        = Lerp(Lerp(grad(aa, x, y), grad(ba, x - 1, y), u), Lerp(grad(ab, x, y - 1), grad(bb, x - 1, y - 1), u), v);
     return (res + 1.0f) * 0.5f; // Normalize to [0, 1]
 }
 
-inline float OctaveNoise2D(float x, float y, int octaves, float persistence, uint32_t seed) {
+inline float OctaveNoise2D(float x, float y, int octaves, float persistence, uint32_t seed)
+{
     float total = 0.0f;
     float frequency = 1.0f;
     float amplitude = 1.0f;
     float maxValue = 0.0f;
 
-    for (int i = 0; i < octaves; ++i) {
+    for (int i = 0; i < octaves; ++i)
+    {
         total += SampleNoise2D(x * frequency, y * frequency, seed + i * 31) * amplitude;
         maxValue += amplitude;
         amplitude *= persistence;

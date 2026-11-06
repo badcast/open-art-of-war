@@ -957,9 +957,9 @@ void Renderer::DrawSelectionBubble(
                 float a = 0.0f;
                 if (r < 1.0f)
                 {
-                    a = std::pow(r, 2.2f) * 0.30f + 0.04f;        // clear in the middle, denser toward the rim
+                    a = std::pow(r, 2.2f) * 0.30f + 0.04f; // clear in the middle, denser toward the rim
                     const float rim = (r - 0.90f) / 0.06f;
-                    a += std::exp(-rim * rim) * 0.75f;            // the glowing rim
+                    a += std::exp(-rim * rim) * 0.75f;               // the glowing rim
                     a *= std::clamp((1.0f - r) / 0.10f, 0.0f, 1.0f); // soft outer edge
                 }
                 const uint8_t v = static_cast<uint8_t>(std::clamp(a, 0.0f, 1.0f) * 255.0f);
@@ -978,7 +978,8 @@ void Renderer::DrawSelectionBubble(
     camera.WorldToScreen(centerX, centerY, sx, sy);
     const float zoom = camera.GetZoom();
     const float k = 1.0f + 0.05f * pulse;
-    const SDL_FRect dst {sx - halfW * zoom * k, sy - halfH * zoom * k, halfW * 2.0f * zoom * k, halfH * 2.0f * zoom * k};
+    const SDL_FRect dst {
+        sx - halfW * zoom * k, sy - halfH * zoom * k, halfW * 2.0f * zoom * k, halfH * 2.0f * zoom * k};
     SDL_SetTextureColorMod(m_glowTexture, color.r, color.g, color.b);
     SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_BLEND);
     SDL_SetTextureAlphaMod(m_glowTexture, static_cast<Uint8>(150.0f + 90.0f * pulse));
@@ -988,8 +989,10 @@ void Renderer::DrawSelectionBubble(
         // A light veil over the object itself: the sprite below seems to shine, breathing with the bubble
         SDL_SetTextureColorMod(m_glowTexture, 255, 255, 255);
         SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_ADD);
-        SDL_SetTextureAlphaMod(m_glowTexture, static_cast<Uint8>(std::clamp(brighten * (60.0f + 110.0f * pulse), 0.0f, 255.0f)));
-        const SDL_FRect veil {sx - halfW * zoom * 0.95f, sy - halfH * zoom * 0.95f, halfW * 1.9f * zoom, halfH * 1.9f * zoom};
+        SDL_SetTextureAlphaMod(
+            m_glowTexture, static_cast<Uint8>(std::clamp(brighten * (60.0f + 110.0f * pulse), 0.0f, 255.0f)));
+        const SDL_FRect veil {
+            sx - halfW * zoom * 0.95f, sy - halfH * zoom * 0.95f, halfW * 1.9f * zoom, halfH * 1.9f * zoom};
         SDL_RenderTexture(m_renderer, m_glowTexture, nullptr, &veil);
         SDL_SetTextureBlendMode(m_glowTexture, SDL_BLENDMODE_BLEND);
     }

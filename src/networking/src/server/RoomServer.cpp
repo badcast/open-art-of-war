@@ -190,7 +190,9 @@ void RoomServer::handleMaster(const TransportEvent &e, uint32_t nowMs)
             room->listed = m.listed;
             room->port = port;
             const std::string codeForLog = room->code;
-            hc.log = [this, codeForLog](const std::string &line) { m_log.push_back("room " + codeForLog + ": " + line); };
+            hc.log = [this, codeForLog](const std::string &line) {
+                m_log.push_back("room " + codeForLog + ": " + line);
+            };
             room->host = std::make_unique<SessionHost>(hc);
             room->host->addTransport(std::move(transport));
             room->createdMs = nowMs;
