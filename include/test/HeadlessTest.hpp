@@ -28,6 +28,9 @@ public:
     static bool RunAiVehicleTest(Application &app);
     static bool RunFogBlockTest(Application &app);
     static bool RunBuildRulesTest(Application &app);
+    // Campaign maps in maps/mission (skirmish lists without them, old names still resolve); hard building limits
+    // (data/limits.yaml) for a person's commands and for computer players, buildings of the map kept
+    static bool RunLimitsAndMapsTest(Application &app);
     // A match with computer players in slots: they build and train, and do it alike every time
     static bool RunMatchAiTest(Application &app);
     // Computer allies on the four-player maps: no base closes itself or its ally in, each has a laboratory, power

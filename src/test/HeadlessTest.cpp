@@ -21,6 +21,7 @@
 #include "game/Economy.hpp"
 #include "game/AIController.hpp"
 #include "game/Missions.hpp"
+#include "game/BuildLimits.hpp"
 #include "game/MissionController.hpp"
 #include "game/GameplayController.hpp"
 #include "game/Simulation.hpp"
@@ -1420,6 +1421,206 @@ bool HeadlessTest::RunBuildRulesTest(Application &app)
     if (!entities.UpdateElimination(map).empty())
         return fail("a player drops out once");
     std::cout << "  - No headquarters: nothing built; no buildings: out with all units: ok" << std::endl;
+    return true;
+}
+
+bool HeadlessTest::RunLimitsAndMapsTest(Application &app)
+{
+    std::cout << "[Test] Validating campaign maps in maps/mission and hard building limits..." << std::endl;
+    EntityManager &entities = *app.m_entities;
+    TileMap &map = *app.m_map;
+    Pathfinder &pf = *app.m_pathfinder;
+    Economy &economy = *app.m_economy;
+    MissionController &mission = *app.m_mission;
+    GameplayController &gc = *app.m_gameplayController;
+    auto fail = [&](const std::string &msg) {
+        std::cerr << "[Test] FAILED: " << msg << std::endl;
+        BuildLimits::Reload();
+        return false;
+    };
+
+    // --- Maps: the campaign's in maps/mission, the custom / network list without them
+    const std::string missionDir = LoaderResources::MissionMapsDir() + "/";
+    const std::string skirmishDir = LoaderResources::MapsDir() + "/";
+    for (const SkirmishMapInfo &m : MissionController::ListSkirmishMaps())
+    {
+        if (m.path.find("_mission_") != std::string::npos || m.path.rfind(missionDir, 0) == 0)
+            return fail("a campaign map in the skirmish list: " + m.path);
+    }
+    const std::vector<std::string> missionMaps = LoaderResources::ListMissionMaps();
+    if (missionMaps.size() != 14)
+        return fail("expected 14 campaign maps, got " + std::to_string(missionMaps.size()));
+    for (const std::string &p : missionMaps)
+    {
+        std::string text;
+        if (p.rfind(missionDir, 0) != 0 || !Assets::ReadText(p, text))
+            return fail("campaign map not readable in the mission folder: " + p);
+    }
+    for (Faction f : {Faction::Resistance, Faction::Confederation})
+    {
+        for (const auto &m : Missions::Campaign(f))
+        {
+            std::string text;
+            const std::string p = LoaderResources::MissionMapPath(m.data.mapFile);
+            if (p.rfind(missionDir, 0) != 0)
+                return fail("the map of a campaign mission is outside the mission folder: " + p);
+            if (Assets::ReadText(p, text))
+                continue;
+            // A moved map that is not found is this test's business; a mission naming a map that never shipped is
+            // only reported
+            if (p.find("_mission_") != std::string::npos)
+                return fail("the map of a campaign mission is missing: " + p);
+            std::cout << "  - Warning: mission \"" << m.info.name << "\" names a map that does not exist: " << p
+                      << std::endl;
+        }
+    }
+    // Old names and paths still lead there; a skirmish map stays where it is
+    if (LoaderResources::MapPath("m26") != missionDir + "resistance_mission_4.json"
+        || LoaderResources::MapPath(skirmishDir + "resistance_mission_4.json")
+               != missionDir + "resistance_mission_4.json"
+        || LoaderResources::MapPath("resistance_mission_4") != missionDir + "resistance_mission_4.json"
+        || LoaderResources::MapPath("skirmish_2") != skirmishDir + "skirmish_2.json"
+        || LoaderResources::MapPath("map_skirmish_2") != skirmishDir + "skirmish_2.json"
+        || LoaderResources::NetDefaultMap().find("_mission_") != std::string::npos)
+        return fail("map names must resolve to the right folders (m26 -> " + LoaderResources::MapPath("m26") + ")");
+    std::cout << "  - " << missionMaps.size() << " campaign maps in " << missionDir << ", "
+              << MissionController::ListSkirmishMaps().size() << " skirmish maps listed, old names resolve"
+              << std::endl;
+
+    // --- The shipped file: 4 of every kind, walls unlimited
+    BuildLimits::Reload();
+    if (BuildLimits::LimitOf(entities, 8) != 4 || BuildLimits::LimitOf(entities, 0) != 4
+        || BuildLimits::LimitOf(entities, 9) != 4 || BuildLimits::LimitOf(entities, 15) != BuildLimits::kUnlimited
+        || BuildLimits::LimitOf(entities, 25) != BuildLimits::kUnlimited)
+        return fail("data/limits.yaml: headquarters 4, power 4, walls -1 expected");
+
+    // --- A person's commands: power plants up to the limit, nothing of a forbidden kind
+    MatchSetup setup;
+    setup.mapPath = LoaderResources::MapPath("m26");
+    setup.seed = 11;
+    setup.local = 0;
+    setup.slots[0] = {true, Faction::Resistance, 0, 1, true, 1};
+    setup.slots[1] = {true, Faction::Confederation, 1, 2, false, 1};
+    setup.startPosition[0] = 0;
+    setup.startPosition[1] = 1;
+    if (!mission.LoadMatch(setup, map, entities, economy, pf))
+        return fail("loading the match");
+    gc.ResetForMission(mission, *app.m_hudController, entities, map);
+    map.SetFogEnabled(false);
+    const PlayerId me = 0;
+    const BuildingBlueprint *power = nullptr;
+    const BuildingBlueprint *bunker = nullptr;
+    for (const BuildingBlueprint &bp : EntityManager::GetBlueprints(Faction::Resistance))
+    {
+        if (BuildLimits::KindOf(bp.buildingIndex) == BuildLimits::Kind::Power)
+            power = &bp;
+        if (BuildLimits::KindOf(bp.buildingIndex) == BuildLimits::Kind::Bunker)
+            bunker = &bp;
+    }
+    if (!power || !bunker)
+        return fail("no power plant / bunker blueprint");
+    const int ownedPower = BuildLimits::CountOwned(entities, map, me, power->buildingIndex);
+    const int limitPower = ownedPower + 2;
+    BuildLimits::LoadText(
+        "default: 4\nbuildings:\n  power: " + std::to_string(limitPower) + "\n  bunker: 0\n  wall: -1\n");
+    int hqX = -1, hqY = -1;
+    for (const Entity &e : entities.GetAllEntities())
+        if (e.owner == me && e.alive && e.isBuilding && e.type == UnitType::Headquarters)
+        {
+            hqX = e.tileX;
+            hqY = e.tileY;
+        }
+    if (hqX < 0)
+        return fail("the person has no headquarters");
+    // Free sites around the headquarters, apart from each other
+    std::vector<std::pair<int, int>> sites;
+    for (int dy = -12; dy <= 12 && sites.size() < 4; dy += 4)
+        for (int dx = -12; dx <= 12 && sites.size() < 4; dx += 4)
+            if (entities.CanPlaceBuilding(hqX + dx, hqY + dy, power->width, power->height, map, me))
+                sites.emplace_back(hqX + dx, hqY + dy);
+    if (sites.size() < 4)
+        return fail("no room around the headquarters for the limit test");
+    Simulation &sim = gc.simulation();
+    SimContext ctx {entities, map, pf, economy, *app.m_aiController};
+    economy.SetCredits(100000);
+    auto place = [&](const BuildingBlueprint &bp, int x, int y) {
+        SimCommand c;
+        c.type = CommandType::PlaceBuilding;
+        c.player = me;
+        c.a = bp.blueprintId;
+        c.x = x;
+        c.y = y;
+        sim.Issue(std::move(c));
+        sim.ApplyCommands(ctx);
+        sim.EndTick();
+    };
+    for (int i = 0; i < 3; ++i)
+        place(*power, sites[static_cast<std::size_t>(i)].first, sites[static_cast<std::size_t>(i)].second);
+    const int afterPower = BuildLimits::CountOwned(entities, map, me, power->buildingIndex);
+    const int creditsAfterPower = economy.GetCredits();
+    place(*bunker, sites[3].first, sites[3].second);
+    const bool bunkerRefused = BuildLimits::CountOwned(entities, map, me, bunker->buildingIndex) == 0
+                               && economy.GetCredits() == creditsAfterPower;
+    const bool paidTwice = creditsAfterPower == 100000 - 2 * power->creditCost;
+    // Buildings the map (or a mission) puts down stay beyond the limit; nothing more is started
+    entities.SpawnBuildingByIndex(power->buildingIndex, sites[2].first, sites[2].second, Faction::Resistance, 1.0f, me);
+    const int overLimit = BuildLimits::CountOwned(entities, map, me, power->buildingIndex);
+    const bool keptOver
+        = overLimit == limitPower + 1 && !BuildLimits::CanBuildMore(entities, map, me, power->buildingIndex);
+    // An exact id overrides its kind
+    bool idOverride = false;
+    if (const BuildingConfig *cfg = entities.GetBuildingConfig(power->buildingIndex))
+    {
+        BuildLimits::LoadText("default: 4\nbuildings:\n  power: 1\n  " + cfg->id + ": 9\n");
+        idOverride = BuildLimits::LimitOf(entities, power->buildingIndex) == 9
+                     && BuildLimits::CanBuildMore(entities, map, me, power->buildingIndex);
+    }
+    std::cout << "  - Limit " << limitPower << " power plants: " << afterPower << " stand after 3 orders (paid twice "
+              << paidTwice << "), bunker at 0 refused " << bunkerRefused << ", map's extra kept " << keptOver
+              << ", id overrides kind " << idOverride << std::endl;
+    if (afterPower != limitPower || !paidTwice || !bunkerRefused || !keptOver || !idOverride)
+        return fail("a person's construction must stop at the building limit");
+
+    // --- Computer players: with nothing allowed they start nothing, their base of the map stays
+    BuildLimits::LoadText("default: 0\nbuildings:\n  wall: 0\n");
+    if (!mission.LoadMatch(setup, map, entities, economy, pf))
+        return fail("loading the match again");
+    gc.ResetForMission(mission, *app.m_hudController, entities, map);
+    auto aiStock = [&]() {
+        int buildings = 0, walls = 0;
+        for (const Entity &e : entities.GetAllEntities())
+            if (e.owner == 1 && e.alive && e.isBuilding && e.state != ActionState::Die)
+                ++buildings;
+        for (int y = 0; y < map.GetHeight(); ++y)
+            for (int x = 0; x < map.GetWidth(); ++x)
+                if (map.GetWall(x, y) > 0 && map.GetWallOwner(x, y) == 1)
+                    ++walls;
+        return std::make_pair(buildings, walls);
+    };
+    const auto start = aiStock();
+    {
+        SimContext mctx {entities, map, pf, economy, *app.m_aiController};
+        const float dt = static_cast<float>(SIMULATION_TIMESTEP);
+        for (int tick = 0; tick < 2400; ++tick)
+        {
+            sim.ApplyCommands(mctx);
+            entities.Update(dt, map, pf);
+            sim.UpdateEconomies(dt, mctx);
+            for (auto &ai : gc.m_matchAis)
+                ai->Update(dt, map, entities, pf);
+            sim.EndTick();
+        }
+    }
+    const auto end = aiStock();
+    std::cout << "  - Computer player with nothing allowed: buildings " << start.first << " -> " << end.first
+              << ", walls " << start.second << " -> " << end.second << " over 120 s" << std::endl;
+    if (start.first <= 0 || end.first > start.first || end.second > start.second)
+        return fail("a computer player must keep to the building limits (and keep its starting base)");
+
+    BuildLimits::Reload();
+    entities.Clear();
+    sim.Reset();
+    ResetResearch();
     return true;
 }
 
@@ -7383,6 +7584,10 @@ bool HeadlessTest::run(Application &app, int numTicks)
 
     // 29e. No headquarters, no construction; players without buildings are out (see RunBuildRulesTest)
     if (!RunBuildRulesTest(app))
+        return false;
+
+    // 29f. Campaign maps in their own folder; hard building limits (see RunLimitsAndMapsTest)
+    if (!RunLimitsAndMapsTest(app))
         return false;
 
     // 29d. Units sent through the fog meet enemy buildings shutting a passage (see RunFogBlockTest)
