@@ -35,6 +35,8 @@ public:
     void NextTrack(); // player: mainmenu -> tracks... -> mainmenu
     void PrevTrack();
     void SetMusicVolume(int volume); // 0..128
+    // 0..128: the general volume, over every other one (music, surroundings, effects, interface, voices)
+    void SetGeneralVolume(int volume);
     // The interface goes silent (a replay): UI sounds, alerts, unit replies and the announcer; battle sounds and the
     // music stay
     void SetInterfaceMuted(bool muted);
@@ -112,6 +114,7 @@ private:
     bool m_initialized {false};
     bool m_muted {false};
     int m_volume {96};
+    int m_generalVolume {128};
     int m_fxVolume {128};
     int m_currentTrack {-1};
     bool m_manualPlayback {false}; // the player was used: tracks follow the playlist instead of the default music

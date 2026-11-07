@@ -99,9 +99,10 @@ public:
     void Mix(std::int16_t *out, int frames);
     void StopAll();
 
-    void SetFxVolume(int volume);    // 0..128: weapons, impacts, interface, alerts
-    void SetVoiceVolume(int volume); // 0..128: unit replies and the announcer
-    void SetUiVolume(int volume);    // 0..128: interface clicks, dialogs and alerts
+    void SetGeneralVolume(int volume); // 0..128: all of the above, including the announcer
+    void SetFxVolume(int volume);      // 0..128: weapons, impacts, interface, alerts
+    void SetVoiceVolume(int volume);   // 0..128: unit replies and the announcer
+    void SetUiVolume(int volume);      // 0..128: interface clicks, dialogs and alerts
     void SetMuted(bool muted);
     // The interface goes silent (a replay): interface sounds, alerts, unit replies and the announcer do not start;
     // weapons and impacts do
@@ -176,6 +177,7 @@ private:
     float m_fxGain {1.0f};
     float m_voiceGain {1.0f};
     float m_uiGain {1.0f};
+    float m_generalVolume {1.0f};
     bool m_muted {false};
     bool m_interfaceMuted {false};
     bool m_reverbOn {true};

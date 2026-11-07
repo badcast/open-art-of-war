@@ -605,12 +605,22 @@ void SoundEngine::StopMusic()
 
 void SoundEngine::ApplyGain()
 {
+    const float general = static_cast<float>(m_generalVolume) / 128.0f;
     if (m_stream)
     {
-        SDL_SetAudioStreamGain(m_stream, m_muted ? 0.0f : static_cast<float>(m_volume) / 128.0f);
+        SDL_SetAudioStreamGain(m_stream, m_muted ? 0.0f : static_cast<float>(m_volume) / 128.0f * general);
     }
     if (m_ambientStream)
-        SDL_SetAudioStreamGain(m_ambientStream, m_muted ? 0.0f : static_cast<float>(m_ambientVolume) / 128.0f);
+        SDL_SetAudioStreamGain(
+            m_ambientStream, m_muted ? 0.0f : static_cast<float>(m_ambientVolume) / 128.0f * general);
+}
+
+void SoundEngine::SetGeneralVolume(int volume)
+{
+    m_generalVolume = std::clamp(volume, 0, 128);
+    m_sfx.SetGeneralVolume(m_generalVolume);
+    m_voices.SetGeneralVolume(m_generalVolume);
+    ApplyGain(); // the music and the surroundings play on their own streams
 }
 
 void SoundEngine::SetMusicVolume(int volume)

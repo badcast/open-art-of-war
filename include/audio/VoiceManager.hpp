@@ -42,6 +42,7 @@ public:
     void StopAll();
 
     void SetVolume(int volume); // 0..128
+    void SetGeneralVolume(int volume); // 0..128: the general volume over the voices' own
     void SetMuted(bool muted);
     // The voices keep quiet (an interface that is silent: replies and the announcer)
     void SetSilenced(bool silenced);
@@ -56,6 +57,7 @@ private:
     std::unique_ptr<SfxMixer> m_mixer;
     std::string m_language;
     int m_volume {128};
+    int m_generalVolume {128};
     bool m_muted {false};
     bool m_silenced {false};
     std::size_t m_lines {0};

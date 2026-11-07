@@ -788,6 +788,18 @@ std::vector<SettingsRow> BuildSettingsRows(
             return std::to_string(static_cast<int>(v * 100.0f / 128.0f + 0.5f)) + "%";
         };
         rows.push_back(SliderRow(
+            _("General volume"),
+            _("Volume of all the sound: music, surroundings, effects, interface and voices"),
+            static_cast<float>(s.generalVolume),
+            0.0f,
+            128.0f,
+            8.0f,
+            percent,
+            [&s, notify](float v) {
+                s.generalVolume = static_cast<int>(v);
+                notify(SettingsArea::Audio);
+            }));
+        rows.push_back(SliderRow(
             _("Music volume"),
             _("Volume of the soundtrack"),
             static_cast<float>(s.musicVolume),
@@ -941,6 +953,7 @@ void ResetSettingsTab(int tab, Settings &s)
     }
     else if (tab == 2)
     {
+        s.generalVolume = d.generalVolume;
         s.musicVolume = d.musicVolume;
         s.fxVolume = d.fxVolume;
         s.voiceVolume = d.voiceVolume;

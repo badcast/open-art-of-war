@@ -47,6 +47,7 @@ struct Settings
     bool sharpPixels {false}; // pixel-art anti-aliased upscaling instead of plain nearest / linear
 
     // Audio
+    int generalVolume {128}; // 0..128: over every other volume below
     int musicVolume {96};   // 0..128
     int fxVolume {128};     // 0..128
     int voiceVolume {128};  // 0..128: unit replies and the announcer

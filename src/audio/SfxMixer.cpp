@@ -449,7 +449,9 @@ void SfxMixer::Mix(std::int16_t *out, int frames)
     for (Voice &v : m_voices)
     {
         const std::vector<std::int16_t> &clip = m_clips[static_cast<std::size_t>(v.clip)];
-        const float vol = m_muted ? 0.0f : (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
+        // The category's volume, scaled by the general one (SetGeneralVolume)
+        const float vol = m_muted ? 0.0f
+                                  : m_generalVolume * (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
         const float gl = v.gainL * vol, gr = v.gainR * vol;
         const float send = m_reverbOn ? v.reverbSend * vol : 0.0f;
         const bool filtered = v.lpCoef < 1.0f;
@@ -508,6 +510,12 @@ void SfxMixer::StopAll()
     std::lock_guard<std::mutex> guard(m_lock);
     m_voices.clear();
     m_announcerQueue.clear();
+}
+
+void SfxMixer::SetGeneralVolume(int volume)
+{
+    std::lock_guard<std::mutex> guard(m_lock);
+    m_generalVolume = std::clamp<int>(volume, 0, 128) / 128.0f;
 }
 
 void SfxMixer::SetFxVolume(int volume)

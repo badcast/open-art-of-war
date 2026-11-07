@@ -26,6 +26,7 @@ bool VoiceManager::Load(const std::string &language)
         borrowed = mixer->LoadClips(LoaderResources::VoiceClips(fallback), true);
     mixer->SetVoiceVolume(m_volume);
     mixer->SetFxVolume(m_volume); // whatever the category: every line of this mixer is a voice
+    mixer->SetGeneralVolume(m_generalVolume);
     mixer->SetMuted(m_muted);
     mixer->SetInterfaceMuted(m_silenced);
     {
@@ -79,6 +80,14 @@ void VoiceManager::StopAll()
     std::lock_guard<std::mutex> guard(m_swap);
     if (m_mixer)
         m_mixer->StopAll();
+}
+
+void VoiceManager::SetGeneralVolume(int volume)
+{
+    m_generalVolume = volume;
+    std::lock_guard<std::mutex> guard(m_swap);
+    if (m_mixer)
+        m_mixer->SetGeneralVolume(volume);
 }
 
 void VoiceManager::SetVolume(int volume)

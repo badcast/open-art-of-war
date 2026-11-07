@@ -58,6 +58,7 @@ void Application::ApplyAudio()
 {
     if (!m_sound)
         return;
+    m_sound->SetGeneralVolume(m_settings.generalVolume);
     m_sound->SetMusicVolume(m_settings.musicVolume);
     m_sound->SetFxVolume(m_settings.fxVolume);
     m_sound->SetReverb(m_settings.reverb);

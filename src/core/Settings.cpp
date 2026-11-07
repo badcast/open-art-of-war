@@ -25,6 +25,7 @@ void Settings::Clamp()
     zoomMin = std::clamp(zoomMin, kZoomLowest, 1.0f);
     zoomMax = std::clamp(zoomMax, 2.0f, kZoomHighest);
     zoomDefault = std::clamp(zoomDefault, zoomMin, zoomMax);
+    generalVolume = std::clamp(generalVolume, 0, 128);
     musicVolume = std::clamp(musicVolume, 0, 128);
     fxVolume = std::clamp(fxVolume, 0, 128);
     voiceVolume = std::clamp(voiceVolume, 0, 128);
@@ -78,6 +79,7 @@ bool Settings::Save(const std::string &path) const
         j["colorGrade"] = colorGrade;
         j["glow"] = glow;
         j["sharpPixels"] = sharpPixels;
+        j["generalVolume"] = generalVolume;
         j["musicVolume"] = musicVolume;
         j["fxVolume"] = fxVolume;
         j["reverb"] = reverb;
@@ -128,6 +130,7 @@ bool Settings::Load(const std::string &path)
         colorGrade = j.value("colorGrade", colorGrade);
         glow = j.value("glow", glow);
         sharpPixels = j.value("sharpPixels", sharpPixels);
+        generalVolume = j.value("generalVolume", generalVolume);
         musicVolume = j.value("musicVolume", musicVolume);
         fxVolume = j.value("fxVolume", fxVolume);
         reverb = j.value("reverb", reverb);
