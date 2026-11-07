@@ -405,7 +405,8 @@ void EditorUI::RequestClose(const MapDocument &doc)
 void EditorUI::ScanAvailableMaps()
 {
     m_availableMaps.clear();
-    const std::string searchDirs[] = {OpenArtOfWar::LoaderResources::MapsDir()};
+    const std::string searchDirs[]
+        = {OpenArtOfWar::LoaderResources::MapsDir(), OpenArtOfWar::LoaderResources::MissionMapsDir()};
 
     for (const auto &sdir : searchDirs)
     {

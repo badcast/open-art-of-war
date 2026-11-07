@@ -1,6 +1,7 @@
 #include "graphics/RenderUtility.hpp"
 #include "core/EnvironmentConfig.hpp"
 #include "game/GameplayController.hpp"
+#include "game/BuildLimits.hpp"
 #include "game/MissionDialogs.hpp"
 #include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
@@ -894,7 +895,18 @@ void GameplayController::Update(const FrameContext &ctx)
                     bool canPlace
                         = entities.CanPlaceBuilding(curTileX, curTileY, bp.width, bp.height, map, Players::Local());
                     bool canAfford = economy.CanAfford(bp.creditCost);
-                    if (!canAfford)
+                    // Hard limits (data/limits.yaml): checked again by the simulation
+                    const bool withinLimit
+                        = BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex);
+                    if (!withinLimit)
+                    {
+                        SoundRequests::Play("ui_error");
+                        hud.SetNotification(
+                            BuildLimits::LimitOf(entities, bp.buildingIndex) == 0 ? _("THIS BUILDING IS NOT ALLOWED!")
+                                                                                  : _("BUILDING LIMIT REACHED!"));
+                        hud.SetBuildMode(false);
+                    }
+                    else if (!canAfford)
                     {
                         SoundRequests::Announce("ann_insufficient_funds");
                     }
@@ -904,7 +916,7 @@ void GameplayController::Update(const FrameContext &ctx)
                         if (!entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true))
                             hud.SetNotification(_("NO HEADQUARTERS: NOTHING CAN BE BUILT!"));
                     }
-                    if (canPlace && canAfford)
+                    if (withinLimit && canPlace && canAfford)
                     {
                         // The simulation checks both again when it places it (a network turn later)
                         SimCommand c = Command(CommandType::PlaceBuilding);

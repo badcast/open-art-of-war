@@ -297,7 +297,13 @@ private:
     int ItemCountForTab(int tab) const;
     int MaxScrollRows(int tab, int gridHeight) const;
     void ActivateCell(
-        int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits);
+        int tab,
+        int index,
+        bool cancel,
+        Economy &economy,
+        EntityManager &entities,
+        const TileMap &map,
+        std::vector<int> &selectedUnits);
     void CyclePrimaryBuilding(int tab, EntityManager &entities, Camera &camera);
 
     bool m_researchOpen {false};

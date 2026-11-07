@@ -199,11 +199,7 @@ void MissionController::SetDefensePacing(
 }
 
 bool MissionController::LoadMission(
-    int missionId,
-    TileMap &map,
-    EntityManager &entities,
-    Economy &economy,
-    Pathfinder &pathfinder)
+    int missionId, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
     // Single player: two slots in the classic colours of the factions, the local player in slot 0 (a network or
     // custom match before left its own slots, colours and local slot behind)
@@ -266,7 +262,7 @@ bool MissionController::LoadMission(
     };
 
     // 2. Load corresponding map
-    std::string mapPath = LoaderResources::MapPath(jmi.mapFile);
+    std::string mapPath = LoaderResources::MissionMapPath(jmi.mapFile);
     if (!map.LoadMap(mapPath))
     {
         std::cerr << "[MissionController] Failed to load map: " << mapPath << std::endl;
@@ -692,17 +688,14 @@ std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
                            || (doc.contains("units") && doc["units"].is_array() && !doc["units"].empty());
         maps.push_back(std::move(info));
     }
-    // confederation_mission_* first, resistance_mission_* next, then skirmish_*, then everything else; numbers compare as
-    // numbers
+    // (only skirmish maps: the campaign's are in maps.mission_dir) skirmish_* first, then everything else; numbers
+    // compare as numbers
     auto sortKey = [](const SkirmishMapInfo &m) {
         const std::string &n = m.name;
         std::size_t digits = n.find_first_of("0123456789");
         std::string prefix = digits == std::string::npos ? n : n.substr(0, digits);
         const int number = digits == std::string::npos ? 0 : std::atoi(n.c_str() + digits);
-        const int group = prefix.rfind("confederation_mission_", 0) == 0 ? 0
-                        : (prefix.rfind("resistance_mission_", 0) == 0   ? 1
-                           : (prefix.rfind("skirmish_", 0) == 0          ? 2
-                                                                         : 3));
+        const int group = prefix.rfind("skirmish_", 0) == 0 ? 0 : 1;
         return std::make_tuple(group, prefix, number, n);
     };
     std::sort(maps.begin(), maps.end(), [&](const SkirmishMapInfo &a, const SkirmishMapInfo &b) {

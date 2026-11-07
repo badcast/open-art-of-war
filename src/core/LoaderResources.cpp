@@ -63,7 +63,8 @@ bool LoadInto(State &s, const std::string &path)
             ok = true;
         }
         else
-            std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest object: no resources" << std::endl;
+            std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest object: no resources"
+                      << std::endl;
     }
     else
         std::cerr << "[LoaderResources] " << path << " not found: no resources" << std::endl;
@@ -377,6 +378,11 @@ std::string LoaderResources::WeaponBalance()
     return join(Str(nullptr, "weapon_balance"));
 }
 
+std::string LoaderResources::Limits()
+{
+    return join(Str(nullptr, "limits"));
+}
+
 std::string LoaderResources::Research(const std::string &faction)
 {
     return join(Str("research", faction.c_str()));
@@ -399,52 +405,80 @@ std::string LoaderResources::MapsDir()
 
 std::string LoaderResources::MapPath(const std::string &name)
 {
-    static const std::unordered_map<std::string, std::string> kAliases = {
-        {"map_mission_1", "confederation_mission_1"},
-        {"map_mission_2", "confederation_mission_2"},
-        {"map_mission_3", "confederation_mission_3"},
-        {"map_mission_4", "confederation_mission_4"},
-        {"map_mission_5", "confederation_mission_5"},
-        {"map_mission_6", "confederation_mission_6"},
-        {"m37", "resistance_mission_1"},
-        {"m42", "resistance_mission_2"},
-        {"m43", "resistance_mission_3"},
-        {"m26", "resistance_mission_4"},
-        {"m35", "resistance_mission_5"},
-        {"m44", "resistance_mission_6"},
-        {"m0", "resistance_mission_7"},
-        {"brod", "resistance_mission_8"},
-        {"m100", "resistance_mission_8"},
-        {"4x_gage", "skirmish_1"},
-        {"map_skirmish_2", "skirmish_2"},
-        {"map_skirmish_3", "skirmish_3"},
-        {"map_skirmish_4", "skirmish_4"},
-        {"map_skirmish_5", "skirmish_5"},
-        {"map_skirmish_6", "skirmish_6"},
-        {"map_skirmish_7", "skirmish_7"},
-        {"4x_kings", "skirmish_8"},
-        {"map_skirmish_9", "skirmish_9"},
-        {"map_skirmish_10", "skirmish_10"},
-        {"map_skirmish_11", "skirmish_11"},
-        {"map_skirmish_12", "skirmish_12"},
-        {"map_skirmish_13", "skirmish_13"},
-        {"map_skirmish_14", "skirmish_14"},
-        {"map_skirmish_15", "skirmish_15"},
-        {"4x_runs", "skirmish_16"},
-        {"generated_map_7142", "skirmish_17"}};
+    static const std::unordered_map<std::string, std::string> kAliases
+        = {{"map_mission_1", "confederation_mission_1"},
+           {"map_mission_2", "confederation_mission_2"},
+           {"map_mission_3", "confederation_mission_3"},
+           {"map_mission_4", "confederation_mission_4"},
+           {"map_mission_5", "confederation_mission_5"},
+           {"map_mission_6", "confederation_mission_6"},
+           {"m37", "resistance_mission_1"},
+           {"m42", "resistance_mission_2"},
+           {"m43", "resistance_mission_3"},
+           {"m26", "resistance_mission_4"},
+           {"m35", "resistance_mission_5"},
+           {"m44", "resistance_mission_6"},
+           {"m0", "resistance_mission_7"},
+           {"brod", "resistance_mission_8"},
+           {"m100", "resistance_mission_8"},
+           {"4x_gage", "skirmish_1"},
+           {"map_skirmish_2", "skirmish_2"},
+           {"map_skirmish_3", "skirmish_3"},
+           {"map_skirmish_4", "skirmish_4"},
+           {"map_skirmish_5", "skirmish_5"},
+           {"map_skirmish_6", "skirmish_6"},
+           {"map_skirmish_7", "skirmish_7"},
+           {"4x_kings", "skirmish_8"},
+           {"map_skirmish_9", "skirmish_9"},
+           {"map_skirmish_10", "skirmish_10"},
+           {"map_skirmish_11", "skirmish_11"},
+           {"map_skirmish_12", "skirmish_12"},
+           {"map_skirmish_13", "skirmish_13"},
+           {"map_skirmish_14", "skirmish_14"},
+           {"map_skirmish_15", "skirmish_15"},
+           {"4x_runs", "skirmish_16"},
+           {"generated_map_7142", "skirmish_17"}};
 
     std::filesystem::path p(name);
     std::string stem = p.stem().string();
     auto it = kAliases.find(stem);
     std::string targetStem = (it != kAliases.end()) ? it->second : stem;
+    // Campaign maps live in their own folder (maps.mission_dir)
+    const bool mission
+        = targetStem.rfind("confederation_mission_", 0) == 0 || targetStem.rfind("resistance_mission_", 0) == 0;
 
     if (name.find('/') != std::string::npos || name.find('\\') != std::string::npos)
     {
+        // An old path of a mission map ("maps/resistance_mission_4.json", "maps/m26.json"): it moved
+        if (mission && p.parent_path().generic_string() == MapsDir())
+            return MissionMapsDir() + "/" + WithExt(targetStem, ".json");
         if (it != kAliases.end())
             return (p.parent_path() / WithExt(targetStem, ".json")).generic_string();
         return WithExt(name, ".json");
     }
-    return MapsDir() + "/" + WithExt(targetStem, ".json");
+    return (mission ? MissionMapsDir() : MapsDir()) + "/" + WithExt(targetStem, ".json");
+}
+
+std::string LoaderResources::MissionMapsDir()
+{
+    const std::string dir = Str("maps", "mission_dir");
+    return dir.empty() ? MapsDir() + "/mission" : join(dir);
+}
+
+std::string LoaderResources::MissionMapPath(const std::string &name)
+{
+    // The mission's own name for its map; an alias or a path is resolved as for any map
+    if (name.find('/') != std::string::npos || name.find('\\') != std::string::npos)
+        return MapPath(name);
+    const std::string path = MapPath(name);
+    if (path.rfind(MissionMapsDir() + "/", 0) == 0)
+        return path;
+    return MissionMapsDir() + "/" + WithExt(std::filesystem::path(path).stem().string(), ".json");
+}
+
+std::vector<std::string> LoaderResources::ListMissionMaps()
+{
+    return Joined(List("maps", "missions"));
 }
 
 std::string LoaderResources::TestMap()
@@ -496,6 +530,7 @@ std::string LoaderResources::NetManifestText()
            "effects",
            "projectiles",
            "weapon_balance",
+           "limits",
            "research",
            "tile_collision",
            "maps",

@@ -139,6 +139,7 @@ set(ENGINE_SOURCES
     src/game/Effects.cpp
     src/game/Projectiles.cpp
     src/game/WeaponBalance.cpp
+    src/game/BuildLimits.cpp
     src/game/Sides.cpp
     src/game/Players.cpp
     src/core/Utility.cpp

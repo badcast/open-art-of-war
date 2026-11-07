@@ -445,7 +445,7 @@ static bool RunEditorSelfTest()
     OpenArtOfWar::Assets::ReadText(gameMapPath, gameMapText);
     nlohmann::json originalGameMap = nlohmann::json::parse(gameMapText);
     const std::size_t expectedEntities = originalGameMap.value("buildings", nlohmann::json::array()).size()
-                                    + originalGameMap.value("units", nlohmann::json::array()).size();
+                                         + originalGameMap.value("units", nlohmann::json::array()).size();
     const auto *playerHq = gameMapDoc.GetEntityAt(4, 21);
     const auto *enemyHq = gameMapDoc.GetEntityAt(46, 18);
     if (gameMapDoc.GetWidth() != 56 || gameMapDoc.GetHeight() != 44
@@ -502,7 +502,7 @@ static bool RunEditorSelfTest()
 
     // 1. Test MapDocument load existing game map
     OpenArtOfWar::MapDocument doc;
-    std::string testMapPath = OpenArtOfWar::LoaderResources::MapPath("resistance_mission_7");
+    std::string testMapPath = OpenArtOfWar::LoaderResources::MissionMapPath("resistance_mission_7");
     if (!doc.LoadMap(testMapPath))
     {
         std::cerr << "[MapEditor-Test] FAILED: Could not load map from " << testMapPath << std::endl;

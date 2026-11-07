@@ -1279,7 +1279,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             else
             {
                 const auto &data = Missions::Campaign(PlayerFaction())[m_campaignMissionSelected];
-                m_beginLoading(_(data.info.name), LoaderResources::MapPath(data.data.mapFile));
+                m_beginLoading(_(data.info.name), LoaderResources::MissionMapPath(data.data.mapFile));
             }
         }
         // A custom game is a match of this computer alone: every player at a start position of the map, the person at
@@ -1325,11 +1325,9 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
                 match.startPosition[p] = static_cast<std::int8_t>(cs.position);
             }
         }
-        const bool started
-            = m_customGame
-                  ? mission.LoadMatch(match, map, entities, economy, pathfinder)
-                  : mission.LoadMission(
-                        m_campaignMissionSelected, map, entities, economy, pathfinder);
+        const bool started = m_customGame
+                                 ? mission.LoadMatch(match, map, entities, economy, pathfinder)
+                                 : mission.LoadMission(m_campaignMissionSelected, map, entities, economy, pathfinder);
         if (m_endLoading)
             m_endLoading();
         if (!started)
@@ -1550,7 +1548,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
         {
             const std::string mapPath
                 = m_customGame ? m_skirmishMaps[m_skirmishSelected].path
-                               : LoaderResources::MapPath(
+                               : LoaderResources::MissionMapPath(
                                      Missions::Campaign(PlayerFaction())[m_campaignMissionSelected].data.mapFile);
             m_editorNotice
                 = LaunchMapEditor(mapPath) ? "" : _("Map editor (openaow-mapeditor) not found next to the game");
@@ -2968,7 +2966,13 @@ void MenuController::RenderCampaignMissionSelect(
         const std::string previewKey = std::string("mission:") + (PlayerFaction() == Faction::Confederation ? "c" : "r")
                                        + std::to_string(selected);
         SDL_Texture *tex = m_mapPreview.Get(
-            renderer.GetSdlRenderer(), texManager, previewKey, LoaderResources::MapPath(data.mapFile), markers, pw, ph);
+            renderer.GetSdlRenderer(),
+            texManager,
+            previewKey,
+            LoaderResources::MissionMapPath(data.mapFile),
+            markers,
+            pw,
+            ph);
         DrawMapPreview(renderer, tex, pw, ph, d);
     }
 
@@ -3405,7 +3409,8 @@ void MenuController::EnsureCustomSlots()
 {
     if (m_skirmishSelected < 0 || m_skirmishSelected >= static_cast<int>(m_skirmishMaps.size()))
         return;
-    const std::size_t most = static_cast<std::size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
+    const std::size_t most
+        = static_cast<std::size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
     if (m_customSlots.empty())
     {
         m_customSlots.resize(2);

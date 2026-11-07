@@ -1,6 +1,7 @@
 #include "ui/HUDController.hpp"
 #include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
+#include "game/BuildLimits.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Localization.hpp"
 #include "graphics/Renderer.hpp"
@@ -763,7 +764,13 @@ int HUDController::MaxScrollRows(int tab, int gridHeight) const
 }
 
 void HUDController::ActivateCell(
-    int tab, int index, bool cancel, Economy &economy, EntityManager &entities, std::vector<int> &selectedUnits)
+    int tab,
+    int index,
+    bool cancel,
+    Economy &economy,
+    EntityManager &entities,
+    const TileMap &map,
+    std::vector<int> &selectedUnits)
 {
     if (cancel)
     {
@@ -796,6 +803,16 @@ void HUDController::ActivateCell(
             {
                 SoundRequests::Play("ui_error");
                 SetNotification(_("RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"));
+            }
+            else if (
+                index < static_cast<int>(blueprints.size())
+                && !BuildLimits::CanBuildMore(entities, map, Players::Local(), blueprints[index].buildingIndex))
+            {
+                SoundRequests::Play("ui_error");
+                SetNotification(
+                    BuildLimits::LimitOf(entities, blueprints[index].buildingIndex) == 0
+                        ? _("THIS BUILDING IS NOT ALLOWED!")
+                        : _("BUILDING LIMIT REACHED!"));
             }
             else if (index < static_cast<int>(blueprints.size()))
             {
@@ -1014,7 +1031,7 @@ bool HUDController::HandleHudClick(
             UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
             if (c.Contains(mx, my))
             {
-                ActivateCell(m_activeTab, i, true, economy, entities, selectedUnits);
+                ActivateCell(m_activeTab, i, true, economy, entities, map, selectedUnits);
                 break;
             }
         }
@@ -1140,7 +1157,7 @@ bool HUDController::HandleHudClick(
                         ToggleRepeat(archetype, inf ? UnitType::Barracks : UnitType::Factory, entities, selectedUnits);
                     break;
                 }
-                ActivateCell(m_activeTab, i, false, economy, entities, selectedUnits);
+                ActivateCell(m_activeTab, i, false, economy, entities, map, selectedUnits);
                 break;
             }
         }
@@ -1602,9 +1619,26 @@ void HUDController::RenderGameHud(
                     const auto &bp = EntityManager::GetBlueprints()[i];
                     bool selected = (m_buildMode && m_selectedBlueprint == i);
                     bool canAfford = economy.CanAfford(bp.creditCost);
-                    const bool radarLocked = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq;
+                    // Hard limits (data/limits.yaml): greyed out at the limit, "n/max" while one is set
+                    const int limit = BuildLimits::LimitOf(entities, bp.buildingIndex);
+                    const int owned
+                        = limit > 0 ? BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex) : 0;
+                    const bool atLimit = limit == 0 || (limit > 0 && owned >= limit);
+                    const bool radarLocked
+                        = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;
                     DrawCameo(
                         renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected && !noHq, radarLocked);
+                    if (limit > 0)
+                    {
+                        fontRenderer.DrawString(
+                            std::to_string(owned) + "/" + std::to_string(limit),
+                            c.x + c.w - 6,
+                            c.y + 5,
+                            ui::FONT_SMALL_BOLD,
+                            atLimit ? col::Danger : col::TextMuted,
+                            true,
+                            Anchor::RIGHT | Anchor::TOP);
+                    }
                     DrawCostTag(
                         renderer,
                         fontRenderer,
@@ -1624,6 +1658,11 @@ void HUDController::RenderGameHud(
                         hoverTitle
                             = std::string(_(bp.name)) + "  $" + std::to_string(bp.creditCost) + ", " + pw + _(" kW");
                         hoverText = _(bp.desc);
+                        if (limit == 0)
+                            hoverText = std::string(_("Not allowed in this game.")) + " " + hoverText;
+                        else if (atLimit)
+                            hoverText = std::string(_("Building limit reached: ")) + std::to_string(owned) + "/"
+                                        + std::to_string(limit) + ". " + hoverText;
                     }
                     break;
                 }

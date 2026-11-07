@@ -887,7 +887,7 @@ void Application::UpdateLocalReplay()
     {
         // A campaign mission: the setup only names the map and the two sides (the mission sets the world up)
         const auto &campaign = Missions::Campaign(PlayerFaction());
-        setup.mapPath = LoaderResources::MapPath(campaign[missionId].data.mapFile);
+        setup.mapPath = LoaderResources::MissionMapPath(campaign[missionId].data.mapFile);
         setup.local = Players::Local();
         setup.slots[setup.local] = {true, PlayerFaction(), 0, 0, true, 1};
         setup.slots[setup.local == 0 ? 1 : 0]

@@ -1,5 +1,6 @@
 #include "graphics/RenderUtility.hpp"
 #include "game/AIController.hpp"
+#include "game/BuildLimits.hpp"
 #include "core/DetMath.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
@@ -2079,7 +2080,8 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         auto open = [&](int px, int py) {
             return px >= 0 && py >= 0 && px < mw && py < mh && map.IsPassable(px, py) && map.GetWall(px, py) == 0;
         };
-        std::vector<std::uint8_t> ring(static_cast<std::size_t>(mw) * mh, 0), inside(ring.size(), 0), outside(ring.size(), 0);
+        std::vector<std::uint8_t> ring(static_cast<std::size_t>(mw) * mh, 0), inside(ring.size(), 0),
+            outside(ring.size(), 0);
         for (std::size_t i = 0; i < wallTiles.size(); ++i)
             if (wallRow[i] == 0)
                 ring[idx(wallTiles[i].first, wallTiles[i].second)] = 1; // the outer row lies outside the ring
@@ -2208,6 +2210,13 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     if (site.kind == AIDefenseSite::Wall)
     {
         const int x = site.tileX, y = site.tileY;
+        // Hard limits (data/limits.yaml) bind the computer as well: the segment is given up
+        if (!BuildLimits::CanBuildMore(entities, map, m_player, side() == Faction::Confederation ? 15 : 25))
+        {
+            site.done = true;
+            ThinkOnce("limitwall", "BUILD", "Walls: the building limit is reached");
+            return false;
+        }
         // Checked first: a unit also makes the tile impassable and fails canPlaceBuilding
         if (entities.IsTileOccupiedByUnit(x, y))
         {
@@ -2228,6 +2237,17 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     }
 
     const int index = FactionBuildingIndex(site.kind, side());
+    // Hard limits (data/limits.yaml) bind the computer as well: no more of that kind, the spot is given up
+    if (!BuildLimits::CanBuildMore(entities, map, m_player, index))
+    {
+        site.done = true;
+        ThinkOnce(
+            "limit" + std::to_string(index),
+            "BUILD",
+            std::string("No ") + BuildLimits::KeyOf(BuildLimits::KindOf(index))
+                + " is started: the building limit is reached");
+        return false;
+    }
     const BuildingConfig *cfg = entities.GetBuildingConfig(index);
     const int w = cfg ? cfg->width : 2;
     const int h = cfg ? cfg->height : 2;
@@ -3113,7 +3133,9 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
                 continue;
             plan.rebuildTimer += deltaTime;
             if (canBuild && plan.rebuildTimer >= 6.0f && m_credits >= plan.creditCost
-                && IsBuildingUnlocked(m_player, plan.rawBuildingType))
+                && IsBuildingUnlocked(m_player, plan.rawBuildingType)
+                // (hard limits: the destroyed one is rebuilt only while the player may have another)
+                && BuildLimits::CanBuildMore(entities, map, m_player, plan.rawBuildingType))
             {
                 bool siteClear
                     = entities.CanPlaceBuilding(plan.tileX, plan.tileY, plan.width, plan.height, map, m_player);
@@ -3165,7 +3187,9 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         else
         {
             wp.rebuildTimer += deltaTime;
-            if (canBuild && wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost)
+            if (canBuild && wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost
+                && BuildLimits::CanBuildMore(
+                    entities, map, m_player, wp.faction == Faction::Confederation ? 15 : 25)) // (hard limits)
             {
                 // Not on a unit that stands even partly on the tile (it would be walled in)
                 if (!entities.IsTileOccupiedByUnit(wp.tileX, wp.tileY))

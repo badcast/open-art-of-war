@@ -1,6 +1,7 @@
 #include "game/Simulation.hpp"
 #include "game/AIController.hpp"
 #include "game/Building.hpp"
+#include "game/BuildLimits.hpp"
 #include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Pathfinder.hpp"
@@ -539,6 +540,9 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             const auto &bp = *found;
             // The Radar Locator is built only once its technology is researched (the interface says so too)
             if (!IsBuildingUnlocked(cmd.player, bp.buildingIndex))
+                return;
+            // Hard limits (data/limits.yaml): no more of that kind than allowed
+            if (!BuildLimits::CanBuildMore(entities, map, cmd.player, bp.buildingIndex))
                 return;
             if (!entities.CanPlaceBuilding(cmd.x, cmd.y, bp.width, bp.height, map, cmd.player))
                 return;

@@ -1929,7 +1929,7 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
         SetPlayerFaction(Faction::Resistance);
         const auto &campaign = Missions::Campaign(Faction::Resistance);
         MatchSetup setup;
-        setup.mapPath = LoaderResources::MapPath(campaign[0].data.mapFile);
+        setup.mapPath = LoaderResources::MissionMapPath(campaign[0].data.mapFile);
         setup.mapHash = MapFiles::HashOf(setup.mapPath);
         setup.local = Players::Local();
         setup.slots[setup.local] = {true, Faction::Resistance, 0, 0, true, 1};

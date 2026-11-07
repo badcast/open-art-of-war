@@ -79,6 +79,8 @@ public:
     {
         return Projectiles();
     }
+    // Hard per-player building limits (data/limits.yaml)
+    static std::string Limits();
     // Damage multipliers by projectile kind and target class (data/weapon_balance.yaml)
     static std::string WeaponBalance();
     static inline std::string weaponBalance()
@@ -102,14 +104,22 @@ public:
     static std::vector<std::string> CharacterFiles();
 
     // ---- Maps ----
-    // The folder of the maps (where the editor saves; network maps must come from there)
+    // The folder of the skirmish maps (where the editor saves; network maps must come from below it)
     static std::string MapsDir();
-    // "m26" -> "assets/maps/m26.json"; a name with a path separator is returned unchanged (".json" added)
+    // The folder of the campaign mission maps (maps.mission_dir, below MapsDir)
+    static std::string MissionMapsDir();
+    // "skirmish_2" -> "maps/skirmish_2.json"; a campaign map's name or an old alias ("m26", "resistance_mission_4")
+    // -> "maps/mission/resistance_mission_4.json"; a name with a path separator is returned unchanged (".json" added,
+    // an old mission path moved to the mission folder)
     static std::string MapPath(const std::string &name);
+    // The map of a campaign mission (MissionData::mapFile) in the mission folder
+    static std::string MissionMapPath(const std::string &name);
     static std::string TestMap();
     static std::string NetDefaultMap();
-    // The shipped maps (maps.files), then in a blob install the player's own maps from the per-user directory
+    // The shipped skirmish maps (maps.files), then in a blob install the player's own maps from the per-user directory
     static std::vector<std::string> ListMaps();
+    // The campaign mission maps (maps.missions)
+    static std::vector<std::string> ListMissionMaps();
 
     // ---- Network ----
     // Files whose contents must match between the players (net_hash), in manifest order
