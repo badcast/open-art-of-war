@@ -478,16 +478,26 @@ void SoundEngine::PrevTrack()
 
 double SoundEngine::GetTrackPosition() const
 {
-    if (!m_initialized || !m_decoder || m_sampleRate <= 0)
+    if (!m_initialized)
         return 0.0;
-    return static_cast<double>(m_currentSample - m_startSample) / m_sampleRate;
+    SDL_LockMutex(m_lock);
+    const double pos = (!m_decoder || m_sampleRate <= 0)
+                           ? 0.0
+                           : static_cast<double>(m_currentSample - m_startSample) / m_sampleRate;
+    SDL_UnlockMutex(m_lock);
+    return pos;
 }
 
 double SoundEngine::GetTrackLength() const
 {
-    if (!m_initialized || !m_decoder || m_sampleRate <= 0)
+    if (!m_initialized)
         return 0.0;
-    return static_cast<double>(m_endSample - m_startSample) / m_sampleRate;
+    SDL_LockMutex(m_lock);
+    const double len = (!m_decoder || m_sampleRate <= 0)
+                           ? 0.0
+                           : static_cast<double>(m_endSample - m_startSample) / m_sampleRate;
+    SDL_UnlockMutex(m_lock);
+    return len;
 }
 
 void SoundEngine::SeekTrack(double ratio)
@@ -584,8 +594,10 @@ void SoundEngine::StopMusic()
         return;
     SDL_LockMutex(m_lock);
     CloseDecoder();
-    SDL_ClearAudioStream(m_stream);
     SDL_UnlockMutex(m_lock);
+    // Clear outside m_lock to avoid ABBA deadlock with FeedAudio holding the stream lock
+    if (m_stream)
+        SDL_ClearAudioStream(m_stream);
     m_currentTrack = -1;
     m_musicContext = 0;
     m_manualPlayback = false;

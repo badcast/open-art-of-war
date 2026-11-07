@@ -42,6 +42,8 @@ public:
     static void ProcessEvent(const SDL_Event &event);
     static void BeginFrame();
     static void EndFrame();
+    static bool IsInitialized();
+    static bool IsFrameActive();
 
     static bool WantCaptureMouse();
     static bool WantCaptureKeyboard();

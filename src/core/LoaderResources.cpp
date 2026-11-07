@@ -129,7 +129,7 @@ void LoaderResources::SetAssetRoot(const std::string &root)
     s.root = root.empty() ? std::string(kDefaultRoot) : root;
 }
 
-const std::string &LoaderResources::AssetRoot()
+std::string LoaderResources::AssetRoot()
 {
     State &s = state();
     std::lock_guard<std::mutex> guard(s.lock);

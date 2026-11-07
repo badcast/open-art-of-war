@@ -26,7 +26,7 @@ public:
     // Sets only the asset root used to resolve relative resource paths
     static void SetAssetRoot(const std::string &root);
     // Gets the current asset root
-    static const std::string &AssetRoot();
+    static std::string AssetRoot();
 
     // True when main.yaml was found and parsed
     static bool HasManifest();

@@ -584,6 +584,7 @@ void Application::Run()
                     // Slightly behind the host: an extra tick this frame
                     if (m_net->TurnsAhead(sim.Tick()) > 2)
                         accumulator += SIMULATION_TIMESTEP;
+                    int ran = 0;
                     while (accumulator >= SIMULATION_TIMESTEP && playing())
                     {
                         if (!netTick())
@@ -593,6 +594,14 @@ void Application::Run()
                             break;
                         }
                         accumulator -= SIMULATION_TIMESTEP;
+                        ++ran;
+                    }
+                    if (ran == 0 && playing())
+                    {
+                        // No network turn ran this frame (paused or waiting): keep UI & pause menu responsive
+                        m_gameplayController->SetSimulationHold(true);
+                        Update(static_cast<float>(frameTime));
+                        m_gameplayController->SetSimulationHold(false);
                     }
                 }
                 else
@@ -808,6 +817,8 @@ void Application::Update(float deltaTime)
     }
     else if (m_state == AppState::MainMenu)
     {
+        if (m_replay)
+            CloseReplay();
         m_menuController->UpdateMainMenu(
             *m_input,
             m_windowW,

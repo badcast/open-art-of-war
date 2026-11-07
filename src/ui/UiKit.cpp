@@ -386,28 +386,46 @@ int ConfirmUpdate(
     bool escPressed)
 {
     if (!state.open)
+    {
+        state.modalResult = -1;
         return -1;
-    const int modalAns = ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
-    if (modalAns >= 0)
-        return modalAns;
+    }
+    if (state.modalResult >= 0)
+    {
+        const int ans = state.modalResult;
+        state.modalResult = -1;
+        return ans;
+    }
+    const bool useNativeHitTest = !ImGuiBridge::IsInitialized();
     const UiRect d = ConfirmDialogRect(windowW, windowH);
-    if (enterPressed || (clicked && ConfirmYes(d).Contains(mx, my)))
+    if (enterPressed || (useNativeHitTest && clicked && ConfirmYes(d).Contains(mx, my)))
+    {
+        state.modalResult = -1;
         return 1;
-    if (escPressed || (clicked && ConfirmNo(d).Contains(mx, my)))
+    }
+    if (escPressed || (useNativeHitTest && clicked && ConfirmNo(d).Contains(mx, my)))
+    {
+        state.modalResult = -1;
         return 0;
+    }
     return -1;
 }
 
 void DrawConfirm(
     Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const ConfirmState &state, int mx, int my)
 {
-    (void) r;
-    (void) font;
-    (void) mx;
-    (void) my;
     if (!state.open)
         return;
-    ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
+    if (ImGuiBridge::IsFrameActive())
+    {
+        ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
+        return;
+    }
+    const UiRect d = ConfirmDialogRect(windowW, windowH);
+    const UiRect content = DrawDialog(r, font, windowW, windowH, d, state.title);
+    font.DrawTextWrapped(state.text, content.x + 24, content.y + 18, content.w - 48, FONT_BODY, color::Text, false);
+    DrawButton(r, font, ConfirmYes(d), _("YES"), ButtonStyle::Danger, ConfirmYes(d).Contains(mx, my));
+    DrawButton(r, font, ConfirmNo(d), _("NO"), ButtonStyle::Secondary, ConfirmNo(d).Contains(mx, my));
 }
 
 void DrawComboField(

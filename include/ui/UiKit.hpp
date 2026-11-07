@@ -148,6 +148,7 @@ struct ConfirmState
     bool open {false};
     std::string title, text;
     int action {0}; // what the owner asked about (his own numbering)
+    mutable int modalResult {-1};
 };
 // Returns 1 for Yes, 0 for No, -1 while the question stays open
 int ConfirmUpdate(

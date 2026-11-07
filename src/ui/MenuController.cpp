@@ -1049,7 +1049,10 @@ bool MenuController::UpdateInGameMenu(
         // Leaving or restarting a game loses its progress: ask first
         if ((item == 4 || item == 5) && !confirmed)
         {
+            if (item == 4 && mission.IsOnlineMatch())
+                return;
             m_confirm.open = true;
+            m_confirm.modalResult = -1;
             SoundRequests::Play("ui_show_dialog");
             m_confirm.action = item;
             if (item == 4)
@@ -1093,13 +1096,21 @@ bool MenuController::UpdateInGameMenu(
                 }
                 break;
             case 4: // Restart mission
-                mission.Restart(map, entities, economy, pathfinder);
-                camera.CenterOn(mission.GetPlayerHqX() * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
+                if (!mission.IsOnlineMatch())
+                {
+                    mission.Restart(map, entities, economy, pathfinder);
+                    camera.CenterOn(mission.GetPlayerHqX() * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
+                }
                 m_inGameMenuOpen = false;
                 break;
             case 5: // Main menu
                 state = AppState::MainMenu;
                 m_inGameMenuOpen = false;
+                m_inGameSettingsOpen = false;
+                m_confirm = {};
+                m_combo = {};
+                SetObjectivesDialogOpen(false);
+                m_missionDialogOpen = false;
                 break;
         }
     };
@@ -1756,6 +1767,7 @@ void MenuController::UpdateSettingsScreen(
             return;
         m_apiPending = name;
         m_apiConfirm.open = true;
+        m_apiConfirm.modalResult = -1;
         m_apiConfirm.title = std::string(_("SWITCH RENDER API?"));
         m_apiConfirm.text
             = m_inGameSettingsOpen

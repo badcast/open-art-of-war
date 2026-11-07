@@ -102,6 +102,7 @@ private:
     std::map<std::string, std::vector<std::uint8_t>> m_files;
     std::map<int, std::vector<View>> m_views; // by slot, ascending ticks
     std::int64_t m_mismatchTick {-1};
+    std::int64_t m_lastScheduledTurn {-1};
     bool m_overlayInstalled {false};
 };
 

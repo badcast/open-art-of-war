@@ -589,6 +589,11 @@ void Application::UpdateReplay(double frameTime)
             m_state = AppState::SkirmishPlaying;
         m_gameplayController->SetSimulationHold(false);
     }
+    if (m_state != AppState::SkirmishPlaying)
+    {
+        CloseReplay();
+        return;
+    }
     const bool finished = sim.Tick() >= total;
     if (finished && !m_replayUi.finished)
     {

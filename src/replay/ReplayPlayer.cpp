@@ -271,6 +271,7 @@ bool ReplayPlayer::PrepareMatch(int watchSlot, MatchSetup &out, std::string &err
             local = i;
     out.local = static_cast<PlayerId>(std::max(0, local));
     m_mismatchTick = -1;
+    m_lastScheduledTurn = -1;
     return true;
 }
 
@@ -279,8 +280,9 @@ void ReplayPlayer::ScheduleDue(Simulation &sim, std::uint32_t tick)
     if (m_info.ticksPerTurn == 0 || tick % m_info.ticksPerTurn != 0)
         return;
     const std::uint32_t turn = tick / m_info.ticksPerTurn;
-    if (turn >= m_turns.size())
+    if (turn >= m_turns.size() || static_cast<std::int64_t>(turn) == m_lastScheduledTurn)
         return;
+    m_lastScheduledTurn = static_cast<std::int64_t>(turn);
     Net::TurnBundle bundle;
     if (Net::decodeTurn(m_turns[turn].data(), m_turns[turn].size(), bundle))
         NetMatch::ScheduleBundle(sim, bundle, m_info.ticksPerTurn);
@@ -311,6 +313,7 @@ bool ReplayPlayer::CameraOf(int slot, std::uint32_t tick, float &x, float &y, fl
 void ReplayPlayer::Rewind()
 {
     m_mismatchTick = -1;
+    m_lastScheduledTurn = -1;
 }
 
 } // namespace OpenArtOfWar

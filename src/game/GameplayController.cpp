@@ -628,8 +628,8 @@ void GameplayController::Update(
     {
         if (menu.UpdateObjectivesDialog(input, leftClicked))
         {
-            // A network match goes on while a player reads its menus
-            if (mission.IsOnlineMatch() && !m_simHold)
+            // A network match or observer playback goes on while a player reads its menus
+            if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }
@@ -669,7 +669,7 @@ void GameplayController::Update(
                 camera,
                 appState))
         {
-            if (mission.IsOnlineMatch() && appState == AppState::SkirmishPlaying && !m_simHold)
+            if ((mission.IsOnlineMatch() || hud.IsObserver()) && appState == AppState::SkirmishPlaying && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
             return;
         }

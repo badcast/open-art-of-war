@@ -162,6 +162,16 @@ void ImGuiBridge::EndFrame()
     s_frameActive = false;
 }
 
+bool ImGuiBridge::IsInitialized()
+{
+    return s_initialized;
+}
+
+bool ImGuiBridge::IsFrameActive()
+{
+    return s_initialized && s_frameActive;
+}
+
 bool ImGuiBridge::WantCaptureMouse()
 {
     if (!s_initialized)
@@ -178,6 +188,8 @@ bool ImGuiBridge::WantCaptureKeyboard()
 
 ImFont *ImGuiBridge::GetFont(UiFont font)
 {
+    if (!s_initialized)
+        return nullptr;
     const int idx = static_cast<int>(font);
     if (idx >= 0 && idx < 7 && s_fonts[idx])
         return s_fonts[idx];
@@ -186,11 +198,15 @@ ImFont *ImGuiBridge::GetFont(UiFont font)
 
 void ImGuiBridge::PushFont(UiFont font)
 {
+    if (!s_initialized || !s_frameActive)
+        return;
     ImGui::PushFont(GetFont(font));
 }
 
 void ImGuiBridge::PopFont()
 {
+    if (!s_initialized || !s_frameActive)
+        return;
     ImGui::PopFont();
 }
 
@@ -198,6 +214,8 @@ void ImGuiBridge::ApplyTheme(Faction faction, const SDL_Color *armyColor)
 {
     // Sync the underlying ui::color palette first
     ui::ApplyTheme(faction, armyColor);
+    if (!ImGui::GetCurrentContext())
+        return;
 
     ImGuiStyle &style = ImGui::GetStyle();
 
@@ -267,6 +285,8 @@ void ImGuiBridge::ApplyTheme(Faction faction, const SDL_Color *armyColor)
 
 bool ImGuiBridge::Button(const char *label, ButtonStyle style, const ImVec2 &size, bool enabled)
 {
+    if (!s_initialized || !s_frameActive)
+        return false;
     if (!enabled)
         ImGui::BeginDisabled(true);
 
@@ -310,6 +330,8 @@ bool ImGuiBridge::Button(const char *label, ButtonStyle style, const ImVec2 &siz
 void ImGuiBridge::DrawPanel(
     const char *str_id, const ImVec2 &size, const std::function<void()> &drawContent, ImU32 fillCol, ImU32 borderCol)
 {
+    if (!s_initialized || !s_frameActive)
+        return;
     int pushedColors = 0;
     if (fillCol != 0)
     {
@@ -335,6 +357,8 @@ void ImGuiBridge::DrawPanel(
 
 void ImGuiBridge::ProgressBar(float ratio, const ImVec2 &size, ImU32 fillColor, const char *overlayText)
 {
+    if (!s_initialized || !s_frameActive)
+        return;
     const int pushedColors = fillColor != 0 ? 1 : 0;
     if (fillColor != 0)
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, fillColor);
@@ -347,6 +371,8 @@ void ImGuiBridge::ProgressBar(float ratio, const ImVec2 &size, ImU32 fillColor, 
 
 bool ImGuiBridge::Checkbox(const char *label, bool *v, bool enabled)
 {
+    if (!s_initialized || !s_frameActive)
+        return false;
     if (!enabled)
         ImGui::BeginDisabled(true);
 
@@ -360,8 +386,8 @@ bool ImGuiBridge::Checkbox(const char *label, bool *v, bool enabled)
 
 int ImGuiBridge::DrawConfirmModal(ui::ConfirmState &state, int windowW, int windowH)
 {
-    if (!state.open)
-        return -1;
+    if (!state.open || state.modalResult >= 0 || !s_initialized || !s_frameActive)
+        return state.modalResult;
 
     int result = -1;
     const std::string popupId = state.title.empty() ? "Confirm" : state.title;
@@ -389,8 +415,7 @@ int ImGuiBridge::DrawConfirmModal(ui::ConfirmState &state, int windowW, int wind
         const float totalW = buttonW * 2 + spacing;
         ImGui::SetCursorPosX((ImGui::GetWindowWidth() - totalW) * 0.5f);
 
-        if (Button(_("YES"), ButtonStyle::Danger, ImVec2(buttonW, 32.0f)) || ImGui::IsKeyPressed(ImGuiKey_Enter)
-            || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
+        if (Button(_("YES"), ButtonStyle::Danger, ImVec2(buttonW, 32.0f)))
         {
             result = 1;
             ImGui::CloseCurrentPopup();
@@ -398,7 +423,7 @@ int ImGuiBridge::DrawConfirmModal(ui::ConfirmState &state, int windowW, int wind
 
         ImGui::SameLine(0.0f, spacing);
 
-        if (Button(_("NO"), ButtonStyle::Secondary, ImVec2(buttonW, 32.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+        if (Button(_("NO"), ButtonStyle::Secondary, ImVec2(buttonW, 32.0f)))
         {
             result = 0;
             ImGui::CloseCurrentPopup();
@@ -407,6 +432,8 @@ int ImGuiBridge::DrawConfirmModal(ui::ConfirmState &state, int windowW, int wind
         ImGui::EndPopup();
     }
 
+    if (result >= 0)
+        state.modalResult = result;
     return result;
 }
 

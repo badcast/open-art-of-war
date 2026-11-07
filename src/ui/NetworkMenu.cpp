@@ -633,6 +633,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     }
     auto askLeave = [&]() {
         m_confirm.open = true;
+        m_confirm.modalResult = -1;
         SoundRequests::Play("ui_show_dialog");
         m_confirm.title = _("LEAVE THE ROOM?");
         m_confirm.text = net.ControlsRoom()
