@@ -46,6 +46,8 @@
 #include <iostream>
 #include <chrono>
 #include <filesystem>
+#include <ctime>
+#include <fstream>
 #include <algorithm>
 #include <cmath>
 
@@ -222,7 +224,56 @@ void Application::LeaveNetworkGame()
     m_notices.clear();
     m_netMapPath.clear();
     m_netAuto = false;
+    m_netStateHistory.clear();
+    m_desyncHandled = false;
+    m_desyncDumpPath.clear();
     m_networkMenu->Reset();
+}
+
+void Application::NoteNetState(std::uint32_t tick)
+{
+    SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
+    m_netStateHistory.emplace_back(tick, m_gameplayController->simulation().DumpState(ctx));
+    while (m_netStateHistory.size() > kNetStateHistory)
+        m_netStateHistory.pop_front();
+}
+
+// The world at the tick that differed (or the closest one before it still kept) to a text file: the players
+// compare their files with diff to find what went apart
+void Application::SaveDesyncDump()
+{
+    const std::uint32_t tick = m_net->DesyncTick();
+    const std::pair<std::uint32_t, std::string> *best = nullptr;
+    for (const auto &entry : m_netStateHistory)
+    {
+        if (entry.first <= tick && (!best || entry.first > best->first))
+            best = &entry;
+    }
+    if (!best)
+    {
+        std::cerr << "[Net] DESYNC at tick " << tick << ": no world state of that tick is kept" << std::endl;
+        return;
+    }
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::path(Assets::UserDataDir()) / "desync";
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    char stamp[32] = "";
+    const std::time_t now = std::time(nullptr);
+    if (const std::tm *lt = std::localtime(&now))
+        std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", lt);
+    const fs::path path = dir
+                          / ("desync-" + std::string(stamp) + "-tick" + std::to_string(best->first) + "-slot"
+                             + std::to_string(static_cast<int>(m_net->LocalSlot())) + ".txt");
+    std::ofstream f(path, std::ios::binary);
+    f << best->second;
+    if (!f)
+    {
+        std::cerr << "[Net] DESYNC: cannot write " << path.string() << std::endl;
+        return;
+    }
+    m_desyncDumpPath = path.string();
+    std::cerr << "[Net] DESYNC: world state of tick " << best->first << " saved to " << m_desyncDumpPath << std::endl;
 }
 
 // The dedicated server of the internet tab: its room list, and joining a room it created or found
@@ -667,12 +718,12 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
     }
     if (m_netMatchLoaded)
         TrackNetPlayers(nowMs);
-    if (m_net->Desynced())
+    if (m_net->Desynced() && !m_desyncHandled)
     {
-        static bool reported = false;
-        if (!reported)
-            std::cerr << "[Net] DESYNC: the worlds of the players differ" << std::endl;
-        reported = true;
+        m_desyncHandled = true;
+        std::cerr << "[Net] DESYNC: the worlds of the players differ (tick " << m_net->DesyncTick() << ")" << std::endl;
+        if (m_netMatchLoaded)
+            SaveDesyncDump();
     }
 }
 

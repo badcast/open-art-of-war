@@ -4416,8 +4416,8 @@ bool EntityManager::IsHostileBuildingShown(const Building &b, const TileMap &map
         }
     }
     const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(b.id)) << 32)
-                         | (static_cast<std::uint64_t>(static_cast<std::uint16_t>(b.tileY)) << 16)
-                         | static_cast<std::uint16_t>(b.tileX);
+                              | (static_cast<std::uint64_t>(static_cast<std::uint16_t>(b.tileY)) << 16)
+                              | static_cast<std::uint16_t>(b.tileX);
     if (inSight)
         m_seenBuildings.insert(key);
     if (outInSight)
@@ -4441,6 +4441,48 @@ SDL_Color SelectionHealthColor(float ratio)
     return ratio >= 0.5f ? mix(yellow, green, (ratio - 0.5f) * 2.0f) : mix(red, yellow, ratio * 2.0f);
 }
 } // namespace
+
+namespace
+{
+// A jump farther than this in one tick is no movement (unloaded from a transport, spawned, a slot reused):
+// it is shown where it is now instead of sliding there
+constexpr float kMaxRenderGlide = 2.0f * TILE_WIDTH;
+
+bool Glides(float fromX, float fromY, float toX, float toY)
+{
+    const float dx = toX - fromX, dy = toY - fromY;
+    return dx * dx + dy * dy <= kMaxRenderGlide * kMaxRenderGlide;
+}
+} // namespace
+
+void EntityManager::SnapshotRenderState()
+{
+    for (auto &entity : m_entities)
+    {
+        if (!entity.AsUnit())
+            continue; // buildings never move
+        entity.prevRenderX = entity.GetWorldPixelX();
+        entity.prevRenderY = entity.GetWorldPixelY();
+        entity.hasPrevRender = true;
+    }
+    for (auto &proj : m_projectiles)
+    {
+        proj.prevRenderX = proj.x;
+        proj.prevRenderY = proj.y;
+        proj.hasPrevRender = true;
+    }
+}
+
+void EntityManager::RenderPosition(const Entity &entity, float &x, float &y) const
+{
+    x = entity.GetWorldPixelX();
+    y = entity.GetWorldPixelY();
+    if (entity.hasPrevRender && m_renderAlpha < 1.0f && Glides(entity.prevRenderX, entity.prevRenderY, x, y))
+    {
+        x = entity.prevRenderX + (x - entity.prevRenderX) * m_renderAlpha;
+        y = entity.prevRenderY + (y - entity.prevRenderY) * m_renderAlpha;
+    }
+}
 
 void EntityManager::Render(
     Renderer &renderer,
@@ -4492,7 +4534,9 @@ void EntityManager::Render(
             {
                 continue;
             }
-            const float foot = u->GetWorldPixelY() + TILE_HEIGHT;
+            float shownX, shownY;
+            RenderPosition(*u, shownX, shownY);
+            const float foot = shownY + TILE_HEIGHT;
             if (foot < viewTop || foot > viewBottom + TILE_HEIGHT)
                 continue;
             items.push_back({foot, 2, 0, u, nullptr, true});
@@ -4542,8 +4586,8 @@ void EntityManager::Render(
         }
         else if (const Unit *u = it.unit)
         {
-            float wx = u->GetWorldPixelX();
-            float wy = u->GetWorldPixelY();
+            float wx, wy;
+            RenderPosition(*u, wx, wy);
             if (u->selected)
             {
                 renderer.SetDrawOwner(kNoPlayer);
@@ -4681,10 +4725,12 @@ void EntityManager::Render(
             bool showUnitHp = showAllHealth || (debugMode && (u->currentHp < u->maxHp || u->selected));
             if (showUnitHp)
             {
+                float shownX, shownY;
+                RenderPosition(*u, shownX, shownY);
                 float barW = 24.0f;
                 float barH = 3.0f;
-                float barX = u->GetWorldPixelX() + (TILE_WIDTH * 0.5f) - barW * 0.5f;
-                float barY = u->GetWorldPixelY() - 10.0f;
+                float barX = shownX + (TILE_WIDTH * 0.5f) - barW * 0.5f;
+                float barY = shownY - 10.0f;
                 float hpPct = std::clamp(static_cast<float>(u->currentHp) / u->maxHp, 0.0f, 1.0f);
                 renderer.FillRectWorld(barX, barY, barW, barH, camera, {60, 0, 0, 200});
                 renderer.FillRectWorld(barX, barY, barW * hpPct, barH, camera, {0, 230, 0, 255});
@@ -4834,12 +4880,18 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
         const ProjectileSpec &spec = Projectiles::of(proj.type);
         if (proj.type == ProjectileType::Flame || spec.sprite <= 0)
             continue; // a flame is drawn as a FlameBurst below
+        float px = proj.x, py = proj.y;
+        if (proj.hasPrevRender && m_renderAlpha < 1.0f && Glides(proj.prevRenderX, proj.prevRenderY, px, py))
+        {
+            px = proj.prevRenderX + (px - proj.prevRenderX) * m_renderAlpha;
+            py = proj.prevRenderY + (py - proj.prevRenderY) * m_renderAlpha;
+        }
         renderer.SetDrawOwner(proj.owner);
         renderer.DrawProjectileWorld(
             spec.sprite,
             spec.directions == 16 ? proj.direction : proj.dir32,
-            proj.x,
-            proj.y,
+            px,
+            py,
             camera,
             proj.faction,
             spec.directions);

@@ -166,6 +166,9 @@ void Application::RenderNetworkBanner()
     {
         text = std::string(_("OUT OF SYNC at tick ")) + std::to_string(m_net->DesyncTick())
                + _(": the players' games differ, the result is not reliable");
+        if (!m_desyncDumpPath.empty())
+            text += std::string(" (") + _("world state saved: ")
+                    + std::filesystem::path(m_desyncDumpPath).filename().string() + ")";
         color = ui::color::Danger;
     }
     else if (m_net->paused())

@@ -437,6 +437,39 @@ bool Application::LaunchMap(const std::string &nameOrPath, bool fromScratch)
     return true;
 }
 
+void Application::UpdateRenderAlpha(double accumulator, double frameTime)
+{
+    if (!m_entities || !m_gameplayController)
+        return;
+    const bool inWorld = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
+                         || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat;
+    if (!inWorld)
+    {
+        m_entities->SetRenderAlpha(1.0f);
+        m_alphaLast = 1.0f;
+        return;
+    }
+    const std::uint32_t tick = m_gameplayController->simulation().Tick();
+    const bool ticked = tick != m_alphaTick;
+    if (ticked)
+    {
+        m_alphaTick = tick;
+        m_alphaSince = 0.0;
+    }
+    else
+    {
+        m_alphaSince += frameTime;
+    }
+    // The accumulator is the exact phase while ticks run at the frame loop's pace; a replay or an observed match
+    // drives its ticks itself (no accumulator): there the time since the last tick stands in. A frame without a
+    // tick never goes back (a menu still eats the accumulator in steps without ticking).
+    double alpha = std::max(accumulator, m_alphaSince) / SIMULATION_TIMESTEP;
+    if (!ticked)
+        alpha = std::max(alpha, static_cast<double>(m_alphaLast));
+    m_alphaLast = static_cast<float>(std::clamp(alpha, 0.0, 1.0));
+    m_entities->SetRenderAlpha(m_alphaLast);
+}
+
 void Application::Run()
 {
     using clock = std::chrono::high_resolution_clock;
@@ -533,17 +566,18 @@ void Application::Run()
                             SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
                             std::uint64_t sections[Simulation::kChecksumSections];
                             checksum = sim.ChecksumSections(ctx, sections);
+                            if (!m_net->Desynced())
+                                NoteNetState(tick); // kept for a desync dump of this tick
                             static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
                             if (trace)
                             {
-                                std::printf(
-                                    "[Net] tick %u parts entities %016llx credits %016llx walls %016llx research "
-                                    "%016llx\n",
-                                    tick,
-                                    static_cast<unsigned long long>(sections[0]),
-                                    static_cast<unsigned long long>(sections[1]),
-                                    static_cast<unsigned long long>(sections[2]),
-                                    static_cast<unsigned long long>(sections[3]));
+                                std::printf("[Net] tick %u parts", tick);
+                                for (int i = 0; i < Simulation::kChecksumSections; ++i)
+                                    std::printf(
+                                        " %s %016llx",
+                                        Simulation::ChecksumSectionName(i),
+                                        static_cast<unsigned long long>(sections[i]));
+                                std::printf("\n");
                                 std::fflush(stdout);
                             }
                         }
@@ -652,6 +686,7 @@ void Application::Run()
             accumulator = 0.0;
         }
 
+        UpdateRenderAlpha(accumulator, frameTime);
         UpdateSounds();
         Render();
 
@@ -864,11 +899,11 @@ void Application::Update(float deltaTime)
     }
     if (m_hudController)
     {
-        const bool singlePlayerSpeed = !InNetworkMatch() && !m_replay && !m_spectating && IsSpeedControlAllowed()
-            && (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying);
-        m_hudController->SetSpeedControl(singlePlayerSpeed, GameSpeedMultiplier(), [this](int delta) {
-            StepGameSpeed(delta);
-        });
+        const bool singlePlayerSpeed
+            = !InNetworkMatch() && !m_replay && !m_spectating && IsSpeedControlAllowed()
+              && (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying);
+        m_hudController->SetSpeedControl(
+            singlePlayerSpeed, GameSpeedMultiplier(), [this](int delta) { StepGameSpeed(delta); });
     }
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
@@ -940,9 +975,8 @@ void Application::Update(float deltaTime)
                 m_mission->GetEnemyHqY(),
                 m_mission->GetPlayerHqX(),
                 m_mission->GetPlayerHqY());
-            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish()))
-                          ? AppState::SkirmishPlaying
-                          : AppState::CampaignPlaying;
+            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish())) ? AppState::SkirmishPlaying
+                                                                                       : AppState::CampaignPlaying;
             m_camera->SetZoom(m_settings.zoomDefault);
             m_camera->CenterOn(m_mission->GetPlayerHqX() * TILE_WIDTH, m_mission->GetPlayerHqY() * TILE_HEIGHT);
         }
@@ -951,9 +985,8 @@ void Application::Update(float deltaTime)
     {
         if (m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || m_input->IsConfirmJustPressed())
         {
-            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish()))
-                          ? AppState::SkirmishPlaying
-                          : AppState::CampaignPlaying;
+            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish())) ? AppState::SkirmishPlaying
+                                                                                       : AppState::CampaignPlaying;
         }
     }
     else if (m_state == AppState::Victory || m_state == AppState::Defeat)

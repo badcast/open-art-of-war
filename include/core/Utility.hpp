@@ -37,6 +37,11 @@ public:
     {
         m_state = seed ? seed : 0x9e3779b9u;
     }
+    // The internal state (world checksums: peers in sync have rolled the same numbers)
+    result_type State() const
+    {
+        return m_state;
+    }
 
     result_type Next()
     {

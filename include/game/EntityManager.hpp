@@ -336,10 +336,10 @@ struct WeaponConfig
     float maxDistance {0.0f};
     // Sounds of this gun (events of data/audio_sfx.json; empty: the sound of its projectile kind). Only heard:
     // nothing of it is part of the world
-    std::string sound;        // the shot (fire_sfx)
-    std::string impactSound;  // where it hits (impact_sfx)
-    float soundVolume {1.0f}; // times the event's own volume
-    std::uint16_t soundId {0};     // the interned events (EntityManager::SoundName)
+    std::string sound;         // the shot (fire_sfx)
+    std::string impactSound;   // where it hits (impact_sfx)
+    float soundVolume {1.0f};  // times the event's own volume
+    std::uint16_t soundId {0}; // the interned events (EntityManager::SoundName)
     std::uint16_t impactSoundId {0};
 };
 
@@ -577,6 +577,22 @@ public:
     bool IsHostileBuildingShown(const Building &building, const TileMap &map, bool *outInSight = nullptr) const;
     void RenderGroundRemnants(
         Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled = true) const;
+
+    // Render interpolation. At the start of every simulation tick the positions of the units and shots are kept;
+    // the picture then shows prev + (current - prev) * alpha, alpha being how far the frame is into the next tick
+    // (0..1, set by the main loop). Nothing of it is part of the world.
+    void SnapshotRenderState();
+    void SetRenderAlpha(float alpha)
+    {
+        m_renderAlpha = alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
+    }
+    float RenderAlpha() const
+    {
+        return m_renderAlpha;
+    }
+    // Where the picture shows the unit (top-left world pixel, as GetWorldPixelX / Y)
+    void RenderPosition(const Entity &entity, float &x, float &y) const;
+
     void Render(
         Renderer &renderer,
         const Camera &camera,
@@ -753,7 +769,7 @@ public:
         float x {0.0f};
         float y {0.0f};
         PlayerId owner {kNoPlayer}; // who fired
-        std::uint16_t sound {0};         // the event of the character / weapon (SoundName), 0: the cue's own
+        std::uint16_t sound {0};    // the event of the character / weapon (SoundName), 0: the cue's own
         float gain {1.0f};          // the volume of the character / weapon
     };
     // The sound events named by the character files (0: none)
@@ -841,6 +857,7 @@ private:
     bool m_unlimitedPower {false};
     EntityContainer m_entities;
     std::vector<Projectile> m_projectiles;
+    float m_renderAlpha {1.0f}; // render interpolation between the last two ticks (see SnapshotRenderState)
     std::vector<ExplosionParticle> m_explosions;
     std::vector<SmokePuff> m_smokePuffs;
     std::vector<FlameBurst> m_flameBursts;

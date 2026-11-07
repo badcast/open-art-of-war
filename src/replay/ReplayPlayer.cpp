@@ -10,6 +10,8 @@
 #include <nlohmann/json.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include <iostream>
+
 #include <algorithm>
 #include <filesystem>
 
@@ -39,6 +41,8 @@ bool FillInfo(const Net::ReplayData &data, ReplayPlayer::Info &info, std::string
     info.source = meta.value("source", std::string("client"));
     info.gameVersion = meta.value("game_version", std::string());
     info.protocol = meta.value("protocol", 0);
+    info.simBuildId = meta.value("sim_build_id", static_cast<std::uint64_t>(0));
+    info.checksumsComparable = info.simBuildId != 0 && info.simBuildId == NetMatch::SimBuildId();
     info.recordedAt = meta.value("recorded_at", static_cast<std::int64_t>(0));
     info.ticksPerTurn = std::clamp<std::uint32_t>(meta.value("ticks_per_turn", 2u), 1, 16);
     info.turns = static_cast<std::uint32_t>(data.turns.size());
@@ -153,8 +157,16 @@ bool ReplayPlayer::Load(const std::string &path, std::string &error)
     m_setup = std::move(data.setup);
     m_files = std::move(data.files);
     m_checksums.clear();
-    for (const auto &[tick, hash] : data.checksums)
-        m_checksums[tick] = hash;
+    // A file of another simulation build hashed the world differently: it plays, but is not checked
+    if (m_info.checksumsComparable)
+    {
+        for (const auto &[tick, hash] : data.checksums)
+            m_checksums[tick] = hash;
+    }
+    else if (!data.checksums.empty())
+    {
+        std::cout << "[Replay] Recorded by another simulation build: its checksums are not compared" << std::endl;
+    }
     // Every turn must read, and the cameras are collected on the way
     m_views.clear();
     for (std::size_t t = 0; t < m_turns.size(); ++t)

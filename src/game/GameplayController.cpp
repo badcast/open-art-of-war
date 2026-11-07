@@ -1224,6 +1224,7 @@ void GameplayController::SimulationStep(
     AppState &appState)
 {
     // 8. Simulation updates: the commands of this tick first, then the world
+    entities.SnapshotRenderState(); // the picture glides from here to where this tick leaves things
     SimContext ctx {entities, map, pathfinder, economy, aiController};
     m_sim.ApplyCommands(ctx);
     m_sim.UpdateResearch(deltaTime, ctx);

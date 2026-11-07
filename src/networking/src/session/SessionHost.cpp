@@ -85,6 +85,7 @@ void SessionHost::finishReplay(const std::string &reason)
         = {{"format", 1},
            {"game_version", m_config.identity.gameVersion},
            {"protocol", kProtocolVersion},
+           {"sim_build_id", m_config.identity.simBuildId},
            {"source", "server"},
            {"recorded_at", m_replayStartedAt},
            {"ended_at", endedAt},
@@ -995,7 +996,8 @@ void SessionHost::adaptInputDelay()
     }
     const std::uint32_t needMs = worst / 2 + 30;
     const std::uint32_t turns = (needMs + m_config.turnMs - 1) / m_config.turnMs;
-    m_inputDelay = static_cast<std::uint8_t>(std::clamp<std::uint32_t>(turns, m_config.inputDelayMin, m_config.inputDelayMax));
+    m_inputDelay
+        = static_cast<std::uint8_t>(std::clamp<std::uint32_t>(turns, m_config.inputDelayMin, m_config.inputDelayMax));
 }
 
 void SessionHost::closeTurn(std::uint32_t turn)

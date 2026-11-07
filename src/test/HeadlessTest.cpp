@@ -212,6 +212,128 @@ bool HeadlessTest::RunDeterminismTest(Application &app)
         std::cerr << "[Test] FAILED: the same commands gave a different world (desync)" << std::endl;
         return false;
     }
+    // What the checksum covers: one more random roll, a turned unit, power are seen at once; the desync dump
+    // is the same walk (its header carries the same checksum)
+    {
+        SimContext ctx {entities, map, pf, economy, ai};
+        std::uint64_t parts[Simulation::kChecksumSections];
+        const std::uint64_t base = sim.ChecksumSections(ctx, parts);
+        const std::string dump = sim.DumpState(ctx);
+        char want[24];
+        std::snprintf(want, sizeof want, "%016llx", static_cast<unsigned long long>(base));
+        const bool dumpMatches = dump.find(std::string("checksum ") + want) != std::string::npos
+                                 && dump.find("[random]") != std::string::npos
+                                 && dump.find("unit id=") != std::string::npos;
+
+        Utility::RandomGenerator &rng = Utility::Rng();
+        const Utility::RandomGenerator::result_type saved = rng.State();
+        rng.Next();
+        std::uint64_t rolled[Simulation::kChecksumSections];
+        const std::uint64_t afterRoll = sim.ChecksumSections(ctx, rolled);
+        rng.Reseed(saved);
+        // (only the last part, "random", may differ: the earlier running hashes stay the same)
+        bool onlyRandom = afterRoll != base
+                          && rolled[Simulation::kChecksumSections - 1] != parts[Simulation::kChecksumSections - 1];
+        for (int i = 0; i + 1 < Simulation::kChecksumSections; ++i)
+            onlyRandom = onlyRandom && rolled[i] == parts[i];
+
+        bool facingSeen = false;
+        for (Entity &e : entities.GetAllEntities())
+        {
+            if (Unit *u = e.AsUnit())
+            {
+                const int was = u->facingDirection;
+                u->facingDirection = (was + 1) % 8;
+                facingSeen = sim.Checksum(ctx) != base;
+                u->facingDirection = was;
+                break;
+            }
+        }
+        const bool restored = sim.Checksum(ctx) == base;
+        std::cout << "  - Checksum covers the random numbers " << onlyRandom << ", facings " << facingSeen
+                  << ", dump matches " << dumpMatches << " (" << dump.size() << " bytes)" << std::endl;
+        if (!onlyRandom || !facingSeen || !dumpMatches || !restored)
+        {
+            std::cerr << "[Test] FAILED: the world checksum must cover the random numbers and the facings, and the "
+                         "desync dump must match it"
+                      << std::endl;
+            return false;
+        }
+
+        // Render interpolation: halfway between the last two ticks at alpha 0.5, no slide over a jump, and none of
+        // it in the world
+        Unit *mover = nullptr;
+        for (Entity &e : entities.GetAllEntities())
+            if (Unit *u = e.AsUnit(); u && u->alive)
+            {
+                mover = u;
+                break;
+            }
+        bool glide = false, jump = false, untouched = false;
+        if (mover)
+        {
+            const float sub = mover->subX;
+            const int tile = mover->tileX;
+            entities.SnapshotRenderState();
+            untouched = sim.Checksum(ctx) == base;
+            const float x0 = mover->GetWorldPixelX();
+            float x = 0.0f, y = 0.0f;
+            mover->subX = sub + 10.0f;
+            entities.SetRenderAlpha(0.5f);
+            entities.RenderPosition(*mover, x, y);
+            glide = std::abs(x - (x0 + 5.0f)) < 0.01f;
+            mover->tileX = tile + 10; // ten tiles in one tick: shown where it is
+            entities.RenderPosition(*mover, x, y);
+            jump = x == mover->GetWorldPixelX();
+            mover->tileX = tile;
+            mover->subX = sub;
+            entities.SetRenderAlpha(1.0f);
+        }
+        std::cout << "  - Render interpolation: glides " << glide << ", jumps " << jump << ", world untouched "
+                  << untouched << std::endl;
+        if (!glide || !jump || !untouched)
+        {
+            std::cerr << "[Test] FAILED: render interpolation" << std::endl;
+            return false;
+        }
+    }
+
+    // One turn of a click-spamming player: only what a later command of the turn does not undo goes out
+    {
+        auto order = [](std::vector<std::uint32_t> ids, int x, int b) {
+            SimCommand c;
+            c.type = CommandType::OrderAt;
+            c.player = 1;
+            c.ids = std::move(ids);
+            c.x = x;
+            c.b = b;
+            return c;
+        };
+        SimCommand view;
+        view.type = CommandType::View;
+        view.player = 1;
+        std::vector<SimCommand> turn = {
+            order({3, 4, 5}, 100, 0),
+            order({5, 3, 4}, 200, 0), // same units: the first is undone
+            order({3, 4, 5}, 300, 1), // (a march) undoes the second too
+            order({3, 4, 5}, 400, 2), // Shift: lined up after it, both stay
+            order({3, 4}, 500, 0),    // other units
+            view,
+            order({3, 4}, 600, 0), // a view between: kept (only neighbours are folded)
+            view,
+        };
+        const std::size_t dropped = NetMatch::CoalesceTurn(turn);
+        std::vector<int> xs;
+        for (const SimCommand &c : turn)
+            xs.push_back(c.type == CommandType::View ? -1 : c.x);
+        const bool good = dropped == 3 && xs == std::vector<int> {300, 400, 500, 600, -1};
+        std::cout << "  - Turn coalescing: " << dropped << " of 8 commands dropped" << std::endl;
+        if (!good)
+        {
+            std::cerr << "[Test] FAILED: coalescing the commands of a turn" << std::endl;
+            return false;
+        }
+    }
     entities.Clear();
     sim.Reset();
     ResetResearch();
@@ -756,6 +878,7 @@ bool HeadlessTest::RunReplayTest(Application &app)
         = nlohmann::json(
               {{"format", 1},
                {"source", "client"},
+               {"sim_build_id", NetMatch::SimBuildId()},
                {"ticks_per_turn", kTicksPerTurn},
                {"local_slot", 0},
                {"players", nlohmann::json::array({{{"slot", 0}, {"name", "Red"}}, {{"slot", 1}, {"name", "Blue"}}})},
@@ -773,6 +896,22 @@ bool HeadlessTest::RunReplayTest(Application &app)
         std::cerr << "[Test] FAILED: writing the replay: " << error << std::endl;
         return false;
     }
+    // A file of an older build (no sim_build_id) hashed the world another way: it is played, not checked
+    {
+        Net::ReplayData legacy = data;
+        nlohmann::json meta = nlohmann::json::parse(legacy.meta);
+        meta.erase("sim_build_id");
+        legacy.meta = meta.dump();
+        const std::string legacyPath = (dir / "legacy.awr").string();
+        ReplayPlayer::Info legacyInfo;
+        if (!Net::writeReplay(legacyPath, legacy, error) || !ReplayPlayer::ReadInfo(legacyPath, legacyInfo, error)
+            || legacyInfo.checksumsComparable)
+        {
+            std::cerr << "[Test] FAILED: a replay without sim_build_id must not have its checksums compared"
+                      << std::endl;
+            return false;
+        }
+    }
 
     // --- Playing the file back
     {
@@ -788,7 +927,7 @@ bool HeadlessTest::RunReplayTest(Application &app)
         // Turns 5, 15, ... 55 recorded a view of player 1; at tick 120 (turn 60) the one of turn 55 is current
         if (info.turns != kTurns || info.ticks != kTurns * kTicksPerTurn || info.players.size() != 2
             || info.players[0].name != "Red" || info.players[1].faction != Faction::Confederation || !hasCamera
-            || cx != 1000.0f + 55.0f * 3.0f || cy != 700.0f || zoom != 2.0f)
+            || cx != 1000.0f + 55.0f * 3.0f || cy != 700.0f || zoom != 2.0f || !info.checksumsComparable)
         {
             std::cerr << "[Test] FAILED: replay info (turns " << info.turns << ", camera " << cx << "," << cy << ")"
                       << std::endl;
@@ -1345,8 +1484,7 @@ bool HeadlessTest::RunMatchAiTest(Application &app)
         MatchSetup local = setup;
         local.localOnly = true;
         if (!mission.LoadMatch(local, map, entities, economy, pf) || !mission.IsMatch() || mission.IsOnlineMatch()
-            || !mission.Restart(map, entities, economy, pf) || !mission.IsMatch()
-            || mission.IsOnlineMatch())
+            || !mission.Restart(map, entities, economy, pf) || !mission.IsMatch() || mission.IsOnlineMatch())
         {
             std::cerr << "[Test] FAIL: a local match must load, stay local and restart" << std::endl;
             return false;
@@ -1656,7 +1794,8 @@ bool HeadlessTest::RunLocalReplayTest(Application &app)
     }
 
     // Plays kTicks of the loaded match through the full game step. `before` runs ahead of every tick
-    auto play = [&](const std::function<void(std::uint32_t)> &before, const std::function<void(std::uint32_t, std::uint64_t)> &after) {
+    auto play = [&](const std::function<void(std::uint32_t)> &before,
+                    const std::function<void(std::uint32_t, std::uint64_t)> &after) {
         AppState state = mission.IsMatch() ? AppState::SkirmishPlaying : AppState::CampaignPlaying;
         for (std::uint32_t tick = 0; tick < kTicks; ++tick)
         {
@@ -4438,8 +4577,8 @@ bool HeadlessTest::run(Application &app, int numTicks)
                           << " wRes=" << wRes << std::endl;
                 return false;
             }
-            std::cout << "  - Validated defensive walls on Map resistance_mission_7 (was m0): Confederation wall=" << wConf
-                      << ", Resistance wall=" << wRes << std::endl;
+            std::cout << "  - Validated defensive walls on Map resistance_mission_7 (was m0): Confederation wall="
+                      << wConf << ", Resistance wall=" << wRes << std::endl;
         }
     }
 

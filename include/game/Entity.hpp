@@ -56,6 +56,11 @@ struct Projectile
     float startY {0.0f};
     float targetX {0.0f};
     float targetY {0.0f};
+    // Render only (not part of the world, not hashed): where it was when the last tick began, so the picture
+    // glides from there to x, y between ticks (EntityManager::SnapshotRenderState)
+    float prevRenderX {0.0f};
+    float prevRenderY {0.0f};
+    bool hasPrevRender {false};
     float speed {12.0f};
     int damage {10};
     int splashPercent {0};
@@ -107,6 +112,12 @@ public:
     // tileX/tileY only change when a step is fully completed (no half-way tile flips).
     float subX {0.0f};
     float subY {0.0f};
+
+    // Render only (not part of the world, not hashed): the world pixel position when the last tick began, so
+    // the sprite glides from there to the current one between ticks (EntityManager::SnapshotRenderState)
+    float prevRenderX {0.0f};
+    float prevRenderY {0.0f};
+    bool hasPrevRender {false};
 
     // Tile reservation: the adjacent tile a unit is currently stepping into.
     // While a step is in progress the unit owns BOTH tileX/tileY and resTileX/resTileY,

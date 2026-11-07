@@ -134,7 +134,11 @@ public:
     // Host / room owner: add, change or remove a computer player
     void SetAi(const Net::OwnerSetAi &change);
     // Host / room owner: the team of a player (players cannot choose their own)
-    void SetTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap = 255); // 255: keep the player's limit
+    void SetTeam(
+        std::uint8_t slot,
+        std::uint8_t team,
+        std::uint8_t handicap,
+        std::uint8_t armyCap = 255); // 255: keep the player's limit
     // Host / room owner: a start position open, blocked or taken by a computer player
     void SetSeat(const Net::OwnerSetSeat &change);
     // The owner sets the match options of the room
@@ -239,6 +243,14 @@ public:
     // agree. Pictures, sounds and the UI colours (net_visual in main.yaml) are not part of it. Computed from the files
     // as they are now, a session overlay (see below) included.
     static std::uint64_t AssetsHash();
+    // Which simulation (code and checksum) this build runs: peers must agree, and the checksums of a replay
+    // are only comparable when it was recorded with the same one ("sim_build_id" in its meta)
+    static std::uint64_t SimBuildId();
+    // The commands of one turn without the ones a later one of the same turn undoes before they could do anything
+    // (a click-spammed move: an order of the selection replaced at once by the next order of the same selection;
+    // a camera view followed by a newer one). Order kept; returns how many were dropped. The sender does it,
+    // so every peer applies the same stream.
+    static std::size_t CoalesceTurn(std::vector<SimCommand> &commands);
     // The same files one by one (path, hash of the bytes); the last entry stands for the manifest's simulation part
     static std::vector<Net::DataEntry> DataManifest();
     // Joining a host whose data differ: the host's files are fetched and put into a session overlay (Assets::
@@ -282,7 +294,7 @@ private:
     struct DataSync
     {
         bool active {false};
-        std::vector<Net::DataEntry> wanted;              // the files that differ, as the host has them
+        std::vector<Net::DataEntry> wanted;                   // the files that differ, as the host has them
         std::map<std::string, std::vector<std::uint8_t>> got; // asset key -> bytes
         std::size_t bytes {0};
     } m_sync;

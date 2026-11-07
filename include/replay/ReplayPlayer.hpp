@@ -44,6 +44,9 @@ public:
         std::uint32_t ticksPerTurn {2};
         int localSlot {-1};
         int protocol {0};
+        std::uint64_t simBuildId {0}; // the simulation that recorded it (0: an older file that does not say)
+        // Its checksums were computed the way this build computes them: only then are they compared
+        bool checksumsComparable {false};
         bool carriesData {false};     // the file holds its map and simulation data
         std::string mode {"network"}; // "network", "custom" or "campaign"
         int mission {-1};             // campaign: the mission, the side of the player, the computer's difficulty

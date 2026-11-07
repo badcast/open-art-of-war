@@ -38,15 +38,68 @@ Net::GameIdentity Identity()
 {
     Net::GameIdentity id;
     id.gameVersion = OAOW_VERSION;
-    // The simulation code: the same version string means the same source (the build is deterministic
-    // across platforms, see DetMath / -ffp-contract=off)
-    const std::string v = std::string(OAOW_VERSION) + "|sim2";
-    id.simBuildId = Net::crc32(v.data(), v.size());
+    id.simBuildId = NetMatch::SimBuildId();
     id.assetsHash = NetMatch::AssetsHash();
     return id;
 }
 
 } // namespace
+
+std::size_t NetMatch::CoalesceTurn(std::vector<SimCommand> &commands)
+{
+    // A move / attack-move without Shift releases the units from their march and clears their orders first
+    // (Simulation::Apply), so one right after another for exactly the same units leaves no trace of the first
+    auto replacingOrder = [](const SimCommand &c) {
+        return c.type == CommandType::OrderAt && (c.b & 2) == 0 && !c.ids.empty();
+    };
+    auto sameUnits = [](const SimCommand &l, const SimCommand &r) {
+        if (l.player != r.player || l.debug != r.debug || l.ids.size() != r.ids.size())
+            return false;
+        std::vector<std::uint32_t> a = l.ids, b = r.ids;
+        std::sort(a.begin(), a.end());
+        std::sort(b.begin(), b.end());
+        return a == b;
+    };
+    std::vector<bool> drop(commands.size(), false);
+    int lastView = -1;
+    for (std::size_t i = 0; i < commands.size(); ++i)
+    {
+        const SimCommand &c = commands[i];
+        if (c.type == CommandType::View)
+        {
+            if (lastView >= 0)
+                drop[static_cast<std::size_t>(lastView)] = true;
+            lastView = static_cast<int>(i);
+            continue;
+        }
+        if (i + 1 < commands.size() && replacingOrder(c) && replacingOrder(commands[i + 1])
+            && sameUnits(c, commands[i + 1]))
+            drop[i] = true;
+    }
+    std::size_t kept = 0, dropped = 0;
+    for (std::size_t i = 0; i < commands.size(); ++i)
+    {
+        if (drop[i])
+        {
+            ++dropped;
+            continue;
+        }
+        if (kept != i)
+            commands[kept] = std::move(commands[i]);
+        ++kept;
+    }
+    commands.resize(kept);
+    return dropped;
+}
+
+std::uint64_t NetMatch::SimBuildId()
+{
+    // The simulation code: the same version string means the same source (the build is deterministic
+    // across platforms, see DetMath / -ffp-contract=off). The tag changes whenever the simulation or its
+    // checksum changes without a new version string
+    const std::string v = std::string(OAOW_VERSION) + "|sim1";
+    return Net::crc32(v.data(), v.size());
+}
 
 NetMatch::NetMatch() = default;
 NetMatch::~NetMatch()
@@ -630,8 +683,8 @@ void NetMatch::SetLobbyMap(const std::string &mapPath)
 {
     if (!ControlsRoom())
         return;
-    const std::uint8_t spots
-        = static_cast<std::uint8_t>(std::min<std::size_t>(MissionController::StartPositions(mapPath).size(), kMaxPlayers));
+    const std::uint8_t spots = static_cast<std::uint8_t>(
+        std::min<std::size_t>(MissionController::StartPositions(mapPath).size(), kMaxPlayers));
     const std::uint64_t hash = MapFiles::HashOf(mapPath);
     // The room hands the map out to whoever does not have this very file (~20 KB compressed)
     const std::vector<std::uint8_t> packed = MapFiles::Packed(mapPath);
@@ -925,6 +978,7 @@ void NetMatch::AfterTick(std::uint32_t tick, std::uint64_t checksum)
     if ((tick + 1) % tpt == 0 && !m_outgoing.empty())
     {
         const std::uint32_t turn = tick / tpt + m_client->inputDelay();
+        CoalesceTurn(m_outgoing);
         // In batches the room accepts: at most kMaxCommandsPerTurn commands and kMaxPlayerCommandBytes bytes
         // each (a bigger one was refused by the host and the orders were lost). The host keeps every batch.
         std::size_t begin = 0;

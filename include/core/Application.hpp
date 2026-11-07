@@ -10,6 +10,7 @@
 #include "core/VideoModes.hpp"
 #include "graphics/RenderBackend.hpp"
 #include <array>
+#include <deque>
 #include <map>
 #include <memory>
 #include <string>
@@ -132,6 +133,13 @@ private:
     void Update(float deltaTime);
     // The references one Update step of a screen needs (see FrameContext)
     FrameContext MakeFrameContext(float deltaTime);
+    // How far this frame is between the last simulation tick and the next one (render interpolation): the time
+    // left in the accumulator, never going back between two ticks, and 1 once the ticks stop (pause, menus,
+    // waiting for the host)
+    void UpdateRenderAlpha(double accumulator, double frameTime);
+    std::uint32_t m_alphaTick {0};
+    double m_alphaSince {0.0}; // seconds since the tick last advanced
+    float m_alphaLast {1.0f};
     void Render();
     inline void render()
     {
@@ -243,10 +251,10 @@ private:
     std::vector<LanGame> m_serverRooms;
     std::string m_serverStatus;
     std::uint32_t m_serverListMs {0};
-    std::uint32_t m_serverFailedMs {0};                   // when the server connection failed (retried after kServerRetryMs)
+    std::uint32_t m_serverFailedMs {0}; // when the server connection failed (retried after kServerRetryMs)
     static constexpr std::uint32_t kServerRetryMs = 3000; // room list refresh and server retry period
-    bool m_serverJoinPending {false};                // waiting for the server's answer to create / find
-    std::string m_serverOverride;                    // --server: instead of the environment's master host
+    bool m_serverJoinPending {false};                     // waiting for the server's answer to create / find
+    std::string m_serverOverride;                         // --server: instead of the environment's master host
     std::uint16_t m_serverOverridePort {0};
     int m_cliServerAction {0}; // 1 create, 2 find by code (from the command line)
     std::string m_cliServerCode;
@@ -337,6 +345,14 @@ private:
     std::string m_netMapPath;
     bool m_netMatchStarted {false};
     bool m_netMatchLoaded {false}; // the match world is set up and playing (or was)
+    // Desync analysis: the world as text at the last checksummed ticks (the host names the tick that differed a
+    // little later), and the file the one of that tick went to once the game went out of sync
+    void NoteNetState(std::uint32_t tick);
+    void SaveDesyncDump();
+    static constexpr std::size_t kNetStateHistory = 12;
+    std::deque<std::pair<std::uint32_t, std::string>> m_netStateHistory;
+    bool m_desyncHandled {false};
+    std::string m_desyncDumpPath;
     // The match's players as the roster last showed them (by slot), to notice changes and to name them on the
     // scoreboard after they have gone
     struct NetPlayer

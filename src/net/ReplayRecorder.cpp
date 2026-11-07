@@ -91,6 +91,7 @@ std::string ReplayRecorder::Finish(const std::string &outcome, std::uint32_t tic
         = {{"format", 1},
            {"game_version", OAOW_VERSION},
            {"protocol", Net::kProtocolVersion},
+           {"sim_build_id", NetMatch::SimBuildId()},
            {"source", "client"},
            {"recorded_at", m_startedAt},
            {"map", raw.mapPath},

@@ -11,6 +11,7 @@
 #include "core/Utility.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -27,10 +28,14 @@ bool Alive(const Entity *e)
     return e && e->alive && e->state != ActionState::Die;
 }
 
+// Sinks of Simulation::VisitState: Section(name) starts a part, Record(name) a line (an entity, a player, ...),
+// I32 / F32 are the values, EndSection(index) closes the part. The names only go into the text dump.
+
 // FNV-1a, 64 bit
 struct Hasher
 {
     std::uint64_t h {0xcbf29ce484222325ull};
+    std::uint64_t *sections {nullptr};
     void Bytes(const void *p, std::size_t n)
     {
         const auto *b = static_cast<const std::uint8_t *>(p);
@@ -40,15 +45,78 @@ struct Hasher
             h *= 0x100000001b3ull;
         }
     }
-    void I32(std::int32_t v)
+    void Section(const char *) {}
+    void EndSection(int index)
+    {
+        if (sections)
+            sections[index] = h;
+    }
+    void Record(const char *) {}
+    void I32(const char *, std::int32_t v)
     {
         Bytes(&v, sizeof v);
     }
-    void F32(float v)
+    void F32(const char *, float v)
     { // the exact bits: peers in sync have bit-identical floats
         std::uint32_t u;
         std::memcpy(&u, &v, sizeof u);
         Bytes(&u, sizeof u);
+    }
+};
+
+// The same walk as text; it hashes along, so every part shows the running checksum it ends with
+struct Dumper
+{
+    Hasher hash;
+    std::string out;
+    bool lineOpen {false};
+    void Section(const char *name)
+    {
+        CloseLine();
+        out += "\n[";
+        out += name;
+        out += "]\n";
+    }
+    void EndSection(int)
+    {
+        CloseLine();
+        char buf[48];
+        std::snprintf(buf, sizeof buf, "# hash %016llx\n", static_cast<unsigned long long>(hash.h));
+        out += buf;
+    }
+    void Record(const char *name)
+    {
+        CloseLine();
+        out += name;
+        lineOpen = true;
+    }
+    void I32(const char *name, std::int32_t v)
+    {
+        hash.I32(name, v);
+        Field(name, std::to_string(v));
+    }
+    void F32(const char *name, float v)
+    {
+        hash.F32(name, v);
+        char buf[32];
+        std::snprintf(buf, sizeof buf, "%.9g", static_cast<double>(v)); // round-trips the bits
+        Field(name, buf);
+    }
+
+private:
+    void Field(const char *name, const std::string &value)
+    {
+        out += lineOpen ? " " : "";
+        out += name;
+        out += '=';
+        out += value;
+        lineOpen = true;
+    }
+    void CloseLine()
+    {
+        if (lineOpen)
+            out += '\n';
+        lineOpen = false;
     }
 };
 
@@ -651,6 +719,146 @@ std::vector<SimEvent> Simulation::TakeEvents()
     return out;
 }
 
+const char *Simulation::ChecksumSectionName(int section)
+{
+    static const char *const kNames[kChecksumSections] = {"entities", "economies", "walls", "research", "random"};
+    return section >= 0 && section < kChecksumSections ? kNames[section] : "?";
+}
+
+template <class Sink>
+void Simulation::VisitState(const SimContext &ctx, Sink &s) const
+{
+    s.Section(ChecksumSectionName(0));
+    s.Record("tick");
+    s.I32("n", static_cast<std::int32_t>(m_tick));
+    for (const Entity &e : ctx.entities.GetAllEntities())
+    {
+        s.Record(e.AsBuilding() ? "building" : "unit");
+        s.I32("id", e.id);
+        s.I32("type", static_cast<std::int32_t>(e.type));
+        s.I32("faction", static_cast<std::int32_t>(e.faction));
+        s.I32("owner", e.owner);
+        s.I32("alive", e.alive ? 1 : 0);
+        s.I32("state", static_cast<std::int32_t>(e.state));
+        s.I32("tx", e.tileX);
+        s.I32("ty", e.tileY);
+        s.F32("sx", e.subX);
+        s.F32("sy", e.subY);
+        s.I32("hp", e.currentHp);
+        s.I32("target", e.targetEntityId);
+        s.I32("wallX", e.targetWallTileX);
+        s.I32("wallY", e.targetWallTileY);
+        s.I32("attacker", e.lastAttackerId);
+        s.I32("turret", e.turretFacing);
+        if (const Building *b = e.AsBuilding())
+        {
+            s.I32("repairing", b->repairing ? 1 : 0);
+            s.I32("repeat", b->repeatArchetype);
+            s.F32("built", b->buildProgress);
+            s.I32("powered", b->isPowered ? 1 : 0);
+            s.I32("queue", static_cast<std::int32_t>(b->productionQueue.size()));
+            for (const ProductionItem &item : b->productionQueue)
+            {
+                s.I32("q.unit", item.archetype);
+                s.F32("q.time", item.progressTime);
+            }
+        }
+        if (const Unit *u = e.AsUnit())
+        {
+            s.I32("facing", u->facingDirection);
+            s.I32("siege", u->isSiegeMode ? 1 : 0);
+            s.I32("orderX", u->orderX);
+            s.I32("orderY", u->orderY);
+            s.I32("stance", static_cast<std::int32_t>(u->stance));
+            s.I32("homeX", u->stanceHomeX);
+            s.I32("homeY", u->stanceHomeY);
+            s.I32("returning", u->stanceReturning ? 1 : 0);
+            s.I32("ordered", u->orderedTargetId);
+            s.I32("orders", static_cast<std::int32_t>(u->orderQueue.size()));
+            for (const Unit::QueuedOrder &q : u->orderQueue)
+            {
+                s.I32("o.kind", q.kind);
+                s.I32("o.x", q.x);
+                s.I32("o.y", q.y);
+            }
+        }
+    }
+    s.EndSection(0);
+
+    // Economies in player order (the local player's economy is SimContext::economy on every peer, so the
+    // order must not depend on it)
+    s.Section(ChecksumSectionName(1));
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        const Economy *eco = nullptr;
+        if ((m_economyMask >> p) & 1u)
+            eco = &m_economies[p];
+        else if (p == ctx.economy.player())
+            eco = &ctx.economy;
+        if (!eco)
+            continue;
+        s.Record("player");
+        s.I32("slot", p);
+        s.I32("credits", eco->GetCredits());
+        s.I32("powerOut", eco->GetPowerProduced());
+        s.I32("powerUse", eco->GetPowerConsumed());
+    }
+    s.EndSection(1);
+
+    s.Section(ChecksumSectionName(2));
+    const TileMap &map = ctx.map;
+    for (int y = 0; y < map.GetHeight(); ++y)
+    {
+        for (int x = 0; x < map.GetWidth(); ++x)
+        {
+            const int wall = map.GetWall(x, y);
+            if (wall > 0)
+            {
+                s.Record("wall");
+                s.I32("x", x);
+                s.I32("y", y);
+                s.I32("kind", wall);
+                s.I32("owner", map.GetWallOwner(x, y));
+            }
+        }
+    }
+    s.EndSection(2);
+
+    s.Section(ChecksumSectionName(3));
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        s.Record("player");
+        s.I32("slot", p);
+        for (int i = 0; i < kResearchCount; ++i)
+            s.I32("t", IsResearched(p, i) ? 1 : 0);
+        s.I32("active", m_research[p].active);
+        s.F32("timer", m_research[p].timer);
+    }
+    s.EndSection(3);
+
+    // The gameplay random numbers (shot spread, damage rolls: a peer that rolled once more is out of sync
+    // even before anything shows it) and the shots in flight
+    s.Section(ChecksumSectionName(4));
+    s.Record("rng");
+    s.I32("state", static_cast<std::int32_t>(Utility::Rng().State()));
+    for (const Projectile &p : ctx.entities.GetProjectiles())
+    {
+        if (!p.active)
+            continue;
+        s.Record("shot");
+        s.I32("type", static_cast<std::int32_t>(p.type));
+        s.I32("owner", p.owner);
+        s.I32("shooter", p.shooterId);
+        s.I32("target", p.targetId);
+        s.I32("damage", p.damage);
+        s.F32("x", p.x);
+        s.F32("y", p.y);
+        s.F32("toX", p.targetX);
+        s.F32("toY", p.targetY);
+    }
+    s.EndSection(4);
+}
+
 std::uint64_t Simulation::Checksum(const SimContext &ctx) const
 {
     std::uint64_t sections[kChecksumSections];
@@ -660,80 +868,23 @@ std::uint64_t Simulation::Checksum(const SimContext &ctx) const
 std::uint64_t Simulation::ChecksumSections(const SimContext &ctx, std::uint64_t (&sections)[kChecksumSections]) const
 {
     Hasher h;
-    h.I32(static_cast<std::int32_t>(m_tick));
-    for (const Entity &e : ctx.entities.GetAllEntities())
-    {
-        h.I32(e.id);
-        h.I32(static_cast<std::int32_t>(e.type));
-        h.I32(static_cast<std::int32_t>(e.faction));
-        h.I32(e.owner);
-        h.I32(e.alive ? 1 : 0);
-        h.I32(static_cast<std::int32_t>(e.state));
-        h.I32(e.tileX);
-        h.I32(e.tileY);
-        h.F32(e.subX);
-        h.F32(e.subY);
-        h.I32(e.currentHp);
-        h.I32(e.targetEntityId);
-        h.I32(e.targetWallTileX);
-        h.I32(e.targetWallTileY);
-        h.I32(e.lastAttackerId);
-        if (const Building *b = e.AsBuilding())
-            h.I32(b->repairing ? 1 : 0);
-        if (const Building *b = e.AsBuilding())
-            h.I32(b->repeatArchetype);
-        if (const Unit *u = e.AsUnit())
-        {
-            h.I32(u->orderX);
-            h.I32(u->orderY);
-            h.I32(static_cast<std::int32_t>(u->stance));
-            h.I32(u->stanceHomeX);
-            h.I32(u->stanceHomeY);
-            h.I32(u->stanceReturning ? 1 : 0);
-            h.I32(u->orderedTargetId);
-            h.I32(static_cast<std::int32_t>(u->orderQueue.size()));
-            for (const Unit::QueuedOrder &q : u->orderQueue)
-            {
-                h.I32(q.kind);
-                h.I32(q.x);
-                h.I32(q.y);
-            }
-        }
-    }
-    sections[0] = h.h;
-    // Credits in player order (the local player's economy is SimContext::economy on every peer, so the
-    // order must not depend on it)
-    for (PlayerId p = 0; p < kMaxPlayers; ++p)
-    {
-        if ((m_economyMask >> p) & 1u)
-            h.I32(m_economies[p].GetCredits());
-        else if (p == ctx.economy.player())
-            h.I32(ctx.economy.GetCredits());
-    }
-    sections[1] = h.h;
-    const TileMap &map = ctx.map;
-    for (int y = 0; y < map.GetHeight(); ++y)
-    {
-        for (int x = 0; x < map.GetWidth(); ++x)
-        {
-            const int wall = map.GetWall(x, y);
-            if (wall > 0)
-            {
-                h.I32(x);
-                h.I32(y);
-                h.I32(wall);
-                h.I32(map.GetWallOwner(x, y));
-            }
-        }
-    }
-    sections[2] = h.h;
-    for (PlayerId p = 0; p < kMaxPlayers; ++p)
-    {
-        for (int i = 0; i < kResearchCount; ++i)
-            h.I32(IsResearched(p, i) ? 1 : 0);
-    }
-    sections[3] = h.h;
+    h.sections = sections;
+    VisitState(ctx, h);
     return h.h;
+}
+
+std::string Simulation::DumpState(const SimContext &ctx) const
+{
+    Dumper d;
+    VisitState(ctx, d);
+    char head[96];
+    std::snprintf(
+        head,
+        sizeof head,
+        "# Open Art of War world state: tick %u, checksum %016llx\n",
+        m_tick,
+        static_cast<unsigned long long>(d.hash.h));
+    return head + d.out;
 }
 
 } // namespace OpenArtOfWar

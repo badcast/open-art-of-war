@@ -7,6 +7,7 @@
 #include <array>
 #include <functional>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -143,15 +144,25 @@ public:
     // 64-bit checksum of the world: equal on every peer of a network game as long as they are in sync
     std::uint64_t Checksum(const SimContext &ctx) const;
 
-    // The same checksum, plus the running hash after each part (entities, credits, walls, research): the first
-    // part that differs between two peers shows where they diverged. Debug aid (OAOW_NET_TRACE)
-    static constexpr int kChecksumSections = 4;
+    // The same checksum, plus the running hash after each part (entities, economies, walls, research, random
+    // numbers & projectiles): the first part that differs between two peers shows where they diverged.
+    // Debug aid (OAOW_NET_TRACE)
+    static constexpr int kChecksumSections = 5;
+    static const char *ChecksumSectionName(int section);
     std::uint64_t ChecksumSections(const SimContext &ctx, std::uint64_t (&sections)[kChecksumSections]) const;
+
+    // Everything the checksum covers, as text (one line per entity / economy / ...): written when a network
+    // game goes out of sync, so the files of two peers can be compared with diff
+    std::string DumpState(const SimContext &ctx) const;
 
     // Settings of the player-commanded marches (shared by every side)
     static const AITacticsConfig &GroupTactics();
 
 private:
+    // Walks the state the checksum covers, in a fixed order (Simulation.cpp: the hasher and the text dump)
+    template <class Sink>
+    void VisitState(const SimContext &ctx, Sink &sink) const;
+
     void Apply(const SimCommand &cmd, SimContext &ctx);
     // Units of `cmd` that its issuer may command and that can take an order
     std::vector<int> OwnUnits(const SimCommand &cmd, const SimContext &ctx) const;
