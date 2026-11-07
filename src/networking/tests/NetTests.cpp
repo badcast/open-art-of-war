@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <random>
 #include <string>
 #include <thread>
@@ -75,6 +76,29 @@ void testCrc32()
 void testBitStream()
 {
     std::printf("[bitstream]\n");
+    // The tenth varint byte has room for one bit, not seven.
+    for (std::uint8_t last : {std::uint8_t(2), std::uint8_t(0x7F), std::uint8_t(0x81)})
+    {
+        std::uint8_t invalid[10];
+        std::memset(invalid, 0x80, sizeof invalid);
+        invalid[9] = last;
+        BitReader reader(invalid, sizeof invalid);
+        CHECK(reader.readVarUint() == 0);
+        CHECK(reader.failed());
+    }
+    // Full signed ranges must not overflow while calculating the bit width.
+    for (std::int32_t value : {std::numeric_limits<std::int32_t>::min(), -1, 0,
+                               std::numeric_limits<std::int32_t>::max()})
+    {
+        std::uint8_t bytes[4];
+        BitWriter writer(bytes, sizeof bytes);
+        writer.writeRanged(value, std::numeric_limits<std::int32_t>::min(),
+                           std::numeric_limits<std::int32_t>::max());
+        BitReader reader(bytes, writer.finish());
+        CHECK(reader.readRanged(std::numeric_limits<std::int32_t>::min(),
+                                std::numeric_limits<std::int32_t>::max()) == value);
+        CHECK(!reader.failed() && !writer.overflowed());
+    }
     std::uint8_t buf[512];
     BitWriter w(buf, sizeof buf);
     w.writeBits(5, 3);
@@ -373,6 +397,22 @@ void testReplayFile()
     ReplayData bad = data;
     bad.files["../evil.json"] = {1};
     CHECK(!writeReplay((dir / "bad.awr").string(), bad, error));
+    // Rejected writes preserve the previous replay, including its setup.
+    {
+        ReplayData oversized;
+        oversized.setup.resize(kMaxReplayEntryBytes + 1);
+        CHECK(!writeReplay(path, oversized, error));
+        oversized.setup.clear();
+        oversized.turns.emplace_back(kMaxReplayEntryBytes, 0);
+        CHECK(!writeReplay(path, oversized, error)); // also count the length prefix
+        oversized.turns.clear();
+        for (std::size_t i = 0; i < kMaxReplayEntries - 3; ++i)
+            oversized.files["maps/" + std::to_string(i)] = {};
+        CHECK(!writeReplay(path, oversized, error));
+        CHECK(readReplay(path, back, error));
+        CHECK(back.setup == data.setup && back.turns == data.turns);
+        CHECK(!fs::exists(path + ".tmp"));
+    }
     CHECK(!validReplayFileName("maps/../x") && !validReplayFileName("/maps/x") && !validReplayFileName("other/x"));
     CHECK(
         !validReplayFileName("data/a b") && !validReplayFileName("data//x")

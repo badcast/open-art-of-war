@@ -1,0 +1,640 @@
+#include "graphics/SpriteRegistry.hpp"
+
+#include "core/AssetStore.hpp"
+
+#include <algorithm>
+#include <iostream>
+#include <limits>
+
+namespace OpenArtOfWar
+{
+
+namespace
+{
+constexpr const char *kMetaPrefix = "sprite_";
+constexpr const char *kMetaSuffix = "_meta.yaml";
+
+bool EndsWith(const std::string &s, const std::string &suffix)
+{
+    return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+SpriteKind SectionKind(const std::string &section)
+{
+    if (section == "frames")
+        return SpriteKind::Frame;
+    if (section == "parts")
+        return SpriteKind::Part;
+    if (section == "anims")
+        return SpriteKind::Anim;
+    if (section == "bodies")
+        return SpriteKind::Body;
+    if (section == "sequences")
+        return SpriteKind::Sequence;
+    if (section == "buildings")
+        return SpriteKind::Building;
+    return SpriteKind::None;
+}
+
+// The entry key of a kind: {frame: x}, {part: x}, ...
+const char *EntryKey(SpriteKind kind)
+{
+    switch (kind)
+    {
+    case SpriteKind::Frame:
+        return "frame";
+    case SpriteKind::Part:
+        return "part";
+    case SpriteKind::Anim:
+        return "anim";
+    case SpriteKind::Body:
+        return "body";
+    case SpriteKind::Sequence:
+        return "sequence";
+    case SpriteKind::Building:
+        return "building";
+    default:
+        return "";
+    }
+}
+
+// The isComp code the renderer expects for an entry's target
+std::uint8_t IsCompCode(SpriteKind kind)
+{
+    switch (kind)
+    {
+    case SpriteKind::Part:
+        return 1;
+    case SpriteKind::Anim:
+        return 2;
+    default:
+        return 0;
+    }
+}
+
+// Which kinds an entry of a container may name
+bool EntryAllowed(SpriteKind container, SpriteKind target)
+{
+    switch (container)
+    {
+    case SpriteKind::Part:
+        return target == SpriteKind::Frame || target == SpriteKind::Part;
+    case SpriteKind::Anim:
+        return target == SpriteKind::Frame || target == SpriteKind::Part;
+    case SpriteKind::Body:
+    case SpriteKind::Building:
+        return target == SpriteKind::Frame || target == SpriteKind::Part || target == SpriteKind::Anim;
+    case SpriteKind::Sequence:
+        return target == SpriteKind::Body;
+    default:
+        return false;
+    }
+}
+
+template <typename T> T Narrow(int v, const std::string &where, std::vector<std::string> &errors)
+{
+    constexpr int lo = static_cast<int>(std::numeric_limits<T>::min());
+    constexpr int hi = static_cast<int>(std::numeric_limits<T>::max());
+    if (v < lo || v > hi)
+    {
+        errors.push_back(where + ": value " + std::to_string(v) + " out of range");
+        v = std::clamp(v, lo, hi);
+    }
+    return static_cast<T>(v);
+}
+} // namespace
+
+const char *SpriteKindName(SpriteKind kind)
+{
+    switch (kind)
+    {
+    case SpriteKind::Frame:
+        return "frame";
+    case SpriteKind::Part:
+        return "part";
+    case SpriteKind::Anim:
+        return "anim";
+    case SpriteKind::Body:
+        return "body";
+    case SpriteKind::Sequence:
+        return "sequence";
+    case SpriteKind::Building:
+        return "building";
+    default:
+        return "none";
+    }
+}
+
+void SpriteRegistry::Clear()
+{
+    m_objects.clear();
+    m_errors.clear();
+    m_tables = {};
+    m_names.clear();
+}
+
+void SpriteRegistry::Error(const std::string &msg)
+{
+    m_errors.push_back(msg);
+}
+
+bool SpriteRegistry::LoadDirectory(const std::string &dir)
+{
+    for (const std::string &path : Assets::List(dir, ".yaml"))
+    {
+        const std::string file = path.substr(path.find_last_of('/') + 1);
+        if (file.rfind(kMetaPrefix, 0) != 0 || !EndsWith(file, kMetaSuffix))
+            continue;
+        const std::string name =
+            file.substr(std::char_traits<char>::length(kMetaPrefix),
+                        file.size() - std::char_traits<char>::length(kMetaPrefix) -
+                            std::char_traits<char>::length(kMetaSuffix));
+        std::string text;
+        if (!Assets::ReadText(path, text))
+        {
+            Error(path + ": cannot read");
+            continue;
+        }
+        try
+        {
+            AddObject(name, YAML::Load(text), dir);
+        }
+        catch (const std::exception &e)
+        {
+            Error(path + ": " + e.what());
+        }
+    }
+    return Compile();
+}
+
+void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, const std::string &dir)
+{
+    const std::string where = "sprite '" + name + "'";
+    if (name.empty() || name.find('.') != std::string::npos)
+    {
+        Error(where + ": an object name must be non-empty and have no '.'");
+        return;
+    }
+    if (m_objects.count(name))
+    {
+        Error(where + ": defined twice");
+        return;
+    }
+    Object obj;
+    obj.name = name;
+    obj.image.object = name;
+    const std::string image = meta["image"] ? meta["image"].as<std::string>() : kMetaPrefix + name + ".png";
+    obj.image.path = dir.empty() ? image : dir + "/" + image;
+    obj.image.scale = meta["scale"] ? meta["scale"].as<float>() : 1.0f;
+    if (obj.image.scale <= 0.0f)
+    {
+        Error(where + ": scale must be positive");
+        obj.image.scale = 1.0f;
+    }
+    if (meta["recolor"])
+    {
+        const std::string rc = meta["recolor"].as<std::string>();
+        if (rc == "blue")
+            obj.image.recolor = SpriteRecolor::Blue;
+        else if (rc == "red")
+            obj.image.recolor = SpriteRecolor::Red;
+        else if (rc != "none")
+            Error(where + ": recolor must be none, blue or red, not '" + rc + "'");
+    }
+
+    auto parseEntries = [&](SpriteKind container, const YAML::Node &list, const std::string &at, Item &item) {
+        if (!list.IsSequence())
+        {
+            Error(at + ": expected a list of entries");
+            return;
+        }
+        for (const YAML::Node &e : list)
+        {
+            Entry entry;
+            int found = 0;
+            for (SpriteKind k : {SpriteKind::Frame, SpriteKind::Part, SpriteKind::Anim, SpriteKind::Body})
+            {
+                if (e[EntryKey(k)])
+                {
+                    entry.kind = k;
+                    entry.ref = e[EntryKey(k)].as<std::string>();
+                    ++found;
+                }
+            }
+            if (found != 1)
+            {
+                Error(at + ": an entry needs exactly one of frame/part/anim/body");
+                continue;
+            }
+            if (!EntryAllowed(container, entry.kind))
+            {
+                Error(at + ": a " + SpriteKindName(container) + " cannot hold a " + SpriteKindName(entry.kind));
+                continue;
+            }
+            if (const YAML::Node off = e["at"])
+            {
+                if (!off.IsSequence() || off.size() != 2)
+                    Error(at + ": 'at' must be [x, y]");
+                else
+                {
+                    entry.ox = off[0].as<int>();
+                    entry.oy = off[1].as<int>();
+                }
+            }
+            entry.flag = e["flag"] ? e["flag"].as<int>() : 0;
+            entry.layer = e["layer"] ? e["layer"].as<int>() : 0;
+            entry.state = e["state"] ? e["state"].as<int>() : 0;
+            item.entries.push_back(std::move(entry));
+        }
+    };
+
+    for (const char *section : {"frames", "parts", "anims", "bodies", "sequences", "buildings"})
+    {
+        const YAML::Node node = meta[section];
+        if (!node)
+            continue;
+        if (!node.IsMap())
+        {
+            Error(where + ": '" + section + "' must be a map");
+            continue;
+        }
+        const SpriteKind kind = SectionKind(section);
+        for (const auto &kv : node)
+        {
+            Item item;
+            item.kind = kind;
+            item.name = kv.first.as<std::string>();
+            const std::string at = where + " " + SpriteKindName(kind) + " '" + item.name + "'";
+            if (item.name.find('.') != std::string::npos)
+            {
+                Error(at + ": an item name must have no '.'");
+                continue;
+            }
+            const YAML::Node v = kv.second;
+            if (kind == SpriteKind::Frame)
+            {
+                const YAML::Node rect = v.IsMap() ? v["rect"] : v;
+                if (!rect || !rect.IsSequence() || rect.size() != 4)
+                {
+                    Error(at + ": expected [x, y, w, h]");
+                    continue;
+                }
+                for (int i = 0; i < 4; ++i)
+                    item.rect[i] = rect[i].as<float>();
+                if (v.IsMap() && v["palette"])
+                    item.palette = v["palette"].as<int>();
+            }
+            else if (kind == SpriteKind::Building)
+            {
+                if (const YAML::Node size = v["size"])
+                {
+                    item.width = size[0].as<int>();
+                    item.height = size[1].as<int>();
+                }
+                parseEntries(kind, v["parts"], at, item);
+            }
+            else
+            {
+                parseEntries(kind, v, at, item);
+            }
+            auto &index = obj.byName[static_cast<int>(kind)];
+            if (index.count(item.name))
+            {
+                Error(at + ": defined twice");
+                continue;
+            }
+            index[item.name] = obj.items.size();
+            obj.items.push_back(std::move(item));
+        }
+    }
+
+    if (const YAML::Node fams = meta["families"])
+    {
+        for (const auto &kv : fams)
+        {
+            FamilyDef fam;
+            fam.name = kv.first.as<std::string>();
+            const std::string at = where + " family '" + fam.name + "'";
+            const YAML::Node v = kv.second;
+            if (!v.IsMap() || v.size() != 1)
+            {
+                Error(at + ": expected {<section>: [names]}");
+                continue;
+            }
+            const std::string section = v.begin()->first.as<std::string>();
+            fam.kind = SectionKind(section);
+            if (fam.kind == SpriteKind::None)
+            {
+                Error(at + ": unknown section '" + section + "'");
+                continue;
+            }
+            for (const YAML::Node &m : v.begin()->second)
+                fam.members.push_back(m.as<std::string>());
+            if (FindFamilyDef(obj, fam.name))
+            {
+                Error(at + ": defined twice");
+                continue;
+            }
+            obj.families.push_back(std::move(fam));
+        }
+    }
+    m_objects.emplace(name, std::move(obj));
+}
+
+const SpriteRegistry::FamilyDef *SpriteRegistry::FindFamilyDef(const Object &obj, const std::string &name) const
+{
+    for (const FamilyDef &f : obj.families)
+        if (f.name == name)
+            return &f;
+    return nullptr;
+}
+
+const SpriteRegistry::Item *SpriteRegistry::LookupItem(
+    const std::string &fromObject, const std::string &ref, SpriteKind kind) const
+{
+    const auto dot = ref.find('.');
+    const std::string objName = dot == std::string::npos ? fromObject : ref.substr(0, dot);
+    const std::string itemName = dot == std::string::npos ? ref : ref.substr(dot + 1);
+    const auto it = m_objects.find(objName);
+    if (it == m_objects.end())
+        return nullptr;
+    const auto &index = it->second.byName[static_cast<int>(kind)];
+    const auto found = index.find(itemName);
+    return found == index.end() ? nullptr : &it->second.items[found->second];
+}
+
+SpriteRef SpriteRegistry::LookupRef(
+    const std::string &fromObject, const std::string &ref, SpriteKind kind, const std::string &where)
+{
+    if (const Item *item = LookupItem(fromObject, ref, kind))
+        return {kind, item->handle};
+    const auto dot = ref.find('.');
+    const std::string objName = dot == std::string::npos ? fromObject : ref.substr(0, dot);
+    const auto it = m_objects.find(objName);
+    if (it == m_objects.end())
+    {
+        Error(where + ": no sprite object '" + objName + "' (for '" + ref + "')");
+        return {};
+    }
+    if (const FamilyDef *fam = FindFamilyDef(it->second, dot == std::string::npos ? ref : ref.substr(dot + 1)))
+    {
+        if (fam->kind == kind && fam->compiled.count > 0)
+            return {kind, fam->compiled.start};
+    }
+    Error(where + ": no " + std::string(SpriteKindName(kind)) + " '" + ref + "'");
+    return {};
+}
+
+int SpriteRegistry::Allocate(SpriteKind kind)
+{
+    switch (kind)
+    {
+    case SpriteKind::Frame:
+        m_tables.frames.emplace_back();
+        return static_cast<int>(m_tables.frames.size()) - 1;
+    case SpriteKind::Part:
+        m_tables.compositeRanges.emplace_back();
+        return static_cast<int>(m_tables.compositeRanges.size()) - 1;
+    case SpriteKind::Anim:
+        m_tables.animRanges.emplace_back();
+        return static_cast<int>(m_tables.animRanges.size()) - 1;
+    case SpriteKind::Body:
+        m_tables.bodyRanges.emplace_back();
+        return static_cast<int>(m_tables.bodyRanges.size()) - 1;
+    case SpriteKind::Sequence:
+        m_tables.sequenceRanges.emplace_back();
+        return static_cast<int>(m_tables.sequenceRanges.size()) - 1;
+    case SpriteKind::Building:
+        m_tables.buildings.emplace_back();
+        return static_cast<int>(m_tables.buildings.size()) - 1;
+    default:
+        return -1;
+    }
+}
+
+void SpriteRegistry::Emit(const std::string &object, const Item &item, int handle)
+{
+    const std::string where = "sprite '" + object + "' " + SpriteKindName(item.kind) + " '" + item.name + "'";
+    auto &t = m_tables;
+    auto childOf = [&](const Entry &e) -> std::int16_t {
+        const SpriteRef r = LookupRef(object, e.ref, e.kind, where);
+        return static_cast<std::int16_t>(r.handle);
+    };
+    auto range = [](std::size_t before, std::size_t after) {
+        if (after == before)
+            return IndexRange {0, -1};
+        return IndexRange {static_cast<std::int16_t>(before), static_cast<std::int16_t>(after - 1)};
+    };
+
+    switch (item.kind)
+    {
+    case SpriteKind::Frame:
+    {
+        const auto img = m_objects.find(object);
+        SpriteFrame &f = t.frames[handle];
+        f.id = handle;
+        f.page = img != m_objects.end() ? img->second.imageIndex : -1;
+        f.x = item.rect[0];
+        f.y = item.rect[1];
+        f.width = item.rect[2];
+        f.height = item.rect[3];
+        f.palette = item.palette;
+        break;
+    }
+    case SpriteKind::Part:
+    {
+        const std::size_t before = t.compositeParts.size();
+        for (const Entry &e : item.entries)
+            t.compositeParts.push_back({childOf(e), Narrow<std::int16_t>(e.ox, where, m_errors),
+                                        Narrow<std::int16_t>(e.oy, where, m_errors), IsCompCode(e.kind)});
+        t.compositeRanges[handle] = range(before, t.compositeParts.size());
+        break;
+    }
+    case SpriteKind::Anim:
+    {
+        const std::size_t before = t.animFrames.size();
+        for (const Entry &e : item.entries)
+            t.animFrames.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
+                                    Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind)});
+        t.animRanges[handle] = range(before, t.animFrames.size());
+        break;
+    }
+    case SpriteKind::Body:
+    {
+        const std::size_t before = t.bodyLayers.size();
+        for (const Entry &e : item.entries)
+            t.bodyLayers.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
+                                    Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind),
+                                    Narrow<std::uint8_t>(e.flag, where, m_errors)});
+        t.bodyRanges[handle] = range(before, t.bodyLayers.size());
+        break;
+    }
+    case SpriteKind::Sequence:
+    {
+        const std::size_t before = t.sequenceSteps.size();
+        for (const Entry &e : item.entries)
+            t.sequenceSteps.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
+                                       Narrow<std::int8_t>(e.oy, where, m_errors)});
+        t.sequenceRanges[handle] = range(before, t.sequenceSteps.size());
+        break;
+    }
+    case SpriteKind::Building:
+    {
+        const std::size_t before = t.buildingParts.size();
+        for (const Entry &e : item.entries)
+            t.buildingParts.push_back({childOf(e), Narrow<std::int16_t>(e.ox, where, m_errors),
+                                       Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind),
+                                       Narrow<std::uint8_t>(e.layer, where, m_errors),
+                                       Narrow<std::uint8_t>(e.state, where, m_errors)});
+        BuildingDef &b = t.buildings[handle];
+        const IndexRange r = range(before, t.buildingParts.size());
+        b.start = r.start;
+        b.end = r.end;
+        b.width = Narrow<std::uint8_t>(item.width, where, m_errors);
+        b.height = Narrow<std::uint8_t>(item.height, where, m_errors);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+bool SpriteRegistry::Compile()
+{
+    m_tables = {};
+    m_names.clear();
+    const std::size_t errorsBefore = m_errors.size();
+
+    // 1. Images and handles of every item (objects in name order, items in file order)
+    for (auto &[name, obj] : m_objects)
+    {
+        obj.imageIndex = static_cast<int>(m_tables.images.size());
+        m_tables.images.push_back(obj.image);
+        for (Item &item : obj.items)
+        {
+            item.handle = Allocate(item.kind);
+            m_names[{static_cast<int>(item.kind), item.handle}] = name + "." + item.name;
+        }
+    }
+
+    // 2. Families: a contiguous block of copies per family
+    struct Slot
+    {
+        std::string object; // the object the copied item belongs to (its references resolve from there)
+        const Item *source;
+        int handle;
+    };
+    std::vector<Slot> slots;
+    for (auto &[name, obj] : m_objects)
+    {
+        for (FamilyDef &fam : obj.families)
+        {
+            fam.compiled = {fam.kind, -1, 0};
+            std::vector<std::pair<std::string, const Item *>> members;
+            for (const std::string &m : fam.members)
+            {
+                const Item *item = LookupItem(name, m, fam.kind);
+                if (!item)
+                {
+                    Error("sprite '" + name + "' family '" + fam.name + "': no " + SpriteKindName(fam.kind) + " '" +
+                          m + "'");
+                    item = nullptr;
+                }
+                const auto dot = m.find('.');
+                members.emplace_back(dot == std::string::npos ? name : m.substr(0, dot), item);
+            }
+            for (std::size_t i = 0; i < members.size(); ++i)
+            {
+                const int h = Allocate(fam.kind);
+                if (i == 0)
+                    fam.compiled.start = h;
+                ++fam.compiled.count;
+                slots.push_back({members[i].first, members[i].second, h});
+            }
+        }
+    }
+
+    // 3. Contents (references resolve now that every handle, family starts included, is known)
+    for (const auto &[name, obj] : m_objects)
+        for (const Item &item : obj.items)
+            Emit(name, item, item.handle);
+    for (const Slot &s : slots)
+    {
+        if (s.source)
+            Emit(s.object, *s.source, s.handle);
+    }
+
+    for (std::size_t i = errorsBefore; i < m_errors.size(); ++i)
+        std::cerr << "[SpriteRegistry] " << m_errors[i] << std::endl;
+    return m_errors.empty();
+}
+
+bool SpriteRegistry::HasObject(const std::string &name) const
+{
+    return m_objects.count(name) != 0;
+}
+
+std::vector<std::string> SpriteRegistry::ObjectNames() const
+{
+    std::vector<std::string> names;
+    names.reserve(m_objects.size());
+    for (const auto &kv : m_objects)
+        names.push_back(kv.first);
+    return names;
+}
+
+int SpriteRegistry::ImageOf(const std::string &object) const
+{
+    const auto it = m_objects.find(object);
+    return it == m_objects.end() ? -1 : it->second.imageIndex;
+}
+
+SpriteRef SpriteRegistry::Resolve(const std::string &ref, SpriteKind expected) const
+{
+    const auto dot = ref.find('.');
+    if (dot == std::string::npos)
+        return {};
+    const std::string objName = ref.substr(0, dot);
+    const std::string itemName = ref.substr(dot + 1);
+    const auto it = m_objects.find(objName);
+    if (it == m_objects.end())
+        return {};
+    for (int k = static_cast<int>(SpriteKind::Frame); k <= static_cast<int>(SpriteKind::Building); ++k)
+    {
+        if (expected != SpriteKind::None && k != static_cast<int>(expected))
+            continue;
+        const auto found = it->second.byName[k].find(itemName);
+        if (found != it->second.byName[k].end())
+            return {static_cast<SpriteKind>(k), it->second.items[found->second].handle};
+    }
+    if (const FamilyDef *fam = FindFamilyDef(it->second, itemName))
+    {
+        if ((expected == SpriteKind::None || expected == fam->kind) && fam->compiled.count > 0)
+            return {fam->kind, fam->compiled.start};
+    }
+    return {};
+}
+
+const SpriteFamily *SpriteRegistry::FindFamily(const std::string &object, const std::string &family) const
+{
+    const auto it = m_objects.find(object);
+    if (it == m_objects.end())
+        return nullptr;
+    const FamilyDef *fam = FindFamilyDef(it->second, family);
+    return fam ? &fam->compiled : nullptr;
+}
+
+std::string SpriteRegistry::NameOf(SpriteRef ref) const
+{
+    const auto it = m_names.find({static_cast<int>(ref.kind), ref.handle});
+    if (it != m_names.end())
+        return it->second;
+    // A family member: "<object>.<family>[i]"
+    for (const auto &[name, obj] : m_objects)
+        for (const FamilyDef &f : obj.families)
+            if (f.kind == ref.kind && ref.handle >= f.compiled.start && ref.handle < f.compiled.start + f.compiled.count)
+                return name + "." + f.name + "[" + std::to_string(ref.handle - f.compiled.start) + "]";
+    return {};
+}
+
+} // namespace OpenArtOfWar

@@ -58,7 +58,8 @@ public:
             value = lo;
         if (value > hi)
             value = hi;
-        writeBits(static_cast<std::uint32_t>(value - lo), bitsFor(static_cast<std::uint32_t>(hi - lo)));
+        writeBits(static_cast<std::uint32_t>(static_cast<std::int64_t>(value) - lo),
+                  bitsFor(static_cast<std::uint32_t>(static_cast<std::int64_t>(hi) - lo)));
     }
     // LEB128 in 8-bit groups: 1 byte below 128, 2 below 16384, ...
     void writeVarUint(std::uint64_t v)
@@ -227,7 +228,8 @@ public:
     }
     std::int32_t readRanged(std::int32_t lo, std::int32_t hi)
     {
-        const std::uint32_t raw = readBits(bitsFor(static_cast<std::uint32_t>(hi - lo)));
+        const std::uint32_t raw
+            = readBits(bitsFor(static_cast<std::uint32_t>(static_cast<std::int64_t>(hi) - lo)));
         const std::int64_t v = static_cast<std::int64_t>(lo) + raw;
         if (v > hi)
         {
@@ -242,6 +244,11 @@ public:
         for (int shift = 0; shift < 64; shift += 7)
         {
             const std::uint32_t b = readBits(8);
+            if (shift == 63 && (b & 0xFEu))
+            {
+                m_failed = true; // only bit 63 fits in the tenth group
+                return 0;
+            }
             v |= static_cast<std::uint64_t>(b & 0x7Fu) << shift;
             if (!(b & 0x80u))
                 return m_failed ? 0 : v;

@@ -27,6 +27,67 @@ void SDLCALL OnFolderChosen(void *userdata, const char *const *list, int /*filte
 
 const char *const kGroupLabels[kSpriteGroupCount] = {"Units", "Buildings", "Terrain", "Other"};
 
+// The rectangle of a sprite in the pixels of its sheet as loaded (an HD sheet has `scale` pixels per unit of the
+// original), rounded as the game rounds it (Renderer: std::round) and kept inside the sheet
+SDL_Rect SheetPixels(const RawSprite &s, float scale, float sheetW, float sheetH)
+{
+    const int w = static_cast<int>(sheetW), h = static_cast<int>(sheetH);
+    const int x0 = std::clamp(static_cast<int>(std::lround(s.x * scale)), 0, w);
+    const int y0 = std::clamp(static_cast<int>(std::lround(s.y * scale)), 0, h);
+    const int x1 = std::clamp(static_cast<int>(std::lround((s.x + s.w) * scale)), 0, w);
+    const int y1 = std::clamp(static_cast<int>(std::lround((s.y + s.h) * scale)), 0, h);
+    return SDL_Rect {x0, y0, x1 - x0, y1 - y0};
+}
+
+// A sprite coordinate (units of the original sheet) put on the nearest pixel of the sheet as loaded
+float SnapToSheet(float v, float scale)
+{
+    return scale > 0.0f ? std::round(v * scale) / scale : std::round(v);
+}
+
+// A coordinate for the eye: whole numbers without decimals, else up to three
+std::string CoordText(float v)
+{
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.3f", static_cast<double>(v));
+    std::string t = buf;
+    while (!t.empty() && t.back() == '0')
+        t.pop_back();
+    if (!t.empty() && t.back() == '.')
+        t.pop_back();
+    return t;
+}
+
+// "-" / the value / "+" of one coordinate; the buttons step one pixel of the sheet as loaded (1 / scale of a unit), the
+// field takes any value (put on the sheet's pixels). True when it changed.
+bool CoordStepper(const char *id, float &v, float scale, float minValue)
+{
+    const float step = scale > 0.0f ? 1.0f / scale : 1.0f;
+    bool changed = false;
+    ImGui::PushID(id);
+    if (ImGui::Button("-"))
+    {
+        v = std::max(minValue, SnapToSheet(v - step, scale));
+        changed = true;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(72.0f);
+    float edit = v;
+    if (ImGui::InputFloat("##v", &edit, 0.0f, 0.0f, "%.3f"))
+    {
+        v = std::max(minValue, SnapToSheet(edit, scale));
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("+"))
+    {
+        v = SnapToSheet(v + step, scale);
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 } // namespace
 
 void CharacterEditor::EnsureSpriteCatalog()
@@ -718,11 +779,8 @@ void CharacterEditor::InitPreviewFromObject(int objectIndex)
             continue;
         float tw = 1.0f, th = 1.0f;
         SDL_GetTextureSize(tex, &tw, &th);
-        const int scale = std::max(1, static_cast<int>(std::round(textures->GetSheetScale(s.page))));
-        const int x0 = std::clamp(s.x * scale, 0, static_cast<int>(tw));
-        const int y0 = std::clamp(s.y * scale, 0, static_cast<int>(th));
-        const int x1 = std::clamp((s.x + s.w) * scale, 0, static_cast<int>(tw));
-        const int y1 = std::clamp((s.y + s.h) * scale, 0, static_cast<int>(th));
+        const SDL_Rect px = SheetPixels(s, textures->GetSheetScale(s.page), tw, th);
+        const int x0 = px.x, y0 = px.y, x1 = px.x + px.w, y1 = px.y + px.h;
         if (x1 <= x0 || y1 <= y0)
             continue;
 
@@ -805,11 +863,8 @@ void CharacterEditor::InitPreviewFromSingleSprites()
             continue;
         float tw = 1.0f, th = 1.0f;
         SDL_GetTextureSize(tex, &tw, &th);
-        const int scale = std::max(1, static_cast<int>(std::round(textures->GetSheetScale(s.page))));
-        const int x0 = std::clamp(s.x * scale, 0, static_cast<int>(tw));
-        const int y0 = std::clamp(s.y * scale, 0, static_cast<int>(th));
-        const int x1 = std::clamp((s.x + s.w) * scale, 0, static_cast<int>(tw));
-        const int y1 = std::clamp((s.y + s.h) * scale, 0, static_cast<int>(th));
+        const SDL_Rect px = SheetPixels(s, textures->GetSheetScale(s.page), tw, th);
+        const int x0 = px.x, y0 = px.y, x1 = px.x + px.w, y1 = px.y + px.h;
         if (x1 <= x0 || y1 <= y0)
             continue;
 
@@ -1044,11 +1099,8 @@ void CharacterEditor::LayoutPreviewByObject(int pad)
                     continue;
                 float tw = 1.0f, th = 1.0f;
                 SDL_GetTextureSize(tex, &tw, &th);
-                const int scale = std::max(1, static_cast<int>(std::round(textures->GetSheetScale(s.page))));
-                const int x0 = std::clamp(s.x * scale, 0, static_cast<int>(tw));
-                const int y0 = std::clamp(s.y * scale, 0, static_cast<int>(th));
-                const int x1 = std::clamp((s.x + s.w) * scale, 0, static_cast<int>(tw));
-                const int y1 = std::clamp((s.y + s.h) * scale, 0, static_cast<int>(th));
+                const SDL_Rect px = SheetPixels(s, textures->GetSheetScale(s.page), tw, th);
+                const int x0 = px.x, y0 = px.y, x1 = px.x + px.w, y1 = px.y + px.h;
                 if (x1 <= x0 || y1 <= y0)
                     continue;
 
@@ -1831,16 +1883,6 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
         }
     }
 
-    // Atlas bounding rectangle
-    const ImVec2 atlasMin(origin.x + previewPanX, origin.y + previewPanY);
-    const ImVec2 atlasMax(atlasMin.x + previewAtlasW * previewZoomLevel, atlasMin.y + previewAtlasH * previewZoomLevel);
-    const ImU32 atlasBorderCol = previewCollisionCount > 0 ? IM_COL32(230, 65, 65, 220) : IM_COL32(80, 140, 100, 180);
-    dl->AddRect(atlasMin, atlasMax, atlasBorderCol, 0.0f, 0, 1.5f);
-    dl->AddText(
-        ImVec2(atlasMin.x + 4.0f, atlasMin.y - 18.0f),
-        previewCollisionCount > 0 ? IM_COL32(255, 95, 95, 255) : IM_COL32(120, 180, 140, 255),
-        (std::to_string(previewAtlasW) + " x " + std::to_string(previewAtlasH) + " px").c_str());
-
     // Canvas interaction
     ImGui::InvisibleButton(
         "canvas_click_target",
@@ -1854,8 +1896,8 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
     if (canvasHovered && io.MouseWheel != 0.0f)
     {
         const float oldZoom = previewZoomLevel;
-        const float factor = io.MouseWheel > 0 ? 1.15f : (1.0f / 1.15f);
-        previewZoomLevel = std::clamp(previewZoomLevel * factor, 0.05f, 16.0f);
+        // (a fractional wheel step - a touchpad - zooms by as much)
+        previewZoomLevel = std::clamp(previewZoomLevel * std::pow(1.15f, io.MouseWheel), 0.05f, 16.0f);
         const float relX = io.MousePos.x - (origin.x + previewPanX);
         const float relY = io.MousePos.y - (origin.y + previewPanY);
         previewPanX = io.MousePos.x - origin.x - relX * (previewZoomLevel / oldZoom);
@@ -1872,6 +1914,16 @@ void CharacterEditor::DrawSpritePreviewCanvas(const ImVec2 &size)
         previewPanX += io.MouseDelta.x;
         previewPanY += io.MouseDelta.y;
     }
+
+    // Atlas bounding rectangle (after the wheel and the panning: drawn with this frame's zoom like the sprites)
+    const ImVec2 atlasMin(origin.x + previewPanX, origin.y + previewPanY);
+    const ImVec2 atlasMax(atlasMin.x + previewAtlasW * previewZoomLevel, atlasMin.y + previewAtlasH * previewZoomLevel);
+    const ImU32 atlasBorderCol = previewCollisionCount > 0 ? IM_COL32(230, 65, 65, 220) : IM_COL32(80, 140, 100, 180);
+    dl->AddRect(atlasMin, atlasMax, atlasBorderCol, 0.0f, 0, 1.5f);
+    dl->AddText(
+        ImVec2(atlasMin.x + 4.0f, atlasMin.y - 18.0f),
+        previewCollisionCount > 0 ? IM_COL32(255, 95, 95, 255) : IM_COL32(120, 180, 140, 255),
+        (std::to_string(previewAtlasW) + " x " + std::to_string(previewAtlasH) + " px").c_str());
 
     const float mouseAtlasX = (io.MousePos.x - origin.x - previewPanX) / previewZoomLevel;
     const float mouseAtlasY = (io.MousePos.y - origin.y - previewPanY) / previewZoomLevel;
@@ -2385,7 +2437,7 @@ void CharacterEditor::DrawLoadedSprites()
         if (textures && textures->GetSpriteSheet(p) != nullptr)
             ++loadedSheetsCount;
     }
-    const fs::path spritesJsonPath = assetsRoot / "characters" / "sprites.json";
+    const fs::path spritesJsonPath = assetsRoot / "data" / "sprites.json";
     const fs::path graphicsJsonPath = assetsRoot / "data" / "sprites_graphics.json";
     const fs::path sheetsDirPath = assetsRoot / "sprites";
 
@@ -2624,12 +2676,12 @@ void CharacterEditor::DrawLoadedSprites()
             ImVec4(1.0f, 0.88f, 0.30f, 1.0f), _("Sprite #%d  —  Loaded from %s (Page %d)"), sel.id, relSheet, sel.page);
         ImGui::TextDisabled(_("Full File Path: %s"), fullSheetPath.generic_string().c_str());
         ImGui::Text(
-            _("sprites.json Rect: x=%d, y=%d, w=%d, h=%d (palette=%d)  |  PNG Pixel Rect (%.0fx): [%d, %d, %d, %d] on "
+            _("sprites.json Rect: x=%s, y=%s, w=%s, h=%s (palette=%d)  |  PNG Pixel Rect (%.2fx): [%d, %d, %d, %d] on "
               "%.0fx%.0f px texture"),
-            sel.x,
-            sel.y,
-            sel.w,
-            sel.h,
+            CoordText(sel.x).c_str(),
+            CoordText(sel.y).c_str(),
+            CoordText(sel.w).c_str(),
+            CoordText(sel.h).c_str(),
             sel.palette,
             sheetScale,
             static_cast<int>(std::round(sel.x * sheetScale)),
@@ -2664,19 +2716,11 @@ void CharacterEditor::DrawLoadedSprites()
         ImGui::BeginGroup();
         ImGui::Text("%s", _("Position:"));
         ImGui::SameLine();
-        if (ImGui::Button("-1##ls_x")) { sel.x = std::max(0, sel.x - 1); OnSpriteModified(sel); }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(60.0f);
-        if (ImGui::InputInt("##ls_xv", &sel.x, 0)) { sel.x = std::max(0, sel.x); OnSpriteModified(sel); }
-        ImGui::SameLine();
-        if (ImGui::Button("+1##ls_x")) { sel.x += 1; OnSpriteModified(sel); }
+        if (CoordStepper("ls_x", sel.x, sheetScale, 0.0f))
+            OnSpriteModified(sel);
         ImGui::SameLine(0.0f, 10.0f);
-        if (ImGui::Button("-1##ls_y")) { sel.y = std::max(0, sel.y - 1); OnSpriteModified(sel); }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(60.0f);
-        if (ImGui::InputInt("##ls_yv", &sel.y, 0)) { sel.y = std::max(0, sel.y); OnSpriteModified(sel); }
-        ImGui::SameLine();
-        if (ImGui::Button("+1##ls_y")) { sel.y += 1; OnSpriteModified(sel); }
+        if (CoordStepper("ls_y", sel.y, sheetScale, 0.0f))
+            OnSpriteModified(sel);
         if (spritesJsonDirty)
         {
             ImGui::SameLine(0.0f, 15.0f);
@@ -2741,7 +2785,7 @@ void CharacterEditor::DrawLoadedSprites()
                 if (hoveredSprite >= 0)
                 {
                     ImGui::SetTooltip(
-                        "Sprite #%d (%dx%d at %d,%d) — Click to inspect",
+                        "Sprite #%d (%gx%g at %g,%g) — Click to inspect",
                         hoveredSprite,
                         allSprites[static_cast<std::size_t>(hoveredSprite)].w,
                         allSprites[static_cast<std::size_t>(hoveredSprite)].h,
@@ -2837,7 +2881,7 @@ void CharacterEditor::DrawLoadedSprites()
 
                 // Col 3: Source Rect
                 ImGui::TableSetColumnIndex(3);
-                ImGui::Text("(%d, %d) %dx%d px", s.x, s.y, s.w, s.h);
+                ImGui::Text("(%g, %g) %gx%g", s.x, s.y, s.w, s.h);
                 if (std::abs(scale - 1.0f) > 0.01f)
                 {
                     ImGui::SameLine();
@@ -2979,7 +3023,7 @@ bool CharacterEditor::SaveSpritesJson()
     if (spriteCatalog.SaveSpritesJson(assetsRoot, err))
     {
         spritesJsonDirty = false;
-        status = _("Saved to assets/characters/sprites.json");
+        status = _("Saved to assets/data/sprites.json");
         return true;
     }
     else
@@ -3094,8 +3138,11 @@ void CharacterEditor::DrawPointEditor()
                 if (sid >= 0 && sid < static_cast<int>(allSprites.size()))
                 {
                     RawSprite &curS = allSprites[static_cast<std::size_t>(sid)];
-                    curS.x = std::max(0, curS.x + pointEditorShiftAllDx);
-                    curS.y = std::max(0, curS.y + pointEditorShiftAllDy);
+                    // (pixels of each sprite's own sheet as loaded)
+                    const float scaleS = textures ? textures->GetSheetScale(curS.page) : 1.0f;
+                    const float pxS = scaleS > 0.0f ? 1.0f / scaleS : 1.0f;
+                    curS.x = std::max(0.0f, SnapToSheet(curS.x + pointEditorShiftAllDx * pxS, scaleS));
+                    curS.y = std::max(0.0f, SnapToSheet(curS.y + pointEditorShiftAllDy * pxS, scaleS));
                     OnSpriteModified(curS);
                 }
             }
@@ -3178,8 +3225,8 @@ void CharacterEditor::DrawPointEditor()
             ImVec2(rMin.x + 38.0f, rMin.y + 2.0f),
             isSelected ? IM_COL32(255, 230, 80, 255) : IM_COL32(230, 235, 230, 255),
             line1);
-        char line2[48];
-        std::snprintf(line2, sizeof(line2), "P%d: (%d, %d) %dx%d", s.page, s.x, s.y, s.w, s.h);
+        char line2[96];
+        std::snprintf(line2, sizeof(line2), "P%d: (%g, %g) %gx%g", s.page, s.x, s.y, s.w, s.h);
         dl->AddText(ImVec2(rMin.x + 38.0f, rMin.y + 18.0f), IM_COL32(145, 175, 165, 255), line2);
 
         ImGui::PopID();
@@ -3208,18 +3255,33 @@ void CharacterEditor::DrawPointEditor()
         ImGui::InvisibleButton("##sprite_thumb_drag", ImVec2(thumbBox, thumbBox));
         const bool thumbHovered = ImGui::IsItemHovered();
         const bool thumbActive = ImGui::IsItemActive();
+        // The sheet's zoom from the buttons and the thumbnail's wheel: around the middle of the canvas (the canvas's
+        // own wheel zooms around the mouse, below)
+        auto zoomAroundCentre = [&](float zoom) {
+            zoom = std::clamp(zoom, kPointEditorZoomMin, kPointEditorZoomMax);
+            const float cx = pointEditorCanvasSize.x * 0.5f, cy = pointEditorCanvasSize.y * 0.5f;
+            pointEditorPan.x = cx - (cx - pointEditorPan.x) * (zoom / pointEditorZoom);
+            pointEditorPan.y = cy - (cy - pointEditorPan.y) * (zoom / pointEditorZoom);
+            pointEditorZoom = zoom;
+        };
         if (thumbHovered && ImGui::GetIO().MouseWheel != 0.0f)
-        {
-            const float factor = (ImGui::GetIO().MouseWheel > 0.0f) ? 1.25f : 0.8f;
-            pointEditorZoom = std::clamp(pointEditorZoom * factor, 0.15f, 24.0f);
-        }
+            zoomAroundCentre(pointEditorZoom * std::pow(1.25f, ImGui::GetIO().MouseWheel));
+        if (ImGui::IsItemActivated())
+            pointEditorThumbDragStart = ImVec2(sel.x, sel.y);
         if (thumbActive && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
         {
-            const ImVec2 delta = ImGui::GetIO().MouseDelta;
-            if (std::abs(delta.x) >= 1.0f || std::abs(delta.y) >= 1.0f)
+            // The thumbnail shows the sprite at its own zoom (DrawSpriteImage): the mouse moves it by as much, measured
+            // from where the drag began (so no step is lost to rounding), and it lands on a pixel of the sheet
+            float thumbZoom = (sel.w > 0.0f && sel.h > 0.0f) ? std::min(thumbBox / sel.w, thumbBox / sel.h) : 1.0f;
+            if (thumbZoom >= 1.0f)
+                thumbZoom = std::floor(thumbZoom);
+            const ImVec2 drag = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left, 0.0f);
+            const float nx = std::max(0.0f, SnapToSheet(pointEditorThumbDragStart.x + drag.x / thumbZoom, sheetScale));
+            const float ny = std::max(0.0f, SnapToSheet(pointEditorThumbDragStart.y + drag.y / thumbZoom, sheetScale));
+            if (nx != sel.x || ny != sel.y)
             {
-                sel.x = std::max(0, sel.x + static_cast<int>(std::round(delta.x)));
-                sel.y = std::max(0, sel.y + static_cast<int>(std::round(delta.y)));
+                sel.x = nx;
+                sel.y = ny;
                 OnSpriteModified(sel);
             }
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
@@ -3237,67 +3299,95 @@ void CharacterEditor::DrawPointEditor()
             headerText, sizeof(headerText), "Sprite #%d  —  sheet_%02d.png (Page %d)", sel.id, sel.page, sel.page);
         ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.30f, 1.0f), "%s", headerText);
 
+        // The rectangle is in units of the original sheet; the steps here are pixels of the sheet as loaded (an HD
+        // sheet has sheetScale of them per unit), and every value is put on those pixels
+        const float px = sheetScale > 0.0f ? 1.0f / sheetScale : 1.0f;
+        auto snap = [&](float v) {
+            return SnapToSheet(v, sheetScale);
+        };
+        auto stepButton = [&](const char *label, float &v, float pixels, float minValue) {
+            if (ImGui::Button(label))
+            {
+                v = std::max(minValue, snap(v + pixels * px));
+                OnSpriteModified(sel);
+            }
+        };
+        auto valueField = [&](const char *id, float &v, float width, float minValue) {
+            ImGui::SetNextItemWidth(width);
+            float edit = v;
+            if (ImGui::InputFloat(id, &edit, 0.0f, 0.0f, "%.3f"))
+            {
+                v = std::max(minValue, snap(edit));
+                OnSpriteModified(sel);
+            }
+        };
+
         // Position X Controls
         ImGui::Text("%s", _("Position X:"));
         ImGui::SameLine(95.0f);
-        if (ImGui::Button("-10##px")) { sel.x = std::max(0, sel.x - 10); OnSpriteModified(sel); }
+        stepButton("-10##px", sel.x, -10.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("-1##px")) { sel.x = std::max(0, sel.x - 1); OnSpriteModified(sel); }
+        stepButton("-1##px", sel.x, -1.0f, 0.0f);
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(75.0f);
-        if (ImGui::InputInt("##val_px", &sel.x, 0)) { sel.x = std::max(0, sel.x); OnSpriteModified(sel); }
+        valueField("##val_px", sel.x, 75.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("+1##px")) { sel.x += 1; OnSpriteModified(sel); }
+        stepButton("+1##px", sel.x, 1.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("+10##px")) { sel.x += 10; OnSpriteModified(sel); }
+        stepButton("+10##px", sel.x, 10.0f, 0.0f);
 
         // Position Y Controls
         ImGui::Text("%s", _("Position Y:"));
         ImGui::SameLine(95.0f);
-        if (ImGui::Button("-10##py")) { sel.y = std::max(0, sel.y - 10); OnSpriteModified(sel); }
+        stepButton("-10##py", sel.y, -10.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("-1##py")) { sel.y = std::max(0, sel.y - 1); OnSpriteModified(sel); }
+        stepButton("-1##py", sel.y, -1.0f, 0.0f);
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(75.0f);
-        if (ImGui::InputInt("##val_py", &sel.y, 0)) { sel.y = std::max(0, sel.y); OnSpriteModified(sel); }
+        valueField("##val_py", sel.y, 75.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("+1##py")) { sel.y += 1; OnSpriteModified(sel); }
+        stepButton("+1##py", sel.y, 1.0f, 0.0f);
         ImGui::SameLine();
-        if (ImGui::Button("+10##py")) { sel.y += 10; OnSpriteModified(sel); }
+        stepButton("+10##py", sel.y, 10.0f, 0.0f);
 
         // Size W x H Controls
         ImGui::Text("%s", _("Size (WxH):"));
         ImGui::SameLine(95.0f);
-        if (ImGui::Button("-1##pw")) { sel.w = std::max(1, sel.w - 1); OnSpriteModified(sel); }
+        stepButton("-1##pw", sel.w, -1.0f, px);
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(55.0f);
-        if (ImGui::InputInt("##val_pw", &sel.w, 0)) { sel.w = std::max(1, sel.w); OnSpriteModified(sel); }
+        valueField("##val_pw", sel.w, 64.0f, px);
         ImGui::SameLine();
-        if (ImGui::Button("+1##pw")) { sel.w += 1; OnSpriteModified(sel); }
+        stepButton("+1##pw", sel.w, 1.0f, px);
         ImGui::SameLine();
         ImGui::Text("x");
         ImGui::SameLine();
-        if (ImGui::Button("-1##ph")) { sel.h = std::max(1, sel.h - 1); OnSpriteModified(sel); }
+        stepButton("-1##ph", sel.h, -1.0f, px);
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(55.0f);
-        if (ImGui::InputInt("##val_ph", &sel.h, 0)) { sel.h = std::max(1, sel.h); OnSpriteModified(sel); }
+        valueField("##val_ph", sel.h, 64.0f, px);
         ImGui::SameLine();
-        if (ImGui::Button("+1##ph")) { sel.h += 1; OnSpriteModified(sel); }
+        stepButton("+1##ph", sel.h, 1.0f, px);
+        // The same rectangle in pixels of the sheet as loaded
+        ImGui::TextDisabled(
+            _("Sheet pixels (%.2fx): x=%d y=%d w=%d h=%d"),
+            sheetScale,
+            static_cast<int>(std::lround(sel.x * sheetScale)),
+            static_cast<int>(std::lround(sel.y * sheetScale)),
+            static_cast<int>(std::lround(sel.w * sheetScale)),
+            static_cast<int>(std::lround(sel.h * sheetScale)));
         ImGui::EndGroup();
 
         ImGui::SameLine(0.0f, 25.0f);
-        // Nudge D-Pad
+        // Nudge D-Pad (steps of sheet pixels)
         ImGui::BeginGroup();
         ImGui::TextDisabled("%s", _("Nudge:"));
+        const float nudge = static_cast<float>(pointEditorNudgeStep);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 26.0f);
         if (ImGui::Button("▲##nudge_up", ImVec2(24.0f, 22.0f)))
         {
-            sel.y = std::max(0, sel.y - pointEditorNudgeStep);
+            sel.y = std::max(0.0f, snap(sel.y - nudge * px));
             OnSpriteModified(sel);
         }
         if (ImGui::Button("◄##nudge_l", ImVec2(24.0f, 22.0f)))
         {
-            sel.x = std::max(0, sel.x - pointEditorNudgeStep);
+            sel.x = std::max(0.0f, snap(sel.x - nudge * px));
             OnSpriteModified(sel);
         }
         ImGui::SameLine();
@@ -3305,13 +3395,13 @@ void CharacterEditor::DrawPointEditor()
         ImGui::SameLine();
         if (ImGui::Button("►##nudge_r", ImVec2(24.0f, 22.0f)))
         {
-            sel.x += pointEditorNudgeStep;
+            sel.x = snap(sel.x + nudge * px);
             OnSpriteModified(sel);
         }
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 26.0f);
         if (ImGui::Button("▼##nudge_dn", ImVec2(24.0f, 22.0f)))
         {
-            sel.y += pointEditorNudgeStep;
+            sel.y = snap(sel.y + nudge * px);
             OnSpriteModified(sel);
         }
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f, 2.0f));
@@ -3336,21 +3426,21 @@ void CharacterEditor::DrawPointEditor()
         {
             const ImVec2 avail = ImGui::GetContentRegionAvail();
             const float fit = std::min(avail.x / tw, (avail.y - 10.0f) / th);
-            pointEditorZoom = std::max(0.1f, fit);
+            pointEditorZoom = std::clamp(fit, kPointEditorZoomMin, kPointEditorZoomMax);
             pointEditorPan = ImVec2(0.0f, 0.0f);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("100%")) { pointEditorZoom = 1.0f; }
+        if (ImGui::SmallButton("100%")) { zoomAroundCentre(1.0f); }
         ImGui::SameLine();
-        if (ImGui::SmallButton("200%")) { pointEditorZoom = 2.0f; }
+        if (ImGui::SmallButton("200%")) { zoomAroundCentre(2.0f); }
         ImGui::SameLine();
-        if (ImGui::SmallButton("400%")) { pointEditorZoom = 4.0f; }
+        if (ImGui::SmallButton("400%")) { zoomAroundCentre(4.0f); }
         ImGui::SameLine();
-        if (ImGui::SmallButton("-##zm")) { pointEditorZoom = std::max(0.2f, pointEditorZoom / 1.25f); }
+        if (ImGui::SmallButton("-##zm")) { zoomAroundCentre(pointEditorZoom / 1.25f); }
         ImGui::SameLine();
         ImGui::Text("%.0f%%", pointEditorZoom * 100.0f);
         ImGui::SameLine();
-        if (ImGui::SmallButton("+##zm")) { pointEditorZoom = std::min(24.0f, pointEditorZoom * 1.25f); }
+        if (ImGui::SmallButton("+##zm")) { zoomAroundCentre(pointEditorZoom * 1.25f); }
         ImGui::SameLine();
         ImGui::Checkbox(_("Grid"), &pointEditorShowGrid);
         ImGui::SameLine(0.0f, 15.0f);
@@ -3363,12 +3453,13 @@ void CharacterEditor::DrawPointEditor()
             const float canvasW = std::max(100.0f, avail.x);
             const float canvasH = std::max(150.0f, avail.y - 6.0f);
             const ImVec2 canvasSize(canvasW, canvasH);
+            pointEditorCanvasSize = canvasSize; // (the zoom buttons above keep its middle in place)
 
             if (pointEditorFramedSpriteId != sel.id)
             {
                 pointEditorFramedSpriteId = sel.id;
-                const float targetW = static_cast<float>(std::max(16, sel.w));
-                const float targetH = static_cast<float>(std::max(16, sel.h));
+                const float targetW = std::max(16.0f, sel.w);
+                const float targetH = std::max(16.0f, sel.h);
                 const float idealZoom = std::clamp(std::min(canvasW * 0.40f / targetW, canvasH * 0.40f / targetH), 1.5f, 8.0f);
                 pointEditorZoom = std::round(idealZoom);
                 if (pointEditorZoom < 1.0f)
@@ -3399,8 +3490,8 @@ void CharacterEditor::DrawPointEditor()
             // 1. Zoom with Mouse Wheel (anchored around mouse pointer)
             if (isHovered && io.MouseWheel != 0.0f)
             {
-                const float factor = (io.MouseWheel > 0.0f) ? 1.25f : 0.8f;
-                const float newZoom = std::clamp(pointEditorZoom * factor, 0.15f, 24.0f);
+                const float newZoom = std::clamp(
+                    pointEditorZoom * std::pow(1.25f, io.MouseWheel), kPointEditorZoomMin, kPointEditorZoomMax);
                 if (newZoom != pointEditorZoom)
                 {
                     const float relX = mp.x - canvasMin.x;
@@ -3540,80 +3631,89 @@ void CharacterEditor::DrawPointEditor()
                 }
                 else
                 {
+                    // The mouse moved by this much in units of the original sheet, put on whole pixels of the sheet as
+                    // loaded (an HD sheet has sheetScale of them per unit): the rectangle can sit on any of them
                     const float deltaSheetX = (mp.x - pointEditorDragStartMouse.x) / (sheetScale * pointEditorZoom);
                     const float deltaSheetY = (mp.y - pointEditorDragStartMouse.y) / (sheetScale * pointEditorZoom);
-                    const int idx = static_cast<int>(std::round(deltaSheetX));
-                    const int idy = static_cast<int>(std::round(deltaSheetY));
+                    const float dx = SnapToSheet(deltaSheetX, sheetScale);
+                    const float dy = SnapToSheet(deltaSheetY, sheetScale);
+                    const float minSize = sheetScale > 0.0f ? 1.0f / sheetScale : 1.0f; // one pixel of the sheet
+                    const float ox = pointEditorOrigX, oy = pointEditorOrigY;
+                    const float ow = pointEditorOrigW, oh = pointEditorOrigH;
 
-                    int newX = pointEditorOrigX;
-                    int newY = pointEditorOrigY;
-                    int newW = pointEditorOrigW;
-                    int newH = pointEditorOrigH;
+                    float newX = ox, newY = oy, newW = ow, newH = oh;
+                    // The left / top edge moves, the right / bottom one stays where it is
+                    auto moveLeft = [&]() {
+                        const float right = ox + ow;
+                        newX = std::clamp(SnapToSheet(ox + dx, sheetScale), 0.0f, right - minSize);
+                        newW = right - newX;
+                    };
+                    auto moveTop = [&]() {
+                        const float bottom = oy + oh;
+                        newY = std::clamp(SnapToSheet(oy + dy, sheetScale), 0.0f, bottom - minSize);
+                        newH = bottom - newY;
+                    };
+                    auto moveRight = [&]() {
+                        newW = std::max(minSize, SnapToSheet(ow + dx, sheetScale));
+                    };
+                    auto moveBottom = [&]() {
+                        newH = std::max(minSize, SnapToSheet(oh + dy, sheetScale));
+                    };
 
                     switch (pointEditorDragMode)
                     {
                         case PointEditorDragMode::MoveRect:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
-                            newX = std::max(0, pointEditorOrigX + idx);
-                            newY = std::max(0, pointEditorOrigY + idy);
+                            newX = std::max(0.0f, SnapToSheet(ox + dx, sheetScale));
+                            newY = std::max(0.0f, SnapToSheet(oy + dy, sheetScale));
                             break;
                         case PointEditorDragMode::ResizeE:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-                            newW = std::max(1, pointEditorOrigW + idx);
+                            moveRight();
                             break;
                         case PointEditorDragMode::ResizeW:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-                            if (pointEditorOrigW - idx >= 1)
-                            {
-                                newX = std::max(0, pointEditorOrigX + idx);
-                                newW = pointEditorOrigW - idx;
-                            }
+                            moveLeft();
                             break;
                         case PointEditorDragMode::ResizeS:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                            newH = std::max(1, pointEditorOrigH + idy);
+                            moveBottom();
                             break;
                         case PointEditorDragMode::ResizeN:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                            if (pointEditorOrigH - idy >= 1)
-                            {
-                                newY = std::max(0, pointEditorOrigY + idy);
-                                newH = pointEditorOrigH - idy;
-                            }
+                            moveTop();
                             break;
                         case PointEditorDragMode::ResizeSE:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
-                            newW = std::max(1, pointEditorOrigW + idx);
-                            newH = std::max(1, pointEditorOrigH + idy);
+                            moveRight();
+                            moveBottom();
                             break;
                         case PointEditorDragMode::ResizeNW:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
-                            if (pointEditorOrigW - idx >= 1) { newX = std::max(0, pointEditorOrigX + idx); newW = pointEditorOrigW - idx; }
-                            if (pointEditorOrigH - idy >= 1) { newY = std::max(0, pointEditorOrigY + idy); newH = pointEditorOrigH - idy; }
+                            moveLeft();
+                            moveTop();
                             break;
                         case PointEditorDragMode::ResizeNE:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
-                            newW = std::max(1, pointEditorOrigW + idx);
-                            if (pointEditorOrigH - idy >= 1) { newY = std::max(0, pointEditorOrigY + idy); newH = pointEditorOrigH - idy; }
+                            moveRight();
+                            moveTop();
                             break;
                         case PointEditorDragMode::ResizeSW:
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNESW);
-                            if (pointEditorOrigW - idx >= 1) { newX = std::max(0, pointEditorOrigX + idx); newW = pointEditorOrigW - idx; }
-                            newH = std::max(1, pointEditorOrigH + idy);
+                            moveLeft();
+                            moveBottom();
                             break;
                         case PointEditorDragMode::DrawBox:
                         {
                             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
                             const float sX0 = (pointEditorDragStartMouse.x - canvasMin.x - pointEditorPan.x) / (sheetScale * pointEditorZoom);
                             const float sY0 = (pointEditorDragStartMouse.y - canvasMin.y - pointEditorPan.y) / (sheetScale * pointEditorZoom);
-                            const int ix0 = static_cast<int>(std::round(sX0));
-                            const int iy0 = static_cast<int>(std::round(sY0));
-                            const int ix1 = static_cast<int>(std::round(mouseSheetX));
-                            const int iy1 = static_cast<int>(std::round(mouseSheetY));
-                            newX = std::max(0, std::min(ix0, ix1));
-                            newY = std::max(0, std::min(iy0, iy1));
-                            newW = std::max(1, std::abs(ix1 - ix0));
-                            newH = std::max(1, std::abs(iy1 - iy0));
+                            const float x0 = SnapToSheet(sX0, sheetScale), y0 = SnapToSheet(sY0, sheetScale);
+                            const float x1 = SnapToSheet(mouseSheetX, sheetScale), y1 = SnapToSheet(mouseSheetY, sheetScale);
+                            newX = std::max(0.0f, std::min(x0, x1));
+                            newY = std::max(0.0f, std::min(y0, y1));
+                            newW = std::max(minSize, std::abs(x1 - x0));
+                            newH = std::max(minSize, std::abs(y1 - y0));
                             break;
                         }
                         default:
@@ -3654,13 +3754,14 @@ void CharacterEditor::DrawPointEditor()
             dl->AddRect(sheetP0, sheetP1, IM_COL32(90, 130, 115, 220), 0.0f, 0, 1.2f);
 
             // Pixel Grid when zoomed in
+            // (one cell is one pixel of the sheet as loaded: what the rectangle snaps to)
             if (pointEditorShowGrid && pointEditorZoom >= 4.0f)
             {
-                const float pixStep = sheetScale * pointEditorZoom;
+                const float pixStep = pointEditorZoom;
                 const int startX = std::max(0, static_cast<int>(std::floor((canvasMin.x - sheetP0.x) / pixStep)));
-                const int endX = std::min(static_cast<int>(tw / sheetScale), static_cast<int>(std::ceil((canvasMax.x - sheetP0.x) / pixStep)));
+                const int endX = std::min(static_cast<int>(tw), static_cast<int>(std::ceil((canvasMax.x - sheetP0.x) / pixStep)));
                 const int startY = std::max(0, static_cast<int>(std::floor((canvasMin.y - sheetP0.y) / pixStep)));
-                const int endY = std::min(static_cast<int>(th / sheetScale), static_cast<int>(std::ceil((canvasMax.y - sheetP0.y) / pixStep)));
+                const int endY = std::min(static_cast<int>(th), static_cast<int>(std::ceil((canvasMax.y - sheetP0.y) / pixStep)));
 
                 if ((endX - startX) * (endY - startY) <= 80000)
                 {
@@ -3729,7 +3830,7 @@ void CharacterEditor::DrawPointEditor()
 
             // Top-left HUD badge on canvas
             char hudBuf[128];
-            std::snprintf(hudBuf, sizeof(hudBuf), "Sprite #%d: (%d, %d) %dx%d  |  Zoom: %.0f%%", sel.id, sel.x, sel.y, sel.w, sel.h, pointEditorZoom * 100.0f);
+            std::snprintf(hudBuf, sizeof(hudBuf), "Sprite #%d: (%g, %g) %gx%g  |  Zoom: %.0f%%", sel.id, sel.x, sel.y, sel.w, sel.h, pointEditorZoom * 100.0f);
             const ImVec2 hudSz = ImGui::CalcTextSize(hudBuf);
             const ImVec2 hb0(canvasMin.x + 8.0f, canvasMin.y + 8.0f);
             const ImVec2 hb1(hb0.x + hudSz.x + 12.0f, hb0.y + hudSz.y + 6.0f);
@@ -3742,7 +3843,7 @@ void CharacterEditor::DrawPointEditor()
             if (isHovered && pointEditorDragMode == PointEditorDragMode::None)
             {
                 ImGui::SetTooltip(
-                    _("Sheet (%.0f, %.0f)  |  Sprite #%d: (%d, %d) %dx%d\nLMB Drag: Move/Resize | MMB / Space+Drag: Pan | Wheel: Zoom | Click sprite: Select"),
+                    _("Sheet (%.2f, %.2f)  |  Sprite #%d: (%g, %g) %gx%g\nLMB Drag: Move/Resize | MMB / Space+Drag: Pan | Wheel: Zoom | Click sprite: Select"),
                     mouseSheetX, mouseSheetY, sel.id, sel.x, sel.y, sel.w, sel.h);
             }
         }

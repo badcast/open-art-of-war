@@ -320,6 +320,9 @@ private:
     PreviewMode previewMode {PreviewMode::Idle};
     float playbackSpeed {1.0f};
     float previewZoom {2.0f};
+    // The zoom range of the preview canvas: the wheel, the slider and the camera keep to it
+    static constexpr float kPreviewZoomMin = 0.25f;
+    static constexpr float kPreviewZoomMax = 8.0f;
     float previewTime {0.0f};
     float buildingProgress {1.0f};
     int previewHealthPercent {100};
@@ -498,13 +501,18 @@ private:
     int pointEditorShiftAllDy {0};
     float pointEditorZoom {2.0f};
     ImVec2 pointEditorPan {0.0f, 0.0f};
+    ImVec2 pointEditorThumbDragStart {0.0f, 0.0f}; // the sprite's (x, y) when the thumbnail drag began
+    ImVec2 pointEditorCanvasSize {600.0f, 400.0f};  // the sheet canvas of the last frame
+    static constexpr float kPointEditorZoomMin = 0.1f;
+    static constexpr float kPointEditorZoomMax = 24.0f;
     int pointEditorFramedSpriteId {-1};
     PointEditorDragMode pointEditorDragMode {PointEditorDragMode::None};
     ImVec2 pointEditorDragStartMouse {0.0f, 0.0f};
-    int pointEditorOrigX {0};
-    int pointEditorOrigY {0};
-    int pointEditorOrigW {0};
-    int pointEditorOrigH {0};
+    // The rectangle when the drag began (units of the original sheet)
+    float pointEditorOrigX {0.0f};
+    float pointEditorOrigY {0.0f};
+    float pointEditorOrigW {0.0f};
+    float pointEditorOrigH {0.0f};
     bool pointEditorShowGrid {true};
 
     // Sprite Tools Preview State

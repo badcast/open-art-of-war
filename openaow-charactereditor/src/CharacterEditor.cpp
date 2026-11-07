@@ -97,6 +97,9 @@ bool CharacterEditor::Init()
     previewZoom = 2.0f;
     cameraPanX = 0.0f;
     cameraPanY = 0.0f;
+    // The camera takes the canvas's whole zoom range (its own default, 0.5..4, clipped the zoom while the position was
+    // still computed with the unclipped one, and the picture went off)
+    camera->SetZoomLimits(kPreviewZoomMin, kPreviewZoomMax);
     camera->SetZoom(previewZoom);
     LoadCatalog();
     if (files.empty())
@@ -166,34 +169,7 @@ int CharacterEditor::run()
             {
                 testSiegeMode = !testSiegeMode;
             }
-            else if (event.type == SDL_EVENT_MOUSE_WHEEL && previewRect.w > 0 && previewRect.h > 0)
-            {
-                float mouseX = 0.0f;
-                float mouseY = 0.0f;
-                SDL_GetMouseState(&mouseX, &mouseY);
-                const bool overPreview = mouseX >= previewRect.x && mouseX < previewRect.x + previewRect.w
-                                         && mouseY >= previewRect.y && mouseY < previewRect.y + previewRect.h;
-                if (overPreview)
-                {
-                    const float wheelRaw
-                        = event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -event.wheel.y : event.wheel.y;
-                    const int wheelY = (wheelRaw > 0.0f) ? 1 : ((wheelRaw < 0.0f) ? -1 : 0);
-                    const float oldZoom = previewZoom;
-                    previewZoom = std::clamp(previewZoom * std::pow(1.12f, static_cast<float>(wheelY)), 0.5f, 4.0f);
-                    if (std::abs(previewZoom - oldZoom) > 0.0001f)
-                    {
-                        float mouseWorldX = 0.0f, mouseWorldY = 0.0f;
-                        camera->ScreenToWorld(
-                            static_cast<float>(mouseX), static_cast<float>(mouseY), mouseWorldX, mouseWorldY);
-                        const float centerScreenX
-                            = static_cast<float>(previewRect.x) + static_cast<float>(previewRect.w) * 0.5f;
-                        const float centerScreenY
-                            = static_cast<float>(previewRect.y) + static_cast<float>(previewRect.h) * 0.5f;
-                        cameraPanX = mouseWorldX - (static_cast<float>(mouseX) - centerScreenX) / previewZoom;
-                        cameraPanY = mouseWorldY - (static_cast<float>(mouseY) - centerScreenY) / previewZoom;
-                    }
-                }
-            }
+            // (the mouse wheel over the preview is handled by the canvas itself: EditorProperties.cpp)
         }
 
         ImGui_ImplSDLRenderer3_NewFrame();
@@ -211,6 +187,7 @@ int CharacterEditor::run()
         {
             const float centerScreenX = static_cast<float>(previewRect.x) + static_cast<float>(previewRect.w) * 0.5f;
             const float centerScreenY = static_cast<float>(previewRect.y) + static_cast<float>(previewRect.h) * 0.5f;
+            previewZoom = std::clamp(previewZoom, kPreviewZoomMin, kPreviewZoomMax);
             camera->SetZoom(previewZoom);
             camera->SetPosition(-centerScreenX / previewZoom + cameraPanX, -centerScreenY / previewZoom + cameraPanY);
         }

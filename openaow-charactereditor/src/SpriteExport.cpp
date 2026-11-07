@@ -75,9 +75,10 @@ public:
             return false;
         }
         const float scale = this->Scale(s.page);
-        const int x0 = static_cast<int>(s.x * scale), y0 = static_cast<int>(s.y * scale);
-        const int x1 = std::min(sheet->w, static_cast<int>((s.x + s.w) * scale));
-        const int y1 = std::min(sheet->h, static_cast<int>((s.y + s.h) * scale));
+        // (rounded as the game rounds it: the rectangle is fractional, in units of the original sheet)
+        const int x0 = static_cast<int>(std::lround(s.x * scale)), y0 = static_cast<int>(std::lround(s.y * scale));
+        const int x1 = std::min(sheet->w, static_cast<int>(std::lround((s.x + s.w) * scale)));
+        const int y1 = std::min(sheet->h, static_cast<int>(std::lround((s.y + s.h) * scale)));
         if (x1 <= x0 || y1 <= y0)
             return false;
         out = {x0, y0, x1 - x0, y1 - y0};

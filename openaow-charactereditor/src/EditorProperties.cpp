@@ -374,11 +374,21 @@ void CharacterEditor::DrawEditor()
         const bool canvasActive = ImGui::IsItemActive();
         const bool canvasHovered = ImGui::IsItemHovered();
 
-        // Zooming canvas with mouse wheel scroll
+        // Zooming canvas with mouse wheel, around the mouse: the point under it stays there. (The camera looks at
+        // cameraPan from the middle of the canvas: world = pan + (screen - middle) / zoom.) A fractional step - a
+        // touchpad - zooms by as much.
         if (canvasHovered && io.MouseWheel != 0.0f)
         {
-            const float factor = (io.MouseWheel > 0.0f) ? 1.15f : (1.0f / 1.15f);
-            previewZoom = std::clamp(previewZoom * factor, 0.25f, 8.0f);
+            const float zoom
+                = std::clamp(previewZoom * std::pow(1.15f, io.MouseWheel), kPreviewZoomMin, kPreviewZoomMax);
+            // (the same middle as the camera's, CharacterEditor::Run: from previewRect)
+            const float midX = static_cast<float>(previewRect.x) + static_cast<float>(previewRect.w) * 0.5f;
+            const float midY = static_cast<float>(previewRect.y) + static_cast<float>(previewRect.h) * 0.5f;
+            const float worldX = cameraPanX + (io.MousePos.x - midX) / previewZoom;
+            const float worldY = cameraPanY + (io.MousePos.y - midY) / previewZoom;
+            previewZoom = zoom;
+            cameraPanX = worldX - (io.MousePos.x - midX) / previewZoom;
+            cameraPanY = worldY - (io.MousePos.y - midY) / previewZoom;
         }
 
         // 1. Panning canvas with MMB (Middle Mouse Button) or Space + Drag

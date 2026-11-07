@@ -433,34 +433,48 @@ std::string DifficultyDesc(AIDifficulty d)
 // ---- Settings screen --------------------------------------------------------------------------------------------
 constexpr int kSettingsTabs = 4;
 
+// The dialog has the same size on every tab; a tab with more rows than fit scrolls (wheel, scroll bar, arrows)
 struct SettingsLayout
 {
+    static constexpr int kRowH = 56;
+    static constexpr int kGap = 6;
     UiRect dialog;
     UiRect tabs[kSettingsTabs];
-    static constexpr int kMaxRows = 10;
-    UiRect rows[kMaxRows];
-    int rowCount {6};
+    UiRect list;     // where the rows are
+    UiRect track;    // the scroll bar along its right edge
+    int visible {1}; // rows that fit
     UiRect defaultsBtn;
     UiRect backBtn;
+
+    // Row `i` of the tab with row `top` first in view; empty (w = 0) when it is scrolled out of view
+    UiRect Row(int i, int top) const
+    {
+        const int slot = i - top;
+        if (slot < 0 || slot >= visible)
+            return {};
+        return {list.x, list.y + slot * (kRowH + kGap), list.w, kRowH};
+    }
 };
 
-// `rows`: how many the shown tab has; the dialog grows and the rows get lower so they all fit
-SettingsLayout settingsLayout(int windowW, int windowH, int rows = 6)
+SettingsLayout settingsLayout(int windowW, int windowH)
 {
     SettingsLayout l;
-    l.rowCount = std::clamp(rows, 1, SettingsLayout::kMaxRows);
-    l.dialog = ui::CenteredRect(windowW, windowH, 780, l.rowCount > 6 ? 700 : 560);
+    l.dialog = ui::CenteredRect(windowW, windowH, 780, std::min(640, std::max(420, windowH - 40)));
     const int tabW = (l.dialog.w - 40 - (kSettingsTabs - 1) * 6) / kSettingsTabs;
     for (int i = 0; i < kSettingsTabs; ++i)
         l.tabs[i] = {l.dialog.x + 20 + i * (tabW + 6), l.dialog.y + 60, tabW, 36};
     l.backBtn = {l.dialog.Right() - 20 - 160, l.dialog.Bottom() - 20 - 40, 160, 40};
     l.defaultsBtn = {l.backBtn.x - 12 - 200, l.backBtn.y, 200, 40};
     const int top = l.dialog.y + 60 + 36 + 14;
-    const int gap = 6;
     const int space = l.backBtn.y - 12 - top;
-    const int rowH = std::clamp((space - gap * (l.rowCount - 1)) / l.rowCount, 40, 56);
-    for (int i = 0; i < l.rowCount; ++i)
-        l.rows[i] = {l.dialog.x + 20, top + i * (rowH + gap), l.dialog.w - 40, rowH};
+    l.visible = std::max(1, (space + SettingsLayout::kGap) / (SettingsLayout::kRowH + SettingsLayout::kGap));
+    // (the rows leave room for the scroll bar on the right)
+    l.list
+        = {l.dialog.x + 20,
+           top,
+           l.dialog.w - 40 - 14,
+           l.visible * (SettingsLayout::kRowH + SettingsLayout::kGap) - SettingsLayout::kGap};
+    l.track = {l.list.Right() + 8, l.list.y, 4, l.list.h};
     return l;
 }
 
@@ -1098,6 +1112,7 @@ bool MenuController::UpdateInGameMenu(const FrameContext &ctx, int mx, int my, b
                 m_inGameSettingsOpen = true;
                 SoundRequests::Play("ui_show_dialog");
                 m_settingsSelected = 0;
+                m_settingsTop = 0;
                 break;
             case 3: // Sound & Music
                 sound.ToggleMute();
@@ -1824,15 +1839,30 @@ void MenuController::UpdateSettingsScreen(
     {
         m_settingsTab = (m_settingsTab + 1) % kSettingsTabs;
         m_settingsSelected = 0;
+        m_settingsTop = 0;
     }
     std::vector<SettingsRow> current = rows();
     const int count = static_cast<int>(current.size());
-    SettingsLayout l = settingsLayout(windowW, windowH, count);
+    const SettingsLayout l = settingsLayout(windowW, windowH);
+    const int maxTop = std::max(0, count - l.visible);
     m_settingsSelected = std::clamp(m_settingsSelected, 0, std::max(0, count - 1));
+    bool moved = false;
     if (input.IsKeyJustPressed(SDL_SCANCODE_UP) && count > 0)
+    {
         m_settingsSelected = (m_settingsSelected - 1 + count) % count;
+        moved = true;
+    }
     if (input.IsKeyJustPressed(SDL_SCANCODE_DOWN) && count > 0)
+    {
         m_settingsSelected = (m_settingsSelected + 1) % count;
+        moved = true;
+    }
+    // The row picked with the arrows scrolls into view
+    if (moved && m_settingsSelected < m_settingsTop)
+        m_settingsTop = m_settingsSelected;
+    if (moved && m_settingsSelected >= m_settingsTop + l.visible)
+        m_settingsTop = m_settingsSelected - l.visible + 1;
+    m_settingsTop = std::clamp(m_settingsTop, 0, maxTop);
 
     auto stepRow = [&](int row, int dir) {
         if (row >= 0 && row < count && current[row].enabled && current[row].step)
@@ -1844,7 +1874,8 @@ void MenuController::UpdateSettingsScreen(
         m_combo.open = -1; // one of the custom game dialog's
     if (m_combo.open >= 0)
     {
-        if (m_combo.open >= count || current[m_combo.open].options.empty() || !current[m_combo.open].enabled)
+        if (m_combo.open >= count || current[m_combo.open].options.empty() || !current[m_combo.open].enabled
+            || l.Row(m_combo.open, m_settingsTop).w == 0)
         {
             m_combo.open = -1;
         }
@@ -1854,7 +1885,7 @@ void MenuController::UpdateSettingsScreen(
             const int openRow = m_combo.open;
             if (ui::ComboUpdate(
                     m_combo,
-                    SettingsControlRect(l.rows[openRow]),
+                    SettingsControlRect(l.Row(openRow, m_settingsTop)),
                     static_cast<int>(current[openRow].options.size()),
                     windowH,
                     mx,
@@ -1875,6 +1906,23 @@ void MenuController::UpdateSettingsScreen(
             }
         }
     }
+    // No list open: the wheel scrolls the rows; the scroll bar can be dragged
+    if (m_combo.open < 0 && wheel != 0 && maxTop > 0)
+        m_settingsTop = std::clamp(m_settingsTop - wheel, 0, maxTop);
+    if (maxTop > 0)
+    {
+        int px = 0, py = 0;
+        if (input.ConsumeLeftPress(px, py) && input.IsLeftMouseDown() && OnScrollBar(l.track, px, py))
+            m_scrollDrag = 4;
+        if (m_scrollDrag == 4)
+        {
+            if (input.IsLeftMouseDown())
+                m_settingsTop = ScrollTopFromMouse(l.track, my, count, l.visible);
+            else
+                m_scrollDrag = 0;
+            return;
+        }
+    }
     if (input.IsKeyJustPressed(SDL_SCANCODE_LEFT))
         stepRow(m_settingsSelected, -1);
     if (input.IsKeyJustPressed(SDL_SCANCODE_RIGHT) || input.IsConfirmJustPressed())
@@ -1889,6 +1937,7 @@ void MenuController::UpdateSettingsScreen(
                 m_combo.open = -1;
                 m_settingsTab = i;
                 m_settingsSelected = 0;
+                m_settingsTop = 0;
                 return;
             }
         }
@@ -1903,15 +1952,16 @@ void MenuController::UpdateSettingsScreen(
             m_onSettingsChanged(SettingsTabArea(m_settingsTab));
             return;
         }
-        for (int i = 0; i < count && i < l.rowCount; ++i)
+        for (int i = 0; i < count; ++i)
         {
-            if (!l.rows[i].Contains(mx, my))
+            const UiRect row = l.Row(i, m_settingsTop);
+            if (!row.Contains(mx, my))
                 continue;
             m_settingsSelected = i;
-            const UiRect c = SettingsControlRect(l.rows[i]);
+            const UiRect c = SettingsControlRect(row);
             if (current[i].slider)
             {
-                const UiRect track = SliderTrackRect(l.rows[i]);
+                const UiRect track = SliderTrackRect(row);
                 if (mx >= track.x - 6 && mx <= track.Right() + 6)
                 {
                     m_sliderDrag = i;
@@ -1938,9 +1988,10 @@ void MenuController::UpdateSettingsScreen(
             break;
         }
     }
-    if (m_sliderDrag >= 0 && input.IsLeftMouseDown() && m_sliderDrag < count && current[m_sliderDrag].slider)
+    if (m_sliderDrag >= 0 && input.IsLeftMouseDown() && m_sliderDrag < count && current[m_sliderDrag].slider
+        && l.Row(m_sliderDrag, m_settingsTop).w > 0)
     {
-        const UiRect track = SliderTrackRect(l.rows[m_sliderDrag]);
+        const UiRect track = SliderTrackRect(l.Row(m_sliderDrag, m_settingsTop));
         current[m_sliderDrag].setRatio(static_cast<float>(mx - track.x) / track.w);
     }
     else if (!input.IsLeftMouseDown())
@@ -2310,7 +2361,9 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
     Settings scratch = *m_settings; // only read: the rows' value texts, the callbacks are not called here
     std::vector<SettingsRow> rows
         = BuildSettingsRows(m_settingsTab, scratch, m_resolutions(), kNoNotify, m_renderApi, m_inGameSettingsOpen);
-    SettingsLayout l = settingsLayout(windowW, windowH, static_cast<int>(rows.size()));
+    const SettingsLayout l = settingsLayout(windowW, windowH);
+    const int count = static_cast<int>(rows.size());
+    const int top = std::clamp(m_settingsTop, 0, std::max(0, count - l.visible));
     ui::DrawDialog(renderer, fontRenderer, windowW, windowH, l.dialog, _("SETTINGS"));
 
     static const char *const kTabNames[kSettingsTabs] = {"VIDEO", "GRAPHICS", "AUDIO", "GAME"};
@@ -2325,10 +2378,10 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
             l.tabs[i].Contains(m_mouseX, m_mouseY));
     }
 
-    for (int i = 0; i < static_cast<int>(rows.size()) && i < l.rowCount; ++i)
+    for (int i = top; i < count && i < top + l.visible; ++i)
     {
         const SettingsRow &row = rows[i];
-        const UiRect &r = l.rows[i];
+        const UiRect r = l.Row(i, top);
         const bool hot = r.Contains(m_mouseX, m_mouseY) || i == m_settingsSelected;
         ui::DrawPanel(renderer, r, hot ? col::Hover : col::PanelRaised, hot ? col::BorderStrong : col::Border);
         if (hot)
@@ -2432,14 +2485,25 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
         _("BACK"),
         ui::ButtonStyle::Secondary,
         l.backBtn.Contains(m_mouseX, m_mouseY));
+    // A tab longer than the dialog: its scroll bar
+    if (count > l.visible)
+    {
+        ui::DrawScrollBar(
+            renderer,
+            l.track,
+            static_cast<float>(top),
+            static_cast<float>(count),
+            static_cast<float>(l.visible),
+            OnScrollBar(l.track, m_mouseX, m_mouseY) || m_scrollDrag == 4);
+    }
     // The open list over everything
-    if (m_combo.open >= 0 && m_combo.open < static_cast<int>(rows.size()) && m_combo.open < l.rowCount
+    if (m_combo.open >= 0 && m_combo.open < count && l.Row(m_combo.open, top).w > 0
         && !rows[m_combo.open].options.empty())
     {
         ui::DrawComboList(
             renderer,
             fontRenderer,
-            SettingsControlRect(l.rows[m_combo.open]),
+            SettingsControlRect(l.Row(m_combo.open, top)),
             rows[m_combo.open].options,
             rows[m_combo.open].current,
             m_combo,

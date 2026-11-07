@@ -116,6 +116,7 @@ set(ENGINE_SOURCES
     src/core/JsonFile.cpp
     src/graphics/Camera.cpp
     src/graphics/TextureManager.cpp
+    src/graphics/SpriteRegistry.cpp
     src/graphics/Renderer.cpp
     src/graphics/RenderUtility.cpp
     src/graphics/RenderBackend.cpp
@@ -389,3 +390,11 @@ add_subdirectory(openaow-charactereditor charactereditor_build)
 
 # Map editor
 add_subdirectory(openaow-mapeditor mapeditor_build)
+
+# Engine unit tests (no window, no assets)
+add_executable(openaow-sprite-tests tests/SpriteRegistryTests.cpp)
+target_link_libraries(openaow-sprite-tests PRIVATE openaow-core)
+set_target_properties(openaow-sprite-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    BUILD_RPATH "${OAOW_RPATH}")
+add_test(NAME openaow-sprite-tests COMMAND openaow-sprite-tests)

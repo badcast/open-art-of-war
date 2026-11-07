@@ -271,10 +271,10 @@ bool TextureManager::LoadAllAssets()
             SpriteFrame f;
             f.id = item["id"].get<int>();
             f.page = item["page"].get<int>();
-            f.x = item["x"].get<int>();
-            f.y = item["y"].get<int>();
-            f.width = item["width"].get<int>();
-            f.height = item["height"].get<int>();
+            f.x = item["x"].get<float>();
+            f.y = item["y"].get<float>();
+            f.width = item["width"].get<float>();
+            f.height = item["height"].get<float>();
             f.palette = item["palette"].get<int>();
             m_spriteFrames.push_back(f);
         }
@@ -572,7 +572,7 @@ const SpriteFrame *TextureManager::GetSpriteFrame(int spriteId) const
     return nullptr;
 }
 
-bool TextureManager::UpdateSpriteFrame(int spriteId, int page, int x, int y, int width, int height, int palette)
+bool TextureManager::UpdateSpriteFrame(int spriteId, int page, float x, float y, float width, float height, int palette)
 {
     if (spriteId >= 0 && spriteId < static_cast<int>(m_spriteFrames.size()))
     {

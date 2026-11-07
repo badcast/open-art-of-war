@@ -32,7 +32,7 @@ fs::path FindAssetRoot()
 
     for (const auto &candidate : candidates)
     {
-        if (fs::exists(candidate / "characters" / "sprites.json")
+        if (fs::exists(candidate / "data" / "sprites.json")
             && fs::exists(candidate / "data" / "sprites_graphics.json"))
         {
             return fs::weakly_canonical(candidate);

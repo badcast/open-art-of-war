@@ -25,15 +25,17 @@ constexpr int kSpriteGroupCount = 4;
 const char *SpriteGroupName(SpriteGroup group); // gettext msgid, e.g. "Units"
 const char *SpriteGroupSlug(SpriteGroup group); // file name part, e.g. "units"
 
-// One rectangle of a sprite sheet (assets/characters/sprites.json)
+// One rectangle of a sprite sheet (assets/data/sprites.json), in the units of the original sheet. The sheets are drawn
+// scaled (TextureManager::GetSheetScale: an HD sheet has several pixels per unit), so the rectangle is fractional: it
+// can sit on any pixel of the sheet as it is now
 struct RawSprite
 {
     int id {0};
     int page {0};
-    int x {0};
-    int y {0};
-    int w {0};
-    int h {0};
+    float x {0.0f};
+    float y {0.0f};
+    float w {0.0f};
+    float h {0.0f};
     int palette {0};
 };
 
@@ -88,7 +90,7 @@ public:
     {
         return rawSprites;
     }
-    bool SetSpriteRect(int spriteId, int x, int y, int w, int h, int page = -1, int palette = -1);
+    bool SetSpriteRect(int spriteId, float x, float y, float w, float h, int page = -1, int palette = -1);
     bool SaveSpritesJson(const fs::path &assetsRoot, std::string &error) const;
     bool ReloadSpritesJson(const fs::path &assetsRoot, std::string &error);
     const std::vector<SpriteObject> &Objects() const

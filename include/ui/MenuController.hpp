@@ -68,6 +68,7 @@ public:
     {
         m_settingsTab = tab;
         m_settingsSelected = 0;
+        m_settingsTop = 0;
     }
 
     // Menu States
@@ -264,8 +265,8 @@ private:
     int m_mapSort {0};          // 0 name, 1 players, 2 size
     void RebuildMapList();
     int m_skirmishSelected {0};
-    bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
-    bool m_skirmishFogOfWar {true}; // custom game: fog of war enabled
+    bool m_skirmishPrebuilt {true};    // custom game: prebuilt bases (else from scratch: HQ + power plant only)
+    bool m_skirmishFogOfWar {true};    // custom game: fog of war enabled
     bool m_skirmishAllowSpeed {false}; // custom game: allow game speed control (off by default)
     int m_skirmishCredits {kDefaultCreditsIndex}; // custom game: index into kStartingCredits
     bool m_skirmishNight {false};                 // custom game: played at night
@@ -316,12 +317,14 @@ private:
     ui::ComboState m_combo;            // the open drop-down list of the settings / the custom game dialog
     bool m_inGameSettingsOpen {false}; // the settings screen opened from the pause menu
     int m_settingsTab {0};
+    int m_settingsTop {0}; // first row of the settings tab in view (a long tab scrolls)
     int m_sliderDrag {-1}; // settings row whose slider the mouse is dragging
     Settings *m_settings {nullptr};
     std::function<void(SettingsArea)> m_onSettingsChanged;
     std::function<const std::vector<Resolution> &()> m_resolutions;
     RenderApiBinding m_renderApi;
-    int m_scrollDrag {0}; // scroll bar or seek bar held by the mouse: 0 none, 1 map list, 2 About, 3 track position
+    int m_scrollDrag {0}; // scroll bar or seek bar held by the mouse: 0 none, 1 map list, 2 About, 3 track position,
+                          // 4 settings rows
     ui::UiRect m_infoTrack {}; // About scroll bar of the last frame (empty when the text fits)
     int m_infoTotal {0}, m_infoVisible {0};
     int m_infoScroll {0}; // first visible line of the About dialog

@@ -15,10 +15,12 @@ struct SpriteFrame
 {
     int id {0};
     int page {0};
-    int x {0};
-    int y {0};
-    int width {0};
-    int height {0};
+    // In the units of the original sheet (GetSheetScale pixels each on an HD sheet): fractional, so a rectangle can
+    // sit on any pixel of the sheet as it is
+    float x {0.0f};
+    float y {0.0f};
+    float width {0.0f};
+    float height {0.0f};
     int palette {0};
 };
 
@@ -105,7 +107,7 @@ public:
     SDL_Texture *GetTileset(int index) const;
     SDL_Texture *GetUiTexture(const std::string &name) const;
     const SpriteFrame *GetSpriteFrame(int spriteId) const;
-    bool UpdateSpriteFrame(int spriteId, int page, int x, int y, int width, int height, int palette = -1);
+    bool UpdateSpriteFrame(int spriteId, int page, float x, float y, float width, float height, int palette = -1);
 
     // Average color of a map tile's picture (for minimap-like previews); computed from the sprite sheet
     // pixels on first use and cached

@@ -71,7 +71,7 @@ def manifest_paths(node, key=""):
 
 
 def check_manifest(assets_dir, keys):
-    """main.yaml must name only files that exist; files it does not name are reported"""
+    """The manifest must name only files included in the archive inventory."""
     manifest_yaml = os.path.join(assets_dir, "main.yaml")
     manifest_json = os.path.join(assets_dir, "main.json")
     if os.path.isfile(manifest_yaml):
@@ -88,7 +88,9 @@ def check_manifest(assets_dir, keys):
         raise SystemExit(f"pack_assets: neither main.yaml nor main.json found in {assets_dir}")
 
     named = set(manifest_paths(data))
-    missing = sorted(p for p in named if not os.path.isfile(os.path.join(assets_dir, p)))
+    # Check the actual archive inventory: an existing file may have been skipped
+    # (for example a hidden file or the generated certificate).
+    missing = sorted(named - set(keys))
     if missing:
         raise SystemExit(f"pack_assets: {manifest_name} names missing files:\n  " + "\n  ".join(missing))
     return len(named)

@@ -4,6 +4,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cmath>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -43,6 +45,21 @@ nlohmann::json ReadJson(const fs::path &path)
 int IntOf(const nlohmann::json &j, const char *key, int fallback = 0)
 {
     return j.contains(key) && j[key].is_number() ? j[key].get<int>() : fallback;
+}
+
+// A rectangle coordinate: whole or fractional
+float CoordOf(const nlohmann::json &j, const char *key)
+{
+    return j.contains(key) && j[key].is_number() ? j[key].get<float>() : 0.0f;
+}
+
+// Written back whole when it is whole (the file stays as it was), else to 1/1000 of a unit
+nlohmann::ordered_json CoordJson(float v)
+{
+    const double r = std::round(static_cast<double>(v) * 1000.0) / 1000.0;
+    if (r == std::floor(r))
+        return static_cast<long long>(r);
+    return r;
 }
 
 } // namespace
@@ -220,7 +237,7 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
     spriteGroup.clear();
     try
     {
-        const nlohmann::json sp = ReadJson(assetsRoot / "characters" / "sprites.json");
+        const nlohmann::json sp = ReadJson(assetsRoot / "data" / "sprites.json");
         gd = ReadJson(assetsRoot / "data" / "sprites_graphics.json");
         rawSprites.reserve(sp.size());
         for (const auto &s : sp)
@@ -228,10 +245,10 @@ bool SpriteCatalog::load(const fs::path &assetsRoot, std::string &error)
             RawSprite r;
             r.id = IntOf(s, "id", static_cast<int>(rawSprites.size()));
             r.page = IntOf(s, "page");
-            r.x = IntOf(s, "x");
-            r.y = IntOf(s, "y");
-            r.w = IntOf(s, "width");
-            r.h = IntOf(s, "height");
+            r.x = CoordOf(s, "x");
+            r.y = CoordOf(s, "y");
+            r.w = CoordOf(s, "width");
+            r.h = CoordOf(s, "height");
             r.palette = IntOf(s, "palette");
             rawSprites.push_back(r);
         }
@@ -761,7 +778,7 @@ nlohmann::json SpriteCatalog::Describe(const SpriteObject &o) const
     return out;
 }
 
-bool SpriteCatalog::SetSpriteRect(int spriteId, int x, int y, int w, int h, int page, int palette)
+bool SpriteCatalog::SetSpriteRect(int spriteId, float x, float y, float w, float h, int page, int palette)
 {
     if (spriteId < 0 || spriteId >= static_cast<int>(rawSprites.size()))
         return false;
@@ -779,7 +796,7 @@ bool SpriteCatalog::SetSpriteRect(int spriteId, int x, int y, int w, int h, int 
 
 bool SpriteCatalog::SaveSpritesJson(const fs::path &assetsRoot, std::string &error) const
 {
-    const fs::path outPath = assetsRoot / "characters" / "sprites.json";
+    const fs::path outPath = assetsRoot / "data" / "sprites.json";
     try
     {
         nlohmann::ordered_json root = nlohmann::ordered_json::array();
@@ -788,10 +805,10 @@ bool SpriteCatalog::SaveSpritesJson(const fs::path &assetsRoot, std::string &err
             nlohmann::ordered_json item;
             item["id"] = s.id;
             item["page"] = s.page;
-            item["x"] = s.x;
-            item["y"] = s.y;
-            item["width"] = s.w;
-            item["height"] = s.h;
+            item["x"] = CoordJson(s.x);
+            item["y"] = CoordJson(s.y);
+            item["width"] = CoordJson(s.w);
+            item["height"] = CoordJson(s.h);
             item["palette"] = s.palette;
             root.push_back(std::move(item));
         }
@@ -815,7 +832,7 @@ bool SpriteCatalog::ReloadSpritesJson(const fs::path &assetsRoot, std::string &e
 {
     try
     {
-        const nlohmann::json sp = ReadJson(assetsRoot / "characters" / "sprites.json");
+        const nlohmann::json sp = ReadJson(assetsRoot / "data" / "sprites.json");
         if (!sp.is_array())
         {
             error = "sprites.json is not an array";
@@ -828,10 +845,10 @@ bool SpriteCatalog::ReloadSpritesJson(const fs::path &assetsRoot, std::string &e
             RawSprite r;
             r.id = IntOf(s, "id", static_cast<int>(rawSprites.size()));
             r.page = IntOf(s, "page");
-            r.x = IntOf(s, "x");
-            r.y = IntOf(s, "y");
-            r.w = IntOf(s, "width");
-            r.h = IntOf(s, "height");
+            r.x = CoordOf(s, "x");
+            r.y = CoordOf(s, "y");
+            r.w = CoordOf(s, "width");
+            r.h = CoordOf(s, "height");
             r.palette = IntOf(s, "palette");
             rawSprites.push_back(r);
         }

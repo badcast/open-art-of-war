@@ -130,6 +130,9 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 
 ## 6. Game data guarantee
 
+Run `python3 tools/test_pack_assets.py` to check that manifest references must be present in the archive inventory,
+including rejection of existing but excluded files and paths outside the assets directory.
+
 - `assets/main.yaml` names every file the game loads by its full path; the game does not start without it.
   `tools/pack_assets.py` refuses to pack when main.yaml names a file that does not exist.
 - `tools/pack_assets.py <assets> <out.blob>` packs the data and writes the integrity certificate into the blob

@@ -120,9 +120,41 @@ std::string replayFileName(const std::string &mapName, std::int64_t when)
 
 bool writeReplay(const std::string &path, const ReplayData &data, std::string &error)
 {
+    // Apply the reader's limits before touching the destination. Otherwise a
+    // successful recording can produce a replay we cannot open ourselves.
+    std::size_t total = 0;
+    auto account = [&](std::size_t size)
+    {
+        if (size > kMaxReplayEntryBytes || size > kMaxReplayTotalBytes - total)
+            return false;
+        total += size;
+        return true;
+    };
+    if (data.files.size() > kMaxReplayEntries - 4 || data.turns.size() > kMaxReplayTurns
+        || data.checksums.size() > kMaxReplayEntryBytes / 12)
+    {
+        error = "replay has too many entries, turns or checksums";
+        return false;
+    }
+    std::size_t turnsSize = 0;
+    for (const auto &turn : data.turns)
+    {
+        if (kMaxReplayEntryBytes - turnsSize < 4 || turn.size() > kMaxReplayEntryBytes - turnsSize - 4)
+        {
+            error = "turn list too big";
+            return false;
+        }
+        turnsSize += 4 + turn.size();
+    }
+    if (!account(data.meta.size()) || !account(data.setup.size()) || !account(turnsSize)
+        || !account(data.checksums.size() * 12))
+    {
+        error = "replay too big";
+        return false;
+    }
     for (const auto &[name, bytes] : data.files)
     {
-        if (!validReplayFileName(name) || bytes.size() > kMaxReplayEntryBytes)
+        if (!validReplayFileName(name) || !account(bytes.size()))
         {
             error = "bad extra file " + name;
             return false;

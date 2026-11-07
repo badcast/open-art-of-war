@@ -333,7 +333,7 @@ void CharacterEditor::DrawPreviewControls()
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0f);
-    Hinted(ImGui::SliderFloat(_("Zoom"), &previewZoom, 0.5f, 4.0f, "%.2fx"), "Zoom");
+    Hinted(ImGui::SliderFloat(_("Zoom"), &previewZoom, kPreviewZoomMin, kPreviewZoomMax, "%.2fx", ImGuiSliderFlags_Logarithmic), "Zoom");
     ImGui::SameLine();
     if (Hinted(ImGui::Button(_("Reset Aim")), "Reset Aim"))
     {
