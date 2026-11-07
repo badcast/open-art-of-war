@@ -29,6 +29,7 @@ struct MatchSetup
     bool prebuilt {true};   // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
                             // (HQ + power only)
     bool night {false};     // time of day: night (only drawn and heard, not part of the simulation)
+    bool allowSpeed {false}; // custom game: allow game speed control (x0.5..x32), off by default
 };
 
 } // namespace OpenArtOfWar

@@ -606,12 +606,41 @@ void Application::Run()
                 }
                 else
                 {
-                    while (accumulator >= SIMULATION_TIMESTEP)
+                    const bool allowSpeed = IsSpeedControlAllowed();
+                    if (!allowSpeed)
+                        m_gameSpeed = 1;
+                    if (allowSpeed && m_input && !m_textInput)
+                    {
+                        if (m_input->IsKeyJustPressed(SDL_SCANCODE_MINUS)
+                            || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_MINUS))
+                            StepGameSpeed(-1);
+                        if (m_input->IsKeyJustPressed(SDL_SCANCODE_EQUALS)
+                            || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_PLUS))
+                            StepGameSpeed(1);
+                    }
+                    const double speedMul = allowSpeed ? static_cast<double>(GameSpeedMultiplier()) : 1.0;
+                    // frameTime was already added once above; add the remaining (speedMul - 1.0) * frameTime
+                    accumulator = std::min(accumulator + frameTime * (speedMul - 1.0), SIMULATION_TIMESTEP * 240.0);
+                    const auto stepDeadline = clock::now() + std::chrono::milliseconds(28);
+                    int ran = 0;
+                    while (accumulator >= SIMULATION_TIMESTEP && ran < 400)
                     {
                         Update(static_cast<float>(SIMULATION_TIMESTEP));
                         accumulator -= SIMULATION_TIMESTEP;
+                        ++ran;
                         if (!playing())
                             break;
+                        if (ran > 1 && clock::now() >= stepDeadline)
+                        {
+                            accumulator = 0.0;
+                            break;
+                        }
+                    }
+                    if (ran == 0 && playing())
+                    {
+                        m_gameplayController->SetSimulationHold(true);
+                        Update(static_cast<float>(frameTime));
+                        m_gameplayController->SetSimulationHold(false);
                     }
                 }
             }
@@ -634,6 +663,37 @@ void Application::Run()
             if (spent < target)
                 SDL_DelayNS(static_cast<Uint64>((target - spent) * 1e9));
         }
+    }
+}
+
+bool Application::IsSpeedControlAllowed() const
+{
+    if (m_replay)
+        return true;
+    if (InNetworkMatch())
+        return false;
+    if (m_mission && m_mission->IsMatch() && m_mission->matchSetup().localOnly)
+        return m_mission->matchSetup().allowSpeed;
+    return false;
+}
+
+void Application::StepGameSpeed(int delta)
+{
+    if (!IsSpeedControlAllowed())
+        return;
+    if (delta == 0)
+        m_gameSpeed = 1;
+    else
+        m_gameSpeed = std::clamp(m_gameSpeed + delta, 0, kGameSpeedCount - 1);
+    if (m_hudController)
+    {
+        char buf[32];
+        const float mul = GameSpeedMultiplier();
+        if (mul < 1.0f)
+            std::snprintf(buf, sizeof(buf), "%s: x%.1f", _("SPEED"), mul);
+        else
+            std::snprintf(buf, sizeof(buf), "%s: x%d", _("SPEED"), static_cast<int>(mul));
+        m_hudController->SetNotification(buf, 1.5f);
     }
 }
 
@@ -696,6 +756,26 @@ void Application::HandleEvents()
 #endif
     // Refresh mouse position every frame so menus get hover feedback too
     m_input->Update(0.0f, *m_camera);
+}
+
+FrameContext Application::MakeFrameContext(float deltaTime)
+{
+    return FrameContext {
+        deltaTime,
+        m_windowW,
+        m_windowH,
+        *m_input,
+        *m_camera,
+        *m_map,
+        *m_pathfinder,
+        *m_entities,
+        *m_economy,
+        *m_aiController,
+        *m_mission,
+        *m_hudController,
+        *m_menuController,
+        *m_sound,
+        m_state};
 }
 
 void Application::Update(float deltaTime)
@@ -772,25 +852,28 @@ void Application::Update(float deltaTime)
     }
 
     UpdateLocalReplay();
+    if (m_state == AppState::MainMenu)
+    {
+        m_gameSpeed = 1;
+        m_speedSerial = -1;
+    }
+    else if (m_mission && m_mission->GetLoadSerial() != m_speedSerial)
+    {
+        m_speedSerial = m_mission->GetLoadSerial();
+        m_gameSpeed = 1;
+    }
+    if (m_hudController)
+    {
+        const bool singlePlayerSpeed = !InNetworkMatch() && !m_replay && !m_spectating && IsSpeedControlAllowed()
+            && (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying);
+        m_hudController->SetSpeedControl(singlePlayerSpeed, GameSpeedMultiplier(), [this](int delta) {
+            StepGameSpeed(delta);
+        });
+    }
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
         const std::uint32_t tickBefore = m_gameplayController->simulation().Tick();
-        m_gameplayController->Update(
-            deltaTime,
-            *m_input,
-            *m_camera,
-            *m_map,
-            *m_pathfinder,
-            *m_entities,
-            *m_economy,
-            *m_aiController,
-            *m_mission,
-            *m_hudController,
-            *m_menuController,
-            *m_sound,
-            m_state,
-            m_windowW,
-            m_windowH);
+        m_gameplayController->Update(MakeFrameContext(deltaTime));
         if (m_gameplayController->simulation().Tick() != tickBefore)
             LocalTickRan(tickBefore);
     }
@@ -819,20 +902,7 @@ void Application::Update(float deltaTime)
     {
         if (m_replay)
             CloseReplay();
-        m_menuController->UpdateMainMenu(
-            *m_input,
-            m_windowW,
-            m_windowH,
-            m_state,
-            m_running,
-            *m_sound,
-            *m_mission,
-            *m_map,
-            *m_entities,
-            *m_economy,
-            *m_pathfinder,
-            *m_camera,
-            *m_aiController);
+        m_menuController->UpdateMainMenu(MakeFrameContext(deltaTime), m_running);
     }
     else if (m_state == AppState::MenuSettings)
     {
@@ -870,7 +940,9 @@ void Application::Update(float deltaTime)
                 m_mission->GetEnemyHqY(),
                 m_mission->GetPlayerHqX(),
                 m_mission->GetPlayerHqY());
-            m_state = AppState::CampaignPlaying;
+            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish()))
+                          ? AppState::SkirmishPlaying
+                          : AppState::CampaignPlaying;
             m_camera->SetZoom(m_settings.zoomDefault);
             m_camera->CenterOn(m_mission->GetPlayerHqX() * TILE_WIDTH, m_mission->GetPlayerHqY() * TILE_HEIGHT);
         }
@@ -879,7 +951,9 @@ void Application::Update(float deltaTime)
     {
         if (m_input->IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || m_input->IsConfirmJustPressed())
         {
-            m_state = AppState::CampaignPlaying;
+            m_state = (m_mission && (m_mission->IsMatch() || m_mission->IsSkirmish()))
+                          ? AppState::SkirmishPlaying
+                          : AppState::CampaignPlaying;
         }
     }
     else if (m_state == AppState::Victory || m_state == AppState::Defeat)

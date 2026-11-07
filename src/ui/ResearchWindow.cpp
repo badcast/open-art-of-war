@@ -282,16 +282,13 @@ UiRect researchHTrack(const UiRect &tree)
 }
 } // namespace
 
-bool HUDController::UpdateResearchWindow(
-    InputManager &input,
-    int mx,
-    int my,
-    bool leftClicked,
-    int windowW,
-    int windowH,
-    Economy &economy,
-    EntityManager &entities)
+bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my, bool leftClicked)
 {
+    InputManager &input = ctx.input;
+    const int windowW = ctx.windowW;
+    const int windowH = ctx.windowH;
+    Economy &economy = ctx.economy;
+    EntityManager &entities = ctx.entities;
     if (!m_researchOpen)
         return false;
     const WindowLayout l = windowLayout(windowW, windowH, 1.0f, m_observer ? kObserverBarHeight : 0);

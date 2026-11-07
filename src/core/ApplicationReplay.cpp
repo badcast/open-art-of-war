@@ -51,8 +51,8 @@ namespace
 
 namespace col = ui::color;
 
-constexpr float kSpeeds[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
-constexpr int kSpeedCount = 5;
+constexpr float kSpeeds[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f};
+constexpr int kSpeedCount = 7;
 constexpr int kBarHeight = 64; // a thin row for the sound check box on top, the controls under it
 constexpr int kTopRow = 26;
 
@@ -345,10 +345,15 @@ void Application::UpdateReplayInput(double frameTime)
         = m_input->IsKeyJustPressed(SDL_SCANCODE_SPACE)
           || (!replay && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)));
     bool restart = replay && m_input->IsKeyJustPressed(SDL_SCANCODE_HOME);
+    const bool allowSpeed = IsSpeedControlAllowed();
+    if (!allowSpeed)
+        m_replayUi.speed = 1;
     int speedStep = 0;
-    if (m_input->IsKeyJustPressed(SDL_SCANCODE_EQUALS) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_PLUS))
+    if (allowSpeed
+        && (m_input->IsKeyJustPressed(SDL_SCANCODE_EQUALS) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_PLUS)))
         speedStep = 1;
-    if (m_input->IsKeyJustPressed(SDL_SCANCODE_MINUS) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_MINUS))
+    if (allowSpeed
+        && (m_input->IsKeyJustPressed(SDL_SCANCODE_MINUS) || m_input->IsKeyJustPressed(SDL_SCANCODE_KP_MINUS)))
         speedStep = -1;
     // (Tab shows the scoreboard in a live match: there the view changes with V)
     bool nextView = m_input->IsKeyJustPressed(replay ? SDL_SCANCODE_TAB : SDL_SCANCODE_V);
@@ -398,9 +403,11 @@ void Application::UpdateReplayInput(double frameTime)
             }
             else if (bar.play.Contains(mx, my))
                 togglePause = true;
-            else if (bar.slower.Contains(mx, my))
+            else if (allowSpeed && bar.slower.Contains(mx, my))
                 speedStep = -1;
-            else if (bar.faster.Contains(mx, my))
+            else if (allowSpeed && bar.speed.Contains(mx, my))
+                m_replayUi.speed = 1;
+            else if (allowSpeed && bar.faster.Contains(mx, my))
                 speedStep = 1;
             else if (replay && bar.restart.Contains(mx, my))
                 restart = true;
@@ -633,7 +640,15 @@ void Application::RenderReplayBar()
         m_replayUi.finished ? _("AGAIN") : (m_replayUi.paused ? _("PLAY") : _("PAUSE")),
         ui::ButtonStyle::Primary,
         hot(l.play));
-    ui::DrawButton(*m_renderer, *m_fontRenderer, l.slower, "-", ui::ButtonStyle::Secondary, hot(l.slower));
+    const bool allowSpeed = IsSpeedControlAllowed();
+    ui::DrawButton(
+        *m_renderer,
+        *m_fontRenderer,
+        l.slower,
+        "-",
+        ui::ButtonStyle::Secondary,
+        hot(l.slower),
+        !allowSpeed || m_replayUi.speed <= 0);
     char speed[16];
     std::snprintf(speed, sizeof speed, "x%g", kSpeeds[m_replayUi.speed]);
     m_fontRenderer->DrawString(
@@ -641,10 +656,17 @@ void Application::RenderReplayBar()
         l.speed.CenterX(),
         l.speed.CenterY(),
         ui::FONT_BODY_BOLD,
-        col::Text,
+        allowSpeed ? col::Text : col::TextMuted,
         false,
         Anchor::HCENTER | Anchor::VCENTER);
-    ui::DrawButton(*m_renderer, *m_fontRenderer, l.faster, "+", ui::ButtonStyle::Secondary, hot(l.faster));
+    ui::DrawButton(
+        *m_renderer,
+        *m_fontRenderer,
+        l.faster,
+        "+",
+        ui::ButtonStyle::Secondary,
+        hot(l.faster),
+        !allowSpeed || m_replayUi.speed >= kSpeedCount - 1);
     if (replay)
         ui::DrawButton(*m_renderer, *m_fontRenderer, l.restart, "|<", ui::ButtonStyle::Secondary, hot(l.restart));
 

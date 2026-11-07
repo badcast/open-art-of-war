@@ -2691,3 +2691,6 @@ msgstr "Ambient volume"
 
 msgid "Volume of the surroundings in a match: the forest by day or by night"
 msgstr "Volume of the surroundings in a match: the forest by day or by night"
+
+msgid "ALLOW SPEED CONTROL"
+msgstr "ALLOW SPEED CONTROL"

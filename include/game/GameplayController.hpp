@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Config.hpp"
+#include "core/FrameContext.hpp"
 #include "game/Simulation.hpp"
 #include <array>
 #include <memory>
@@ -42,22 +43,7 @@ class GameplayController
 public:
     GameplayController() = default;
 
-    void Update(
-        float deltaTime,
-        InputManager &input,
-        Camera &camera,
-        TileMap &map,
-        Pathfinder &pathfinder,
-        EntityManager &entities,
-        Economy &economy,
-        AIController &aiController,
-        MissionController &mission,
-        HUDController &hud,
-        MenuController &menu,
-        SoundEngine &sound,
-        AppState &appState,
-        int windowW,
-        int windowH);
+    void Update(const FrameContext &ctx);
 
     void RenderSelectionBox(Renderer &renderer, const Camera &camera, const InputManager &input);
 

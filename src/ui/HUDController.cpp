@@ -128,6 +128,9 @@ struct SidebarLayout
     UiRect radar;
     UiRect menuBtn;
     UiRect objectivesBtn;
+    UiRect slowerBtn;
+    UiRect speedBtn;
+    UiRect fasterBtn;
     UiRect researchBtn; // opens the window of the technology tree
     UiRect tabs[HUDController::TabCount];
     UiRect strip;
@@ -154,7 +157,7 @@ struct SidebarLayout
     }
 };
 
-SidebarLayout sidebarLayout(int windowW, int windowH, int top)
+SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showSpeed = false)
 {
     SidebarLayout l;
     const int w = HUDController::kSidebarWidth;
@@ -165,8 +168,19 @@ SidebarLayout sidebarLayout(int windowW, int windowH, int top)
     l.panel = {x, 0, w, windowH};
     l.header = {x + pad, top + 8, innerW, 40};
     l.radar = {x + pad, top + 54, innerW, 150};
-    l.menuBtn = {x + pad, top + 212, (innerW - 8) / 2, 30};
-    l.objectivesBtn = {l.menuBtn.Right() + 8, top + 212, innerW - l.menuBtn.w - 8, 30};
+    if (showSpeed)
+    {
+        l.menuBtn = {x + pad, top + 212, 82, 30};
+        l.objectivesBtn = {l.menuBtn.Right() + 6, top + 212, 92, 30};
+        l.slowerBtn = {l.objectivesBtn.Right() + 6, top + 212, 24, 30};
+        l.speedBtn = {l.slowerBtn.Right() + 2, top + 212, 42, 30};
+        l.fasterBtn = {l.speedBtn.Right() + 2, top + 212, 24, 30};
+    }
+    else
+    {
+        l.menuBtn = {x + pad, top + 212, (innerW - 8) / 2, 30};
+        l.objectivesBtn = {l.menuBtn.Right() + 8, top + 212, innerW - l.menuBtn.w - 8, 30};
+    }
     l.researchBtn = {x + pad, top + 248, innerW, 30};
 
     const int tabGap = 5;
@@ -948,7 +962,7 @@ bool HUDController::HandleHudClick(
     if (!IsOverSidebar(mx, windowW))
         return false;
 
-    SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset);
+    SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset, !m_observer && m_speedEnabled);
 
     // Radar: wheel and the +/- buttons zoom, click or drag moves the camera
     if (l.radar.Contains(mx, my))
@@ -1064,6 +1078,24 @@ bool HUDController::HandleHudClick(
         outOpenObjectives = true;
         return true;
     }
+    if (!m_observer && m_speedEnabled && m_onSpeedStep)
+    {
+        if (l.slowerBtn.Contains(mx, my))
+        {
+            m_onSpeedStep(-1);
+            return true;
+        }
+        if (l.speedBtn.Contains(mx, my))
+        {
+            m_onSpeedStep(0);
+            return true;
+        }
+        if (l.fasterBtn.Contains(mx, my))
+        {
+            m_onSpeedStep(1);
+            return true;
+        }
+    }
     if (l.researchBtn.Contains(mx, my))
     {
         OpenResearchWindow();
@@ -1133,7 +1165,7 @@ void HUDController::RenderGameHud(
     int windowH,
     const std::vector<int> &selected)
 {
-    SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset);
+    SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset, !m_observer && m_speedEnabled);
 
     // Frame
     ui::FillVerticalGradient(renderer, l.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
@@ -1378,14 +1410,50 @@ void HUDController::RenderGameHud(
 
     // --- Menu / objectives -------------------------------------------------------------------
     ui::DrawButton(
-        renderer, fontRenderer, l.menuBtn, _("MENU"), ui::ButtonStyle::Secondary, l.menuBtn.Contains(mx, my));
+        renderer,
+        fontRenderer,
+        l.menuBtn,
+        ui::FitText(fontRenderer, _("MENU"), ui::FONT_SMALL, l.menuBtn.w - 8),
+        ui::ButtonStyle::Secondary,
+        l.menuBtn.Contains(mx, my));
     ui::DrawButton(
         renderer,
         fontRenderer,
         l.objectivesBtn,
-        _("OBJECTIVES"),
+        ui::FitText(fontRenderer, _("OBJECTIVES"), ui::FONT_SMALL, l.objectivesBtn.w - 8),
         ui::ButtonStyle::Secondary,
         l.objectivesBtn.Contains(mx, my));
+    if (!m_observer && m_speedEnabled)
+    {
+        char spdBuf[16];
+        if (m_speedMultiplier < 1.0f)
+            std::snprintf(spdBuf, sizeof(spdBuf), "x%.1f", m_speedMultiplier);
+        else
+            std::snprintf(spdBuf, sizeof(spdBuf), "x%d", static_cast<int>(m_speedMultiplier));
+        ui::DrawButton(
+            renderer,
+            fontRenderer,
+            l.slowerBtn,
+            "-",
+            ui::ButtonStyle::Secondary,
+            l.slowerBtn.Contains(mx, my),
+            m_speedMultiplier <= 0.5f);
+        ui::DrawButton(
+            renderer,
+            fontRenderer,
+            l.speedBtn,
+            spdBuf,
+            m_speedMultiplier != 1.0f ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
+            l.speedBtn.Contains(mx, my));
+        ui::DrawButton(
+            renderer,
+            fontRenderer,
+            l.fasterBtn,
+            "+",
+            ui::ButtonStyle::Secondary,
+            l.fasterBtn.Contains(mx, my),
+            m_speedMultiplier >= 32.0f);
+    }
 
     // A replay's observer has no buildings to command: only the radar, the header and the menu stay
     if (!m_observer)

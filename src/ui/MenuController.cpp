@@ -152,6 +152,7 @@ struct CampaignLayout
     UiRect editorBtn;     // opens the map editor with the selected map, left of Start
     UiRect baseCheckbox;  // custom game: start with a base (check box under the picture)
     UiRect fogCheckbox;   // custom game: fog of war checkbox
+    UiRect speedCheckbox; // custom game: allow speed control checkbox
     UiRect creditsBtn;    // custom game: starting credits (top right of the details)
     UiRect timeBtn;       // custom game: time of day (left of the credits)
     int itemH {40};
@@ -184,6 +185,7 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     const int optX = pv.Right() + 20;
     l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
     l.baseCheckbox = {optX, pv.y + 32, l.details.Right() - 20 - optX, 28};
+    l.speedCheckbox = {optX, pv.y + 64, l.details.Right() - 20 - optX, 28};
     l.difficultyBtn = {
         l.sideBtn[0].Right() + 12, footerY + 10, std::max(180, l.editorBtn.x - 12 - (l.sideBtn[0].Right() + 12)), 40};
     return l;
@@ -988,22 +990,19 @@ int DrawTextSection(
 // Update handlers
 // ---------------------------------------------------------------------------
 
-bool MenuController::UpdateInGameMenu(
-    InputManager &input,
-    int mx,
-    int my,
-    bool leftClicked,
-    int windowW,
-    int windowH,
-    SoundEngine &sound,
-    MissionController &mission,
-    TileMap &map,
-    EntityManager &entities,
-    Economy &economy,
-    Pathfinder &pathfinder,
-    Camera &camera,
-    AppState &state)
+bool MenuController::UpdateInGameMenu(const FrameContext &ctx, int mx, int my, bool leftClicked)
 {
+    InputManager &input = ctx.input;
+    const int windowW = ctx.windowW;
+    const int windowH = ctx.windowH;
+    SoundEngine &sound = ctx.sound;
+    MissionController &mission = ctx.mission;
+    TileMap &map = ctx.map;
+    EntityManager &entities = ctx.entities;
+    Economy &economy = ctx.economy;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    Camera &camera = ctx.camera;
+    AppState &state = ctx.state;
     if (!m_inGameMenuOpen)
         return false;
     m_mouseX = mx;
@@ -1207,28 +1206,21 @@ void MenuController::RebuildMapList()
     m_skirmishTop = 0;
 }
 
-bool MenuController::UpdateCampaignSelect(
-    InputManager &input,
-    int mx,
-    int my,
-    bool leftClicked,
-    int windowW,
-    int windowH,
-    MissionController &mission,
-    TileMap &map,
-    EntityManager &entities,
-    Economy &economy,
-    Pathfinder &pathfinder,
-    Camera &camera,
-    AppState &state,
-    AIController &ai)
+bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int my, bool leftClicked)
 {
-    (void) camera;
+    InputManager &input = ctx.input;
+    const int windowW = ctx.windowW;
+    const int windowH = ctx.windowH;
+    MissionController &mission = ctx.mission;
+    TileMap &map = ctx.map;
+    EntityManager &entities = ctx.entities;
+    Economy &economy = ctx.economy;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    AppState &state = ctx.state;
     if (!m_campaignSelectOpen)
         return false;
     m_mouseX = mx;
     m_mouseY = my;
-    (void) ai;
     if (m_settings)
         m_difficulty = static_cast<AIDifficulty>(m_settings->difficulty);
 
@@ -1301,6 +1293,7 @@ bool MenuController::UpdateCampaignSelect(
             match.localOnly = true;
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
+            match.allowSpeed = m_skirmishAllowSpeed;
             match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
             match.night = m_skirmishNight;
             // The person watches: he is no player, the computer players take the ids from 0 (a watcher's view belongs
@@ -1509,6 +1502,12 @@ bool MenuController::UpdateCampaignSelect(
             SoundRequests::Play("ui_confirm");
             return true;
         }
+        if (hasLayoutChoice && l.speedCheckbox.Contains(mx, my))
+        {
+            m_skirmishAllowSpeed = !m_skirmishAllowSpeed;
+            SoundRequests::Play("ui_confirm");
+            return true;
+        }
         if (hasLayoutChoice)
         {
             const UiRect &d = l.details;
@@ -1621,6 +1620,7 @@ void MenuController::ActivateMenuItem(
             RebuildMapList();
             SetCampaignSelectOpen(!m_skirmishAll.empty());
             m_customGame = true;
+            m_skirmishAllowSpeed = false;
             m_customSlots.clear();
             m_customBlocked = 0;
             m_customSpectator = false;
@@ -1655,21 +1655,19 @@ void MenuController::ActivateMenuItem(
     }
 }
 
-void MenuController::UpdateMainMenu(
-    InputManager &input,
-    int windowW,
-    int windowH,
-    AppState &state,
-    bool &running,
-    SoundEngine &sound,
-    MissionController &mission,
-    TileMap &map,
-    EntityManager &entities,
-    Economy &economy,
-    Pathfinder &pathfinder,
-    Camera &camera,
-    AIController &ai)
+void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
 {
+    InputManager &input = ctx.input;
+    const int windowW = ctx.windowW;
+    const int windowH = ctx.windowH;
+    AppState &state = ctx.state;
+    SoundEngine &sound = ctx.sound;
+    MissionController &mission = ctx.mission;
+    TileMap &map = ctx.map;
+    EntityManager &entities = ctx.entities;
+    Economy &economy = ctx.economy;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    Camera &camera = ctx.camera;
     int mx = input.GetMouseScreenX();
     int my = input.GetMouseScreenY();
     m_mouseX = mx;
@@ -1679,8 +1677,7 @@ void MenuController::UpdateMainMenu(
 
     if (m_campaignSelectOpen)
     {
-        UpdateCampaignSelect(
-            input, mx, my, clicked, windowW, windowH, mission, map, entities, economy, pathfinder, camera, state, ai);
+        UpdateCampaignSelect(ctx, mx, my, clicked);
         return;
     }
 
@@ -2911,7 +2908,7 @@ void MenuController::RenderCampaignMissionSelect(
             renderer,
             fontRenderer,
             l.fogCheckbox.x,
-            l.baseCheckbox.Bottom() + 14,
+            l.speedCheckbox.Bottom() + 10,
             l.fogCheckbox.w,
             _("MAP SIZE:"),
             size,
@@ -2931,6 +2928,13 @@ void MenuController::RenderCampaignMissionSelect(
             _("FOG OF WAR"),
             m_skirmishFogOfWar,
             l.fogCheckbox.Contains(m_mouseX, m_mouseY));
+        ui::DrawCheckbox(
+            renderer,
+            fontRenderer,
+            l.speedCheckbox,
+            _("ALLOW SPEED CONTROL"),
+            m_skirmishAllowSpeed,
+            l.speedCheckbox.Contains(m_mouseX, m_mouseY));
     }
     else if (!m_customGame && selected >= 0 && selected < count)
     {

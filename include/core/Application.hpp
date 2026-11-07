@@ -4,6 +4,7 @@
 
 #include "core/Config.hpp"
 #include "core/EnvironmentConfig.hpp"
+#include "core/FrameContext.hpp"
 #include "ui/MapPreview.hpp"
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
@@ -129,6 +130,8 @@ public:
 private:
     void HandleEvents();
     void Update(float deltaTime);
+    // The references one Update step of a screen needs (see FrameContext)
+    FrameContext MakeFrameContext(float deltaTime);
     void Render();
     inline void render()
     {
@@ -307,6 +310,22 @@ private:
     }
     // A custom game without a player of this computer: only the computer players fight, the whole map is shown
     bool m_spectating {false};
+    // Single-player game speed (index into kGameSpeeds, default 1 = x1.0)
+    static constexpr float kGameSpeeds[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f};
+    static constexpr int kGameSpeedCount = 7;
+    int m_gameSpeed {1};
+    int m_speedSerial {-1};
+    float GameSpeedMultiplier() const
+    {
+        const int idx = (m_gameSpeed < 0) ? 0 : (m_gameSpeed >= kGameSpeedCount ? kGameSpeedCount - 1 : m_gameSpeed);
+        return kGameSpeeds[idx];
+    }
+    bool IsSpeedControlAllowed() const;
+    void StepGameSpeed(int delta);
+    void ResetGameSpeed()
+    {
+        m_gameSpeed = 1;
+    }
     bool m_textInput {false};
     bool m_menuTextInput {false}; // the text input is on for the map search of the main menu
     void UpdateNetworkMenu();

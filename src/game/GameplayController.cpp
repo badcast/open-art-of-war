@@ -579,23 +579,23 @@ void GameplayController::SetDebugMode(bool enabled)
     }
 }
 
-void GameplayController::Update(
-    float deltaTime,
-    InputManager &input,
-    Camera &camera,
-    TileMap &map,
-    Pathfinder &pathfinder,
-    EntityManager &entities,
-    Economy &economy,
-    AIController &aiController,
-    MissionController &mission,
-    HUDController &hud,
-    MenuController &menu,
-    SoundEngine &sound,
-    AppState &appState,
-    int windowW,
-    int windowH)
+void GameplayController::Update(const FrameContext &ctx)
 {
+    const float deltaTime = ctx.deltaTime;
+    const int windowW = ctx.windowW;
+    const int windowH = ctx.windowH;
+    InputManager &input = ctx.input;
+    Camera &camera = ctx.camera;
+    TileMap &map = ctx.map;
+    Pathfinder &pathfinder = ctx.pathfinder;
+    EntityManager &entities = ctx.entities;
+    Economy &economy = ctx.economy;
+    AIController &aiController = ctx.ai;
+    MissionController &mission = ctx.mission;
+    HUDController &hud = ctx.hud;
+    MenuController &menu = ctx.menu;
+    AppState &appState = ctx.state;
+
     input.Update(deltaTime, camera);
     camera.ClampToBounds(map.GetWidth(), map.GetHeight());
     hud.BindSimulation(&m_sim);
@@ -639,7 +639,7 @@ void GameplayController::Update(
     if (hud.IsResearchWindowOpen())
     {
         hud.SetTopInset(m_debugMode ? 32 : 0);
-        hud.UpdateResearchWindow(input, mx, my, leftClicked, windowW, windowH, economy, entities);
+        hud.UpdateResearchWindow(ctx, mx, my, leftClicked);
         // (an observer's window stops nothing; a held tick - a replay frame without one - stays held)
         if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
             SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
@@ -653,21 +653,7 @@ void GameplayController::Update(
     // 2. In-Game Pause Menu
     if (menu.IsInGameMenuOpen())
     {
-        if (menu.UpdateInGameMenu(
-                input,
-                mx,
-                my,
-                leftClicked,
-                windowW,
-                windowH,
-                sound,
-                mission,
-                map,
-                entities,
-                economy,
-                pathfinder,
-                camera,
-                appState))
+        if (menu.UpdateInGameMenu(ctx, mx, my, leftClicked))
         {
             if ((mission.IsOnlineMatch() || hud.IsObserver()) && appState == AppState::SkirmishPlaying && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
@@ -1212,7 +1198,7 @@ void GameplayController::Update(
     // The mission dialogue opens after its delay of playing time (menus and pauses do not count)
     if (m_pendingDialogId != 0 && hud.IsObserver())
         m_pendingDialogId = 0; // a replay of the mission: its story was read when it was played
-    if (m_pendingDialogId != 0)
+    if (m_pendingDialogId != 0 && !m_simHold)
     {
         m_dialogTimer += deltaTime;
         if (m_dialogTimer >= MissionDialogs::kDelaySeconds)

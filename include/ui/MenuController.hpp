@@ -6,6 +6,7 @@
 #include "ui/MenuBackdropFx.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Config.hpp"
+#include "core/FrameContext.hpp"
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
 #include "graphics/RenderBackend.hpp"
@@ -152,6 +153,15 @@ public:
         m_skirmishFogOfWar = enabled;
     }
 
+    bool IsSkirmishAllowSpeed() const
+    {
+        return m_skirmishAllowSpeed;
+    }
+    void SetSkirmishAllowSpeed(bool enabled)
+    {
+        m_skirmishAllowSpeed = enabled;
+    }
+
     int GetSelectedMenuItem() const
     {
         return m_selectedMenuItem;
@@ -162,54 +172,13 @@ public:
     }
 
     // Update / Event Handlers
-    bool UpdateInGameMenu(
-        InputManager &input,
-        int mx,
-        int my,
-        bool leftClicked,
-        int windowW,
-        int windowH,
-        SoundEngine &sound,
-        MissionController &mission,
-        TileMap &map,
-        EntityManager &entities,
-        Economy &economy,
-        Pathfinder &pathfinder,
-        Camera &camera,
-        AppState &state);
+    bool UpdateInGameMenu(const FrameContext &ctx, int mx, int my, bool leftClicked);
 
     bool UpdateObjectivesDialog(InputManager &input, bool leftClicked);
 
-    bool UpdateCampaignSelect(
-        InputManager &input,
-        int mx,
-        int my,
-        bool leftClicked,
-        int windowW,
-        int windowH,
-        MissionController &mission,
-        TileMap &map,
-        EntityManager &entities,
-        Economy &economy,
-        Pathfinder &pathfinder,
-        Camera &camera,
-        AppState &state,
-        AIController &ai);
+    bool UpdateCampaignSelect(const FrameContext &ctx, int mx, int my, bool leftClicked);
 
-    void UpdateMainMenu(
-        InputManager &input,
-        int windowW,
-        int windowH,
-        AppState &state,
-        bool &running,
-        SoundEngine &sound,
-        MissionController &mission,
-        TileMap &map,
-        EntityManager &entities,
-        Economy &economy,
-        Pathfinder &pathfinder,
-        Camera &camera,
-        AIController &ai);
+    void UpdateMainMenu(const FrameContext &ctx, bool &running);
 
     void UpdateSettings(InputManager &input, int windowW, int windowH, AppState &state);
 
@@ -297,6 +266,7 @@ private:
     int m_skirmishSelected {0};
     bool m_skirmishPrebuilt {true}; // custom game: prebuilt bases (else from scratch: HQ + power plant only)
     bool m_skirmishFogOfWar {true}; // custom game: fog of war enabled
+    bool m_skirmishAllowSpeed {false}; // custom game: allow game speed control (off by default)
     int m_skirmishCredits {kDefaultCreditsIndex}; // custom game: index into kStartingCredits
     bool m_skirmishNight {false};                 // custom game: played at night
     // Custom game players, as the network room has them: [0] is the person, the rest are computer players

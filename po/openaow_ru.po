@@ -2691,3 +2691,6 @@ msgstr "Громкость окружения"
 
 msgid "Volume of the surroundings in a match: the forest by day or by night"
 msgstr "Громкость звуков окружения в матче: лес днём или ночью"
+
+msgid "ALLOW SPEED CONTROL"
+msgstr "РАЗРЕШИТЬ УСКОРЕНИЕ"

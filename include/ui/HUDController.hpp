@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Config.hpp"
+#include "core/FrameContext.hpp"
 #include "game/Simulation.hpp"
 #include "ui/RadarAlert.hpp"
 #include "ui/UiKit.hpp"
@@ -57,15 +58,7 @@ public:
         return m_researchOpen && m_researchSearchFocus;
     }
     // Returns true while the window takes the input of this frame
-    bool UpdateResearchWindow(
-        InputManager &input,
-        int mx,
-        int my,
-        bool leftClicked,
-        int windowW,
-        int windowH,
-        Economy &economy,
-        EntityManager &entities);
+    bool UpdateResearchWindow(const FrameContext &ctx, int mx, int my, bool leftClicked);
     void RenderResearchWindow(
         Renderer &renderer,
         BitmapFontRenderer &fontRenderer,
@@ -92,6 +85,14 @@ public:
 
     // Drops per-mission state (running research, primary buildings, build mode)
     void ResetForMission();
+
+    // Single-player speed control on the sidebar (-1 = slower, +1 = faster, 0 = reset to x1)
+    void SetSpeedControl(bool enabled, float multiplier, std::function<void(int)> onStep)
+    {
+        m_speedEnabled = enabled;
+        m_speedMultiplier = multiplier;
+        m_onSpeedStep = std::move(onStep);
+    }
 
     // Returns true when the mouse is over the sidebar (map input must be ignored)
     bool HandleHudClick(
@@ -343,6 +344,10 @@ private:
     bool m_buildMode {false};
     int m_selectedBlueprint {0};
     bool m_attackMoveMode {false};
+
+    bool m_speedEnabled {false};
+    float m_speedMultiplier {1.0f};
+    std::function<void(int)> m_onSpeedStep;
 };
 
 } // namespace OpenArtOfWar

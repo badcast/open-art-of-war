@@ -530,6 +530,18 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
                 continue;
             teamAlive[Players::TeamOf(e.owner) % kMaxPlayers] = true;
         }
+        bool hasHuman = false;
+        for (int p = 0; p < kMaxPlayers; ++p)
+            hasHuman = hasHuman || (m_matchSetup.slots[p].active && m_matchSetup.slots[p].human);
+        if (!hasHuman)
+        {
+            int aliveTeams = 0;
+            for (int t = 0; t < kMaxPlayers; ++t)
+                aliveTeams += teamAlive[t] ? 1 : 0;
+            if (aliveTeams <= 1)
+                m_isVictory = true;
+            return;
+        }
         const std::uint8_t mine = Players::TeamOf(Players::Local()) % kMaxPlayers;
         int others = 0;
         for (int t = 0; t < kMaxPlayers; ++t)
