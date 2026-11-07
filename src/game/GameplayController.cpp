@@ -643,7 +643,17 @@ void GameplayController::Update(const FrameContext &ctx)
         hud.UpdateResearchWindow(ctx, mx, my, leftClicked);
         // (an observer's window stops nothing; a held tick - a replay frame without one - stays held)
         if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
+        {
             SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+        }
+        else if (!mission.IsOnlineMatch() && !hud.IsObserver())
+        {
+            // The game stands still, but what the window ordered (a research started) takes effect now instead of
+            // waiting for the window to close: the command carries this tick, so it is the same as applying it at
+            // the start of the tick that runs next (a recording replays it alike)
+            SimContext simCtx {entities, map, pathfinder, economy, aiController};
+            m_sim.ApplyCommands(simCtx);
+        }
         return;
     }
 
