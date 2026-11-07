@@ -212,13 +212,12 @@ Targets: `openaow` (game), `openaow-server` (dedicated server, `-DOAOW_BUILD_SER
 ./build/openaow                 # the game
 ./build/openaow --debug         # with the debug toolbar and the ImGui debugger (debug build)
 ./build/openaow --testmap       # straight into the test map
-./build/openaow --test          # headless self-test (debug build)
 ./build/openaow --renderer=opengl   # try one render API once (not stored)
 
 ```
 
-`--debug`, `--test`, the ImGui debugger, cheats and the developer environment variables (`OAOW_NET_BOT`,
-`OAOW_NET_TRACE`, `OAOW_NET_DROP_AT`, `OAOW_NET_FACTION`, `OAOW_NET_FACTION_BY_SLOT`, `OAOW_TEST_*`) exist only in a
+`--debug`, the ImGui debugger, cheats and the developer environment variables (`OAOW_NET_BOT`,
+`OAOW_NET_TRACE`, `OAOW_NET_DROP_AT`, `OAOW_NET_FACTION`, `OAOW_NET_FACTION_BY_SLOT`) exist only in a
 debug build: `cmake -B build -DAOW_DEBUG=ON` (off by default). A normal build ignores them.
 
 The game finds `assets/` (or `data.blob`) next to the executable or one level above, so it can be started from any directory.
@@ -394,7 +393,6 @@ Run with `--debug` (or start the test map) and click **IMGUI** on the debug tool
 The tests need a debug build (`-DAOW_DEBUG=ON`), except `openaow-net-tests` and `openaow-charactereditor-tests`.
 
 ```bash
-./build/openaow --test                                # simulation, AI, determinism, replays, matches
 ./build/openaow-net-tests                             # serializer, protocol fuzzing, sessions, discovery, server
 
 ```

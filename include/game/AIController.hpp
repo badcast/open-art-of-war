@@ -142,7 +142,6 @@ struct AIBaseStyle
 class AIController
 {
 public:
-    friend class HeadlessTest;
 
     AIController();
     ~AIController() = default;

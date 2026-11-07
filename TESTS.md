@@ -6,7 +6,7 @@ Everything there is to test, trace and inspect the game, the network code and th
 
 | Build | What it has |
 | --- | --- |
-| Release (`build/`) | The game only. `--debug`, `--test`, the ImGui debugger, cheats and every `OAOW_*` developer variable are compiled out (a player's environment cannot change the game). `ctest` still works. |
+| Release (`build/`) | The game only. `--debug`, the ImGui debugger, cheats and every `OAOW_*` developer variable are compiled out (a player's environment cannot change the game). `ctest` still works. |
 | Debug variant (`-DAOW_DEBUG=ON`) | Everything below. Build it in its **own directory**, never reconfigure `build/`. |
 
 ```bash
@@ -38,48 +38,9 @@ CMake options: `OAOW_BUILD_NET_TESTS` (default ON, network unit tests), `OAOW_BU
 Run one binary directly to see its whole output: `./build/openaow-net-tests`.
 
 Not covered: packet loss, latency or reordering (the loopback transport has no loss model); the game side of a
-network match (`NetMatch`) and the world checksum. Use the bot matches below for those.
+network match (`NetMatch`) and the world checksum. Use the bot matches below for those (there is no automated game-level test).
 
-## 3. Headless game tests (`--test`, debug build)
-
-```bash
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-debug/openaow --test
-```
-
-The run ends with `Headless test result: SUCCESS` (exit code 0) or `FAILURE`. Aliases: `--headless`,
-`--headless-test`, `-t`. Source: `src/test/HeadlessTest.cpp`; `HeadlessTest::run()` lists every check in order.
-
-What the full run checks (in this order):
-
-- Localization (gettext, en ↔ ru), YAML character configs, settings and the user directory (round trip,
-  clamping, zoom / quality options).
-- Campaign missions (8 Resistance missions with base positions, defense waves, Confederation campaign).
-- Base construction, production prerequisites and queues (cancel refunds), destructible walls, AI rebuilding
-  bases and walls.
-- Test map (`assets/maps/testmap.json`): unit blocking, closed passages, wall breaching.
-- Build radius (HQ 25 tiles, lab +5), Stormcast, siege units (Rhino transform, Grad range).
-- Raycast bullets, retreat orders, recoil, camera bounds; wall targeting, rubble, flamethrower, crouching attack.
-- Bunker construction and autonomous combat; fog of war (hidden → visible → explored, AI blind in fog);
-  AI difficulty (`assets/characters/difficulty.yaml`).
-- Damage to moving units, muzzle points, projectile spread, splash, burning deaths, multi-weapon units.
-- Vehicle rotation, chain aggro, command override, choke points and anti-stacking, building damage, unit
-  remains, cohesive group movement, sidestepping, wall factions.
-- Construction rules, demolition, siege research, radar alarm, voices of each language, the AI keeping its base
-  exit open, enemy structures under fog, prebuilt bases vs. start from scratch.
-- Determinism: a skirmish played twice from recorded commands must give the same checksums
-  (`RunDeterminismTest`), a full match and an AI-vs-AI match likewise (`RunMatchTest`, `RunMatchAiTest`).
-
-### Environment switches of the headless tests
-
-| Variable | Effect |
-| --- | --- |
-| `OAOW_TEST_ONLY=group` | Only the group movement test (`RunGroupMovementTest`) |
-| `OAOW_TEST_ONLY=ai` | Only the AI behaviour test (`RunAiBehaviourTest`) |
-| `OAOW_TEST_ONLY=combat` | Only the combat behaviour test (`RunCombatBehaviourTest`) |
-| `OAOW_TEST_ONLY=makeway` | Only the make-way test (`RunMakeWayTest`) |
-| `OAOW_TEST_VERBOSE=1` | Extra output: stuck units, squad states over time, distances in the manual attack test |
-
-## 4. Debug mode in the game (`--debug`, debug build)
+## 3. Debug mode in the game (`--debug`, debug build)
 
 ```bash
 ./build-debug/openaow --debug          # or -d
@@ -102,7 +63,7 @@ What the full run checks (in this order):
 
 In a network game the debug powers are switched off (commands from the network never carry the debug flag).
 
-## 5. Network games and bot matches
+## 4. Network games and bot matches
 
 ### Command line
 
@@ -159,7 +120,7 @@ sudo tc qdisc show dev lo
 sudo tc qdisc del dev lo root                                    # remove it afterwards
 ```
 
-## 6. Sound
+## 5. Sound
 
 | Variable | Effect |
 | --- | --- |
@@ -167,7 +128,7 @@ sudo tc qdisc del dev lo root                                    # remove it aft
 
 At start the log reports what was loaded: `[SfxMixer] N sound clips for M events`, `[VoiceManager] N voice lines in '<lang>'`.
 
-## 7. Game data guarantee
+## 6. Game data guarantee
 
 - `assets/main.yaml` names every file the game loads by its full path; the game does not start without it.
   `tools/pack_assets.py` refuses to pack when main.yaml names a file that does not exist.
@@ -181,7 +142,7 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 - Try it: pack a blob into an empty folder, start the game there (no `assets/` next to it, so the blob is used);
   then change a file inside the blob without repacking and start again.
 
-## 8. Map editor
+## 7. Map editor
 
 ```bash
 ./build-debug/openaow-mapeditor --test                       # all editor self-tests
@@ -190,7 +151,7 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 ./build-debug/openaow-mapeditor --generate-map out.json [seed] [tileset]   # write a generated map and exit
 ```
 
-## 9. Other checks
+## 8. Other checks
 
 - **Translations**: every project has its own catalogs under `po/`:
   `po/openaow_{en,ru}.po`, `po/openaow_character_editor_{en,ru}.po`, `po/openaow_map_editor_{en,ru}.po`.

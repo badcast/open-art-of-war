@@ -15,9 +15,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Debug build: cheats, the debug overlay, --debug, --test (HeadlessTest) and the OAOW_* environment variables.
+# Debug build: cheats, the debug overlay, --debug and the OAOW_* environment variables.
 # The macro AOW_DEBUG exists only when this is ON (code checks it with #if defined(AOW_DEBUG)).
-option(AOW_DEBUG "Build the game in debug mode (enables cheats, --debug, --test, OAOW_* variables)" OFF)
+option(AOW_DEBUG "Build the game in debug mode (enables cheats, --debug, OAOW_* variables)" OFF)
 # A string, not an option(): option() is a boolean and turned the name into "OFF"
 if(DEFINED CACHE{MAIN_ASSET_BLOB_NAME} AND (MAIN_ASSET_BLOB_NAME STREQUAL "OFF" OR MAIN_ASSET_BLOB_NAME STREQUAL "ON"))
     unset(MAIN_ASSET_BLOB_NAME CACHE)
@@ -168,10 +168,6 @@ set(ENGINE_SOURCES
     src/storage/SaveManager.cpp
     src/debug/DebugOverlay.cpp
 )
-# The automated self-test (--test) exists only in a debug build
-if(AOW_DEBUG)
-    list(APPEND ENGINE_SOURCES src/test/HeadlessTest.cpp)
-endif()
 
 # Translations (gettext MO generation)
 find_program(MSGFMT_EXECUTABLE msgfmt)

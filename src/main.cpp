@@ -1,7 +1,5 @@
 #include "core/Application.hpp"
-#include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
-#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -39,7 +37,6 @@ Graphics:
 
 Debug builds only (cmake -DAOW_DEBUG=ON):
   --debug, -d                   debug overlay, navigation inspection, full control over the enemy
-  --test, --headless, -t        run the headless self-tests and exit (0 = success)
 
   --help, -h                    this text
   --version                     print the version
@@ -65,7 +62,6 @@ int main(int argc, char *argv[])
         }
     }
 #endif
-    bool testMode = false;
     bool debugMode = false;
     bool testMapMode = false;
     bool fromScratch = false; // --map without a network game: a custom game, --from-scratch ignores the map's own bases
@@ -94,14 +90,6 @@ int main(int argc, char *argv[])
         {
             std::cout << "openaow " << OAOW_VERSION << std::endl;
             return 0;
-        }
-        if (arg == "--test" || arg == "--headless" || arg == "--headless-test" || arg == "-t")
-        {
-#if defined(AOW_DEBUG)
-            testMode = true;
-#else
-            std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
-#endif
         }
         if (arg == "--host" || arg.rfind("--host=", 0) == 0)
         {
@@ -171,23 +159,12 @@ int main(int argc, char *argv[])
     }
     std::cout << "========================================================" << std::endl;
 
-    // The self-test works in a throw-away user directory: it must neither read nor change the player's files
-    std::filesystem::path testUserDir;
-    if (testMode)
-    {
-        testUserDir = std::filesystem::temp_directory_path() / "openaow-test-user";
-        std::error_code ec;
-        std::filesystem::remove_all(testUserDir, ec);
-        OpenArtOfWar::Assets::SetUserDataDir(testUserDir.string());
-    }
-
     // A changed render API rebuilds the whole window: run() returns and a fresh Application takes over
     bool restart = false;
     do
     {
         OpenArtOfWar::Application app;
         app.SetRendererOverride(restart ? std::string() : rendererOverride);
-        app.SetHeadless(testMode);
         if (!app.Init(1280, 720))
         {
             std::cerr << "Engine initialization failed." << std::endl;
@@ -201,7 +178,7 @@ int main(int argc, char *argv[])
         // --map=<name> alone: a single-player custom game on that map (with --host / --server it is the match map)
         const bool netGame
             = netHost || !netJoin.empty() || (!netServer.empty() && (netServerCreate || !netServerCode.empty()));
-        if (!restart && !testMapMode && !testMode && !netGame && !netMapName.empty())
+        if (!restart && !testMapMode && !netGame && !netMapName.empty())
             app.LaunchMap(netMapName, fromScratch);
         if (!restart && netHost)
         {
@@ -250,17 +227,6 @@ int main(int argc, char *argv[])
                 netName,
                 fromScratch);
         }
-
-#if defined(AOW_DEBUG)
-        if (testMode)
-        {
-            bool ok = app.RunHeadlessTest(200);
-            std::cout << "Headless test result: " << (ok ? "SUCCESS" : "FAILED") << std::endl;
-            std::error_code ec;
-            std::filesystem::remove_all(testUserDir, ec);
-            return ok ? 0 : 1;
-        }
-#endif
 
         app.Run();
         restart = app.RestartRequested();

@@ -38,7 +38,6 @@ class EnvironmentConfig;
 
 class GameplayController
 {
-    friend class HeadlessTest;
 
 public:
     GameplayController() = default;

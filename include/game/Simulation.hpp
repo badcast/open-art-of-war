@@ -55,7 +55,6 @@ struct SimEvent
 // not in the interface; the interface only issues commands and reads it.
 class Simulation
 {
-    friend class HeadlessTest;
 
 public:
     Simulation() = default;

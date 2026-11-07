@@ -61,7 +61,6 @@ class Application
 public:
     static constexpr int kGlowDivisor = 4; // the glow is worked out at a quarter of the view size
 
-    friend class HeadlessTest;
 
     Application();
     ~Application();
@@ -73,7 +72,6 @@ public:
         Run();
     }
 #if defined(AOW_DEBUG)
-    bool RunHeadlessTest(int numTicks = 200); // debug builds only (HeadlessTest.cpp)
 #endif
     void Shutdown();
     void SetDebugMode(bool debug);

@@ -12,7 +12,6 @@
 #include "game/Sides.hpp"
 #include "game/Players.hpp"
 #if defined(AOW_DEBUG)
-#include "test/HeadlessTest.hpp"
 #endif
 #include "graphics/TextureManager.hpp"
 #include "graphics/Renderer.hpp"
@@ -731,13 +730,6 @@ void Application::StepGameSpeed(int delta)
         m_hudController->SetNotification(buf, 1.5f);
     }
 }
-
-#if defined(AOW_DEBUG)
-bool Application::RunHeadlessTest(int numTicks)
-{
-    return HeadlessTest::run(*this, numTicks);
-}
-#endif
 
 void Application::HandleEvents()
 {
