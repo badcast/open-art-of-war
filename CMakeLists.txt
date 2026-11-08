@@ -398,3 +398,10 @@ set_target_properties(openaow-sprite-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     BUILD_RPATH "${OAOW_RPATH}")
 add_test(NAME openaow-sprite-tests COMMAND openaow-sprite-tests)
+
+# Dumps compiled sprite metas as JSON (tools/check_sprites.py)
+add_executable(openaow-sprite-dump tests/SpriteDump.cpp)
+target_link_libraries(openaow-sprite-dump PRIVATE openaow-core)
+set_target_properties(openaow-sprite-dump PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    BUILD_RPATH "${OAOW_RPATH}")
