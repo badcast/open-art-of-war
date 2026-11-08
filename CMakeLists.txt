@@ -431,3 +431,10 @@ set_target_properties(openaow-ai-layout-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     BUILD_RPATH "${OAOW_RPATH}")
 add_test(NAME openaow-ai-layout-tests COMMAND openaow-ai-layout-tests)
+
+add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
+target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)
+set_target_properties(openaow-build-limits-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    BUILD_RPATH "${OAOW_RPATH}")
+add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)

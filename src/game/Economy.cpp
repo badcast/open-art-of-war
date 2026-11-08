@@ -1,4 +1,5 @@
 #include "game/Economy.hpp"
+#include "game/BuildLimits.hpp"
 #include "game/EntityManager.hpp"
 #include "core/Utility.hpp"
 #include "game/Pathfinder.hpp"
@@ -167,7 +168,7 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
     };
     std::vector<Spawn> spawns; // spawning while iterating would invalidate the entity container
     // The army size limit of the player: a trained unit waits in its building until there is room for it
-    const int armyCap = ArmyCapUnitsOf(Players::Slot(player).armyCap);
+    const int armyCap = BuildLimits::EffectiveArmyCap(ArmyCapUnitsOf(Players::Slot(player).armyCap));
     int armySize = 0;
     if (armyCap > 0)
     {

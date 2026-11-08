@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game/BuildLimits.hpp"
+
 #include "core/Localization.hpp"
 #include "game/Match.hpp"
 #include "game/Players.hpp"
@@ -31,7 +33,10 @@ inline std::vector<std::string> ArmyCapChoices()
 {
     std::vector<std::string> out;
     for (int u : kArmyCapUnits)
-        out.push_back(u > 0 ? std::to_string(u) : std::string(_("Unlimited")));
+        out.push_back(u > 0 ? std::to_string(u)
+                      : BuildLimits::MaxArmy() > 0
+                          ? std::string(_("Max")) + " (" + std::to_string(BuildLimits::MaxArmy()) + ")"
+                          : std::string(_("Unlimited")));
     return out;
 }
 inline std::string CreditsLabel(int index)

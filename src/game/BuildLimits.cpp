@@ -7,6 +7,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <map>
@@ -23,6 +24,7 @@ struct Table
 {
     std::array<int, kKinds> byKind;
     std::map<std::string, int> byId; // exact building ids
+    int maxArmy {kDefaultMaxArmy};
     Table()
     {
         byKind.fill(kUnlimited);
@@ -160,6 +162,19 @@ bool CanBuildMore(const EntityManager &entities, const TileMap &map, PlayerId pl
     return CountOwned(entities, map, player, buildingIndex) < limit;
 }
 
+int MaxArmy()
+{
+    return Current().maxArmy;
+}
+
+int EffectiveArmyCap(int lobbyUnits)
+{
+    const int hard = MaxArmy();
+    if (lobbyUnits <= 0)
+        return hard > 0 ? hard : 0;
+    return hard > 0 ? std::min(lobbyUnits, hard) : lobbyUnits;
+}
+
 bool LoadText(const std::string &yamlText)
 {
     Table t;
@@ -170,6 +185,8 @@ bool LoadText(const std::string &yamlText)
             return false;
         if (const YAML::Node d = root["default"])
             t.byKind.fill(Normalized(d.as<int>()));
+        if (const YAML::Node m = root["max_army"])
+            t.maxArmy = m.as<int>() > 0 ? m.as<int>() : kUnlimited;
         if (const YAML::Node all = root["buildings"]; all && all.IsMap())
         {
             for (const auto &entry : all)
