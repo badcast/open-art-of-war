@@ -349,7 +349,83 @@ AIController::AIController()
 
 bool AIController::IsFoe(const Entity &e) const
 {
-    return e.owner < kMaxPlayers && Players::Hostile(e.owner, m_player);
+    return e.owner < kMaxPlayers && Players::Hostile(e.owner, m_player) && !((m_eliminatedFoes >> e.owner) & 1u);
+}
+
+void AIController::RefreshFoeAnchor(EntityManager &entities)
+{
+    m_foeAnchorTimer -= SIMULATION_TIMESTEP;
+    // A player who is out: never a target again, and the squads marching (perhaps at him) come back
+    bool newlyOut = false;
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if (p == m_player || !Players::Hostile(p, m_player) || ((m_eliminatedFoes >> p) & 1u)
+            || !entities.IsEliminated(p))
+            continue;
+        m_eliminatedFoes |= 1u << p;
+        newlyOut = true;
+    }
+    if (!newlyOut && m_foeAnchorTimer > 0.0f)
+        return;
+    m_foeAnchorTimer = 2.0f;
+    // The anchor stands while a foe's building is there; otherwise the nearest headquarters of a living foe, else
+    // any building of one
+    const Entity *best = nullptr;
+    bool bestHq = false, anchorHolds = false, anyFoe = false;
+    float bestDist = 1e9f;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die || !IsFoe(e))
+            continue;
+        anyFoe = true;
+        if (m_playerHqX >= b->tileX && m_playerHqX < b->tileX + b->buildWidth && m_playerHqY >= b->tileY
+            && m_playerHqY < b->tileY + b->buildHeight)
+            anchorHolds = true;
+        const bool hq = b->type == UnitType::Headquarters;
+        const float d = DetMath::Hypot(
+            static_cast<float>(b->tileX + b->buildWidth / 2 - m_enemyHqX),
+            static_cast<float>(b->tileY + b->buildHeight / 2 - m_enemyHqY));
+        if ((hq && !bestHq) || (hq == bestHq && d < bestDist))
+        {
+            best = &e;
+            bestHq = hq;
+            bestDist = d;
+        }
+    }
+    if (!anyFoe)
+    {
+        // Units of a living foe may still be about (no building left, not out yet): they stay targets
+        for (const auto &e : entities.GetAllEntities())
+            if (e.alive && e.state != ActionState::Die && !e.isBuilding && IsFoe(e))
+            {
+                anyFoe = true;
+                break;
+            }
+    }
+    if (m_noFoesLeft != !anyFoe)
+        Think("ATTACK", anyFoe ? "A foe is in sight again" : "No foe is left: no more waves");
+    m_noFoesLeft = !anyFoe;
+    if (best && !anchorHolds)
+    {
+        const Building *b = best->AsBuilding();
+        m_playerHqX = b->tileX + b->buildWidth / 2;
+        m_playerHqY = b->tileY + b->buildHeight / 2;
+        std::ostringstream msg;
+        msg << "New objective: the base at (" << m_playerHqX << ", " << m_playerHqY << ")";
+        Think("ATTACK", msg.str());
+    }
+    if (newlyOut)
+    {
+        std::vector<int> marching;
+        for (const AISquad &sq : m_squadController.GetSquads())
+            marching.insert(marching.end(), sq.unitIds.begin(), sq.unitIds.end());
+        if (!marching.empty())
+        {
+            m_squadController.ReleaseUnits(marching, entities);
+            Think("ATTACK", "A foe is out of the game: the squads come back for a new objective");
+        }
+    }
 }
 
 void AIController::SetPlayer(PlayerId player)
@@ -423,6 +499,9 @@ void AIController::Reset()
     m_lastThreatX = m_lastThreatY = -1;
     m_lastThreatId = 0;
     m_knownBuildings.clear();
+    m_eliminatedFoes = 0;
+    m_noFoesLeft = false;
+    m_foeAnchorTimer = 0.0f;
     m_seenEnemyUnits.clear();
     m_intelTimer = 0.0f;
     m_scoutId = 0;
@@ -489,6 +568,7 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     UpdateUnitStances(entities);
     m_squadController.SetSeesAll(GetEffectiveDifficulty() == AIDifficulty::Hardcore);
     UpdateRepairs(deltaTime, entities);
+    RefreshFoeAnchor(entities);
 
     // Auto-synchronize Enemy & Player base coordinates from living entities if uninitialized or destroyed
     if (m_enemyHqX <= 0 || m_enemyHqY <= 0 || m_playerHqX <= 0 || m_playerHqY <= 0)

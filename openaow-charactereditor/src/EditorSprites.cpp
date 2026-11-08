@@ -218,6 +218,7 @@ void CharacterEditor::LoadSpriteObject(const std::string &object, const fs::path
     spriteFrames.clear();
     spriteRemoved.clear();
     spriteFrameSel = -1;
+    spriteMulti.clear();
     spriteDirty = false;
     spriteCameraPending = SpriteCamera::Fit;
     spriteScale = 1.0f;
@@ -791,66 +792,121 @@ bool CharacterEditor::RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmalle
     return true;
 }
 
-std::string CharacterEditor::SpriteMoveBlocker(int index, int x, int y) const
+std::vector<int> CharacterEditor::SpriteSelection() const
 {
-    if (index < 0 || index >= static_cast<int>(spriteFrames.size()))
-        return _("No frame");
-    const SpriteFrameEdit &f = spriteFrames[index];
-    if (x < 0 || y < 0 || x + f.rect[2] > spriteImageW || y + f.rect[3] > spriteImageH)
-        return _("The frame would leave the image");
-    auto crosses = [&](const SpriteFrameEdit &o, int ax, int ay) {
-        return ax < o.rect[0] + o.rect[2] && o.rect[0] < ax + f.rect[2] && ay < o.rect[1] + o.rect[3]
-               && o.rect[1] < ay + f.rect[3];
-    };
+    std::vector<int> out;
     for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+        if (i == spriteFrameSel || (i < static_cast<int>(spriteMulti.size()) && spriteMulti[i]))
+            out.push_back(i);
+    return out;
+}
+
+std::string CharacterEditor::SpriteGroupMoveBlocker(const std::vector<int> &frames, int dx, int dy) const
+{
+    if (frames.empty())
+        return _("No frame");
+    std::vector<char> moving(spriteFrames.size(), 0);
+    for (int i : frames)
     {
-        if (i == index)
-            continue;
-        if (crosses(spriteFrames[i], f.rect[0], f.rect[1]))
-            return _("This frame overlaps ") + spriteFrames[i].name + _(" already: separate them first");
-        if (crosses(spriteFrames[i], x, y))
-            return _("The frame would overlap ") + spriteFrames[i].name;
+        if (i < 0 || i >= static_cast<int>(spriteFrames.size()))
+            return _("No frame");
+        moving[i] = 1;
+    }
+    auto crosses = [](const int *a, int ax, int ay, const int *o) {
+        return ax < o[0] + o[2] && o[0] < ax + a[2] && ay < o[1] + o[3] && o[1] < ay + a[3];
+    };
+    for (int i : frames)
+    {
+        const SpriteFrameEdit &f = spriteFrames[i];
+        const int x = f.rect[0] + dx, y = f.rect[1] + dy;
+        if (x < 0 || y < 0 || x + f.rect[2] > spriteImageW || y + f.rect[3] > spriteImageH)
+            return frames.size() > 1 ? _("The frames would leave the image") : _("The frame would leave the image");
+        for (int j = 0; j < static_cast<int>(spriteFrames.size()); ++j)
+        {
+            if (moving[j])
+                continue; // the moved ones keep their places among each other
+            if (crosses(f.rect, f.rect[0], f.rect[1], spriteFrames[j].rect))
+                return f.name + _(" overlaps ") + spriteFrames[j].name + _(" already: separate them first");
+            if (crosses(f.rect, x, y, spriteFrames[j].rect))
+                return f.name + _(" would overlap ") + spriteFrames[j].name;
+        }
     }
     return "";
 }
 
+std::string CharacterEditor::SpriteMoveBlocker(int index, int x, int y) const
+{
+    if (index < 0 || index >= static_cast<int>(spriteFrames.size()))
+        return _("No frame");
+    return SpriteGroupMoveBlocker({index}, x - spriteFrames[index].rect[0], y - spriteFrames[index].rect[1]);
+}
+
 bool CharacterEditor::MoveSpriteFramePixels(int index, int x, int y)
 {
-    const std::string why = SpriteMoveBlocker(index, x, y);
+    if (index < 0 || index >= static_cast<int>(spriteFrames.size()))
+        return false;
+    return MoveSpriteFramesPixels({index}, x - spriteFrames[index].rect[0], y - spriteFrames[index].rect[1]);
+}
+
+bool CharacterEditor::MoveSpriteFramesPixels(const std::vector<int> &frames, int dx, int dy)
+{
+    const std::string why = SpriteGroupMoveBlocker(frames, dx, dy);
     if (!why.empty())
     {
         spriteReport = _("Not moved: ") + why;
         return false;
     }
-    SpriteFrameEdit &f = spriteFrames[index];
-    if (f.rect[0] == x && f.rect[1] == y)
+    if (dx == 0 && dy == 0)
         return true;
     if (!EnsurePending())
         return false;
-    const SDL_Rect from {f.rect[0], f.rect[1], f.rect[2], f.rect[3]};
-    SDL_Rect to {x, y, from.w, from.h};
-    // The piece is cut first (the new place may cross the old one); all in memory
+    // All the pieces are cut first, then their old places cleared, then they go to the new ones (the new places may
+    // cross the old ones, the group's own frames may share pixels); all in memory
     for (auto &[name, img] : spritePending)
     {
-        SDL_Surface *piece = SDL_CreateSurface(from.w, from.h, SDL_PIXELFORMAT_RGBA32);
-        if (!piece)
-        {
-            spriteReport = SDL_GetError();
-            return false;
-        }
         SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
-        SDL_SetSurfaceBlendMode(piece, SDL_BLENDMODE_NONE);
-        SDL_BlitSurface(img, &from, piece, nullptr);
-        SDL_FillSurfaceRect(img, &from, 0);
-        SDL_BlitSurface(piece, nullptr, img, &to);
-        SDL_DestroySurface(piece);
+        std::vector<SDL_Surface *> pieces;
+        for (int i : frames)
+        {
+            const SpriteFrameEdit &f = spriteFrames[i];
+            const SDL_Rect from {f.rect[0], f.rect[1], f.rect[2], f.rect[3]};
+            SDL_Surface *piece = SDL_CreateSurface(from.w, from.h, SDL_PIXELFORMAT_RGBA32);
+            if (!piece)
+            {
+                for (SDL_Surface *p : pieces)
+                    SDL_DestroySurface(p);
+                spriteReport = SDL_GetError();
+                return false;
+            }
+            SDL_SetSurfaceBlendMode(piece, SDL_BLENDMODE_NONE);
+            SDL_BlitSurface(img, &from, piece, nullptr);
+            pieces.push_back(piece);
+        }
+        for (int i : frames)
+        {
+            const SpriteFrameEdit &f = spriteFrames[i];
+            const SDL_Rect from {f.rect[0], f.rect[1], f.rect[2], f.rect[3]};
+            SDL_FillSurfaceRect(img, &from, 0);
+        }
+        for (std::size_t k = 0; k < frames.size(); ++k)
+        {
+            const SpriteFrameEdit &f = spriteFrames[frames[k]];
+            SDL_Rect to {f.rect[0] + dx, f.rect[1] + dy, f.rect[2], f.rect[3]};
+            SDL_BlitSurface(pieces[k], nullptr, img, &to);
+            SDL_DestroySurface(pieces[k]);
+        }
     }
-    f.rect[0] = x;
-    f.rect[1] = y;
+    for (int i : frames)
+    {
+        spriteFrames[i].rect[0] += dx;
+        spriteFrames[i].rect[1] += dy;
+    }
     FreeSurfaces(spriteScaleBase);
     spriteDirty = true;
     RefreshPendingTexture();
-    spriteReport = _("Moved ") + spriteFrames[index].name + _(" with its pixels (not saved yet)");
+    spriteReport = (frames.size() == 1 ? _("Moved ") + spriteFrames[frames[0]].name
+                                       : _("Moved ") + std::to_string(frames.size()) + _(" frames"))
+                   + _(" with their pixels (not saved yet)");
     return true;
 }
 
@@ -960,6 +1016,8 @@ void CharacterEditor::RemoveSpriteFrame(int index)
     if (!spriteFrames[index].original.empty())
         spriteRemoved.push_back(spriteFrames[index].original);
     spriteFrames.erase(spriteFrames.begin() + index);
+    if (index < static_cast<int>(spriteMulti.size()))
+        spriteMulti.erase(spriteMulti.begin() + index);
     spriteFrameSel = std::min(spriteFrameSel, static_cast<int>(spriteFrames.size()) - 1);
     spriteDirty = true;
 }
@@ -1181,7 +1239,17 @@ void CharacterEditor::DrawSpriteTools()
         dl->AddImage(reinterpret_cast<ImTextureID>(tex), i0, i1);
     dl->AddRect(i0, i1, IM_COL32(120, 120, 130, 255));
 
-    // Frames; the selected one has corner handles
+    // The selection: the main frame (its properties, its resize handles) and the frames picked along with it
+    spriteMulti.resize(spriteFrames.size(), 0);
+    auto isSelected = [&](int i) {
+        return i == spriteFrameSel || (i >= 0 && i < static_cast<int>(spriteMulti.size()) && spriteMulti[i]);
+    };
+    auto clearSelection = [&]() {
+        std::fill(spriteMulti.begin(), spriteMulti.end(), 0);
+        spriteFrameSel = -1;
+    };
+
+    // Frames; the selected ones are orange, the main one has corner handles
     const float handle = 5.0f;
     int hoveredFrame = -1;
     for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
@@ -1192,12 +1260,15 @@ void CharacterEditor::DrawSpriteTools()
         const bool inside = mouse.x >= a.x && mouse.x < b.x && mouse.y >= a.y && mouse.y < b.y;
         if (inside && hovered)
             hoveredFrame = i; // the last (topmost) one wins
-        const bool sel = i == spriteFrameSel;
-        dl->AddRect(a, b, sel ? IM_COL32(255, 180, 60, 255) : IM_COL32(90, 200, 160, 200), 0.0f, 0, sel ? 2.0f : 1.0f);
-        if (sel || (inside && hovered))
+        const bool main = i == spriteFrameSel, sel = isSelected(i);
+        if (sel && !main)
+            dl->AddRectFilled(a, b, IM_COL32(255, 180, 60, 40));
+        dl->AddRect(
+            a, b, sel ? IM_COL32(255, 180, 60, 255) : IM_COL32(90, 200, 160, 200), 0.0f, 0, main ? 2.0f : sel ? 1.5f : 1.0f);
+        if (main || (inside && hovered))
             dl->AddText(
                 ImVec2(a.x + 2, a.y - ImGui::GetTextLineHeight() - 1), IM_COL32(255, 230, 180, 255), f.name.c_str());
-        if (sel)
+        if (main)
             for (int c = 0; c < 4; ++c)
             {
                 const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
@@ -1212,12 +1283,13 @@ void CharacterEditor::DrawSpriteTools()
     const bool magnet = spriteMagnet && !io.KeyAlt;
     const int snapThreshold = std::max(1, static_cast<int>(std::lround(8.0f / spriteZoom)));
     constexpr int kNoGuide = std::numeric_limits<int>::min();
+    constexpr int kSkipSelected = -2; // the targets leave out the whole selection (it is what moves)
     int guideX = kNoGuide, guideY = kNoGuide; // the lines the dragged edge stuck to
     auto targetsFor = [&](bool xAxis, int skip) {
         std::vector<int> t = {0, xAxis ? spriteImageW : spriteImageH};
         for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
         {
-            if (i == skip)
+            if (i == skip || (skip == kSkipSelected && isSelected(i)))
                 continue;
             const int *r = spriteFrames[i].rect;
             t.push_back(r[xAxis ? 0 : 1]);
@@ -1254,8 +1326,30 @@ void CharacterEditor::DrawSpriteTools()
             y1 = static_cast<int>(std::max(spriteDragStart.y, std::floor(my))) + 1;
         }
     };
+    // The group being dragged: the offset of the press, stuck to a target by the group's bounding box
+    auto groupOffset = [&](int dx, int dy, int &ox, int &oy) {
+        int bx0 = std::numeric_limits<int>::max(), by0 = bx0, bx1 = std::numeric_limits<int>::min(), by1 = bx1;
+        for (const auto &g : spriteGroupStart)
+        {
+            bx0 = std::min(bx0, g[1]);
+            by0 = std::min(by0, g[2]);
+            bx1 = std::max(bx1, g[1] + g[3]);
+            by1 = std::max(by1, g[2] + g[4]);
+        }
+        ox = dx + snapSpan(true, kSkipSelected, bx0 + dx, bx1 + dx);
+        oy = dy + snapSpan(false, kSkipSelected, by0 + dy, by1 + dy);
+    };
+    auto rememberGroup = [&]() {
+        spriteGroupStart.clear();
+        for (int i : SpriteSelection())
+        {
+            const int *r = spriteFrames[i].rect;
+            spriteGroupStart.push_back({i, r[0], r[1], r[2], r[3]});
+        }
+    };
 
-    // Left button: draw a new frame (draw mode), drag a corner of the selected frame, move it, or select
+    // Left button: draw a new frame (draw mode), drag a corner of the main frame, move the selection, pick frames
+    // (Ctrl: one in / out, Shift: one more), or a box on empty ground
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         spriteDrag = SpriteDrag::None;
@@ -1268,21 +1362,9 @@ void CharacterEditor::DrawSpriteTools()
             spriteDragStartV[1] = sy + snapSpan(false, -1, sy, sy);
             guideX = guideY = kNoGuide;
         }
-        else if (spriteMoveMode)
-        {
-            // Sprite change mode: a frame travels with its pixels
-            if (hoveredFrame >= 0)
-            {
-                spriteFrameSel = hoveredFrame;
-                spriteDrag = SpriteDrag::MovePixels;
-                std::copy(spriteFrames[hoveredFrame].rect, spriteFrames[hoveredFrame].rect + 4, spriteDragRect);
-                spriteMoveTo[0] = spriteDragRect[0];
-                spriteMoveTo[1] = spriteDragRect[1];
-            }
-        }
         else
         {
-            if (spriteFrameSel >= 0)
+            if (!spriteMoveMode && spriteFrameSel >= 0 && !io.KeyCtrl && !io.KeyShift)
             {
                 const SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
                 const ImVec2 a = toScreen(static_cast<float>(f.rect[0]), static_cast<float>(f.rect[1]));
@@ -1298,14 +1380,55 @@ void CharacterEditor::DrawSpriteTools()
                     }
                 }
             }
-            if (spriteDrag == SpriteDrag::None && hoveredFrame >= 0)
+            if (spriteDrag == SpriteDrag::None)
             {
-                spriteFrameSel = hoveredFrame;
-                spriteDrag = SpriteDrag::Move;
-            }
-            else if (spriteDrag == SpriteDrag::None)
-            {
-                spriteFrameSel = -1;
+                const int h = hoveredFrame;
+                if (h >= 0 && io.KeyCtrl)
+                {
+                    // Ctrl: this frame in or out of the selection (no drag)
+                    if (isSelected(h))
+                    {
+                        spriteMulti[h] = 0;
+                        if (spriteFrameSel == h)
+                        {
+                            spriteFrameSel = -1;
+                            for (int i = 0; i < static_cast<int>(spriteMulti.size()) && spriteFrameSel < 0; ++i)
+                                if (spriteMulti[i])
+                                    spriteFrameSel = i;
+                        }
+                    }
+                    else
+                    {
+                        if (spriteFrameSel >= 0)
+                            spriteMulti[spriteFrameSel] = 1;
+                        spriteMulti[h] = 1;
+                        spriteFrameSel = h;
+                    }
+                }
+                else if (h >= 0)
+                {
+                    if (io.KeyShift)
+                    {
+                        if (spriteFrameSel >= 0)
+                            spriteMulti[spriteFrameSel] = 1;
+                        spriteMulti[h] = 1;
+                    }
+                    else if (!isSelected(h))
+                    {
+                        clearSelection();
+                    }
+                    spriteFrameSel = h; // the grabbed frame becomes the main one, the group moves along
+                    rememberGroup();
+                    spriteGroupMove[0] = spriteGroupMove[1] = 0;
+                    spriteDrag = spriteMoveMode ? SpriteDrag::MovePixels : SpriteDrag::Move;
+                }
+                else
+                {
+                    // Empty ground: a box picks frames (with Ctrl / Shift it adds to the selection)
+                    if (!io.KeyCtrl && !io.KeyShift)
+                        clearSelection();
+                    spriteDrag = SpriteDrag::BoxSelect;
+                }
             }
             if (spriteFrameSel >= 0)
                 std::copy(spriteFrames[spriteFrameSel].rect, spriteFrames[spriteFrameSel].rect + 4, spriteDragRect);
@@ -1327,53 +1450,62 @@ void CharacterEditor::DrawSpriteTools()
                 0,
                 1.5f);
         }
+        else if (spriteDrag == SpriteDrag::BoxSelect)
+        {
+            const ImVec2 a = toScreen(std::min(spriteDragStart.x, std::floor(mx)), std::min(spriteDragStart.y, std::floor(my)));
+            const ImVec2 b
+                = toScreen(std::max(spriteDragStart.x, std::floor(mx)) + 1, std::max(spriteDragStart.y, std::floor(my)) + 1);
+            dl->AddRectFilled(a, b, IM_COL32(80, 160, 255, 40));
+            dl->AddRect(a, b, IM_COL32(80, 160, 255, 220), 0.0f, 0, 1.0f);
+        }
         else if (spriteDrag == SpriteDrag::MovePixels)
         {
-            // A ghost of the frame at the new place: green when it fits, red when it is not allowed
-            spriteMoveTo[0] = spriteDragRect[0] + dx;
-            spriteMoveTo[1] = spriteDragRect[1] + dy;
-            spriteMoveTo[0] += snapSpan(true, spriteFrameSel, spriteMoveTo[0], spriteMoveTo[0] + spriteDragRect[2]);
-            spriteMoveTo[1] += snapSpan(false, spriteFrameSel, spriteMoveTo[1], spriteMoveTo[1] + spriteDragRect[3]);
-            const bool ok = SpriteMoveBlocker(spriteFrameSel, spriteMoveTo[0], spriteMoveTo[1]).empty();
-            const ImVec2 a = toScreen(static_cast<float>(spriteMoveTo[0]), static_cast<float>(spriteMoveTo[1]));
-            const ImVec2 b = toScreen(
-                static_cast<float>(spriteMoveTo[0] + spriteDragRect[2]),
-                static_cast<float>(spriteMoveTo[1] + spriteDragRect[3]));
-            if (tex && spriteImageW > 0 && spriteImageH > 0)
-                dl->AddImage(
-                    reinterpret_cast<ImTextureID>(tex),
-                    a,
-                    b,
-                    ImVec2(
-                        static_cast<float>(spriteDragRect[0]) / spriteImageW,
-                        static_cast<float>(spriteDragRect[1]) / spriteImageH),
-                    ImVec2(
-                        static_cast<float>(spriteDragRect[0] + spriteDragRect[2]) / spriteImageW,
-                        static_cast<float>(spriteDragRect[1] + spriteDragRect[3]) / spriteImageH),
-                    IM_COL32(255, 255, 255, 170));
-            dl->AddRectFilled(a, b, ok ? IM_COL32(60, 220, 120, 50) : IM_COL32(255, 60, 60, 90));
-            dl->AddRect(a, b, ok ? IM_COL32(60, 255, 140, 255) : IM_COL32(255, 70, 70, 255), 0.0f, 0, 2.0f);
+            // Ghosts of the frames at the new places: green when they fit, red when it is not allowed
+            int ox = 0, oy = 0;
+            groupOffset(dx, dy, ox, oy);
+            spriteGroupMove[0] = ox;
+            spriteGroupMove[1] = oy;
+            std::vector<int> moving;
+            for (const auto &g : spriteGroupStart)
+                moving.push_back(g[0]);
+            const bool ok = SpriteGroupMoveBlocker(moving, ox, oy).empty();
+            for (const auto &g : spriteGroupStart)
+            {
+                const ImVec2 a = toScreen(static_cast<float>(g[1] + ox), static_cast<float>(g[2] + oy));
+                const ImVec2 b = toScreen(static_cast<float>(g[1] + ox + g[3]), static_cast<float>(g[2] + oy + g[4]));
+                if (tex && spriteImageW > 0 && spriteImageH > 0)
+                    dl->AddImage(
+                        reinterpret_cast<ImTextureID>(tex),
+                        a,
+                        b,
+                        ImVec2(static_cast<float>(g[1]) / spriteImageW, static_cast<float>(g[2]) / spriteImageH),
+                        ImVec2(
+                            static_cast<float>(g[1] + g[3]) / spriteImageW,
+                            static_cast<float>(g[2] + g[4]) / spriteImageH),
+                        IM_COL32(255, 255, 255, 170));
+                dl->AddRectFilled(a, b, ok ? IM_COL32(60, 220, 120, 50) : IM_COL32(255, 60, 60, 90));
+                dl->AddRect(a, b, ok ? IM_COL32(60, 255, 140, 255) : IM_COL32(255, 70, 70, 255), 0.0f, 0, 2.0f);
+            }
         }
-        else if (spriteFrameSel >= 0 && (dx || dy))
+        else if (spriteDrag == SpriteDrag::Move && (dx || dy))
+        {
+            int ox = 0, oy = 0;
+            groupOffset(dx, dy, ox, oy);
+            for (const auto &g : spriteGroupStart)
+                if (g[0] < static_cast<int>(spriteFrames.size()))
+                    SetSpriteFrameRect(spriteFrames[g[0]], g[1] + ox, g[2] + oy, g[3], g[4]);
+        }
+        else if (spriteDrag == SpriteDrag::Resize && spriteFrameSel >= 0 && (dx || dy))
         {
             SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
             int x0 = spriteDragRect[0], y0 = spriteDragRect[1];
             int x1 = x0 + spriteDragRect[2], y1 = y0 + spriteDragRect[3];
-            if (spriteDrag == SpriteDrag::Move)
-            {
-                x0 += dx, x1 += dx, y0 += dy, y1 += dy;
-                const int sx = snapSpan(true, spriteFrameSel, x0, x1), sy = snapSpan(false, spriteFrameSel, y0, y1);
-                x0 += sx, x1 += sx, y0 += sy, y1 += sy;
-            }
-            else
-            {
-                int &vx = spriteDragCorner & 1 ? x1 : x0;
-                int &vy = spriteDragCorner & 2 ? y1 : y0;
-                vx += dx;
-                vy += dy;
-                vx += snapSpan(true, spriteFrameSel, vx, vx);
-                vy += snapSpan(false, spriteFrameSel, vy, vy);
-            }
+            int &vx = spriteDragCorner & 1 ? x1 : x0;
+            int &vy = spriteDragCorner & 2 ? y1 : y0;
+            vx += dx;
+            vy += dy;
+            vx += snapSpan(true, spriteFrameSel, vx, vx);
+            vy += snapSpan(false, spriteFrameSel, vy, vy);
             SetSpriteFrameRect(
                 f, std::min(x0, x1), std::min(y0, y1), std::max(1, std::abs(x1 - x0)), std::max(1, std::abs(y1 - y0)));
         }
@@ -1398,17 +1530,54 @@ void CharacterEditor::DrawSpriteTools()
             int x0, y0, x1, y1;
             drawBox(x0, y0, x1, y1);
             if (x1 - x0 > 1 && y1 - y0 > 1)
+            {
                 AddSpriteFrame(x0, y0, x1 - x0, y1 - y0, "f");
+                spriteMulti.assign(spriteFrames.size(), 0);
+            }
+        }
+        if (spriteDrag == SpriteDrag::BoxSelect)
+        {
+            const int x0 = static_cast<int>(std::min(spriteDragStart.x, std::floor(mx)));
+            const int y0 = static_cast<int>(std::min(spriteDragStart.y, std::floor(my)));
+            const int x1 = static_cast<int>(std::max(spriteDragStart.x, std::floor(mx))) + 1;
+            const int y1 = static_cast<int>(std::max(spriteDragStart.y, std::floor(my))) + 1;
+            if (x1 - x0 > 1 || y1 - y0 > 1)
+                for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+                {
+                    const int *r = spriteFrames[i].rect;
+                    if (r[0] < x1 && x0 < r[0] + r[2] && r[1] < y1 && y0 < r[1] + r[3])
+                    {
+                        spriteMulti[i] = 1;
+                        if (spriteFrameSel < 0)
+                            spriteFrameSel = i;
+                    }
+                }
         }
         if (spriteDrag == SpriteDrag::MovePixels)
-            MoveSpriteFramePixels(spriteFrameSel, spriteMoveTo[0], spriteMoveTo[1]);
+        {
+            std::vector<int> moving;
+            for (const auto &g : spriteGroupStart)
+                moving.push_back(g[0]);
+            MoveSpriteFramesPixels(moving, spriteGroupMove[0], spriteGroupMove[1]);
+        }
         spriteDrag = SpriteDrag::None;
     }
 
-    // Arrows move the selected frame by a pixel (Shift: 10), with Ctrl they resize it
+    // Keys: arrows move the selection by a pixel (Shift: 10), with Ctrl they resize the main frame; Delete removes the
+    // selection, Ctrl+A selects every frame, Esc none
+    if (ImGui::IsWindowFocused() && !io.WantTextInput)
+    {
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
+        {
+            spriteMulti.assign(spriteFrames.size(), 1);
+            if (spriteFrameSel < 0 && !spriteFrames.empty())
+                spriteFrameSel = 0;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            clearSelection();
+    }
     if (spriteFrameSel >= 0 && ImGui::IsWindowFocused() && !io.WantTextInput)
     {
-        SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
         const int step = io.KeyShift ? 10 : 1;
         int d[2] = {0, 0};
         if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
@@ -1422,13 +1591,25 @@ void CharacterEditor::DrawSpriteTools()
         if (d[0] || d[1])
         {
             if (io.KeyCtrl)
+            {
+                SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
                 SetSpriteFrameRect(
                     f, f.rect[0], f.rect[1], std::max(1, f.rect[2] + d[0]), std::max(1, f.rect[3] + d[1]));
+            }
             else
-                SetSpriteFrameRect(f, f.rect[0] + d[0], f.rect[1] + d[1], f.rect[2], f.rect[3]);
+                for (int i : SpriteSelection())
+                {
+                    SpriteFrameEdit &f = spriteFrames[i];
+                    SetSpriteFrameRect(f, f.rect[0] + d[0], f.rect[1] + d[1], f.rect[2], f.rect[3]);
+                }
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-            RemoveSpriteFrame(spriteFrameSel);
+        {
+            const std::vector<int> gone = SpriteSelection();
+            for (auto it = gone.rbegin(); it != gone.rend(); ++it)
+                RemoveSpriteFrame(*it);
+            clearSelection();
+        }
     }
     dl->PopClipRect();
 

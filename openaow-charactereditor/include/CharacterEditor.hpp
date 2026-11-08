@@ -41,7 +41,8 @@ enum class SpriteDrag
     Move,
     Resize,
     Draw,
-    MovePixels // Sprite change mode: the frame travels with its pixels
+    MovePixels, // Sprite change mode: the frames travel with their pixels
+    BoxSelect   // a box on empty ground picks the frames it touches
 };
 
 // A frame on the Sprite Merge canvas: where it is in its object's image and where it goes in the result
@@ -218,6 +219,10 @@ private:
     bool RestoreSpriteBackup();
     std::string SpriteMoveBlocker(int index, int x, int y) const; // why the frame cannot go there; empty: it can
     bool MoveSpriteFramePixels(int index, int x, int y);          // the frame and its pixels to (x, y), unsaved
+    // Several frames: why they cannot all move by dx, dy (empty: they can) / move them with their pixels, unsaved
+    std::string SpriteGroupMoveBlocker(const std::vector<int> &frames, int dx, int dy) const;
+    bool MoveSpriteFramesPixels(const std::vector<int> &frames, int dx, int dy);
+    std::vector<int> SpriteSelection() const; // the main frame and the others picked with it, in frame order
     bool RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmaller = false); // PNGs redrawn with the frames at new places, unsaved
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
     // Pixel edits are kept in memory (spritePending) until Save: the PNGs on disk stay as they were
@@ -512,7 +517,10 @@ private:
     float spriteScale {1.0f};
     int spriteRecolor {0};
     int spriteImageW {0}, spriteImageH {0};
-    int spriteFrameSel {-1};
+    int spriteFrameSel {-1};             // the main selected frame (its properties, its resize handles)
+    std::vector<char> spriteMulti;       // per frame: selected along with it (Ctrl / Shift click, a box, Ctrl+A)
+    std::vector<std::array<int, 5>> spriteGroupStart; // the dragged group at the press: frame, x, y, w, h
+    int spriteGroupMove[2] {0, 0};       // the offset of the group while it is dragged with its pixels
     bool spriteDirty {false};
     std::map<std::string, SDL_Surface *> spritePending;   // edited PNGs (name -> RGBA), written by Save only
     std::map<std::string, SDL_Surface *> spriteScaleBase; // the pixels before the first resize, resampled from

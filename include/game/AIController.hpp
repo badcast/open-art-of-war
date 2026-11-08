@@ -386,6 +386,9 @@ private:
         std::vector<std::pair<int, int>> &wallTiles);
     // Hard / Hardcore: repairs buildings that are not under fire, paid from the AI treasury
     void UpdateRepairs(float deltaTime, EntityManager &entities);
+    // The foe the waves go for when nothing better is known (m_playerHqX/Y): moved off a player who is out, onto a
+    // living foe; with no foe left nothing is sent. A newly eliminated foe sends the marching squads back
+    void RefreshFoeAnchor(EntityManager &entities);
     // What the computer knows of the enemy: structures and units it has seen (Hardcore: everything)
     void UpdateIntel(EntityManager &entities);
     // A cheap unit looks for the enemy at the start and again every while (not on Hardcore: it sees all)
@@ -435,6 +438,9 @@ private:
     int m_enemyHqY {0};
     int m_playerHqX {0};
     int m_playerHqY {0};
+    std::uint32_t m_eliminatedFoes {0}; // bit per player: out of the match (UpdateElimination), never a target again
+    bool m_noFoesLeft {false};
+    float m_foeAnchorTimer {0.0f};
     bool m_initialized {false};
 
     float m_gameTime {0.0f};

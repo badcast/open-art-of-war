@@ -83,6 +83,23 @@ int main()
             AIBaseLayoutTest::Site(ai, map, entities, againX, againY, 100) && x == againX && y == againY,
             "placement is deterministic");
     }
+    // Narrow map: a long strip with a niche by a cliff. Closing the niche (a dead end) is fine, closing the strip is not
+    {
+        EntityManager none;
+        TileMap strip;
+        strip.InitBlankArena(40, 6); // (the arena may come out bigger: everything outside the strip is closed)
+        for (int y = 0; y < strip.GetHeight(); ++y)
+            for (int x = 0; x < strip.GetWidth(); ++x)
+                strip.SetPassable(x, y, x < 40 && y < 6);
+        strip.SetPassable(2, 0, false); // the niche (0..1, 0..1) opens only downwards
+        strip.SetPassable(2, 1, false);
+        check(AIBaseLayoutTest::Keeps(ai, strip, none, 0, 2, 2, 2), "narrow map: a niche may be closed");
+        check(!AIBaseLayoutTest::Keeps(ai, strip, none, 20, 0, 2, 6), "narrow map: the strip may not be cut");
+        for (int y = 0; y < 4; ++y)
+            strip.SetPassable(20, y, false); // a cliff: the strip goes on through two rows at the bottom
+        check(!AIBaseLayoutTest::Keeps(ai, strip, none, 21, 4, 1, 2), "narrow map: the last gap stays open");
+        check(!AIBaseLayoutTest::Keeps(ai, strip, none, 21, 5, 1, 1), "narrow map: the gap stays wide for vehicles");
+    }
     std::printf("AI layout: %d failures\n", failures);
     return failures ? 1 : 0;
 }

@@ -120,7 +120,7 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
     }
     else
     {
-        if (!m_doc.LoadMap(LoaderResources::MapPath("resistance_mission_7")))
+        if (!m_doc.LoadMap(LoaderResources::MapPath("confederation_mission_1")))
         {
             m_doc.NewMap(60, 40, 0, 0);
         }

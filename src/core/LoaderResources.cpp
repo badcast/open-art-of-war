@@ -23,7 +23,7 @@ struct State
     std::mutex lock;
     nlohmann::json doc;
     std::string text;
-    std::string root = LoaderResources::kDefaultRoot;
+    std::string root;
     bool fromFile = false;
 };
 
@@ -106,22 +106,19 @@ std::string WithExt(const std::string &name, const std::string &ext)
 }
 } // namespace
 
-bool LoaderResources::Init(const std::string &assetRoot, const std::string &manifestPath)
+bool LoaderResources::Init()
 {
     State &s = state();
     {
         std::lock_guard<std::mutex> guard(s.lock);
-        s.root = assetRoot.empty() ? std::string(kDefaultRoot) : assetRoot;
+        s.root = std::string(kDefaultRoot);
     }
     std::call_once(s.loaded, [] {}); // later lazy loads must not overwrite this one
-    std::string path = manifestPath;
-    if (manifestPath == kManifestPath && !assetRoot.empty() && assetRoot != kDefaultRoot)
-    {
-        std::string text;
-        if (!Assets::ReadText(path, text))
-            path = s.root + "/main.yaml";
-    }
-    // TODO: kMinimalVersionManifest != from loaded version
+    std::string path = kManifestPath;
+    std::string text;
+    if (!Assets::ReadText(path, text))
+        path = s.root + "/main.yaml";
+
     return LoadInto(s, path);
 }
 

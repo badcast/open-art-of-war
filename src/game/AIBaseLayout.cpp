@@ -256,6 +256,26 @@ bool AIController::KeepsWayOut(
             for (int tx = std::max(0, b->tileX); tx < std::min(mw, b->tileX + b->buildWidth); ++tx)
                 blocked[ty * mw + tx] = 1;
     }
+    // Tiles a passage must keep together: roads, the ground around every exit building of this player and around
+    // every headquarters
+    std::vector<unsigned char> important(mw * mh, 0);
+    for (int ty = 0; ty < mh; ++ty)
+        for (int tx = 0; tx < mw; ++tx)
+            if (IsRoadCore(tx, ty))
+                important[ty * mw + tx] = 1;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die)
+            continue;
+        const bool hq = b->type == UnitType::Headquarters;
+        if (!hq && !(b->owner == m_player && IsExitBuilding(b->type)))
+            continue;
+        for (int ty = b->tileY - 2; ty <= b->tileY + b->buildHeight + 1; ++ty)
+            for (int tx = b->tileX - 2; tx <= b->tileX + b->buildWidth + 1; ++tx)
+                if (tx >= 0 && ty >= 0 && tx < mw && ty < mh)
+                    important[ty * mw + tx] = 1;
+    }
     for (int clearance : {1, 2})
     {
         auto free = [&](int bx, int by, bool after) {
@@ -303,15 +323,44 @@ bool AIController::KeepsWayOut(
             return labels;
         };
         const auto before = components(false), after = components(true);
-        std::vector<int> destination(mw * mh, -1);
+        // A passage that falls apart is refused, unless the parts cut off are only small dead ends (a niche by a
+        // cliff, a corner behind the building): on narrow maps nearly every spot closes one, and refusing them all
+        // left the computer without a place to build. A part that holds a road, the door of a building or a
+        // headquarters' surroundings is never cut off.
+        int afterCount = 0;
         for (int i = 0; i < mw * mh; ++i)
-            if (after[i] >= 0)
-            {
-                int &to = destination[before[i]];
-                if (to >= 0 && to != after[i])
-                    return false; // a previously connected passage was split
-                to = after[i];
-            }
+            afterCount = std::max(afterCount, after[i] + 1);
+        std::vector<int> partSize(afterCount, 0), partOwner(afterCount, -1);
+        std::vector<char> partImportant(afterCount, 0);
+        for (int i = 0; i < mw * mh; ++i)
+        {
+            if (after[i] < 0)
+                continue;
+            ++partSize[after[i]];
+            partOwner[after[i]] = before[i];
+            if (important[i])
+                partImportant[after[i]] = 1;
+        }
+        std::vector<int> mainPart(mw * mh, -1); // per component before: its largest part after
+        for (int a = 0; a < afterCount; ++a)
+        {
+            const int b = partOwner[a];
+            if (b < 0)
+                continue;
+            int &m = mainPart[b];
+            if (m < 0 || partSize[a] > partSize[m] || (partSize[a] == partSize[m] && partImportant[a] && !partImportant[m]))
+                m = a;
+        }
+        constexpr int kDeadEndTiles = 32;
+        for (int a = 0; a < afterCount; ++a)
+        {
+            const int b = partOwner[a];
+            if (b < 0 || mainPart[b] == a)
+                continue;
+            // (a dead end is small, and small next to what stays connected: halving a small map is no dead end)
+            if (partImportant[a] || partSize[a] > kDeadEndTiles || partSize[a] * 4 > partSize[mainPart[b]])
+                return false; // a previously connected passage was split
+        }
         auto touches = [&](const std::vector<int> &labels, int bx, int by, int bw, int bh) {
             for (int ty = by - clearance; ty <= by + bh; ++ty)
                 for (int tx = bx - clearance; tx <= bx + bw; ++tx)

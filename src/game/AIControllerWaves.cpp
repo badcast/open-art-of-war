@@ -387,6 +387,8 @@ void AIController::FindAttackObjective(const EntityManager &entities, const Tile
 {
     outX = -1;
     outY = -1;
+    if (m_noFoesLeft)
+        return; // everybody hostile is out: nobody to attack
     float bestBldgDist = 1e9f;
 
     // The closest enemy structure the computer knows of (walls on the way get breached), otherwise the closest

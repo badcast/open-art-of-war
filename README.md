@@ -97,7 +97,7 @@ Deeply inspired by open-source revival projects like **Warzone 2100** and **Open
 </p>
 
 <details>
-  <summary><b>📷 Показать больше скриншотов (галерея)</b></summary>
+  <summary><b>📷 Screenshots</b></summary>
   <br>
   
   | | |

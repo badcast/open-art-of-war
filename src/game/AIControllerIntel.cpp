@@ -57,7 +57,7 @@ void AIController::UpdateIntel(EntityManager &entities)
 void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
 {
     const AIDifficulty difficulty = GetEffectiveDifficulty();
-    if (difficulty == AIDifficulty::Hardcore || (m_playerHqX <= 0 && m_playerHqY <= 0))
+    if (difficulty == AIDifficulty::Hardcore || m_noFoesLeft || (m_playerHqX <= 0 && m_playerHqY <= 0))
         return;
     m_scoutTimer -= deltaTime;
     Unit *scout = m_scoutId ? entities.GetUnit(m_scoutId) : nullptr;
