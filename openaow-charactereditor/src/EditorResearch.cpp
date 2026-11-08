@@ -230,7 +230,7 @@ void CharacterEditor::DrawResearchTree()
             0,
             selected ? 2.0f : 1.0f);
 
-        const int icon = YamlInt(n, "icon", 0);
+        const int icon = SpriteRefHandle(n["icon"], OpenArtOfWar::SpriteKind::Part);
         if (SDL_Texture *thumb = CompositeThumbnail(icon, false))
         {
             dl->AddImage(
@@ -279,13 +279,18 @@ void CharacterEditor::DrawResearchProperties()
     changed |= EditFloat(n, "research_seconds", "Research time (seconds)", 60.0f);
 
     // Icon
-    const int icon = YamlInt(n, "icon", 0);
-    ImGui::Text(_("Icon: %d"), icon);
+    const int icon = SpriteRefHandle(n["icon"], OpenArtOfWar::SpriteKind::Part);
+    ImGui::Text(_("Icon: %s"), YamlString(n, "icon", "-").c_str());
     const int perRow = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / 70.0f));
     FieldHint("Icon");
     ImGui::BeginChild("research-icons", ImVec2(0.0f, 150.0f), true);
     int k = 0;
-    for (int comp = OpenArtOfWar::kResearchIconFirst; comp <= OpenArtOfWar::kResearchIconLast; ++comp)
+    // The icons of the faction (sprite icons_res / icons_conf)
+    std::vector<int> icons;
+    const std::string iconObject = researchFaction == 0 ? "icons_conf" : "icons_res";
+    for (const std::string &item : OpenArtOfWar::Sprites().ItemNames(iconObject, OpenArtOfWar::SpriteKind::Part))
+        icons.push_back(OpenArtOfWar::Sprites().Resolve(iconObject + "." + item).handle);
+    for (int comp : icons)
     {
         if (k++ % perRow != 0)
             ImGui::SameLine();
@@ -298,9 +303,11 @@ void CharacterEditor::DrawResearchProperties()
                                    : ImGui::Button(std::to_string(comp).c_str(), ImVec2(60, 38));
         if (selected)
             ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", SpriteRefName(OpenArtOfWar::SpriteKind::Part, comp).c_str());
         if (clicked)
         {
-            n["icon"] = comp;
+            n["icon"] = SpriteRefName(OpenArtOfWar::SpriteKind::Part, comp);
             changed = true;
         }
         ImGui::PopID();

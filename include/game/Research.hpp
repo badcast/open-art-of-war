@@ -69,9 +69,6 @@ constexpr int kResearchCount = 24; // technologies per faction
 // YAML name of an effect (assets/characters/research_<faction>.yaml): `infantry_armor`, `fire_rate`, ...
 const char *ResearchEffectName(ResearchEffect effect);
 bool ParseResearchEffect(const std::string &name, ResearchEffect &out);
-// Cameo composites the research icon can be picked from
-constexpr int kResearchIconFirst = 2064;
-constexpr int kResearchIconLast = 2132;
 // The catalog is read from the faction's research YAML; entries it lacks keep the built-in values
 const ResearchDef &researchDef(Faction faction, int index);
 // The research files are read again on the next use (a network game plays with the host's data)

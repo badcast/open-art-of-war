@@ -535,11 +535,16 @@ bool CharacterEditor::DrawIdentity(bool isBuilding)
 bool CharacterEditor::DrawIconPicker(YAML::Node production)
 {
     bool changed = false;
-    const int current = YamlInt(production, "icon_composite", 0);
-    ImGui::Text(_("Build menu icon: %d"), current);
+    const int current = SpriteRefHandle(production["icon_composite"], OpenArtOfWar::SpriteKind::Part);
+    ImGui::Text(_("Build menu icon: %s"), YamlString(production, "icon_composite", "-").c_str());
     const int perRow = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / 74.0f));
     int n = 0;
-    for (int comp = 2064; comp <= 2081; ++comp)
+    // The icons of both factions (sprites icons_res and icons_conf)
+    std::vector<int> icons;
+    for (const char *object : {"icons_res", "icons_conf"})
+        for (const std::string &item : OpenArtOfWar::Sprites().ItemNames(object, OpenArtOfWar::SpriteKind::Part))
+            icons.push_back(OpenArtOfWar::Sprites().Resolve(std::string(object) + "." + item).handle);
+    for (int comp : icons)
     {
         if (n++ % perRow != 0)
             ImGui::SameLine();
@@ -552,9 +557,11 @@ bool CharacterEditor::DrawIconPicker(YAML::Node production)
                                    : ImGui::Button(std::to_string(comp).c_str(), ImVec2(64, 42));
         if (selected)
             ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", SpriteRefName(OpenArtOfWar::SpriteKind::Part, comp).c_str());
         if (clicked)
         {
-            production["icon_composite"] = comp;
+            production["icon_composite"] = SpriteRefName(OpenArtOfWar::SpriteKind::Part, comp);
             changed = true;
         }
         ImGui::PopID();
@@ -579,10 +586,14 @@ bool CharacterEditor::DrawWreckProperties(bool isBuilding)
         return false;
     }
 
-    int composite = 0, stages = 0;
+    int composite = -1, stages = 0;
     WreckOf(document, composite, stages);
     const bool custom = animations["wreck_composite"].IsDefined();
-    ImGui::Text(_("Wreck composite %d, %d stage(s)%s"), composite, stages, custom ? "" : _(" (default)"));
+    ImGui::Text(
+        _("Wreck %s, %d stage(s)%s"),
+        SpriteRefName(OpenArtOfWar::SpriteKind::Part, composite).c_str(),
+        stages,
+        custom ? "" : _(" (default)"));
 
     // Family list with pictures; click to use it
     const float cell = 104.0f;
@@ -593,19 +604,20 @@ bool CharacterEditor::DrawWreckProperties(bool isBuilding)
         if (n++ % perRow != 0)
             ImGui::SameLine();
         ImGui::BeginGroup();
-        ImGui::PushID(f.composite);
-        const bool current = (f.composite == composite);
+        const FamilyRef fam = SpriteFamilyRef(f.family);
+        ImGui::PushID(f.family);
+        const bool current = (fam.start == composite);
         if (current)
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
-        SDL_Texture *thumb = WreckThumbnail(f.composite);
+        SDL_Texture *thumb = WreckThumbnail(fam.start);
         const bool clicked = thumb ? ImGui::ImageButton("thumb", reinterpret_cast<ImTextureID>(thumb), ImVec2(96, 64))
                                    : ImGui::Button("?", ImVec2(96, 64));
         if (current)
             ImGui::PopStyleColor();
         if (clicked)
         {
-            animations["wreck_composite"] = f.composite;
-            animations["wreck_stages"] = f.stages;
+            animations["wreck_composite"] = std::string(f.family);
+            animations["wreck_stages"] = fam.count;
             SetMode(PreviewMode::Wreck);
             changed = true;
         }

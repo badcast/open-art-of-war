@@ -154,7 +154,7 @@ int CharacterEditor::run()
                 if (editorMode == EditorMode::Research)
                     SaveResearch();
                 else if (editorMode == EditorMode::SpriteTools)
-                    SaveSpritesJson();
+                    SaveSpriteObject();
                 else if (
                     editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
                     || editorMode == EditorMode::Projectiles || editorMode == EditorMode::GameUi

@@ -117,6 +117,48 @@ bool TextureManager::LoadAllAssets()
 {
     std::cout << "[TextureManager] Loading game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
 
+    LoadSprites();
+
+    // 4. Load UI screens
+    for (const auto &[name, path] : LoaderResources::UiTextures())
+        m_uiTextures[name] = LoadTexture(path);
+
+    std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
+    return true;
+}
+
+void TextureManager::ReloadSprites()
+{
+    // Forget every texture and surface made from the sprite images, then read them again
+    for (const std::string &path : m_imagePaths)
+    {
+        const auto it = m_textureCache.find(path);
+        if (it != m_textureCache.end())
+        {
+            if (it->second)
+                SDL_DestroyTexture(it->second);
+            m_textureCache.erase(it);
+        }
+    }
+    for (auto &[key, tex] : m_recoloredSheets)
+        if (tex)
+            SDL_DestroyTexture(tex);
+    m_recoloredSheets.clear();
+    for (SDL_Surface *surface : m_sheetSurfaces)
+        if (surface)
+            SDL_DestroySurface(surface);
+    m_sheetSurfaces.clear();
+    m_tileColors.clear();
+    OpenArtOfWar::ReloadSprites();
+    LoadSprites();
+    SDL_ScaleMode terrain = m_terrainScaleMode, sprite = m_spriteScaleMode;
+    for (std::size_t i = 0; i < m_spriteSheets.size(); ++i)
+        if (m_spriteSheets[i])
+            SDL_SetTextureScaleMode(m_spriteSheets[i], m_terrainPages[i] ? terrain : sprite);
+}
+
+void TextureManager::LoadSprites()
+{
     // 1. The sprites: one image and one meta per object, compiled into the drawing tables
     const SpriteRegistry &reg = Sprites();
     const SpriteTables &t = reg.Tables();
@@ -168,13 +210,6 @@ bool TextureManager::LoadAllAssets()
 
     // 3. What the game's units, buildings and tilesets are drawn from
     LoadSpriteBindings();
-
-    // 4. Load UI screens
-    for (const auto &[name, path] : LoaderResources::UiTextures())
-        m_uiTextures[name] = LoadTexture(path);
-
-    std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
-    return true;
 }
 
 namespace

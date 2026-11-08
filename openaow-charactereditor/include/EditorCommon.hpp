@@ -5,6 +5,7 @@
 #include "core/Utility.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/Renderer.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "graphics/TextureManager.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Pathfinder.hpp"
@@ -62,22 +63,35 @@ enum class PreviewMode
     Wreck // the remains left behind, stage by stage
 };
 
-// Wreck (hull remains) composite families: first composite of the family and the number of burial stages
+// Wreck (hull remains) families of the game: a sprite family of burial stages
 struct WreckFamily
 {
-    int composite;
-    int stages;
-    const char *label; // gettext msgid
+    const char *family; // "<object>.<family>"
+    const char *label;  // gettext msgid
 };
 
 inline const WreckFamily kWreckFamilies[] = {
-    {1759, 5, "Light vehicle"},
-    {1764, 5, "Vehicle"},
-    {1769, 4, "Heavy vehicle"},
-    {1741, 6, "Rubble 2x2"},
-    {1747, 6, "Rubble 3x3"},
-    {1753, 6, "Rubble 4x4"},
+    {"fx_wreck_light.stages", "Light vehicle"},
+    {"fx_wreck_vehicle.stages", "Vehicle"},
+    {"fx_wreck_heavy.stages", "Heavy vehicle"},
+    {"fx_rubble_small.stages", "Rubble 2x2"},
+    {"fx_rubble_medium.stages", "Rubble 3x3"},
+    {"fx_rubble_large.stages", "Rubble 4x4"},
 };
+
+// Sprites in the configs are written by name ("<object>.<item>", "<object>.<family>"); the editor draws them by the
+// handle of the game's sprite tables
+struct FamilyRef
+{
+    int start {-1};
+    int count {0};
+};
+FamilyRef SpriteFamilyRef(const std::string &ref);           // a family by name; {-1, 0} unknown
+int SpriteRefHandle(const YAML::Node &value, OpenArtOfWar::SpriteKind kind); // -1: none / unknown
+std::vector<int> SpriteRefHandles(const YAML::Node &list, OpenArtOfWar::SpriteKind kind);
+// The name to write for a handle: the family for the first member of a family ("<object>.<family>")
+std::string SpriteRefName(OpenArtOfWar::SpriteKind kind, int handle);
+std::string SpriteRefList(OpenArtOfWar::SpriteKind kind, const std::vector<int> &handles); // "[a.b, c.d]"
 
 fs::path FindAssetRoot();
 

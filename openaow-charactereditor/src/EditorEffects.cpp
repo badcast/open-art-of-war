@@ -130,7 +130,10 @@ void CharacterEditor::DrawAnimGallery(float height)
             ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
         {
-            ImGui::SetTooltip(_("Animation %d: %d frames"), id, r.end - r.start + 1);
+            ImGui::SetTooltip(
+                _("Animation %s: %d frames"),
+                SpriteRefName(OpenArtOfWar::SpriteKind::Anim, id).c_str(),
+                r.end - r.start + 1);
         }
         if (clicked)
         {
@@ -146,11 +149,11 @@ void CharacterEditor::DrawAnimGallery(float height)
                     std::string list = "[";
                     for (std::size_t i = 0; i < target.size(); ++i)
                         list += target[i].Scalar() + ", ";
-                    ok = y.Set(animPickPath, list + std::to_string(id) + "]");
+                    ok = y.Set(animPickPath, list + SpriteRefName(OpenArtOfWar::SpriteKind::Anim, id) + "]");
                 }
                 else
                 {
-                    ok = y.Set(animPickPath, std::to_string(id));
+                    ok = y.Set(animPickPath, SpriteRefName(OpenArtOfWar::SpriteKind::Anim, id));
                 }
                 if (ok)
                 {
@@ -470,31 +473,32 @@ void CharacterEditor::DrawWreckTabProperties()
         if (!ImGui::CollapsingHeader(_(kWreckClasses[i].label), i == wreckClass ? ImGuiTreeNodeFlags_DefaultOpen : 0))
             continue;
         ImGui::PushID(i);
-        changed |= EditYamlScalar(effectsYaml, base + ".composite", _("Composite"));
+        changed |= EditYamlScalar(effectsYaml, base + ".sprite", _("Sprite (family of stages)"));
         changed |= EditYamlScalar(effectsYaml, base + ".stages", _("Stages"));
         // The known wreck families of the game: one click sets composite and stage count
         ImGui::TextUnformatted(_("Families"));
         FieldHint("Families");
-        const int cur = static_cast<int>(effectsYaml.At(base + ".composite").as<int>(0));
+        const int cur = SpriteFamilyRef(effectsYaml.At(base + ".sprite").as<std::string>("")).start;
         for (std::size_t f = 0; f < std::size(kWreckFamilies); ++f)
         {
             if (f)
                 ImGui::SameLine();
             ImGui::PushID(static_cast<int>(f));
-            const bool selected = kWreckFamilies[f].composite == cur;
+            const FamilyRef fam = SpriteFamilyRef(kWreckFamilies[f].family);
+            const bool selected = fam.start >= 0 && fam.start == cur;
             if (selected)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
-            SDL_Texture *thumb = CompositeThumbnail(kWreckFamilies[f].composite, true);
+            SDL_Texture *thumb = CompositeThumbnail(fam.start, true);
             const bool clicked = thumb ? ImGui::ImageButton("fam", reinterpret_cast<ImTextureID>(thumb), ImVec2(48, 32))
-                                       : ImGui::Button(std::to_string(kWreckFamilies[f].composite).c_str());
+                                       : ImGui::Button(kWreckFamilies[f].family);
             if (selected)
                 ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s (%d)", _(kWreckFamilies[f].label), kWreckFamilies[f].composite);
+                ImGui::SetTooltip("%s (%s)", _(kWreckFamilies[f].label), kWreckFamilies[f].family);
             if (clicked)
             {
-                changed |= effectsYaml.Set(base + ".composite", std::to_string(kWreckFamilies[f].composite));
-                changed |= effectsYaml.Set(base + ".stages", std::to_string(kWreckFamilies[f].stages));
+                changed |= effectsYaml.Set(base + ".sprite", kWreckFamilies[f].family);
+                changed |= effectsYaml.Set(base + ".stages", std::to_string(fam.count));
             }
             ImGui::PopID();
         }

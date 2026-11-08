@@ -32,8 +32,8 @@ fs::path FindAssetRoot()
 
     for (const auto &candidate : candidates)
     {
-        if (fs::exists(candidate / "data" / "sprites.json")
-            && fs::exists(candidate / "data" / "sprites_graphics.json"))
+        if (fs::exists(candidate / "main.yaml") && fs::exists(candidate / "sprites")
+            && fs::exists(candidate / "characters"))
         {
             return fs::weakly_canonical(candidate);
         }
@@ -137,8 +137,67 @@ void WreckOf(const YAML::Node &doc, int &composite, int &stages)
         composite = w.composite;
         stages = w.stages;
     }
-    composite = YamlInt(anim, "wreck_composite", composite);
+    if (anim && anim["wreck_composite"])
+    {
+        const std::string ref = anim["wreck_composite"].Scalar();
+        const FamilyRef fam = SpriteFamilyRef(ref);
+        if (fam.start >= 0)
+        {
+            composite = fam.start;
+            stages = fam.count;
+        }
+        else
+        {
+            composite = SpriteRefHandle(anim["wreck_composite"], OpenArtOfWar::SpriteKind::Part);
+        }
+    }
     stages = std::max(1, YamlInt(anim, "wreck_stages", stages));
+}
+
+FamilyRef SpriteFamilyRef(const std::string &ref)
+{
+    const auto dot = ref.find('.');
+    if (dot == std::string::npos)
+        return {};
+    const OpenArtOfWar::SpriteFamily *f = OpenArtOfWar::Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+    return f && f->count > 0 ? FamilyRef {f->start, f->count} : FamilyRef {};
+}
+
+int SpriteRefHandle(const YAML::Node &value, OpenArtOfWar::SpriteKind kind)
+{
+    if (!value || !value.IsScalar())
+        return -1;
+    const std::string ref = value.Scalar();
+    return ref.empty() || ref == "none" ? -1 : OpenArtOfWar::Sprites().Resolve(ref, kind).handle;
+}
+
+std::vector<int> SpriteRefHandles(const YAML::Node &list, OpenArtOfWar::SpriteKind kind)
+{
+    std::vector<int> out;
+    if (list && list.IsSequence())
+        for (const auto &v : list)
+        {
+            const int h = SpriteRefHandle(v, kind);
+            if (h >= 0)
+                out.push_back(h);
+        }
+    return out;
+}
+
+std::string SpriteRefName(OpenArtOfWar::SpriteKind kind, int handle)
+{
+    std::string name = OpenArtOfWar::SpriteName(kind, handle);
+    if (name.size() > 3 && name.compare(name.size() - 3, 3, "[0]") == 0)
+        name.resize(name.size() - 3);
+    return name;
+}
+
+std::string SpriteRefList(OpenArtOfWar::SpriteKind kind, const std::vector<int> &handles)
+{
+    std::string s = "[";
+    for (std::size_t i = 0; i < handles.size(); ++i)
+        s += (i ? ", " : "") + SpriteRefName(kind, handles[i]);
+    return s + "]";
 }
 
 void GetDefaultTurretOffset(int archetypeId, bool isBuilding, float &outX, float &outY)

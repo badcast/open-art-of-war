@@ -27,8 +27,9 @@ namespace
 // The infantry deaths every infantry character falls back to
 std::vector<int> DefaultDeaths(bool flame)
 {
-    const char *names[2] = {flame ? "fx_infantry_death.flame_0" : "fx_infantry_death.death_0",
-                            flame ? "fx_infantry_death.flame_1" : "fx_infantry_death.death_1"};
+    const char *names[2]
+        = {flame ? "fx_infantry_death.flame_0" : "fx_infantry_death.death_0",
+           flame ? "fx_infantry_death.flame_1" : "fx_infantry_death.death_1"};
     std::vector<int> out;
     for (const char *n : names)
     {
@@ -49,8 +50,8 @@ void ReadWreck(const YAML::Node &anim, int &composite, int &stages, const std::s
     {
         const std::string ref = anim["wreck_composite"].as<std::string>();
         const auto dot = ref.find('.');
-        const SpriteFamily *f =
-            dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+        const SpriteFamily *f
+            = dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
         if (f && f->count > 0)
         {
             composite = f->start;
@@ -4129,7 +4130,7 @@ void EntityManager::DestroyPlayer(PlayerId player, TileMap &map)
             if (map.GetWall(x, y) > 0 && map.GetWallOwner(x, y) == player)
             {
                 map.DestroyWall(x, y);
-                static const int collapse = SpriteHandle("fx_impacts.wall_destroyed", SpriteKind::Anim, "wall");
+                static const CachedSprite collapse("fx_impacts.wall_destroyed", SpriteKind::Anim);
                 SpawnExplosion(x * TILE_WIDTH + TILE_WIDTH * 0.5f, y * TILE_HEIGHT + TILE_HEIGHT * 0.5f, collapse);
             }
         }
@@ -4628,7 +4629,7 @@ void EntityManager::Render(
                     0.0f);
                 if (u->isSiegeMode || u->state == ActionState::Transform)
                 {
-                    static const int marker = SpriteHandle("ui_siege_marker.marker", SpriteKind::Part, "siege");
+                    static const CachedSprite marker("ui_siege_marker.marker", SpriteKind::Part);
                     renderer.DrawCompositeWorld(marker, wx - 90.0f, wy - 60.0f, camera, u->faction);
                 }
             }
@@ -4927,8 +4928,9 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
         const float prog = burst.duration > 0.0f ? std::clamp(burst.age / burst.duration, 0.0f, 1.0f) : 1.0f;
         const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
         renderer.SetDrawOwner(burst.owner);
-        static const int jet = SpriteHandle("fx_flame_jet.jet", SpriteKind::Anim, "flame jet");
-        renderer.DrawAnimSequenceWorldRotated(jet, flameFrame, burst.startX, burst.startY, angle, camera, burst.faction);
+        static const CachedSprite jet("fx_flame_jet.jet", SpriteKind::Anim);
+        renderer.DrawAnimSequenceWorldRotated(
+            jet, flameFrame, burst.startX, burst.startY, angle, camera, burst.faction);
     }
 
     // 6. Render Explosions (with visual centering for bullet hits and impacts)

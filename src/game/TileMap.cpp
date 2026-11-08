@@ -638,7 +638,7 @@ void TileMap::RenderWallRubble(Renderer &renderer, const Camera &camera, bool fo
             if (rubble > 0)
             {
                 // The grid only marks the rubble (the simulation compares it); its picture is a sprite
-                static const int sprite = SpriteHandle("fx_wall_rubble.rubble", SpriteKind::Part, "wall rubble");
+                static const CachedSprite sprite("fx_wall_rubble.rubble", SpriteKind::Part);
                 renderer.DrawCompositeWorld(
                     sprite, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
             }

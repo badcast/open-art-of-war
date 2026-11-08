@@ -3,8 +3,6 @@
 #include "BattleSim.hpp"
 #include "CommentedYaml.hpp"
 #include "EditorCommon.hpp"
-#include "SpriteCatalog.hpp"
-#include "SpriteExport.hpp"
 #include "graphics/ShaderEffects.hpp"
 #include "game/Projectiles.hpp"
 
@@ -15,49 +13,27 @@
 namespace CharEditor
 {
 
-struct PreviewSprite
+// A frame of the sprite being edited in the Sprite Tools tab
+struct SpriteFrameEdit
 {
-    int id {0};
-    int page {0};
-    SDL_Rect src {0, 0, 0, 0};
-    int x {0};
-    int y {0};
-    int w {0};
-    int h {0};
-    int groupId {-1};
-    std::string groupLabel;
-    bool colliding {false};
-    bool selected {false};
+    std::string name;
+    std::string original; // its name in the file; empty: added since the load
+    int rect[4] {0, 0, 1, 1}; // pixels in the image
+    float size[2] {1.0f, 1.0f}; // drawn size in game units
+    float ppu[2] {1.0f, 1.0f};  // pixels per game unit (the drawn size follows a resize at this ratio)
+    bool ownSize {false};       // the file gives the size
+    int recolor {-1};           // -1: as the sprite
+    int palette {0};
 };
 
-enum class SpriteDetailTab
-{
-    PointEditor,
-    Tree,
-    ExportPreview,
-    LoadedSprites
-};
-
-enum class PreviewSourceMode
-{
-    Object,
-    SingleSprites
-};
-
-enum class PointEditorDragMode
+enum class SpriteDrag
 {
     None,
-    MoveRect,
-    ResizeN,
-    ResizeS,
-    ResizeE,
-    ResizeW,
-    ResizeNW,
-    ResizeNE,
-    ResizeSW,
-    ResizeSE,
-    DrawBox
+    Move,
+    Resize,
+    Draw
 };
+
 
 class CharacterEditor
 {
@@ -202,38 +178,25 @@ private:
     void DrawResearchTree();
     void DrawResearchProperties();
 
-    // Sprite Tools tab: browser of the sprite data and the exports for repacking the assets
-    void EnsureSpriteCatalog();
+
+    // Sprite Tools tab: the per-object sprites (assets/sprites/sprite_<name>.png + _meta.yaml)
+    fs::path SpriteDir() const;
+    fs::path SpriteMetaPath(const std::string &object) const;
+    void LoadSpriteObject(const std::string &object);
+    std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
+    bool SaveSpriteObject();
+    void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
+    bool CreateSpriteObject(const fs::path &png, const std::string &name);
+    std::string FreeFrameName(const std::string &prefix) const;
+    void AddSpriteFrame(int x, int y, int w, int h, const std::string &prefix);
+    void RemoveSpriteFrame(int index);
+    void SetSpriteFrameRect(SpriteFrameEdit &f, int x, int y, int w, int h);
+    void SliceSpriteGrid();
+    void DetectSpriteFrames();
+    void SyncSpriteObjectFromActive();
     void DrawSpriteTools();
     void DrawSpriteProperties();
-    void DrawSpriteImage(int spriteId, float box);
-    void DrawSpriteImageAt(const ImVec2 &pos, int spriteId, float box);
-    void DrawDepNode(const DepNode &node, int depth);
-
-    // Sprite Tools Export Preview & Layout Editor
-    void InitPreviewFromObject(int objectIndex);
-    void InitPreviewFromSingleSprites();
-    void UpdatePreviewCollisions();
-    void LayoutPreviewLine(bool horizontal = true, int pad = 2);
-    void LayoutPreviewGrid(int cols, int pad = 2, bool compress = true);
-    void LayoutPreviewPack(int pad = 1);
-    void LayoutPreviewByObject(int pad = 2);
-    void LayoutPreviewScatter();
-    void LayoutPreviewSeparateOverlaps(int pad = 2);
-    void LayoutPreviewAlign(int mode); // 0=left, 1=top, 2=right, 3=bottom, 4=distribH, 5=distribV
-    void FitPreviewView(const ImVec2 &canvasSize);
-    void DrawSpritePreview();
-    void DrawSpritePreviewCanvas(const ImVec2 &size);
-    bool ExportCurrentPreview(std::string &report);
-    void DrawLoadedSprites();
-    int FindSpriteObjectForActiveCharacter() const;
-    void SyncSpriteObjectFromActive();
-    void OnSpriteObjectSelected(int objIdx);
-    void OnSpriteModified(const RawSprite &s);
-    bool SaveSpritesJson();
-    bool RevertSpritesJson();
-    void SyncTextureFramesFromCatalog();
-    void DrawPointEditor();
+    void ClearThumbnails();
 
     // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
@@ -474,86 +437,32 @@ private:
     std::map<std::string, std::array<char, 512>> envTextBuffers;
     FolderPick fontPick[2]; // result of the file dialog of the regular / bold font
     int aiSelected {0};     // 0 easy .. 3 hardcore
-    SpriteCatalog spriteCatalog;
-    bool spriteCatalogTried {false};
-    bool spriteCatalogOk {false};
-    std::vector<int> spriteThumbIds; // per object: the sprite shown in the list
-    int spriteGroupFilter {-1};      // -1 all, else SpriteGroup
-    int spriteSelected {-1};
-    int spriteAnchor {-1};       // start of a Shift+click range
-    std::set<int> spriteChecked; // objects chosen for export (multi-select)
-    int spriteTreeFor {-1};
-    DepNode spriteTree;
+    // Sprite Tools tab
+    std::string spriteObject; // the sprite being edited
+    std::string spriteImageName;
     std::array<char, 128> spriteSearch {};
-    std::array<char, 512> spriteOutDir {};
-    SingleExportOptions singleOptions;
+    std::vector<SpriteFrameEdit> spriteFrames;
+    std::vector<std::string> spriteRemoved; // frames removed since the load (names in the file)
+    float spriteScale {1.0f};
+    int spriteRecolor {0};
+    int spriteImageW {0}, spriteImageH {0};
+    int spriteFrameSel {-1};
+    bool spriteDirty {false};
+    float spriteZoom {2.0f};
+    ImVec2 spritePan {16.0f, 16.0f};
+    SpriteDrag spriteDrag {SpriteDrag::None};
+    int spriteDragCorner {0};
+    ImVec2 spriteDragStart {0.0f, 0.0f};
+    int spriteDragRect[4] {0, 0, 0, 0};
+    bool spriteDrawMode {false};
+    int spriteGridCols {4}, spriteGridRows {1};
+    bool spriteSkipEmpty {true};
+    int spriteDetectGap {1};
+    int spriteDetectMinArea {4};
+    std::array<char, 512> spriteNewPng {};
+    std::array<char, 64> spriteNewName {};
+    FolderPick spritePngPick;
     std::string spriteReport;
-    FolderPick folderPick;
-    FolderPick importPick;                // result of the folder dialog of the import
-    std::array<char, 512> spriteInDir {}; // folder the import reads
-    bool importConfirm {false};           // ask before the import overwrites the assets
-
-    // Point Editor & sprites.json State
-    bool spritesJsonDirty {false};
-    int pointEditorSpriteId {-1};
-    int pointEditorNudgeStep {1};
-    int pointEditorShiftAllDx {0};
-    int pointEditorShiftAllDy {0};
-    float pointEditorZoom {2.0f};
-    ImVec2 pointEditorPan {0.0f, 0.0f};
-    ImVec2 pointEditorThumbDragStart {0.0f, 0.0f}; // the sprite's (x, y) when the thumbnail drag began
-    ImVec2 pointEditorCanvasSize {600.0f, 400.0f};  // the sheet canvas of the last frame
-    static constexpr float kPointEditorZoomMin = 0.1f;
-    static constexpr float kPointEditorZoomMax = 24.0f;
-    int pointEditorFramedSpriteId {-1};
-    PointEditorDragMode pointEditorDragMode {PointEditorDragMode::None};
-    ImVec2 pointEditorDragStartMouse {0.0f, 0.0f};
-    // The rectangle when the drag began (units of the original sheet)
-    float pointEditorOrigX {0.0f};
-    float pointEditorOrigY {0.0f};
-    float pointEditorOrigW {0.0f};
-    float pointEditorOrigH {0.0f};
-    bool pointEditorShowGrid {true};
-
-    // Sprite Tools Preview State
-    SpriteDetailTab spriteDetailTab {SpriteDetailTab::PointEditor};
-    PreviewSourceMode previewSourceMode {PreviewSourceMode::Object};
-    int previewForObject {-1};
-    std::vector<PreviewSprite> previewSprites;
-    int previewAtlasW {0};
-    int previewAtlasH {0};
-    int previewCollisionCount {0};
-    int previewCollidingSpritesCount {0};
-    std::string previewCollisionDetail;
-    ImVec2 previewLastCanvasSize {700.0f, 500.0f};
-    float previewPanX {40.0f};
-    float previewPanY {40.0f};
-    float previewZoomLevel {1.0f};
-    bool previewDragging {false};
-    bool previewDragMoved {false};
-    int previewClickedIndex {-1};
-    ImVec2 previewDragStartMouse {0.0f, 0.0f};
-    std::vector<ImVec2> previewOriginalPositions;
-    bool previewMarquee {false};
-    ImVec2 previewMarqueeStart {0.0f, 0.0f};
-    ImVec2 previewMarqueeEnd {0.0f, 0.0f};
-    int previewSnapGrid {1}; // 1, 2, 4, 8, 16 px
-    int previewGridCols {16};
-    int previewPadding {1};
-    int previewSelectedCount {0};
-    bool previewShowObjectGroups {false};
-    bool previewExportConfirm {false};
-    std::string previewExportReport;
-
-    // Loaded Sprites Provenance Inspector State
-    int loadedSpritesScope {0};            // 0 = All Sprites, 1 = Selected Object(s), 2 = By Sheet Page
-    int loadedSpritesSheetFilter {-1};     // -1 = All pages, 0..41 = specific sheet_XX.png
-    int loadedSpriteSelectedId {0};        // currently inspected sprite ID
-    bool loadedSpritesShowSheetMap {true}; // show visual sheet_XX.png cutout map
-    bool loadedSpritesScrollToSelected {false};
-    std::array<char, 128> loadedSpritesSearch {};
-    std::vector<std::vector<int>> spriteToObjects;   // per spriteId -> list of object indices using it
-    std::map<int, std::string> spriteExternalSource; // per spriteId -> external exported/imported file info
     BattleSim battle;
     BattleSim::Setup battleSetup;
     bool battlePaused {false};

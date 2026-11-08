@@ -137,7 +137,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
             }
             const int bTurretFacing
                 = hasRotTurret ? turretFacingDir : ((previewMode == PreviewMode::Attack) ? aimDir8 : facing);
-            int wreckComp = 0, wreckStages = 0;
+            int wreckComp = -1, wreckStages = 0;
             WreckOf(doc, wreckComp, wreckStages);
 
             if (previewMode == PreviewMode::Wreck)
@@ -301,13 +301,15 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
         if (previewMode == PreviewMode::Wreck)
         {
             // Remains only: vehicles sink stage by stage, infantry leaves its corpse
-            int wreckComp = 0, wreckStages = 0;
+            int wreckComp = -1, wreckStages = 0;
             WreckOf(doc, wreckComp, wreckStages);
             const int stage = CurrentWreckStage(wreckStages);
             if (isInf)
             {
                 const YAML::Node seqs = doc["animations"]["death_sequences"];
-                const int corpseSeq = (seqs && seqs.IsSequence() && seqs.size() > 0) ? seqs[0].as<int>(0) : 0;
+                const int corpseSeq = (seqs && seqs.IsSequence() && seqs.size() > 0)
+                                          ? SpriteRefHandle(seqs[0], OpenArtOfWar::SpriteKind::Sequence)
+                                          : -1;
                 gameRenderer->DrawUnitWorld(
                     archetypeId,
                     static_cast<int>(OpenArtOfWar::ActionState::Die),
@@ -319,7 +321,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
                     faction,
                     turretFacing,
                     testFlameDeath,
-                    0,
+                    -1,
                     0,
                     corpseSeq);
             }
@@ -352,7 +354,7 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
 
                 if (showWreck)
                 {
-                    int wreckComp = 0, wreckStages = 0;
+                    int wreckComp = -1, wreckStages = 0;
                     WreckOf(doc, wreckComp, wreckStages);
                     gameRenderer->DrawUnitWorld(
                         archetypeId,

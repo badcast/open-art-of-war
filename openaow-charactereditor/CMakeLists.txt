@@ -17,8 +17,6 @@ set(CHARACTER_EDITOR_SOURCES
     src/EditorPreview.cpp
     src/EditorResearch.cpp
     src/EditorSprites.cpp
-    src/SpriteCatalog.cpp
-    src/SpriteExport.cpp
     src/EditorProperties.cpp
     src/EditorUtils.cpp
 )

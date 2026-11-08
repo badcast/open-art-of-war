@@ -763,10 +763,10 @@ void Renderer::DrawUnitWorld(
             int deathSeq = customDeathSeq;
             if (deathSeq < 0)
             {
-                static const int bullet[2] = {SpriteHandle("fx_infantry_death.death_0", SpriteKind::Sequence),
-                                              SpriteHandle("fx_infantry_death.death_1", SpriteKind::Sequence)};
-                static const int flame[2] = {SpriteHandle("fx_infantry_death.flame_0", SpriteKind::Sequence),
-                                             SpriteHandle("fx_infantry_death.flame_1", SpriteKind::Sequence)};
+                static const CachedSprite bullet[2] = {{"fx_infantry_death.death_0", SpriteKind::Sequence},
+                                                       {"fx_infantry_death.death_1", SpriteKind::Sequence}};
+                static const CachedSprite flame[2] = {{"fx_infantry_death.flame_0", SpriteKind::Sequence},
+                                                      {"fx_infantry_death.flame_1", SpriteKind::Sequence}};
                 deathSeq = (isFlaming ? flame : bullet)[(unitTypeId % 2 + 2) % 2];
             }
             IndexRange r = m_texManager->GetUnitSequenceRange(deathSeq);
@@ -938,7 +938,8 @@ void Renderer::DrawProjectileWorld(
 void Renderer::DrawSmokePuffWorld(int frame, float worldX, float worldY, const Camera &camera)
 {
     int f = std::clamp(frame, 0, 13);
-    static const int smoke = SpriteHandle("fx_smoke_puff.frames", SpriteKind::Part, "smoke puff");
+    static const CachedSprite smokeFrames("fx_smoke_puff.frames", SpriteKind::Part);
+    const int smoke = smokeFrames;
     if (smoke >= 0)
         DrawCompositeWorld(smoke + f, worldX - 90.0f, worldY - 60.0f, camera, Faction::Resistance);
 }

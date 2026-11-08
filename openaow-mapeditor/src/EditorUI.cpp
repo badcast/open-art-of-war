@@ -40,12 +40,10 @@ void DrawSpriteFrame(
     if (depth > 6)
         return;
     const SpriteFrame *frame = textureManager.GetSpriteFrame(spriteId);
-    if (!frame || frame->width <= 0 || frame->height <= 0)
+    if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
         return;
 
-    int page = frame->page;
-    if (page == 8 && faction == Faction::Resistance)
-        page = 9;
+    const int page = faction == Faction::Resistance ? textureManager.ResistancePage(frame->page) : frame->page;
     SDL_Texture *sheet = textureManager.GetSpriteSheet(page);
     if (!sheet)
         return;
@@ -62,11 +60,8 @@ void DrawSpriteFrame(
     if (size->second.x <= 0.0f || size->second.y <= 0.0f)
         return;
 
-    const float sheetScale = textureManager.GetSheetScale(page);
-    const ImVec2 uv0(frame->x * sheetScale / size->second.x, frame->y * sheetScale / size->second.y);
-    const ImVec2 uv1(
-        (frame->x + frame->width) * sheetScale / size->second.x,
-        (frame->y + frame->height) * sheetScale / size->second.y);
+    const ImVec2 uv0(frame->srcX / size->second.x, frame->srcY / size->second.y);
+    const ImVec2 uv1((frame->srcX + frame->srcW) / size->second.x, (frame->srcY + frame->srcH) / size->second.y);
     const ImVec2 min(x, y);
     const ImVec2 max(x + frame->width * scale, y + frame->height * scale);
     drawList->AddImage(SpriteTextureId(sheet), min, max, uv0, uv1);

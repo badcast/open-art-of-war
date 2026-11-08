@@ -118,6 +118,8 @@ public:
     ~TextureManager();
 
     bool LoadAllAssets();
+    // The sprites again from disk (metas and images; the editors after a change), with the bindings of the characters
+    void ReloadSprites();
     SDL_Texture *LoadTexture(const std::string &filePath);
 
     // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).
@@ -184,6 +186,7 @@ public:
     void Cleanup();
 
 private:
+    void LoadSprites();
     void LoadSpriteBindings();
     SDL_Surface *SheetSurface(int page);
     void SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);

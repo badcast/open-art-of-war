@@ -159,7 +159,12 @@ void ExplosionCentering(int animId, float &outOx, float &outOy)
         {"shell_0 shell_1 shell_2", -16.0f, 0.0f},        // cannon shell explosions
         {"rocket_0 rocket_1 rocket_2", -16.0f, -2.0f},    // rocket explosions
     };
-    static const std::map<int, std::pair<float, float>> table = [] {
+    static int generation = -1;
+    static std::map<int, std::pair<float, float>> table;
+    if (generation != SpritesGeneration())
+    {
+        generation = SpritesGeneration();
+        table = [] {
         std::map<int, std::pair<float, float>> t;
         for (const Centering &c : kGroups)
         {
@@ -177,7 +182,8 @@ void ExplosionCentering(int animId, float &outOx, float &outOy)
             }
         }
         return t;
-    }();
+        }();
+    }
     const auto it = table.find(animId);
     outOx = it != table.end() ? it->second.first : 0.0f;
     outOy = it != table.end() ? it->second.second : 0.0f;

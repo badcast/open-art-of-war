@@ -480,7 +480,7 @@ void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
 
 int HUDController::PowerIconSprite()
 {
-    static const int sprite = SpriteHandle("ui_power_icon.icon", SpriteKind::Frame, "power icon");
+    static const CachedSprite sprite("ui_power_icon.icon", SpriteKind::Frame);
     return sprite;
 }
 

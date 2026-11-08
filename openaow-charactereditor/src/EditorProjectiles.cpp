@@ -32,50 +32,23 @@ const ProjectileKind kKinds[] = {
 };
 
 // Projectile pictures of the game: first composite and its number of directions
-struct SpriteFamily
+// The projectile sprites of the game: families of directions
+struct ProjectileSprite
 {
-    int composite;
-    int directions;
-    const char *label; // gettext msgid
+    const char *family; // "<object>.<family>"
+    const char *label;  // gettext msgid
 };
 
-const SpriteFamily kSpriteFamilies[] = {
-    {1309, 32, "Bullet tracer"},
-    {1373, 32, "Heavy tracer"},
-    {1341, 32, "Shell"},
-    {1405, 16, "Rocket"},
-    {1421, 16, "Rocket with flame"},
+const ProjectileSprite kSpriteFamilies[] = {
+    {"projectile_bullet.dirs", "Bullet tracer"},
+    {"projectile_sniper.dirs", "Heavy tracer"},
+    {"projectile_shell.dirs", "Shell"},
+    {"projectile_rocket.dirs", "Rocket"},
 };
 
-// Small craters of the game (composites)
-constexpr int kCraterFirst = 1784;
-constexpr int kCraterLast = 1800;
+// Small craters of the game: the composites of the sprite fx_craters
+constexpr const char *kCraterObject = "fx_craters";
 
-std::string ListText(const std::vector<int> &v)
-{
-    std::string s = "[";
-    for (std::size_t i = 0; i < v.size(); ++i)
-        s += (i ? ", " : "") + std::to_string(v[i]);
-    return s + "]";
-}
-
-std::vector<int> ListOf(const YAML::Node &n)
-{
-    std::vector<int> v;
-    if (n.IsSequence())
-    {
-        for (const auto &item : n)
-        {
-            try
-            {
-                v.push_back(item.as<int>());
-            }
-            catch (...)
-            {}
-        }
-    }
-    return v;
-}
 
 } // namespace
 
@@ -367,38 +340,39 @@ void CharacterEditor::DrawProjectileProperties()
         ImGui::SameLine();
         ImGui::TextDisabled("%.1f deg", projectileSpec().spread * 180.0f / static_cast<float>(M_PI));
         changed |= EditYamlScalar(projectilesYaml, base + ".smoke_trail", _("Smoke trail"));
-        changed |= EditYamlScalar(projectilesYaml, base + ".sprite", _("Sprite (composite)"));
+        changed |= EditYamlScalar(projectilesYaml, base + ".sprite", _("Sprite (family of directions)"));
         changed |= EditYamlScalar(projectilesYaml, base + ".directions", _("Directions"));
         // The projectile pictures of the game: a click sets the composite and its directions
         ImGui::TextUnformatted(_("Projectile sprites"));
         FieldHint("Projectile sprites");
-        const int cur = projectilesYaml.At(base + ".sprite").as<int>(0);
+        const int cur = SpriteFamilyRef(projectilesYaml.At(base + ".sprite").as<std::string>("")).start;
         for (std::size_t f = 0; f < std::size(kSpriteFamilies); ++f)
         {
             if (f)
                 ImGui::SameLine();
             ImGui::PushID(static_cast<int>(f));
-            const SpriteFamily &fam = kSpriteFamilies[f];
-            const bool selected = fam.composite == cur;
+            const ProjectileSprite &ps = kSpriteFamilies[f];
+            const FamilyRef fam = SpriteFamilyRef(ps.family);
+            const bool selected = fam.start >= 0 && fam.start == cur;
             if (selected)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
             // East-facing frame: a quarter of the directions after north
-            SDL_Texture *thumb = ZoomedThumbnail(fam.composite + fam.directions / 4, 2.5f);
+            SDL_Texture *thumb = fam.start >= 0 ? ZoomedThumbnail(fam.start + fam.count / 4, 2.5f) : nullptr;
             const bool clicked = thumb ? ImGui::ImageButton("spr", reinterpret_cast<ImTextureID>(thumb), ImVec2(48, 32))
-                                       : ImGui::Button(std::to_string(fam.composite).c_str());
+                                       : ImGui::Button(ps.family);
             if (selected)
                 ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s (%d, %d)", _(fam.label), fam.composite, fam.directions);
-            if (clicked)
+                ImGui::SetTooltip("%s (%s, %d)", _(ps.label), ps.family, fam.count);
+            if (clicked && fam.start >= 0)
             {
-                changed |= projectilesYaml.Set(base + ".sprite", std::to_string(fam.composite));
-                changed |= projectilesYaml.Set(base + ".directions", std::to_string(fam.directions));
+                changed |= projectilesYaml.Set(base + ".sprite", ps.family);
+                changed |= projectilesYaml.Set(base + ".directions", std::to_string(fam.count));
             }
             ImGui::PopID();
         }
         if (projKind == 4)
-            ImGui::TextDisabled("%s", _("A flame is drawn as its own jet (animation 59), not as a sprite."));
+            ImGui::TextDisabled("%s", _("A flame is drawn as its own jet (fx_flame_jet), not as a sprite."));
     }
 
     if (ImGui::CollapsingHeader(_("Hit effects"), ImGuiTreeNodeFlags_DefaultOpen))
@@ -407,7 +381,8 @@ void CharacterEditor::DrawProjectileProperties()
         changed |= EditYamlScalar(projectilesYaml, base + ".impact_wall", _("Wall hit"));
         changed |= EditYamlScalar(projectilesYaml, base + ".wall_destroyed", _("Wall destroyed"));
         // The chosen impacts as pictures
-        const std::vector<int> impacts = ListOf(projectilesYaml.At(base + ".impact"));
+        const std::vector<int> impacts
+            = SpriteRefHandles(projectilesYaml.At(base + ".impact"), OpenArtOfWar::SpriteKind::Anim);
         for (std::size_t i = 0; i < impacts.size(); ++i)
         {
             if (i)
@@ -416,7 +391,8 @@ void CharacterEditor::DrawProjectileProperties()
             {
                 ImGui::Image(reinterpret_cast<ImTextureID>(t), ImVec2(40, 40));
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(_("Animation %d"), impacts[i]);
+                    ImGui::SetTooltip(
+                        _("Animation %s"), SpriteRefName(OpenArtOfWar::SpriteKind::Anim, impacts[i]).c_str());
             }
         }
         if (!impacts.empty() && Hinted(ImGui::SmallButton(_("Clear impacts")), "Clear impacts"))
@@ -430,11 +406,15 @@ void CharacterEditor::DrawProjectileProperties()
         ImGui::TextUnformatted(_("Craters"));
         FieldHint("Craters");
         // Every crater of the game: a click adds it to the list or takes it out
-        std::vector<int> marks = ListOf(projectilesYaml.At(base + ".ground_marks"));
+        std::vector<int> marks
+            = SpriteRefHandles(projectilesYaml.At(base + ".ground_marks"), OpenArtOfWar::SpriteKind::Part);
+        std::vector<int> craters;
+        for (const std::string &item : OpenArtOfWar::Sprites().ItemNames(kCraterObject, OpenArtOfWar::SpriteKind::Part))
+            craters.push_back(OpenArtOfWar::Sprites().Resolve(std::string(kCraterObject) + "." + item).handle);
         const float avail = ImGui::GetContentRegionAvail().x;
         const int perRow = std::max(1, static_cast<int>(avail / 62.0f));
         int k = 0;
-        for (int c = kCraterFirst; c <= kCraterLast; ++c)
+        for (int c : craters)
         {
             if (k++ % perRow != 0)
                 ImGui::SameLine();
@@ -449,7 +429,7 @@ void CharacterEditor::DrawProjectileProperties()
             if (on)
                 ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s %d", _("Composite"), c);
+                ImGui::SetTooltip("%s", SpriteRefName(OpenArtOfWar::SpriteKind::Part, c).c_str());
             if (clicked)
             {
                 if (on)
@@ -457,7 +437,8 @@ void CharacterEditor::DrawProjectileProperties()
                 else
                     marks.push_back(c);
                 std::sort(marks.begin(), marks.end());
-                changed |= projectilesYaml.Set(base + ".ground_marks", ListText(marks));
+                changed |= projectilesYaml.Set(
+                    base + ".ground_marks", SpriteRefList(OpenArtOfWar::SpriteKind::Part, marks));
             }
             ImGui::PopID();
         }

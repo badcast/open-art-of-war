@@ -671,6 +671,27 @@ std::vector<std::string> SpriteRegistry::ObjectNames() const
     return names;
 }
 
+std::vector<std::string> SpriteRegistry::ItemNames(const std::string &object, SpriteKind kind) const
+{
+    std::vector<std::string> out;
+    const auto it = m_objects.find(object);
+    if (it != m_objects.end())
+        for (const Item &item : it->second.items)
+            if (item.kind == kind)
+                out.push_back(item.name);
+    return out;
+}
+
+std::vector<std::string> SpriteRegistry::FamilyNames(const std::string &object) const
+{
+    std::vector<std::string> out;
+    const auto it = m_objects.find(object);
+    if (it != m_objects.end())
+        for (const FamilyDef &f : it->second.families)
+            out.push_back(f.name);
+    return out;
+}
+
 int SpriteRegistry::ImageOf(const std::string &object) const
 {
     const auto it = m_objects.find(object);
@@ -728,6 +749,7 @@ SpriteRegistry &Instance()
     return reg;
 }
 bool g_loaded = false;
+int g_generation = 0;
 std::set<std::string> g_reported; // unresolved references already reported
 } // namespace
 
@@ -736,6 +758,7 @@ SpriteRegistry &Sprites()
     if (!g_loaded)
     {
         g_loaded = true;
+        ++g_generation;
         Instance().Clear();
         Instance().LoadDirectory(LoaderResources::SpritesDir());
         std::cout << "[SpriteRegistry] " << Instance().ObjectNames().size() << " sprite objects from "
@@ -749,6 +772,23 @@ void ReloadSprites()
     g_loaded = false;
     g_reported.clear();
     Sprites();
+}
+
+int SpritesGeneration()
+{
+    Sprites();
+    return g_generation;
+}
+
+int CachedSprite::Get() const
+{
+    const int gen = SpritesGeneration();
+    if (gen != m_generation)
+    {
+        m_generation = gen;
+        m_handle = SpriteHandle(m_ref, m_kind, "code");
+    }
+    return m_handle;
 }
 
 int SpriteHandle(const std::string &ref, SpriteKind kind, const std::string &context)

@@ -145,6 +145,9 @@ public:
 
     bool HasObject(const std::string &name) const;
     std::vector<std::string> ObjectNames() const;
+    // The items of one kind of an object, in file order; its families
+    std::vector<std::string> ItemNames(const std::string &object, SpriteKind kind) const;
+    std::vector<std::string> FamilyNames(const std::string &object) const;
     int ImageOf(const std::string &object) const;
 
     // "<object>.<item>", "<object>.<family>" (its first member) or "<object>.<family>[i]"; `expected` None = any
@@ -219,6 +222,29 @@ private:
 SpriteRegistry &Sprites();
 // Compiles the sprites folder again (the editors after a save); handles of unchanged files stay the same
 void ReloadSprites();
+// Counts the loads of the sprites: what keeps handles compares it to know they are still valid
+int SpritesGeneration();
+
+// A handle the code names by a fixed sprite name, resolved again after every load of the sprites
+class CachedSprite
+{
+public:
+    CachedSprite(const char *ref, SpriteKind kind)
+        : m_ref(ref)
+        , m_kind(kind)
+    {}
+    int Get() const;
+    operator int() const
+    {
+        return Get();
+    }
+
+private:
+    const char *m_ref;
+    SpriteKind m_kind;
+    mutable int m_handle {-1};
+    mutable int m_generation {-1};
+};
 
 // A sprite reference of a config ("<object>.<item>", "<object>.<family>", "<object>.<family>[i]") as a handle of
 // `kind`; -1 (with one message naming `context`) when it does not resolve. An empty name is -1 without a message.
