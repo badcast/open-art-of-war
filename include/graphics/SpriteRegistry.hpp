@@ -24,10 +24,14 @@ namespace OpenArtOfWar
 // Meta format (all sections optional):
 //
 //   image: sprite_tank_conf.png      # default: sprite_<name>.png next to the meta
-//   scale: 4                         # PNG pixels per unit of the original sheet (rects, offsets are in those units)
-//   recolor: red                     # none | blue | red: which team armour colour the shader/CPU recolours
-//   frames:                          # rectangles in the image: [x, y, w, h] or {rect: [x, y, w, h], palette: n}
-//     f0: [0, 0, 30, 20]
+//   scale: 4                         # default PNG pixels per drawing unit (frames without their own "size")
+//   terrain: true                    # map tiles (filtered without bleeding between tiles)
+//   recolor: red                     # none | blue | red: team armour the army colour recolours (frames may override)
+//   resistance_image: sprite_tank_conf_resistance.png  # same layout, drawn for the Resistance (optional)
+//   frames:                          # pixel rectangles in the image: [x, y, w, h], or
+//     f0: [0, 0, 120, 80]            # {rect: [x, y, w, h], size: [w, h], recolor: none, palette: n}
+//                                    # "size": drawn size in game units (default: rect size / scale); offsets
+//                                    # ("at") are game units as well
 //   parts:                           # composites: lists of entries
 //     hull_0: [ {frame: f0, at: [-15, -10]}, {part: other_object.shadow} ]
 //   anims:                           # animations: one entry per frame
@@ -37,12 +41,14 @@ namespace OpenArtOfWar
 //   sequences:                       # unit sequences: steps of bodies
 //     idle_0: [ {body: b0} ]
 //   buildings:                       # building parts by layer and damage state
-//     main: { size: [3, 2], parts: [ {part: base, layer: 0, state: 4}, {anim: lights, layer: 1, state: 5} ] }
+//     main: { size: [3, 2], style: structure, parts: [ {part: base, layer: 0, state: 4}, {anim: lights, layer: 1} ] }
+//                                    # style: structure | wall | decor | decor_flat; tall: true for high decorations
 //   families:                        # ordered lists the game indexes by direction / stage / tile slot
 //     idle: { sequences: [idle_0, idle_1, ...] }
 //     turret: { parts: [t0, t1, ...] }
 //
-// An entry names exactly one of frame / part / anim / body / sequence; "at" is the offset (default [0, 0]).
+// An entry names exactly one of frame / part / anim / body; "at" is the offset (default [0, 0]). A name is "item",
+// "family" (its first member), "family[i]" (its i-th member), each optionally prefixed with "<object>.".
 // A family is laid out contiguously in the compiled tables (its members are copies), so "start + direction" works
 // whatever order the items have in the file.
 enum class SpriteKind : std::uint8_t
@@ -89,8 +95,10 @@ enum class SpriteRecolor : std::uint8_t
 struct SpriteImage
 {
     std::string object;
-    std::string path; // asset path of the PNG
+    std::string path;           // asset path of the PNG
+    std::string resistancePath; // the same layout for the Resistance; empty: `path` for everyone
     float scale {1.0f};
+    bool terrain {false}; // map tiles: kept sharp-edged when scaled (neighbouring tiles must not bleed in)
     SpriteRecolor recolor {SpriteRecolor::None};
 };
 
@@ -139,7 +147,7 @@ public:
     std::vector<std::string> ObjectNames() const;
     int ImageOf(const std::string &object) const;
 
-    // "<object>.<item>" or "<object>.<family>" (a family gives its first member); `expected` None = any kind
+    // "<object>.<item>", "<object>.<family>" (its first member) or "<object>.<family>[i]"; `expected` None = any
     SpriteRef Resolve(const std::string &ref, SpriteKind expected = SpriteKind::None) const;
     const SpriteFamily *FindFamily(const std::string &object, const std::string &family) const;
     // Name of the item behind a handle ("<object>.<item>"), for editors and messages; empty when unknown
@@ -161,9 +169,13 @@ private:
         SpriteKind kind {SpriteKind::None};
         std::string name;
         // Frame
-        float rect[4] {0, 0, 0, 0};
+        float rect[4] {0, 0, 0, 0}; // pixels
+        float size[2] {-1, -1};     // game units; < 0: rect / scale
         int palette {0};
+        int recolor {-1}; // -1: the object's
         // Building
+        BuildingStyle style {BuildingStyle::Structure};
+        bool tall {false};
         int width {1};
         int height {1};
         std::vector<Entry> entries;
@@ -187,6 +199,7 @@ private:
     };
 
     const FamilyDef *FindFamilyDef(const Object &obj, const std::string &name) const;
+    SpriteRef FamilyMember(const Object &obj, const std::string &name, SpriteKind kind) const;
     // `ref` ("item" or "object.item") as seen from `fromObject`: the item itself, never a family
     const Item *LookupItem(const std::string &fromObject, const std::string &ref, SpriteKind kind) const;
     // An item or, failing that, a family's first member; reports the failure

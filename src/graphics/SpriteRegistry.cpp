@@ -91,6 +91,18 @@ bool EntryAllowed(SpriteKind container, SpriteKind target)
     }
 }
 
+// "none" / "blue" / "red" -> 0 / 1 / 2; -1 unknown
+int ParseRecolor(const std::string &v)
+{
+    if (v == "none")
+        return 0;
+    if (v == "blue")
+        return 1;
+    if (v == "red")
+        return 2;
+    return -1;
+}
+
 template <typename T> T Narrow(int v, const std::string &where, std::vector<std::string> &errors)
 {
     constexpr int lo = static_cast<int>(std::numeric_limits<T>::min());
@@ -194,12 +206,17 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
     if (meta["recolor"])
     {
         const std::string rc = meta["recolor"].as<std::string>();
-        if (rc == "blue")
-            obj.image.recolor = SpriteRecolor::Blue;
-        else if (rc == "red")
-            obj.image.recolor = SpriteRecolor::Red;
-        else if (rc != "none")
+        const int v = ParseRecolor(rc);
+        if (v < 0)
             Error(where + ": recolor must be none, blue or red, not '" + rc + "'");
+        else
+            obj.image.recolor = static_cast<SpriteRecolor>(v);
+    }
+    obj.image.terrain = meta["terrain"] && meta["terrain"].as<bool>();
+    if (meta["resistance_image"])
+    {
+        const std::string alt = meta["resistance_image"].as<std::string>();
+        obj.image.resistancePath = dir.empty() ? alt : dir + "/" + alt;
     }
 
     auto parseEntries = [&](SpriteKind container, const YAML::Node &list, const std::string &at, Item &item) {
@@ -281,8 +298,25 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
                 }
                 for (int i = 0; i < 4; ++i)
                     item.rect[i] = rect[i].as<float>();
+                if (v.IsMap() && v["size"])
+                {
+                    const YAML::Node size = v["size"];
+                    if (!size.IsSequence() || size.size() != 2)
+                        Error(at + ": size must be [w, h]");
+                    else
+                    {
+                        item.size[0] = size[0].as<float>();
+                        item.size[1] = size[1].as<float>();
+                    }
+                }
                 if (v.IsMap() && v["palette"])
                     item.palette = v["palette"].as<int>();
+                if (v.IsMap() && v["recolor"])
+                {
+                    item.recolor = ParseRecolor(v["recolor"].as<std::string>());
+                    if (item.recolor < 0)
+                        Error(at + ": recolor must be none, blue or red");
+                }
             }
             else if (kind == SpriteKind::Building)
             {
@@ -291,6 +325,21 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
                     item.width = size[0].as<int>();
                     item.height = size[1].as<int>();
                 }
+                if (v["style"])
+                {
+                    const std::string st = v["style"].as<std::string>();
+                    if (st == "structure")
+                        item.style = BuildingStyle::Structure;
+                    else if (st == "wall")
+                        item.style = BuildingStyle::Wall;
+                    else if (st == "decor")
+                        item.style = BuildingStyle::Decor;
+                    else if (st == "decor_flat")
+                        item.style = BuildingStyle::DecorFlat;
+                    else
+                        Error(at + ": style must be structure, wall, decor or decor_flat, not '" + st + "'");
+                }
+                item.tall = v["tall"] && v["tall"].as<bool>();
                 parseEntries(kind, v["parts"], at, item);
             }
             else
@@ -376,13 +425,37 @@ SpriteRef SpriteRegistry::LookupRef(
         Error(where + ": no sprite object '" + objName + "' (for '" + ref + "')");
         return {};
     }
-    if (const FamilyDef *fam = FindFamilyDef(it->second, dot == std::string::npos ? ref : ref.substr(dot + 1)))
-    {
-        if (fam->kind == kind && fam->compiled.count > 0)
-            return {kind, fam->compiled.start};
-    }
+    const SpriteRef r = FamilyMember(it->second, dot == std::string::npos ? ref : ref.substr(dot + 1), kind);
+    if (r.Valid())
+        return r;
     Error(where + ": no " + std::string(SpriteKindName(kind)) + " '" + ref + "'");
     return {};
+}
+
+SpriteRef SpriteRegistry::FamilyMember(const Object &obj, const std::string &name, SpriteKind kind) const
+{
+    // "family" or "family[i]"
+    std::string famName = name;
+    int index = 0;
+    const auto open = name.find('[');
+    if (open != std::string::npos)
+    {
+        if (name.back() != ']')
+            return {};
+        famName = name.substr(0, open);
+        try
+        {
+            index = std::stoi(name.substr(open + 1, name.size() - open - 2));
+        }
+        catch (const std::exception &)
+        {
+            return {};
+        }
+    }
+    const FamilyDef *fam = FindFamilyDef(obj, famName);
+    if (!fam || (kind != SpriteKind::None && fam->kind != kind))
+        return {};
+    return fam->compiled.At(index);
 }
 
 int SpriteRegistry::Allocate(SpriteKind kind)
@@ -432,13 +505,24 @@ void SpriteRegistry::Emit(const std::string &object, const Item &item, int handl
     {
         const auto img = m_objects.find(object);
         SpriteFrame &f = t.frames[handle];
+        const float scale = img != m_objects.end() ? img->second.image.scale : 1.0f;
         f.id = handle;
         f.page = img != m_objects.end() ? img->second.imageIndex : -1;
-        f.x = item.rect[0];
-        f.y = item.rect[1];
-        f.width = item.rect[2];
-        f.height = item.rect[3];
+        f.srcX = item.rect[0];
+        f.srcY = item.rect[1];
+        f.srcW = item.rect[2];
+        f.srcH = item.rect[3];
+        f.width = item.size[0] >= 0 ? item.size[0] : item.rect[2] / scale;
+        f.height = item.size[1] >= 0 ? item.size[1] : item.rect[3] / scale;
+        // In drawing units, as the sheet frames have them (pixels / pixels-per-unit of this frame)
+        const float sx = f.width > 0 ? item.rect[2] / f.width : scale;
+        const float sy = f.height > 0 ? item.rect[3] / f.height : scale;
+        f.x = sx > 0 ? item.rect[0] / sx : 0.0f;
+        f.y = sy > 0 ? item.rect[1] / sy : 0.0f;
         f.palette = item.palette;
+        f.recolor = static_cast<std::uint8_t>(
+            item.recolor >= 0 ? item.recolor
+                              : (img != m_objects.end() ? static_cast<int>(img->second.image.recolor) : 0));
         break;
     }
     case SpriteKind::Part:
@@ -492,6 +576,8 @@ void SpriteRegistry::Emit(const std::string &object, const Item &item, int handl
         b.end = r.end;
         b.width = Narrow<std::uint8_t>(item.width, where, m_errors);
         b.height = Narrow<std::uint8_t>(item.height, where, m_errors);
+        b.style = item.style;
+        b.tall = item.tall;
         break;
     }
     default:
@@ -607,12 +693,7 @@ SpriteRef SpriteRegistry::Resolve(const std::string &ref, SpriteKind expected) c
         if (found != it->second.byName[k].end())
             return {static_cast<SpriteKind>(k), it->second.items[found->second].handle};
     }
-    if (const FamilyDef *fam = FindFamilyDef(it->second, itemName))
-    {
-        if ((expected == SpriteKind::None || expected == fam->kind) && fam->compiled.count > 0)
-            return {fam->kind, fam->compiled.start};
-    }
-    return {};
+    return FamilyMember(it->second, itemName, expected);
 }
 
 const SpriteFamily *SpriteRegistry::FindFamily(const std::string &object, const std::string &family) const

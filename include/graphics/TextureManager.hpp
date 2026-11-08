@@ -22,6 +22,13 @@ struct SpriteFrame
     float width {0.0f};
     float height {0.0f};
     int palette {0};
+    // The pixels in the image (per-object sprites): srcW > 0 means use these instead of x/y/width/height * sheet scale
+    float srcX {0.0f};
+    float srcY {0.0f};
+    float srcW {0.0f};
+    float srcH {0.0f};
+    // Team armour on this frame the army colour recolours: 0 none, 1 blue (Confederation), 2 red (Resistance)
+    std::uint8_t recolor {0};
 };
 
 struct IndexRange
@@ -72,12 +79,23 @@ struct BuildingPart
     std::uint8_t state {0};
 };
 
+// How a building's parts are drawn (it used to follow from the building's position in the table)
+enum class BuildingStyle : std::uint8_t
+{
+    Structure, // faction buildings: damage states, rotating turret / muzzle, power icon, animated parts
+    Wall,      // walls and the construction scaffolding: state 0 parts by layer, animated parts, army colour
+    Decor,     // map decorations: state 0 parts by layer, no animation
+    DecorFlat  // map decorations drawn in one pass (every part with layer 0)
+};
+
 struct BuildingDef
 {
     std::int16_t start {0};
     std::int16_t end {-1};
     std::uint8_t width {1};
     std::uint8_t height {1};
+    BuildingStyle style {BuildingStyle::Structure};
+    bool tall {false}; // decorations that rise above their rows (drawn later so units pass behind them)
 };
 
 class TextureManager

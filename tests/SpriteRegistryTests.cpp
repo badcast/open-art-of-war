@@ -26,9 +26,10 @@ parts:
 
 static const char *kTank = R"(
 recolor: red
+resistance_image: sprite_tank_conf_resistance.png
 frames:
   h0: [0, 0, 30, 20]
-  h1: {rect: [30, 0, 30, 20], palette: 4}
+  h1: {rect: [30, 0, 30, 20], palette: 4, recolor: none, size: [15, 10]}
   t0: [0, 20, 16, 16]
   t1: [16, 20, 16, 16]
 parts:
@@ -40,12 +41,12 @@ anims:
   fire: [ {part: hull_0}, {part: hull_1, at: [1, 0]} ]
 bodies:
   b0: [ {part: hull_0, flag: 1}, {part: turret, flag: 2}, {anim: fire, flag: 3} ]
-  b1: [ {part: hull_1, at: [-29, -20]} ]
+  b1: [ {part: hull_1, at: [-29, -20]}, {part: "turret[1]", flag: 2} ]
 sequences:
   idle_1: [ {body: b1} ]
   idle_0: [ {body: b0} ]
 buildings:
-  wreck: { size: [2, 1], parts: [ {part: hull_0, layer: 0, state: 4}, {anim: fire, layer: 1, state: 5} ] }
+  wreck: { size: [2, 1], style: decor_flat, tall: true, parts: [ {part: hull_0, layer: 0, state: 4}, {anim: fire, layer: 1, state: 5} ] }
 families:
   idle: { sequences: [idle_0, idle_1] }
   turret: { parts: [tur_0, tur_1] }
@@ -79,7 +80,16 @@ int main()
     // Frames
     const SpriteRef h1 = reg.Resolve("tank_conf.h1");
     CHECK(h1.kind == SpriteKind::Frame);
-    CHECK(t.frames[h1.handle].page == tankImg && t.frames[h1.handle].x == 30 && t.frames[h1.handle].palette == 4);
+    CHECK(t.frames[h1.handle].page == tankImg && t.frames[h1.handle].srcX == 30 && t.frames[h1.handle].palette == 4);
+    CHECK(t.frames[h1.handle].width == 15 && t.frames[h1.handle].srcW == 30 && t.frames[h1.handle].x == 15);
+    {
+        const SpriteFrame &s = t.frames[reg.Resolve("fx_shadow.s").handle]; // scale 2, no size
+        CHECK(s.width == 5 && s.height == 2 && s.srcW == 10);
+    }
+    CHECK(t.frames[h1.handle].recolor == 0);
+    CHECK(t.frames[reg.Resolve("tank_conf.h0").handle].recolor == 2);
+    CHECK(t.images[tankImg].resistancePath == "assets/sprites/sprite_tank_conf_resistance.png");
+    CHECK(t.images[reg.ImageOf("fx_shadow")].resistancePath.empty());
 
     // A composite referencing another object
     const SpriteRef hull0 = reg.Resolve("tank_conf.hull_0", SpriteKind::Part);
@@ -114,6 +124,11 @@ int main()
         CHECK(t.bodyLayers[b.start + 2].isComp == 2);
         const IndexRange t1 = t.compositeRanges[tf->start + 1];
         CHECK(t.compositeParts[t1.start].child == reg.Resolve("tank_conf.t1").handle);
+        // "family[i]": the i-th member, so child + offset walks the family
+        const IndexRange b1 = t.bodyRanges[reg.Resolve("tank_conf.b1").handle];
+        CHECK(t.bodyLayers[b1.start + 1].child == tf->start + 1);
+        CHECK(reg.Resolve("tank_conf.turret[1]").handle == tf->start + 1);
+        CHECK(!reg.Resolve("tank_conf.turret[2]").Valid());
     }
 
     // Buildings
@@ -121,6 +136,7 @@ int main()
     CHECK(wreck.kind == SpriteKind::Building);
     const BuildingDef &bd = t.buildings[wreck.handle];
     CHECK(bd.width == 2 && bd.height == 1 && bd.end - bd.start == 1);
+    CHECK(bd.style == BuildingStyle::DecorFlat && bd.tall);
     CHECK(t.buildingParts[bd.start + 1].isComp == 2 && t.buildingParts[bd.start + 1].state == 5);
 
     // Names round-trip
@@ -133,7 +149,7 @@ int main()
     CHECK(reg.Errors().size() == 1);
     CHECK(!reg.Errors().empty() && reg.Errors()[0].find("fx_shadow") != std::string::npos);
     const SpriteRef h1b = reg.Resolve("tank_conf.h1");
-    CHECK(h1b.Valid() && reg.Tables().frames[h1b.handle].x == 30);
+    CHECK(h1b.Valid() && reg.Tables().frames[h1b.handle].srcX == 30);
     const SpriteFamily *idle2 = reg.FindFamily("tank_conf", "idle");
     CHECK(idle2 && idle2->count == 2);
     {
