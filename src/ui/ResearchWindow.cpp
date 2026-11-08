@@ -51,22 +51,22 @@ struct WindowLayout
 // `top`: rows kept free above it (the bar of an observer)
 WindowLayout windowLayout(int windowW, int windowH, float scale, int top = 0)
 {
-    WindowLayout l;
-    l.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
-    l.dialog.y += top;
-    l.dialog.h -= top;
-    l.content = {l.dialog.x + 16, l.dialog.y + 60, l.dialog.w - 32, l.dialog.h - 60 - 16};
-    const int kDetailsW = std::clamp(static_cast<int>(l.content.w * 0.26f), kDetailsW0, 440);
-    l.search = {l.content.x, l.content.y, std::clamp(static_cast<int>(l.content.w * 0.28f), 280, 460), 30};
-    l.filter = {l.search.Right() + 10, l.content.y, std::clamp(static_cast<int>(l.content.w * 0.18f), 200, 300), 30};
-    l.closeBtn = {l.content.Right() - 130, l.content.y, 130, 30};
-    l.details = {l.content.Right() - kDetailsW, l.content.y + 42, kDetailsW, l.content.h - 42};
-    l.tree = {l.content.x, l.content.y + 42, l.details.x - 12 - l.content.x, l.content.h - 42};
-    l.startBtn = {l.details.x + 12, l.details.Bottom() - 52, l.details.w - 24, 40};
+    WindowLayout windowLayout;
+    windowLayout.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
+    windowLayout.dialog.y += top;
+    windowLayout.dialog.h -= top;
+    windowLayout.content = {windowLayout.dialog.x + 16, windowLayout.dialog.y + 60, windowLayout.dialog.w - 32, windowLayout.dialog.h - 60 - 16};
+    const int kDetailsW = std::clamp(static_cast<int>(windowLayout.content.w * 0.26f), kDetailsW0, 440);
+    windowLayout.search = {windowLayout.content.x, windowLayout.content.y, std::clamp(static_cast<int>(windowLayout.content.w * 0.28f), 280, 460), 30};
+    windowLayout.filter = {windowLayout.search.Right() + 10, windowLayout.content.y, std::clamp(static_cast<int>(windowLayout.content.w * 0.18f), 200, 300), 30};
+    windowLayout.closeBtn = {windowLayout.content.Right() - 130, windowLayout.content.y, 130, 30};
+    windowLayout.details = {windowLayout.content.Right() - kDetailsW, windowLayout.content.y + 42, kDetailsW, windowLayout.content.h - 42};
+    windowLayout.tree = {windowLayout.content.x, windowLayout.content.y + 42, windowLayout.details.x - 12 - windowLayout.content.x, windowLayout.content.h - 42};
+    windowLayout.startBtn = {windowLayout.details.x + 12, windowLayout.details.Bottom() - 52, windowLayout.details.w - 24, 40};
     // + / - at the bottom right of the tree, like the radar's zoom buttons
-    l.zoomOut = {l.tree.Right() - 30, l.tree.Bottom() - 30, 24, 24};
-    l.zoomIn = {l.tree.Right() - 30, l.tree.Bottom() - 58, 24, 24};
-    return l;
+    windowLayout.zoomOut = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 30, 24, 24};
+    windowLayout.zoomIn = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 58, 24, 24};
+    return windowLayout;
 }
 
 // Columns are the depth in the chain of requirements, rows are leaves in tree order, a parent sits in the middle of

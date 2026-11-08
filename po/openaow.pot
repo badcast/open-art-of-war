@@ -15,8 +15,8 @@ msgstr "Main Menu"
 msgid "CAMPAIGN"
 msgstr "Campaign"
 
-msgid "CUSTOM GAME"
-msgstr "Custom Game"
+msgid "SKIRMISH"
+msgstr "Skirmish"
 
 msgid "TEST MAP"
 msgstr "Test Map"
