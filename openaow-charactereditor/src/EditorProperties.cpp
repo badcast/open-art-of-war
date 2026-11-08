@@ -176,6 +176,8 @@ void CharacterEditor::DrawEditor()
             return;
         std::size_t totalCount = group.units.size() + group.buildings.size();
         std::string headerLabel = group.title + " (" + std::to_string(totalCount) + ")";
+        // Same "Units (N)" / "Buildings (N)" labels recur in every faction group: the group scopes their IDs
+        ImGui::PushID(group.title.c_str());
         if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
             if (!group.units.empty())
@@ -203,6 +205,7 @@ void CharacterEditor::DrawEditor()
                 }
             }
         }
+        ImGui::PopID();
     };
 
     renderGroup(confGroup);
