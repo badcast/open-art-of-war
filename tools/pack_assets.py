@@ -73,19 +73,12 @@ def manifest_paths(node, key=""):
 def check_manifest(assets_dir, keys):
     """The manifest must name only files included in the archive inventory."""
     manifest_yaml = os.path.join(assets_dir, "main.yaml")
-    manifest_json = os.path.join(assets_dir, "main.json")
-    if os.path.isfile(manifest_yaml):
-        import yaml
-        with open(manifest_yaml, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        manifest_name = "main.yaml"
-    elif os.path.isfile(manifest_json):
-        import json
-        with open(manifest_json, encoding="utf-8") as f:
-            data = json.load(f)
-        manifest_name = "main.json"
-    else:
-        raise SystemExit(f"pack_assets: neither main.yaml nor main.json found in {assets_dir}")
+    if not os.path.isfile(manifest_yaml):
+        raise SystemExit(f"pack_assets: main.yaml not found in {assets_dir}")
+    import yaml
+    with open(manifest_yaml, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    manifest_name = "main.yaml"
 
     named = set(manifest_paths(data))
     # Check the actual archive inventory: an existing file may have been skipped

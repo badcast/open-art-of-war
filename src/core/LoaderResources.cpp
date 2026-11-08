@@ -39,25 +39,12 @@ bool LoadInto(State &s, const std::string &path)
     nlohmann::json doc = nlohmann::json::object();
     std::string text;
     bool ok = false;
-    std::string actualPath = path;
-    if (!Assets::ReadText(actualPath, text))
-    {
-        if (actualPath.size() >= 5 && actualPath.compare(actualPath.size() - 5, 5, ".yaml") == 0)
-        {
-            std::string alt = actualPath.substr(0, actualPath.size() - 5) + ".json";
-            if (Assets::ReadText(alt, text))
-                actualPath = alt;
-        }
-        else if (actualPath.size() >= 5 && actualPath.compare(actualPath.size() - 5, 5, ".json") == 0)
-        {
-            std::string alt = actualPath.substr(0, actualPath.size() - 5) + ".yaml";
-            if (Assets::ReadText(alt, text))
-                actualPath = alt;
-        }
-    }
+    // The manifest is YAML, always (main.yaml): there is no other format and no other name to fall back on
+    const std::string &actualPath = path;
+    Assets::ReadText(actualPath, text);
     if (!text.empty())
     {
-        nlohmann::json file = JsonFile::ReadFromString(text);
+        nlohmann::json file = JsonFile::ReadYamlFromString(text);
         if (file.is_object() && !file.empty())
         {
             doc = std::move(file);
@@ -84,15 +71,9 @@ void EnsureLoaded()
         std::string text;
         if (!Assets::ReadText(path, text))
         {
-            std::string rootPath = s.root + "/main.yaml";
+            const std::string rootPath = s.root + "/main.yaml";
             if (Assets::ReadText(rootPath, text))
                 path = rootPath;
-            else
-            {
-                rootPath = s.root + "/main.json";
-                if (Assets::ReadText(rootPath, text))
-                    path = rootPath;
-            }
         }
         LoadInto(s, path);
     });

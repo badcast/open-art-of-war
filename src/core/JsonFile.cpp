@@ -72,6 +72,23 @@ nlohmann::json ReadFromString(const std::string &text)
     return nlohmann::json::object();
 }
 
+nlohmann::json ReadYamlFromString(const std::string &text)
+{
+    try
+    {
+        YAML::Node root = YAML::Load(text);
+        if (root.IsMap())
+        {
+            nlohmann::json yj = YamlToJson(root);
+            if (yj.is_object())
+                return yj;
+        }
+    }
+    catch (...)
+    {}
+    return nlohmann::json::object();
+}
+
 nlohmann::json ReadObjectFromFileName(const std::string &path)
 {
     std::ifstream in(path, std::ios::binary);
