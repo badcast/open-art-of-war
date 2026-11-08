@@ -76,13 +76,14 @@ struct AssemblyPiece
     int x {0}, y {0};
 };
 using AssemblyGroup = std::vector<AssemblyPiece>;
-// The composites of an object's meta that are made of its own frames (nested "part:" entries are followed, their
-// offsets added). `frameIndex`: frame name -> index; `scale`: pixels per game unit for the offsets
+// The pictures of an object's meta as the game puts them together, made of its own frames: every unit body and every
+// building first (parts, the first picture of an animation and family members opened up, offsets added), then every
+// composite (parts) on its own. `frameIndex`: frame name -> index; `scale`: pixels per game unit for the offsets
 std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
     const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale);
-// Where each frame goes: every composite becomes one block with its frames at their offsets (a frame goes with the
-// first composite that uses it; a composite whose frames would overlap in the image is laid out as a row), the
-// blocks and the frames no composite uses are shelf-packed, `padding` pixels apart
+// Where each frame goes: every picture becomes one block with its frames at their offsets (a frame goes with the
+// first picture that uses it; a frame the game draws over another one goes to the nearest free place beside where it
+// is drawn), the blocks and the frames no picture uses are shelf-packed, `padding` pixels apart
 std::vector<std::array<int, 2>> AssemblePack(
     const std::vector<std::array<int, 2>> &sizes, const std::vector<AssemblyGroup> &groups, int padding);
 

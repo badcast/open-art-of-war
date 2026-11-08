@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 
 using namespace CharEditor::SpriteMerge;
 
@@ -175,29 +176,55 @@ int main()
         CHECK(SnapDelta(5, 5, t, 6) == -5);                      // a single point (a dragged corner)
     }
 
-    // Assemble: composites keep their frames at their offsets, overlapping ones become rows, nothing overlaps
+    // Assemble: a body is put together as the game draws it, a layer over another goes right beside its place
     {
         const YAML::Node meta = YAML::Load(R"(
+frames:
+  hull: [0, 0, 20, 10]
+  tur: [0, 0, 8, 8]
+  shadow: [0, 0, 20, 4]
+  fire0: [0, 0, 4, 4]
+  fire1: [0, 0, 4, 4]
+  loose: [0, 0, 5, 5]
 parts:
-  hull: [ {frame: a, at: [0, 0]}, {frame: b, at: [10, 0]} ]
-  both: [ {part: hull, at: [0, 5]}, {frame: c, at: [0, 5]} ]
-  layered: [ {frame: d, at: [0, 0]}, {frame: e, at: [3, 3]} ]
-  foreign: [ {frame: other.x, at: [0, 0]} ]
+  hull_p: [ {frame: hull, at: [0, 0]} ]
+  tur_p: [ {frame: tur, at: [0, 0]} ]
+  f0: [ {frame: fire0} ]
+  f1: [ {frame: fire1} ]
+anims:
+  fire: [ {part: f0}, {part: f1} ]
+bodies:
+  b0: [ {frame: shadow, at: [0, 12]}, {part: hull_p, at: [0, 0]}, {part: tur_p, at: [6, 1]}, {anim: fire, at: [30, 0]} ]
 )");
-        const std::map<std::string, int> idx = {{"a", 0}, {"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}};
+        const std::map<std::string, int> idx
+            = {{"hull", 0}, {"tur", 1}, {"shadow", 2}, {"fire0", 3}, {"fire1", 4}, {"loose", 5}};
         const auto groups = AssemblyGroupsFromMeta(meta, "obj", idx, 1.0f);
-        CHECK(groups.size() == 3); // hull, both, layered (foreign has none of ours)
-        const std::vector<std::array<int, 2>> sz = {{10, 10}, {10, 10}, {4, 4}, {8, 8}, {8, 8}, {5, 5}};
+        CHECK(!groups.empty() && groups[0].size() == 4); // shadow, hull, turret, first fire picture: one body
+        const std::vector<std::array<int, 2>> sz = {{20, 10}, {8, 8}, {20, 4}, {4, 4}, {4, 4}, {5, 5}};
         const auto at = AssemblePack(sz, groups, 1);
-        CHECK(at[1][0] - at[0][0] == 10 && at[1][1] == at[0][1]);              // a, b side by side as in the game
-        CHECK(at[4][0] - at[3][0] == 8 + 1 && at[4][1] == at[3][1]);           // d, e overlap: laid in a row
+        CHECK(at[2][0] == at[0][0] && at[2][1] == at[0][1] + 12); // the shadow under the hull, as in the game
+        CHECK(at[3][0] == at[0][0] + 30 && at[3][1] == at[0][1]); // the fire beside it
+        // The turret is drawn over the hull: it may not share pixels, it stands right next to its place
+        const int tx = at[1][0] - at[0][0], ty = at[1][1] - at[0][1];
+        CHECK(std::abs(tx - 6) + std::abs(ty - 1) <= 12);
         bool apart = true;
         for (std::size_t i = 0; i < sz.size(); ++i)
             for (std::size_t j = i + 1; j < sz.size(); ++j)
                 if (!(at[i][0] + sz[i][0] <= at[j][0] || at[j][0] + sz[j][0] <= at[i][0] || at[i][1] + sz[i][1] <= at[j][1]
                       || at[j][1] + sz[j][1] <= at[i][1]))
                     apart = false;
-        CHECK(apart); // a frame goes with the first composite that uses it: c and f are blocks of their own
+        CHECK(apart);
+        // A building: its parts and the first picture of its animation in one block
+        const YAML::Node bmeta = YAML::Load(R"(
+frames: {base: [0, 0, 30, 20], light: [0, 0, 3, 3]}
+parts: {bp: [ {frame: base} ], lp: [ {frame: light} ]}
+anims: {blink: [ {part: lp} ]}
+buildings: {main: {size: [2, 2], parts: [ {part: bp, at: [0, 0]}, {anim: blink, at: [40, 2]} ]}}
+)");
+        const auto bg = AssemblyGroupsFromMeta(bmeta, "b", {{"base", 0}, {"light", 1}}, 1.0f);
+        CHECK(!bg.empty() && bg[0].size() == 2);
+        const auto bat = AssemblePack({{30, 20}, {3, 3}}, bg, 1);
+        CHECK(bat[1][0] - bat[0][0] == 40 && bat[1][1] - bat[0][1] == 2);
     }
 
     if (fails)

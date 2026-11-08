@@ -639,58 +639,115 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
     const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale)
 {
     std::vector<AssemblyGroup> groups;
-    const YAML::Node parts = meta["parts"];
-    if (!parts || !parts.IsMap())
-        return groups;
-    // "object.item" -> "item" for this object; another object's or an indexed name is not ours
-    auto local = [&](std::string name) -> std::string {
+    const YAML::Node frames = meta["frames"], parts = meta["parts"], anims = meta["anims"], families = meta["families"];
+    // "object.item[i]" / "item[i]" -> {item, i} for this object; another object's name is not ours (empty)
+    auto local = [&](std::string name, int &index) -> std::string {
+        index = 0;
         const std::string prefix = object + ".";
         if (name.rfind(prefix, 0) == 0)
             name = name.substr(prefix.size());
-        if (name.find('.') != std::string::npos || name.find('[') != std::string::npos)
+        if (name.find('.') != std::string::npos)
             return {};
+        if (const auto open = name.find('['); open != std::string::npos)
+        {
+            index = std::atoi(name.c_str() + open + 1);
+            name = name.substr(0, open);
+        }
         return name;
     };
-    for (const auto &kv : parts)
-    {
-        AssemblyGroup group;
-        std::function<void(const YAML::Node &, int, int, int)> walk
-            = [&](const YAML::Node &list, int ox, int oy, int depth) {
-                  if (!list.IsSequence())
-                      return;
-                  for (const auto &e : list)
-                  {
-                      if (!e.IsMap())
-                          continue;
-                      int ax = ox, ay = oy;
-                      try
-                      {
-                          if (const YAML::Node at = e["at"]; at && at.IsSequence() && at.size() == 2)
-                          {
-                              ax += static_cast<int>(std::lround(at[0].as<float>() * scale));
-                              ay += static_cast<int>(std::lround(at[1].as<float>() * scale));
-                          }
-                          if (const YAML::Node f = e["frame"])
-                          {
-                              const auto it = frameIndex.find(local(f.as<std::string>()));
-                              if (it != frameIndex.end())
-                                  group.push_back({it->second, ax, ay});
-                          }
-                          else if (const YAML::Node p = e["part"]; p && depth < 4)
-                          {
-                              const std::string name = local(p.as<std::string>());
-                              if (!name.empty() && parts[name])
-                                  walk(parts[name], ax, ay, depth + 1);
-                          }
-                      }
-                      catch (const std::exception &)
-                      {}
-                  }
-              };
-        walk(kv.second, 0, 0, 0);
+    // A family member by kind ("frames" / "parts" / "anims"): the name of its index-th member
+    auto member = [&](const std::string &family, const char *kind, int index) -> std::string {
+        if (!families || !families.IsMap())
+            return {};
+        const YAML::Node f = families[family];
+        if (!f || !f.IsMap() || !f[kind] || !f[kind].IsSequence() || index < 0
+            || index >= static_cast<int>(f[kind].size()))
+            return {};
+        return f[kind][index].as<std::string>();
+    };
+
+    AssemblyGroup group;
+    std::function<void(const YAML::Node &, int, int, int)> walk;
+    // One entry of a composite: a frame where it is drawn, a part / the first picture of an animation opened up
+    auto entry = [&](const YAML::Node &e, int ox, int oy, int depth) {
+        if (!e.IsMap())
+            return;
+        int ax = ox, ay = oy;
+        if (const YAML::Node at = e["at"]; at && at.IsSequence() && at.size() == 2)
+        {
+            ax += static_cast<int>(std::lround(at[0].as<float>() * scale));
+            ay += static_cast<int>(std::lround(at[1].as<float>() * scale));
+        }
+        int index = 0;
+        if (const YAML::Node f = e["frame"])
+        {
+            std::string name = local(f.as<std::string>(), index);
+            if (!name.empty() && !(frames && frames[name]))
+                name = member(name, "frames", index);
+            const auto it = frameIndex.find(name);
+            if (it != frameIndex.end())
+                group.push_back({it->second, ax, ay});
+        }
+        else if (const YAML::Node p = e["part"]; p && depth < 6)
+        {
+            std::string name = local(p.as<std::string>(), index);
+            if (!name.empty() && !(parts && parts[name]))
+                name = member(name, "parts", index);
+            if (!name.empty() && parts && parts[name])
+                walk(parts[name], ax, ay, depth + 1);
+        }
+        else if (const YAML::Node a = e["anim"]; a && depth < 6)
+        {
+            std::string name = local(a.as<std::string>(), index);
+            if (!name.empty() && !(anims && anims[name]))
+                name = member(name, "anims", index);
+            if (!name.empty() && anims && anims[name] && anims[name].IsSequence() && anims[name].size() > 0)
+            {
+                YAML::Node first = YAML::Node(YAML::NodeType::Sequence);
+                first.push_back(anims[name][0]); // the picture the game shows first
+                walk(first, ax, ay, depth + 1);
+            }
+        }
+    };
+    walk = [&](const YAML::Node &list, int ox, int oy, int depth) {
+        if (!list.IsSequence())
+            return;
+        for (const auto &e : list)
+        {
+            try
+            {
+                entry(e, ox, oy, depth);
+            }
+            catch (const std::exception &)
+            {}
+        }
+    };
+    auto close = [&]() {
         if (!group.empty())
             groups.push_back(std::move(group));
-    }
+        group.clear();
+    };
+    // What the game draws as a whole first: a unit body (hull, turret, shadow...), a building with all its parts
+    if (const YAML::Node bodies = meta["bodies"]; bodies && bodies.IsMap())
+        for (const auto &kv : bodies)
+        {
+            walk(kv.second, 0, 0, 0);
+            close();
+        }
+    if (const YAML::Node buildings = meta["buildings"]; buildings && buildings.IsMap())
+        for (const auto &kv : buildings)
+        {
+            if (kv.second.IsMap())
+                walk(kv.second["parts"], 0, 0, 0);
+            close();
+        }
+    // Then the composites on their own (frames no body / building shows, e.g. the later pictures of an animation)
+    if (parts && parts.IsMap())
+        for (const auto &kv : parts)
+        {
+            walk(kv.second, 0, 0, 0);
+            close();
+        }
     return groups;
 }
 
@@ -704,35 +761,62 @@ std::vector<std::array<int, 2>> AssemblePack(
     };
     std::vector<Block> blocks;
     std::vector<char> placed(sizes.size(), 0);
-    auto overlap = [&](const AssemblyPiece &a, const AssemblyPiece &b) {
-        return a.x < b.x + sizes[b.frame][0] && b.x < a.x + sizes[a.frame][0] && a.y < b.y + sizes[b.frame][1]
-               && b.y < a.y + sizes[a.frame][1];
+    // Two frames in the image must not share pixels; one that does not touch another keeps `padding` from it only when
+    // it had to be moved
+    auto hits = [&](const AssemblyPiece &a, const AssemblyPiece &b, int gap) {
+        return a.x < b.x + sizes[b.frame][0] + gap && b.x < a.x + sizes[a.frame][0] + gap
+               && a.y < b.y + sizes[b.frame][1] + gap && b.y < a.y + sizes[a.frame][1] + gap;
     };
     for (const AssemblyGroup &g : groups)
     {
         std::vector<AssemblyPiece> mine;
         for (const AssemblyPiece &p : g)
-            if (p.frame >= 0 && p.frame < static_cast<int>(sizes.size()) && !placed[p.frame])
+        {
+            if (p.frame < 0 || p.frame >= static_cast<int>(sizes.size()) || placed[p.frame])
+                continue;
+            placed[p.frame] = 1;
+            AssemblyPiece q = p;
+            auto free = [&](const AssemblyPiece &c, int gap) {
+                for (const AssemblyPiece &o : mine)
+                    if (hits(c, o, gap))
+                        return false;
+                return true;
+            };
+            if (!free(q, 0))
             {
-                placed[p.frame] = 1;
-                mine.push_back(p);
+                // A layer drawn over another one (a turret over its hull): the nearest free place around where the
+                // game draws it, ring by ring
+                bool found = false;
+                for (int r = 1; !found && r < 1 << 14; ++r)
+                {
+                    AssemblyPiece best = q;
+                    long long bestD = -1;
+                    for (int oy = -r; oy <= r; ++oy)
+                        for (int ox = -r; ox <= r; ++ox)
+                        {
+                            if (std::max(std::abs(ox), std::abs(oy)) != r)
+                                continue;
+                            AssemblyPiece c {q.frame, p.x + ox, p.y + oy};
+                            if (!free(c, padding))
+                                continue;
+                            const long long d = static_cast<long long>(ox) * ox + static_cast<long long>(oy) * oy;
+                            if (bestD < 0 || d < bestD)
+                            {
+                                bestD = d;
+                                best = c;
+                            }
+                        }
+                    if (bestD >= 0)
+                    {
+                        q = best;
+                        found = true;
+                    }
+                }
             }
+            mine.push_back(q);
+        }
         if (mine.empty())
             continue;
-        bool crossing = false;
-        for (std::size_t i = 0; i < mine.size() && !crossing; ++i)
-            for (std::size_t j = i + 1; j < mine.size() && !crossing; ++j)
-                crossing = overlap(mine[i], mine[j]);
-        if (crossing) // layers on top of each other cannot share pixels: one row instead
-        {
-            int x = 0;
-            for (AssemblyPiece &p : mine)
-            {
-                p.x = x;
-                p.y = 0;
-                x += sizes[p.frame][0] + padding;
-            }
-        }
         int minX = mine[0].x, minY = mine[0].y, maxX = minX, maxY = minY;
         for (const AssemblyPiece &p : mine)
         {
