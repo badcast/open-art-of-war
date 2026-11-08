@@ -19,10 +19,11 @@ class LoaderResources
 public:
     static constexpr const char *kDefaultRoot = "assets";
     static constexpr const char *kManifestPath = "assets/main.yaml";
+    static constexpr const std::uint32_t kMinimalVersionManifest = 1;
 
     // Sets the asset root directory and/or reads the manifest. Call after Assets::Init().
     // False when the manifest is missing or broken: there are no resources then.
-    static bool Init(const std::string &assetRoot = kDefaultRoot, const std::string &manifestPath = kManifestPath);
+    static bool Init();
     // Sets only the asset root used to resolve relative resource paths
     static void SetAssetRoot(const std::string &root);
     // Gets the current asset root

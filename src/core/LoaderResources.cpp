@@ -18,6 +18,7 @@ namespace
 {
 struct State
 {
+    int version = 0;
     std::once_flag loaded;
     std::mutex lock;
     nlohmann::json doc;
@@ -120,6 +121,7 @@ bool LoaderResources::Init(const std::string &assetRoot, const std::string &mani
         if (!Assets::ReadText(path, text))
             path = s.root + "/main.yaml";
     }
+    // TODO: kMinimalVersionManifest != from loaded version
     return LoadInto(s, path);
 }
 
