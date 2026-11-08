@@ -141,12 +141,9 @@ public:
     }
     // The page to draw `page` from for the Resistance: its Resistance image when the object has one
     int ResistancePage(int page) const;
-    // Pixels per drawing unit of a frame's image (the editors; drawing uses the frame's own pixel rectangle)
-    float GetSheetScale(int page) const;
     SDL_Texture *GetTileset(int index) const;
     SDL_Texture *GetUiTexture(const std::string &name) const;
     const SpriteFrame *GetSpriteFrame(int spriteId) const;
-    bool UpdateSpriteFrame(int spriteId, int page, float x, float y, float width, float height, int palette = -1);
 
     // Average color of a map tile's picture (for minimap-like previews); computed from the sprite sheet
     // pixels on first use and cached
@@ -197,7 +194,6 @@ private:
     std::unordered_map<std::uint64_t, SDL_Texture *> m_recoloredSheets;
     SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
     SDL_ScaleMode m_spriteScaleMode {SDL_SCALEMODE_NEAREST};
-    std::vector<float> m_sheetScales;
     std::vector<std::string> m_imagePaths; // per page (Resistance pages included)
     int m_imageCount {0};
     std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only

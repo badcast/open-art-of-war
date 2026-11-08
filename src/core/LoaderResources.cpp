@@ -238,49 +238,6 @@ std::string LoaderResources::SpritesDir()
     return join(dir);
 }
 
-std::string LoaderResources::SpriteFrames()
-{
-    return join(Str("sprites", "frames"));
-}
-
-// The sheets by page number: the page of a sprite (characters/sprites.json) is the number in the file name
-// ("sprites/sheet_07.png" is page 7), not the place in the list, so a sheet that is not listed (page 0 is unused)
-// leaves a gap instead of moving every later page by one. Names without a number keep their place in the list.
-std::vector<std::string> LoaderResources::SheetsByPage()
-{
-    const std::vector<std::string> listed = List("sprites", "sheets");
-    std::vector<std::string> byPage;
-    for (std::size_t i = 0; i < listed.size(); ++i)
-    {
-        std::size_t page = i;
-        const std::string &name = listed[i];
-        const std::size_t us = name.rfind('_'), dot = name.rfind('.');
-        if (us != std::string::npos && dot != std::string::npos && dot > us + 1)
-        {
-            const std::string digits = name.substr(us + 1, dot - us - 1);
-            if (!digits.empty() && digits.find_first_not_of("0123456789") == std::string::npos && digits.size() < 5)
-                page = static_cast<std::size_t>(std::stoul(digits));
-        }
-        if (page >= byPage.size())
-            byPage.resize(page + 1);
-        byPage[page] = name;
-    }
-    return byPage;
-}
-
-int LoaderResources::SpriteSheetCount()
-{
-    return static_cast<int>(SheetsByPage().size());
-}
-
-std::string LoaderResources::SpriteSheet(int index)
-{
-    const std::vector<std::string> sheets = SheetsByPage();
-    if (index < 0 || index >= static_cast<int>(sheets.size()) || sheets[static_cast<std::size_t>(index)].empty())
-        return std::string();
-    return join(sheets[static_cast<std::size_t>(index)]);
-}
-
 std::vector<std::pair<std::string, std::string>> LoaderResources::UiTextures()
 {
     std::vector<std::pair<std::string, std::string>> out;
@@ -294,11 +251,6 @@ std::vector<std::pair<std::string, std::string>> LoaderResources::UiTextures()
             out.emplace_back(e.key(), join(e.value().get<std::string>()));
     }
     return out;
-}
-
-std::string LoaderResources::GraphicsData()
-{
-    return join(Str(nullptr, "graphics_data"));
 }
 
 std::string LoaderResources::AudioFile(const std::string &name)

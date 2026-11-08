@@ -148,7 +148,7 @@ open-art-of-war/
 ├── openaow-mapeditor/      # Map editor
 ├── openaow-charactereditor/# Character archetype editor
 ├── po/                     # Translations (English, Russian)
-├── tools/                  # Sprite unpacking (unpackassets.py), atlas pack/unpack (atlastool.py), asset blob packing
+├── tools/                  # Atlas pack/unpack (atlastool.py), asset blob packing
 ├── docs/                   # Reverse-engineering notes and binary format specs
 └── 3rdParty/               # Dear ImGui, ENet, stb_vorbis, brainmap
 

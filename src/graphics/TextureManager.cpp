@@ -178,7 +178,6 @@ void TextureManager::LoadSprites()
     m_imageCount = static_cast<int>(t.images.size());
     m_imagePaths.assign(2 * m_imageCount, std::string());
     m_spriteSheets.assign(2 * m_imageCount, nullptr);
-    m_sheetScales.assign(2 * m_imageCount, 1.0f);
     m_terrainPages.assign(2 * m_imageCount, false);
     for (int i = 0; i < m_imageCount; ++i)
     {
@@ -196,7 +195,6 @@ void TextureManager::LoadSprites()
         {
             const std::string &path = alt ? img.resistancePath : img.path;
             const int page = i + alt * m_imageCount;
-            m_sheetScales[page] = img.scale;
             m_terrainPages[page] = img.terrain;
             if (path.empty() || !hasFrames)
                 continue;
@@ -523,15 +521,6 @@ SDL_Texture *TextureManager::GetSpriteSheet(int page) const
 
 
 
-float TextureManager::GetSheetScale(int page) const
-{
-    if (page >= 0 && page < static_cast<int>(m_sheetScales.size()))
-    {
-        return m_sheetScales[page];
-    }
-    return 1.0f;
-}
-
 SDL_Texture *TextureManager::GetTileset(int index) const
 {
     if (index >= 0 && index < static_cast<int>(m_tilesets.size()))
@@ -558,24 +547,6 @@ const SpriteFrame *TextureManager::GetSpriteFrame(int spriteId) const
         return &m_spriteFrames[spriteId];
     }
     return nullptr;
-}
-
-bool TextureManager::UpdateSpriteFrame(int spriteId, int page, float x, float y, float width, float height, int palette)
-{
-    if (spriteId >= 0 && spriteId < static_cast<int>(m_spriteFrames.size()))
-    {
-        m_spriteFrames[spriteId].page = page;
-        m_spriteFrames[spriteId].x = x;
-        m_spriteFrames[spriteId].y = y;
-        m_spriteFrames[spriteId].width = width;
-        m_spriteFrames[spriteId].height = height;
-        if (palette >= 0)
-        {
-            m_spriteFrames[spriteId].palette = palette;
-        }
-        return true;
-    }
-    return false;
 }
 
 IndexRange TextureManager::GetCompositeRange(int compId) const

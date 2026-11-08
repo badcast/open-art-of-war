@@ -46,13 +46,8 @@ public:
     static std::string FontBold();
     // Folder of the per-object sprites (sprite_<name>.png + sprite_<name>_meta.yaml): manifest sprites.dir
     static std::string SpritesDir();
-    static std::string SpriteFrames();
-    // The sprite sheets in page order (sprites.sheets); an empty path for a page that is not listed
-    static int SpriteSheetCount();
-    static std::string SpriteSheet(int index);
     // Named UI pictures ("logo", "title", "icon") in manifest order
     static std::vector<std::pair<std::string, std::string>> UiTextures();
-    static std::string GraphicsData();
     // A music file named in the tracklist by its path below the assets root
     static std::string AudioFile(const std::string &name);
     static std::string Tracklist();
@@ -137,7 +132,6 @@ private:
     static std::string Str(const char *section, const char *key);
     // A string array of the manifest (empty when missing)
     static std::vector<std::string> List(const char *section, const char *key);
-    static std::vector<std::string> SheetsByPage(); // the sprite sheets by page number (gaps stay empty)
     static std::vector<std::string> Joined(std::vector<std::string> files);
 };
 
