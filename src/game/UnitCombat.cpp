@@ -1,0 +1,992 @@
+#include "game/Unit.hpp"
+#include "EntityManagerInternal.hpp"
+#include "game/Projectiles.hpp"
+#include "core/DetMath.hpp"
+#include "core/Utility.hpp"
+#include "game/Effects.hpp"
+#include "game/Sides.hpp"
+#include "game/TileMap.hpp"
+#include "game/EntityManager.hpp"
+#include "game/Building.hpp"
+#include <iostream>
+#include <cmath>
+#include <algorithm>
+namespace OpenArtOfWar
+{
+
+bool Unit::FindPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial)
+{
+    int gx = target.tileX, gy = target.tileY;
+    if (const TileMap *map = pathfinder.GetMap())
+        ApproachTile(target, *map, gx, gy);
+    if (pathfinder.FindPath(tileX, tileY, gx, gy, path, id, outPartial))
+        return true;
+    return (gx != target.tileX || gy != target.tileY)
+           && pathfinder.FindPath(tileX, tileY, target.tileX, target.tileY, path, id, outPartial);
+}
+
+bool Unit::CanBreachWalls() const
+{
+    return isAttackMoving || groupOrder || !Players::Slot(owner).human;
+}
+
+bool Unit::ShouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const
+{
+    // Tuning: a detour longer than twice the straight way plus 10 tiles goes through the wall instead;
+    // so does a unit that has been waiting in front of a gap for 3 seconds
+    constexpr int kDetourFactor = 2;
+    constexpr int kDetourSlack = 10;
+    constexpr float kQueueSeconds = 3.0f;
+    int routeLen = 0;
+    if (!HasOpenRouteTo(goalX, goalY, pathfinder, &routeLen))
+        return true;
+    const int straight = std::max(std::abs(goalX - tileX), std::abs(goalY - tileY));
+    if (routeLen > straight * kDetourFactor + kDetourSlack)
+        return true;
+    // (not right at the goal: there the unit only waits for allies to make room; and only a unit standing
+    // at the wall itself - one queueing further back is held up by its allies, not by the wall)
+    if (blockedTimer < kQueueSeconds || straight <= 3)
+        return false;
+    const TileMap *map = pathfinder.GetMap();
+    if (!map)
+        return false;
+    constexpr int kAtWall = 1;
+    for (int y = tileY - kAtWall; y <= tileY + kAtWall; ++y)
+    {
+        for (int x = tileX - kAtWall; x <= tileX + kAtWall; ++x)
+        {
+            if (map->GetWall(x, y) > 0 && Players::Hostile(map->GetWallOwner(x, y), owner))
+                return true;
+        }
+    }
+    return false;
+}
+
+bool Unit::HasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) const
+{
+    int x0 = target.tileX, y0 = target.tileY, x1 = target.tileX, y1 = target.tileY;
+    if (const Building *b = target.AsBuilding())
+    {
+        x1 = b->tileX + b->buildWidth - 1;
+        y1 = b->tileY + b->buildHeight - 1;
+    }
+    auto touches = [&](int x, int y) {
+        return x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 1 && y <= y1 + 1;
+    };
+    if (touches(tileX, tileY))
+        return true;
+    // A building fills its own tiles: the route counts as open when it ends right next to the footprint
+    std::vector<PathNode> route;
+    bool partial = false;
+    pathfinder.SetIgnoreUnitsOnce();
+    if (!pathfinder.FindPath(tileX, tileY, target.tileX, target.tileY, route, id, &partial) || route.empty())
+        return false;
+    return !partial || touches(route.back().x, route.back().y);
+}
+
+bool Unit::StanceAllowsTarget(const Entity &candidate) const
+{
+    if (stance != UnitStance::PursueAndReturn || isAttackMoving || stanceHomeX < 0)
+        return true;
+    const int cx = static_cast<int>(candidate.GetUnitCenterPixelX() / TILE_WIDTH);
+    const int cy = static_cast<int>(candidate.GetUnitCenterPixelY() / TILE_HEIGHT);
+    return std::max(std::abs(cx - stanceHomeX), std::abs(cy - stanceHomeY)) <= StanceLeashTiles();
+}
+
+void Unit::UpdateStanceHome(Pathfinder &pathfinder)
+{
+    if (stance != UnitStance::PursueAndReturn || moveSpeed <= 0.0f || isSiegeMode)
+    {
+        stanceHomeX = stanceHomeY = -1;
+        stanceReturning = false;
+        return;
+    }
+    // A player order owns the unit; the home becomes the place where the order ends
+    const bool ordered = HasMoveTarget() || isAttackMoving || !orderQueue.empty() || isManualWallTarget || holdPosition
+                         || (orderedTargetId != 0 && targetEntityId == orderedTargetId);
+    if (ordered)
+    {
+        stanceHomeX = stanceHomeY = -1;
+        stanceReturning = false;
+        return;
+    }
+    const bool settled
+        = state == ActionState::Idle && targetEntityId == 0 && targetWallTileX < 0 && path.empty() && !waitingForPath;
+    if (stanceHomeX < 0)
+    {
+        if (settled)
+        {
+            stanceHomeX = tileX;
+            stanceHomeY = tileY;
+        }
+        return;
+    }
+    const int away = std::max(std::abs(tileX - stanceHomeX), std::abs(tileY - stanceHomeY));
+    if (stanceReturning)
+    {
+        if (state != ActionState::Move || path.empty())
+        {
+            // Back home, or as near as the way allows: that is where it stands now
+            stanceReturning = false;
+            stanceHomeX = tileX;
+            stanceHomeY = tileY;
+        }
+        return;
+    }
+    const bool tooFar = targetEntityId != 0 && away > StanceLeashTiles();
+    const bool chaseOver = settled && away > 1;
+    if (!tooFar && !chaseOver)
+        return;
+    targetEntityId = 0;
+    isDirectEngaged = false;
+    isSupportAssisting = false;
+    lastAttackerId = 0;
+    lastAttackedTimer = 0.0f;
+    ClearPathState();
+    bool partial = false;
+    if (pathfinder.FindPath(tileX, tileY, stanceHomeX, stanceHomeY, path, id, &partial) && !path.empty())
+    {
+        pathIndex = 0;
+        state = ActionState::Move;
+        animFrame = 0;
+        stanceReturning = true;
+    }
+    else
+    {
+        // No way back: this is the new home
+        path.clear();
+        stanceHomeX = tileX;
+        stanceHomeY = tileY;
+        if (state == ActionState::Attack || state == ActionState::Move)
+        {
+            state = ActionState::Idle;
+            animFrame = 0;
+        }
+    }
+}
+
+void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
+{
+    if (state == ActionState::Transform || attackDamage <= 0 || state == ActionState::Die)
+    {
+        isDirectEngaged = false;
+        return;
+    }
+    if (orderedTargetId != 0 && targetEntityId != orderedTargetId)
+        orderedTargetId = 0; // the ordered target is gone (or the unit was given something else)
+    UpdateStanceHome(pathfinder);
+
+    // Pure retreat / ground move order (!isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
+    // must NOT be interrupted by auto-targeting:
+    if (state == ActionState::Move && targetEntityId == 0 && targetWallTileX < 0 && hasRotatingTurret)
+    {
+        FireOnTheMove(deltaTime, map, delegates);
+    }
+    else
+    {
+        moveFireTargetId = 0;
+    }
+    if (state == ActionState::Move && !isAttackMoving && targetEntityId == 0 && targetWallTileX < 0 && !groupOrder)
+    {
+        isDirectEngaged = false;
+        return;
+    }
+
+    // 1. If attacking an auto-acquired wall, prioritize any enemy unit entering firing range
+    if (targetWallTileX >= 0 && !isManualWallTarget)
+    {
+        if (delegates.findEnemyInAttackRange)
+        {
+            int enemyInRange = delegates.findEnemyInAttackRange(*this);
+            if (enemyInRange != 0)
+            {
+                targetWallTileX = -1;
+                targetWallTileY = -1;
+                targetEntityId = enemyInRange;
+            }
+        }
+    }
+
+    // 2. Handle Wall Target Engagement
+    if (targetWallTileX >= 0 && targetWallTileY >= 0)
+    {
+        if (map.GetWall(targetWallTileX, targetWallTileY) == 0)
+        {
+            targetWallTileX = -1;
+            targetWallTileY = -1;
+            isManualWallTarget = false;
+            isDirectEngaged = false;
+
+            if (HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
+            {
+                if (std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
+                {
+                    bool isPartial = false;
+                    if (pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                    {
+                        pathIndex = 0;
+                        state = ActionState::Move;
+                        waitingForPath = isPartial;
+                    }
+                    else
+                    {
+                        waitingForPath = isPartial;
+                        state = ActionState::Idle;
+                    }
+                }
+                else
+                {
+                    ClearMoveTarget();
+                    isAttackMoving = false;
+                    state = ActionState::Idle;
+                }
+            }
+            else
+            {
+                state = ActionState::Idle;
+            }
+            return;
+        }
+
+        // Fog of War visibility gate for Siege Mode attacking walls
+        if (isSiegeMode && Players::Slot(owner).human
+            && !map.IsVisibleTo(targetWallTileX, targetWallTileY, Players::TeamOf(owner)))
+        {
+            targetWallTileX = -1;
+            targetWallTileY = -1;
+            isManualWallTarget = false;
+            isDirectEngaged = false;
+            if (state == ActionState::Attack && attackAnimTimer <= 0.0f)
+            {
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            return;
+        }
+
+        float srcX = GetUnitCenterPixelX();
+        float srcY = GetUnitCenterPixelY();
+        float dstX = targetWallTileX * TILE_WIDTH + (TILE_WIDTH * 0.5f);
+        float dstY = targetWallTileY * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
+        float dx = dstX - srcX;
+        float dy = dstY - srcY;
+        float dist = DetMath::Hypot(dx, dy);
+
+        // Siege Mode / Immobile unit cannot chase an out-of-range wall: drop target immediately
+        if (dist > attackRange * TILE_WIDTH)
+        {
+            isDirectEngaged = false;
+            if (isSiegeMode || moveSpeed <= 0.0f)
+            {
+                targetWallTileX = -1;
+                targetWallTileY = -1;
+                isManualWallTarget = false;
+                if (state == ActionState::Attack)
+                {
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+                return;
+            }
+            if (state == ActionState::Attack && attackAnimTimer <= 0.0f)
+            {
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            if (state != ActionState::Move && !waitingForPath)
+            {
+                bool isPartial = false;
+                if (pathfinder.FindPath(tileX, tileY, targetWallTileX, targetWallTileY, path, id, &isPartial))
+                {
+                    pathIndex = 0;
+                    state = ActionState::Move;
+                    waitingForPath = isPartial;
+                }
+            }
+            return;
+        }
+
+        // Within firing range: orient turret/hull and fire when cooldown is ready
+        int targetDir8 = Utility::Dir8FromVector(dx, dy);
+
+        if (!isSiegeMode)
+        {
+            // (the turn in place that aims a hull without a turret must keep counting: clearing the path state resets
+            // its timer every tick, and a vehicle whose turn step takes longer than a tick - the Zeus - never turned to
+            // the wall it was ordered to shoot)
+            const float turnProgress = turnTimer;
+            ClearPathState();
+            turnTimer = turnProgress;
+            if (state == ActionState::Move)
+                state = ActionState::Idle;
+        }
+
+        if (hasRotatingTurret)
+        {
+            const bool turretAligned = StepTurretToward(targetDir8, deltaTime);
+            if (isSiegeMode)
+            {
+                facingDirection = turretFacing;
+            }
+            if (!turretAligned)
+                return;
+        }
+        else if (!IsInfantry() && HasReservation())
+        {
+            // A hull without a turret finishes the step it is taking first: turning it to the target while it still
+            // slides to the next tile would show a vehicle driving sideways
+            return;
+        }
+        else if (state != ActionState::Move)
+        {
+            if (!IsInfantry() && facingDirection != targetDir8)
+            {
+                if (turnStepDelay <= 0.0f)
+                {
+                    facingDirection = targetDir8;
+                }
+                else
+                {
+                    turnTimer += deltaTime;
+                    while (turnTimer >= turnStepDelay && facingDirection != targetDir8)
+                    {
+                        turnTimer -= turnStepDelay;
+                        int delta = Utility::TurnStep8(facingDirection, targetDir8);
+                        facingDirection = (facingDirection + delta + 8) % 8;
+                    }
+                }
+                turretFacing = facingDirection;
+                if (facingDirection != targetDir8)
+                    return;
+            }
+            else
+            {
+                facingDirection = targetDir8;
+                turretFacing = targetDir8;
+            }
+        }
+
+        // A new volley waits for the burst in progress; the cooldown counts from the burst's last shot
+        if (cooldownTimer <= 0.0f && burstShotsRemaining == 0)
+        {
+            cooldownTimer = NextCooldown() + burstDelay * static_cast<float>(std::max(0, burstCount - 1));
+
+            if (IsFortress())
+            {
+                int tdx = std::abs(targetWallTileX - tileX);
+                int tdy = std::abs(targetWallTileY - tileY);
+                bool isClose = (tdx <= 1 && tdy <= 1);
+                bool hasUpgrade
+                    = delegates.isFortressFlamethrowerUnlocked && delegates.isFortressFlamethrowerUnlocked(owner);
+                if (isClose && hasUpgrade)
+                {
+                    projectile = ProjectileType::Flame;
+                    if (delegates.spawnProjectile)
+                    {
+                        float mSrcX, mSrcY;
+                        GetMuzzlePoint(mSrcX, mSrcY);
+                        ProjectileType origProj = projectile;
+                        projectile = ProjectileType::Bullet;
+                        delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
+                        projectile = origProj;
+                    }
+                }
+                else
+                {
+                    projectile = ProjectileType::Bullet;
+                }
+            }
+
+            attackAnimTimer = attackPoseTime >= 0.0f
+                                  ? attackPoseTime
+                                  : (IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f));
+            animFrame = 0;
+            animTimer = 0.0f;
+            state = ActionState::Attack;
+
+            float mSrcX, mSrcY;
+            GetMuzzlePoint(mSrcX, mSrcY);
+            if (delegates.spawnProjectile)
+            {
+                delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
+            }
+            if (burstCount > 1)
+            {
+                burstShotsRemaining = burstCount - 1;
+                burstTimer = burstDelay;
+            }
+        }
+        return;
+    }
+
+    // 3. Auto-acquire blocking wall if path is blocked and no enemy is in sight.
+    //    A partial path is often just congestion (allies standing in the way): only breach when
+    //    the goal is unreachable over terrain and walls, checked at most once per second.
+    if (wallCheckCooldown > 0.0f)
+        wallCheckCooldown -= deltaTime;
+    //    Only a unit the wall actually hinders shoots at it: one whose goal is walled off, whose way around
+    //    is a long detour, or that has been queueing in front of a gap for a while. Units that can walk
+    //    on through an open route leave the wall alone.
+    const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath)
+                               || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
+    // On auto-attack, a hostile wall beside the way is shot down with a 50% chance (decided once per unit and wall,
+    // deterministically). Low priority: this only runs without a target, and any enemy in sight drops the wall.
+    if (isAttackMoving && HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && targetEntityId == 0
+        && targetWallTileX < 0 && wallCheckCooldown <= 0.0f)
+    {
+        wallCheckCooldown = 1.0f;
+        constexpr int kReach = 3;
+        int bestX = -1, bestY = -1, bestDist = 1 << 20;
+        for (int y = tileY - kReach; y <= tileY + kReach; ++y)
+        {
+            for (int x = tileX - kReach; x <= tileX + kReach; ++x)
+            {
+                if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
+                    continue;
+                const std::uint32_t h = static_cast<std::uint32_t>(id) * 73856093u
+                                        ^ static_cast<std::uint32_t>(x) * 19349663u
+                                        ^ static_cast<std::uint32_t>(y) * 83492791u;
+                if (((h >> 7) & 1u) == 0u)
+                    continue; // this one is left alone
+                const int d = std::abs(x - tileX) + std::abs(y - tileY);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        if (bestX >= 0)
+        {
+            targetWallTileX = bestX;
+            targetWallTileY = bestY;
+            if (state == ActionState::Move)
+            {
+                ClearPathState(); // the move goal stays: the way is planned again once the wall is down
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            waitingForPath = false;
+            blockedTimer = 0.0f;
+            return;
+        }
+    }
+    if (targetEntityId == 0 && targetWallTileX < 0 && stuckWithGoal && HasMoveTarget() && CanBreachWalls()
+        && wallCheckCooldown <= 0.0f)
+    {
+        wallCheckCooldown = 1.0f;
+        const bool wallsInTheWay = ShouldBreachWalls(targetTileX, targetTileY, pathfinder);
+        if (wallsInTheWay && delegates.findWallTarget)
+        {
+            int wx = -1, wy = -1;
+            delegates.findWallTarget(*this, wx, wy);
+            if (wx >= 0)
+            {
+                targetWallTileX = wx;
+                targetWallTileY = wy;
+                if (state == ActionState::Move)
+                {
+                    // Keep the move goal: the route is planned again once the wall is down
+                    ClearPathState();
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+                waitingForPath = false;
+                blockedTimer = 0.0f;
+                return;
+            }
+        }
+    }
+
+    // A plain move (group or not) got here only for the breach check above: it picks no other fights
+    if (state == ActionState::Move && !isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
+    {
+        isDirectEngaged = false;
+        return;
+    }
+
+    // 3b. Retaliation: a unit shot at from beyond its reach goes after the shooter. Not while holding
+    //     position, deployed (siege), immobile, breaching a wall, or fighting something it can hit already.
+    //     A plain move order never gets here (see the early return above), so explicit moves are kept.
+    if (lastAttackedTimer > 0.0f && lastAttackerId != 0 && lastAttackerId != targetEntityId
+        && !(state == ActionState::Move && !isAttackMoving) && !HoldsGround() && !isSiegeMode && moveSpeed > 0.0f
+        && targetWallTileX < 0 && attackDamage > 0 && state != ActionState::Transform
+        && (targetEntityId == 0 || targetEntityId != orderedTargetId))
+    {
+        Entity *attacker = delegates.getEntity ? delegates.getEntity(lastAttackerId) : nullptr;
+        if (attacker && attacker->alive && attacker->state != ActionState::Die
+            && Players::Hostile(attacker->owner, owner))
+        {
+            bool busyInRange = false;
+            if (targetEntityId != 0)
+            {
+                const Entity *current = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
+                busyInRange = current && current->alive && current->state != ActionState::Die
+                              && ComputeDistanceToEntityPixels(*this, *current) <= attackRange * TILE_WIDTH;
+            }
+            if (!busyInRange)
+            {
+                targetEntityId = lastAttackerId;
+                isSupportAssisting = false;
+                waitingForPath = false;
+                if (state == ActionState::Move)
+                {
+                    ClearPathState();
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+            }
+        }
+        else
+        {
+            lastAttackerId = 0;
+            lastAttackedTimer = 0.0f;
+        }
+    }
+
+    // 4. Auto-acquire Enemy Target & Support Assist (Depth = 1)
+    if (targetEntityId == 0
+        && (state == ActionState::Idle || isAttackMoving || waitingForPath || !Players::Slot(owner).human))
+    {
+        if (delegates.findTarget)
+        {
+            int bestTargetId = delegates.findTarget(*this);
+            if (bestTargetId != 0)
+            {
+                Entity *cand = delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                bool validForUnit = (cand != nullptr);
+                if (validForUnit && (isSiegeMode || moveSpeed <= 0.0f || HoldsGround()))
+                {
+                    // Siege mode and holding units ONLY acquire targets strictly within attackRange
+                    float d = ComputeDistanceToEntityPixels(*this, *cand);
+                    validForUnit = (d <= attackRange * TILE_WIDTH);
+                    if (!validForUnit && HoldsGround() && delegates.findEnemyInAttackRange)
+                    {
+                        bestTargetId = delegates.findEnemyInAttackRange(*this);
+                        cand = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                        validForUnit = cand != nullptr;
+                    }
+                }
+                if (validForUnit && !StanceAllowsTarget(*cand))
+                    validForUnit = false;
+                if (validForUnit && !isManualWallTarget)
+                {
+                    targetEntityId = bestTargetId;
+                    targetWallTileX = -1;
+                    targetWallTileY = -1;
+                    isSupportAssisting = false;
+                    waitingForPath = false;
+                }
+            }
+            else if (isAttackMoving && HasMoveTarget())
+            {
+                if (state == ActionState::Idle && !isSiegeMode && moveSpeed > 0.0f && !waitingForPath)
+                {
+                    if (std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
+                    {
+                        bool isPartial = false;
+                        if (pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                        {
+                            pathIndex = 0;
+                            state = ActionState::Move;
+                            waitingForPath = isPartial;
+                        }
+                        else
+                        {
+                            waitingForPath = isPartial;
+                        }
+                    }
+                    else
+                    {
+                        isAttackMoving = false;
+                        ClearMoveTarget();
+                    }
+                }
+            }
+        }
+
+        // Chain Support Assist (strictly depth = 1):
+        // Only mobile idle units without a target assist a directly engaged frontline ally in attackRange.
+        if (targetEntityId == 0 && state == ActionState::Idle && !isSiegeMode && !HoldsGround() && moveSpeed > 0.0f
+            && !waitingForPath && !isManualWallTarget)
+        {
+            if (delegates.findSupportAlly)
+            {
+                int supportEnemyId = 0;
+                int supportAllyId = delegates.findSupportAlly(*this, supportEnemyId);
+                if (supportAllyId != 0 && supportEnemyId != 0)
+                {
+                    Entity *enemy = delegates.getEntity ? delegates.getEntity(supportEnemyId) : nullptr;
+                    if (enemy && enemy->alive && enemy->state != ActionState::Die && StanceAllowsTarget(*enemy))
+                    {
+                        targetEntityId = supportEnemyId;
+                        targetWallTileX = -1;
+                        targetWallTileY = -1;
+                        isSupportAssisting = true; // Marks depth = 1 so other units do NOT chain off this unit!
+                        waitingForPath = false;
+                        bool isPartial = false;
+                        if (pathfinder.FindPath(tileX, tileY, enemy->tileX, enemy->tileY, path, id, &isPartial))
+                        {
+                            pathIndex = 0;
+                            state = ActionState::Move;
+                            waitingForPath = isPartial;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Handle Active Enemy Entity Target
+    if (targetEntityId != 0)
+    {
+        Entity *target = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
+
+        // 5a. Target destroyed or invalid
+        if (!target || !target->alive || target->state == ActionState::Die)
+        {
+            targetEntityId = 0;
+            isDirectEngaged = false;
+            isSupportAssisting = false;
+
+            if (delegates.findTarget)
+            {
+                int nextTargetId = delegates.findTarget(*this);
+                if (nextTargetId != 0)
+                {
+                    Entity *cand = delegates.getEntity ? delegates.getEntity(nextTargetId) : nullptr;
+                    if (cand && StanceAllowsTarget(*cand)
+                        && (!(isSiegeMode || HoldsGround())
+                            || ComputeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
+                    {
+                        targetEntityId = nextTargetId;
+                        return;
+                    }
+                }
+            }
+
+            // Resume original move / attack-move order if a valid ground destination exists
+            if (HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f)
+            {
+                if (std::abs(tileX - targetTileX) > 1 || std::abs(tileY - targetTileY) > 1)
+                {
+                    bool isPartial = false;
+                    if (pathfinder.FindPath(tileX, tileY, targetTileX, targetTileY, path, id, &isPartial))
+                    {
+                        pathIndex = 0;
+                        state = ActionState::Move;
+                        waitingForPath = isPartial;
+                    }
+                    else
+                    {
+                        waitingForPath = isPartial;
+                        state = ActionState::Idle;
+                    }
+                }
+                else
+                {
+                    ClearMoveTarget();
+                    isAttackMoving = false;
+                    state = ActionState::Idle;
+                }
+            }
+            else
+            {
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            return;
+        }
+
+        // 5a'. A more dangerous enemy in range comes before the current one (a building, an unarmed unit);
+        //      an ordered target stays
+        retargetCooldown -= deltaTime;
+        if (retargetCooldown <= 0.0f && targetEntityId != orderedTargetId && TargetPriorityTier(*target) > 0
+            && delegates.findEnemyInAttackRange)
+        {
+            retargetCooldown = 0.5f;
+            const int betterId = delegates.findEnemyInAttackRange(*this);
+            const Entity *better = betterId != 0 && delegates.getEntity ? delegates.getEntity(betterId) : nullptr;
+            if (better && betterId != targetEntityId && TargetPriorityTier(*better) < TargetPriorityTier(*target))
+            {
+                targetEntityId = betterId;
+                isSupportAssisting = false;
+                return;
+            }
+        }
+
+        // 5b. Fog of War Visibility Gate (multi-tile aware via delegates.isEntityVisible)
+        //     A shooter that just hit this unit is chased even unseen (the unit knows where the fire came from)
+        const bool chasingAttacker = targetEntityId == lastAttackerId && lastAttackedTimer > 0.0f;
+        const bool targetSeen = !delegates.isEntityVisible || delegates.isEntityVisible(*target, owner);
+        if (targetSeen)
+        {
+            lastSeenTargetX = target->tileX;
+            lastSeenTargetY = target->tileY;
+        }
+        else if (!chasingAttacker)
+        {
+            // An ordered target and any building (it cannot move off) are not forgotten when they leave the
+            // team's sight: the unit walks on to where it last saw them and fires only once they are in sight again
+            const bool keepTarget = (targetEntityId == orderedTargetId || target->isBuilding) && moveSpeed > 0.0f
+                                    && !isSiegeMode && !HoldsGround() && lastSeenTargetX >= 0;
+            const bool reachedLastSeen = !target->isBuilding && std::abs(tileX - lastSeenTargetX) <= 1
+                                         && std::abs(tileY - lastSeenTargetY) <= 1;
+            if (!keepTarget || reachedLastSeen)
+            {
+                targetEntityId = 0;
+                lastSeenTargetX = lastSeenTargetY = -1;
+                isDirectEngaged = false;
+                isSupportAssisting = false;
+                if (state != ActionState::Move)
+                {
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+                return;
+            }
+            isDirectEngaged = false;
+            if (state != ActionState::Move && !waitingForPath)
+            {
+                bool isPartial = false;
+                const int gx = target->isBuilding ? target->tileX : lastSeenTargetX;
+                const int gy = target->isBuilding ? target->tileY : lastSeenTargetY;
+                if (pathfinder.FindPath(tileX, tileY, gx, gy, path, id, &isPartial))
+                {
+                    pathIndex = 0;
+                    state = ActionState::Move;
+                }
+                waitingForPath = isPartial;
+            }
+            return;
+        }
+
+        float srcX = GetUnitCenterPixelX();
+        float srcY = GetUnitCenterPixelY();
+        float dstX = target->GetUnitCenterPixelX();
+        float dstY = target->GetUnitCenterPixelY();
+        float dx = dstX - srcX;
+        float dy = dstY - srcY;
+        float dist = ComputeDistanceToEntityPixels(*this, *target);
+
+        // 5b'. The second gun fires on its own beside the main one, at the same target, in its own range
+        if (hasSecondary && secondaryCooldownTimer <= 0.0f && delegates.spawnProjectile
+            && dist <= secondaryRange * TILE_WIDTH && dist >= secondaryMinRange * TILE_WIDTH)
+        {
+            secondaryCooldownTimer = secondaryCooldown;
+            const int mainDamage = attackDamage, mainSplash = splashPercent;
+            const ProjectileType mainProjectile = projectile;
+            const float mainMuzzleX = muzzleOffsetX, mainMuzzleY = muzzleOffsetY;
+            const bool mainCustomTurret = hasCustomTurretOffset;
+            attackDamage = secondaryDamage;
+            splashPercent = secondarySplash;
+            projectile = secondaryProjectile;
+            muzzleOffsetX = secondaryMuzzleX;
+            muzzleOffsetY = secondaryMuzzleY;
+            float mSrcX, mSrcY;
+            GetMuzzlePoint(mSrcX, mSrcY);
+            firingSecondary = true;
+            delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+            firingSecondary = false;
+            attackDamage = mainDamage;
+            splashPercent = mainSplash;
+            projectile = mainProjectile;
+            muzzleOffsetX = mainMuzzleX;
+            muzzleOffsetY = mainMuzzleY;
+            hasCustomTurretOffset = mainCustomTurret;
+            // The second gun shows its own firing pose and flash (not while the hull is driving)
+            if (state != ActionState::Move)
+            {
+                state = ActionState::Attack;
+                animFrame = 0;
+                animTimer = 0.0f;
+                attackAnimTimer = std::max(attackAnimTimer, 0.22f);
+            }
+        }
+
+        // 5c. Out-of-Range Check (Crucial for Siege Mode Anti-Vibration!)
+        if (dist > attackRange * TILE_WIDTH)
+        {
+            isDirectEngaged = false;
+
+            if (isSiegeMode || moveSpeed <= 0.0f || HoldsGround())
+            {
+                // Immobile siege unit MUST drop unreachable target immediately without rotating or flickering
+                targetEntityId = 0;
+                isSupportAssisting = false;
+                if (state == ActionState::Attack)
+                {
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
+                return;
+            }
+
+            if (state == ActionState::Attack && attackAnimTimer <= 0.0f)
+            {
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+
+            // Stuck in front of the target (a base walled in all around): shoot a way through the wall
+            if (state != ActionState::Move && path.empty() && CanBreachWalls() && !isManualWallTarget
+                && wallCheckCooldown <= 0.0f && delegates.findWallTarget)
+            {
+                wallCheckCooldown = 1.0f;
+                if (!HasOpenRouteToEntity(*target, pathfinder))
+                {
+                    int wx = -1, wy = -1;
+                    delegates.findWallTarget(*this, wx, wy);
+                    if (wx >= 0)
+                    {
+                        targetEntityId = 0;
+                        isSupportAssisting = false;
+                        targetWallTileX = wx;
+                        targetWallTileY = wy;
+                        waitingForPath = false;
+                        return;
+                    }
+                }
+            }
+
+            if (state != ActionState::Move && !waitingForPath)
+            {
+                bool isPartial = false;
+                if (FindPathToAttack(*target, pathfinder, &isPartial))
+                {
+                    pathIndex = 0;
+                    state = ActionState::Move;
+                    waitingForPath = isPartial;
+                }
+                else
+                {
+                    waitingForPath = isPartial;
+                }
+            }
+            return;
+        }
+
+        // 5d. Target is Visible AND Within Firing Range: Aim and Fire
+        int targetDir8 = Utility::Dir8FromVector(dx, dy);
+
+        // Mark unit as actively engaged in direct firing range
+        isDirectEngaged = true;
+
+        if (!isSiegeMode)
+        {
+            // (the turn in place that aims a hull without a turret must keep counting: clearing the path state resets
+            // its timer, and a vehicle whose step takes longer than a tick then never turned to its target)
+            const float turnProgress = turnTimer;
+            ClearPathState();
+            turnTimer = turnProgress;
+            if (state == ActionState::Move)
+            {
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+        }
+
+        if (hasRotatingTurret)
+        {
+            const bool turretAligned = StepTurretToward(targetDir8, deltaTime);
+            if (isSiegeMode)
+            {
+                facingDirection = turretFacing;
+            }
+            if (!turretAligned)
+            {
+                return;
+            }
+        }
+        else if (!IsInfantry() && HasReservation())
+        {
+            // A hull without a turret finishes the step it is taking first: turning it to the target while it still
+            // slides to the next tile would show a vehicle driving sideways
+            return;
+        }
+        else if (state != ActionState::Move)
+        {
+            if (!IsInfantry() && facingDirection != targetDir8)
+            {
+                if (turnStepDelay <= 0.0f)
+                {
+                    facingDirection = targetDir8;
+                }
+                else
+                {
+                    turnTimer += deltaTime;
+                    while (turnTimer >= turnStepDelay && facingDirection != targetDir8)
+                    {
+                        turnTimer -= turnStepDelay;
+                        int delta = Utility::TurnStep8(facingDirection, targetDir8);
+                        facingDirection = (facingDirection + delta + 8) % 8;
+                    }
+                }
+                turretFacing = facingDirection;
+                if (facingDirection != targetDir8)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                facingDirection = targetDir8;
+                turretFacing = targetDir8;
+            }
+        }
+
+        // A new volley waits for the burst in progress; the cooldown counts from the burst's last shot
+        if (cooldownTimer <= 0.0f && burstShotsRemaining == 0)
+        {
+            cooldownTimer = NextCooldown() + burstDelay * static_cast<float>(std::max(0, burstCount - 1));
+
+            if (IsFortress())
+            {
+                int tdx = std::abs(target->tileX - tileX);
+                int tdy = std::abs(target->tileY - tileY);
+                bool isClose = (tdx <= 1 && tdy <= 1);
+                bool hasUpgrade
+                    = delegates.isFortressFlamethrowerUnlocked && delegates.isFortressFlamethrowerUnlocked(owner);
+                if (isClose && hasUpgrade)
+                {
+                    projectile = ProjectileType::Flame;
+                    if (delegates.spawnProjectile)
+                    {
+                        float mSrcX, mSrcY;
+                        GetMuzzlePoint(mSrcX, mSrcY);
+                        ProjectileType origProj = projectile;
+                        projectile = ProjectileType::Bullet;
+                        delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+                        projectile = origProj;
+                    }
+                }
+                else
+                {
+                    projectile = ProjectileType::Bullet;
+                }
+            }
+
+            attackAnimTimer = attackPoseTime >= 0.0f
+                                  ? attackPoseTime
+                                  : (IsFortress() ? 0.25f : (Projectiles::of(projectile).hitscan ? 0.12f : 0.22f));
+            animFrame = 0;
+            animTimer = 0.0f;
+            state = ActionState::Attack;
+
+            float mSrcX, mSrcY;
+            GetMuzzlePoint(mSrcX, mSrcY);
+            if (delegates.spawnProjectile)
+            {
+                delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+            }
+            if (burstCount > 1)
+            {
+                burstShotsRemaining = burstCount - 1;
+                burstTimer = burstDelay;
+            }
+        }
+    }
+}
+
+} // namespace OpenArtOfWar

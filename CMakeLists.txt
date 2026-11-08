@@ -130,10 +130,29 @@ set(ENGINE_SOURCES
     src/game/Pathfinder.cpp
     src/game/Entity.cpp
     src/game/Unit.cpp
+    src/game/UnitMovement.cpp
+    src/game/UnitRightOfWay.cpp
+    src/game/UnitCombat.cpp
     src/game/Building.cpp
     src/game/EntityManager.cpp
+    src/game/EntityManagerHelpers.cpp
+    src/game/EntityManagerConfig.cpp
+    src/game/EntityManagerSpawn.cpp
+    src/game/EntityManagerOrders.cpp
+    src/game/EntityManagerSiege.cpp
+    src/game/EntityManagerFog.cpp
+    src/game/EntityManagerUpdate.cpp
+    src/game/EntityManagerProjectiles.cpp
+    src/game/EntityManagerDeath.cpp
+    src/game/EntityManagerRender.cpp
     src/game/Economy.cpp
     src/game/AIController.cpp
+    src/game/AIControllerHelpers.cpp
+    src/game/AIControllerWaves.cpp
+    src/game/AIControllerEconomy.cpp
+    src/game/AIControllerDefense.cpp
+    src/game/AIControllerIntel.cpp
+    src/game/AIControllerRebuild.cpp
     src/game/AIBaseLayout.cpp
     src/game/AISquadController.cpp
     src/game/Research.cpp
@@ -161,7 +180,14 @@ set(ENGINE_SOURCES
     src/ui/ReplayMenu.cpp
     src/core/ApplicationReplay.cpp
     src/ui/MenuController.cpp
+    src/ui/MenuControllerInGame.cpp
+    src/ui/MenuControllerSettings.cpp
+    src/ui/MenuControllerCampaign.cpp
+    src/ui/MenuControllerCustom.cpp
     src/ui/HUDController.cpp
+    src/ui/HUDControllerRender.cpp
+    src/ui/HUDControllerInput.cpp
+    src/ui/HUDControllerOverlays.cpp
     src/ui/ResearchWindow.cpp
     src/ui/UiKit.cpp
     src/ui/ImGuiBridge.cpp

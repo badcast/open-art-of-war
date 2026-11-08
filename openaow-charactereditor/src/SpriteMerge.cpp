@@ -1,6 +1,7 @@
 #include "SpriteMerge.hpp"
 
 #include <algorithm>
+#include <random>
 #include <cctype>
 #include <cmath>
 #include <numeric>
@@ -434,16 +435,13 @@ bool BindsBare(const std::string &text, const std::string &object)
     return false;
 }
 
-std::vector<std::array<int, 2>> ShelfPack(const std::vector<std::array<int, 2>> &sizes, int padding)
+namespace
+{
+// Fills rows in the given order; the row width follows the total area
+std::vector<std::array<int, 2>> RowPack(
+    const std::vector<std::array<int, 2>> &sizes, const std::vector<std::size_t> &order, int padding)
 {
     std::vector<std::array<int, 2>> out(sizes.size(), {0, 0});
-    if (sizes.empty())
-        return out;
-    std::vector<std::size_t> order(sizes.size());
-    std::iota(order.begin(), order.end(), 0);
-    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-        return sizes[a][1] != sizes[b][1] ? sizes[a][1] > sizes[b][1] : sizes[a][0] > sizes[b][0];
-    });
     double area = 0;
     int widest = 0;
     for (const auto &s : sizes)
@@ -466,6 +464,61 @@ std::vector<std::array<int, 2>> ShelfPack(const std::vector<std::array<int, 2>> 
         rowH = std::max(rowH, sizes[i][1]);
     }
     return out;
+}
+} // namespace
+
+std::vector<std::array<int, 2>> ShelfPack(const std::vector<std::array<int, 2>> &sizes, int padding)
+{
+    std::vector<std::size_t> order(sizes.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return sizes[a][1] != sizes[b][1] ? sizes[a][1] > sizes[b][1] : sizes[a][0] > sizes[b][0];
+    });
+    return RowPack(sizes, order, padding);
+}
+
+std::vector<std::array<int, 2>> ShufflePack(const std::vector<std::array<int, 2>> &sizes, int padding, unsigned seed)
+{
+    std::vector<std::size_t> order(sizes.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::mt19937 rng(seed);
+    std::shuffle(order.begin(), order.end(), rng);
+    return RowPack(sizes, order, padding);
+}
+
+std::vector<std::array<int, 2>> GridPack(const std::vector<std::array<int, 2>> &sizes, int padding)
+{
+    std::vector<std::array<int, 2>> out(sizes.size(), {0, 0});
+    if (sizes.empty())
+        return out;
+    int cellW = 1, cellH = 1;
+    for (const auto &s : sizes)
+    {
+        cellW = std::max(cellW, s[0]);
+        cellH = std::max(cellH, s[1]);
+    }
+    // As square as the cells allow
+    const double n = static_cast<double>(sizes.size());
+    const int cols = std::max(
+        1, static_cast<int>(std::lround(std::sqrt(n * (cellH + padding) / static_cast<double>(cellW + padding)))));
+    for (std::size_t i = 0; i < sizes.size(); ++i)
+    {
+        const int col = static_cast<int>(i) % cols, row = static_cast<int>(i) / cols;
+        out[i] = {
+            col * (cellW + padding) + (cellW - sizes[i][0]) / 2, row * (cellH + padding) + (cellH - sizes[i][1]) / 2};
+    }
+    return out;
+}
+
+std::array<int, 2> PackExtent(const std::vector<std::array<int, 2>> &sizes, const std::vector<std::array<int, 2>> &pos)
+{
+    std::array<int, 2> e {1, 1};
+    for (std::size_t i = 0; i < sizes.size(); ++i)
+    {
+        e[0] = std::max(e[0], pos[i][0] + sizes[i][0]);
+        e[1] = std::max(e[1], pos[i][1] + sizes[i][1]);
+    }
+    return e;
 }
 
 } // namespace CharEditor::SpriteMerge

@@ -3,6 +3,7 @@
 // found in the image, renamed and removed, and the meta is saved (only its frame lines change). A new object is made
 // from a PNG. Parts, animations and families are written in the meta by hand; the tab lists them.
 #include "CharacterEditor.hpp"
+#include "SpriteMerge.hpp"
 
 #include "game/Effects.hpp"
 #include "game/Projectiles.hpp"
@@ -294,11 +295,13 @@ std::string CharacterEditor::SpriteFrameLine(const SpriteFrameEdit &f) const
     return s + "}";
 }
 
-bool CharacterEditor::SaveSpriteObject()
+bool CharacterEditor::SaveSpriteObject(bool backup)
 {
     if (spriteObject.empty())
         return false;
     const fs::path path = SpriteMetaPath(spriteObject);
+    if (backup)
+        BackupSpriteFiles();
     std::string text = ReadFile(path);
     // Renamed frames: their references in this meta follow
     for (const SpriteFrameEdit &f : spriteFrames)
@@ -436,6 +439,7 @@ bool CharacterEditor::ScaleSpriteImage(float factor, bool smooth)
         spriteReport = metaPath.filename().string() + ": " + e.what();
         return false;
     }
+    BackupSpriteFiles();
     // The images, all of the same layout
     for (const std::string &name : images)
     {
@@ -476,11 +480,242 @@ bool CharacterEditor::ScaleSpriteImage(float factor, bool smooth)
     WriteFile(metaPath, text);
     const int oldW = spriteImageW, oldH = spriteImageH;
     ReloadSpriteData();
-    if (!SaveSpriteObject())
+    if (!SaveSpriteObject(false))
         return false;
     spriteReport = _("Scaled ") + std::to_string(oldW) + "x" + std::to_string(oldH) + " -> "
                    + std::to_string(spriteImageW) + "x" + std::to_string(spriteImageH)
                    + _(": frames and scale follow, the drawn sizes are the same");
+    return true;
+}
+
+std::vector<std::string> CharacterEditor::SpriteImageNames() const
+{
+    std::vector<std::string> images = {spriteImageName};
+    try
+    {
+        const YAML::Node meta = YAML::LoadFile(SpriteMetaPath(spriteObject).string());
+        if (meta["resistance_image"])
+            images.push_back(meta["resistance_image"].as<std::string>());
+    }
+    catch (const std::exception &)
+    {}
+    return images;
+}
+
+void CharacterEditor::BackupSpriteFiles()
+{
+    std::error_code ec;
+    std::vector<fs::path> files = {SpriteMetaPath(spriteObject)};
+    for (const std::string &name : SpriteImageNames())
+        files.push_back(SpriteDir() / name);
+    for (const fs::path &f : files)
+        if (fs::exists(f, ec))
+            fs::copy_file(f, fs::path(f.string() + ".bak"), fs::copy_options::overwrite_existing, ec);
+}
+
+bool CharacterEditor::HasSpriteBackup() const
+{
+    std::error_code ec;
+    return !spriteObject.empty() && fs::exists(fs::path(SpriteMetaPath(spriteObject).string() + ".bak"), ec);
+}
+
+bool CharacterEditor::RestoreSpriteBackup()
+{
+    if (!HasSpriteBackup())
+        return false;
+    std::error_code ec;
+    std::vector<fs::path> files = {SpriteMetaPath(spriteObject)};
+    for (const std::string &name : SpriteImageNames())
+        files.push_back(SpriteDir() / name);
+    for (const fs::path &f : files)
+    {
+        const fs::path bak(f.string() + ".bak");
+        if (fs::exists(bak, ec))
+            fs::copy_file(bak, f, fs::copy_options::overwrite_existing, ec);
+    }
+    ReloadSpriteData();
+    spriteReport = _("Restored from the backup (.bak)");
+    return true;
+}
+
+bool CharacterEditor::RearrangeSpriteImage(SpriteArrange mode)
+{
+    if (spriteObject.empty() || spriteImageW <= 0 || spriteFrames.empty())
+        return false;
+    if (spriteDirty)
+    {
+        spriteReport = _("Save or revert the changes first");
+        return false;
+    }
+    namespace SM = SpriteMerge;
+    std::vector<std::array<int, 2>> sizes;
+    for (const SpriteFrameEdit &f : spriteFrames)
+        sizes.push_back({std::max(1, f.rect[2]), std::max(1, f.rect[3])});
+    const int pad = std::clamp(spriteArrangePadding, 0, 64);
+    std::vector<std::array<int, 2>> pos;
+    switch (mode)
+    {
+        case SpriteArrange::Shuffle:
+            pos = SM::ShufflePack(sizes, pad, static_cast<unsigned>(SDL_GetTicksNS() ^ (SDL_GetTicksNS() >> 17)));
+            break;
+        case SpriteArrange::Compact:
+            pos = SM::ShelfPack(sizes, pad);
+            break;
+        case SpriteArrange::Grid:
+            pos = SM::GridPack(sizes, pad);
+            break;
+    }
+    const std::array<int, 2> extent = SM::PackExtent(sizes, pos);
+
+    // Every image of the sprite (the faction variant has the same layout) is redrawn first, nothing is written
+    // until all of them are ready
+    const std::vector<std::string> images = SpriteImageNames();
+    std::vector<SDL_Surface *> made;
+    auto freeAll = [&]() {
+        for (SDL_Surface *m : made)
+            SDL_DestroySurface(m);
+    };
+    for (const std::string &name : images)
+    {
+        SDL_Surface *src = LoadRgba(SpriteDir() / name);
+        if (!src || src->w != spriteImageW || src->h != spriteImageH)
+        {
+            if (src)
+                SDL_DestroySurface(src);
+            freeAll();
+            spriteReport = _("Not a PNG image of the sprite's size: ") + (SpriteDir() / name).string();
+            return false;
+        }
+        SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
+        SDL_Surface *dst = SDL_CreateSurface(extent[0], extent[1], SDL_PIXELFORMAT_RGBA32);
+        if (!dst)
+        {
+            SDL_DestroySurface(src);
+            freeAll();
+            spriteReport = SDL_GetError();
+            return false;
+        }
+        SDL_ClearSurface(dst, 0.0f, 0.0f, 0.0f, 0.0f);
+        for (std::size_t i = 0; i < spriteFrames.size(); ++i)
+        {
+            const SDL_Rect from {
+                spriteFrames[i].rect[0], spriteFrames[i].rect[1], spriteFrames[i].rect[2], spriteFrames[i].rect[3]};
+            SDL_Rect to {pos[i][0], pos[i][1], from.w, from.h};
+            SDL_BlitSurface(src, &from, dst, &to);
+        }
+        SDL_DestroySurface(src);
+        made.push_back(dst);
+    }
+    BackupSpriteFiles();
+    for (std::size_t k = 0; k < images.size(); ++k)
+    {
+        if (!SDL_SavePNG(made[k], (SpriteDir() / images[k]).string().c_str()))
+        {
+            spriteReport = _("Could not write ") + (SpriteDir() / images[k]).string() + ": " + SDL_GetError();
+            freeAll();
+            return false;
+        }
+    }
+    freeAll();
+    for (std::size_t i = 0; i < spriteFrames.size(); ++i)
+    {
+        spriteFrames[i].rect[0] = pos[i][0];
+        spriteFrames[i].rect[1] = pos[i][1];
+    }
+    spriteImageW = extent[0];
+    spriteImageH = extent[1];
+    if (!SaveSpriteObject(false))
+        return false;
+    spriteCameraPending = SpriteCamera::Fit;
+    spriteReport = _("Frames rearranged, the image is now ") + std::to_string(extent[0]) + "x"
+                   + std::to_string(extent[1]) + _(" (backup: .bak files; pixels outside the frames are dropped)");
+    return true;
+}
+
+std::string CharacterEditor::SpriteMoveBlocker(int index, int x, int y) const
+{
+    if (index < 0 || index >= static_cast<int>(spriteFrames.size()))
+        return _("No frame");
+    const SpriteFrameEdit &f = spriteFrames[index];
+    if (x < 0 || y < 0 || x + f.rect[2] > spriteImageW || y + f.rect[3] > spriteImageH)
+        return _("The frame would leave the image");
+    auto crosses = [&](const SpriteFrameEdit &o, int ax, int ay) {
+        return ax < o.rect[0] + o.rect[2] && o.rect[0] < ax + f.rect[2] && ay < o.rect[1] + o.rect[3]
+               && o.rect[1] < ay + f.rect[3];
+    };
+    for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+    {
+        if (i == index)
+            continue;
+        if (crosses(spriteFrames[i], f.rect[0], f.rect[1]))
+            return _("This frame overlaps ") + spriteFrames[i].name + _(" already: separate them first");
+        if (crosses(spriteFrames[i], x, y))
+            return _("The frame would overlap ") + spriteFrames[i].name;
+    }
+    return "";
+}
+
+bool CharacterEditor::MoveSpriteFramePixels(int index, int x, int y)
+{
+    if (spriteDirty)
+    {
+        spriteReport = _("Save or revert the changes first");
+        return false;
+    }
+    const std::string why = SpriteMoveBlocker(index, x, y);
+    if (!why.empty())
+    {
+        spriteReport = _("Not moved: ") + why;
+        return false;
+    }
+    SpriteFrameEdit &f = spriteFrames[index];
+    if (f.rect[0] == x && f.rect[1] == y)
+        return true;
+    const SDL_Rect from {f.rect[0], f.rect[1], f.rect[2], f.rect[3]};
+    SDL_Rect to {x, y, from.w, from.h};
+    // The pieces are cut first (the new place may cross the old one), nothing is written until all are ready
+    const std::vector<std::string> images = SpriteImageNames();
+    std::vector<SDL_Surface *> imgs;
+    auto freeAll = [&]() {
+        for (SDL_Surface *m : imgs)
+            SDL_DestroySurface(m);
+    };
+    for (const std::string &name : images)
+    {
+        SDL_Surface *img = LoadRgba(SpriteDir() / name);
+        SDL_Surface *piece = img ? SDL_CreateSurface(from.w, from.h, SDL_PIXELFORMAT_RGBA32) : nullptr;
+        if (!img || !piece || img->w != spriteImageW || img->h != spriteImageH)
+        {
+            if (img)
+                SDL_DestroySurface(img);
+            if (piece)
+                SDL_DestroySurface(piece);
+            freeAll();
+            spriteReport = _("Not a PNG image of the sprite's size: ") + (SpriteDir() / name).string();
+            return false;
+        }
+        SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
+        SDL_SetSurfaceBlendMode(piece, SDL_BLENDMODE_NONE);
+        SDL_BlitSurface(img, &from, piece, nullptr);
+        SDL_FillSurfaceRect(img, &from, 0);
+        SDL_BlitSurface(piece, nullptr, img, &to);
+        SDL_DestroySurface(piece);
+        imgs.push_back(img);
+    }
+    BackupSpriteFiles();
+    for (std::size_t k = 0; k < images.size(); ++k)
+        if (!SDL_SavePNG(imgs[k], (SpriteDir() / images[k]).string().c_str()))
+        {
+            spriteReport = _("Could not write ") + (SpriteDir() / images[k]).string() + ": " + SDL_GetError();
+            freeAll();
+            return false;
+        }
+    freeAll();
+    f.rect[0] = x;
+    f.rect[1] = y;
+    if (!SaveSpriteObject(false))
+        return false;
+    spriteReport = _("Moved ") + spriteFrames[index].name + _(" with its pixels (backup: .bak)");
     return true;
 }
 
@@ -836,6 +1071,18 @@ void CharacterEditor::DrawSpriteTools()
         {
             spriteDrag = SpriteDrag::Draw;
         }
+        else if (spriteMoveMode)
+        {
+            // Sprite change mode: a frame travels with its pixels
+            if (hoveredFrame >= 0)
+            {
+                spriteFrameSel = hoveredFrame;
+                spriteDrag = SpriteDrag::MovePixels;
+                std::copy(spriteFrames[hoveredFrame].rect, spriteFrames[hoveredFrame].rect + 4, spriteDragRect);
+                spriteMoveTo[0] = spriteDragRect[0];
+                spriteMoveTo[1] = spriteDragRect[1];
+            }
+        }
         else
         {
             if (spriteFrameSel >= 0)
@@ -877,6 +1124,31 @@ void CharacterEditor::DrawSpriteTools()
                          b = toScreen(std::floor(mx) + 1, std::floor(my) + 1);
             dl->AddRect(a, b, IM_COL32(255, 255, 255, 255), 0.0f, 0, 1.5f);
         }
+        else if (spriteDrag == SpriteDrag::MovePixels)
+        {
+            // A ghost of the frame at the new place: green when it fits, red when it is not allowed
+            spriteMoveTo[0] = spriteDragRect[0] + dx;
+            spriteMoveTo[1] = spriteDragRect[1] + dy;
+            const bool ok = SpriteMoveBlocker(spriteFrameSel, spriteMoveTo[0], spriteMoveTo[1]).empty();
+            const ImVec2 a = toScreen(static_cast<float>(spriteMoveTo[0]), static_cast<float>(spriteMoveTo[1]));
+            const ImVec2 b = toScreen(
+                static_cast<float>(spriteMoveTo[0] + spriteDragRect[2]),
+                static_cast<float>(spriteMoveTo[1] + spriteDragRect[3]));
+            if (tex && spriteImageW > 0 && spriteImageH > 0)
+                dl->AddImage(
+                    reinterpret_cast<ImTextureID>(tex),
+                    a,
+                    b,
+                    ImVec2(
+                        static_cast<float>(spriteDragRect[0]) / spriteImageW,
+                        static_cast<float>(spriteDragRect[1]) / spriteImageH),
+                    ImVec2(
+                        static_cast<float>(spriteDragRect[0] + spriteDragRect[2]) / spriteImageW,
+                        static_cast<float>(spriteDragRect[1] + spriteDragRect[3]) / spriteImageH),
+                    IM_COL32(255, 255, 255, 170));
+            dl->AddRectFilled(a, b, ok ? IM_COL32(60, 220, 120, 50) : IM_COL32(255, 60, 60, 90));
+            dl->AddRect(a, b, ok ? IM_COL32(60, 255, 140, 255) : IM_COL32(255, 70, 70, 255), 0.0f, 0, 2.0f);
+        }
         else if (spriteFrameSel >= 0 && (dx || dy))
         {
             SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
@@ -906,6 +1178,8 @@ void CharacterEditor::DrawSpriteTools()
             if (w > 1 && h > 1)
                 AddSpriteFrame(x0, y0, w, h, "f");
         }
+        if (spriteDrag == SpriteDrag::MovePixels)
+            MoveSpriteFramePixels(spriteFrameSel, spriteMoveTo[0], spriteMoveTo[1]);
         spriteDrag = SpriteDrag::None;
     }
 
@@ -1018,7 +1292,12 @@ void CharacterEditor::DrawSpriteProperties()
     ImGui::SameLine();
     if (Hinted(ImGui::Button(_("Reload images")), "Reload images"))
         ReloadSpriteData();
-    ImGui::Checkbox(_("Draw new frames (drag on the image)"), &spriteDrawMode);
+    if (ImGui::Checkbox(_("Draw new frames (drag on the image)"), &spriteDrawMode) && spriteDrawMode)
+        spriteMoveMode = false;
+    if (ImGui::Checkbox(_("Sprite change mode (drag a frame with its pixels)"), &spriteMoveMode) && spriteMoveMode)
+        spriteDrawMode = false;
+    ImGui::SetItemTooltip(
+        "%s", _("Drag a frame to another place of the image; it is refused (red) when it would cover another frame."));
 
     // --- Scaling the image: the frames follow, the drawn sizes stay ---
     {
@@ -1033,6 +1312,39 @@ void CharacterEditor::DrawSpriteProperties()
         ImGui::SameLine();
         if (Hinted(ImGui::Button(_("Scale image")), "Scale image"))
             ScaleSpriteImage(kFactors[std::clamp(spriteScaleFactor, 0, 4)], spriteScaleSmooth == 1);
+    }
+
+    // --- Rearranging the frames in the image (a backup of the files is kept as .bak) ---
+    {
+        ImGui::SetNextItemWidth(70.0f);
+        ImGui::InputInt(_("Gap"), &spriteArrangePadding, 0);
+        spriteArrangePadding = std::clamp(spriteArrangePadding, 0, 64);
+        const struct
+        {
+            const char *label;
+            const char *tip;
+            SpriteArrange mode;
+        } buttons[] = {
+            {_("Shuffle"),
+             _("Lay the frames out in another random order (press again for another try)"),
+             SpriteArrange::Shuffle},
+            {_("Compact"), _("Pack the frames tightly: the smallest image"), SpriteArrange::Compact},
+            {_("Beautify"),
+             _("A tidy grid of equal cells, frames in their order, close to a square"),
+             SpriteArrange::Grid},
+        };
+        for (const auto &b : buttons)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button(b.label))
+                RearrangeSpriteImage(b.mode);
+            ImGui::SetItemTooltip("%s", b.tip);
+        }
+        ImGui::BeginDisabled(!HasSpriteBackup());
+        if (ImGui::Button(_("Restore backup")))
+            RestoreSpriteBackup();
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("%s", _("Put back the files saved before the last Save / rearrangement (.bak)"));
     }
 
     // --- Frames ---

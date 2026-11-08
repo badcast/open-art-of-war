@@ -116,6 +116,25 @@ int main()
             CHECK(apart);
         }
 
+    // Arrangements: nothing overlaps, the image holds every frame
+    auto apartAll = [&](const std::vector<std::array<int, 2>> &pp) {
+        for (std::size_t a = 0; a < sizes.size(); ++a)
+            for (std::size_t b = a + 1; b < sizes.size(); ++b)
+                if (!(pp[a][0] + sizes[a][0] <= pp[b][0] || pp[b][0] + sizes[b][0] <= pp[a][0]
+                      || pp[a][1] + sizes[a][1] <= pp[b][1] || pp[b][1] + sizes[b][1] <= pp[a][1]))
+                    return false;
+        return true;
+    };
+    for (unsigned seed = 1; seed <= 20; ++seed)
+        CHECK(apartAll(ShufflePack(sizes, 2, seed)));
+    CHECK(ShufflePack(sizes, 1, 7) == ShufflePack(sizes, 1, 7));
+    const auto grid = GridPack(sizes, 2);
+    CHECK(apartAll(grid));
+    CHECK(grid[0][1] <= grid[3][1]); // the order is kept: rows go down
+    const auto ext = PackExtent(sizes, grid);
+    for (std::size_t i = 0; i < sizes.size(); ++i)
+        CHECK(grid[i][0] + sizes[i][0] <= ext[0] && grid[i][1] + sizes[i][1] <= ext[1]);
+
     if (fails)
         std::printf("%d check(s) failed\n", fails);
     return fails ? 1 : 0;

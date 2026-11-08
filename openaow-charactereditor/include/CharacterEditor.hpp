@@ -26,12 +26,21 @@ struct SpriteFrameEdit
     int palette {0};
 };
 
+// How the frames of a sprite are laid out again in its image
+enum class SpriteArrange
+{
+    Shuffle,
+    Compact,
+    Grid
+};
+
 enum class SpriteDrag
 {
     None,
     Move,
     Resize,
-    Draw
+    Draw,
+    MovePixels // Sprite change mode: the frame travels with its pixels
 };
 
 // A frame on the Sprite Merge canvas: where it is in its object's image and where it goes in the result
@@ -199,7 +208,14 @@ private:
     fs::path SpriteMetaPath(const std::string &object) const;
     void LoadSpriteObject(const std::string &object);
     std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
-    bool SaveSpriteObject();
+    bool SaveSpriteObject(bool backup = true);         // backup: the files as they were go to .bak first
+    std::vector<std::string> SpriteImageNames() const; // the sprite's PNGs (the faction variant too)
+    void BackupSpriteFiles();
+    bool HasSpriteBackup() const;
+    bool RestoreSpriteBackup();
+    std::string SpriteMoveBlocker(int index, int x, int y) const; // why the frame cannot go there; empty: it can
+    bool MoveSpriteFramePixels(int index, int x, int y);          // the frame and its pixels to (x, y); backup first
+    bool RearrangeSpriteImage(SpriteArrange mode);                // redraws the PNGs with the frames at new places
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
     // Resamples the image (and the Resistance image) by `factor`; the frames follow, the drawn sizes stay
     bool ScaleSpriteImage(float factor, bool smooth);
@@ -494,8 +510,11 @@ private:
     ImVec2 spriteDragStart {0.0f, 0.0f};
     int spriteDragRect[4] {0, 0, 0, 0};
     bool spriteDrawMode {false};
-    int spriteScaleFactor {4}; // x4
-    int spriteScaleSmooth {0}; // 0: pixels (nearest), 1: smooth
+    bool spriteMoveMode {false}; // Sprite change mode
+    int spriteMoveTo[2] {0, 0};
+    int spriteArrangePadding {2}; // pixels between the frames when rearranging
+    int spriteScaleFactor {4};    // x4
+    int spriteScaleSmooth {0};    // 0: pixels (nearest), 1: smooth
     int spriteGridCols {4}, spriteGridRows {1};
     bool spriteSkipEmpty {true};
     int spriteDetectGap {1};

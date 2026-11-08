@@ -62,4 +62,13 @@ bool BindsBare(const std::string &text, const std::string &object);
 // Shelf packing, largest first: the top left corner of each size, `padding` pixels apart
 std::vector<std::array<int, 2>> ShelfPack(const std::vector<std::array<int, 2>> &sizes, int padding);
 
+// The same sizes in a random order (rows filled in it); a new seed gives another arrangement
+std::vector<std::array<int, 2>> ShufflePack(const std::vector<std::array<int, 2>> &sizes, int padding, unsigned seed);
+
+// A tidy grid: equal cells, the sizes' order kept, each frame centered in its cell, close to a square
+std::vector<std::array<int, 2>> GridPack(const std::vector<std::array<int, 2>> &sizes, int padding);
+
+// Width and height of the image that holds the frames at `pos`
+std::array<int, 2> PackExtent(const std::vector<std::array<int, 2>> &sizes, const std::vector<std::array<int, 2>> &pos);
+
 } // namespace CharEditor::SpriteMerge
