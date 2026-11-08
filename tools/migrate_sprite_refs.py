@@ -77,9 +77,11 @@ def migrate_character(mg, path, lines):
             if pre:
                 out.append('%sbaseline_sprite_set: %s\n' % (m.group(1), pre.rstrip('_')))
         elif unit and line.startswith('production:'):
-            obj = mg.m['archetypes'][unit.group(1)]['object']
-            if (obj + '.icon') in mg.m['composites'].values() and 'icon_composite' not in text:
-                out.append('  icon_composite: %s.icon\n' % obj)
+            cid = re.search(r'^id:\s*"?([a-z0-9_]+)', text, re.M).group(1)
+            fac = 'res' if cid.endswith('_res') else 'conf'
+            icon = 'icons_%s.%s' % (fac, re.sub(r'_(res|conf)$', '', cid))
+            if icon in mg.m['composites'].values() and 'icon_composite' not in text:
+                out.append('  icon_composite: %s\n' % icon)
         elif building and re.match(r'^building_index:', line):
             b = int(building.group(1))
             ref = mg.m['building_index'][str(b)]

@@ -247,19 +247,29 @@ def build_objects(d):
     power.name_item('S', 1778, 'icon')
     objs.append(power)
 
-    # --- Research icons ---
+    # --- Icons: one object per faction (unit cameos, building icons, research icons) ---
+    icon_objs = {'res': Obj('icons_res', 'fx'), 'conf': Obj('icons_conf', 'fx')}
+    objs += list(icon_objs.values())
+
+    def add_icon(fac, comp, item):
+        o = icon_objs[fac]
+        if ('C', comp) not in o.explicit:
+            o.name_item('C', comp, item)
+            idmap['icons'][str(comp)] = '%s.%s' % (o.name, item)
+
+    def char_icon(ch, comp):
+        """cameo of a character: icons_<faction>.<id without the faction suffix>"""
+        cid = ch['id']
+        fac = 'res' if cid.endswith('_res') else 'conf'
+        add_icon(fac, comp, re.sub(r'_(res|conf)$', '', cid))
+
     for f, ch in chars.items():
         if not f.startswith('research_') or not ch:
             continue
-        fac = slug(ch.get('faction', f[9:-5]))[:3]
+        fac = 'res' if slug(ch.get('faction', f[9:-5])).startswith('res') else 'conf'
         for r in ch.get('research', []):
-            if 'icon' not in r:
-                continue
-            name = 'research_%s_%s' % (fac, slug(r.get('name', str(r.get('id')))))
-            o = Obj(name, 'fx')
-            o.name_item('C', r['icon'], 'icon')
-            idmap['icons'][str(r['icon'])] = name + '.icon'
-            objs.append(o)
+            if 'icon' in r:
+                add_icon(fac, r['icon'], 'research_' + slug(r.get('name', str(r.get('id')))))
 
     # --- Units ---
     hud_cameos = {0: 2057, 2: 2058, 4: 2059, 6: 2060, 8: 2061, 10: 2062, 12: 2063,
@@ -289,8 +299,7 @@ def build_objects(d):
         ch = units[aid]
         o = Obj(ch['id'], 'units')
         if aid in hud_cameos:
-            o.name_item('C', hud_cameos[aid], 'icon')
-            idmap['icons'][str(hud_cameos[aid])] = o.name + '.icon'
+            char_icon(ch, hud_cameos[aid])
         unit_objs[aid] = o
         objs.append(o)
     for aid in range(len(arch)):
@@ -333,8 +342,7 @@ def build_objects(d):
         o.name_item('D', b, 'main')
         icon = find_key(ch, 'icon_composite') if ch else None
         if icon is not None:
-            o.name_item('C', icon, 'icon')
-            idmap['icons'][str(icon)] = o.name + '.icon'
+            char_icon(ch, icon)
         idmap['building_index'][str(b)] = o.name + '.main'
         objs.append(o)
     for first, name, fallback in ((15, 'wall_conf', 'wall_conf'), (20, 'wall_conf_reinforced', None),
@@ -347,8 +355,7 @@ def build_objects(d):
         for ch in build_chars.values():
             icon = find_key(ch, 'icon_composite')
             if ch.get('building_index') == first and icon is not None:
-                o.name_item('C', icon, 'icon')
-                idmap['icons'][str(icon)] = o.name + '.icon'
+                char_icon(ch, icon)
         objs.append(o)
     sc = Obj('construction_scaffold', 'buildings')
     sc.name_item('D', 30, 'main')

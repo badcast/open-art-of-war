@@ -43,29 +43,29 @@ struct UnitCameoDef
 };
 
 const UnitCameoDef kResistanceInfantry[] = {
-    {0, "rifleman_res.icon", "RIFLEMAN", 80, "Standard Resistance infantry rifleman"},
-    {2, "grenadier_res.icon", "GRENADIER", 120, "Heavy rocket soldier vs vehicles and walls"},
-    {4, "sniper_res.icon", "SNIPER", 160, "Long-range sniper (Camouflage mode [G])"},
+    {0, "icons_res.rifleman", "RIFLEMAN", 80, "Standard Resistance infantry rifleman"},
+    {2, "icons_res.grenadier", "GRENADIER", 120, "Heavy rocket soldier vs vehicles and walls"},
+    {4, "icons_res.sniper", "SNIPER", 160, "Long-range sniper (Camouflage mode [G])"},
 };
 
 const UnitCameoDef kResistanceVehicles[] = {
-    {6, "coyote_res.icon", "COYOTE", 220, "Fast scout buggy (spawns at Factory)"},
-    {8, "assault_tank_res.icon", "ARMADILLO", 350, "Main battle tank of Resistance"},
-    {10, "heavy_tank_res.icon", "RHINO", 480, "Heavy twin-cannon tank (Siege mode [G])"},
-    {12, "mlrs_res.icon", "PORCUPINE", 550, "Multiple Launch Rocket System (MLRS)"},
+    {6, "icons_res.coyote", "COYOTE", 220, "Fast scout buggy (spawns at Factory)"},
+    {8, "icons_res.assault_tank", "ARMADILLO", 350, "Main battle tank of Resistance"},
+    {10, "icons_res.heavy_tank", "RHINO", 480, "Heavy twin-cannon tank (Siege mode [G])"},
+    {12, "icons_res.mlrs", "PORCUPINE", 550, "Multiple Launch Rocket System (MLRS)"},
 };
 
 const UnitCameoDef kConfederationInfantry[] = {
-    {1, "rifleman_conf.icon", "RIFLEMAN", 80, "Standard Confederation infantry rifleman"},
-    {3, "heavy_assault_conf.icon", "HEAVY ASSAULT", 120, "Rocket infantry vs vehicles and walls"},
-    {5, "flamethrower_conf.icon", "FLAMETHROWER", 140, "Short-range flame infantry vs infantry"},
+    {1, "icons_conf.rifleman", "RIFLEMAN", 80, "Standard Confederation infantry rifleman"},
+    {3, "icons_conf.heavy_assault", "HEAVY ASSAULT", 120, "Rocket infantry vs vehicles and walls"},
+    {5, "icons_conf.flamethrower", "FLAMETHROWER", 140, "Short-range flame infantry vs infantry"},
 };
 
 const UnitCameoDef kConfederationVehicles[] = {
-    {7, "fortress_conf.icon", "FORTRESS", 220, "Armored machine-gun carrier"},
-    {9, "hammer_conf.icon", "HAMMER", 350, "Main battle tank of Confederation"},
-    {11, "zeus_conf.icon", "ZEUS", 500, "Heavy tank (Siege mode [G])"},
-    {13, "grad_conf.icon", "GRAD", 700, "Multiple Launch Rocket System (MLRS)"},
+    {7, "icons_conf.fortress", "FORTRESS", 220, "Armored machine-gun carrier"},
+    {9, "icons_conf.hammer", "HAMMER", 350, "Main battle tank of Confederation"},
+    {11, "icons_conf.zeus", "ZEUS", 500, "Heavy tank (Siege mode [G])"},
+    {13, "icons_conf.grad", "GRAD", 700, "Multiple Launch Rocket System (MLRS)"},
 };
 
 struct UnitCatalog
@@ -109,9 +109,9 @@ constexpr int kFirstStanceOrder = 4;
 const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "ORDERS"};
 // Tab icons per faction: HQ, rifleman, main tank, a research cameo; Orders draws a crosshair
 const char *const kResistanceTabIcons[HUDController::TabCount] = {
-    "headquarters_res.icon", "rifleman_res.icon", "assault_tank_res.icon", ""};
+    "icons_res.headquarters", "icons_res.rifleman", "icons_res.assault_tank", ""};
 const char *const kConfederationTabIcons[HUDController::TabCount] = {
-    "command_center_conf.icon", "rifleman_conf.icon", "hammer_conf.icon", ""};
+    "icons_conf.command_center", "icons_conf.rifleman", "icons_conf.hammer", ""};
 
 int TabIcon(int tab)
 {
