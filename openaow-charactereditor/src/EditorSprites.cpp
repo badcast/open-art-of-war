@@ -1462,7 +1462,39 @@ void CharacterEditor::SetSpriteFrameRect(SpriteFrameEdit &f, int x, int y, int w
     spriteDirty = true;
 }
 
+// The panel: Save / Revert / Reload stay at its top, always in sight and full size; the rest scrolls under them
 void CharacterEditor::DrawSpriteProperties()
+{
+    if (!spriteObject.empty())
+    {
+        const float w = ImGui::GetContentRegionAvail().x;
+        const float gap = ImGui::GetStyle().ItemSpacing.x;
+        const float saveW = std::max(80.0f, (w - 2.0f * gap) * 0.4f);
+        const float otherW = std::max(40.0f, (w - 2.0f * gap - saveW) * 0.5f);
+        if (spriteDirty)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.12f, 1.0f));
+        const bool save = ImGui::Button(_("Save##sprite"), ImVec2(saveW, 30.0f));
+        if (spriteDirty)
+            ImGui::PopStyleColor();
+        FieldHint("Save sprite");
+        if (save)
+            SaveSpriteObject();
+        ImGui::SameLine();
+        if (ImGui::Button(_("Revert##sprite"), ImVec2(otherW, 30.0f)))
+            LoadSpriteObject(spriteObject);
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Reload images##sprite"), ImVec2(otherW, 30.0f)), "Reload images"))
+            ReloadSpriteData();
+        if (spriteDirty)
+            ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.28f, 1.0f), "%s", _("Unsaved changes"));
+        ImGui::Separator();
+    }
+    ImGui::BeginChild("##sprite-props-body", ImVec2(0.0f, 0.0f), false);
+    DrawSpritePropertiesBody();
+    ImGui::EndChild();
+}
+
+void CharacterEditor::DrawSpritePropertiesBody()
 {
     using OpenArtOfWar::SpriteKind;
     // --- New sprite from a PNG ---
@@ -1506,14 +1538,6 @@ void CharacterEditor::DrawSpriteProperties()
         ImGui::TextWrapped("%s", summary.c_str());
     }
 
-    if (Hinted(ImGui::Button(_("Save")), "Save sprite"))
-        SaveSpriteObject();
-    ImGui::SameLine();
-    if (ImGui::Button(_("Revert")))
-        LoadSpriteObject(spriteObject);
-    ImGui::SameLine();
-    if (Hinted(ImGui::Button(_("Reload images")), "Reload images"))
-        ReloadSpriteData();
     if (ImGui::Checkbox(_("Draw new frames (drag on the image)"), &spriteDrawMode) && spriteDrawMode)
         spriteMoveMode = false;
     if (ImGui::Checkbox(_("Sprite change mode (drag a frame with its pixels)"), &spriteMoveMode) && spriteMoveMode)

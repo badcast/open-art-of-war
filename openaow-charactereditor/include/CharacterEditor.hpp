@@ -243,6 +243,7 @@ private:
     void SyncSpriteObjectFromActive();
     void DrawSpriteTools();
     void DrawSpriteProperties();
+    void DrawSpritePropertiesBody();
     void ClearThumbnails();
 
     // Sprite Merge tab: several objects into one (frames rearranged freely, references rewritten, sources removed),
