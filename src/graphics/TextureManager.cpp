@@ -1,12 +1,14 @@
 #include "graphics/TextureManager.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "graphics/SpriteRegistry.hpp"
+
+#include <yaml-cpp/yaml.h>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <nlohmann/json.hpp>
 
 namespace OpenArtOfWar
 {
@@ -60,10 +62,12 @@ void TextureManager::Cleanup()
     m_unitSteps.clear();
     m_buildings.clear();
     m_buildingParts.clear();
-    m_tilesetsList.clear();
-    m_decorOffsets.clear();
-    m_unitArchetypes.clear();
-    m_decorAnims.clear();
+    m_tilesetSprites.clear();
+    m_unitVisuals.clear();
+    m_buildingSprites.clear();
+    m_imagePaths.clear();
+    m_imageCount = 0;
+    m_terrainPages.clear();
 }
 
 SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
@@ -107,253 +111,208 @@ SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
     return texture;
 }
 
-bool TextureManager::LoadGraphicsData(const std::string &jsonPath)
-{
-    std::string jtext;
-    if (!Assets::ReadText(jsonPath, jtext))
-    {
-        std::cerr << "[TextureManager] Error: could not open " << jsonPath << std::endl;
-        return false;
-    }
 
-    try
-    {
-        nlohmann::json j;
-        j = nlohmann::json::parse(jtext);
-
-        // 1. Composite sprites
-        const auto &comp = j["composite_sprites"];
-        for (const auto &r : comp["ranges"])
-        {
-            m_compositeRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
-        }
-        for (const auto &p : comp["parts"])
-        {
-            m_compositeParts.push_back(
-                {p["child"].get<std::int16_t>(),
-                 p["ox"].get<std::int16_t>(),
-                 p["oy"].get<std::int16_t>(),
-                 static_cast<std::uint8_t>(p["is_comp"].get<int>())});
-        }
-
-        // 2. Animation sequences
-        const auto &anim = j["anim_sequences"];
-        for (const auto &r : anim["ranges"])
-        {
-            m_animRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
-        }
-        for (const auto &f : anim["frames"])
-        {
-            m_animFrames.push_back(
-                {f["child"].get<std::int16_t>(),
-                 static_cast<std::int8_t>(f["ox"].get<int>()),
-                 static_cast<std::int8_t>(f["oy"].get<int>()),
-                 static_cast<std::uint8_t>(f["is_comp"].get<int>())});
-        }
-
-        // 3. Unit bodies
-        const auto &ub = j["unit_bodies"];
-        for (const auto &r : ub["ranges"])
-        {
-            m_unitBodyRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
-        }
-        for (const auto &l : ub["layers"])
-        {
-            m_unitLayers.push_back(
-                {l["child"].get<std::int16_t>(),
-                 static_cast<std::int8_t>(l["ox"].get<int>()),
-                 static_cast<std::int8_t>(l["oy"].get<int>()),
-                 static_cast<std::uint8_t>(l["is_comp"].get<int>()),
-                 static_cast<std::uint8_t>(l["flag"].get<int>())});
-        }
-
-        // 4. Unit sequences
-        const auto &us = j["unit_sequences"];
-        for (const auto &r : us["ranges"])
-        {
-            m_unitSequenceRanges.push_back({r[0].get<std::int16_t>(), r[1].get<std::int16_t>()});
-        }
-        for (const auto &s : us["steps"])
-        {
-            m_unitSteps.push_back(
-                {s["body"].get<std::int16_t>(),
-                 static_cast<std::int8_t>(s["ox"].get<int>()),
-                 static_cast<std::int8_t>(s["oy"].get<int>())});
-        }
-
-        // 5. Buildings
-        const auto &bd = j["buildings"];
-        const auto &ranges = bd["ranges"];
-        const auto &widths = bd["widths"];
-        const auto &heights = bd["heights"];
-        std::size_t bcount = ranges.size();
-        for (std::size_t i = 0; i < bcount; ++i)
-        {
-            BuildingDef bdef;
-            bdef.start = ranges[i][0].get<std::int16_t>();
-            bdef.end = ranges[i][1].get<std::int16_t>();
-            bdef.width = (i < widths.size()) ? static_cast<std::uint8_t>(widths[i].get<int>()) : 1;
-            bdef.height = (i < heights.size()) ? static_cast<std::uint8_t>(heights[i].get<int>()) : 1;
-            m_buildings.push_back(bdef);
-        }
-        for (const auto &p : bd["parts"])
-        {
-            m_buildingParts.push_back(
-                {p["child"].get<std::int16_t>(),
-                 p["ox"].get<std::int16_t>(),
-                 static_cast<std::int8_t>(p["oy"].get<int>()),
-                 static_cast<std::uint8_t>(p["is_comp"].get<int>()),
-                 static_cast<std::uint8_t>(p["layer"].get<int>()),
-                 p.contains("state") ? static_cast<std::uint8_t>(p["state"].get<int>()) : std::uint8_t {0}});
-        }
-
-        // 6. Tilesets
-        for (const auto &ts : j["tilesets"])
-        {
-            std::vector<std::int16_t> tlist;
-            for (const auto &val : ts)
-            {
-                tlist.push_back(val.get<std::int16_t>());
-            }
-            m_tilesetsList.push_back(std::move(tlist));
-        }
-
-        if (j.contains("decor_offsets"))
-        {
-            for (const auto &val : j["decor_offsets"])
-            {
-                m_decorOffsets.push_back(val.get<std::int16_t>());
-            }
-        }
-
-        // 7. Unit archetypes
-        for (const auto &row : j["unit_archetypes"])
-        {
-            std::vector<std::int16_t> rlist;
-            for (const auto &val : row)
-            {
-                rlist.push_back(val.get<std::int16_t>());
-            }
-            m_unitArchetypes.push_back(std::move(rlist));
-        }
-
-        // 8. Decor animations
-        for (const auto &val : j["decor_anims"])
-        {
-            m_decorAnims.push_back(val.get<std::int16_t>());
-        }
-
-        std::cout << "[TextureManager] Loaded graphics data: " << m_compositeRanges.size() << " composites, "
-                  << m_animRanges.size() << " anims, " << m_buildings.size() << " buildings, " << m_tilesetsList.size()
-                  << " tilesets." << std::endl;
-        return true;
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "[TextureManager] Exception parsing graphics data: " << e.what() << std::endl;
-        return false;
-    }
-}
 
 bool TextureManager::LoadAllAssets()
 {
     std::cout << "[TextureManager] Loading game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
 
-    // 1. Load sprite frame definitions from sprites.json
-    std::string jsonPath = LoaderResources::SpriteFrames();
-    std::string sprites;
-    if (Assets::ReadText(jsonPath, sprites))
-    {
-        nlohmann::json j = nlohmann::json::parse(sprites);
-        m_spriteFrames.reserve(j.size());
-        for (const auto &item : j)
-        {
-            SpriteFrame f;
-            f.id = item["id"].get<int>();
-            f.page = item["page"].get<int>();
-            f.x = item["x"].get<float>();
-            f.y = item["y"].get<float>();
-            f.width = item["width"].get<float>();
-            f.height = item["height"].get<float>();
-            f.palette = item["palette"].get<int>();
-            m_spriteFrames.push_back(f);
-        }
-        std::cout << "[TextureManager] Loaded " << m_spriteFrames.size() << " sprite definitions." << std::endl;
-    }
-    else
-    {
-        std::cerr << "[TextureManager] Warning: could not open " << jsonPath << std::endl;
-    }
+    // 1. The sprites: one image and one meta per object, compiled into the drawing tables
+    const SpriteRegistry &reg = Sprites();
+    const SpriteTables &t = reg.Tables();
+    m_spriteFrames = t.frames;
+    m_compositeRanges = t.compositeRanges;
+    m_compositeParts = t.compositeParts;
+    m_animRanges = t.animRanges;
+    m_animFrames = t.animFrames;
+    m_unitBodyRanges = t.bodyRanges;
+    m_unitLayers = t.bodyLayers;
+    m_unitSequenceRanges = t.sequenceRanges;
+    m_unitSteps = t.sequenceSteps;
+    m_buildings = t.buildings;
+    m_buildingParts = t.buildingParts;
 
-    // 2. Load the sprite sheets listed in main.yaml and compute dynamic HD resolution scaling
-    const int sheetCount = LoaderResources::SpriteSheetCount();
-    m_spriteSheets.assign(sheetCount, nullptr);
-    m_sheetScales.assign(sheetCount, 1.0f);
-    for (int i = 0; i < sheetCount; ++i)
+    // 2. Their images; the Resistance images of objects that have one follow as pages ImageCount() + i
+    m_imageCount = static_cast<int>(t.images.size());
+    m_imagePaths.assign(2 * m_imageCount, std::string());
+    m_spriteSheets.assign(2 * m_imageCount, nullptr);
+    m_sheetScales.assign(2 * m_imageCount, 1.0f);
+    m_terrainPages.assign(2 * m_imageCount, false);
+    for (int i = 0; i < m_imageCount; ++i)
     {
-        m_spriteSheets[i] = LoadTexture(LoaderResources::SpriteSheet(i));
-        if (m_spriteSheets[i])
+        const SpriteImage &img = t.images[i];
+        bool hasFrames = false;
+        for (const SpriteFrame &f : m_spriteFrames)
         {
-            float tw = 0.0f, th = 0.0f;
-            SDL_GetTextureSize(m_spriteSheets[i], &tw, &th);
-            if (BaseSheetWidth(i) > 0)
+            if (f.page == i && f.srcW > 0 && f.srcH > 0)
             {
-                m_sheetScales[i] = tw / static_cast<float>(BaseSheetWidth(i));
+                hasFrames = true;
+                break;
             }
         }
+        for (int alt = 0; alt < 2; ++alt)
+        {
+            const std::string &path = alt ? img.resistancePath : img.path;
+            const int page = i + alt * m_imageCount;
+            m_sheetScales[page] = img.scale;
+            m_terrainPages[page] = img.terrain;
+            if (path.empty() || !hasFrames)
+                continue;
+            m_imagePaths[page] = path;
+            m_spriteSheets[page] = LoadTexture(path);
+        }
     }
+    std::cout << "[TextureManager] " << m_imageCount << " sprite objects, " << m_spriteFrames.size() << " frames, "
+              << m_compositeRanges.size() << " composites, " << m_animRanges.size() << " animations, "
+              << m_buildings.size() << " buildings." << std::endl;
 
-    // 3. Load UI screens
+    // 3. What the game's units, buildings and tilesets are drawn from
+    LoadSpriteBindings();
+
+    // 4. Load UI screens
     for (const auto &[name, path] : LoaderResources::UiTextures())
         m_uiTextures[name] = LoadTexture(path);
-
-    // 4. Load comprehensive graphics data (composites, animations, units, buildings, tilesets)
-    std::string gdataPath = LoaderResources::GraphicsData();
-    LoadGraphicsData(gdataPath);
 
     std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
     return true;
 }
 
-void TextureManager::CollectTerrainPages()
+namespace
 {
-    m_terrainPages.assign(m_spriteSheets.size(), false);
-    // Sprites of a composite, nested composites included
-    std::vector<int> stack;
-    for (const auto &tiles : m_tilesetsList)
+// A family of a sprite object; {start, count} or {-1, 0}
+std::pair<int, int> FamilyOf(const std::string &object, const std::string &family)
+{
+    const SpriteFamily *f = Sprites().FindFamily(object, family);
+    if (!f || f->count <= 0)
+        return {-1, 0};
+    return {f->start, f->count};
+}
+
+std::string Scalar(const YAML::Node &n, const char *key)
+{
+    try
     {
-        for (std::int16_t comp : tiles)
-            stack.push_back(comp);
+        if (n && n.IsMap() && n[key] && n[key].IsScalar())
+            return n[key].as<std::string>();
     }
-    std::vector<bool> seen;
-    while (!stack.empty())
-    {
-        const int comp = stack.back();
-        stack.pop_back();
-        if (comp < 0)
-            continue;
-        if (comp >= static_cast<int>(seen.size()))
-            seen.resize(comp + 1, false);
-        if (seen[comp])
-            continue;
-        seen[comp] = true;
-        const IndexRange r = GetCompositeRange(comp);
-        for (int p = r.start; p <= r.end; ++p)
+    catch (...)
+    {}
+    return {};
+}
+} // namespace
+
+void TextureManager::LoadSpriteBindings()
+{
+    m_unitVisuals.assign(64, UnitVisual {});
+    m_buildingSprites.assign(64, -1);
+
+    // A unit archetype: the families "<set>idle" / "attack" / "move" / "die" / "transform" of its object
+    auto bindUnit = [&](int arch, const std::string &object, const std::string &set, const std::string &icon,
+                        const std::string &file) {
+        if (arch < 0 || arch >= static_cast<int>(m_unitVisuals.size()) || object.empty())
+            return;
+        if (!Sprites().HasObject(object))
         {
-            const CompositePart *part = GetCompositePart(p);
-            if (!part)
-                continue;
-            if (part->isComp)
+            std::cerr << "[TextureManager] " << file << ": no sprite object '" << object << "'" << std::endl;
+            return;
+        }
+        const std::string pre = set.empty() ? std::string() : set + "_";
+        UnitVisual v;
+        std::tie(v.idle, v.idleCount) = FamilyOf(object, pre + "idle");
+        v.attack = FamilyOf(object, pre + "attack").first;
+        std::tie(v.move, v.moveCount) = FamilyOf(object, pre + "move");
+        v.die = FamilyOf(object, pre + "die").first;
+        v.transform = FamilyOf(object, pre + "transform").first;
+        if (v.idle < 0)
+            std::cerr << "[TextureManager] " << file << ": sprite '" << object << "' has no family '" << pre
+                      << "idle'" << std::endl;
+        v.icon = icon.empty() ? m_unitVisuals[arch].icon : SpriteHandle(icon, SpriteKind::Part, file);
+        m_unitVisuals[arch] = v;
+    };
+    // A building type, or a family of them (walls by damage)
+    auto bindBuilding = [&](int type, const std::string &ref, const std::string &file) {
+        if (type < 0 || ref.empty())
+            return;
+        const auto dot = ref.find('.');
+        const SpriteFamily *fam =
+            dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+        if (fam && fam->kind == SpriteKind::Building)
+        {
+            for (int i = 0; i < fam->count && type + i < static_cast<int>(m_buildingSprites.size()); ++i)
+                m_buildingSprites[type + i] = fam->start + i;
+            return;
+        }
+        if (type < static_cast<int>(m_buildingSprites.size()))
+            m_buildingSprites[type] = SpriteHandle(ref, SpriteKind::Building, file);
+    };
+
+    for (const std::string &path : LoaderResources::CharacterFiles())
+    {
+        std::string text;
+        if (!Assets::ReadText(path, text))
+            continue;
+        YAML::Node doc;
+        try
+        {
+            doc = YAML::Load(text);
+        }
+        catch (const std::exception &)
+        {
+            continue;
+        }
+        if (!doc.IsMap())
+            continue;
+        const std::string sprite = Scalar(doc, "sprite");
+        if (doc["archetype_id"])
+        {
+            const int arch = doc["archetype_id"].as<int>(-1);
+            const std::string icon = Scalar(doc["production"], "icon_composite");
+            bindUnit(arch, sprite, Scalar(doc, "sprite_set"), icon, path);
+            // Other forms of the unit (siege mode, the baseline before an upgrade): "<form>: {archetype_id, sprite_set}"
+            std::vector<YAML::Node> nodes {doc};
+            if (doc["abilities"] && doc["abilities"].IsMap())
+                for (const auto &kv : doc["abilities"])
+                    nodes.push_back(kv.second);
+            for (const YAML::Node &n : nodes)
             {
-                stack.push_back(part->child);
-            }
-            else if (const auto *frame = GetSpriteFrame(part->child))
-            {
-                if (frame->page >= 0 && frame->page < static_cast<int>(m_terrainPages.size()))
-                    m_terrainPages[frame->page] = true;
+                if (!n.IsMap())
+                    continue;
+                if (&n != &nodes.front() && n["archetype_id"] && n["sprite_set"])
+                    bindUnit(n["archetype_id"].as<int>(-1), Scalar(n, "sprite").empty() ? sprite : Scalar(n, "sprite"),
+                             Scalar(n, "sprite_set"), {}, path);
+                if (n["baseline_archetype_id"] && n["baseline_sprite_set"])
+                    bindUnit(n["baseline_archetype_id"].as<int>(-1), sprite, Scalar(n, "baseline_sprite_set"), {},
+                             path);
             }
         }
+        else if (doc["building_index"])
+        {
+            const int type = doc["building_index"].as<int>(-1);
+            bindBuilding(type, sprite, path);
+            // Walls: the reinforced walls (research) are the five types after the plain ones
+            if (doc["reinforced_sprite"])
+                bindBuilding(type + 5, Scalar(doc, "reinforced_sprite"), path);
+        }
     }
+
+    // Tilesets: "tileset_<id>"
+    m_tilesetSprites.clear();
+    for (int id = 0;; ++id)
+    {
+        const std::string object = "tileset_" + std::to_string(id);
+        if (!Sprites().HasObject(object))
+            break;
+        TilesetSprites ts;
+        std::tie(ts.tiles, ts.tileCount) = FamilyOf(object, "tiles");
+        std::tie(ts.decor, ts.decorCount) = FamilyOf(object, "decor");
+        m_tilesetSprites.push_back(ts);
+    }
+}
+
+void TextureManager::CollectTerrainPages()
+{
+    // Terrain images say so in their meta (LoadAllAssets); nothing to work out
+    m_terrainPages.resize(m_spriteSheets.size(), false);
 }
 
 SDL_ScaleMode TextureManager::SmoothPixelScaleMode()
@@ -527,13 +486,7 @@ SDL_Texture *TextureManager::GetSpriteSheet(int page) const
     return nullptr;
 }
 
-int TextureManager::BaseSheetWidth(int page)
-{
-    static const int kWidths[42]
-        = {240, 179, 206, 229, 200, 274, 268, 240, 77,  77,  107, 153, 91,  112, 223, 154, 193, 158, 135, 73, 65,
-           121, 91,  94,  106, 169, 68,  78,  126, 231, 272, 45,  166, 123, 122, 1,   61,  88,  50,  63,  98, 33};
-    return page >= 0 && page < 42 ? kWidths[page] : 0;
-}
+
 
 float TextureManager::GetSheetScale(int page) const
 {
@@ -682,15 +635,14 @@ const BuildingPart *TextureManager::GetBuildingPart(int index) const
 
 SDL_Surface *TextureManager::SheetSurface(int page)
 {
-    const int sheetCount = LoaderResources::SpriteSheetCount();
-    if (page < 0 || page >= sheetCount)
+    if (page < 0 || page >= static_cast<int>(m_imagePaths.size()) || m_imagePaths[page].empty())
         return nullptr;
-    if (static_cast<int>(m_sheetSurfaces.size()) < sheetCount)
-        m_sheetSurfaces.resize(sheetCount, nullptr);
+    if (m_sheetSurfaces.size() < m_imagePaths.size())
+        m_sheetSurfaces.resize(m_imagePaths.size(), nullptr);
     if (!m_sheetSurfaces[page])
     {
         std::vector<std::uint8_t> png;
-        if (!Assets::ReadBytes(LoaderResources::SpriteSheet(page), png) || png.empty())
+        if (!Assets::ReadBytes(m_imagePaths[page], png) || png.empty())
             return nullptr;
         SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
         if (!loaded)
@@ -699,6 +651,13 @@ SDL_Surface *TextureManager::SheetSurface(int page)
         SDL_DestroySurface(loaded);
     }
     return m_sheetSurfaces[page];
+}
+
+int TextureManager::ResistancePage(int page) const
+{
+    if (page >= 0 && page < m_imageCount && m_spriteSheets[page + m_imageCount])
+        return page + m_imageCount;
+    return page;
 }
 
 void TextureManager::SumCompositeColor(
@@ -723,10 +682,9 @@ void TextureManager::SumCompositeColor(
         SDL_Surface *surface = SheetSurface(frame->page);
         if (!surface)
             continue;
-        const float scale = GetSheetScale(frame->page);
-        const int x0 = static_cast<int>(frame->x * scale), y0 = static_cast<int>(frame->y * scale);
-        const int x1 = std::min(surface->w, static_cast<int>((frame->x + frame->width) * scale));
-        const int y1 = std::min(surface->h, static_cast<int>((frame->y + frame->height) * scale));
+        const int x0 = static_cast<int>(frame->srcX), y0 = static_cast<int>(frame->srcY);
+        const int x1 = std::min(surface->w, static_cast<int>(frame->srcX + frame->srcW));
+        const int y1 = std::min(surface->h, static_cast<int>(frame->srcY + frame->srcH));
         for (int y = y0; y < y1; ++y)
         {
             const std::uint8_t *row = static_cast<const std::uint8_t *>(surface->pixels) + y * surface->pitch;
@@ -764,19 +722,26 @@ SDL_Color TextureManager::GetTileColor(int tilesetId, int tileIdx)
 
 int TextureManager::GetTileCompositeId(int tilesetId, int tileIdx) const
 {
-    if (tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetsList.size()))
-    {
+    if (m_tilesetSprites.empty())
+        return -1;
+    if (tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetSprites.size()))
         tilesetId = 0;
-    }
-    if (tilesetId < static_cast<int>(m_tilesetsList.size()))
-    {
-        const auto &tlist = m_tilesetsList[tilesetId];
-        if (tileIdx >= 0 && tileIdx < static_cast<int>(tlist.size()))
-        {
-            return tlist[tileIdx];
-        }
-    }
-    return 1; // Fallback to basic tile composite
+    const TilesetSprites &ts = m_tilesetSprites[tilesetId];
+    return tileIdx >= 0 && tileIdx < ts.tileCount ? ts.tiles + tileIdx : -1;
+}
+
+int TextureManager::GetTileCount(int tilesetId) const
+{
+    return tilesetId >= 0 && tilesetId < static_cast<int>(m_tilesetSprites.size())
+               ? m_tilesetSprites[tilesetId].tileCount
+               : 0;
+}
+
+int TextureManager::GetDecorCount(int tilesetId) const
+{
+    return tilesetId >= 0 && tilesetId < static_cast<int>(m_tilesetSprites.size())
+               ? m_tilesetSprites[tilesetId].decorCount
+               : 0;
 }
 
 int TextureManager::GetDecorCompositeId(int tilesetId, int decorType) const
@@ -786,26 +751,20 @@ int TextureManager::GetDecorCompositeId(int tilesetId, int decorType) const
 
 int TextureManager::GetDecorBuildingId(int tilesetId, int decorType) const
 {
-    if (tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetsList.size()))
-    {
+    if (m_tilesetSprites.empty())
+        return -1;
+    if (tilesetId < 0 || tilesetId >= static_cast<int>(m_tilesetSprites.size()))
         tilesetId = 0;
-    }
-    int offset = (tilesetId < static_cast<int>(m_decorOffsets.size())) ? m_decorOffsets[tilesetId] : 245;
-    int idx = offset + decorType;
-    if (tilesetId < static_cast<int>(m_tilesetsList.size()))
-    {
-        const auto &tlist = m_tilesetsList[tilesetId];
-        if (idx >= 0 && idx < static_cast<int>(tlist.size()))
-        {
-            return tlist[idx];
-        }
-    }
-    return -1;
+    const TilesetSprites &ts = m_tilesetSprites[tilesetId];
+    return decorType >= 0 && decorType < ts.decorCount ? ts.decor + decorType : -1;
 }
 
 bool TextureManager::GetTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const
 {
-    const int seq = GetUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle)) + ((hullDir8 % 8 + 8) % 8);
+    const UnitVisual *v = GetUnitVisual(unitType);
+    if (!v || v->idle < 0)
+        return false;
+    const int seq = v->idle + ((hullDir8 % 8 + 8) % 8);
     IndexRange r = GetUnitSequenceRange(seq);
     if (r.end < r.start)
         return false;
@@ -827,38 +786,32 @@ bool TextureManager::GetTurretAnchor(int unitType, int hullDir8, float &outX, fl
     return false;
 }
 
+const UnitVisual *TextureManager::GetUnitVisual(int archetype) const
+{
+    if (archetype < 0 || archetype >= static_cast<int>(m_unitVisuals.size()) || m_unitVisuals[archetype].idle < 0)
+        return nullptr;
+    return &m_unitVisuals[archetype];
+}
+
 int TextureManager::GetUnitBaseSeq(int unitType, int actionState) const
 {
-    if (unitType >= 0 && unitType < static_cast<int>(m_unitArchetypes.size()))
-    {
-        const auto &row = m_unitArchetypes[unitType];
-        if (row.empty())
-            return 142;
+    const UnitVisual *v = GetUnitVisual(unitType);
+    if (!v)
+        return -1;
+    if (actionState == static_cast<int>(ActionState::Move))
+        return v->move >= 0 ? v->move : v->idle;
+    if (actionState == static_cast<int>(ActionState::Die))
+        return v->die >= 0 ? v->die : v->idle;
+    if (actionState == static_cast<int>(ActionState::Transform))
+        return v->transform >= 0 ? v->transform : v->idle;
+    return v->idle;
+}
 
-        // Unit animation sequence mapping by action state:
-        // row[0] = Standing / Idle (and base for Attack)
-        // row[1] = Moving / Walking
-        // row[2] = Dying (231+ for infantry)
-        // row[3] = Siege Mode Transformation (4<->14, 10<->15, 13<->16)
-        if (actionState == static_cast<int>(ActionState::Idle) || actionState == static_cast<int>(ActionState::Attack))
-        {
-            return row[0];
-        }
-        else if (actionState == static_cast<int>(ActionState::Move))
-        {
-            return (row.size() > 1) ? row[1] : row[0];
-        }
-        else if (actionState == static_cast<int>(ActionState::Die))
-        {
-            return (row.size() > 2) ? row[2] : 231;
-        }
-        else if (actionState == static_cast<int>(ActionState::Transform))
-        {
-            return (row.size() >= 4) ? row[3] : row[0];
-        }
-        return row[0];
-    }
-    return 142; // Fallback rifleman idle
+int TextureManager::GetBuildingSprite(int buildingType) const
+{
+    if (buildingType >= 0 && buildingType < static_cast<int>(m_buildingSprites.size()))
+        return m_buildingSprites[buildingType];
+    return -1;
 }
 
 } // namespace OpenArtOfWar

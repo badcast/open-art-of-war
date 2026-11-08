@@ -93,7 +93,11 @@ public:
     float Scale(int page)
     {
         SDL_Surface *sheet = Get(page);
-        const int base = OpenArtOfWar::TextureManager::BaseSheetWidth(page);
+        // Widths of the original sheets (the old sheet sprites; this export goes away with them)
+        static const int kWidths[42]
+            = {240, 179, 206, 229, 200, 274, 268, 240, 77,  77,  107, 153, 91,  112, 223, 154, 193, 158, 135, 73, 65,
+               121, 91,  94,  106, 169, 68,  78,  126, 231, 272, 45,  166, 123, 122, 1,   61,  88,  50,  63,  98, 33};
+        const int base = page >= 0 && page < 42 ? kWidths[page] : 0;
         return sheet && base > 0 ? static_cast<float>(sheet->w) / static_cast<float>(base) : 1.0f;
     }
 

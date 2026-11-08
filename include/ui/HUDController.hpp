@@ -142,7 +142,7 @@ public:
     void RenderPowerAlerts(
         Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const;
     // The lightning icon of the game (sprite of the sheets) and its blinking, shared with the power header
-    static constexpr int kPowerIconSprite = 1778;
+    static int PowerIconSprite(); // the lightning of the power readout (sprite ui_power_icon.icon)
     static bool PowerIconBlinkOn();
 
     void RenderGameHud(

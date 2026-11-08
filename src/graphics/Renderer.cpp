@@ -1,4 +1,5 @@
 #include "graphics/Renderer.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "graphics/ShaderEffects.hpp"
 #include "core/Utility.hpp"
 #include "game/Effects.hpp"
@@ -98,22 +99,21 @@ void Renderer::PlainState()
         m_effects->UseDefaultState();
 }
 
-SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
+SDL_Texture *Renderer::BindSheet(int &page, Faction faction, int recolor)
 {
-    // Sheets with team armour: Confederation (blue) 5, 7, 8, 10, 11, 14, 15 and Resistance (red) 6, 12, 13, 16, 17, 29,
-    // 31; sheet 9 is the red copy of 8 (same layout). An army colour recolours the armour; every other pixel stays.
-    (void) faction; // the classic sheet of the faction is chosen by the caller
+    // `recolor`: the team armour on the frame (1 blue, 2 red, 0 none; SpriteFrame::recolor). An army colour recolours
+    // the armour; every other pixel stays.
+    (void) faction; // the image of the faction is chosen by the caller
     const PlayerId owner = m_drawOwner;
-    const bool blueSheet = page == 5 || page == 7 || page == 8 || page == 10 || page == 11 || page == 14 || page == 15;
-    const bool redSheet = page == 6 || page == 12 || page == 13 || page == 16 || page == 17 || page == 29 || page == 31;
     const bool custom = owner < kMaxPlayers && m_armyCustom[owner];
     int team = 0;
     if (custom)
     {
-        if (page == 9)
-            page = 8;
-        team = (blueSheet || page == 8) ? 1 : (redSheet ? 2 : 0);
-        // Buildings, walls and icons: their trims sit on the shared sheets too
+        // An army colour recolours the plain image: the Resistance image is only the classic red
+        if (page >= m_texManager->ImageCount())
+            page -= m_texManager->ImageCount();
+        team = recolor;
+        // Buildings, walls and icons: their trims sit on the shared images too
         if (m_structureTeam != 0)
             team = m_structureTeam;
     }
@@ -127,10 +127,12 @@ SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
     if (gpuEffects)
     {
         m_effects->UseSpriteState(team);
-        const bool tracked = page >= 0 && page < 64;
-        if (team != 0 || blueSheet || redSheet || page == 8 || (tracked && m_tintedSheet[page]))
+        const bool tracked = page >= 0;
+        if (tracked && page >= static_cast<int>(m_tintedSheet.size()))
+            m_tintedSheet.resize(page + 1, false);
+        if (team != 0 || recolor != 0 || (tracked && m_tintedSheet[page]))
         {
-            // The colour mod carries the army colour to the shader; plain draws of the same sheet stay white
+            // The colour mod carries the army colour to the shader; plain draws of the same image stay white
             const SDL_Color c = team ? m_armyColor[owner] : SDL_Color {255, 255, 255, 255};
             SDL_SetTextureColorMod(sheet, c.r, c.g, c.b);
             if (tracked)
@@ -139,6 +141,15 @@ SDL_Texture *Renderer::BindSheet(int &page, Faction faction)
     }
     return sheet;
 }
+
+namespace
+{
+// The pixels of a frame in its image
+SDL_FRect FrameSource(const SpriteFrame &f)
+{
+    return {std::round(f.srcX), std::round(f.srcY), std::round(f.srcW), std::round(f.srcH)};
+}
+} // namespace
 
 void Renderer::Clear(SDL_Color clearColor)
 {
@@ -156,14 +167,11 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
     if (!m_texManager)
         return;
     const auto *frame = m_texManager->GetSpriteFrame(spriteId);
-    if (!frame || frame->width <= 0 || frame->height <= 0)
+    if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
         return;
 
-    int page = frame->page;
-    if (page == 8 && faction == Faction::Resistance)
-    {
-        page = 9; // Red faction (Resistance) switches blue base sheet 8 to red sheet 9
-    }
+    // The Resistance draws from its own image of the object where there is one
+    int page = faction == Faction::Resistance ? m_texManager->ResistancePage(frame->page) : frame->page;
 
     float sx, sy;
     camera.WorldToScreen(worldX, worldY, sx, sy);
@@ -184,15 +192,10 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
         return;
     }
 
-    SDL_Texture *sheet = BindSheet(page, faction);
+    SDL_Texture *sheet = BindSheet(page, faction, frame->recolor);
     if (!sheet)
         return;
-    float sScale = m_texManager->GetSheetScale(page);
-    SDL_FRect srcRect
-        = {std::round(frame->x * sScale),
-           std::round(frame->y * sScale),
-           std::round(frame->width * sScale),
-           std::round(frame->height * sScale)};
+    const SDL_FRect srcRect = FrameSource(*frame);
     SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
     if (m_glowStrength > 0.0f)
     {
@@ -203,7 +206,7 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
         SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
         SDL_SetTextureBlendMode(sheet, SDL_BLENDMODE_BLEND);
         SDL_SetTextureColorMod(sheet, 255, 255, 255);
-        if (page >= 0 && page < 64)
+        if (page >= 0 && page < static_cast<int>(m_tintedSheet.size()))
             m_tintedSheet[page] = false;
     }
 }
@@ -377,14 +380,10 @@ void Renderer::RenderCompositePartsRotated(
             float worldY = originY + oy;
 
             const auto *sf = tm->GetSpriteFrame(part->child);
-            if (!sf)
+            if (!sf || sf->srcW <= 0 || sf->srcH <= 0)
                 continue;
-            int page = sf->page;
-            if (faction == Faction::Confederation && page == 9)
-                page = 8;
-            else if (faction == Faction::Confederation && page == 12)
-                page = 10;
-            SDL_Texture *sheet = BindSheet(page, faction);
+            int page = faction == Faction::Resistance ? tm->ResistancePage(sf->page) : sf->page;
+            SDL_Texture *sheet = BindSheet(page, faction, sf->recolor);
             if (!sheet)
                 continue;
 
@@ -396,12 +395,7 @@ void Renderer::RenderCompositePartsRotated(
             float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
             SDL_FRect dstRect = {sx, sy, drawW + bleed, drawH + bleed};
 
-            float sScale = tm->GetSheetScale(page);
-            SDL_FRect srcRect
-                = {std::round(sf->x * sScale),
-                   std::round(sf->y * sScale),
-                   std::round(sf->width * sScale),
-                   std::round(sf->height * sScale)};
+            const SDL_FRect srcRect = FrameSource(*sf);
             SDL_FPoint center = {-ox * zoom, -oy * zoom};
             SDL_RenderTextureRotated(sdlRnd, sheet, &srcRect, &dstRect, angleDeg, &center, SDL_FLIP_NONE);
         }
@@ -437,14 +431,10 @@ void Renderer::DrawAnimSequenceWorldRotated(
         float baseOx = static_cast<float>(f->ox);
         float baseOy = static_cast<float>(f->oy);
         const auto *sf = m_texManager->GetSpriteFrame(f->child);
-        if (!sf)
+        if (!sf || sf->srcW <= 0 || sf->srcH <= 0)
             return;
-        int page = sf->page;
-        if (faction == Faction::Confederation && page == 9)
-            page = 8;
-        else if (faction == Faction::Confederation && page == 12)
-            page = 10;
-        SDL_Texture *sheet = BindSheet(page, faction);
+        int page = faction == Faction::Resistance ? m_texManager->ResistancePage(sf->page) : sf->page;
+        SDL_Texture *sheet = BindSheet(page, faction, sf->recolor);
         if (!sheet)
             return;
 
@@ -456,12 +446,7 @@ void Renderer::DrawAnimSequenceWorldRotated(
         float bleed = (zoom < 1.0f) ? 0.6f : ((zoom < 2.0f) ? 0.25f : 0.0f);
         SDL_FRect dstRect = {sx, sy, drawW + bleed, drawH + bleed};
 
-        float sScale = m_texManager->GetSheetScale(page);
-        SDL_FRect srcRect
-            = {std::round(sf->x * sScale),
-               std::round(sf->y * sScale),
-               std::round(sf->width * sScale),
-               std::round(sf->height * sScale)};
+        const SDL_FRect srcRect = FrameSource(*sf);
         SDL_FPoint center = {-baseOx * zoom, -baseOy * zoom}; // rotate about (worldX, worldY)
         SDL_RenderTextureRotated(m_renderer, sheet, &srcRect, &dstRect, angleDeg, &center, SDL_FLIP_NONE);
     }
@@ -491,20 +476,12 @@ void Renderer::DrawDecorWorld(
     if (!m_texManager)
         return;
 
-    // Tileset decoration entries map to building IDs (31..338: trees, bridges 83..108, cliffs, landmarks 121..132).
-    // Do not use m_decorAnims here: those are post-destruction craters and vehicle wrecks.
-    int buildingId = m_texManager->GetDecorBuildingId(tilesetId, decorType);
-    if (buildingId >= 0)
+    // Tileset decorations (trees, bridges, cliffs, landmarks) are buildings of the tileset's "decor" family
+    const int sprite = m_texManager->GetDecorBuildingId(tilesetId, decorType);
+    if (sprite >= 0)
     {
-        if (layer < 0)
-        {
-            DrawBuildingWorld(buildingId, worldX, worldY, 0, camera, Faction::Neutral, animFrame, 1.0f, false);
-            DrawBuildingWorld(buildingId, worldX, worldY, 1, camera, Faction::Neutral, animFrame, 1.0f, false);
-        }
-        else
-        {
-            DrawBuildingWorld(buildingId, worldX, worldY, layer, camera, Faction::Neutral, animFrame, 1.0f, false);
-        }
+        for (int l = layer < 0 ? 0 : layer; l <= (layer < 0 ? 1 : layer); ++l)
+            DrawBuildingSpriteWorld(sprite, -1, worldX, worldY, l, camera, Faction::Neutral, animFrame, 1.0f, false);
     }
 }
 
@@ -512,11 +489,10 @@ int Renderer::TallDecorRows(int tilesetId, int decorType) const
 {
     if (!m_texManager)
         return 0;
-    const int id = m_texManager->GetDecorBuildingId(tilesetId, decorType);
-    if (id < 31 || id >= 83)
+    const BuildingDef *def = m_texManager->GetBuildingDef(m_texManager->GetDecorBuildingId(tilesetId, decorType));
+    if (!def || !def->tall)
         return 0;
-    const BuildingDef *def = m_texManager->GetBuildingDef(id);
-    return def ? std::max<int>(1, def->height) : 1;
+    return std::max<int>(1, def->height);
 }
 
 void Renderer::DrawBuildingWorld(
@@ -538,12 +514,51 @@ void Renderer::DrawBuildingWorld(
 {
     if (!m_texManager)
         return;
+    DrawBuildingSpriteWorld(
+        m_texManager->GetBuildingSprite(buildingType),
+        buildingType,
+        worldX,
+        worldY,
+        layer,
+        camera,
+        faction,
+        animFrame,
+        buildProgress,
+        isDestroyed,
+        hpRatio,
+        turretFacing,
+        isAttacking,
+        isPowered,
+        customWreckComp,
+        customWreckStages);
+}
 
-    const auto *bdef = m_texManager->GetBuildingDef(buildingType);
+void Renderer::DrawBuildingSpriteWorld(
+    int sprite,
+    int buildingType,
+    float worldX,
+    float worldY,
+    int layer,
+    const Camera &camera,
+    Faction faction,
+    int animFrame,
+    float buildProgress,
+    bool isDestroyed,
+    float hpRatio,
+    int turretFacing,
+    bool isAttacking,
+    bool isPowered,
+    int customWreckComp,
+    int customWreckStages)
+{
+    if (!m_texManager)
+        return;
+
+    const auto *bdef = m_texManager->GetBuildingDef(sprite);
     if (!bdef || bdef->end < bdef->start)
         return;
 
-    lastDrawnBuilding = {buildingType, animFrame, m_animatedPartsVisible};
+    lastDrawnBuilding = {sprite, animFrame, m_animatedPartsVisible};
 
     // 1. Destroyed building remnant
     // Static crater/rubble composite that stays for 2 minutes without looping frames!
@@ -553,7 +568,7 @@ void Renderer::DrawBuildingWorld(
         {
             int baseRemnant = 0, stages = 0;
             DefaultBuildingWreck(bdef->width, bdef->height, baseRemnant, stages);
-            if (customWreckComp > 0)
+            if (customWreckComp >= 0)
                 baseRemnant = customWreckComp;
             if (customWreckStages > 0)
                 stages = customWreckStages;
@@ -576,19 +591,20 @@ void Renderer::DrawBuildingWorld(
             r.SetStructureFaction(Faction::Neutral);
         }
     } structureScope {*this};
-    if (buildingType < 30 && !isDestroyed)
+    const BuildingStyle style = bdef->style;
+    if ((style == BuildingStyle::Structure || style == BuildingStyle::Wall) && !isDestroyed)
         SetStructureFaction(faction);
 
-    // 2. Walls (15..29), construction scaffolding (30), and map decorations (31..338)
-    if (buildingType >= 15)
+    // 2. Walls, construction scaffolding and map decorations: the parts of state 0
+    if (style != BuildingStyle::Structure)
     {
         for (int p = bdef->start; p <= bdef->end; ++p)
         {
             const auto *part = m_texManager->GetBuildingPart(p);
             if (!part)
                 continue;
-            // Ids from 133 have no layer split: all their parts go with layer 0 (drawn once, not once per layer)
-            const bool inLayer = buildingType >= 133 ? layer == 0 : part->layer == layer;
+            // Flat decorations have no layer split: all their parts go with layer 0 (drawn once, not once per layer)
+            const bool inLayer = style == BuildingStyle::DecorFlat ? layer == 0 : part->layer == layer;
             if (inLayer && part->state == 0)
             {
                 float px = worldX + part->ox;
@@ -601,7 +617,7 @@ void Renderer::DrawBuildingWorld(
                 {
                     DrawCompositeWorld(part->child, px, py, camera, faction);
                 }
-                else if (part->isComp == 2 && buildingType < 30)
+                else if (part->isComp == 2 && style == BuildingStyle::Wall)
                 {
                     DrawAnimSequenceWorld(part->child, animFrame, px, py, camera, faction);
                 }
@@ -610,7 +626,7 @@ void Renderer::DrawBuildingWorld(
         return;
     }
 
-    // 3. Active faction buildings 0..14
+    // 3. Active faction buildings
     // Under construction: draw scaffolding / base
     bool underConstruction = (buildProgress < 1.0f);
     int iA = 4;
@@ -720,7 +736,7 @@ void Renderer::DrawUnitWorld(
     if (!m_texManager)
         return;
 
-    unitTypeId = std::clamp(unitTypeId, 0, 18);
+    const UnitVisual *visual = m_texManager->GetUnitVisual(unitTypeId);
     bool isInfantry = Utility::IsInfantryArchetype(unitTypeId); // archetypes 0..5 and 14 (prone sniper)
 
     // 1. Dying / Wrecked state
@@ -730,7 +746,7 @@ void Renderer::DrawUnitWorld(
         {
             // Destroyed vehicle remnant - static wreck that fades over 2 minutes!
             const EffectsConfig::Wreck def = EffectsConfig::Get().WreckOfVehicle(unitTypeId);
-            const int baseWreck = (customWreckComp > 0) ? customWreckComp : def.composite;
+            const int baseWreck = (customWreckComp >= 0) ? customWreckComp : def.composite;
             const int maxStages = (customWreckStages > 0) ? customWreckStages : def.stages;
             int stage = std::clamp(animStep, 0, maxStages - 1);
             // Vehicle wreck composite is centered at (centerX, centerY) of the unit tile
@@ -745,16 +761,13 @@ void Renderer::DrawUnitWorld(
             // Bullet death: sequences 247 or 248 (corpse variants)
             // Flame death: sequences 259 or 260 (burning human -> charred remains)
             int deathSeq = customDeathSeq;
-            if (deathSeq <= 0)
+            if (deathSeq < 0)
             {
-                if (isFlaming)
-                {
-                    deathSeq = (unitTypeId % 2 == 0) ? 259 : 260;
-                }
-                else
-                {
-                    deathSeq = 247 + (unitTypeId % 2);
-                }
+                static const int bullet[2] = {SpriteHandle("fx_infantry_death.death_0", SpriteKind::Sequence),
+                                              SpriteHandle("fx_infantry_death.death_1", SpriteKind::Sequence)};
+                static const int flame[2] = {SpriteHandle("fx_infantry_death.flame_0", SpriteKind::Sequence),
+                                             SpriteHandle("fx_infantry_death.flame_1", SpriteKind::Sequence)};
+                deathSeq = (isFlaming ? flame : bullet)[(unitTypeId % 2 + 2) % 2];
             }
             IndexRange r = m_texManager->GetUnitSequenceRange(deathSeq);
             if (r.end >= r.start)
@@ -789,24 +802,25 @@ void Renderer::DrawUnitWorld(
         }
     }
 
+    if (!visual)
+        return;
     int baseSeq = m_texManager->GetUnitBaseSeq(unitTypeId, actionState);
-
-    // Infantry shooting pose offset (+8):
-    // archetypes 0..3 (riflemen, heavy assault, grenadiers) switch to their firing pose. The flamethrower (5)
-    // fires from its standing sequence: its firing layer is the flame; its +8 sequences are a walk cycle.
-    int shootOffset = 0;
-    if (((15 & (1 << unitTypeId)) != 0) && actionState == static_cast<int>(ActionState::Attack))
-    {
-        shootOffset = 8;
-    }
+    // A family of 8 is drawn by facing; a single sequence (a deployed siege hull) always faces the same way
+    int baseCount = actionState == static_cast<int>(ActionState::Move) && visual->move >= 0 ? visual->moveCount
+                                                                                           : visual->idleCount;
+    // Infantry with a firing pose (riflemen, heavy assault, grenadiers) switch to it; the flamethrower fires from
+    // its standing sequences (its firing layer is the flame)
+    if (actionState == static_cast<int>(ActionState::Attack) && visual->attack >= 0)
+        baseSeq = visual->attack;
 
     // Deployed siege units use a fixed hull sequence while their turret or gun rotates via tdir8.
-    int dir8 = (unitTypeId >= 14 && unitTypeId <= 16) ? 0 : ((facingDir % 8 + 8) % 8);
+    const bool fixedHull = visual->idleCount == 1;
+    int dir8 = fixedHull ? 0 : ((facingDir % 8 + 8) % 8);
     int tdir8 = (targetFacing >= 0) ? ((targetFacing % 8 + 8) % 8) : ((facingDir % 8 + 8) % 8);
     int seqIdx = baseSeq;
-    if (actionState != static_cast<int>(ActionState::Transform) && baseSeq < 230)
+    if (actionState != static_cast<int>(ActionState::Transform) && baseCount >= 8)
     {
-        seqIdx = baseSeq + shootOffset + dir8;
+        seqIdx = baseSeq + dir8;
     }
 
     IndexRange r = m_texManager->GetUnitSequenceRange(seqIdx);
@@ -924,7 +938,9 @@ void Renderer::DrawProjectileWorld(
 void Renderer::DrawSmokePuffWorld(int frame, float worldX, float worldY, const Camera &camera)
 {
     int f = std::clamp(frame, 0, 13);
-    DrawCompositeWorld(1440 + f, worldX - 90.0f, worldY - 60.0f, camera, Faction::Resistance);
+    static const int smoke = SpriteHandle("fx_smoke_puff.frames", SpriteKind::Part, "smoke puff");
+    if (smoke >= 0)
+        DrawCompositeWorld(smoke + f, worldX - 90.0f, worldY - 60.0f, camera, Faction::Resistance);
 }
 
 void Renderer::FillRectWorld(float wx, float wy, float ww, float wh, const Camera &camera, SDL_Color color)
@@ -1124,31 +1140,24 @@ void Renderer::DrawRawSpriteScreen(int spriteId, int screenX, int screenY, float
     if (!m_texManager)
         return;
     const auto *frame = m_texManager->GetSpriteFrame(spriteId);
-    if (!frame || frame->width <= 0 || frame->height <= 0)
+    if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
         return;
 
-    int page = frame->page;
-    if (page == 8 && faction == Faction::Resistance)
-    {
-        page = 9;
-    }
+    int page = faction == Faction::Resistance ? m_texManager->ResistancePage(frame->page) : frame->page;
 
-    // An owner set (HUD icons of the player): the army colour as in the world; otherwise the plain sheet
-    SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? BindSheet(page, faction) : m_texManager->GetSpriteSheet(page);
+    // An owner set (HUD icons of the player): the army colour as in the world; otherwise the plain image
+    SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? BindSheet(page, faction, frame->recolor)
+                                                   : m_texManager->GetSpriteSheet(page);
     if (!sheet)
         return;
-    if (m_drawOwner >= kMaxPlayers && page >= 0 && page < 64 && m_tintedSheet[page])
+    if (m_drawOwner >= kMaxPlayers && page >= 0 && page < static_cast<int>(m_tintedSheet.size())
+        && m_tintedSheet[page])
     {
         SDL_SetTextureColorMod(sheet, 255, 255, 255);
         m_tintedSheet[page] = false;
     }
 
-    float sScale = m_texManager->GetSheetScale(page);
-    SDL_FRect srcRect
-        = {std::round(frame->x * sScale),
-           std::round(frame->y * sScale),
-           std::round(frame->width * sScale),
-           std::round(frame->height * sScale)};
+    const SDL_FRect srcRect = FrameSource(*frame);
     SDL_FRect dstRect
         = {static_cast<float>(screenX),
            static_cast<float>(screenY),

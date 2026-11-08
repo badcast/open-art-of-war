@@ -98,6 +98,19 @@ struct BuildingDef
     bool tall {false}; // decorations that rise above their rows (drawn later so units pass behind them)
 };
 
+// What a unit archetype is drawn from: families of its sprite object (families "<set>idle", "<set>move", ...)
+struct UnitVisual
+{
+    int idle {-1};      // first sequence; 8 facings when idleCount is 8, a fixed hull when it is 1
+    int idleCount {0};
+    int attack {-1};    // firing pose by facing (infantry); -1: fires from the idle sequences
+    int move {-1};
+    int moveCount {0};
+    int die {-1};
+    int transform {-1}; // siege transformation; -1: none
+    int icon {-1};      // cameo composite
+};
+
 class TextureManager
 {
 public:
@@ -116,12 +129,18 @@ public:
     void SetSpriteFiltering(bool linear, bool sharpPixels = false);
     // Scale mode of "smooth" scaling of pixel graphics: pixel-art when SDL has it, linear otherwise
     static SDL_ScaleMode SmoothPixelScaleMode();
+    // The image of a sprite object (SpriteFrame::page); pages from ImageCount() on are the Resistance images
     SDL_Texture *GetSpriteSheet(int page) const;
-    // Sprite sheet `page` with team armour (team 1: blue, team 2: red) recoloured to `color` on CPU and cached
+    // Image `page` with team armour (team 1: blue, team 2: red) recoloured to `color` on CPU and cached
     SDL_Texture *GetRecoloredSpriteSheet(int page, int team, SDL_Color color);
+    int ImageCount() const
+    {
+        return m_imageCount;
+    }
+    // The page to draw `page` from for the Resistance: its Resistance image when the object has one
+    int ResistancePage(int page) const;
+    // Pixels per drawing unit of a frame's image (the editors; drawing uses the frame's own pixel rectangle)
     float GetSheetScale(int page) const;
-    // Width of a sprite sheet of the original game (the sheets may be enlarged: scale = width / this); 0 when unknown
-    static int BaseSheetWidth(int page);
     SDL_Texture *GetTileset(int index) const;
     SDL_Texture *GetUiTexture(const std::string &name) const;
     const SpriteFrame *GetSpriteFrame(int spriteId) const;
@@ -147,22 +166,25 @@ public:
     const BuildingDef *GetBuildingDef(int buildingType) const;
     const BuildingPart *GetBuildingPart(int index) const;
 
+    // Tilesets are the sprite objects "tileset_<id>" (families "tiles" and "decor")
     int GetTileCompositeId(int tilesetId, int tileIdx) const;
     int GetDecorCompositeId(int tilesetId, int decorType) const;
     int GetDecorBuildingId(int tilesetId, int decorType) const;
+    int GetTileCount(int tilesetId) const;
+    int GetDecorCount(int tilesetId) const;
+    // Unit archetypes and building types are bound to sprites by the character files ("sprite:")
+    const UnitVisual *GetUnitVisual(int archetype) const;
     int GetUnitBaseSeq(int unitType, int actionState) const;
+    // The building sprite of a building type (0-14 structures, 15-29 walls by damage); -1 unknown
+    int GetBuildingSprite(int buildingType) const;
     // Where the rotating turret layer sits for a hull facing (idle sequence, first step), relative to
     // the unit's draw origin; false when the unit has no turret layer
     bool GetTurretAnchor(int unitType, int hullDir8, float &outX, float &outY) const;
-    const std::vector<std::int16_t> &GetDecorAnims() const
-    {
-        return m_decorAnims;
-    }
 
     void Cleanup();
 
 private:
-    bool LoadGraphicsData(const std::string &jsonPath);
+    void LoadSpriteBindings();
     SDL_Surface *SheetSurface(int page);
     void SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);
 
@@ -173,6 +195,8 @@ private:
     SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
     SDL_ScaleMode m_spriteScaleMode {SDL_SCALEMODE_NEAREST};
     std::vector<float> m_sheetScales;
+    std::vector<std::string> m_imagePaths; // per page (Resistance pages included)
+    int m_imageCount {0};
     std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only
     std::unordered_map<int, SDL_Color> m_tileColors;
     std::vector<SDL_Texture *> m_tilesets;
@@ -197,10 +221,16 @@ private:
     std::vector<BuildingDef> m_buildings;
     std::vector<BuildingPart> m_buildingParts;
 
-    std::vector<std::vector<std::int16_t>> m_tilesetsList;
-    std::vector<std::int16_t> m_decorOffsets;
-    std::vector<std::vector<std::int16_t>> m_unitArchetypes;
-    std::vector<std::int16_t> m_decorAnims;
+    struct TilesetSprites
+    {
+        int tiles {-1};
+        int tileCount {0};
+        int decor {-1};
+        int decorCount {0};
+    };
+    std::vector<TilesetSprites> m_tilesetSprites;
+    std::vector<UnitVisual> m_unitVisuals;  // by archetype
+    std::vector<int> m_buildingSprites;     // by building type
 };
 
 } // namespace OpenArtOfWar

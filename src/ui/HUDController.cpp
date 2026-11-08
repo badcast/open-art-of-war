@@ -1,4 +1,5 @@
 #include "ui/HUDController.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
 #include "game/BuildLimits.hpp"
@@ -35,36 +36,36 @@ namespace
 struct UnitCameoDef
 {
     int archetype;
-    int compId;
+    const char *icon; // cameo sprite
     const char *name;
     int cost;
     const char *desc;
 };
 
 const UnitCameoDef kResistanceInfantry[] = {
-    {0, 2057, "RIFLEMAN", 80, "Standard Resistance infantry rifleman"},
-    {2, 2058, "GRENADIER", 120, "Heavy rocket soldier vs vehicles and walls"},
-    {4, 2059, "SNIPER", 160, "Long-range sniper (Camouflage mode [G])"},
+    {0, "rifleman_res.icon", "RIFLEMAN", 80, "Standard Resistance infantry rifleman"},
+    {2, "grenadier_res.icon", "GRENADIER", 120, "Heavy rocket soldier vs vehicles and walls"},
+    {4, "sniper_res.icon", "SNIPER", 160, "Long-range sniper (Camouflage mode [G])"},
 };
 
 const UnitCameoDef kResistanceVehicles[] = {
-    {6, 2060, "COYOTE", 220, "Fast scout buggy (spawns at Factory)"},
-    {8, 2061, "ARMADILLO", 350, "Main battle tank of Resistance"},
-    {10, 2062, "RHINO", 480, "Heavy twin-cannon tank (Siege mode [G])"},
-    {12, 2063, "PORCUPINE", 550, "Multiple Launch Rocket System (MLRS)"},
+    {6, "coyote_res.icon", "COYOTE", 220, "Fast scout buggy (spawns at Factory)"},
+    {8, "assault_tank_res.icon", "ARMADILLO", 350, "Main battle tank of Resistance"},
+    {10, "heavy_tank_res.icon", "RHINO", 480, "Heavy twin-cannon tank (Siege mode [G])"},
+    {12, "mlrs_res.icon", "PORCUPINE", 550, "Multiple Launch Rocket System (MLRS)"},
 };
 
 const UnitCameoDef kConfederationInfantry[] = {
-    {1, 2049, "RIFLEMAN", 80, "Standard Confederation infantry rifleman"},
-    {3, 2050, "HEAVY ASSAULT", 120, "Rocket infantry vs vehicles and walls"},
-    {5, 2051, "FLAMETHROWER", 140, "Short-range flame infantry vs infantry"},
+    {1, "rifleman_conf.icon", "RIFLEMAN", 80, "Standard Confederation infantry rifleman"},
+    {3, "heavy_assault_conf.icon", "HEAVY ASSAULT", 120, "Rocket infantry vs vehicles and walls"},
+    {5, "flamethrower_conf.icon", "FLAMETHROWER", 140, "Short-range flame infantry vs infantry"},
 };
 
 const UnitCameoDef kConfederationVehicles[] = {
-    {7, 2052, "FORTRESS", 220, "Armored machine-gun carrier"},
-    {9, 2053, "HAMMER", 350, "Main battle tank of Confederation"},
-    {11, 2054, "ZEUS", 500, "Heavy tank (Siege mode [G])"},
-    {13, 2056, "GRAD", 700, "Multiple Launch Rocket System (MLRS)"},
+    {7, "fortress_conf.icon", "FORTRESS", 220, "Armored machine-gun carrier"},
+    {9, "hammer_conf.icon", "HAMMER", 350, "Main battle tank of Confederation"},
+    {11, "zeus_conf.icon", "ZEUS", 500, "Heavy tank (Siege mode [G])"},
+    {13, "grad_conf.icon", "GRAD", 700, "Multiple Launch Rocket System (MLRS)"},
 };
 
 struct UnitCatalog
@@ -107,12 +108,15 @@ constexpr int kFirstStanceOrder = 4;
 
 const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "ORDERS"};
 // Tab icons per faction: HQ, rifleman, main tank, a research cameo; Orders draws a crosshair
-const int kResistanceTabIcons[HUDController::TabCount] = {2074, 2057, 2061, -1};
-const int kConfederationTabIcons[HUDController::TabCount] = {2064, 2049, 2053, -1};
+const char *const kResistanceTabIcons[HUDController::TabCount] = {
+    "headquarters_res.icon", "rifleman_res.icon", "assault_tank_res.icon", ""};
+const char *const kConfederationTabIcons[HUDController::TabCount] = {
+    "command_center_conf.icon", "rifleman_conf.icon", "hammer_conf.icon", ""};
 
 int TabIcon(int tab)
 {
-    return (PlayerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
+    const char *name = (PlayerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
+    return SpriteHandle(name, SpriteKind::Part, "sidebar tab icon");
 }
 
 constexpr int kCameoW = 60; // native cameo composite size
@@ -474,6 +478,12 @@ void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
 
 } // namespace
 
+int HUDController::PowerIconSprite()
+{
+    static const int sprite = SpriteHandle("ui_power_icon.icon", SpriteKind::Frame, "power icon");
+    return sprite;
+}
+
 int UnitCameoCompId(int archetype)
 {
     for (bool infantry : {true, false})
@@ -491,7 +501,7 @@ int UnitCameoCompId(int archetype)
             for (int i = 0; i < cat.count; ++i)
             {
                 if (cat.items[i].archetype == archetype)
-                    return cat.items[i].compId;
+                    return SpriteHandle(cat.items[i].icon, SpriteKind::Part, "unit cameo");
             }
         }
     }
@@ -1205,7 +1215,7 @@ void HUDController::RenderGameHud(
         if (!deficit || PowerIconBlinkOn())
         {
             const int textW = fontRenderer.GetTextWidth(pwr, ui::FONT_SMALL_BOLD);
-            renderer.DrawRawSpriteScreen(kPowerIconSprite, h.Right() - textW - 27, h.y, 1.0f);
+            renderer.DrawRawSpriteScreen(PowerIconSprite(), h.Right() - textW - 27, h.y, 1.0f);
         }
         fontRenderer.DrawString(
             _("POWER"), h.Right(), h.y + 17, ui::FONT_SMALL, col::TextMuted, false, Anchor::RIGHT | Anchor::TOP);
@@ -1676,7 +1686,7 @@ void HUDController::RenderGameHud(
                     bool available = (inf ? hasBarracks : hasFactory) && unlocked;
                     int cost = UnitCost(def, entities);
                     std::string name = _(UnitName(def, entities));
-                    DrawCameo(renderer, fontRenderer, c, def.compId, name, hovered, false, !available);
+                    DrawCameo(renderer, fontRenderer, c, SpriteHandle(def.icon, SpriteKind::Part, "unit cameo"), name, hovered, false, !available);
 
                     int queued = 0;
                     float progress = -1.0f; // most advanced order of this unit currently in training
@@ -2034,7 +2044,7 @@ void HUDController::RenderPowerAlerts(
         // Over the roof: the top of the footprint, a little above
         const int w = static_cast<int>(23 * scale), h = static_cast<int>(19 * scale);
         renderer.DrawRawSpriteScreen(
-            kPowerIconSprite,
+            PowerIconSprite(),
             static_cast<int>(sx) - w / 2,
             static_cast<int>(sy) - h - static_cast<int>(10 * zoom),
             scale);

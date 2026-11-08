@@ -305,7 +305,7 @@ struct BuildingBlueprint
 {
     int blueprintId {0};
     int buildingIndex {0}; // 0..7 Confederation / 8..14 Resistance buildings, 15 / 25 walls
-    int iconCompId {2074}; // Composite sprite ID on sheet_16.png (2064..2081)
+    int iconCompId {-1}; // cameo composite (sprite handle; production.icon_composite names it)
     UnitType unitType {UnitType::Headquarters};
     std::string name;
     int width {3};
@@ -400,7 +400,7 @@ struct UnitConfig
     int parentArchetypeId {-1};
     bool hasRotatingTurret {false};
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
-    int wreckComposite {1764};
+    int wreckComposite {-1}; // sprite handle of the first wreck stage (-1: the vehicle wreck of effects.yaml)
     int wreckStages {5};
     // animations: block (timing of the pictures; the character editor's Animator edits it)
     float moveFrameTime {0.09f};   // seconds per walking frame
@@ -435,13 +435,13 @@ struct BuildingConfig
     int creditCost {400};
     int powerCost {0}; // >0 produces, <0 consumes
     float buildTime {12.0f};
-    int iconCompId {2074};
+    int iconCompId {-1};
     bool canAttack {false};
     int attackDamage {0};
     float attackRange {0.0f};
     float attackCooldown {1.0f};
     float attackCooldownMax {0.0f};
-    int wreckComposite {0}; // animations.wreck_composite; 0 = rubble by footprint size
+    int wreckComposite {-1}; // animations.wreck_composite (sprite); -1 = rubble by footprint size
     int wreckStages {0};    // animations.wreck_stages; 0 = default (6)
     int splashPercent {0};
     ProjectileType projectile {ProjectileType::Bullet};

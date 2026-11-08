@@ -1,4 +1,5 @@
 #include "game/EntityManager.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "game/Projectiles.hpp"
 #include "game/WeaponBalance.hpp"
 #include "core/DetMath.hpp"
@@ -20,6 +21,55 @@
 
 namespace OpenArtOfWar
 {
+
+namespace
+{
+// The infantry deaths every infantry character falls back to
+std::vector<int> DefaultDeaths(bool flame)
+{
+    const char *names[2] = {flame ? "fx_infantry_death.flame_0" : "fx_infantry_death.death_0",
+                            flame ? "fx_infantry_death.flame_1" : "fx_infantry_death.death_1"};
+    std::vector<int> out;
+    for (const char *n : names)
+    {
+        const int h = SpriteHandle(n, SpriteKind::Sequence, "infantry deaths");
+        if (h >= 0)
+            out.push_back(h);
+    }
+    return out;
+}
+
+// animations.wreck_composite: "<object>.<family of stages>" (the stage count defaults to the family size) or a
+// single composite; animations.wreck_stages overrides the count
+void ReadWreck(const YAML::Node &anim, int &composite, int &stages, const std::string &where)
+{
+    if (!anim || !anim.IsMap())
+        return;
+    if (anim["wreck_composite"] && anim["wreck_composite"].IsScalar())
+    {
+        const std::string ref = anim["wreck_composite"].as<std::string>();
+        const auto dot = ref.find('.');
+        const SpriteFamily *f =
+            dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+        if (f && f->count > 0)
+        {
+            composite = f->start;
+            stages = f->count;
+        }
+        else
+        {
+            composite = SpriteHandle(anim["wreck_composite"], SpriteKind::Part, where);
+        }
+    }
+    try
+    {
+        if (anim["wreck_stages"])
+            stages = anim["wreck_stages"].as<int>();
+    }
+    catch (...)
+    {}
+}
+} // namespace
 
 std::vector<BuildingBlueprint> EntityManager::s_blueprints;
 std::vector<BuildingBlueprint> EntityManager::s_factionBlueprints[2];
@@ -153,7 +203,9 @@ static void HandleUnitDeathState(Unit *tu, bool isFlameDamage)
         }
         else
         {
-            tu->selectedDeathSeq = (tu->archetypeId % 2 == 0) ? 259 : 260;
+            tu->selectedDeathSeq = SpriteHandle(
+                (tu->archetypeId % 2 == 0) ? "fx_infantry_death.flame_0" : "fx_infantry_death.flame_1",
+                SpriteKind::Sequence);
         }
     }
     else if (tu->IsInfantry())
@@ -164,7 +216,9 @@ static void HandleUnitDeathState(Unit *tu, bool isFlameDamage)
         }
         else
         {
-            tu->selectedDeathSeq = Utility::VisualRandom(247, 248);
+            tu->selectedDeathSeq = SpriteHandle(
+                Utility::VisualRandom(0, 1) ? "fx_infantry_death.death_1" : "fx_infantry_death.death_0",
+                SpriteKind::Sequence);
         }
     }
 }
@@ -249,6 +303,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         return false;
 
     std::string id = getStr(root, "id");
+    const std::string where = "character " + id; // for messages about its sprites
     std::string type = getStr(root, "type");
     const int archId = getInt(root, "archetype_id", -1);
     const int bldgIdx = getInt(root, "building_index", -1);
@@ -292,7 +347,7 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
     int creditCost = getInt(prodNode, "cost", 100);
     int powerCost = getInt(prodNode, "power", 0);
     float buildTime = getFloat(prodNode, "build_time", 4.0f);
-    int iconComp = getInt(prodNode, "icon_composite", 0);
+    const int iconComp = SpriteHandle(prodNode ? prodNode["icon_composite"] : YAML::Node(), SpriteKind::Part, where);
     std::string producedIn = Utility::ProducedIn(archId);
 
     YAML::Node combatNode = root["combat"];
@@ -506,8 +561,9 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         const EffectsConfig::Wreck defaultWreck = EffectsConfig::Get().WreckOfVehicle(cfg.archetypeId);
         const int defaultWreckComp = defaultWreck.composite;
         const int defaultWreckStages = defaultWreck.stages;
-        cfg.wreckComposite = getInt(animNode, "wreck_composite", defaultWreckComp);
-        cfg.wreckStages = getInt(animNode, "wreck_stages", defaultWreckStages);
+        cfg.wreckComposite = defaultWreckComp;
+        cfg.wreckStages = defaultWreckStages;
+        ReadWreck(animNode, cfg.wreckComposite, cfg.wreckStages, where);
         cfg.moveFrameTime = std::clamp(getFloat(animNode, "move_frame_time", cfg.moveFrameTime), 0.02f, 1.0f);
         cfg.attackFrameTime = getFloat(animNode, "attack_frame_time", cfg.attackFrameTime);
         cfg.attackPoseTime = getFloat(animNode, "attack_pose_time", cfg.attackPoseTime);
@@ -519,63 +575,27 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
         }
         cfg.flashFrames = std::max(0, getInt(animNode, "flash_frames", 0));
 
-        if (animNode["death_sequences"] && animNode["death_sequences"].IsSequence())
+        // Death sequences are sprites by name (fx_infantry_death.death_0); the older "*_variants" keys too
+        for (const char *key : {"death_sequences", "death_variants"})
         {
-            for (const auto &item : animNode["death_sequences"])
+            if (animNode[key] && animNode[key].IsSequence())
             {
-                try
-                {
-                    cfg.deathSequences.push_back(item.as<int>());
-                }
-                catch (...)
-                {}
+                cfg.deathSequences = SpriteHandles(animNode[key], SpriteKind::Sequence, where);
+                break;
             }
         }
-        else if (animNode["death_variants"] && animNode["death_variants"].IsSequence())
+        if (cfg.deathSequences.empty() && isInf)
+            cfg.deathSequences = DefaultDeaths(false);
+        for (const char *key : {"flame_death_sequences", "flame_death_variants"})
         {
-            for (const auto &item : animNode["death_variants"])
+            if (animNode[key] && animNode[key].IsSequence())
             {
-                try
-                {
-                    cfg.deathSequences.push_back(item.as<int>());
-                }
-                catch (...)
-                {}
+                cfg.flameDeathSequences = SpriteHandles(animNode[key], SpriteKind::Sequence, where);
+                break;
             }
         }
-        else if (isInf)
-        {
-            cfg.deathSequences = {247, 248};
-        }
-
-        if (animNode["flame_death_sequences"] && animNode["flame_death_sequences"].IsSequence())
-        {
-            for (const auto &item : animNode["flame_death_sequences"])
-            {
-                try
-                {
-                    cfg.flameDeathSequences.push_back(item.as<int>());
-                }
-                catch (...)
-                {}
-            }
-        }
-        else if (animNode["flame_death_variants"] && animNode["flame_death_variants"].IsSequence())
-        {
-            for (const auto &item : animNode["flame_death_variants"])
-            {
-                try
-                {
-                    cfg.flameDeathSequences.push_back(item.as<int>());
-                }
-                catch (...)
-                {}
-            }
-        }
-        else if (isInf)
-        {
-            cfg.flameDeathSequences = {259, 260};
-        }
+        if (cfg.flameDeathSequences.empty() && isInf)
+            cfg.flameDeathSequences = DefaultDeaths(true);
 
         cfg.weapons = weapons;
         if (cfg.weapons.empty() && canAttack)
@@ -725,8 +745,9 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
             m_factionBuildRadius[static_cast<std::size_t>(faction)] = bRadius;
             m_buildRadiusExtra = {};
         }
-        cfg.wreckComposite = getInt(animNode, "wreck_composite", 0);
-        cfg.wreckStages = getInt(animNode, "wreck_stages", 0);
+        cfg.wreckComposite = -1;
+        cfg.wreckStages = 0;
+        ReadWreck(animNode, cfg.wreckComposite, cfg.wreckStages, where);
         cfg.description = desc;
         cfg.weapons = weapons;
         cfg.sounds = sounds;
@@ -1238,8 +1259,8 @@ int EntityManager::SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, F
         if (u->IsInfantry())
         {
             u->wreckType = "infantry";
-            u->deathSequences = {247, 248};
-            u->flameDeathSequences = {259, 260};
+            u->deathSequences = DefaultDeaths(false);
+            u->flameDeathSequences = DefaultDeaths(true);
         }
         else
         {
@@ -4108,7 +4129,8 @@ void EntityManager::DestroyPlayer(PlayerId player, TileMap &map)
             if (map.GetWall(x, y) > 0 && map.GetWallOwner(x, y) == player)
             {
                 map.DestroyWall(x, y);
-                SpawnExplosion(x * TILE_WIDTH + TILE_WIDTH * 0.5f, y * TILE_HEIGHT + TILE_HEIGHT * 0.5f, 42);
+                static const int collapse = SpriteHandle("fx_impacts.wall_destroyed", SpriteKind::Anim, "wall");
+                SpawnExplosion(x * TILE_WIDTH + TILE_WIDTH * 0.5f, y * TILE_HEIGHT + TILE_HEIGHT * 0.5f, collapse);
             }
         }
     }
@@ -4606,7 +4628,8 @@ void EntityManager::Render(
                     0.0f);
                 if (u->isSiegeMode || u->state == ActionState::Transform)
                 {
-                    renderer.DrawCompositeWorld(1872, wx - 90.0f, wy - 60.0f, camera, u->faction);
+                    static const int marker = SpriteHandle("ui_siege_marker.marker", SpriteKind::Part, "siege");
+                    renderer.DrawCompositeWorld(marker, wx - 90.0f, wy - 60.0f, camera, u->faction);
                 }
             }
             bool isFlaming
@@ -4878,7 +4901,7 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
         if (!proj.active)
             continue;
         const ProjectileSpec &spec = Projectiles::of(proj.type);
-        if (proj.type == ProjectileType::Flame || spec.sprite <= 0)
+        if (proj.type == ProjectileType::Flame || spec.sprite < 0)
             continue; // a flame is drawn as a FlameBurst below
         float px = proj.x, py = proj.y;
         if (proj.hasPrevRender && m_renderAlpha < 1.0f && Glides(proj.prevRenderX, proj.prevRenderY, px, py))
@@ -4904,7 +4927,8 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
         const float prog = burst.duration > 0.0f ? std::clamp(burst.age / burst.duration, 0.0f, 1.0f) : 1.0f;
         const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
         renderer.SetDrawOwner(burst.owner);
-        renderer.DrawAnimSequenceWorldRotated(59, flameFrame, burst.startX, burst.startY, angle, camera, burst.faction);
+        static const int jet = SpriteHandle("fx_flame_jet.jet", SpriteKind::Anim, "flame jet");
+        renderer.DrawAnimSequenceWorldRotated(jet, flameFrame, burst.startX, burst.startY, angle, camera, burst.faction);
     }
 
     // 6. Render Explosions (with visual centering for bullet hits and impacts)

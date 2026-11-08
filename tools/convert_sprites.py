@@ -646,7 +646,9 @@ def write_object(d, o, owner, layers, out_dir):
                 g = d.g['buildings']
                 bd['size'] = Flow([g['widths'][b] if b < len(g['widths']) else 1,
                                    g['heights'][b] if b < len(g['heights']) else 1])
-                bd['style'] = 'structure' if b < 15 else 'wall' if b <= 30 else 'decor' if b < 133 else 'decor_flat'
+                # what the renderer did by position: 0-14 structures, 15-29 walls (army colour, animated parts),
+                # 30 (scaffolding) and 31-132 plain decorations, 133+ decorations drawn in one pass
+                bd['style'] = 'structure' if b < 15 else 'wall' if b < 30 else 'decor' if b < 133 else 'decor_flat'
                 if 31 <= b < 83:
                     bd['tall'] = True
                 bd['parts'] = ents

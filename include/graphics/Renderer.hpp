@@ -60,7 +60,7 @@ public:
         int animFrame = 0,
         int layer = -1);
 
-    // Trees, groves and rocks (decoration building ids 31..82) stand up from the ground: their layer 0 (ground,
+    // Trees, groves and rocks (decorations marked "tall") stand up from the ground: their layer 0 (ground,
     // trunks) is drawn flat with the terrain, their layer 1 (crowns) in the depth-sorted pass with units, so a unit
     // behind a tree is covered by its crown. Returns the footprint rows of such a decoration, 0 for flat ones
     // (bridges, cliffs, landmarks).
@@ -97,7 +97,26 @@ public:
         int turretFacing = 0,
         bool isAttacking = false,
         bool isPowered = true,
-        int customWreckComp = 0,
+        int customWreckComp = -1,
+        int customWreckStages = 0);
+    // The same for a building sprite (a handle of the building tables): `buildingType` is the game's building type
+    // (it decides which buildings need power), -1 for decorations
+    void DrawBuildingSpriteWorld(
+        int sprite,
+        int buildingType,
+        float worldX,
+        float worldY,
+        int layer,
+        const Camera &camera,
+        Faction faction = Faction::Resistance,
+        int animFrame = 0,
+        float buildProgress = 1.0f,
+        bool isDestroyed = false,
+        float hpRatio = 1.0f,
+        int turretFacing = 0,
+        bool isAttacking = false,
+        bool isPowered = true,
+        int customWreckComp = -1,
         int customWreckStages = 0);
     // Rubble composite family a destroyed building of that size leaves (first stage, and its stage count)
     static void DefaultBuildingWreck(int width, int height, int &outComposite, int &outStages);
@@ -227,7 +246,7 @@ private:
     void ApplyAnchor(int &x, int &y, int w, int h, int anchor) const;
     // Sprite sheet `page` (after the classic faction mapping) for a world draw: switches to the army
     // colour sheet and shader state when that faction has its own colour; `page` becomes the sheet used
-    SDL_Texture *BindSheet(int &page, Faction faction);
+    SDL_Texture *BindSheet(int &page, Faction faction, int recolor);
     // Untextured primitives, fog, UI: no custom shader
     void PlainState();
     void RenderCompositePartsRotated(
@@ -252,7 +271,7 @@ private:
     float m_glowStrength {0.0f};
     int m_structureTeam {0};                                             // see setStructureFaction
     std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
-    bool m_tintedSheet[64] {}; // sheets whose colour mod carries an army colour right now
+    std::vector<bool> m_tintedSheet; // images whose colour mod carries an army colour right now
 
     SDL_Renderer *m_renderer {nullptr};
     TextureManager *m_texManager {nullptr};

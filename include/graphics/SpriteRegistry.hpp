@@ -214,4 +214,20 @@ private:
     std::map<std::pair<int, int>, std::string> m_names; // (kind, handle) -> "<object>.<item>"
 };
 
+// The game's sprites (every meta in the sprites folder of the manifest), compiled on first use. Configs resolve their
+// sprite names through it; the TextureManager draws from its tables.
+SpriteRegistry &Sprites();
+// Compiles the sprites folder again (the editors after a save); handles of unchanged files stay the same
+void ReloadSprites();
+
+// A sprite reference of a config ("<object>.<item>", "<object>.<family>", "<object>.<family>[i]") as a handle of
+// `kind`; -1 (with one message naming `context`) when it does not resolve. An empty name is -1 without a message.
+int SpriteHandle(const std::string &ref, SpriteKind kind, const std::string &context = {});
+// The same for a YAML value: a string reference; anything else (a number of the old sheet sprites) is reported
+int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &context = {});
+// A list of references (a single string is a list of one); unresolved ones are left out
+std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, const std::string &context = {});
+// The name to write back into a config for a handle ("" for -1 / unknown)
+std::string SpriteName(SpriteKind kind, int handle);
+
 } // namespace OpenArtOfWar

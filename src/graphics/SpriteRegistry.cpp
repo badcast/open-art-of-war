@@ -1,10 +1,12 @@
 #include "graphics/SpriteRegistry.hpp"
 
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <set>
 
 namespace OpenArtOfWar
 {
@@ -716,6 +718,101 @@ std::string SpriteRegistry::NameOf(SpriteRef ref) const
             if (f.kind == ref.kind && ref.handle >= f.compiled.start && ref.handle < f.compiled.start + f.compiled.count)
                 return name + "." + f.name + "[" + std::to_string(ref.handle - f.compiled.start) + "]";
     return {};
+}
+
+namespace
+{
+SpriteRegistry &Instance()
+{
+    static SpriteRegistry reg;
+    return reg;
+}
+bool g_loaded = false;
+std::set<std::string> g_reported; // unresolved references already reported
+} // namespace
+
+SpriteRegistry &Sprites()
+{
+    if (!g_loaded)
+    {
+        g_loaded = true;
+        Instance().Clear();
+        Instance().LoadDirectory(LoaderResources::SpritesDir());
+        std::cout << "[SpriteRegistry] " << Instance().ObjectNames().size() << " sprite objects from "
+                  << LoaderResources::SpritesDir() << std::endl;
+    }
+    return Instance();
+}
+
+void ReloadSprites()
+{
+    g_loaded = false;
+    g_reported.clear();
+    Sprites();
+}
+
+int SpriteHandle(const std::string &ref, SpriteKind kind, const std::string &context)
+{
+    if (ref.empty())
+        return -1;
+    const SpriteRef r = Sprites().Resolve(ref, kind);
+    if (r.Valid())
+        return r.handle;
+    if (g_reported.insert(context + "|" + ref).second)
+        std::cerr << "[SpriteRegistry] " << (context.empty() ? std::string() : context + ": ") << "no "
+                  << SpriteKindName(kind) << " '" << ref << "'" << std::endl;
+    return -1;
+}
+
+int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &context)
+{
+    if (!node || node.IsNull())
+        return -1;
+    if (!node.IsScalar())
+    {
+        std::cerr << "[SpriteRegistry] " << context << ": a sprite name is expected" << std::endl;
+        return -1;
+    }
+    const std::string v = node.as<std::string>();
+    if (!v.empty() && v.find_first_not_of("-0123456789") == std::string::npos)
+    {
+        if (g_reported.insert(context + "|" + v).second)
+            std::cerr << "[SpriteRegistry] " << context << ": '" << v
+                      << "' is a number of the old sheet sprites; write the sprite name (<object>.<item>)"
+                      << std::endl;
+        return -1;
+    }
+    return SpriteHandle(v, kind, context);
+}
+
+std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, const std::string &context)
+{
+    std::vector<int> out;
+    if (!node)
+        return out;
+    if (node.IsSequence())
+    {
+        for (const auto &n : node)
+        {
+            const int h = SpriteHandle(n, kind, context);
+            if (h >= 0)
+                out.push_back(h);
+        }
+    }
+    else
+    {
+        const int h = SpriteHandle(node, kind, context);
+        if (h >= 0)
+            out.push_back(h);
+    }
+    return out;
+}
+
+std::string SpriteName(SpriteKind kind, int handle)
+{
+    if (handle < 0)
+        return {};
+    return Sprites().NameOf({kind, handle});
 }
 
 } // namespace OpenArtOfWar

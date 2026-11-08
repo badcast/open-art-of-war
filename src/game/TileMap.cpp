@@ -1,4 +1,5 @@
 #include "game/TileMap.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "game/TileCollision.hpp"
 #include "game/Research.hpp"
 #include "core/AssetStore.hpp"
@@ -636,8 +637,10 @@ void TileMap::RenderWallRubble(Renderer &renderer, const Camera &camera, bool fo
             std::uint16_t rubble = live ? m_wallRubbleGrid[ty][tx] : m_seenRubble[ty][tx];
             if (rubble > 0)
             {
+                // The grid only marks the rubble (the simulation compares it); its picture is a sprite
+                static const int sprite = SpriteHandle("fx_wall_rubble.rubble", SpriteKind::Part, "wall rubble");
                 renderer.DrawCompositeWorld(
-                    rubble, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
+                    sprite, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
             }
         }
     }

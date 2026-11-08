@@ -228,6 +228,16 @@ std::string LoaderResources::FontBold()
     return join(Str("fonts", "bold"));
 }
 
+std::string LoaderResources::SpritesDir()
+{
+    std::string dir = Str("sprites", "dir");
+    if (dir.empty())
+        dir = "sprites";
+    while (!dir.empty() && dir.back() == '/')
+        dir.pop_back();
+    return join(dir);
+}
+
 std::string LoaderResources::SpriteFrames()
 {
     return join(Str("sprites", "frames"));

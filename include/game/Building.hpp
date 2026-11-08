@@ -80,7 +80,7 @@ public:
 
     // Unit production (Barracks / Factory): every building trains its own queue
     std::deque<ProductionItem> productionQueue;
-    int wreckComposite {0}; // 0: rubble by footprint size
+    int wreckComposite {-1}; // sprite handle; -1: rubble by footprint size
     int wreckStages {0};
     int rallyTileX {-1}; // where fresh units walk to; -1 = stay at the exit
     int rallyTileY {-1};

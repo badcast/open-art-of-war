@@ -44,6 +44,8 @@ public:
     static std::string UiTheme();
     static std::string FontRegular();
     static std::string FontBold();
+    // Folder of the per-object sprites (sprite_<name>.png + sprite_<name>_meta.yaml): manifest sprites.dir
+    static std::string SpritesDir();
     static std::string SpriteFrames();
     // The sprite sheets in page order (sprites.sheets); an empty path for a page that is not listed
     static int SpriteSheetCount();

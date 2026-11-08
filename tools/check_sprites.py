@@ -449,7 +449,8 @@ def main():
                                                              powered))
         # the new building's style must give the old type's behaviour
         style = dump['buildings'][n][4]
-        want = 0 if b < 15 else 1 if b <= 30 else 2 if b < 133 else 3
+        # styles: 0 structure (0-14), 1 wall (15-29: army colour, animated), 2 decor (30-132), 3 flat decor (133+)
+        want = 0 if b < 15 else 1 if b < 30 else 2 if b < 133 else 3
         if style != want:
             failures.append(('building %d style %d, want %d' % (b, style, want), None, None, 0, 0))
 

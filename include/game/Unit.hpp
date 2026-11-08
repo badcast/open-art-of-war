@@ -152,7 +152,7 @@ public:
 
     // Wreck & Remains attributes (from YAML)
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
-    int wreckComposite {1764};
+    int wreckComposite {-1};
     int wreckStages {5};
     // animations: block (timing of the pictures; the character editor's Animator edits it)
     float moveFrameTime {0.09f};   // seconds per walking frame

@@ -1,4 +1,5 @@
 #include "game/Research.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Sides.hpp"
 #include "core/Utility.hpp"
@@ -93,7 +94,8 @@ void ApplyYaml(LoadedCatalog &c, const std::string &text)
         {}
         d.name = c.names[i].c_str();
         d.desc = c.descs[i].c_str();
-        d.compId = num(n, "icon", d.compId);
+        if (n["icon"])
+            d.compId = SpriteHandle(n["icon"], SpriteKind::Part, "research icon");
         try
         {
             if (n["research_seconds"])
@@ -144,6 +146,7 @@ const LoadedCatalog &loadedCatalog(Faction faction)
                 c.descs[i] = builtIn[i].desc;
                 c.defs[i].name = c.names[i].c_str();
                 c.defs[i].desc = c.descs[i].c_str();
+                c.defs[i].compId = -1; // the icon is a sprite named in the faction's research file
             }
             std::string text;
             const std::string file
