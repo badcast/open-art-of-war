@@ -1018,10 +1018,11 @@ void AISquadController::PaceGroup(
             continue;
         }
         const float along = (UnitTileX(*u) - cx) * dirX + (UnitTileY(*u) - cy) * dirY;
+        const float apart = DetMath::Hypot(UnitTileX(*u) - cx, UnitTileY(*u) - cy);
         float scale = slowest / u->moveSpeed;
-        if (along < -0.5f * leash)
+        if (along < -0.5f * leash || (along <= 0.0f && apart > leash))
         {
-            scale = 1.0f; // behind: catch up
+            scale = 1.0f; // behind (or off to the side, out of the leash): catches up at its own full speed
         }
         else if (along > 0.5f * leash)
         {

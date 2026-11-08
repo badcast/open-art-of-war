@@ -365,8 +365,9 @@ void GameplayController::OrderAt(const std::vector<int> &units, float worldX, fl
     c.x = static_cast<std::int32_t>(worldX);
     c.y = static_cast<std::int32_t>(worldY);
     c.a = static_cast<std::int32_t>(kind);
-    // bit 0: march as a control group; bit 1: Shift - after the orders the units already have
-    c.b = (units.size() >= 2 && GroupOfUnits(units) >= 0) ? 1 : 0;
+    // bit 0: march as a group (a control group, or any selection on attack-move: the column keeps together at the
+    // pace of its slowest, stragglers catch up at their own speed); bit 1: Shift - after the orders the units have
+    c.b = (units.size() >= 2 && (GroupOfUnits(units) >= 0 || kind == OrderKind::AttackMove)) ? 1 : 0;
     if (queued)
         c.b |= 2;
     m_sim.Issue(std::move(c));
