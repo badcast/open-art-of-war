@@ -545,9 +545,14 @@ void CharacterEditor::RefreshPendingTexture()
     const auto it = spritePending.find(spriteImageName);
     if (it == spritePending.end() || !renderer)
         return;
+    // (the surface was blitted with blending off: the picture must still be drawn with its transparency)
+    SDL_SetSurfaceBlendMode(it->second, SDL_BLENDMODE_BLEND);
     spritePendingTex = SDL_CreateTextureFromSurface(renderer, it->second);
     if (spritePendingTex)
+    {
+        SDL_SetTextureBlendMode(spritePendingTex, SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(spritePendingTex, SDL_SCALEMODE_NEAREST);
+    }
 }
 
 SDL_Texture *CharacterEditor::SpriteCanvasTexture()

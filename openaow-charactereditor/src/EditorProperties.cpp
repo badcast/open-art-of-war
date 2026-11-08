@@ -93,6 +93,28 @@ void CharacterEditor::DrawEditor()
     Hinted(ImGui::RadioButton(_("Units"), &filterCategory, 1), "Units");
     ImGui::SameLine();
     Hinted(ImGui::RadioButton(_("Buildings"), &filterCategory, 2), "Buildings");
+    // Faction filter, the layout in columns and collapsing of all the groups
+    static int filterFaction = 0;  // 0 all, 1 Confederation, 2 Resistance
+    static int listColumns = 1;    // 1..3
+    static int forceOpen = -1;     // -1 as the user left it, 0 collapse all, 1 expand all (for one frame)
+    {
+        const char *factionNames[] = {_("All factions"), _("Confederation"), _("Resistance")};
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::Combo("##archetype-faction", &filterFaction, factionNames, IM_ARRAYSIZE(factionNames));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(70.0f);
+        const char *columnNames[] = {_("1 col"), _("2 cols"), _("3 cols")};
+        int columnIndex = listColumns - 1;
+        if (ImGui::Combo("##archetype-columns", &columnIndex, columnNames, IM_ARRAYSIZE(columnNames)))
+            listColumns = columnIndex + 1;
+        ImGui::SetItemTooltip("%s", _("The list in columns"));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(_("Expand")))
+            forceOpen = 1;
+        ImGui::SameLine();
+        if (ImGui::SmallButton(_("Collapse")))
+            forceOpen = 0;
+    }
 
     ImGui::BeginChild("archetype-list", ImVec2(0.0f, 0.0f), true);
 
@@ -148,6 +170,11 @@ void CharacterEditor::DrawEditor()
             continue;
         if (filterCategory == 2 && file.type != "building")
             continue;
+        const OpenArtOfWar::Faction wantedFaction = filterFaction == 1 ? OpenArtOfWar::Faction::Confederation
+                                                                       : OpenArtOfWar::Faction::Resistance;
+        if (filterFaction > 0
+            && OpenArtOfWar::Utility::ParseFaction(file.faction, OpenArtOfWar::Faction::Neutral) != wantedFaction)
+            continue;
 
         FactionGroup *target = &otherGroup;
         const OpenArtOfWar::Faction fileFaction
@@ -171,6 +198,25 @@ void CharacterEditor::DrawEditor()
         }
     }
 
+    // The entries one under another, or in columns (a table inside the tree node)
+    auto renderItems = [&](const std::vector<CharacterFile> &list) {
+        if (listColumns <= 1)
+        {
+            for (const auto &f : list)
+                renderItem(f);
+            return;
+        }
+        if (ImGui::BeginTable("##archetype-table", listColumns, ImGuiTableFlags_SizingStretchSame))
+        {
+            for (const auto &f : list)
+            {
+                ImGui::TableNextColumn();
+                renderItem(f);
+            }
+            ImGui::EndTable();
+        }
+    };
+
     auto renderGroup = [&](FactionGroup &group) {
         if (group.units.empty() && group.buildings.empty())
             return;
@@ -178,29 +224,29 @@ void CharacterEditor::DrawEditor()
         std::string headerLabel = group.title + " (" + std::to_string(totalCount) + ")";
         // Same "Units (N)" / "Buildings (N)" labels recur in every faction group: the group scopes their IDs
         ImGui::PushID(group.title.c_str());
+        if (forceOpen >= 0)
+            ImGui::SetNextItemOpen(forceOpen == 1, ImGuiCond_Always);
         if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
             if (!group.units.empty())
             {
                 std::string uHeader = std::string(_("Units")) + " (" + std::to_string(group.units.size()) + ")";
+                if (forceOpen >= 0)
+                    ImGui::SetNextItemOpen(forceOpen == 1, ImGuiCond_Always);
                 if (ImGui::TreeNodeEx(uHeader.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    for (const auto &f : group.units)
-                    {
-                        renderItem(f);
-                    }
+                    renderItems(group.units);
                     ImGui::TreePop();
                 }
             }
             if (!group.buildings.empty())
             {
                 std::string bHeader = std::string(_("Buildings")) + " (" + std::to_string(group.buildings.size()) + ")";
+                if (forceOpen >= 0)
+                    ImGui::SetNextItemOpen(forceOpen == 1, ImGuiCond_Always);
                 if (ImGui::TreeNodeEx(bHeader.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    for (const auto &f : group.buildings)
-                    {
-                        renderItem(f);
-                    }
+                    renderItems(group.buildings);
                     ImGui::TreePop();
                 }
             }
@@ -211,6 +257,7 @@ void CharacterEditor::DrawEditor()
     renderGroup(confGroup);
     renderGroup(resGroup);
     renderGroup(otherGroup);
+    forceOpen = -1;
 
     ImGui::EndChild();
     ImGui::End();
