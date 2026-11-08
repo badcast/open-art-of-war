@@ -41,3 +41,9 @@ target_include_directories(openaow-spritemerge-tests PRIVATE ${CMAKE_CURRENT_SOU
 target_link_libraries(openaow-spritemerge-tests PRIVATE openaow-core)
 set_target_properties(openaow-spritemerge-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 add_test(NAME openaow-spritemerge-tests COMMAND openaow-spritemerge-tests)
+
+add_executable(openaow-preview-tests tests/PreviewStatsTests.cpp src/EditorUtils.cpp)
+target_include_directories(openaow-preview-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(openaow-preview-tests PRIVATE openaow-core)
+set_target_properties(openaow-preview-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+add_test(NAME openaow-preview-tests COMMAND openaow-preview-tests)

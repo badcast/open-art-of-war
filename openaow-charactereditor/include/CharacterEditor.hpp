@@ -31,7 +31,8 @@ enum class SpriteArrange
 {
     Shuffle,
     Compact,
-    Grid
+    Grid,
+    Assemble // as the game puts the composites together
 };
 
 enum class SpriteDrag
@@ -206,7 +207,9 @@ private:
     // Sprite Tools tab: the per-object sprites (assets/sprites/sprite_<name>.png + _meta.yaml)
     fs::path SpriteDir() const;
     fs::path SpriteMetaPath(const std::string &object) const;
-    void LoadSpriteObject(const std::string &object);
+    // metaFile / imageSuffix: read the frames from another file and the PNGs as `<name><suffix>` (the .bak files),
+    // kept as unsaved changes
+    void LoadSpriteObject(const std::string &object, const fs::path &metaFile = {}, const std::string &imageSuffix = {});
     std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
     bool SaveSpriteObject(bool backup = true);         // backup: the files as they were go to .bak first
     std::vector<std::string> SpriteImageNames() const; // the sprite's PNGs (the faction variant too)
@@ -214,11 +217,22 @@ private:
     bool HasSpriteBackup() const;
     bool RestoreSpriteBackup();
     std::string SpriteMoveBlocker(int index, int x, int y) const; // why the frame cannot go there; empty: it can
-    bool MoveSpriteFramePixels(int index, int x, int y);          // the frame and its pixels to (x, y); backup first
-    bool RearrangeSpriteImage(SpriteArrange mode);                // redraws the PNGs with the frames at new places
+    bool MoveSpriteFramePixels(int index, int x, int y);          // the frame and its pixels to (x, y), unsaved
+    bool RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmaller = false); // PNGs redrawn with the frames at new places, unsaved
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
-    // Resamples the image (and the Resistance image) by `factor`; the frames follow, the drawn sizes stay
-    bool ScaleSpriteImage(float factor, bool smooth);
+    // Pixel edits are kept in memory (spritePending) until Save: the PNGs on disk stay as they were
+    bool EnsurePending();                                // loads the sprite's PNGs into spritePending
+    void SetPending(const std::string &name, SDL_Surface *surface); // takes the surface
+    void DiscardPending();                               // Revert / a new load: the unsaved pixels go
+    void RefreshPendingTexture();                        // the canvas picture of the pending image
+    SDL_Texture *SpriteCanvasTexture();                  // pending picture, else the registry's sheet
+    // Resamples the image (and the Resistance image) to w x h; the frames follow, the drawn sizes stay. `uniform`:
+    // the same factor on both axes (an aspect-keeping size)
+    bool ResizeSpriteImage(int w, int h, bool smooth, bool uniform);
+    // Smallest image without losing quality: exact integer upscale undone, empty space cut away
+    bool FitSpriteImage();
+    // The frames after the image was scaled by kx, ky: rects follow, the drawn sizes stay
+    void ApplyImageScaleToFrames(float kx, float ky, bool forceEven);
     bool CreateSpriteObject(const fs::path &png, const std::string &name);
     std::string FreeFrameName(const std::string &prefix) const;
     void AddSpriteFrame(int x, int y, int w, int h, const std::string &prefix);
@@ -306,6 +320,7 @@ private:
     std::unique_ptr<OpenArtOfWar::Renderer> gameRenderer;
     std::unique_ptr<OpenArtOfWar::ShaderEffects> shaderEffects; // army colours need the SDL GPU renderer
     int previewArmyColor {0};
+    int previewBackdrop {0}; // layer over the background colour: 0 none, 1 checkerboard, 2 grid, 3 gradient, 4 stripes
     float previewBackground[3] {0.0f, 0.0f, 0.0f}; // canvas background (black by default)                  // 0 classic
                                                    // sheets, 1..8 the army colours of the game
     void DrawArmyColorCombo();
@@ -392,9 +407,6 @@ private:
     int simBurstIndex2 {0};
     float simBurstDelayTimer2 {0.0f};
     bool testFlameDeath {false};
-    float muzzleFlashTimer {0.0f};
-    float muzzleFlashX {0.0f};
-    float muzzleFlashY {0.0f};
     float previewBulletSpeed {620.0f};
     float previewFxSpeed {1.0f};
     float muzzleOffsetX {0.0f}; // localePosition X (Forward)
@@ -461,7 +473,7 @@ private:
     std::map<std::string, std::array<char, 256>> yamlTextBuffers;
     std::map<int, SDL_Texture *> animThumbs;
     int fxPreset {0}; // 0 vehicle, 1 small building, 2 power building, 3 large building, 4 one animation
-    int fxAnim {11};  // animation of preset 4
+    int fxAnim {-1};  // animation of preset 4, resolved after effects are loaded
     float fxTime {0.0f};
     float fxRestartTimer {0.0f};
     bool fxLoop {true};
@@ -501,6 +513,15 @@ private:
     int spriteImageW {0}, spriteImageH {0};
     int spriteFrameSel {-1};
     bool spriteDirty {false};
+    std::map<std::string, SDL_Surface *> spritePending;   // edited PNGs (name -> RGBA), written by Save only
+    std::map<std::string, SDL_Surface *> spriteScaleBase; // the pixels before the first resize, resampled from
+    SDL_Texture *spritePendingTex {nullptr};
+    std::string spriteMetaBase; // text Save patches instead of the file's (a restored backup); empty: the file's
+    bool spriteMagnet {true};   // frames stick to the image borders and to the other frames' edges
+    int spriteSizePreset {1};   // 512, 1024, 2048, 4096 (the longer side)
+    int spriteCustomW {0}, spriteCustomH {0};
+    bool spriteKeepAspect {true};
+    int spriteDragStartV[2] {0, 0}; // draw mode with magnetism: the grid point where the drag began
     float spriteZoom {2.0f};
     ImVec2 spritePan {16.0f, 16.0f};
     // Camera reset of the sprite canvas, applied on the next draw (it needs the canvas size)
@@ -513,7 +534,6 @@ private:
     bool spriteMoveMode {false}; // Sprite change mode
     int spriteMoveTo[2] {0, 0};
     int spriteArrangePadding {2}; // pixels between the frames when rearranging
-    int spriteScaleFactor {4};    // x4
     int spriteScaleSmooth {0};    // 0: pixels (nearest), 1: smooth
     int spriteGridCols {4}, spriteGridRows {1};
     bool spriteSkipEmpty {true};

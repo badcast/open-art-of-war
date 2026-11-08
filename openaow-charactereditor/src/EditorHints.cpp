@@ -42,6 +42,7 @@ const Hint kHints[] = {
      "every impact."},
     {"Preview fade speed", "How much faster the craters disappear on the canvas than in the game."},
     {"Canvas background", "Background color of the canvas (black by default)."},
+    {"Background layer", "A checkerboard, grid, gradient or stripes over the background colour, for when a sprite blends into it. Preview only."},
     {"Army color",
      "Tests how the character looks in an army color of the game (the character of the Preview, Compare and Wrecks "
      "tabs). Classic shows the original sheets."},
@@ -339,6 +340,13 @@ const Hint kHints[] = {
      "Saves modified sprite coordinates and rectangle definitions to assets/characters/sprites.json."},
     {"Revert sprites.json",
      "Discards unsaved sprite coordinates and reloads assets/characters/sprites.json from disk."},
+    {"Apply size",
+     "Resamples the image to the chosen size; the frames follow and their drawn sizes stay. Kept in memory until Save."},
+    {"Set to fit",
+     "The smallest image without losing quality: an exact integer upscale is undone, the empty space is cut away. "
+     "Kept in memory until Save."},
+    {"Save sprite", "Writes the pictures and the meta of this sprite (a .bak copy of the old files is kept). Until then "
+                    "every change, pixels included, lives in memory only."},
     {"Fit", "Fits the whole image of the sprite into the view (Home, or a double click with the middle button)."},
     {"1:1", "Shows the image at its real size, one image pixel per screen pixel, centered."},
     {"Frame", "Centers and zooms the view onto the selected frame (F)."},

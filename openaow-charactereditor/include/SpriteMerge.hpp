@@ -68,7 +68,42 @@ std::vector<std::array<int, 2>> ShufflePack(const std::vector<std::array<int, 2>
 // A tidy grid: equal cells, the sizes' order kept, each frame centered in its cell, close to a square
 std::vector<std::array<int, 2>> GridPack(const std::vector<std::array<int, 2>> &sizes, int padding);
 
+// --- Assemble: the frames laid out the way the game puts them together ---
+// One composite of the meta ("parts: name: [{frame, at}, ...]"): its frames with their offsets in image pixels
+struct AssemblyPiece
+{
+    int frame {0}; // index into the frame list
+    int x {0}, y {0};
+};
+using AssemblyGroup = std::vector<AssemblyPiece>;
+// The composites of an object's meta that are made of its own frames (nested "part:" entries are followed, their
+// offsets added). `frameIndex`: frame name -> index; `scale`: pixels per game unit for the offsets
+std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
+    const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale);
+// Where each frame goes: every composite becomes one block with its frames at their offsets (a frame goes with the
+// first composite that uses it; a composite whose frames would overlap in the image is laid out as a row), the
+// blocks and the frames no composite uses are shelf-packed, `padding` pixels apart
+std::vector<std::array<int, 2>> AssemblePack(
+    const std::vector<std::array<int, 2>> &sizes, const std::vector<AssemblyGroup> &groups, int padding);
+
 // Width and height of the image that holds the frames at `pos`
 std::array<int, 2> PackExtent(const std::vector<std::array<int, 2>> &sizes, const std::vector<std::array<int, 2>> &pos);
+
+// --- Image size ---
+// The image with its longer side set to `n` pixels, the aspect ratio kept: {width, height}
+std::array<int, 2> FitToLongestSide(int w, int h, int n);
+// A free size ({newW, newH} typed by hand): with `keepAspect` the side that was not edited follows the other
+std::array<int, 2> CustomSize(int w, int h, int newW, int newH, bool keepAspect, bool changedW);
+// The largest k such that the RGBA image (w x h) is an exact upscale by k: every aligned k x k block of equal
+// pixels, and every frame rectangle {x, y, w, h} on that grid. 1 when it is not
+int DetectIntegerUpscale(const unsigned char *rgba, int w, int h, const std::vector<std::array<int, 4>> &rects);
+// The image reduced k times by taking one pixel of each k x k block (no pixel is invented or lost for an exact upscale)
+std::vector<unsigned char> DownscaleInteger(const unsigned char *rgba, int w, int h, int k);
+
+// --- Magnetism ---
+// How far to move a span [a0, a1] (a frame's left / right or top / bottom edge) so that one of its edges meets the
+// nearest of `targets` (image borders, edges of the other frames), when that is within `threshold` pixels; else 0.
+// `snappedTo` gets the target met (when not null and the span snaps)
+int SnapDelta(int a0, int a1, const std::vector<int> &targets, int threshold, int *snappedTo = nullptr);
 
 } // namespace CharEditor::SpriteMerge

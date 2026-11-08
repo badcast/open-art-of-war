@@ -56,6 +56,8 @@ void CharacterEditor::EnsureEffects()
              "explosions.building.extra_anims",
              "explosions.building.big_anim"});
         EffectsChanged();
+        const auto &main = EffectsConfig::Get().vehicleMain;
+        fxAnim = main.empty() ? -1 : main.front();
         StartExplosionPreview(0);
     }
 }

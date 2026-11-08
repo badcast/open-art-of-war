@@ -188,6 +188,13 @@ void CharacterEditor::DrawPreviewControls()
         return;
     // Background of the canvas (black by default)
     Hinted(ImGui::ColorEdit3(_("Background"), previewBackground, ImGuiColorEditFlags_NoInputs), "Canvas background");
+    ImGui::SameLine();
+    {
+        // A layer over the colour, for when a sprite blends into it (only the preview)
+        const char *backdrops[] = {_("No layer"), _("Checkerboard"), _("Grid"), _("Gradient"), _("Stripes")};
+        ImGui::SetNextItemWidth(120.0f);
+        Hinted(ImGui::Combo("##backdrop", &previewBackdrop, backdrops, IM_ARRAYSIZE(backdrops)), "Background layer");
+    }
     if (editorMode == EditorMode::Preview || editorMode == EditorMode::Compare || editorMode == EditorMode::Wrecks
         || editorMode == EditorMode::Animator)
     {
@@ -425,6 +432,61 @@ void CharacterEditor::DrawCanvasGuides(const ImVec2 &min, const ImVec2 &size)
         min,
         max,
         ImGui::ColorConvertFloat4ToU32(ImVec4(previewBackground[0], previewBackground[1], previewBackground[2], 1.0f)));
+    // The layer over the colour: a lighter / darker shade of it, so it shows whatever the colour is
+    if (previewBackdrop > 0)
+    {
+        const float lum = 0.299f * previewBackground[0] + 0.587f * previewBackground[1] + 0.114f * previewBackground[2];
+        const float d = lum < 0.5f ? 0.14f : -0.14f;
+        auto shade = [&](float k, int alpha = 255) {
+            return IM_COL32(
+                static_cast<int>(std::clamp(previewBackground[0] + d * k, 0.0f, 1.0f) * 255.0f),
+                static_cast<int>(std::clamp(previewBackground[1] + d * k, 0.0f, 1.0f) * 255.0f),
+                static_cast<int>(std::clamp(previewBackground[2] + d * k, 0.0f, 1.0f) * 255.0f),
+                alpha);
+        };
+        const float cell = 32.0f;
+        drawList->PushClipRect(min, max, true);
+        if (previewBackdrop == 1)
+        {
+            const ImU32 c = shade(1.0f);
+            for (int row = 0; min.y + row * cell < max.y; ++row)
+                for (int col = (row & 1); min.x + col * cell < max.x; col += 2)
+                    drawList->AddRectFilled(
+                        ImVec2(min.x + col * cell, min.y + row * cell),
+                        ImVec2(min.x + (col + 1) * cell, min.y + (row + 1) * cell),
+                        c);
+        }
+        else if (previewBackdrop == 2)
+        {
+            const ImU32 c = shade(1.6f);
+            for (float x = min.x; x < max.x; x += cell)
+                drawList->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), c);
+            for (float y = min.y; y < max.y; y += cell)
+                drawList->AddLine(ImVec2(min.x, y), ImVec2(max.x, y), c);
+        }
+        else if (previewBackdrop == 3)
+        {
+            drawList->AddRectFilledMultiColor(min, max, shade(0.0f, 0), shade(0.0f, 0), shade(3.0f), shade(3.0f));
+        }
+        else if (previewBackdrop == 4)
+        {
+            const ImU32 c = shade(1.0f);
+            for (float x = min.x - size.y; x < max.x; x += cell * 2.0f)
+                drawList->AddQuadFilled(
+                    ImVec2(x, max.y),
+                    ImVec2(x + cell, max.y),
+                    ImVec2(x + cell + size.y, min.y),
+                    ImVec2(x + size.y, min.y),
+                    c);
+        }
+        drawList->PopClipRect();
+    }
+    // The scene (ground, characters) is drawn here, in the order of the canvas' draw list: what the UI puts on the
+    // canvas (guides, banners, popups, other windows) stays above it
+    drawList->AddCallback(
+        [](const ImDrawList *, const ImDrawCmd *cmd) { static_cast<CharacterEditor *>(cmd->UserCallbackData)->DrawPreviewScene(); },
+        this);
+    drawList->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 
     // Effect tabs show no character: no turret / target guides and no combat card of the character
     if (editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
@@ -549,7 +611,7 @@ void CharacterEditor::DrawCanvasGuides(const ImVec2 &min, const ImVec2 &size)
         if (testSiegeMode && document["abilities"] && document["abilities"]["siege"]
             && document["abilities"]["siege"]["combat"].IsMap())
         {
-            combatNode = document["abilities"]["siege"]["combat"];
+            combatNode.reset(document["abilities"]["siege"]["combat"]);
         }
         const YAML::Node hudWeapon = MainWeapon(combatNode);
         const int damage = YamlInt(hudWeapon, "damage", 0);

@@ -325,7 +325,7 @@ CharacterStats ComputeStats(YAML::Node doc, bool siege)
     {
         YAML::Node sNode = doc["abilities"]["siege"];
         if (sNode["combat"].IsMap())
-            combat = sNode["combat"];
+            combat.reset(sNode["combat"]);
         if (sNode["stats"].IsMap())
         {
             s.hp = YamlFloat(sNode["stats"], "max_hp", s.hp);

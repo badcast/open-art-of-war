@@ -71,11 +71,11 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
     {
         if (doc["abilities"]["siege"]["combat"].IsMap())
         {
-            combatNode = doc["abilities"]["siege"]["combat"];
+            combatNode.reset(doc["abilities"]["siege"]["combat"]);
         }
         if (doc["abilities"]["siege"]["stats"].IsMap())
         {
-            statsNode = doc["abilities"]["siege"]["stats"];
+            statsNode.reset(doc["abilities"]["siege"]["stats"]);
         }
     }
 
@@ -162,9 +162,13 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
             else if (destroyed)
             {
                 // Destruction sequence: explosion starts, and from the middle of destruction the crater appears
-                int expAnim = (width <= 2 && height <= 2) ? 37 : 32;
-                int expFrames = (expAnim == 37) ? 6 : 8;
-                float expDur = expFrames * 0.08f;
+                const auto &fx = OpenArtOfWar::EffectsConfig::Get();
+                const int expAnim = (width <= 2 && height <= 2) ? fx.buildingSmallMain
+                    : (buildingIndex == 2 || buildingIndex == 4 || buildingIndex == 12)
+                        ? fx.buildingPowerMain : fx.buildingLargeMain;
+                const auto expRange = textures->GetAnimRange(expAnim);
+                const int expFrames = std::max(0, expRange.end - expRange.start + 1);
+                const float expDur = expFrames * fx.frameTime;
                 bool showRemnant = (previewTime >= expDur * 0.45f);
 
                 gameRenderer->DrawBuildingWorld(
@@ -198,10 +202,12 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
                     false,
                     buildingPowered);
 
-                if (previewTime < expDur)
+                if (expFrames > 0 && previewTime < expDur)
                 {
-                    int expFrame = std::clamp(static_cast<int>(previewTime / 0.08f), 0, expFrames - 1);
-                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
+                    int expFrame = std::clamp(static_cast<int>(previewTime / fx.frameTime), 0, expFrames - 1);
+                    float ox = 0.0f, oy = 0.0f;
+                    OpenArtOfWar::ExplosionCentering(expAnim, ox, oy);
+                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, ox, oy, *camera, faction);
                 }
             }
             else
@@ -347,9 +353,11 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
             action = static_cast<int>(OpenArtOfWar::ActionState::Die);
             if (!isInf)
             {
-                int expAnim = 11;
-                int expFrames = 8;
-                float expDur = expFrames * 0.08f;
+                const auto &fx = OpenArtOfWar::EffectsConfig::Get();
+                const int expAnim = fx.vehicleMain.empty() ? -1 : fx.vehicleMain.front();
+                const auto expRange = textures->GetAnimRange(expAnim);
+                const int expFrames = std::max(0, expRange.end - expRange.start + 1);
+                const float expDur = expFrames * fx.frameTime;
                 bool showWreck = (previewTime >= expDur * 0.45f);
 
                 if (showWreck)
@@ -385,10 +393,12 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
                         true);
                 }
 
-                if (previewTime < expDur)
+                if (expFrames > 0 && previewTime < expDur)
                 {
-                    int expFrame = std::clamp(static_cast<int>(previewTime / 0.08f), 0, expFrames - 1);
-                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, -16.0f, -16.0f, *camera, faction);
+                    int expFrame = std::clamp(static_cast<int>(previewTime / fx.frameTime), 0, expFrames - 1);
+                    float ox = 0.0f, oy = 0.0f;
+                    OpenArtOfWar::ExplosionCentering(expAnim, ox, oy);
+                    gameRenderer->DrawAnimSequenceWorld(expAnim, expFrame, ox, oy, *camera, faction);
                 }
             }
             else
@@ -691,14 +701,8 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
                 muzzleX, muzzleY, targetWorldX, targetWorldY, *camera, SDL_Color {236, 111, 77, 90});
         }
 
-        // Muzzle flash on each shot
-        const bool ownFlame = isInf && YamlString(MainWeapon(combatNode), "projectile", "bullet") == "flame";
-        if (muzzleFlashTimer > 0.0f && !ownFlame)
-        { // the flamethrower's own firing layer is its nozzle flame
-            float flashDur = 0.08f / std::max(0.1f, previewFxSpeed);
-            int mFrame = std::clamp(static_cast<int>((1.0f - muzzleFlashTimer / flashDur) * 3.0f), 0, 2);
-            gameRenderer->DrawAnimSequenceWorld(42, mFrame, muzzleFlashX, muzzleFlashY, *camera, faction);
-        }
+        // Muzzle flashes are part of the character firing layers drawn above.
+        // Registry animation handles are dynamic; a numeric ID can draw another unit.
 
         // Projectiles and impact effects in flight
         // Each projectile flies strictly to its own locked target from the moment of firing!
@@ -818,7 +822,7 @@ void CharacterEditor::UpdateCombatSim(float dt)
         if (testSiegeMode && document["abilities"] && document["abilities"]["siege"]
             && document["abilities"]["siege"]["combat"].IsMap())
         {
-            cNode = document["abilities"]["siege"]["combat"];
+            cNode.reset(document["abilities"]["siege"]["combat"]);
         }
         const bool hasRotTurret = YamlBool(cNode, "has_rotating_turret", false);
         const int effArch = (simArchetype >= 0) ? simArchetype : arch;
@@ -915,7 +919,6 @@ void CharacterEditor::UpdateCombatSim(float dt)
         simShotCooldown2 = 0.0f;
         simBurstIndex2 = 0;
         simBurstDelayTimer2 = 0.0f;
-        muzzleFlashTimer = 0.0f;
         return;
     }
 
@@ -923,7 +926,7 @@ void CharacterEditor::UpdateCombatSim(float dt)
     if (testSiegeMode && document["abilities"] && document["abilities"]["siege"]
         && document["abilities"]["siege"]["combat"].IsMap())
     {
-        combatNode = document["abilities"]["siege"]["combat"];
+        combatNode.reset(document["abilities"]["siege"]["combat"]);
     }
     if (!YamlBool(combatNode, "can_attack", true))
     {
@@ -971,11 +974,6 @@ void CharacterEditor::UpdateCombatSim(float dt)
     const int expectedAimDir
         = targetCustomized ? aimDir8 : (hasRotTurret ? desiredTurretFacingDir : desiredHullFacingDir);
     const bool aimAligned = (!building && !hasRotTurret && isInf) || (tf == (expectedAimDir % 8 + 8) % 8);
-
-    if (muzzleFlashTimer > 0.0f)
-    {
-        muzzleFlashTimer -= dt;
-    }
 
     float distTiles = std::hypot(targetWorldX, targetWorldY) / static_cast<float>(OpenArtOfWar::TILE_WIDTH);
 
@@ -1141,10 +1139,6 @@ void CharacterEditor::UpdateCombatSim(float dt)
                 p.impactTimer = p.maxImpactTime;
 
                 simProjectiles.push_back(p);
-
-                muzzleFlashX = muzzleX;
-                muzzleFlashY = muzzleY;
-                muzzleFlashTimer = 0.08f / std::max(0.1f, previewFxSpeed);
 
                 sw.bIdx++;
                 sw.bDelay = burstDelay;

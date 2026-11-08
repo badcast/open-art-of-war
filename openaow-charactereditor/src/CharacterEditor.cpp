@@ -198,8 +198,8 @@ int CharacterEditor::run()
 
         SDL_SetRenderDrawColor(renderer, 18, 22, 23, 255);
         SDL_RenderClear(renderer);
+        // The scene is drawn from inside the canvas' draw list (DrawCanvasGuides), under the UI above it
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
-        DrawPreviewScene();
         SDL_RenderPresent(renderer);
     }
     return 0;
@@ -207,6 +207,7 @@ int CharacterEditor::run()
 
 CharacterEditor::~CharacterEditor()
 {
+    DiscardPending();
     for (auto &[comp, tex] : wreckThumbs)
     {
         if (tex)
@@ -357,7 +358,6 @@ bool CharacterEditor::loadFile(const fs::path &path)
         simShotCooldown2 = 0.0f;
         simBurstIndex2 = 0;
         simBurstDelayTimer2 = 0.0f;
-        muzzleFlashTimer = 0.0f;
         turretFacingDir = facing;
         desiredHullFacingDir = facing;
         desiredTurretFacingDir = facing;
@@ -742,7 +742,6 @@ void CharacterEditor::SetMode(PreviewMode mode)
     simShotCooldown2 = 0.0f;
     simBurstIndex2 = 0;
     simBurstDelayTimer2 = 0.0f;
-    muzzleFlashTimer = 0.0f;
 }
 
 } // namespace CharEditor

@@ -4,6 +4,10 @@
 #include <random>
 #include <cctype>
 #include <cmath>
+#include <functional>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <numeric>
 #include <set>
 #include <sstream>
@@ -519,6 +523,253 @@ std::array<int, 2> PackExtent(const std::vector<std::array<int, 2>> &sizes, cons
         e[1] = std::max(e[1], pos[i][1] + sizes[i][1]);
     }
     return e;
+}
+
+std::array<int, 2> FitToLongestSide(int w, int h, int n)
+{
+    w = std::max(1, w);
+    h = std::max(1, h);
+    n = std::max(1, n);
+    if (w >= h)
+        return {n, std::max(1, static_cast<int>(std::lround(static_cast<double>(h) * n / w)))};
+    return {std::max(1, static_cast<int>(std::lround(static_cast<double>(w) * n / h))), n};
+}
+
+std::array<int, 2> CustomSize(int w, int h, int newW, int newH, bool keepAspect, bool changedW)
+{
+    w = std::max(1, w);
+    h = std::max(1, h);
+    newW = std::max(1, newW);
+    newH = std::max(1, newH);
+    if (keepAspect)
+    {
+        if (changedW)
+            newH = std::max(1, static_cast<int>(std::lround(static_cast<double>(h) * newW / w)));
+        else
+            newW = std::max(1, static_cast<int>(std::lround(static_cast<double>(w) * newH / h)));
+    }
+    return {newW, newH};
+}
+
+int DetectIntegerUpscale(const unsigned char *rgba, int w, int h, const std::vector<std::array<int, 4>> &rects)
+{
+    if (!rgba || w <= 0 || h <= 0)
+        return 1;
+    auto px = [&](int x, int y) {
+        std::uint32_t v;
+        std::memcpy(&v, rgba + (static_cast<std::size_t>(y) * w + x) * 4, 4);
+        return v;
+    };
+    int g = std::gcd(w, h);
+    // Runs of equal pixels along rows and columns all start on the grid: their lengths are multiples of k
+    for (int y = 0; y < h && g > 1; ++y)
+    {
+        int run = 1;
+        for (int x = 1; x <= w; ++x)
+        {
+            if (x < w && px(x, y) == px(x - 1, y))
+            {
+                ++run;
+                continue;
+            }
+            g = std::gcd(g, run);
+            run = 1;
+            if (g == 1)
+                break;
+        }
+    }
+    for (int x = 0; x < w && g > 1; ++x)
+    {
+        int run = 1;
+        for (int y = 1; y <= h; ++y)
+        {
+            if (y < h && px(x, y) == px(x, y - 1))
+            {
+                ++run;
+                continue;
+            }
+            g = std::gcd(g, run);
+            run = 1;
+            if (g == 1)
+                break;
+        }
+    }
+    for (const auto &r : rects)
+        for (int v : r)
+            g = std::gcd(g, std::abs(v));
+    return std::max(1, g);
+}
+
+std::vector<unsigned char> DownscaleInteger(const unsigned char *rgba, int w, int h, int k)
+{
+    k = std::max(1, k);
+    const int nw = std::max(1, w / k), nh = std::max(1, h / k);
+    std::vector<unsigned char> out(static_cast<std::size_t>(nw) * nh * 4);
+    for (int y = 0; y < nh; ++y)
+        for (int x = 0; x < nw; ++x)
+            std::memcpy(
+                &out[(static_cast<std::size_t>(y) * nw + x) * 4],
+                rgba + (static_cast<std::size_t>(y) * k * w + static_cast<std::size_t>(x) * k) * 4,
+                4);
+    return out;
+}
+
+int SnapDelta(int a0, int a1, const std::vector<int> &targets, int threshold, int *snappedTo)
+{
+    int best = 0, bestDist = threshold + 1, bestTarget = 0;
+    for (int t : targets)
+        for (int edge : {a0, a1})
+        {
+            const int d = std::abs(t - edge);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = t - edge;
+                bestTarget = t;
+            }
+        }
+    if (bestDist > threshold)
+        return 0;
+    if (snappedTo)
+        *snappedTo = bestTarget;
+    return best;
+}
+
+std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
+    const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale)
+{
+    std::vector<AssemblyGroup> groups;
+    const YAML::Node parts = meta["parts"];
+    if (!parts || !parts.IsMap())
+        return groups;
+    // "object.item" -> "item" for this object; another object's or an indexed name is not ours
+    auto local = [&](std::string name) -> std::string {
+        const std::string prefix = object + ".";
+        if (name.rfind(prefix, 0) == 0)
+            name = name.substr(prefix.size());
+        if (name.find('.') != std::string::npos || name.find('[') != std::string::npos)
+            return {};
+        return name;
+    };
+    for (const auto &kv : parts)
+    {
+        AssemblyGroup group;
+        std::function<void(const YAML::Node &, int, int, int)> walk
+            = [&](const YAML::Node &list, int ox, int oy, int depth) {
+                  if (!list.IsSequence())
+                      return;
+                  for (const auto &e : list)
+                  {
+                      if (!e.IsMap())
+                          continue;
+                      int ax = ox, ay = oy;
+                      try
+                      {
+                          if (const YAML::Node at = e["at"]; at && at.IsSequence() && at.size() == 2)
+                          {
+                              ax += static_cast<int>(std::lround(at[0].as<float>() * scale));
+                              ay += static_cast<int>(std::lround(at[1].as<float>() * scale));
+                          }
+                          if (const YAML::Node f = e["frame"])
+                          {
+                              const auto it = frameIndex.find(local(f.as<std::string>()));
+                              if (it != frameIndex.end())
+                                  group.push_back({it->second, ax, ay});
+                          }
+                          else if (const YAML::Node p = e["part"]; p && depth < 4)
+                          {
+                              const std::string name = local(p.as<std::string>());
+                              if (!name.empty() && parts[name])
+                                  walk(parts[name], ax, ay, depth + 1);
+                          }
+                      }
+                      catch (const std::exception &)
+                      {}
+                  }
+              };
+        walk(kv.second, 0, 0, 0);
+        if (!group.empty())
+            groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<std::array<int, 2>> AssemblePack(
+    const std::vector<std::array<int, 2>> &sizes, const std::vector<AssemblyGroup> &groups, int padding)
+{
+    struct Block
+    {
+        std::vector<AssemblyPiece> pieces; // offsets from the block's top left
+        int w {1}, h {1};
+    };
+    std::vector<Block> blocks;
+    std::vector<char> placed(sizes.size(), 0);
+    auto overlap = [&](const AssemblyPiece &a, const AssemblyPiece &b) {
+        return a.x < b.x + sizes[b.frame][0] && b.x < a.x + sizes[a.frame][0] && a.y < b.y + sizes[b.frame][1]
+               && b.y < a.y + sizes[a.frame][1];
+    };
+    for (const AssemblyGroup &g : groups)
+    {
+        std::vector<AssemblyPiece> mine;
+        for (const AssemblyPiece &p : g)
+            if (p.frame >= 0 && p.frame < static_cast<int>(sizes.size()) && !placed[p.frame])
+            {
+                placed[p.frame] = 1;
+                mine.push_back(p);
+            }
+        if (mine.empty())
+            continue;
+        bool crossing = false;
+        for (std::size_t i = 0; i < mine.size() && !crossing; ++i)
+            for (std::size_t j = i + 1; j < mine.size() && !crossing; ++j)
+                crossing = overlap(mine[i], mine[j]);
+        if (crossing) // layers on top of each other cannot share pixels: one row instead
+        {
+            int x = 0;
+            for (AssemblyPiece &p : mine)
+            {
+                p.x = x;
+                p.y = 0;
+                x += sizes[p.frame][0] + padding;
+            }
+        }
+        int minX = mine[0].x, minY = mine[0].y, maxX = minX, maxY = minY;
+        for (const AssemblyPiece &p : mine)
+        {
+            minX = std::min(minX, p.x);
+            minY = std::min(minY, p.y);
+            maxX = std::max(maxX, p.x + sizes[p.frame][0]);
+            maxY = std::max(maxY, p.y + sizes[p.frame][1]);
+        }
+        Block b;
+        for (AssemblyPiece p : mine)
+        {
+            p.x -= minX;
+            p.y -= minY;
+            b.pieces.push_back(p);
+        }
+        b.w = std::max(1, maxX - minX);
+        b.h = std::max(1, maxY - minY);
+        blocks.push_back(std::move(b));
+    }
+    for (std::size_t i = 0; i < sizes.size(); ++i)
+        if (!placed[i])
+        {
+            Block b;
+            b.pieces.push_back({static_cast<int>(i), 0, 0});
+            b.w = std::max(1, sizes[i][0]);
+            b.h = std::max(1, sizes[i][1]);
+            blocks.push_back(std::move(b));
+        }
+    std::vector<std::array<int, 2>> blockSizes;
+    for (const Block &b : blocks)
+        blockSizes.push_back({b.w, b.h});
+    const auto at = ShelfPack(blockSizes, padding);
+    std::vector<std::array<int, 2>> out(sizes.size(), {0, 0});
+    for (std::size_t i = 0; i < blocks.size(); ++i)
+        for (const AssemblyPiece &p : blocks[i].pieces)
+            out[p.frame] = {at[i][0] + p.x, at[i][1] + p.y};
+    return out;
 }
 
 } // namespace CharEditor::SpriteMerge

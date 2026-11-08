@@ -2,6 +2,7 @@
 #include "SpriteMerge.hpp"
 
 #include <cstdio>
+#include <cstring>
 
 using namespace CharEditor::SpriteMerge;
 
@@ -134,6 +135,70 @@ int main()
     const auto ext = PackExtent(sizes, grid);
     for (std::size_t i = 0; i < sizes.size(); ++i)
         CHECK(grid[i][0] + sizes[i][0] <= ext[0] && grid[i][1] + sizes[i][1] <= ext[1]);
+
+    // Image size
+    CHECK(FitToLongestSide(300, 200, 1024) == (std::array<int, 2> {1024, 683}));
+    CHECK(FitToLongestSide(200, 300, 512) == (std::array<int, 2> {341, 512}));
+    CHECK(CustomSize(400, 200, 100, 999, true, true) == (std::array<int, 2> {100, 50}));
+    CHECK(CustomSize(400, 200, 999, 100, true, false) == (std::array<int, 2> {200, 100}));
+    CHECK(CustomSize(400, 200, 123, 45, false, true) == (std::array<int, 2> {123, 45}));
+    {
+        // A 4x4 picture of distinct colours scaled up by 3 is detected as x3 and comes back exactly
+        const int sw = 4, sh = 4, k = 3, w = sw * k, h = sh * k;
+        std::vector<unsigned char> small(sw * sh * 4), big(w * h * 4);
+        for (int i = 0; i < sw * sh; ++i)
+        {
+            small[i * 4] = static_cast<unsigned char>(i * 15 + 1);
+            small[i * 4 + 1] = static_cast<unsigned char>(255 - i * 9);
+            small[i * 4 + 2] = static_cast<unsigned char>(i * 7);
+            small[i * 4 + 3] = 255;
+        }
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+                std::memcpy(&big[(y * w + x) * 4], &small[((y / k) * sw + x / k) * 4], 4);
+        CHECK(DetectIntegerUpscale(big.data(), w, h, {}) == k);
+        CHECK(DetectIntegerUpscale(big.data(), w, h, {{3, 3, 6, 6}}) == k);
+        CHECK(DetectIntegerUpscale(big.data(), w, h, {{1, 3, 6, 6}}) == 1); // a frame off the grid
+        CHECK(DownscaleInteger(big.data(), w, h, k) == small);
+        big[(5 * w + 5) * 4] ^= 1; // one pixel differs: not an exact upscale any more
+        CHECK(DetectIntegerUpscale(big.data(), w, h, {}) == 1);
+    }
+
+    // Magnetism: an edge within the threshold meets the nearest target, otherwise nothing moves
+    {
+        int met = -1;
+        const std::vector<int> t = {0, 40, 100};
+        CHECK(SnapDelta(3, 20, t, 6, &met) == -3 && met == 0);   // left edge to the border
+        CHECK(SnapDelta(50, 97, t, 6, &met) == 3 && met == 100); // right edge to 100
+        CHECK(SnapDelta(10, 30, t, 6) == 0);                     // nothing near
+        CHECK(SnapDelta(38, 70, t, 6) == 2);                     // 40 is two away
+        CHECK(SnapDelta(5, 5, t, 6) == -5);                      // a single point (a dragged corner)
+    }
+
+    // Assemble: composites keep their frames at their offsets, overlapping ones become rows, nothing overlaps
+    {
+        const YAML::Node meta = YAML::Load(R"(
+parts:
+  hull: [ {frame: a, at: [0, 0]}, {frame: b, at: [10, 0]} ]
+  both: [ {part: hull, at: [0, 5]}, {frame: c, at: [0, 5]} ]
+  layered: [ {frame: d, at: [0, 0]}, {frame: e, at: [3, 3]} ]
+  foreign: [ {frame: other.x, at: [0, 0]} ]
+)");
+        const std::map<std::string, int> idx = {{"a", 0}, {"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}};
+        const auto groups = AssemblyGroupsFromMeta(meta, "obj", idx, 1.0f);
+        CHECK(groups.size() == 3); // hull, both, layered (foreign has none of ours)
+        const std::vector<std::array<int, 2>> sz = {{10, 10}, {10, 10}, {4, 4}, {8, 8}, {8, 8}, {5, 5}};
+        const auto at = AssemblePack(sz, groups, 1);
+        CHECK(at[1][0] - at[0][0] == 10 && at[1][1] == at[0][1]);              // a, b side by side as in the game
+        CHECK(at[4][0] - at[3][0] == 8 + 1 && at[4][1] == at[3][1]);           // d, e overlap: laid in a row
+        bool apart = true;
+        for (std::size_t i = 0; i < sz.size(); ++i)
+            for (std::size_t j = i + 1; j < sz.size(); ++j)
+                if (!(at[i][0] + sz[i][0] <= at[j][0] || at[j][0] + sz[j][0] <= at[i][0] || at[i][1] + sz[i][1] <= at[j][1]
+                      || at[j][1] + sz[j][1] <= at[i][1]))
+                    apart = false;
+        CHECK(apart); // a frame goes with the first composite that uses it: c and f are blocks of their own
+    }
 
     if (fails)
         std::printf("%d check(s) failed\n", fails);

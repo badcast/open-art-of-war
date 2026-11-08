@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <sstream>
@@ -86,8 +87,9 @@ Kind KindOf(const YAML::Node &n)
 std::string FormatFloat(float v)
 {
     char buf[40];
-    std::snprintf(buf, sizeof buf, "%.4g", v);
-    std::string s = buf;
+    // (not snprintf: it follows the locale and would write "0,5" into the YAML)
+    const auto r = std::to_chars(buf, buf + sizeof buf, v, std::chars_format::general, 4);
+    std::string s(buf, r.ptr);
     if (s.find_first_of(".e") == std::string::npos)
         s += ".0";
     return s;
