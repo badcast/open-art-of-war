@@ -3,6 +3,7 @@
 #include "core/Localization.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "core/Mods.hpp"
 #include "core/DebugEnv.hpp"
 #include "ui/MenuController.hpp"
 #include "ui/HUDController.hpp"
@@ -133,6 +134,12 @@ bool Application::Init(int windowWidth, int windowHeight)
         m_settings.Clamp();
     }
     m_confirmedVideo = m_settings;
+    // The player's mods over the installed data, before anything is loaded from it
+    if (!m_settings.enabledMods.empty())
+    {
+        Mods::Activate(m_settings.enabledMods);
+        LoaderResources::Reload();
+    }
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS))
     {

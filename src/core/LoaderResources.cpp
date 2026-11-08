@@ -2,6 +2,7 @@
 
 #include "core/AssetStore.hpp"
 #include "core/JsonFile.hpp"
+#include "core/Mods.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -49,6 +50,15 @@ bool LoadInto(State &s, const std::string &path)
         {
             doc = std::move(file);
             ok = true;
+            // The enabled mods add to it (not while a session overlay brings another computer's data: its manifest
+            // is that computer's, mods included)
+            if (!Assets::HasSessionOverlay() && !Mods::Active().empty())
+            {
+                for (const Mods::ModInfo &m : Mods::Active())
+                    Mods::MergeManifest(doc, m.manifest);
+                text = "# " + std::string(LoaderResources::kManifestPath) + " with the mods " + Mods::ActiveSummary()
+                       + "\n" + doc.dump(2) + "\n";
+            }
         }
         else
             std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest object: no resources"
@@ -100,6 +110,20 @@ bool LoaderResources::Init()
     if (!Assets::ReadText(path, text))
         path = s.root + "/main.yaml";
 
+    return LoadInto(s, path);
+}
+
+bool LoaderResources::Reload()
+{
+    State &s = state();
+    std::call_once(s.loaded, [] {}); // a later lazy load must not overwrite this one
+    std::string path = kManifestPath;
+    std::string text;
+    if (!Assets::ReadText(path, text))
+    {
+        std::lock_guard<std::mutex> guard(s.lock);
+        path = s.root + "/main.yaml";
+    }
     return LoadInto(s, path);
 }
 

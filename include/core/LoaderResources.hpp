@@ -31,6 +31,8 @@ class LoaderResources
 
     // True when main.yaml was found and parsed
     static bool HasManifest();
+    // Reads main.yaml again, with the mods enabled now (Mods::Activate) merged into it
+    static bool Reload();
     // The raw manifest text (empty when missing), e.g. for the network asset hash
     static const std::string &ManifestText();
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace OpenArtOfWar
 {
@@ -31,6 +32,7 @@ struct Settings
     int fullscreenW {1920}; // display mode of the exclusive fullscreen
     int fullscreenH {1080};
     bool vsync {true};
+    std::vector<std::string> enabledMods; // the mods in use, in load order (a later one wins), Mods::Activate
     int fpsLimit {0}; // 0 = unlimited (frames per second), only used without vsync or below the refresh rate
     bool showFps {false};
     bool showNetStats {false}; // network game: ping, jitter, loss, traffic, turn buffer in the corner

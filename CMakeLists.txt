@@ -104,6 +104,7 @@ set(ENGINE_SOURCES
     src/core/ApplicationOverlays.cpp
     src/core/Localization.cpp
     src/core/AssetStore.cpp
+    src/core/Mods.cpp
     src/core/Sha256.cpp
     src/core/LoaderResources.cpp
     src/audio/SfxMixer.cpp
@@ -438,3 +439,10 @@ set_target_properties(openaow-build-limits-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     BUILD_RPATH "${OAOW_RPATH}")
 add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
+
+add_executable(openaow-mods-tests tests/ModsTests.cpp)
+target_link_libraries(openaow-mods-tests PRIVATE openaow-core)
+set_target_properties(openaow-mods-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    BUILD_RPATH "${OAOW_RPATH}")
+add_test(NAME openaow-mods-tests COMMAND openaow-mods-tests)

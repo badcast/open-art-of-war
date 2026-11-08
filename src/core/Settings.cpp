@@ -69,6 +69,7 @@ bool Settings::Save(const std::string &path) const
         j["fullscreenHeight"] = fullscreenH;
         j["vsync"] = vsync;
         j["fpsLimit"] = fpsLimit;
+        j["enabledMods"] = enabledMods;
         j["showFps"] = showFps;
         j["showNetStats"] = showNetStats;
         j["graphicsQuality"] = graphicsQuality;
@@ -120,6 +121,11 @@ bool Settings::Load(const std::string &path)
         fullscreenH = j.value("fullscreenHeight", fullscreenH);
         vsync = j.value("vsync", vsync);
         fpsLimit = j.value("fpsLimit", fpsLimit);
+        enabledMods.clear();
+        if (j.contains("enabledMods") && j["enabledMods"].is_array())
+            for (const auto &m : j["enabledMods"])
+                if (m.is_string())
+                    enabledMods.push_back(m.get<std::string>());
         showFps = j.value("showFps", showFps);
         showNetStats = j.value("showNetStats", showNetStats);
         graphicsQuality = j.value("graphicsQuality", graphicsQuality);

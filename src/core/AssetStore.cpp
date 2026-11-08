@@ -32,6 +32,7 @@ struct State
     std::mutex lock;
     std::map<std::string, std::vector<std::uint8_t>> blobFiles;
     std::map<std::string, std::vector<std::uint8_t>> overlay; // session overlay, see SetSessionOverlay
+    std::vector<ModLayer> mods;                                // enabled mods, see SetModLayers
     std::string userDir;
     fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
@@ -101,7 +102,8 @@ bool ReadFile(const fs::path &p, std::vector<std::uint8_t> &out)
 }
 
 // Unpacks every regular file of the tar.zst blob into memory (blobArhive tar stream has no random access)
-bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<std::uint8_t>> &files)
+bool LoadBlob(
+    const fs::path &filePath, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only = "")
 {
     archive *blobArhive = archive_read_new();
     archive_read_support_filter_all(blobArhive);
@@ -118,6 +120,17 @@ bool LoadBlob(const fs::path &filePath, std::map<std::string, std::vector<std::u
     {
         if (archive_entry_filetype(entry) != AE_IFREG)
             continue;
+        if (!only.empty())
+        {
+            std::string entryName = fs::path(archive_entry_pathname(entry)).lexically_normal().generic_string();
+            if (entryName.compare(0, 2, "./") == 0)
+                entryName.erase(0, 2);
+            if (entryName != only)
+            {
+                archive_read_data_skip(blobArhive);
+                continue;
+            }
+        }
         std::vector<std::uint8_t> data(static_cast<std::size_t>(archive_entry_size(entry)));
         std::size_t got = 0;
         while (got < data.size())
@@ -319,12 +332,68 @@ bool OverlayRead(State &s, const std::string &path, std::vector<std::uint8_t> *o
         *out = it->second;
     return true;
 }
+// The file of the topmost enabled mod that has `path`
+bool ModRead(State &s, const std::string &path, std::vector<std::uint8_t> *out)
+{
+    std::lock_guard<std::mutex> guard(s.lock);
+    if (s.mods.empty())
+        return false;
+    std::string key;
+    if (!AssetKey(path, key) || key.empty())
+        return false;
+    for (auto layer = s.mods.rbegin(); layer != s.mods.rend(); ++layer)
+    {
+        if (!layer->folder.empty())
+        {
+            std::error_code ec;
+            const fs::path p = fs::path(layer->folder) / key;
+            if (!fs::is_regular_file(p, ec))
+                continue;
+            if (!out)
+                return true;
+            if (ReadFile(p, *out))
+                return true;
+            continue;
+        }
+        const auto it = layer->files.find(key);
+        if (it == layer->files.end())
+            continue;
+        if (out)
+            *out = it->second;
+        return true;
+    }
+    return false;
+}
 } // namespace
+
+void SetModLayers(std::vector<ModLayer> layers)
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    s.mods = std::move(layers);
+}
+
+void ClearModLayers()
+{
+    SetModLayers({});
+}
+
+bool HasModLayers()
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    return !s.mods.empty();
+}
+
+bool ReadArchive(const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only)
+{
+    return LoadBlob(fs::path(file), files, only);
+}
 
 bool Exists(const std::string &path)
 {
     State &s = state();
-    if (OverlayRead(s, path, nullptr))
+    if (OverlayRead(s, path, nullptr) || ModRead(s, path, nullptr))
         return true;
     std::string key;
     if (s.mode != Mode::Blob || !AssetKey(path, key))
@@ -340,7 +409,7 @@ bool Exists(const std::string &path)
 bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out)
 {
     State &s = state();
-    if (OverlayRead(s, path, &out))
+    if (OverlayRead(s, path, &out) || ModRead(s, path, &out))
         return true;
     std::string key;
     if (s.mode != Mode::Blob || !AssetKey(path, key))
@@ -392,6 +461,31 @@ std::vector<std::string> List(const std::string &dir, const std::string &extensi
             const std::string rest = full.substr(prefix.size());
             if (!rest.empty() && rest.find('/') == std::string::npos)
                 names.insert(rest);
+        }
+    }
+
+    // What the enabled mods add to that directory
+    if (std::string modKey; AssetKey(dir, modKey))
+    {
+        std::lock_guard<std::mutex> guard(s.lock);
+        const std::string prefix = modKey.empty() ? "" : modKey + "/";
+        for (const ModLayer &layer : s.mods)
+        {
+            if (!layer.folder.empty())
+            {
+                const fs::path p = fs::path(layer.folder) / modKey;
+                if (fs::is_directory(p, ec))
+                    scanDirectory(p);
+                continue;
+            }
+            for (const auto &[full, data] : layer.files)
+            {
+                if (full.compare(0, prefix.size(), prefix) != 0)
+                    continue;
+                const std::string rest = full.substr(prefix.size());
+                if (!rest.empty() && rest.find('/') == std::string::npos)
+                    names.insert(rest);
+            }
         }
     }
 
