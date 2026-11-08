@@ -18,14 +18,14 @@ struct ProjectileSpec
     // Otherwise it flies, deals its damage where it lands and splashes (splash_percent of the weapon).
     bool hitscan {true};
     // Sprites are written by name in projectiles.yaml and kept as handles (-1: none)
-    int sprite {-1};       // first composite of the flying projectile, one per direction (-1: nothing drawn)
-    int directions {32};   // 16 or 32
-    float speed {36.0f};   // pixels per simulation tick
-    float spread {0.065f}; // largest aim error in radians (a weapon's own spread overrides it)
-    std::vector<int> impact; // animation where it hits a unit / building / the ground, by target id
-    int impactWall {-1};     // animation on a wall that stands the hit
-    int wallDestroyed {-1};  // animation on a wall the hit brings down
-    bool smokeTrail {false};                  // puffs of smoke behind it (rockets)
+    int sprite {-1};                 // first composite of the flying projectile, one per direction (-1: nothing drawn)
+    int directions {32};             // 16 or 32
+    float speed {36.0f};             // pixels per simulation tick
+    float spread {0.065f};           // largest aim error in radians (a weapon's own spread overrides it)
+    std::vector<int> impact;         // animation where it hits a unit / building / the ground, by target id
+    int impactWall {-1};             // animation on a wall that stands the hit
+    int wallDestroyed {-1};          // animation on a wall the hit brings down
+    bool smokeTrail {false};         // puffs of smoke behind it (rockets)
     std::vector<int> groundMarks;    // composites of the small crater left where it lands (one picked); empty: none
     float groundMarkSeconds {45.0f}; // how long a crater stays on the ground
 

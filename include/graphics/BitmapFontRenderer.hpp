@@ -92,12 +92,12 @@ private:
     CachedText GetOrCreateTexture(const std::string &text, int scale, SDL_Color color);
 
     SDL_Renderer *m_renderer {nullptr};
-    TTF_Font *m_fontSmall {nullptr};        // scale 1 (~13px)
-    TTF_Font *m_fontMedium {nullptr};       // scale 2 (~16px)
-    TTF_Font *m_fontLarge {nullptr};        // scale 3 (~22px bold)
-    TTF_Font *m_fontTitle {nullptr};        // scale 4 (~30px bold)
-    TTF_Font *m_fontSmallBold {nullptr};    // scale 5 (13px bold)
-    TTF_Font *m_fontMediumBold {nullptr};   // scale 6 (16px bold)
+    TTF_Font *m_fontSmall {nullptr};             // scale 1 (~13px)
+    TTF_Font *m_fontMedium {nullptr};            // scale 2 (~16px)
+    TTF_Font *m_fontLarge {nullptr};             // scale 3 (~22px bold)
+    TTF_Font *m_fontTitle {nullptr};             // scale 4 (~30px bold)
+    TTF_Font *m_fontSmallBold {nullptr};         // scale 5 (13px bold)
+    TTF_Font *m_fontMediumBold {nullptr};        // scale 6 (16px bold)
     std::vector<std::uint8_t> m_fontDataRegular; // font files from data.blob, read by m_font* via SDL IO
     std::vector<std::uint8_t> m_fontDataBold;
     TTF_Font *m_fontHero {nullptr}; // scale 7 (48px bold)

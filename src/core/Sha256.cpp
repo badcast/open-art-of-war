@@ -31,8 +31,8 @@ void Sha256::Block(const std::uint8_t *p)
 {
     std::uint32_t w[64];
     for (int i = 0; i < 16; ++i)
-        w[i] = (std::uint32_t(p[i * 4]) << 24) | (std::uint32_t(p[i * 4 + 1]) << 16) | (std::uint32_t(p[i * 4 + 2]) << 8)
-               | std::uint32_t(p[i * 4 + 3]);
+        w[i] = (std::uint32_t(p[i * 4]) << 24) | (std::uint32_t(p[i * 4 + 1]) << 16)
+               | (std::uint32_t(p[i * 4 + 2]) << 8) | std::uint32_t(p[i * 4 + 3]);
     for (int i = 16; i < 64; ++i)
     {
         const std::uint32_t s0 = Rotr(w[i - 15], 7) ^ Rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);

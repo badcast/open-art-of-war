@@ -902,6 +902,20 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
 
     // Rebuild starting base structures & walls if destroyed
     UpdateRebuilding(deltaTime, map, entities);
+    std::vector<int> headquarters;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (b && b->alive && b->state != ActionState::Die && b->type == UnitType::Headquarters
+            && b->buildProgress >= 1.0f)
+            headquarters.push_back(b->id);
+    }
+    if (m_skirmish && (!m_territoryReady || headquarters != m_territoryHeadquarters))
+    {
+        PlanTerritory(map, entities, pathfinder);
+        m_territoryHeadquarters = std::move(headquarters);
+        m_defensePlanned = false;
+    }
     // The builder also runs while the base lacks a barracks or a factory: without a factory there are no vehicles
     if (m_skirmish
         && (m_currentDifficultyConfig.tactics.buildDefenses
@@ -2768,21 +2782,42 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
             if (!found && rear && kind != AIDefenseSite::PowerPlant)
                 found = FindCoreSite(
                     x, y, w, h, ox, oy, false, minRing, map, entities, crowding, needsExit); // the back is full
-            if (!found && kind == AIDefenseSite::PowerPlant)
-            {
-                // The back is full: the sides of the base, never its front
-                found = FindCoreSite(x, y, w, h, sideX, sideY, false, minRing, map, entities, crowding, needsExit);
-                if (found)
-                {
-                    const float px = x + w * 0.5f - cx, py = y + h * 0.5f - cy;
-                    found = px * tdx + py * tdy <= 0.35f * DetMath::Hypot(px, py);
-                }
-            }
         }
+        std::string failure;
+        // Exhaustive fallback: all finished HQ zones, no aesthetic exclusions.
+        if (!found)
+            for (const auto &e : entities.GetAllEntities())
+            {
+                const Building *base = e.AsBuilding();
+                if (!base || !base->alive || base->state == ActionState::Die || base->owner != m_player
+                    || base->type != UnitType::Headquarters || base->buildProgress < 1.0f)
+                    continue;
+                found = FindCoreSite(
+                    x,
+                    y,
+                    w,
+                    h,
+                    ox,
+                    oy,
+                    false,
+                    0,
+                    map,
+                    entities,
+                    3,
+                    needsExit,
+                    base->tileX + base->buildWidth / 2,
+                    base->tileY + base->buildHeight / 2,
+                    &failure);
+                if (found)
+                    break;
+            }
+
         if (!found)
         {
             ThinkOnce(
-                "core" + std::to_string(kind), "BUILD", std::string(want.why) + " (no room that keeps the base open)");
+                "core" + std::to_string(kind),
+                "BUILD",
+                std::string(want.why) + " (placement rejected: " + failure + ")");
             continue;
         }
         AIDefenseSite site;

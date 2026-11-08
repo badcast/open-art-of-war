@@ -61,7 +61,6 @@ class Application
 public:
     static constexpr int kGlowDivisor = 4; // the glow is worked out at a quarter of the view size
 
-
     Application();
     ~Application();
 

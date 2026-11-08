@@ -31,7 +31,11 @@ constexpr std::uint32_t kJoinTimeoutMs = 15000;
 } // namespace
 
 HostAnnouncer::HostAnnouncer(
-    const std::string &master, std::uint16_t masterPort, Transport &gameSocket, std::uint16_t gamePort, const std::string &lanIp)
+    const std::string &master,
+    std::uint16_t masterPort,
+    Transport &gameSocket,
+    std::uint16_t gamePort,
+    const std::string &lanIp)
     : m_master(master, masterPort)
     , m_socket(gameSocket)
     , m_host(master)

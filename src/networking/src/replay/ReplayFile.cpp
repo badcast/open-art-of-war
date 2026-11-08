@@ -123,8 +123,7 @@ bool writeReplay(const std::string &path, const ReplayData &data, std::string &e
     // Apply the reader's limits before touching the destination. Otherwise a
     // successful recording can produce a replay we cannot open ourselves.
     std::size_t total = 0;
-    auto account = [&](std::size_t size)
-    {
+    auto account = [&](std::size_t size) {
         if (size > kMaxReplayEntryBytes || size > kMaxReplayTotalBytes - total)
             return false;
         total += size;

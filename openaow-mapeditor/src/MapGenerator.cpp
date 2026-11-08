@@ -1337,9 +1337,9 @@ private:
     std::vector<FPoint> m_roadPoints;
     std::vector<std::uint8_t> m_reserved; // kept free: bases, roads, clearings
     std::vector<std::uint8_t> m_island;   // impassable island
-    std::vector<int> m_depth;        // distance of an island tile from the open ground (0 = open)
+    std::vector<int> m_depth;             // distance of an island tile from the open ground (0 = open)
     std::vector<std::uint8_t> m_cover;    // covered by a decoration footprint
-    int m_decorArea {0};             // sum of the footprint areas
+    int m_decorArea {0};                  // sum of the footprint areas
     int m_decorCount {0};
     int m_rockCount {0};        // rocks and stones among the decorations
     std::vector<char> m_corner; // ground material of the (w+1) x (h+1) tile corners

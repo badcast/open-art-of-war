@@ -4,6 +4,7 @@
 #include "core/LoaderResources.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <set>
@@ -15,6 +16,21 @@ namespace
 {
 constexpr const char *kMetaPrefix = "sprite_";
 constexpr const char *kMetaSuffix = "_meta.yaml";
+
+// Width and height from the IHDR chunk of a PNG
+bool PngSize(const std::string &path, int &w, int &h)
+{
+    std::vector<std::uint8_t> bytes;
+    if (!Assets::ReadBytes(path, bytes) || bytes.size() < 24 || bytes[1] != 'P' || bytes[2] != 'N' || bytes[3] != 'G'
+        || bytes[12] != 'I' || bytes[13] != 'H' || bytes[14] != 'D' || bytes[15] != 'R')
+        return false;
+    auto be = [&](int at) {
+        return static_cast<int>((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]);
+    };
+    w = be(16);
+    h = be(20);
+    return w > 0 && h > 0;
+}
 
 bool EndsWith(const std::string &s, const std::string &suffix)
 {
@@ -43,20 +59,20 @@ const char *EntryKey(SpriteKind kind)
 {
     switch (kind)
     {
-    case SpriteKind::Frame:
-        return "frame";
-    case SpriteKind::Part:
-        return "part";
-    case SpriteKind::Anim:
-        return "anim";
-    case SpriteKind::Body:
-        return "body";
-    case SpriteKind::Sequence:
-        return "sequence";
-    case SpriteKind::Building:
-        return "building";
-    default:
-        return "";
+        case SpriteKind::Frame:
+            return "frame";
+        case SpriteKind::Part:
+            return "part";
+        case SpriteKind::Anim:
+            return "anim";
+        case SpriteKind::Body:
+            return "body";
+        case SpriteKind::Sequence:
+            return "sequence";
+        case SpriteKind::Building:
+            return "building";
+        default:
+            return "";
     }
 }
 
@@ -65,12 +81,12 @@ std::uint8_t IsCompCode(SpriteKind kind)
 {
     switch (kind)
     {
-    case SpriteKind::Part:
-        return 1;
-    case SpriteKind::Anim:
-        return 2;
-    default:
-        return 0;
+        case SpriteKind::Part:
+            return 1;
+        case SpriteKind::Anim:
+            return 2;
+        default:
+            return 0;
     }
 }
 
@@ -79,17 +95,17 @@ bool EntryAllowed(SpriteKind container, SpriteKind target)
 {
     switch (container)
     {
-    case SpriteKind::Part:
-        return target == SpriteKind::Frame || target == SpriteKind::Part;
-    case SpriteKind::Anim:
-        return target == SpriteKind::Frame || target == SpriteKind::Part;
-    case SpriteKind::Body:
-    case SpriteKind::Building:
-        return target == SpriteKind::Frame || target == SpriteKind::Part || target == SpriteKind::Anim;
-    case SpriteKind::Sequence:
-        return target == SpriteKind::Body;
-    default:
-        return false;
+        case SpriteKind::Part:
+            return target == SpriteKind::Frame || target == SpriteKind::Part;
+        case SpriteKind::Anim:
+            return target == SpriteKind::Frame || target == SpriteKind::Part;
+        case SpriteKind::Body:
+        case SpriteKind::Building:
+            return target == SpriteKind::Frame || target == SpriteKind::Part || target == SpriteKind::Anim;
+        case SpriteKind::Sequence:
+            return target == SpriteKind::Body;
+        default:
+            return false;
     }
 }
 
@@ -105,7 +121,8 @@ int ParseRecolor(const std::string &v)
     return -1;
 }
 
-template <typename T> T Narrow(int v, const std::string &where, std::vector<std::string> &errors)
+template <typename T>
+T Narrow(int v, const std::string &where, std::vector<std::string> &errors)
 {
     constexpr int lo = static_cast<int>(std::numeric_limits<T>::min());
     constexpr int hi = static_cast<int>(std::numeric_limits<T>::max());
@@ -122,20 +139,20 @@ const char *SpriteKindName(SpriteKind kind)
 {
     switch (kind)
     {
-    case SpriteKind::Frame:
-        return "frame";
-    case SpriteKind::Part:
-        return "part";
-    case SpriteKind::Anim:
-        return "anim";
-    case SpriteKind::Body:
-        return "body";
-    case SpriteKind::Sequence:
-        return "sequence";
-    case SpriteKind::Building:
-        return "building";
-    default:
-        return "none";
+        case SpriteKind::Frame:
+            return "frame";
+        case SpriteKind::Part:
+            return "part";
+        case SpriteKind::Anim:
+            return "anim";
+        case SpriteKind::Body:
+            return "body";
+        case SpriteKind::Sequence:
+            return "sequence";
+        case SpriteKind::Building:
+            return "building";
+        default:
+            return "none";
     }
 }
 
@@ -159,10 +176,9 @@ bool SpriteRegistry::LoadDirectory(const std::string &dir)
         const std::string file = path.substr(path.find_last_of('/') + 1);
         if (file.rfind(kMetaPrefix, 0) != 0 || !EndsWith(file, kMetaSuffix))
             continue;
-        const std::string name =
-            file.substr(std::char_traits<char>::length(kMetaPrefix),
-                        file.size() - std::char_traits<char>::length(kMetaPrefix) -
-                            std::char_traits<char>::length(kMetaSuffix));
+        const std::string name = file.substr(
+            std::char_traits<char>::length(kMetaPrefix),
+            file.size() - std::char_traits<char>::length(kMetaPrefix) - std::char_traits<char>::length(kMetaSuffix));
         std::string text;
         if (!Assets::ReadText(path, text))
         {
@@ -389,6 +405,34 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
             obj.families.push_back(std::move(fam));
         }
     }
+
+    // "image_size": the size of the image the rectangles were written for. An image scaled since (an HD redraw, x4)
+    // scales the rectangles with it; the drawn sizes stay
+    if (const YAML::Node declared = meta["image_size"])
+    {
+        int w = 0, h = 0;
+        if (!declared.IsSequence() || declared.size() != 2 || declared[0].as<float>(0) <= 0
+            || declared[1].as<float>(0) <= 0)
+            Error(where + ": image_size must be [w, h]");
+        else if (PngSize(obj.image.path, w, h))
+        {
+            const float kx = w / declared[0].as<float>(), ky = h / declared[1].as<float>();
+            if (std::fabs(kx - 1.0f) > 1e-6f || std::fabs(ky - 1.0f) > 1e-6f)
+                for (Item &item : obj.items)
+                {
+                    if (item.kind != SpriteKind::Frame)
+                        continue;
+                    if (item.size[0] < 0)
+                        item.size[0] = item.rect[2] / obj.image.scale;
+                    if (item.size[1] < 0)
+                        item.size[1] = item.rect[3] / obj.image.scale;
+                    item.rect[0] *= kx;
+                    item.rect[2] *= kx;
+                    item.rect[1] *= ky;
+                    item.rect[3] *= ky;
+                }
+        }
+    }
     m_objects.emplace(name, std::move(obj));
 }
 
@@ -464,26 +508,26 @@ int SpriteRegistry::Allocate(SpriteKind kind)
 {
     switch (kind)
     {
-    case SpriteKind::Frame:
-        m_tables.frames.emplace_back();
-        return static_cast<int>(m_tables.frames.size()) - 1;
-    case SpriteKind::Part:
-        m_tables.compositeRanges.emplace_back();
-        return static_cast<int>(m_tables.compositeRanges.size()) - 1;
-    case SpriteKind::Anim:
-        m_tables.animRanges.emplace_back();
-        return static_cast<int>(m_tables.animRanges.size()) - 1;
-    case SpriteKind::Body:
-        m_tables.bodyRanges.emplace_back();
-        return static_cast<int>(m_tables.bodyRanges.size()) - 1;
-    case SpriteKind::Sequence:
-        m_tables.sequenceRanges.emplace_back();
-        return static_cast<int>(m_tables.sequenceRanges.size()) - 1;
-    case SpriteKind::Building:
-        m_tables.buildings.emplace_back();
-        return static_cast<int>(m_tables.buildings.size()) - 1;
-    default:
-        return -1;
+        case SpriteKind::Frame:
+            m_tables.frames.emplace_back();
+            return static_cast<int>(m_tables.frames.size()) - 1;
+        case SpriteKind::Part:
+            m_tables.compositeRanges.emplace_back();
+            return static_cast<int>(m_tables.compositeRanges.size()) - 1;
+        case SpriteKind::Anim:
+            m_tables.animRanges.emplace_back();
+            return static_cast<int>(m_tables.animRanges.size()) - 1;
+        case SpriteKind::Body:
+            m_tables.bodyRanges.emplace_back();
+            return static_cast<int>(m_tables.bodyRanges.size()) - 1;
+        case SpriteKind::Sequence:
+            m_tables.sequenceRanges.emplace_back();
+            return static_cast<int>(m_tables.sequenceRanges.size()) - 1;
+        case SpriteKind::Building:
+            m_tables.buildings.emplace_back();
+            return static_cast<int>(m_tables.buildings.size()) - 1;
+        default:
+            return -1;
     }
 }
 
@@ -503,87 +547,101 @@ void SpriteRegistry::Emit(const std::string &object, const Item &item, int handl
 
     switch (item.kind)
     {
-    case SpriteKind::Frame:
-    {
-        const auto img = m_objects.find(object);
-        SpriteFrame &f = t.frames[handle];
-        const float scale = img != m_objects.end() ? img->second.image.scale : 1.0f;
-        f.id = handle;
-        f.page = img != m_objects.end() ? img->second.imageIndex : -1;
-        f.srcX = item.rect[0];
-        f.srcY = item.rect[1];
-        f.srcW = item.rect[2];
-        f.srcH = item.rect[3];
-        f.width = item.size[0] >= 0 ? item.size[0] : item.rect[2] / scale;
-        f.height = item.size[1] >= 0 ? item.size[1] : item.rect[3] / scale;
-        // In drawing units, as the sheet frames have them (pixels / pixels-per-unit of this frame)
-        const float sx = f.width > 0 ? item.rect[2] / f.width : scale;
-        const float sy = f.height > 0 ? item.rect[3] / f.height : scale;
-        f.x = sx > 0 ? item.rect[0] / sx : 0.0f;
-        f.y = sy > 0 ? item.rect[1] / sy : 0.0f;
-        f.palette = item.palette;
-        f.recolor = static_cast<std::uint8_t>(
-            item.recolor >= 0 ? item.recolor
-                              : (img != m_objects.end() ? static_cast<int>(img->second.image.recolor) : 0));
-        break;
-    }
-    case SpriteKind::Part:
-    {
-        const std::size_t before = t.compositeParts.size();
-        for (const Entry &e : item.entries)
-            t.compositeParts.push_back({childOf(e), Narrow<std::int16_t>(e.ox, where, m_errors),
-                                        Narrow<std::int16_t>(e.oy, where, m_errors), IsCompCode(e.kind)});
-        t.compositeRanges[handle] = range(before, t.compositeParts.size());
-        break;
-    }
-    case SpriteKind::Anim:
-    {
-        const std::size_t before = t.animFrames.size();
-        for (const Entry &e : item.entries)
-            t.animFrames.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
-                                    Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind)});
-        t.animRanges[handle] = range(before, t.animFrames.size());
-        break;
-    }
-    case SpriteKind::Body:
-    {
-        const std::size_t before = t.bodyLayers.size();
-        for (const Entry &e : item.entries)
-            t.bodyLayers.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
-                                    Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind),
-                                    Narrow<std::uint8_t>(e.flag, where, m_errors)});
-        t.bodyRanges[handle] = range(before, t.bodyLayers.size());
-        break;
-    }
-    case SpriteKind::Sequence:
-    {
-        const std::size_t before = t.sequenceSteps.size();
-        for (const Entry &e : item.entries)
-            t.sequenceSteps.push_back({childOf(e), Narrow<std::int8_t>(e.ox, where, m_errors),
-                                       Narrow<std::int8_t>(e.oy, where, m_errors)});
-        t.sequenceRanges[handle] = range(before, t.sequenceSteps.size());
-        break;
-    }
-    case SpriteKind::Building:
-    {
-        const std::size_t before = t.buildingParts.size();
-        for (const Entry &e : item.entries)
-            t.buildingParts.push_back({childOf(e), Narrow<std::int16_t>(e.ox, where, m_errors),
-                                       Narrow<std::int8_t>(e.oy, where, m_errors), IsCompCode(e.kind),
-                                       Narrow<std::uint8_t>(e.layer, where, m_errors),
-                                       Narrow<std::uint8_t>(e.state, where, m_errors)});
-        BuildingDef &b = t.buildings[handle];
-        const IndexRange r = range(before, t.buildingParts.size());
-        b.start = r.start;
-        b.end = r.end;
-        b.width = Narrow<std::uint8_t>(item.width, where, m_errors);
-        b.height = Narrow<std::uint8_t>(item.height, where, m_errors);
-        b.style = item.style;
-        b.tall = item.tall;
-        break;
-    }
-    default:
-        break;
+        case SpriteKind::Frame:
+        {
+            const auto img = m_objects.find(object);
+            SpriteFrame &f = t.frames[handle];
+            const float scale = img != m_objects.end() ? img->second.image.scale : 1.0f;
+            f.id = handle;
+            f.page = img != m_objects.end() ? img->second.imageIndex : -1;
+            f.srcX = item.rect[0];
+            f.srcY = item.rect[1];
+            f.srcW = item.rect[2];
+            f.srcH = item.rect[3];
+            f.width = item.size[0] >= 0 ? item.size[0] : item.rect[2] / scale;
+            f.height = item.size[1] >= 0 ? item.size[1] : item.rect[3] / scale;
+            // In drawing units, as the sheet frames have them (pixels / pixels-per-unit of this frame)
+            const float sx = f.width > 0 ? item.rect[2] / f.width : scale;
+            const float sy = f.height > 0 ? item.rect[3] / f.height : scale;
+            f.x = sx > 0 ? item.rect[0] / sx : 0.0f;
+            f.y = sy > 0 ? item.rect[1] / sy : 0.0f;
+            f.palette = item.palette;
+            f.recolor = static_cast<std::uint8_t>(
+                item.recolor >= 0 ? item.recolor
+                                  : (img != m_objects.end() ? static_cast<int>(img->second.image.recolor) : 0));
+            break;
+        }
+        case SpriteKind::Part:
+        {
+            const std::size_t before = t.compositeParts.size();
+            for (const Entry &e : item.entries)
+                t.compositeParts.push_back(
+                    {childOf(e),
+                     Narrow<std::int16_t>(e.ox, where, m_errors),
+                     Narrow<std::int16_t>(e.oy, where, m_errors),
+                     IsCompCode(e.kind)});
+            t.compositeRanges[handle] = range(before, t.compositeParts.size());
+            break;
+        }
+        case SpriteKind::Anim:
+        {
+            const std::size_t before = t.animFrames.size();
+            for (const Entry &e : item.entries)
+                t.animFrames.push_back(
+                    {childOf(e),
+                     Narrow<std::int8_t>(e.ox, where, m_errors),
+                     Narrow<std::int8_t>(e.oy, where, m_errors),
+                     IsCompCode(e.kind)});
+            t.animRanges[handle] = range(before, t.animFrames.size());
+            break;
+        }
+        case SpriteKind::Body:
+        {
+            const std::size_t before = t.bodyLayers.size();
+            for (const Entry &e : item.entries)
+                t.bodyLayers.push_back(
+                    {childOf(e),
+                     Narrow<std::int8_t>(e.ox, where, m_errors),
+                     Narrow<std::int8_t>(e.oy, where, m_errors),
+                     IsCompCode(e.kind),
+                     Narrow<std::uint8_t>(e.flag, where, m_errors)});
+            t.bodyRanges[handle] = range(before, t.bodyLayers.size());
+            break;
+        }
+        case SpriteKind::Sequence:
+        {
+            const std::size_t before = t.sequenceSteps.size();
+            for (const Entry &e : item.entries)
+                t.sequenceSteps.push_back(
+                    {childOf(e),
+                     Narrow<std::int8_t>(e.ox, where, m_errors),
+                     Narrow<std::int8_t>(e.oy, where, m_errors)});
+            t.sequenceRanges[handle] = range(before, t.sequenceSteps.size());
+            break;
+        }
+        case SpriteKind::Building:
+        {
+            const std::size_t before = t.buildingParts.size();
+            for (const Entry &e : item.entries)
+                t.buildingParts.push_back(
+                    {childOf(e),
+                     Narrow<std::int16_t>(e.ox, where, m_errors),
+                     Narrow<std::int8_t>(e.oy, where, m_errors),
+                     IsCompCode(e.kind),
+                     Narrow<std::uint8_t>(e.layer, where, m_errors),
+                     Narrow<std::uint8_t>(e.state, where, m_errors)});
+            BuildingDef &b = t.buildings[handle];
+            const IndexRange r = range(before, t.buildingParts.size());
+            b.start = r.start;
+            b.end = r.end;
+            b.width = Narrow<std::uint8_t>(item.width, where, m_errors);
+            b.height = Narrow<std::uint8_t>(item.height, where, m_errors);
+            b.style = item.style;
+            b.tall = item.tall;
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -624,8 +682,9 @@ bool SpriteRegistry::Compile()
                 const Item *item = LookupItem(name, m, fam.kind);
                 if (!item)
                 {
-                    Error("sprite '" + name + "' family '" + fam.name + "': no " + SpriteKindName(fam.kind) + " '" +
-                          m + "'");
+                    Error(
+                        "sprite '" + name + "' family '" + fam.name + "': no " + SpriteKindName(fam.kind) + " '" + m
+                        + "'");
                     item = nullptr;
                 }
                 const auto dot = m.find('.');
@@ -736,7 +795,8 @@ std::string SpriteRegistry::NameOf(SpriteRef ref) const
     // A family member: "<object>.<family>[i]"
     for (const auto &[name, obj] : m_objects)
         for (const FamilyDef &f : obj.families)
-            if (f.kind == ref.kind && ref.handle >= f.compiled.start && ref.handle < f.compiled.start + f.compiled.count)
+            if (f.kind == ref.kind && ref.handle >= f.compiled.start
+                && ref.handle < f.compiled.start + f.compiled.count)
                 return name + "." + f.name + "[" + std::to_string(ref.handle - f.compiled.start) + "]";
     return {};
 }
@@ -818,8 +878,7 @@ int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &con
     {
         if (g_reported.insert(context + "|" + v).second)
             std::cerr << "[SpriteRegistry] " << context << ": '" << v
-                      << "' is a number of the old sheet sprites; write the sprite name (<object>.<item>)"
-                      << std::endl;
+                      << "' is a number of the old sheet sprites; write the sprite name (<object>.<item>)" << std::endl;
         return -1;
     }
     return SpriteHandle(v, kind, context);

@@ -53,8 +53,8 @@ enum class DebugSpawnKind : std::uint8_t
 struct SimCommand
 {
     CommandType type {CommandType::Stop};
-    PlayerId player {0};       // who issues it (a network session sets it from the sender)
-    bool debug {false};        // debug mode: may command units of any faction
+    PlayerId player {0};            // who issues it (a network session sets it from the sender)
+    bool debug {false};             // debug mode: may command units of any faction
     std::vector<std::uint32_t> ids; // ascending, no duplicates
     std::int32_t x {0};
     std::int32_t y {0};

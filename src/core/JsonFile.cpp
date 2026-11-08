@@ -67,8 +67,7 @@ nlohmann::json ReadFromString(const std::string &text)
         }
     }
     catch (...)
-    {
-    }
+    {}
 
     return nlohmann::json::object();
 }

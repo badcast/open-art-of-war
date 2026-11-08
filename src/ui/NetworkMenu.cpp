@@ -125,7 +125,8 @@ std::vector<SeatOption> SeatOptions(const NetMatch &net, const Net::LobbyState &
             out.push_back({_("Occupy"), kSeatOccupy});
         out.push_back({_("Open"), kSeatOpen});
         for (int level = 0; level < 4; ++level)
-            out.push_back({std::string(_("AI")) + " - " + AiLevelName(static_cast<std::uint8_t>(level)), kSeatAi + level});
+            out.push_back(
+                {std::string(_("AI")) + " - " + AiLevelName(static_cast<std::uint8_t>(level)), kSeatAi + level});
         out.push_back({_("Blocked"), kSeatBlocked});
     }
     else if (free)
@@ -757,7 +758,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         seat.kind = code == kSeatOpen      ? Net::OwnerSetSeat::Open
                                     : code == kSeatBlocked ? Net::OwnerSetSeat::Blocked
                                                            : Net::OwnerSetSeat::Ai;
-                        seat.level = code >= kSeatAi && code < kSeatBlocked ? static_cast<std::uint8_t>(code - kSeatAi) : 1;
+                        seat.level
+                            = code >= kSeatAi && code < kSeatBlocked ? static_cast<std::uint8_t>(code - kSeatAi) : 1;
                         net.SetSeat(seat);
                     }
                 }

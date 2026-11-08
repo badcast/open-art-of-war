@@ -54,12 +54,7 @@ class MissionController
 public:
     MissionController();
 
-    bool LoadMission(
-        int missionId,
-        TileMap &map,
-        EntityManager &entities,
-        Economy &economy,
-        Pathfinder &pathfinder);
+    bool LoadMission(int missionId, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);
 
     // Custom game on any map of assets/maps: both sides get a starting base next to the open
     // ground nearest to their corner (or to the map's playerPos / enemyPos), the AI builds the rest.

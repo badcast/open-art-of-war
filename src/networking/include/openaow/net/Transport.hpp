@@ -17,10 +17,10 @@ using PeerId = std::uint32_t;
 // Link quality to one peer, for the network statistics overlay
 struct LinkStats
 {
-    std::uint32_t rttMs {0};      // smoothed round trip time
-    std::uint32_t jitterMs {0};   // round trip time variance
-    float packetLoss {0.0f}; // 0..1, recent
-    std::uint64_t bytesSent {0};  // totals of this socket
+    std::uint32_t rttMs {0};     // smoothed round trip time
+    std::uint32_t jitterMs {0};  // round trip time variance
+    float packetLoss {0.0f};     // 0..1, recent
+    std::uint64_t bytesSent {0}; // totals of this socket
     std::uint64_t bytesReceived {0};
     std::uint32_t packetsSent {0};
     std::uint32_t packetsLost {0};
@@ -73,7 +73,8 @@ public:
 
     // Raw datagrams through the same socket (NAT hole punching, telling a server the socket's public
     // address). They start with their own magic, ENet never sees them.
-    using RawHandler = std::function<void(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)>;
+    using RawHandler
+        = std::function<void(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)>;
     virtual void sendRaw(const std::string &ip, std::uint16_t port, const std::vector<std::uint8_t> &data)
     {
         (void) ip;
@@ -100,7 +101,8 @@ enum class RawKind : std::uint8_t
     Punch = 2
 };
 std::vector<std::uint8_t> encodeRaw(RawKind kind, const std::vector<std::uint8_t> &payload);
-bool decodeRaw(const std::uint8_t *data, std::size_t size, RawKind &kind, const std::uint8_t *&payload, std::size_t &payloadSize);
+bool decodeRaw(
+    const std::uint8_t *data, std::size_t size, RawKind &kind, const std::uint8_t *&payload, std::size_t &payloadSize);
 
 // UDP via ENet. A server listens on `port` (0: any free one, see boundPort); a client connects to
 // host:port and sees its single peer as PeerId 0. `error` gets the reason on failure.

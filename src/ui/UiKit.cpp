@@ -501,8 +501,8 @@ void DrawComboList(
         if (i >= n)
             break;
         const UiRect item {list.x + 2, list.y + 2 + row * kComboItemH, list.w - (n > visible ? 10 : 4), kComboItemH};
-        const bool off = disabled && static_cast<std::size_t>(i) < disabled->size() && (*disabled)[static_cast<std::size_t>(i)]
-                         && i != current;
+        const bool off = disabled && static_cast<std::size_t>(i) < disabled->size()
+                         && (*disabled)[static_cast<std::size_t>(i)] && i != current;
         const bool hot = item.Contains(mouseX, mouseY) && !off;
         if (hot)
             SoundRequests::MarkHover();

@@ -57,9 +57,10 @@ bool RoomServer::start(std::string &error)
     m_master = createEnetServer(m_config.port, m_config.maxMasterClients, &error, nullptr, m_config.bindAddress);
     if (!m_master)
         return false;
-    m_master->setRawHandler([this](const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size) {
-        handleRaw(ip, port, data, size);
-    });
+    m_master->setRawHandler(
+        [this](const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size) {
+            handleRaw(ip, port, data, size);
+        });
     return true;
 }
 
@@ -338,9 +339,10 @@ void RoomServer::update(std::uint32_t nowMs)
             m_rooms.end(),
             [&](const auto &room) {
                 const std::uint32_t idle = nowMs - room->lastOccupiedMs;
-                const std::uint32_t limit = !room->everOccupied ? m_config.unusedRoomTimeoutMs
-                                                           : (room->host->matchRunning() ? m_config.idleRoomTimeoutMs
-                                                                                         : m_config.emptyRoomTimeoutMs);
+                const std::uint32_t limit
+                    = !room->everOccupied
+                          ? m_config.unusedRoomTimeoutMs
+                          : (room->host->matchRunning() ? m_config.idleRoomTimeoutMs : m_config.emptyRoomTimeoutMs);
                 const bool close = idle > limit;
                 if (close)
                     m_log.push_back("room " + room->code + " closed (empty)");

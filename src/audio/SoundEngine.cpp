@@ -481,9 +481,8 @@ double SoundEngine::GetTrackPosition() const
     if (!m_initialized)
         return 0.0;
     SDL_LockMutex(m_lock);
-    const double pos = (!m_decoder || m_sampleRate <= 0)
-                           ? 0.0
-                           : static_cast<double>(m_currentSample - m_startSample) / m_sampleRate;
+    const double pos
+        = (!m_decoder || m_sampleRate <= 0) ? 0.0 : static_cast<double>(m_currentSample - m_startSample) / m_sampleRate;
     SDL_UnlockMutex(m_lock);
     return pos;
 }
@@ -493,9 +492,8 @@ double SoundEngine::GetTrackLength() const
     if (!m_initialized)
         return 0.0;
     SDL_LockMutex(m_lock);
-    const double len = (!m_decoder || m_sampleRate <= 0)
-                           ? 0.0
-                           : static_cast<double>(m_endSample - m_startSample) / m_sampleRate;
+    const double len
+        = (!m_decoder || m_sampleRate <= 0) ? 0.0 : static_cast<double>(m_endSample - m_startSample) / m_sampleRate;
     SDL_UnlockMutex(m_lock);
     return len;
 }

@@ -164,10 +164,8 @@ bool Application::StartReplay(int watchSlot)
     }
     ReloadGameData(); // the match plays with the data it was recorded with
     BeginMapLoading(TitleOf(setup.mapPath), setup.mapPath);
-    const bool loaded
-        = campaign ? m_mission->LoadMission(
-                         rinfo.mission, *m_map, *m_entities, *m_economy, *m_pathfinder)
-                   : m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder);
+    const bool loaded = campaign ? m_mission->LoadMission(rinfo.mission, *m_map, *m_entities, *m_economy, *m_pathfinder)
+                                 : m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder);
     if (!loaded)
     {
         EndMapLoading();

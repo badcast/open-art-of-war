@@ -208,8 +208,7 @@ bool CharacterEditor::SaveEnvironment()
             disk = YamlToOrderedJson(root);
     }
     catch (...)
-    {
-    }
+    {}
     Json merged = disk.is_object() ? MergeJsonEdits(envBase, envJson, disk) : envJson;
     YAML::Node outNode = OrderedJsonToYaml(merged);
     std::string error;

@@ -151,7 +151,7 @@ CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int s
     }
 
     std::uint32_t colorKey = (static_cast<std::uint32_t>(color.r) << 24) | (static_cast<std::uint32_t>(color.g) << 16)
-                        | (static_cast<std::uint32_t>(color.b) << 8) | (static_cast<std::uint32_t>(color.a));
+                             | (static_cast<std::uint32_t>(color.b) << 8) | (static_cast<std::uint32_t>(color.a));
     TextCacheKey key {text, scale, colorKey};
 
     auto it = m_cache.find(key);

@@ -269,6 +269,8 @@ void CharacterEditor::DrawEditor()
         DrawResearchProperties();
     else if (editorMode == EditorMode::SpriteTools)
         DrawSpriteProperties();
+    else if (editorMode == EditorMode::SpriteMerge)
+        DrawSpriteMergeProperties();
     else if (editorMode == EditorMode::Explosions)
         DrawExplosionProperties();
     else if (editorMode == EditorMode::Wrecks)
@@ -339,7 +341,8 @@ void CharacterEditor::DrawEditor()
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse
             | ImGuiWindowFlags_NoBringToFrontOnFocus);
     DrawPreviewControls();
-    if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools || editorMode == EditorMode::GameUi
+    if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
+        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::GameUi
         || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
     {
         previewRect = {0, 0, 0, 0};
@@ -351,6 +354,8 @@ void CharacterEditor::DrawEditor()
             DrawEnvironment();
         else if (editorMode == EditorMode::AiDifficulty)
             DrawAiDifficulty();
+        else if (editorMode == EditorMode::SpriteMerge)
+            DrawSpriteMerge();
         else
             DrawSpriteTools();
         ImGui::End();

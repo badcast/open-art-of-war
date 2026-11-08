@@ -1858,8 +1858,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
                     continue;
-                const std::uint32_t h = static_cast<std::uint32_t>(id) * 73856093u ^ static_cast<std::uint32_t>(x) * 19349663u
-                                   ^ static_cast<std::uint32_t>(y) * 83492791u;
+                const std::uint32_t h = static_cast<std::uint32_t>(id) * 73856093u
+                                        ^ static_cast<std::uint32_t>(x) * 19349663u
+                                        ^ static_cast<std::uint32_t>(y) * 83492791u;
                 if (((h >> 7) & 1u) == 0u)
                     continue; // this one is left alone
                 const int d = std::abs(x - tileX) + std::abs(y - tileY);

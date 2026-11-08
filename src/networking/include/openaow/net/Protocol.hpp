@@ -199,7 +199,8 @@ struct LobbyChoice
     std::uint8_t color {0};         // 0..15
     std::uint8_t spawn {kRandom};   // start position 0..7 or kRandom
     std::uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
-    std::uint8_t armyCap {7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
+    std::uint8_t armyCap {
+        7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
     bool ready {false};
 };
 
@@ -207,7 +208,7 @@ struct LobbySlot
 {
     std::uint8_t slot {0};
     LobbyChoice choice;
-    bool ai {false};     // a computer player (no connection; always ready)
+    bool ai {false};          // a computer player (no connection; always ready)
     std::uint8_t aiLevel {1}; // 0..3 (the game's difficulties)
 };
 
@@ -231,13 +232,13 @@ struct OwnerSetTeam
 
 struct LobbyState
 {
-    std::string map;        // the game's map path
+    std::string map;             // the game's map path
     std::uint64_t mapHash {0};   // of the map file: everybody must have exactly this one
     std::uint8_t spawnCount {2}; // start positions of the map
-    bool fogOfWar {true};   // match options, set by the room owner and shown to everybody
+    bool fogOfWar {true};        // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
     std::uint8_t credits {1}; // index into the game's list of starting credits (0..4)
-    bool night {false};  // time of day of the match (day / night)
+    bool night {false};       // time of day of the match (day / night)
     std::uint8_t blockedMask {
         0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
@@ -263,7 +264,7 @@ struct OwnerSetOptions
     bool fogOfWar {true};
     bool prebuilt {true};
     std::uint8_t credits {1}; // 0..4
-    bool night {false};  // time of day
+    bool night {false};       // time of day
 };
 
 struct OwnerSetMap

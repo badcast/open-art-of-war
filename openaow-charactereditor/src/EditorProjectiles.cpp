@@ -49,7 +49,6 @@ const ProjectileSprite kSpriteFamilies[] = {
 // Small craters of the game: the composites of the sprite fx_craters
 constexpr const char *kCraterObject = "fx_craters";
 
-
 } // namespace
 
 SDL_Texture *CharacterEditor::ZoomedThumbnail(int composite, float scale)

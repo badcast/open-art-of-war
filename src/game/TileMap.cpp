@@ -82,7 +82,8 @@ bool TileMap::LoadMap(const std::string &jsonPath)
                         if (spanCount > 1)
                         {
                             std::uint32_t hash
-                                = (static_cast<std::uint32_t>(curX) * 73856093u ^ static_cast<std::uint32_t>(curY) * 19349663u);
+                                = (static_cast<std::uint32_t>(curX) * 73856093u
+                                   ^ static_cast<std::uint32_t>(curY) * 19349663u);
                             int varIdx = static_cast<int>(hash % static_cast<std::uint32_t>(spanCount));
                             finalTile = eRanges[r][0] + varIdx;
                         }
@@ -277,7 +278,8 @@ void TileMap::InitBlankArena(int width, int height, int tilesetId)
     {
         for (int x = 0; x < MAX_MAP_SIZE; ++x)
         {
-            std::uint32_t hash = (static_cast<std::uint32_t>(x) * 73856093u ^ static_cast<std::uint32_t>(y) * 19349663u);
+            std::uint32_t hash
+                = (static_cast<std::uint32_t>(x) * 73856093u ^ static_cast<std::uint32_t>(y) * 19349663u);
             m_baseTiles[y][x] = static_cast<std::uint8_t>(hash % 10);
             m_decorGrid[y][x] = 0;
             m_wallGrid[y][x] = 0;
@@ -776,8 +778,8 @@ void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) c
             const int my = std::clamp(y0 + ty, 0, m_height - 1);
             const FogState fog = m_fog[my][mx];
             const std::uint8_t a = fog == FogState::Hidden     ? static_cast<std::uint8_t>(m_fogStyle.hiddenAlpha)
-                              : fog == FogState::Explored ? static_cast<std::uint8_t>(m_fogStyle.exploredAlpha)
-                                                          : 0;
+                                   : fog == FogState::Explored ? static_cast<std::uint8_t>(m_fogStyle.exploredAlpha)
+                                                               : 0;
             if (a == 0)
                 continue;
             for (int py = 0; py < s; ++py)

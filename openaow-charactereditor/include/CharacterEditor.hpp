@@ -17,8 +17,8 @@ namespace CharEditor
 struct SpriteFrameEdit
 {
     std::string name;
-    std::string original; // its name in the file; empty: added since the load
-    int rect[4] {0, 0, 1, 1}; // pixels in the image
+    std::string original;       // its name in the file; empty: added since the load
+    int rect[4] {0, 0, 1, 1};   // pixels in the image
     float size[2] {1.0f, 1.0f}; // drawn size in game units
     float ppu[2] {1.0f, 1.0f};  // pixels per game unit (the drawn size follows a resize at this ratio)
     bool ownSize {false};       // the file gives the size
@@ -34,6 +34,22 @@ enum class SpriteDrag
     Draw
 };
 
+// A frame on the Sprite Merge canvas: where it is in its object's image and where it goes in the result
+struct MergePiece
+{
+    std::string object;
+    std::string frame;
+    int src[4] {0, 0, 1, 1};
+    int x {0}, y {0};
+    bool selected {false};
+};
+
+enum class MergeDrag
+{
+    None,
+    Move,
+    Box
+};
 
 class CharacterEditor
 {
@@ -178,7 +194,6 @@ private:
     void DrawResearchTree();
     void DrawResearchProperties();
 
-
     // Sprite Tools tab: the per-object sprites (assets/sprites/sprite_<name>.png + _meta.yaml)
     fs::path SpriteDir() const;
     fs::path SpriteMetaPath(const std::string &object) const;
@@ -186,6 +201,8 @@ private:
     std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
     bool SaveSpriteObject();
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
+    // Resamples the image (and the Resistance image) by `factor`; the frames follow, the drawn sizes stay
+    bool ScaleSpriteImage(float factor, bool smooth);
     bool CreateSpriteObject(const fs::path &png, const std::string &name);
     std::string FreeFrameName(const std::string &prefix) const;
     void AddSpriteFrame(int x, int y, int w, int h, const std::string &prefix);
@@ -197,6 +214,26 @@ private:
     void DrawSpriteTools();
     void DrawSpriteProperties();
     void ClearThumbnails();
+
+    // Sprite Merge tab: several objects into one (frames rearranged freely, references rewritten, sources removed),
+    // or chosen frames baked into one picture (a new object)
+    struct MergeFrameInfo
+    {
+        std::string name;
+        int rect[4];
+    };
+    const std::vector<MergeFrameInfo> &MergeFramesOf(const std::string &object);
+    void MergeAddPieces(const std::string &object, const std::string &frame); // empty frame: all of them
+    void MergeRemovePieces(const std::string &object, const std::string &frame);
+    void MergeBounds(int &x0, int &y0, int &x1, int &y1) const;
+    std::vector<char> MergeOverlaps() const; // per piece: overlaps another one
+    void MergePack();
+    void MergeReset();
+    bool MergePrepare(); // checks, and the text of the confirmation
+    bool MergeObjectsSave();
+    bool BakeFramesSave();
+    void DrawSpriteMerge();
+    void DrawSpriteMergeProperties();
 
     // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
@@ -450,11 +487,15 @@ private:
     bool spriteDirty {false};
     float spriteZoom {2.0f};
     ImVec2 spritePan {16.0f, 16.0f};
+    // Camera reset of the sprite canvas, applied on the next draw (it needs the canvas size)
+    SpriteCamera spriteCameraPending {SpriteCamera::Fit};
     SpriteDrag spriteDrag {SpriteDrag::None};
     int spriteDragCorner {0};
     ImVec2 spriteDragStart {0.0f, 0.0f};
     int spriteDragRect[4] {0, 0, 0, 0};
     bool spriteDrawMode {false};
+    int spriteScaleFactor {4}; // x4
+    int spriteScaleSmooth {0}; // 0: pixels (nearest), 1: smooth
     int spriteGridCols {4}, spriteGridRows {1};
     bool spriteSkipEmpty {true};
     int spriteDetectGap {1};
@@ -463,6 +504,22 @@ private:
     std::array<char, 64> spriteNewName {};
     FolderPick spritePngPick;
     std::string spriteReport;
+    // Sprite Merge tab
+    bool mergeBake {false};                // false: merge objects, true: bake frames into one picture
+    std::vector<std::string> mergeObjects; // checked objects in the order they were checked (merge)
+    std::vector<MergePiece> mergePieces;   // the layout; drawn in this order
+    std::map<std::string, std::vector<MergeFrameInfo>> mergeFrameCache;
+    std::array<char, 128> mergeSearch {};
+    std::array<char, 64> mergeName {};
+    int mergePadding {1};
+    float mergeZoom {1.0f};
+    ImVec2 mergePan {16.0f, 16.0f};
+    SpriteCamera mergeCameraPending {SpriteCamera::Fit};
+    MergeDrag mergeDrag {MergeDrag::None};
+    ImVec2 mergeDragStart {0.0f, 0.0f};
+    std::vector<std::array<int, 2>> mergeDragFrom;
+    std::string mergeReport;
+    std::string mergeConfirmText;
     BattleSim battle;
     BattleSim::Setup battleSetup;
     bool battlePaused {false};

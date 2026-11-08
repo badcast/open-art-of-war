@@ -48,7 +48,8 @@ public:
         auto it = m_s->clientInbox.find(peer);
         if (it == m_s->clientInbox.end() || !m_s->clientConnected[peer])
             return;
-        it->second.push_back({TransportEvent::Type::Received, 0, channel, std::vector<std::uint8_t>(data, data + size)});
+        it->second.push_back(
+            {TransportEvent::Type::Received, 0, channel, std::vector<std::uint8_t>(data, data + size)});
     }
     void poll(std::vector<TransportEvent> &out) override
     {

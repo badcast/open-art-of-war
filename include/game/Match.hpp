@@ -17,18 +17,18 @@ constexpr int kDefaultCreditsIndex = 1;
 
 struct MatchSetup
 {
-    std::string mapPath;                              // assets/maps/<name>.json
+    std::string mapPath;                                   // assets/maps/<name>.json
     std::uint64_t mapHash {0};                             // of the map file everybody plays on
     std::uint32_t seed {0};                                // gameplay random numbers (Simulation::reset)
-    std::array<PlayerSlot, kMaxPlayers> slots {};     // active ones take part
+    std::array<PlayerSlot, kMaxPlayers> slots {};          // active ones take part
     std::array<std::int8_t, kMaxPlayers> startPosition {}; // index into the map's start positions per slot
-    PlayerId local {0};                               // this computer's slot
+    PlayerId local {0};                                    // this computer's slot
     int startingCredits {1500};
     bool fogOfWar {true};
-    bool localOnly {false}; // custom game on this computer (not sent anywhere): menus pause it, it can restart
-    bool prebuilt {true};   // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
-                            // (HQ + power only)
-    bool night {false};     // time of day: night (only drawn and heard, not part of the simulation)
+    bool localOnly {false};  // custom game on this computer (not sent anywhere): menus pause it, it can restart
+    bool prebuilt {true};    // prebuilt bases (the map's own, or HQ + power + barracks + 4 units); false = from scratch
+                             // (HQ + power only)
+    bool night {false};      // time of day: night (only drawn and heard, not part of the simulation)
     bool allowSpeed {false}; // custom game: allow game speed control (x0.5..x32), off by default
 };
 

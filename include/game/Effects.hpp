@@ -23,7 +23,7 @@ struct EffectsConfig
     EffectsConfig(); // the defaults
 
     // --- Explosions ---
-    float frameTime {0.065f};                        // seconds per frame of an explosion animation
+    float frameTime {0.065f};       // seconds per frame of an explosion animation
     std::vector<int> vehicleMain;   // blast of a dying vehicle, picked by the unit id
     std::vector<int> vehicleSecond; // the ammunition / fuel a moment later, picked by id + 2
     float vehicleSecondDelayMin {0.18f}, vehicleSecondDelayMax {0.3f};

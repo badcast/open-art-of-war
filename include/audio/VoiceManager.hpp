@@ -41,7 +41,7 @@ public:
     void Mix(std::int16_t *out, int frames);
     void StopAll();
 
-    void SetVolume(int volume); // 0..128
+    void SetVolume(int volume);        // 0..128
     void SetGeneralVolume(int volume); // 0..128: the general volume over the voices' own
     void SetMuted(bool muted);
     // The voices keep quiet (an interface that is silent: replies and the announcer)

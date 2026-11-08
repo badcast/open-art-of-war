@@ -305,7 +305,7 @@ struct BuildingBlueprint
 {
     int blueprintId {0};
     int buildingIndex {0}; // 0..7 Confederation / 8..14 Resistance buildings, 15 / 25 walls
-    int iconCompId {-1}; // cameo composite (sprite handle; production.icon_composite names it)
+    int iconCompId {-1};   // cameo composite (sprite handle; production.icon_composite names it)
     UnitType unitType {UnitType::Headquarters};
     std::string name;
     int width {3};
@@ -400,7 +400,7 @@ struct UnitConfig
     int parentArchetypeId {-1};
     bool hasRotatingTurret {false};
     std::string wreckType {"vehicle"}; // "infantry" or "vehicle"
-    int wreckComposite {-1}; // sprite handle of the first wreck stage (-1: the vehicle wreck of effects.yaml)
+    int wreckComposite {-1};           // sprite handle of the first wreck stage (-1: the vehicle wreck of effects.yaml)
     int wreckStages {5};
     // animations: block (timing of the pictures; the character editor's Animator edits it)
     float moveFrameTime {0.09f};   // seconds per walking frame
@@ -442,7 +442,7 @@ struct BuildingConfig
     float attackCooldown {1.0f};
     float attackCooldownMax {0.0f};
     int wreckComposite {-1}; // animations.wreck_composite (sprite); -1 = rubble by footprint size
-    int wreckStages {0};    // animations.wreck_stages; 0 = default (6)
+    int wreckStages {0};     // animations.wreck_stages; 0 = default (6)
     int splashPercent {0};
     ProjectileType projectile {ProjectileType::Bullet};
     float muzzleOffsetX {0.0f}; // localePosition X
@@ -501,7 +501,9 @@ public:
     const UnitConfig *GetUnitConfigByUnitType(UnitType type, Faction faction) const;
 
     // `player` builds there: within the radius of one of its headquarters, on ground it sees (people)
-    bool CanPlaceBuilding(int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const;
+    bool CanPlaceBuilding(
+        int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player, const char **reason = nullptr)
+        const;
     // The footprint would not shut the player's base in: from the headquarters and from the exits of the unit
     // producers the rest of the map stays reachable, and the new building keeps a free side of its own.
     // Checked for computer players (a human may wall himself in).

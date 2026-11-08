@@ -155,6 +155,10 @@ int CharacterEditor::run()
                     SaveResearch();
                 else if (editorMode == EditorMode::SpriteTools)
                     SaveSpriteObject();
+                else if (editorMode == EditorMode::SpriteMerge)
+                {
+                    // merging asks first: no Ctrl+S
+                }
                 else if (
                     editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
                     || editorMode == EditorMode::Projectiles || editorMode == EditorMode::GameUi

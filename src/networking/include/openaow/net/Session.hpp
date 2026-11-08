@@ -42,7 +42,7 @@ struct HostConfig
     std::uint8_t pausesPerPlayer {3};
     std::uint32_t maxPauseMs {120000};       // a pause ends by itself after this
     std::uint32_t reconnectWindowMs {60000}; // a player who dropped out of a running match is given up after this
-    std::string password;               // joining asks for it (empty: open)
+    std::string password;                    // joining asks for it (empty: open)
     // The data files of the simulation this host plays with (path, hash). A client whose data differ and that can
     // sync (Hello::canSync) is sent this list and may ask for the files; empty: such a client is turned away.
     std::vector<DataEntry> dataManifest;

@@ -108,8 +108,11 @@ EffectsConfig::EffectsConfig()
     auto anim = [](const char *name) {
         return SpriteHandle(name, SpriteKind::Anim, "effects defaults");
     };
-    const std::vector<int> blasts {anim("fx_explosions.blast_0"), anim("fx_explosions.blast_1"),
-                                   anim("fx_explosions.blast_2"), anim("fx_explosions.blast_3")};
+    const std::vector<int> blasts {
+        anim("fx_explosions.blast_0"),
+        anim("fx_explosions.blast_1"),
+        anim("fx_explosions.blast_2"),
+        anim("fx_explosions.blast_3")};
     vehicleMain = blasts;
     vehicleSecond = blasts;
     buildingExtraAnims = blasts;
@@ -152,12 +155,12 @@ void ExplosionCentering(int animId, float &outOx, float &outOy)
     };
     // The impacts of fx_impacts by group
     static const Centering kGroups[] = {
-        {"a48 a49 a50", -13.5f, 0.0f},                    // infantry bullet impact (blood / sparks)
+        {"a48 a49 a50", -13.5f, 0.0f},                          // infantry bullet impact (blood / sparks)
         {"sniper_0 sniper_1 sniper_2 sniper_3", -14.5f, -7.5f}, // bullet ricochets
         {"bullet_0 bullet_1 bullet_2 bullet_3", -16.0f, -6.0f}, // vehicle / armour bullet impact sparks
-        {"wall_destroyed", -16.0f, -8.0f},                // small bullet hit flash / wall hit
-        {"shell_0 shell_1 shell_2", -16.0f, 0.0f},        // cannon shell explosions
-        {"rocket_0 rocket_1 rocket_2", -16.0f, -2.0f},    // rocket explosions
+        {"wall_destroyed", -16.0f, -8.0f},                      // small bullet hit flash / wall hit
+        {"shell_0 shell_1 shell_2", -16.0f, 0.0f},              // cannon shell explosions
+        {"rocket_0 rocket_1 rocket_2", -16.0f, -2.0f},          // rocket explosions
     };
     static int generation = -1;
     static std::map<int, std::pair<float, float>> table;
@@ -165,23 +168,24 @@ void ExplosionCentering(int animId, float &outOx, float &outOy)
     {
         generation = SpritesGeneration();
         table = [] {
-        std::map<int, std::pair<float, float>> t;
-        for (const Centering &c : kGroups)
-        {
-            std::string names = c.names;
-            std::size_t pos = 0;
-            while (pos < names.size())
+            std::map<int, std::pair<float, float>> t;
+            for (const Centering &c : kGroups)
             {
-                std::size_t end = names.find(' ', pos);
-                if (end == std::string::npos)
-                    end = names.size();
-                const int h = SpriteHandle("fx_impacts." + names.substr(pos, end - pos), SpriteKind::Anim, "centering");
-                if (h >= 0)
-                    t.emplace(h, std::make_pair(c.ox, c.oy));
-                pos = end + 1;
+                std::string names = c.names;
+                std::size_t pos = 0;
+                while (pos < names.size())
+                {
+                    std::size_t end = names.find(' ', pos);
+                    if (end == std::string::npos)
+                        end = names.size();
+                    const int h
+                        = SpriteHandle("fx_impacts." + names.substr(pos, end - pos), SpriteKind::Anim, "centering");
+                    if (h >= 0)
+                        t.emplace(h, std::make_pair(c.ox, c.oy));
+                    pos = end + 1;
+                }
             }
-        }
-        return t;
+            return t;
         }();
     }
     const auto it = table.find(animId);

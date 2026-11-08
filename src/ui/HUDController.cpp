@@ -108,10 +108,10 @@ constexpr int kFirstStanceOrder = 4;
 
 const char *const kTabNames[HUDController::TabCount] = {"BUILD", "INFANTRY", "VEHICLES", "ORDERS"};
 // Tab icons per faction: HQ, rifleman, main tank, a research cameo; Orders draws a crosshair
-const char *const kResistanceTabIcons[HUDController::TabCount] = {
-    "icons_res.headquarters", "icons_res.rifleman", "icons_res.assault_tank", ""};
-const char *const kConfederationTabIcons[HUDController::TabCount] = {
-    "icons_conf.command_center", "icons_conf.rifleman", "icons_conf.hammer", ""};
+const char *const kResistanceTabIcons[HUDController::TabCount]
+    = {"icons_res.headquarters", "icons_res.rifleman", "icons_res.assault_tank", ""};
+const char *const kConfederationTabIcons[HUDController::TabCount]
+    = {"icons_conf.command_center", "icons_conf.rifleman", "icons_conf.hammer", ""};
 
 int TabIcon(int tab)
 {
@@ -1686,7 +1686,15 @@ void HUDController::RenderGameHud(
                     bool available = (inf ? hasBarracks : hasFactory) && unlocked;
                     int cost = UnitCost(def, entities);
                     std::string name = _(UnitName(def, entities));
-                    DrawCameo(renderer, fontRenderer, c, SpriteHandle(def.icon, SpriteKind::Part, "unit cameo"), name, hovered, false, !available);
+                    DrawCameo(
+                        renderer,
+                        fontRenderer,
+                        c,
+                        SpriteHandle(def.icon, SpriteKind::Part, "unit cameo"),
+                        name,
+                        hovered,
+                        false,
+                        !available);
 
                     int queued = 0;
                     float progress = -1.0f; // most advanced order of this unit currently in training

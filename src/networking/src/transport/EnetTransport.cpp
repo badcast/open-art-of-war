@@ -350,7 +350,8 @@ std::vector<std::uint8_t> encodeRaw(RawKind kind, const std::vector<std::uint8_t
     return out;
 }
 
-bool decodeRaw(const std::uint8_t *data, std::size_t size, RawKind &kind, const std::uint8_t *&payload, std::size_t &payloadSize)
+bool decodeRaw(
+    const std::uint8_t *data, std::size_t size, RawKind &kind, const std::uint8_t *&payload, std::size_t &payloadSize)
 {
     if (size < 9 || std::memcmp(data, kRawMagic, 8) != 0)
         return false;

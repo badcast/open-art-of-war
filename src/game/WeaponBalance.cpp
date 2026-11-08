@@ -83,7 +83,8 @@ bool LoadText(const std::string &jsonText)
                 if (!row.contains(kClassKeys[c]) || !row[kClassKeys[c]].is_number())
                     continue;
                 const double m = std::clamp(row[kClassKeys[c]].get<double>(), 0.0, 10.0);
-                t[static_cast<std::size_t>(kind)][static_cast<std::size_t>(c)] = static_cast<int>(std::lround(m * 100.0));
+                t[static_cast<std::size_t>(kind)][static_cast<std::size_t>(c)]
+                    = static_cast<int>(std::lround(m * 100.0));
             }
         }
     }

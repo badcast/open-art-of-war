@@ -141,8 +141,9 @@ struct AIBaseStyle
 
 class AIController
 {
-public:
+    friend struct AIBaseLayoutTest;
 
+public:
     AIController();
     ~AIController() = default;
 
@@ -347,13 +348,12 @@ private:
     bool UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, bool full = true);
     // --- Base layout (AIBaseLayout.cpp) ---
     // Roads between all headquarters of the map (kept free of buildings) and the ground of this player (nearer to
-    // its headquarters than to an ally's): worked out once, when the base is planned
+    // its headquarters than to an ally's): refreshed when finished headquarters change
     void PlanTerritory(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
     bool IsRoad(int x, int y) const;     // a road or the band along it
     bool IsRoadCore(int x, int y) const; // the road itself (where the gates go)
     bool IsOwnGround(int x, int y) const;
-    // Would a structure on (x, y, w, h) still leave the headquarters, the barracks and the factories a way out (two
-    // tiles wide) to the roads leading away from the base?
+    // Preserve connected free space for one- and two-tile units and existing production exits.
     // `needsExit`: the structure placed there trains troops or is a headquarters: its own sides must lead out too
     bool KeepsWayOut(
         int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit = false) const;
@@ -370,8 +370,11 @@ private:
         int minRing,
         const TileMap &map,
         const EntityManager &entities,
-        int crowding = 0, // 0: a gap around it, 1: side by side, 2: also on the band along a road
-        bool needsExit = false) const;
+        int crowding = 0, // 0: spaced, 1: adjacent, 2: road band, 3: exhaustive fallback
+        bool needsExit = false,
+        int centreX = -1,
+        int centreY = -1,
+        std::string *failure = nullptr) const;
     // Walls across the narrowest passage on each road to an enemy, gates on the road, towers behind them; true
     // when at least one passage was closed (else the caller falls back to an arc in front of the base)
     bool PlanPassageWalls(
@@ -487,6 +490,7 @@ private:
     std::uint32_t m_seed {0};
     AIBaseStyle m_style;
     bool m_territoryReady {false};
+    std::vector<int> m_territoryHeadquarters;
     int m_terrW {0}, m_terrH {0};
     std::vector<std::uint8_t> m_road;      // 2: a road between two headquarters, 1: the band along it, 0: free
     std::vector<std::uint8_t> m_ownGround; // 1: nearer to this player's headquarters than to any ally's

@@ -134,9 +134,9 @@ private:
 
     SDL_AudioStream *m_stream {nullptr};
     SfxMixer m_sfx;
-    VoiceManager m_voices; // unit replies and the announcer, mixed into the same stream
+    VoiceManager m_voices;                  // unit replies and the announcer, mixed into the same stream
     SDL_AudioStream *m_sfxStream {nullptr}; // the effects: stereo 44.1 kHz from m_sfx
-    std::vector<std::int16_t> m_sfxBuffer;       // audio thread only
+    std::vector<std::int16_t> m_sfxBuffer;  // audio thread only
     int m_voiceVolume {128};
     // The ambient loop: its decoder is only touched by its stream's callback while the stream exists
     SDL_AudioStream *m_ambientStream {nullptr};

@@ -52,7 +52,8 @@ void Renderer::DrawAlphaMaskWorld(
         SDL_SetTextureBlendMode(m_maskTexture, SDL_BLENDMODE_BLEND);
     }
     SDL_SetTextureScaleMode(m_maskTexture, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
-    const std::uint32_t rgb = (static_cast<std::uint32_t>(color.r) << 16) | (static_cast<std::uint32_t>(color.g) << 8) | color.b;
+    const std::uint32_t rgb
+        = (static_cast<std::uint32_t>(color.r) << 16) | (static_cast<std::uint32_t>(color.g) << 8) | color.b;
     m_maskPixels.resize(static_cast<std::size_t>(w) * h);
     for (std::size_t i = 0; i < m_maskPixels.size(); ++i)
         m_maskPixels[i] = (static_cast<std::uint32_t>(alpha[i]) << 24) | rgb;
@@ -763,10 +764,12 @@ void Renderer::DrawUnitWorld(
             int deathSeq = customDeathSeq;
             if (deathSeq < 0)
             {
-                static const CachedSprite bullet[2] = {{"fx_infantry_death.death_0", SpriteKind::Sequence},
-                                                       {"fx_infantry_death.death_1", SpriteKind::Sequence}};
-                static const CachedSprite flame[2] = {{"fx_infantry_death.flame_0", SpriteKind::Sequence},
-                                                      {"fx_infantry_death.flame_1", SpriteKind::Sequence}};
+                static const CachedSprite bullet[2]
+                    = {{"fx_infantry_death.death_0", SpriteKind::Sequence},
+                       {"fx_infantry_death.death_1", SpriteKind::Sequence}};
+                static const CachedSprite flame[2]
+                    = {{"fx_infantry_death.flame_0", SpriteKind::Sequence},
+                       {"fx_infantry_death.flame_1", SpriteKind::Sequence}};
                 deathSeq = (isFlaming ? flame : bullet)[(unitTypeId % 2 + 2) % 2];
             }
             IndexRange r = m_texManager->GetUnitSequenceRange(deathSeq);
@@ -807,7 +810,7 @@ void Renderer::DrawUnitWorld(
     int baseSeq = m_texManager->GetUnitBaseSeq(unitTypeId, actionState);
     // A family of 8 is drawn by facing; a single sequence (a deployed siege hull) always faces the same way
     int baseCount = actionState == static_cast<int>(ActionState::Move) && visual->move >= 0 ? visual->moveCount
-                                                                                           : visual->idleCount;
+                                                                                            : visual->idleCount;
     // Infantry with a firing pose (riflemen, heavy assault, grenadiers) switch to it; the flamethrower fires from
     // its standing sequences (its firing layer is the flame)
     if (actionState == static_cast<int>(ActionState::Attack) && visual->attack >= 0)
@@ -1147,12 +1150,11 @@ void Renderer::DrawRawSpriteScreen(int spriteId, int screenX, int screenY, float
     int page = faction == Faction::Resistance ? m_texManager->ResistancePage(frame->page) : frame->page;
 
     // An owner set (HUD icons of the player): the army colour as in the world; otherwise the plain image
-    SDL_Texture *sheet = m_drawOwner < kMaxPlayers ? BindSheet(page, faction, frame->recolor)
-                                                   : m_texManager->GetSpriteSheet(page);
+    SDL_Texture *sheet
+        = m_drawOwner < kMaxPlayers ? BindSheet(page, faction, frame->recolor) : m_texManager->GetSpriteSheet(page);
     if (!sheet)
         return;
-    if (m_drawOwner >= kMaxPlayers && page >= 0 && page < static_cast<int>(m_tintedSheet.size())
-        && m_tintedSheet[page])
+    if (m_drawOwner >= kMaxPlayers && page >= 0 && page < static_cast<int>(m_tintedSheet.size()) && m_tintedSheet[page])
     {
         SDL_SetTextureColorMod(sheet, 255, 255, 255);
         m_tintedSheet[page] = false;

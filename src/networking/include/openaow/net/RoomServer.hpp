@@ -19,7 +19,7 @@ namespace OpenArtOfWar::Net
 
 struct RoomServerConfig
 {
-    std::string bindAddress;      // empty: every interface
+    std::string bindAddress;           // empty: every interface
     std::uint16_t port {kDefaultPort}; // master port
     std::uint16_t roomPortFirst {38110};
     std::uint16_t roomPortLast {38199};
@@ -31,7 +31,7 @@ struct RoomServerConfig
     std::uint8_t inputDelayMax {6};
     std::uint32_t idleRoomTimeoutMs {
         120000}; // a room with a running match that nobody is in closes after this (time to reconnect)
-    std::uint32_t emptyRoomTimeoutMs {30000};   // a room that is only a lobby closes this long after the last player left
+    std::uint32_t emptyRoomTimeoutMs {30000}; // a room that is only a lobby closes this long after the last player left
     std::uint32_t unusedRoomTimeoutMs {120000}; // ... and one nobody ever entered after this
     std::string name {"OpenAOW server"};
     std::string motd;

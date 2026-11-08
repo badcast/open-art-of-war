@@ -36,6 +36,30 @@ inline bool Hinted(bool result, const char *key)
     return result;
 }
 
+// Camera of a sprite canvas (Sprite Tools, Sprite Merge). A reset waits for the next draw: it needs the canvas size
+enum class SpriteCamera
+{
+    None,
+    Fit,    // the whole content
+    Actual, // 1:1
+    Frame   // the focused rectangle
+};
+
+// Camera of a canvas drawn at `origin` / `avail` (an invisible button over it gave hovered / active / the double middle
+// click): the Fit / 1:1 / Frame buttons in its top right corner, Home / F, wheel zoom about the cursor, panning with
+// the right / middle button. `content` and `focus` (nullptr: none) are x, y, w, h in image pixels.
+void SpriteCanvasCamera(
+    const ImVec2 &origin,
+    const ImVec2 &avail,
+    bool hovered,
+    bool active,
+    bool middleDoubleClick,
+    const float content[4],
+    const float *focus,
+    float &zoom,
+    ImVec2 &pan,
+    SpriteCamera &pending);
+
 // Result of the folder dialog (SDL calls back on its own thread)
 struct FolderPick
 {
@@ -86,7 +110,7 @@ struct FamilyRef
     int start {-1};
     int count {0};
 };
-FamilyRef SpriteFamilyRef(const std::string &ref);           // a family by name; {-1, 0} unknown
+FamilyRef SpriteFamilyRef(const std::string &ref);                           // a family by name; {-1, 0} unknown
 int SpriteRefHandle(const YAML::Node &value, OpenArtOfWar::SpriteKind kind); // -1: none / unknown
 std::vector<int> SpriteRefHandles(const YAML::Node &list, OpenArtOfWar::SpriteKind kind);
 // The name to write for a handle: the family for the first member of a family ("<object>.<family>")
@@ -209,7 +233,8 @@ enum class EditorMode
     Environment,  // fog, construction, network, overlay and font (assets/data/game_environment.json)
     AiDifficulty, // AI levels (assets/characters/difficulty.yaml)
     Animator,     // timing of the pictures of the selected character: pose, muzzle flash, burst
-    SpriteTools   // sprite browser and exports for repacking the assets
+    SpriteTools,  // sprite browser and exports for repacking the assets
+    SpriteMerge   // several sprite objects into one, or frames baked into one picture
 };
 
 } // namespace CharEditor

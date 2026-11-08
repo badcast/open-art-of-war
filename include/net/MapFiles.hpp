@@ -23,7 +23,8 @@ std::string Resolve(const std::string &path, std::uint64_t hash);
 std::vector<std::uint8_t> Packed(const std::string &path);
 // A received file, unpacked and checked against `hash` and `maxBytes` (what it claims to be, never more); false when
 // anything is wrong
-bool Unpack(const std::vector<std::uint8_t> &packed, std::uint64_t hash, std::vector<std::uint8_t> &raw, std::size_t maxBytes);
+bool Unpack(
+    const std::vector<std::uint8_t> &packed, std::uint64_t hash, std::vector<std::uint8_t> &raw, std::size_t maxBytes);
 // A received file: unpacked, checked against `hash` and against being a map at all, stored.
 // Returns the stored path, empty when anything is wrong.
 std::string Store(const std::string &path, std::uint64_t hash, const std::vector<std::uint8_t> &packedBytes);

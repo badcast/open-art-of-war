@@ -38,7 +38,6 @@ class EnvironmentConfig;
 
 class GameplayController
 {
-
 public:
     GameplayController() = default;
 

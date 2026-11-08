@@ -111,8 +111,6 @@ SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
     return texture;
 }
 
-
-
 bool TextureManager::LoadAllAssets()
 {
     std::cout << "[TextureManager] Loading game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
@@ -240,7 +238,10 @@ void TextureManager::LoadSpriteBindings()
     m_buildingSprites.assign(64, -1);
 
     // A unit archetype: the families "<set>idle" / "attack" / "move" / "die" / "transform" of its object
-    auto bindUnit = [&](int arch, const std::string &object, const std::string &set, const std::string &icon,
+    auto bindUnit = [&](int arch,
+                        const std::string &object,
+                        const std::string &set,
+                        const std::string &icon,
                         const std::string &file) {
         if (arch < 0 || arch >= static_cast<int>(m_unitVisuals.size()) || object.empty())
             return;
@@ -257,8 +258,8 @@ void TextureManager::LoadSpriteBindings()
         v.die = FamilyOf(object, pre + "die").first;
         v.transform = FamilyOf(object, pre + "transform").first;
         if (v.idle < 0)
-            std::cerr << "[TextureManager] " << file << ": sprite '" << object << "' has no family '" << pre
-                      << "idle'" << std::endl;
+            std::cerr << "[TextureManager] " << file << ": sprite '" << object << "' has no family '" << pre << "idle'"
+                      << std::endl;
         v.icon = icon.empty() ? m_unitVisuals[arch].icon : SpriteHandle(icon, SpriteKind::Part, file);
         m_unitVisuals[arch] = v;
     };
@@ -267,8 +268,8 @@ void TextureManager::LoadSpriteBindings()
         if (type < 0 || ref.empty())
             return;
         const auto dot = ref.find('.');
-        const SpriteFamily *fam =
-            dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+        const SpriteFamily *fam
+            = dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
         if (fam && fam->kind == SpriteKind::Building)
         {
             for (int i = 0; i < fam->count && type + i < static_cast<int>(m_buildingSprites.size()); ++i)
@@ -301,7 +302,8 @@ void TextureManager::LoadSpriteBindings()
             const int arch = doc["archetype_id"].as<int>(-1);
             const std::string icon = Scalar(doc["production"], "icon_composite");
             bindUnit(arch, sprite, Scalar(doc, "sprite_set"), icon, path);
-            // Other forms of the unit (siege mode, the baseline before an upgrade): "<form>: {archetype_id, sprite_set}"
+            // Other forms of the unit (siege mode, the baseline before an upgrade): "<form>: {archetype_id,
+            // sprite_set}"
             std::vector<YAML::Node> nodes {doc};
             if (doc["abilities"] && doc["abilities"].IsMap())
                 for (const auto &kv : doc["abilities"])
@@ -311,11 +313,15 @@ void TextureManager::LoadSpriteBindings()
                 if (!n.IsMap())
                     continue;
                 if (&n != &nodes.front() && n["archetype_id"] && n["sprite_set"])
-                    bindUnit(n["archetype_id"].as<int>(-1), Scalar(n, "sprite").empty() ? sprite : Scalar(n, "sprite"),
-                             Scalar(n, "sprite_set"), {}, path);
+                    bindUnit(
+                        n["archetype_id"].as<int>(-1),
+                        Scalar(n, "sprite").empty() ? sprite : Scalar(n, "sprite"),
+                        Scalar(n, "sprite_set"),
+                        {},
+                        path);
                 if (n["baseline_archetype_id"] && n["baseline_sprite_set"])
-                    bindUnit(n["baseline_archetype_id"].as<int>(-1), sprite, Scalar(n, "baseline_sprite_set"), {},
-                             path);
+                    bindUnit(
+                        n["baseline_archetype_id"].as<int>(-1), sprite, Scalar(n, "baseline_sprite_set"), {}, path);
             }
         }
         else if (doc["building_index"])
@@ -439,9 +445,9 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
         return nullptr;
 
     const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(page)) << 32)
-                         | (static_cast<std::uint64_t>(static_cast<std::uint8_t>(team)) << 24)
-                         | (static_cast<std::uint64_t>(color.r) << 16) | (static_cast<std::uint64_t>(color.g) << 8)
-                         | static_cast<std::uint64_t>(color.b);
+                              | (static_cast<std::uint64_t>(static_cast<std::uint8_t>(team)) << 24)
+                              | (static_cast<std::uint64_t>(color.r) << 16) | (static_cast<std::uint64_t>(color.g) << 8)
+                              | static_cast<std::uint64_t>(color.b);
     auto it = m_recoloredSheets.find(key);
     if (it != m_recoloredSheets.end())
         return it->second;
@@ -518,8 +524,6 @@ SDL_Texture *TextureManager::GetSpriteSheet(int page) const
     }
     return nullptr;
 }
-
-
 
 SDL_Texture *TextureManager::GetTileset(int index) const
 {

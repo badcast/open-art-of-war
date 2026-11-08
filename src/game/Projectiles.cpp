@@ -122,7 +122,6 @@ void Read(const YAML::Node &n, const char *key, T &out)
     {}
 }
 
-
 } // namespace
 
 int ProjectileSpec::PickImpact(int seed) const
@@ -184,12 +183,14 @@ bool LoadText(const std::string &yamlText)
                 // "<object>.<family of directions>" (or "none")
                 const std::string ref = n["sprite"].as<std::string>("");
                 const auto dot = ref.find('.');
-                const SpriteFamily *f =
-                    dot == std::string::npos ? nullptr : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
-                s.sprite = f ? f->start
-                             : (ref.empty() || ref == "none" ? -1
-                                                             : SpriteHandle(n["sprite"], SpriteKind::Part,
-                                                                            std::string("projectiles.yaml ") + s.key));
+                const SpriteFamily *f = dot == std::string::npos
+                                            ? nullptr
+                                            : Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
+                s.sprite
+                    = f ? f->start
+                        : (ref.empty() || ref == "none"
+                               ? -1
+                               : SpriteHandle(n["sprite"], SpriteKind::Part, std::string("projectiles.yaml ") + s.key));
             }
             Read(n, "directions", s.directions);
             s.directions = s.directions <= 16 ? 16 : 32;

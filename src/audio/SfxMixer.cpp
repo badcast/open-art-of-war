@@ -450,8 +450,8 @@ void SfxMixer::Mix(std::int16_t *out, int frames)
     {
         const std::vector<std::int16_t> &clip = m_clips[static_cast<std::size_t>(v.clip)];
         // The category's volume, scaled by the general one (SetGeneralVolume)
-        const float vol = m_muted ? 0.0f
-                                  : m_generalVolume * (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
+        const float vol
+            = m_muted ? 0.0f : m_generalVolume * (v.voiceVolume ? m_voiceGain : (v.uiVolume ? m_uiGain : m_fxGain));
         const float gl = v.gainL * vol, gr = v.gainR * vol;
         const float send = m_reverbOn ? v.reverbSend * vol : 0.0f;
         const bool filtered = v.lpCoef < 1.0f;

@@ -1498,11 +1498,18 @@ int EntityManager::SpawnBuildingByIndex(
 }
 
 bool EntityManager::CanPlaceBuilding(
-    int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player) const
+    int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player, const char **reason) const
 {
+    auto reject = [&](const char *why) {
+        if (reason)
+            *reason = why;
+        return false;
+    };
+    if (reason)
+        *reason = nullptr;
     if (tileX < 0 || tileX + width > map.GetWidth() || tileY < 0 || tileY + height > map.GetHeight())
     {
-        return false;
+        return reject("bounds");
     }
 
     // 1. Fog of War check: building can only be placed on Visible tiles, NOT on Fog
@@ -1516,7 +1523,7 @@ bool EntityManager::CanPlaceBuilding(
             {
                 if (!map.IsVisibleTo(tx, ty, team))
                 {
-                    return false;
+                    return reject("visibility");
                 }
             }
         }
@@ -1548,7 +1555,7 @@ bool EntityManager::CanPlaceBuilding(
     }
     if (!inHQRange)
     {
-        return false;
+        return reject("HQ radius");
     }
 
     // 3. No construction under the enemy's nose: a visible enemy unit or building near the footprint blocks it
@@ -1570,7 +1577,7 @@ bool EntityManager::CanPlaceBuilding(
             if (std::max(gapX, gapY) > block)
                 continue;
             if (IsEntityVisibleToPlayer(e, player, map))
-                return false;
+                return reject("nearby enemy");
         }
     }
 
@@ -1579,9 +1586,9 @@ bool EntityManager::CanPlaceBuilding(
         for (int tx = tileX; tx < tileX + width; ++tx)
         {
             if (!map.IsPassable(tx, ty))
-                return false;
+                return reject("terrain");
             if (map.GetWall(tx, ty) > 0)
-                return false;
+                return reject("wall");
             for (const auto &e : m_entities)
             {
                 if (!e.alive || e.state == ActionState::Die)
@@ -1591,14 +1598,14 @@ bool EntityManager::CanPlaceBuilding(
                     if (tx >= b->tileX && tx < b->tileX + b->buildWidth && ty >= b->tileY
                         && ty < b->tileY + b->buildHeight)
                     {
-                        return false;
+                        return reject("building");
                     }
                 }
                 else
                 {
                     if (e.tileX == tx && e.tileY == ty)
                     {
-                        return false;
+                        return reject("unit");
                     }
                 }
             }

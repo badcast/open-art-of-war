@@ -99,6 +99,77 @@ fs::path CharacterEditor::SpriteMetaPath(const std::string &object) const
     return SpriteDir() / ("sprite_" + object + "_meta.yaml");
 }
 
+void SpriteCanvasCamera(
+    const ImVec2 &origin,
+    const ImVec2 &avail,
+    bool hovered,
+    bool active,
+    bool middleDoubleClick,
+    const float content[4],
+    const float *focus,
+    float &zoom,
+    ImVec2 &pan,
+    SpriteCamera &pending)
+{
+    const ImGuiIO &io = ImGui::GetIO();
+    // Buttons in the top right corner, Home / double middle click fit the content, F the focus
+    {
+        const float pad = ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float wFit = ImGui::CalcTextSize(_("Fit")).x + pad;
+        const float wOne = ImGui::CalcTextSize("1:1").x + pad;
+        const float wFrame = ImGui::CalcTextSize(_("Frame")).x + pad;
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        ImGui::SetCursorScreenPos(
+            ImVec2(origin.x + avail.x - (wFit + wOne + wFrame + 2.0f * spacing) - 6.0f, origin.y + 6.0f));
+        if (Hinted(ImGui::SmallButton(_("Fit")), "Fit"))
+            pending = SpriteCamera::Fit;
+        ImGui::SameLine();
+        if (Hinted(ImGui::SmallButton("1:1"), "1:1"))
+            pending = SpriteCamera::Actual;
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!focus);
+        if (Hinted(ImGui::SmallButton(_("Frame")), "Frame"))
+            pending = SpriteCamera::Frame;
+        ImGui::EndDisabled();
+        const bool keys = (hovered || ImGui::IsWindowFocused()) && !io.WantTextInput;
+        if (middleDoubleClick || (keys && ImGui::IsKeyPressed(ImGuiKey_Home, false)))
+            pending = SpriteCamera::Fit;
+        if (keys && focus && ImGui::IsKeyPressed(ImGuiKey_F, false))
+            pending = SpriteCamera::Frame;
+    }
+    if (pending != SpriteCamera::None)
+    {
+        // The status line at the bottom stays free
+        const float margin = 16.0f;
+        const float viewW = std::max(1.0f, avail.x - 2.0f * margin);
+        const float viewH = std::max(1.0f, avail.y - 2.0f * margin - ImGui::GetTextLineHeight());
+        const float *r = pending == SpriteCamera::Frame && focus ? focus : content;
+        const float rw = std::max(r[2], 1.0f), rh = std::max(r[3], 1.0f);
+        if (pending == SpriteCamera::Actual)
+            zoom = 1.0f;
+        else
+            zoom = std::clamp(std::min(viewW / rw, viewH / rh), 0.1f, pending == SpriteCamera::Frame ? 16.0f : 8.0f);
+        pan.x = margin + (viewW - rw * zoom) * 0.5f - r[0] * zoom;
+        pan.y = margin + (viewH - rh * zoom) * 0.5f - r[1] * zoom;
+        pending = SpriteCamera::None;
+    }
+    // Zoom about the cursor, pan with the right / middle button
+    if (hovered && io.MouseWheel != 0.0f)
+    {
+        const float mx = (io.MousePos.x - origin.x - pan.x) / zoom;
+        const float my = (io.MousePos.y - origin.y - pan.y) / zoom;
+        const float old = zoom;
+        zoom = std::clamp(zoom * (io.MouseWheel > 0 ? 1.25f : 0.8f), 0.1f, 32.0f);
+        pan.x -= mx * (zoom - old);
+        pan.y -= my * (zoom - old);
+    }
+    if (active && (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)))
+    {
+        pan.x += io.MouseDelta.x;
+        pan.y += io.MouseDelta.y;
+    }
+}
+
 void CharacterEditor::LoadSpriteObject(const std::string &object)
 {
     spriteObject = object;
@@ -106,11 +177,13 @@ void CharacterEditor::LoadSpriteObject(const std::string &object)
     spriteRemoved.clear();
     spriteFrameSel = -1;
     spriteDirty = false;
+    spriteCameraPending = SpriteCamera::Fit;
     spriteScale = 1.0f;
     spriteRecolor = 0;
     spriteImageW = spriteImageH = 0;
     if (object.empty())
         return;
+    float declaredW = 0.0f, declaredH = 0.0f; // "image_size": the image the rectangles are written for
     try
     {
         const YAML::Node meta = YAML::LoadFile(SpriteMetaPath(object).string());
@@ -120,6 +193,11 @@ void CharacterEditor::LoadSpriteObject(const std::string &object)
         const std::string rc = meta["recolor"] ? meta["recolor"].as<std::string>() : "none";
         spriteRecolor = rc == "blue" ? 1 : rc == "red" ? 2 : 0;
         spriteImageName = meta["image"] ? meta["image"].as<std::string>() : "sprite_" + object + ".png";
+        if (const YAML::Node d = meta["image_size"]; d && d.IsSequence() && d.size() == 2)
+        {
+            declaredW = d[0].as<float>(0.0f);
+            declaredH = d[1].as<float>(0.0f);
+        }
         if (const YAML::Node frames = meta["frames"])
         {
             for (const auto &kv : frames)
@@ -176,6 +254,30 @@ void CharacterEditor::LoadSpriteObject(const std::string &object)
         spriteImageH = s->h;
         SDL_DestroySurface(s);
     }
+    // The image was scaled since the rectangles were written: they follow it in pixels, the drawn sizes stay.
+    // Evenly scaled, the scale follows too; otherwise every frame keeps its size. Saving writes the image's pixels
+    if (declaredW > 0.0f && declaredH > 0.0f && spriteImageW > 0 && spriteImageH > 0
+        && (std::lround(declaredW) != spriteImageW || std::lround(declaredH) != spriteImageH))
+    {
+        const float kx = spriteImageW / declaredW, ky = spriteImageH / declaredH;
+        const bool even = std::fabs(kx - ky) < 1e-3f;
+        if (even)
+            spriteScale *= kx;
+        for (SpriteFrameEdit &f : spriteFrames)
+        {
+            f.rect[0] = static_cast<int>(std::lround(f.rect[0] * kx));
+            f.rect[1] = static_cast<int>(std::lround(f.rect[1] * ky));
+            f.rect[2] = std::max(1, static_cast<int>(std::lround(f.rect[2] * kx)));
+            f.rect[3] = std::max(1, static_cast<int>(std::lround(f.rect[3] * ky)));
+            f.ppu[0] *= kx;
+            f.ppu[1] *= ky;
+            if (!even)
+                f.ownSize = true;
+        }
+        spriteReport = _("The image is ") + std::to_string(spriteImageW) + "x" + std::to_string(spriteImageH)
+                       + _(", the frames were written for ") + std::to_string(std::lround(declaredW)) + "x"
+                       + std::to_string(std::lround(declaredH)) + _(": scaled with it (Save writes them so)");
+    }
 }
 
 std::string CharacterEditor::SpriteFrameLine(const SpriteFrameEdit &f) const
@@ -221,7 +323,9 @@ bool CharacterEditor::SaveSpriteObject()
     std::set<std::string> removed(spriteRemoved.begin(), spriteRemoved.end());
 
     std::vector<std::string> out;
-    bool inFrames = false, sawFrames = false, skipping = false;
+    bool inFrames = false, sawFrames = false, skipping = false, sawScale = false, sawImageSize = false;
+    const std::string sizeLine
+        = "image_size: [" + std::to_string(spriteImageW) + ", " + std::to_string(spriteImageH) + "]";
     auto addNew = [&]() {
         for (const SpriteFrameEdit &f : spriteFrames)
             if (f.original.empty())
@@ -238,6 +342,20 @@ bool CharacterEditor::SaveSpriteObject()
             inFrames = line.rfind("frames:", 0) == 0;
             sawFrames |= inFrames;
             skipping = false;
+            // The scale and the size of the image the rectangles are written for
+            if (line.rfind("scale:", 0) == 0)
+            {
+                out.push_back("scale: " + Num(spriteScale));
+                sawScale = true;
+                continue;
+            }
+            if (line.rfind("image_size:", 0) == 0)
+            {
+                if (spriteImageW > 0)
+                    out.push_back(sizeLine);
+                sawImageSize = true;
+                continue;
+            }
             out.push_back(line);
             continue;
         }
@@ -275,6 +393,14 @@ bool CharacterEditor::SaveSpriteObject()
         out.push_back("frames:");
         addNew();
     }
+    // Missing scale / image_size lines go before the frames
+    {
+        auto at = std::find_if(out.begin(), out.end(), [](const std::string &l) { return l.rfind("frames:", 0) == 0; });
+        if (!sawImageSize && spriteImageW > 0)
+            at = out.insert(at, sizeLine) + 1;
+        if (!sawScale && std::fabs(spriteScale - 1.0f) > 1e-4f)
+            out.insert(at, "scale: " + Num(spriteScale));
+    }
     std::string result;
     for (const std::string &l : out)
         result += l + "\n";
@@ -285,6 +411,76 @@ bool CharacterEditor::SaveSpriteObject()
     }
     ReloadSpriteData();
     spriteReport = _("Saved ") + path.filename().string();
+    return true;
+}
+
+bool CharacterEditor::ScaleSpriteImage(float factor, bool smooth)
+{
+    if (spriteObject.empty() || spriteImageW <= 0)
+        return false;
+    if (spriteDirty)
+    {
+        spriteReport = _("Save or revert the changes first");
+        return false;
+    }
+    const fs::path metaPath = SpriteMetaPath(spriteObject);
+    std::vector<std::string> images = {spriteImageName};
+    try
+    {
+        const YAML::Node meta = YAML::LoadFile(metaPath.string());
+        if (meta["resistance_image"])
+            images.push_back(meta["resistance_image"].as<std::string>());
+    }
+    catch (const std::exception &e)
+    {
+        spriteReport = metaPath.filename().string() + ": " + e.what();
+        return false;
+    }
+    // The images, all of the same layout
+    for (const std::string &name : images)
+    {
+        SDL_Surface *s = LoadRgba(SpriteDir() / name);
+        if (!s)
+        {
+            spriteReport = _("Not a PNG image: ") + (SpriteDir() / name).string();
+            return false;
+        }
+        const int w = std::max(1, static_cast<int>(std::lround(s->w * factor)));
+        const int h = std::max(1, static_cast<int>(std::lround(s->h * factor)));
+        SDL_Surface *scaled = SDL_ScaleSurface(s, w, h, smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+        SDL_DestroySurface(s);
+        const bool ok = scaled && SDL_SavePNG(scaled, (SpriteDir() / name).string().c_str());
+        if (scaled)
+            SDL_DestroySurface(scaled);
+        if (!ok)
+        {
+            spriteReport = _("Could not write ") + (SpriteDir() / name).string() + ": " + SDL_GetError();
+            return false;
+        }
+    }
+    // The meta keeps describing the old size: loading scales the frames, saving writes them in the new pixels
+    const std::string oldSize
+        = "image_size: [" + std::to_string(spriteImageW) + ", " + std::to_string(spriteImageH) + "]";
+    std::string text = ReadFile(metaPath);
+    const std::regex sizeLine("(^|\n)image_size:[^\n]*");
+    if (std::regex_search(text, sizeLine))
+        text = std::regex_replace(text, sizeLine, "$1" + oldSize);
+    else
+    {
+        const std::regex framesLine("(^|\n)frames:");
+        text = std::regex_search(text, framesLine)
+                   ? std::regex_replace(
+                         text, framesLine, "$1" + oldSize + "\nframes:", std::regex_constants::format_first_only)
+                   : text + oldSize + "\n";
+    }
+    WriteFile(metaPath, text);
+    const int oldW = spriteImageW, oldH = spriteImageH;
+    ReloadSpriteData();
+    if (!SaveSpriteObject())
+        return false;
+    spriteReport = _("Scaled ") + std::to_string(oldW) + "x" + std::to_string(oldH) + " -> "
+                   + std::to_string(spriteImageW) + "x" + std::to_string(spriteImageH)
+                   + _(": frames and scale follow, the drawn sizes are the same");
     return true;
 }
 
@@ -332,8 +528,9 @@ bool CharacterEditor::CreateSpriteObject(const fs::path &png, const std::string 
         return false;
     }
     const std::string meta = "# Sprite \"" + name + "\" (made in the character editor from " + png.filename().string()
-                             + ")\nimage: sprite_" + name + ".png\nscale: 1\nframes:\n  f0: {rect: [0, 0, "
-                             + std::to_string(w) + ", " + std::to_string(h) + "]}\n";
+                             + ")\nimage: sprite_" + name + ".png\nimage_size: [" + std::to_string(w) + ", "
+                             + std::to_string(h) + "]\nscale: 1\nframes:\n  f0: {rect: [0, 0, " + std::to_string(w)
+                             + ", " + std::to_string(h) + "]}\n";
     if (!WriteFile(SpriteMetaPath(name), meta))
     {
         spriteReport = _("Could not write ") + SpriteMetaPath(name).string();
@@ -544,42 +741,54 @@ void CharacterEditor::DrawSpriteTools()
     ImGui::SameLine();
 
     // Right: the image of the object with its frames
-    ImGui::BeginChild("sprite-canvas", ImVec2(0.0f, 0.0f), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
+    ImGui::BeginChild(
+        "sprite-canvas", ImVec2(0.0f, 0.0f), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    ImGui::InvisibleButton("canvas", avail, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight
-                                                | ImGuiButtonFlags_MouseButtonMiddle);
+    ImGui::SetNextItemAllowOverlap(); // the camera buttons sit on top of the canvas
+    ImGui::InvisibleButton(
+        "canvas",
+        avail,
+        ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
+    const bool canvasActive = ImGui::IsItemActive();
+    const bool middleDoubleClick = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle);
     ImDrawList *dl = ImGui::GetWindowDrawList();
     dl->AddRectFilled(origin, ImVec2(origin.x + avail.x, origin.y + avail.y), IM_COL32(24, 26, 30, 255));
     if (spriteObject.empty())
     {
-        dl->AddText(ImVec2(origin.x + 12, origin.y + 12), IM_COL32(200, 200, 200, 255),
-                    _("Choose a sprite on the left, or make one from a PNG (right panel)."));
+        dl->AddText(
+            ImVec2(origin.x + 12, origin.y + 12),
+            IM_COL32(200, 200, 200, 255),
+            _("Choose a sprite on the left, or make one from a PNG (right panel)."));
         ImGui::EndChild();
         return;
     }
     const ImGuiIO &io = ImGui::GetIO();
+
+    float focus[4] {0, 0, 0, 0};
+    const bool hasFocus = spriteFrameSel >= 0 && spriteFrameSel < static_cast<int>(spriteFrames.size());
+    if (hasFocus)
+        for (int i = 0; i < 4; ++i)
+            focus[i] = static_cast<float>(spriteFrames[spriteFrameSel].rect[i]);
+    const float content[4] {0.0f, 0.0f, static_cast<float>(spriteImageW), static_cast<float>(spriteImageH)};
+    SpriteCanvasCamera(
+        origin,
+        avail,
+        hovered,
+        canvasActive,
+        middleDoubleClick,
+        content,
+        hasFocus ? focus : nullptr,
+        spriteZoom,
+        spritePan,
+        spriteCameraPending);
     auto toScreen = [&](float x, float y) {
         return ImVec2(origin.x + spritePan.x + x * spriteZoom, origin.y + spritePan.y + y * spriteZoom);
     };
     const ImVec2 mouse = io.MousePos;
     const float mx = (mouse.x - origin.x - spritePan.x) / spriteZoom;
     const float my = (mouse.y - origin.y - spritePan.y) / spriteZoom;
-
-    // Zoom about the cursor, pan with the right / middle button
-    if (hovered && io.MouseWheel != 0.0f)
-    {
-        const float old = spriteZoom;
-        spriteZoom = std::clamp(spriteZoom * (io.MouseWheel > 0 ? 1.25f : 0.8f), 0.1f, 32.0f);
-        spritePan.x -= mx * (spriteZoom - old);
-        spritePan.y -= my * (spriteZoom - old);
-    }
-    if (ImGui::IsItemActive() && (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)))
-    {
-        spritePan.x += io.MouseDelta.x;
-        spritePan.y += io.MouseDelta.y;
-    }
 
     // The image and a checkerboard under it
     const int page = Sprites().ImageOf(spriteObject);
@@ -605,14 +814,16 @@ void CharacterEditor::DrawSpriteTools()
         const bool sel = i == spriteFrameSel;
         dl->AddRect(a, b, sel ? IM_COL32(255, 180, 60, 255) : IM_COL32(90, 200, 160, 200), 0.0f, 0, sel ? 2.0f : 1.0f);
         if (sel || (inside && hovered))
-            dl->AddText(ImVec2(a.x + 2, a.y - ImGui::GetTextLineHeight() - 1), IM_COL32(255, 230, 180, 255),
-                        f.name.c_str());
+            dl->AddText(
+                ImVec2(a.x + 2, a.y - ImGui::GetTextLineHeight() - 1), IM_COL32(255, 230, 180, 255), f.name.c_str());
         if (sel)
             for (int c = 0; c < 4; ++c)
             {
                 const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
-                dl->AddRectFilled(ImVec2(p.x - handle, p.y - handle), ImVec2(p.x + handle, p.y + handle),
-                                  IM_COL32(255, 180, 60, 255));
+                dl->AddRectFilled(
+                    ImVec2(p.x - handle, p.y - handle),
+                    ImVec2(p.x + handle, p.y + handle),
+                    IM_COL32(255, 180, 60, 255));
             }
     }
 
@@ -631,7 +842,8 @@ void CharacterEditor::DrawSpriteTools()
             {
                 const SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
                 const ImVec2 a = toScreen(static_cast<float>(f.rect[0]), static_cast<float>(f.rect[1]));
-                const ImVec2 b = toScreen(static_cast<float>(f.rect[0] + f.rect[2]), static_cast<float>(f.rect[1] + f.rect[3]));
+                const ImVec2 b
+                    = toScreen(static_cast<float>(f.rect[0] + f.rect[2]), static_cast<float>(f.rect[1] + f.rect[3]));
                 for (int c = 0; c < 4; ++c)
                 {
                     const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
@@ -661,7 +873,8 @@ void CharacterEditor::DrawSpriteTools()
         const int dy = static_cast<int>(std::floor(my) - spriteDragStart.y);
         if (spriteDrag == SpriteDrag::Draw)
         {
-            const ImVec2 a = toScreen(spriteDragStart.x, spriteDragStart.y), b = toScreen(std::floor(mx) + 1, std::floor(my) + 1);
+            const ImVec2 a = toScreen(spriteDragStart.x, spriteDragStart.y),
+                         b = toScreen(std::floor(mx) + 1, std::floor(my) + 1);
             dl->AddRect(a, b, IM_COL32(255, 255, 255, 255), 0.0f, 0, 1.5f);
         }
         else if (spriteFrameSel >= 0 && (dx || dy))
@@ -678,7 +891,8 @@ void CharacterEditor::DrawSpriteTools()
                 (spriteDragCorner & 1 ? x1 : x0) += dx;
                 (spriteDragCorner & 2 ? y1 : y0) += dy;
             }
-            SetSpriteFrameRect(f, std::min(x0, x1), std::min(y0, y1), std::max(1, std::abs(x1 - x0)), std::max(1, std::abs(y1 - y0)));
+            SetSpriteFrameRect(
+                f, std::min(x0, x1), std::min(y0, y1), std::max(1, std::abs(x1 - x0)), std::max(1, std::abs(y1 - y0)));
         }
     }
     if (spriteDrag != SpriteDrag::None && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -712,7 +926,8 @@ void CharacterEditor::DrawSpriteTools()
         if (d[0] || d[1])
         {
             if (io.KeyCtrl)
-                SetSpriteFrameRect(f, f.rect[0], f.rect[1], std::max(1, f.rect[2] + d[0]), std::max(1, f.rect[3] + d[1]));
+                SetSpriteFrameRect(
+                    f, f.rect[0], f.rect[1], std::max(1, f.rect[2] + d[0]), std::max(1, f.rect[3] + d[1]));
             else
                 SetSpriteFrameRect(f, f.rect[0] + d[0], f.rect[1] + d[1], f.rect[2], f.rect[3]);
         }
@@ -723,10 +938,19 @@ void CharacterEditor::DrawSpriteTools()
 
     // Status line
     char line[256];
-    std::snprintf(line, sizeof(line), "%s  %dx%d  zoom %.2f  (%d, %d)%s", spriteObject.c_str(), spriteImageW, spriteImageH,
-                  spriteZoom, static_cast<int>(std::floor(mx)), static_cast<int>(std::floor(my)),
-                  spriteDirty ? _("  - not saved") : "");
-    dl->AddText(ImVec2(origin.x + 8, origin.y + avail.y - ImGui::GetTextLineHeight() - 6), IM_COL32(220, 220, 220, 255), line);
+    std::snprintf(
+        line,
+        sizeof(line),
+        "%s  %dx%d  zoom %.2f  (%d, %d)%s",
+        spriteObject.c_str(),
+        spriteImageW,
+        spriteImageH,
+        spriteZoom,
+        static_cast<int>(std::floor(mx)),
+        static_cast<int>(std::floor(my)),
+        spriteDirty ? _("  - not saved") : "");
+    dl->AddText(
+        ImVec2(origin.x + 8, origin.y + avail.y - ImGui::GetTextLineHeight() - 6), IM_COL32(220, 220, 220, 255), line);
     ImGui::EndChild();
 }
 
@@ -767,10 +991,12 @@ void CharacterEditor::DrawSpriteProperties()
 
     ImGui::Separator();
     ImGui::Text("%s", spriteObject.c_str());
-    ImGui::TextDisabled("%s  %dx%d px, %s %.3g", spriteImageName.c_str(), spriteImageW, spriteImageH, _("scale"), spriteScale);
+    ImGui::TextDisabled(
+        "%s  %dx%d px, %s %.3g", spriteImageName.c_str(), spriteImageW, spriteImageH, _("scale"), spriteScale);
     {
         const char *kinds[] = {"parts", "anims", "bodies", "sequences", "buildings"};
-        const SpriteKind k[] = {SpriteKind::Part, SpriteKind::Anim, SpriteKind::Body, SpriteKind::Sequence, SpriteKind::Building};
+        const SpriteKind k[]
+            = {SpriteKind::Part, SpriteKind::Anim, SpriteKind::Body, SpriteKind::Sequence, SpriteKind::Building};
         std::string summary = std::to_string(spriteFrames.size()) + " frames";
         for (int i = 0; i < 5; ++i)
         {
@@ -794,6 +1020,21 @@ void CharacterEditor::DrawSpriteProperties()
         ReloadSpriteData();
     ImGui::Checkbox(_("Draw new frames (drag on the image)"), &spriteDrawMode);
 
+    // --- Scaling the image: the frames follow, the drawn sizes stay ---
+    {
+        static const float kFactors[] = {0.25f, 0.5f, 2.0f, 3.0f, 4.0f};
+        static const char *const kFactorNames[] = {"x0.25", "x0.5", "x2", "x3", "x4"};
+        ImGui::SetNextItemWidth(80.0f);
+        ImGui::Combo("##scale-factor", &spriteScaleFactor, kFactorNames, IM_ARRAYSIZE(kFactorNames));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100.0f);
+        const char *filters[] = {_("Pixels"), _("Smooth")};
+        Hinted(ImGui::Combo("##scale-filter", &spriteScaleSmooth, filters, 2), "##scale-filter");
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Scale image")), "Scale image"))
+            ScaleSpriteImage(kFactors[std::clamp(spriteScaleFactor, 0, 4)], spriteScaleSmooth == 1);
+    }
+
     // --- Frames ---
     if (ImGui::CollapsingHeader(_("Frames"), ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -802,7 +1043,16 @@ void CharacterEditor::DrawSpriteProperties()
         {
             const SpriteFrameEdit &f = spriteFrames[i];
             char label[160];
-            std::snprintf(label, sizeof(label), "%s  [%d %d %d %d]##%d", f.name.c_str(), f.rect[0], f.rect[1], f.rect[2], f.rect[3], i);
+            std::snprintf(
+                label,
+                sizeof(label),
+                "%s  [%d %d %d %d]##%d",
+                f.name.c_str(),
+                f.rect[0],
+                f.rect[1],
+                f.rect[2],
+                f.rect[3],
+                i);
             if (ImGui::Selectable(label, i == spriteFrameSel))
                 spriteFrameSel = i;
         }
@@ -861,10 +1111,14 @@ void CharacterEditor::DrawSpriteProperties()
                 {
                     const float box = std::min(ImGui::GetContentRegionAvail().x, 200.0f);
                     const float z = std::min(box / g.rect[2], box / g.rect[3]);
-                    ImGui::Image(reinterpret_cast<ImTextureID>(tex), ImVec2(g.rect[2] * z, g.rect[3] * z),
-                                 ImVec2(static_cast<float>(g.rect[0]) / spriteImageW, static_cast<float>(g.rect[1]) / spriteImageH),
-                                 ImVec2(static_cast<float>(g.rect[0] + g.rect[2]) / spriteImageW,
-                                        static_cast<float>(g.rect[1] + g.rect[3]) / spriteImageH));
+                    ImGui::Image(
+                        reinterpret_cast<ImTextureID>(tex),
+                        ImVec2(g.rect[2] * z, g.rect[3] * z),
+                        ImVec2(
+                            static_cast<float>(g.rect[0]) / spriteImageW, static_cast<float>(g.rect[1]) / spriteImageH),
+                        ImVec2(
+                            static_cast<float>(g.rect[0] + g.rect[2]) / spriteImageW,
+                            static_cast<float>(g.rect[1] + g.rect[3]) / spriteImageH));
                 }
             }
         }
@@ -902,8 +1156,12 @@ void CharacterEditor::DrawSpriteProperties()
         {
             const char *label;
             SpriteKind kind;
-        } groups[] = {{"parts", SpriteKind::Part}, {"anims", SpriteKind::Anim}, {"bodies", SpriteKind::Body},
-                      {"sequences", SpriteKind::Sequence}, {"buildings", SpriteKind::Building}};
+        } groups[]
+            = {{"parts", SpriteKind::Part},
+               {"anims", SpriteKind::Anim},
+               {"bodies", SpriteKind::Body},
+               {"sequences", SpriteKind::Sequence},
+               {"buildings", SpriteKind::Building}};
         for (const auto &g : groups)
         {
             const std::vector<std::string> names = Sprites().ItemNames(spriteObject, g.kind);
@@ -922,7 +1180,8 @@ void CharacterEditor::DrawSpriteProperties()
             for (const std::string &n : fams)
             {
                 const OpenArtOfWar::SpriteFamily *f = Sprites().FindFamily(spriteObject, n);
-                ImGui::BulletText("%s: %d %s", n.c_str(), f ? f->count : 0, f ? OpenArtOfWar::SpriteKindName(f->kind) : "");
+                ImGui::BulletText(
+                    "%s: %d %s", n.c_str(), f ? f->count : 0, f ? OpenArtOfWar::SpriteKindName(f->kind) : "");
             }
             ImGui::TreePop();
         }

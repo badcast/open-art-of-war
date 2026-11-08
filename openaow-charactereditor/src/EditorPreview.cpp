@@ -64,9 +64,10 @@ CharacterEditor::MoveSample CharacterEditor::SampleMove(int archetype, float mov
     }
     t -= driveTime;
     m.offsetX = -leg * 0.5f; // turning back at the left end
-    m.facing = turnRight.empty()
-                   ? 0
-                   : turnRight[std::min(turnRight.size() - 1, static_cast<std::size_t>(t / std::max(0.001f, turnDelay)))];
+    m.facing
+        = turnRight.empty()
+              ? 0
+              : turnRight[std::min(turnRight.size() - 1, static_cast<std::size_t>(t / std::max(0.001f, turnDelay)))];
     return m;
 }
 
@@ -166,6 +167,7 @@ void CharacterEditor::DrawPreviewControls()
         {EditorMode::AiDifficulty, "AI Difficulty"},
         {EditorMode::Animator, "Animator"},
         {EditorMode::SpriteTools, "Sprite Tools"},
+        {EditorMode::SpriteMerge, "Sprite Merge"},
     };
     const ImGuiStyle &style = ImGui::GetStyle();
     const float rightEdge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - style.WindowPadding.x;
@@ -180,7 +182,8 @@ void CharacterEditor::DrawPreviewControls()
             SetEditorMode(tab.mode);
     }
     ImGui::Separator();
-    if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools || editorMode == EditorMode::GameUi
+    if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
+        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::GameUi
         || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
         return;
     // Background of the canvas (black by default)
@@ -333,7 +336,10 @@ void CharacterEditor::DrawPreviewControls()
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0f);
-    Hinted(ImGui::SliderFloat(_("Zoom"), &previewZoom, kPreviewZoomMin, kPreviewZoomMax, "%.2fx", ImGuiSliderFlags_Logarithmic), "Zoom");
+    Hinted(
+        ImGui::SliderFloat(
+            _("Zoom"), &previewZoom, kPreviewZoomMin, kPreviewZoomMax, "%.2fx", ImGuiSliderFlags_Logarithmic),
+        "Zoom");
     ImGui::SameLine();
     if (Hinted(ImGui::Button(_("Reset Aim")), "Reset Aim"))
     {

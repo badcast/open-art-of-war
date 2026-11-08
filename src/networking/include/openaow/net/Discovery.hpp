@@ -38,7 +38,8 @@ struct FoundRoom
 std::vector<std::uint8_t> encodeProbe(std::uint32_t nonce);
 bool decodeProbe(const std::uint8_t *data, std::size_t size, std::uint32_t &nonce);
 std::vector<std::uint8_t> encodeAnswer(std::uint32_t nonce, std::uint16_t port, const RoomInfo &info);
-bool decodeAnswer(const std::uint8_t *data, std::size_t size, std::uint32_t &nonce, std::uint16_t &port, RoomInfo &info);
+bool decodeAnswer(
+    const std::uint8_t *data, std::size_t size, std::uint32_t &nonce, std::uint16_t &port, RoomInfo &info);
 
 // This computer's address in its local network (the first IPv4 interface that is up and not
 // loopback); empty when there is none

@@ -137,7 +137,7 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
     {
         const Building *b = e.AsBuilding();
         if (b && b->alive && b->state != ActionState::Die && b->type == UnitType::Headquarters && b->owner < kMaxPlayers
-            && !hq[b->owner])
+            && b->buildProgress >= 1.0f && !hq[b->owner])
             hq[b->owner] = b;
     }
     auto centreOf = [&](PlayerId p, float &x, float &y) {
@@ -171,7 +171,20 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
                 for (int x = 0; x < m_terrW; ++x)
                 {
                     const float px = x + 0.5f, py = y + 0.5f;
-                    const float own = DetMath::Hypot(px - ox, py - oy), other = DetMath::Hypot(px - qx, py - qy);
+                    float own = DetMath::Hypot(px - ox, py - oy), other = DetMath::Hypot(px - qx, py - qy);
+                    for (const auto &e : entities.GetAllEntities())
+                    {
+                        const Building *b = e.AsBuilding();
+                        if (!b || !b->alive || b->state == ActionState::Die || b->buildProgress < 1.0f
+                            || b->type != UnitType::Headquarters || (b->owner != m_player && b->owner != q))
+                            continue;
+                        float d = DetMath::Hypot(
+                            px - (b->tileX + b->buildWidth * 0.5f), py - (b->tileY + b->buildHeight * 0.5f));
+                        if (b->owner == m_player)
+                            own = std::min(own, d);
+                        else
+                            other = std::min(other, d);
+                    }
                     if (other < own || (other == own && q < m_player))
                         m_ownGround[static_cast<std::size_t>(y) * m_terrW + x] = 0;
                 }
@@ -230,124 +243,94 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
 bool AIController::KeepsWayOut(
     int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit) const
 {
-    if (!m_territoryReady)
-        return true;
     const int mw = map.GetWidth(), mh = map.GetHeight();
-    auto inRect = [&](int tx, int ty) {
-        return tx >= x && ty >= y && tx < x + w && ty < y + h;
-    };
-    // A block of 2 x 2 free tiles: where a vehicle fits through
-    auto freeTile = [&](int tx, int ty, bool withRect) {
-        if (tx < 0 || ty < 0 || tx >= mw || ty >= mh)
-            return false;
-        if (withRect && inRect(tx, ty))
-            return false;
-        return map.IsPassable(tx, ty) && map.GetWall(tx, ty) == 0;
-    };
-    auto wide = [&](int bx, int by, bool withRect) {
-        return freeTile(bx, by, withRect) && freeTile(bx + 1, by, withRect) && freeTile(bx, by + 1, withRect)
-               && freeTile(bx + 1, by + 1, withRect);
-    };
-    // Where the way out leads: the roads farther from the base than its building zone
-    const float far = static_cast<float>(entities.GetBuildRadius(m_player) + 4);
-    std::vector<std::pair<int, int>> targets;
-    for (int ty = 0; ty < mh; ++ty)
-    {
-        for (int tx = 0; tx < mw; ++tx)
-        {
-            if (m_road[static_cast<std::size_t>(ty) * mw + tx] != 2)
-                continue;
-            if (DetMath::Hypot(static_cast<float>(tx - m_homeX), static_cast<float>(ty - m_homeY)) <= far)
-                continue;
-            targets.emplace_back(tx, ty);
-        }
-    }
-    if (targets.empty())
-        return true;
-
-    auto flood = [&](bool withRect) {
-        std::vector<std::uint8_t> reached(static_cast<std::size_t>(mw) * mh, 0);
-        std::vector<std::pair<int, int>> frontier;
-        for (const auto &[tx, ty] : targets)
-        {
-            for (int oy = -1; oy <= 0; ++oy)
-            {
-                for (int ox = -1; ox <= 0; ++ox)
-                {
-                    const int bx = tx + ox, by = ty + oy;
-                    if (bx < 0 || by < 0 || bx >= mw || by >= mh || reached[static_cast<std::size_t>(by) * mw + bx]
-                        || !wide(bx, by, withRect))
-                        continue;
-                    reached[static_cast<std::size_t>(by) * mw + bx] = 1;
-                    frontier.emplace_back(bx, by);
-                }
-            }
-        }
-        static const int kDx[4] = {1, -1, 0, 0}, kDy[4] = {0, 0, 1, -1};
-        for (std::size_t i = 0; i < frontier.size(); ++i)
-        {
-            const auto [fx, fy] = frontier[i];
-            for (int k = 0; k < 4; ++k)
-            {
-                const int nx = fx + kDx[k], ny = fy + kDy[k];
-                if (nx < 0 || ny < 0 || nx >= mw || ny >= mh || reached[static_cast<std::size_t>(ny) * mw + nx]
-                    || !wide(nx, ny, withRect))
-                    continue;
-                reached[static_cast<std::size_t>(ny) * mw + nx] = 1;
-                frontier.emplace_back(nx, ny);
-            }
-        }
-        return reached;
-    };
-    // Does a reached 2 x 2 block touch the ring around (bx, by, bw, bh)?
-    auto touches = [&](const std::vector<std::uint8_t> &reached, int bx, int by, int bw, int bh) {
-        for (int ty = by - 1; ty <= by + bh; ++ty)
-        {
-            for (int tx = bx - 1; tx <= bx + bw; ++tx)
-            {
-                if (tx >= bx && tx < bx + bw && ty >= by && ty < by + bh)
-                    continue;
-                for (int oy = -1; oy <= 0; ++oy)
-                {
-                    for (int ox = -1; ox <= 0; ++ox)
-                    {
-                        const int kx = tx + ox, ky = ty + oy;
-                        if (kx >= 0 && ky >= 0 && kx < mw && ky < mh && reached[static_cast<std::size_t>(ky) * mw + kx])
-                            return true;
-                    }
-                }
-            }
-        }
-        return false;
-    };
-
-    const std::vector<std::uint8_t> after = flood(true);
-    // A barracks, a factory or a headquarters in a pocket the others have nearly closed: its troops would never
-    // get out (only the structures already standing were checked before). Unless the base has no wide way out at
-    // all (narrow exits of the map): then its headquarters is not reached either and the pocket is no worse
-    if (needsExit && !touches(after, x, y, w, h))
-    {
-        for (const auto &e : entities.GetAllEntities())
-        {
-            const Building *b = e.AsBuilding();
-            if (b && b->alive && b->state != ActionState::Die && b->owner == m_player
-                && b->type == UnitType::Headquarters
-                && touches(after, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
-                return false;
-        }
-    }
-    std::vector<std::uint8_t> before;
+    // Compare connected components before/after placement, at infantry and vehicle clearance.
+    // This also works when the whole map lies inside the HQ's construction radius.
+    std::vector<unsigned char> blocked(mw * mh, 0);
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || !IsExitBuilding(b->type))
+        if (!b || !b->alive || b->state == ActionState::Die)
             continue;
-        if (touches(after, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
-            continue;
-        // Closed in already (a map's own base, terrain): this structure is not the one to blame
-        if (before.empty())
-            before = flood(false);
-        if (touches(before, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
+        for (int ty = std::max(0, b->tileY); ty < std::min(mh, b->tileY + b->buildHeight); ++ty)
+            for (int tx = std::max(0, b->tileX); tx < std::min(mw, b->tileX + b->buildWidth); ++tx)
+                blocked[ty * mw + tx] = 1;
+    }
+    for (int clearance : {1, 2})
+    {
+        auto free = [&](int bx, int by, bool after) {
+            for (int dy = 0; dy < clearance; ++dy)
+                for (int dx = 0; dx < clearance; ++dx)
+                {
+                    int tx = bx + dx, ty = by + dy;
+                    if (tx < 0 || ty < 0 || tx >= mw || ty >= mh || blocked[ty * mw + tx] || !map.IsPassable(tx, ty)
+                        || map.GetWall(tx, ty) != 0 || (after && tx >= x && tx < x + w && ty >= y && ty < y + h))
+                        return false;
+                }
+            return true;
+        };
+        auto components = [&](bool after) {
+            std::vector<int> labels(mw * mh, -1), queue;
+            int label = 0;
+            for (int ty = 0; ty < mh; ++ty)
+                for (int tx = 0; tx < mw; ++tx)
+                {
+                    int start = ty * mw + tx;
+                    if (labels[start] >= 0 || !free(tx, ty, after))
+                        continue;
+                    queue.clear();
+                    queue.push_back(start);
+                    labels[start] = label;
+                    for (std::size_t i = 0; i < queue.size(); ++i)
+                    {
+                        int px = queue[i] % mw, py = queue[i] / mw;
+                        for (const auto &[dx, dy] :
+                             std::array<std::pair<int, int>, 4> {{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}})
+                        {
+                            int nx = px + dx, ny = py + dy;
+                            if (nx < 0 || ny < 0 || nx >= mw || ny >= mh)
+                                continue;
+                            int next = ny * mw + nx;
+                            if (labels[next] < 0 && free(nx, ny, after))
+                            {
+                                labels[next] = label;
+                                queue.push_back(next);
+                            }
+                        }
+                    }
+                    ++label;
+                }
+            return labels;
+        };
+        const auto before = components(false), after = components(true);
+        std::vector<int> destination(mw * mh, -1);
+        for (int i = 0; i < mw * mh; ++i)
+            if (after[i] >= 0)
+            {
+                int &to = destination[before[i]];
+                if (to >= 0 && to != after[i])
+                    return false; // a previously connected passage was split
+                to = after[i];
+            }
+        auto touches = [&](const std::vector<int> &labels, int bx, int by, int bw, int bh) {
+            for (int ty = by - clearance; ty <= by + bh; ++ty)
+                for (int tx = bx - clearance; tx <= bx + bw; ++tx)
+                    if (tx >= 0 && ty >= 0 && tx < mw && ty < mh && labels[ty * mw + tx] >= 0)
+                        return true;
+            return false;
+        };
+        bool hadWideExit = false;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Building *b = e.AsBuilding();
+            if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || !IsExitBuilding(b->type))
+                continue;
+            bool accessible = touches(before, b->tileX, b->tileY, b->buildWidth, b->buildHeight);
+            hadWideExit |= accessible;
+            if (accessible && !touches(after, b->tileX, b->tileY, b->buildWidth, b->buildHeight))
+                return false;
+        }
+        if (needsExit && (clearance == 1 || hadWideExit) && !touches(after, x, y, w, h))
             return false;
     }
     return true;
@@ -365,9 +348,12 @@ bool AIController::FindCoreSite(
     const TileMap &map,
     const EntityManager &entities,
     int crowding,
-    bool needsExit) const
+    bool needsExit,
+    int centreX,
+    int centreY,
+    std::string *failure) const
 {
-    const int cx = m_homeX, cy = m_homeY;
+    const int cx = centreX < 0 ? m_homeX : centreX, cy = centreY < 0 ? m_homeY : centreY;
     if (cx < 0 || cy < 0)
         return false;
     float tdx = static_cast<float>(m_playerHqX - cx), tdy = static_cast<float>(m_playerHqY - cy);
@@ -413,7 +399,7 @@ bool AIController::FindCoreSite(
         float score;
         int x, y;
     };
-    for (int r = std::max(1, minRing); r <= maxRing; ++r)
+    for (int r = (crowding >= 3 ? 0 : std::max(1, minRing)); r <= maxRing; ++r)
     {
         std::vector<Candidate> ring;
         for (int oy = -r; oy <= r; ++oy)
@@ -424,22 +410,31 @@ bool AIController::FindCoreSite(
                     continue;
                 const float ol = std::max(0.001f, DetMath::Hypot(static_cast<float>(ox), static_cast<float>(oy)));
                 const float facing = (ox * tdx + oy * tdy) / ol; // 1: toward the enemy
-                if (rearOnly && facing > 0.05f)
+                if (crowding < 3 && rearOnly && facing > 0.05f)
                     continue;
                 const int px = cx + ox - w / 2, py = cy + oy - h / 2;
-                if (nearGate(px, py))
+                if (crowding < 3 && nearGate(px, py))
                     continue;
-                if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player))
+                const char *reason = nullptr;
+                if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player, &reason))
+                {
+                    if (failure && reason && failure->find(reason) == std::string::npos)
+                        *failure += std::string(reason) + "; ";
                     continue;
+                }
                 bool ok = true;
                 for (int ty = py; ty < py + h && ok; ++ty)
                 {
                     for (int tx = px; tx < px + w && ok; ++tx)
-                        ok = (crowding >= 2 ? !IsRoadCore(tx, ty) : !IsRoad(tx, ty)) && IsOwnGround(tx, ty)
-                             && !entities.IsTileOccupiedByUnit(tx, ty);
+                        ok = (crowding >= 3 || (crowding >= 2 ? !IsRoadCore(tx, ty) : !IsRoad(tx, ty)))
+                             && IsOwnGround(tx, ty) && !entities.IsTileOccupiedByUnit(tx, ty);
                 }
                 if (!ok || (gap > 0 && overlapsBuilding(px - gap, py - gap, w + 2 * gap, h + 2 * gap)))
+                {
+                    if (failure && failure->find("layout") == std::string::npos)
+                        *failure += "layout/territory; ";
                     continue;
+                }
                 float score = (ox * dirX + oy * dirY) / ol;
                 if (m_style.layout == AIBaseStyle::Road)
                 {
@@ -460,9 +455,9 @@ bool AIController::FindCoreSite(
         int tried = 0;
         for (const Candidate &c : ring)
         {
-            if (c.score < -0.2f && m_style.layout != AIBaseStyle::Compact)
+            if (crowding < 3 && c.score < -0.2f && m_style.layout != AIBaseStyle::Compact)
                 break;
-            if (++tried > 24)
+            if (++tried > 24 && crowding < 3)
                 break; // the way-out check floods the map: a ring gets a limited number of tries
             if (KeepsWayOut(c.x, c.y, w, h, map, entities, needsExit))
             {
@@ -470,6 +465,8 @@ bool AIController::FindCoreSite(
                 outY = c.y;
                 return true;
             }
+            if (failure && failure->find("exit") == std::string::npos)
+                *failure += "exit connectivity; ";
         }
     }
     return false;

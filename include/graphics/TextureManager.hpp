@@ -101,9 +101,9 @@ struct BuildingDef
 // What a unit archetype is drawn from: families of its sprite object (families "<set>idle", "<set>move", ...)
 struct UnitVisual
 {
-    int idle {-1};      // first sequence; 8 facings when idleCount is 8, a fixed hull when it is 1
+    int idle {-1}; // first sequence; 8 facings when idleCount is 8, a fixed hull when it is 1
     int idleCount {0};
-    int attack {-1};    // firing pose by facing (infantry); -1: fires from the idle sequences
+    int attack {-1}; // firing pose by facing (infantry); -1: fires from the idle sequences
     int move {-1};
     int moveCount {0};
     int die {-1};
@@ -228,8 +228,8 @@ private:
         int decorCount {0};
     };
     std::vector<TilesetSprites> m_tilesetSprites;
-    std::vector<UnitVisual> m_unitVisuals;  // by archetype
-    std::vector<int> m_buildingSprites;     // by building type
+    std::vector<UnitVisual> m_unitVisuals; // by archetype
+    std::vector<int> m_buildingSprites;    // by building type
 };
 
 } // namespace OpenArtOfWar

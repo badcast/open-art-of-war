@@ -25,6 +25,8 @@ namespace OpenArtOfWar
 //
 //   image: sprite_tank_conf.png      # default: sprite_<name>.png next to the meta
 //   scale: 4                         # default PNG pixels per drawing unit (frames without their own "size")
+//   image_size: [512, 256]           # the size of the PNG the rects are written for: when the PNG is scaled
+//                                    # (e.g. redrawn x4) the rects scale with it and the drawn sizes stay
 //   terrain: true                    # map tiles (filtered without bleeding between tiles)
 //   recolor: red                     # none | blue | red: team armour the army colour recolours (frames may override)
 //   resistance_image: sprite_tank_conf_resistance.png  # same layout, drawn for the Resistance (optional)
@@ -206,7 +208,8 @@ private:
     // `ref` ("item" or "object.item") as seen from `fromObject`: the item itself, never a family
     const Item *LookupItem(const std::string &fromObject, const std::string &ref, SpriteKind kind) const;
     // An item or, failing that, a family's first member; reports the failure
-    SpriteRef LookupRef(const std::string &fromObject, const std::string &ref, SpriteKind kind, const std::string &where);
+    SpriteRef LookupRef(
+        const std::string &fromObject, const std::string &ref, SpriteKind kind, const std::string &where);
     int Allocate(SpriteKind kind);
     void Emit(const std::string &object, const Item &item, int handle);
     void Error(const std::string &msg);

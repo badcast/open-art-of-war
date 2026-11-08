@@ -42,7 +42,8 @@ std::uint64_t HashOfBytes(const std::vector<std::uint8_t> &bytes)
 {
     // Two CRCs side by side: 64 bits, cheap, the same on every platform
     const std::uint32_t a = Net::crc32(bytes.data(), bytes.size());
-    const std::uint32_t b = Net::crc32(bytes.data(), bytes.size(), 0x9e3779b9u ^ static_cast<std::uint32_t>(bytes.size()));
+    const std::uint32_t b
+        = Net::crc32(bytes.data(), bytes.size(), 0x9e3779b9u ^ static_cast<std::uint32_t>(bytes.size()));
     return (static_cast<std::uint64_t>(a) << 32) | b;
 }
 
@@ -73,7 +74,11 @@ std::vector<std::uint8_t> Packed(const std::string &path)
     return out;
 }
 
-bool Unpack(const std::vector<std::uint8_t> &packedBytes, std::uint64_t hash, std::vector<std::uint8_t> &raw, std::size_t maxBytes)
+bool Unpack(
+    const std::vector<std::uint8_t> &packedBytes,
+    std::uint64_t hash,
+    std::vector<std::uint8_t> &raw,
+    std::size_t maxBytes)
 {
     raw.clear();
     if (packedBytes.empty())

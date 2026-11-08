@@ -398,3 +398,10 @@ set_target_properties(openaow-sprite-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     BUILD_RPATH "${OAOW_RPATH}")
 add_test(NAME openaow-sprite-tests COMMAND openaow-sprite-tests)
+
+add_executable(openaow-ai-layout-tests tests/AIBaseLayoutTests.cpp)
+target_link_libraries(openaow-ai-layout-tests PRIVATE openaow-core)
+set_target_properties(openaow-ai-layout-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    BUILD_RPATH "${OAOW_RPATH}")
+add_test(NAME openaow-ai-layout-tests COMMAND openaow-ai-layout-tests)

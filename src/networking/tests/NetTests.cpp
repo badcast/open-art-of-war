@@ -87,16 +87,16 @@ void testBitStream()
         CHECK(reader.failed());
     }
     // Full signed ranges must not overflow while calculating the bit width.
-    for (std::int32_t value : {std::numeric_limits<std::int32_t>::min(), -1, 0,
-                               std::numeric_limits<std::int32_t>::max()})
+    for (std::int32_t value :
+         {std::numeric_limits<std::int32_t>::min(), -1, 0, std::numeric_limits<std::int32_t>::max()})
     {
         std::uint8_t bytes[4];
         BitWriter writer(bytes, sizeof bytes);
-        writer.writeRanged(value, std::numeric_limits<std::int32_t>::min(),
-                           std::numeric_limits<std::int32_t>::max());
+        writer.writeRanged(value, std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max());
         BitReader reader(bytes, writer.finish());
-        CHECK(reader.readRanged(std::numeric_limits<std::int32_t>::min(),
-                                std::numeric_limits<std::int32_t>::max()) == value);
+        CHECK(
+            reader.readRanged(std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::max())
+            == value);
         CHECK(!reader.failed() && !writer.overflowed());
     }
     std::uint8_t buf[512];

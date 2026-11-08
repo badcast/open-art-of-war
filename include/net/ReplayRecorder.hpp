@@ -21,8 +21,8 @@ public:
     struct Info
     {
         std::vector<std::uint8_t> setupBytes; // the StartMatch setup as the room sent it
-        MatchSetup setup;                // the same, decoded (local slot set)
-        std::vector<std::string> names;  // by slot; empty for a computer player
+        MatchSetup setup;                     // the same, decoded (local slot set)
+        std::vector<std::string> names;       // by slot; empty for a computer player
         std::uint32_t ticksPerTurn {2};
         std::uint32_t turnMs {100};
         std::uint64_t assetsHash {0};
