@@ -40,6 +40,11 @@ bool FillInfo(const Net::ReplayData &data, ReplayPlayer::Info &info, std::string
     }
     info.source = meta.value("source", std::string("client"));
     info.gameVersion = meta.value("game_version", std::string());
+    info.mods.clear();
+    if (meta.contains("mods") && meta["mods"].is_array())
+        for (const auto &m : meta["mods"])
+            if (m.is_object())
+                info.mods.push_back(m.value("name", m.value("id", std::string())) + " " + m.value("version", std::string()));
     info.protocol = meta.value("protocol", 0);
     info.simBuildId = meta.value("sim_build_id", static_cast<std::uint64_t>(0));
     info.checksumsComparable = info.simBuildId != 0 && info.simBuildId == NetMatch::SimBuildId();

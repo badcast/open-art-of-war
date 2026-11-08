@@ -92,6 +92,7 @@ enum class AppState
     MenuSettings, // Sound & music options
     MenuNetwork,  // Network game: browser and game room
     MenuReplay,   // Open replay: the list of recorded network games
+    MenuMods,     // Mods: which data packages are in use, in what order
     Briefing,
     CampaignPlaying,
     SkirmishPlaying,

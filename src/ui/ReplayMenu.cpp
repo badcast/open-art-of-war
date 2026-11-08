@@ -301,6 +301,13 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
                     + (result.empty() ? "" : "  -  " + result),
                 col::TextDim);
             line(std::string(_("Game version")) + ": " + in.gameVersion, col::TextMuted, ui::FONT_SMALL);
+            if (!in.mods.empty())
+            {
+                std::string mods;
+                for (const std::string &m : in.mods)
+                    mods += (mods.empty() ? "" : ", ") + m;
+                line(std::string(_("Mods")) + ": " + mods, col::TextMuted, ui::FONT_SMALL);
+            }
             y += 8;
             ui::DrawCaption(font, renderer, x, y, _("PLAYERS"));
             y += 24;

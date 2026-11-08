@@ -27,6 +27,7 @@ class ReplayPlayer;
 class ReplayRecorder;
 struct SimCommand;
 class ReplayMenu;
+class ModsMenu;
 
 class TextureManager;
 class Renderer;
@@ -261,6 +262,7 @@ private:
     // --- Replay (.awr): a recorded network game played back through the simulation (ApplicationReplay.cpp)
     std::unique_ptr<ReplayPlayer> m_replay;
     std::unique_ptr<ReplayMenu> m_replayMenu;
+    std::unique_ptr<ModsMenu> m_modsMenu;
     MatchSetup m_replaySetup; // the recorded match, `local` = who is watched
     struct ReplayUi
     {
@@ -277,6 +279,7 @@ private:
         int comboScroll {0};
         bool stats {false};         // the table of every player is shown
     } m_replayUi;                   // also the bar of a custom match watched without playing (m_spectating)
+    bool m_modsMenuFresh {false};   // the mods screen looked for the mods since it opened
     bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
     std::string m_pendingReplay;    // a file dropped on the window / given on the command line, opened when possible
     bool StartReplay(int watchSlot);
@@ -338,6 +341,7 @@ private:
     // Reads the simulation data (characters, research, projectiles, ...) again: a network game plays with the host's
     // files
     void ReloadGameData();
+    void ApplyMods(const std::vector<std::string> &ids);
     int m_netWantedPlayers {2};
     std::string m_netMapPath;
     bool m_netMatchStarted {false};

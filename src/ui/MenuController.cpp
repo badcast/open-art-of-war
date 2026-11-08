@@ -41,10 +41,10 @@ namespace
 // Shared geometry: the same rectangles drive rendering and mouse hit-testing
 // ---------------------------------------------------------------------------
 
-constexpr int kMainMenuItems = 9;
+constexpr int kMainMenuItems = 10;
 
 const char *const kMainMenuLabels[kMainMenuItems]
-    = {"CAMPAIGN", "CUSTOM GAME", "NETWORK GAME", "OPEN REPLAY", "TEST MAP", "SETTINGS", "HELP", "ABOUT", "EXIT"};
+    = {"CAMPAIGN", "SKIRMISH", "NETWORK GAME", "OPEN REPLAY", "TEST MAP", "MODS", "SETTINGS", "HELP", "ABOUT", "EXIT"};
 
 int MainMenuColumnX(int windowW)
 {
@@ -140,16 +140,19 @@ void MenuController::ActivateMenuItem(
             state = AppState::CampaignPlaying;
             camera.CenterOn((mission.GetPlayerHqX() + 12) * TILE_WIDTH, mission.GetPlayerHqY() * TILE_HEIGHT);
             break;
-        case 5:
-            state = AppState::MenuSettings;
+        case 5: // Mods: the data packages in use
+            state = AppState::MenuMods;
             break;
         case 6:
-            state = AppState::MenuHelp;
+            state = AppState::MenuSettings;
             break;
         case 7:
-            state = AppState::MenuAbout;
+            state = AppState::MenuHelp;
             break;
         case 8:
+            state = AppState::MenuAbout;
+            break;
+        case 9:
             running = false;
             break;
         default:
@@ -355,11 +358,11 @@ void MenuController::RenderMainMenu(
         bool isExit = (i == kMainMenuItems - 1);
         std::string label = _(kMainMenuLabels[i]);
 
-        if (selected)
-        {
-            ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 250), ui::WithAlpha(col::Hover, 0));
-            renderer.FillRectScreen(r.x, r.y, 4, r.h, isExit ? col::Danger : col::Accent);
-        }
+        // if (selected)
+        // {
+        //     ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 250), ui::WithAlpha(col::Hover, 0));
+        //     renderer.FillRectScreen(r.x, r.y, 4, r.h, isExit ? col::Danger : col::Accent);
+        // }
         SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
         fontRenderer.DrawString(
             label,

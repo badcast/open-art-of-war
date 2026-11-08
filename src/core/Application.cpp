@@ -32,6 +32,7 @@
 #include "audio/SoundRequests.hpp"
 #include "replay/ReplayPlayer.hpp"
 #include "ui/ReplayMenu.hpp"
+#include "ui/ModsMenu.hpp"
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/EntityManager.hpp"
@@ -265,6 +266,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_menuController = std::make_unique<MenuController>();
     m_networkMenu = std::make_unique<NetworkMenu>();
     m_replayMenu = std::make_unique<ReplayMenu>();
+    m_modsMenu = std::make_unique<ModsMenu>();
     m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
     m_gameplayController = std::make_unique<GameplayController>();
@@ -831,6 +833,8 @@ void Application::Update(float deltaTime)
     }
     if (m_state != AppState::MenuReplay)
         m_replayMenuFresh = false;
+    if (m_state != AppState::MenuMods)
+        m_modsMenuFresh = false;
     // A replay file dropped on the window (or named on the command line): from the menus it is opened at once
     if (!m_pendingReplay.empty() && !m_replay
         && (m_state == AppState::MainMenu || m_state == AppState::MenuReplay || m_state == AppState::MenuSettings
@@ -959,6 +963,19 @@ void Application::Update(float deltaTime)
         else if (!r.open.empty())
             OpenReplay(r.open);
     }
+    else if (m_state == AppState::MenuMods)
+    {
+        if (!m_modsMenuFresh)
+        {
+            m_modsMenu->Refresh(m_settings.enabledMods);
+            m_modsMenuFresh = true;
+        }
+        const ModsMenu::Result r = m_modsMenu->Update(*m_input, m_windowW, m_windowH);
+        if (r.back)
+            m_state = AppState::MainMenu;
+        else if (r.apply)
+            ApplyMods(r.enabled);
+    }
     else if (m_state == AppState::MenuHelp || m_state == AppState::MenuAbout)
     {
         m_menuController->UpdateInfoScreen(*m_input, m_state);
@@ -1016,7 +1033,8 @@ void Application::Update(float deltaTime)
     // The menu theme goes on through every screen of the main menu (help, about, settings, network game)
     const bool menuMusic = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                            || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
-                           || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
+                           || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay
+                           || m_state == AppState::MenuMods;
     m_sound->Update(menuMusic, gameplayMusic);
 
     // The time of day of the match (campaign missions are by day): the picture and the loop of the surroundings
@@ -1075,7 +1093,8 @@ void Application::UpdateSounds()
     {
         const bool isMenuState
             = (m_state == AppState::MainMenu || m_state == AppState::MenuSettings || m_state == AppState::MenuNetwork
-               || m_state == AppState::MenuReplay || m_state == AppState::MenuHelp || m_state == AppState::MenuAbout);
+               || m_state == AppState::MenuReplay || m_state == AppState::MenuHelp || m_state == AppState::MenuAbout
+               || m_state == AppState::MenuMods);
         if (isMenuState && m_soundState != AppState::SplashLogo)
             m_sound->PlaySfx("ui_show_dialog");
 
@@ -1102,7 +1121,8 @@ void Application::RenderMenuFade()
 {
     const bool menuScreen = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                             || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
-                            || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay;
+                            || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay
+                           || m_state == AppState::MenuMods;
     const std::uint64_t now = SDL_GetTicks();
     if (menuScreen && !m_menuFadeWasMenu)
         m_menuFadeStartMs = m_state == AppState::MainMenu ? now : 0;
@@ -1166,6 +1186,11 @@ void Application::Render()
     {
         m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
         m_replayMenu->Render(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
+    }
+    else if (m_state == AppState::MenuMods)
+    {
+        m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
+        m_modsMenu->Render(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
     }
     else if (m_state == AppState::MenuNetwork)
     {
@@ -1549,6 +1574,27 @@ void Application::Render()
         m_renderFirstFrame = false;
         RenderBackend::ConfirmFirstFrame(m_env);
     }
+}
+
+// The Mods screen applied: the mods go in place in that order, everything read from the data is read again, the choice
+// is saved. Music, sounds, fonts and translations were loaded at start: they change with the next start.
+void Application::ApplyMods(const std::vector<std::string> &ids)
+{
+    Mods::ActivateReport report;
+    const bool ok = Mods::Activate(ids, &report);
+    LoaderResources::Reload();
+    ReloadGameData();
+    if (m_texManager)
+        m_texManager->ReloadSprites();
+    m_settings.enabledMods.clear();
+    for (const Mods::ModInfo &m : Mods::Active())
+        m_settings.enabledMods.push_back(m.id);
+    m_settings.Save(Settings::DefaultPath());
+    m_modsMenu->Refresh(m_settings.enabledMods);
+    std::string notice = ok ? (ids.empty() ? _("No mods: the installed data is in use") : _("Mods applied"))
+                            : _("Some mods could not be used");
+    notice += std::string(". ") + _("Music, sounds, fonts and translations change after a restart.");
+    m_modsMenu->SetReport(report, notice);
 }
 
 } // namespace OpenArtOfWar

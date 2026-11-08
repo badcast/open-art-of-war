@@ -1,4 +1,5 @@
 #include "net/ReplayRecorder.hpp"
+#include "core/Mods.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
 #include "net/MapFiles.hpp"
@@ -116,6 +117,14 @@ std::string ReplayRecorder::Finish(const std::string &outcome, std::uint32_t tic
         meta["mission"] = m_info.mission;
         meta["player_faction"] = m_info.playerFaction;
         meta["difficulty"] = m_info.difficulty;
+    }
+    // The mods this computer played with (a network game plays the host's data: then they did not count)
+    if (!Mods::Active().empty() && !Assets::HasSessionOverlay())
+    {
+        nlohmann::json mods = nlohmann::json::array();
+        for (const Mods::ModInfo &m : Mods::Active())
+            mods.push_back({{"id", m.id}, {"name", m.name}, {"version", m.version}});
+        meta["mods"] = mods;
     }
     data.meta = meta.dump(2);
 

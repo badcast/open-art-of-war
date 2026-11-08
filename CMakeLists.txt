@@ -179,6 +179,7 @@ set(ENGINE_SOURCES
     src/net/ReplayRecorder.cpp
     src/replay/ReplayPlayer.cpp
     src/ui/ReplayMenu.cpp
+    src/ui/ModsMenu.cpp
     src/core/ApplicationReplay.cpp
     src/ui/MenuController.cpp
     src/ui/MenuControllerInGame.cpp

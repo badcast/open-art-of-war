@@ -11,6 +11,7 @@ loads a blob it checks the blob's files against that certificate and refuses to 
 or a file is missing or differs (Assets::VerifyCertificate).
 
 Usage: pack_assets.py <assets_dir> <output.blob>
+       pack_assets.py --mod <mod_dir> <output.mod> [<assets_dir> to check the names of mod.yaml against]
 """
 import hashlib
 import io
@@ -19,6 +20,8 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import posixpath
+import re
 
 FIXED_TIME = 1767225600  # 2026-01-01, reproducible archives
 ZSTD_LEVEL = 19
@@ -89,7 +92,92 @@ def check_manifest(assets_dir, keys):
     return len(named)
 
 
+MOD_ID = re.compile(r"^[a-z0-9_]+$")
+
+
+def mod_key(name):
+    """A path inside a mod as the game reads it (below assets/); None when it would leave the mod"""
+    if not name or "\\" in name or ":" in name or name.startswith("/"):
+        return None
+    key = posixpath.normpath(name)
+    if key in (".", "..") or key.startswith("../"):
+        return None
+    if key.startswith("assets/"):
+        key = key[len("assets/"):]
+    return key or None
+
+
+def check_mod(mod_dir, keys, base_assets=None):
+    """mod.yaml must name the mod; every path its manifest section names must be in the mod or the base game"""
+    path = os.path.join(mod_dir, "mod.yaml")
+    if not os.path.isfile(path):
+        raise SystemExit(f"pack_assets: {mod_dir} has no mod.yaml")
+    import yaml
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise SystemExit("pack_assets: mod.yaml is not a mapping")
+    if not MOD_ID.match(str(data.get("id", ""))):
+        raise SystemExit('pack_assets: mod.yaml needs an "id" of lower case letters, digits and _')
+    if "version" not in data:
+        raise SystemExit('pack_assets: mod.yaml needs a "version"')
+    manifest = data.get("manifest") or {}
+    if not isinstance(manifest, dict):
+        raise SystemExit('pack_assets: "manifest" in mod.yaml must be a mapping')
+    have = set(keys)
+    missing = []
+    for named in manifest_paths(manifest):
+        key = mod_key(named)
+        if key is None:
+            raise SystemExit(f"pack_assets: mod.yaml names {named}, which is outside the game data")
+        if key in have:
+            continue
+        if base_assets and os.path.isfile(os.path.join(base_assets, key)):
+            continue
+        missing.append(named)
+    if missing:
+        raise SystemExit("pack_assets: mod.yaml names missing files:\n  " + "\n  ".join(sorted(missing)))
+    return data
+
+
+def pack_mod(mod_dir, output, base_assets=None):
+    """A mod folder as <name>.mod: a tar.zst with mod.yaml and the files laid out as below assets/"""
+    files = []
+    for root, dirs, names in os.walk(mod_dir):
+        dirs.sort()
+        for name in sorted(names):
+            if name.startswith(".") or name.endswith(".bak") or name.startswith("~"):
+                continue
+            path = os.path.join(root, name)
+            rel = os.path.relpath(path, mod_dir).replace(os.sep, "/")
+            key = mod_key(rel)
+            if key is None:
+                raise SystemExit(f"pack_assets: {rel} is outside the mod")
+            files.append((key, path))
+    data = check_mod(mod_dir, [k for k, _ in files if k != "mod.yaml"], base_assets)
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w", format=tarfile.PAX_FORMAT) as tar:
+        for key, path in files:
+            with open(path, "rb") as f:
+                add_entry(tar, key, f.read())
+    tmp = output + ".tmp"
+    compress(buf.getvalue(), tmp)
+    os.replace(tmp, output)
+    print(f"pack_assets: mod {data['id']} {data['version']}: {len(files)} files -> {output}")
+    return 0
+
+
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "--mod":
+        if len(sys.argv) not in (4, 5):
+            print(__doc__)
+            return 2
+        mod_dir, output = sys.argv[2], sys.argv[3]
+        base = sys.argv[4] if len(sys.argv) == 5 else None
+        if not os.path.isdir(mod_dir):
+            print(f"pack_assets: {mod_dir} is not a directory", file=sys.stderr)
+            return 1
+        return pack_mod(mod_dir, output, base)
     if len(sys.argv) != 3:
         print(__doc__)
         return 2
