@@ -6,10 +6,12 @@
 #include "game/EntityManager.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/Research.hpp"
+#include "game/SimCommandCodec.hpp"
 #include "game/Sides.hpp"
 #include "game/TileMap.hpp"
 #include "game/Unit.hpp"
 #include "core/Utility.hpp"
+#include "openaow/net/Protocol.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -201,6 +203,15 @@ void Simulation::UpdateEconomies(float dt, SimContext &ctx)
 
 void Simulation::Issue(SimCommand command)
 {
+    // Never more units than one command carries over the network or in a replay (kMaxIdsPerCommand, a batch of
+    // kMaxPlayerCommandBytes): a bigger one was dropped by every peer, and a recording of it could not be read back.
+    // The same cut here for a game of this computer alone, so it plays back exactly as it was played.
+    std::sort(command.ids.begin(), command.ids.end());
+    command.ids.erase(std::unique(command.ids.begin(), command.ids.end()), command.ids.end());
+    if (command.ids.size() > SimCommandCodec::kMaxIdsPerCommand)
+        command.ids.resize(SimCommandCodec::kMaxIdsPerCommand);
+    while (command.ids.size() > 1 && SimCommandCodec::Encode({command}).size() > Net::kMaxPlayerCommandBytes)
+        command.ids.resize(command.ids.size() * 3 / 4);
     if (m_sink)
     {
         m_sink(std::move(command));

@@ -124,6 +124,9 @@ public:
     // Start of a sight update: nothing seen; the viewer's visible tiles become explored
     void ResetVisibility();
     void ResetAllFog(FogState state = FogState::Hidden);
+    // The drawn fog starts over for a new viewer: what its team sees this tick is shown, the rest is hidden. Only the
+    // picture: what each team sees (the simulation's part) is kept as it is
+    void ResetViewerFog();
     void RevealArea(int centerTileX, int centerTileY, int radius, std::uint8_t team);
     void RevealArea(int centerTileX, int centerTileY, int radius)
     {

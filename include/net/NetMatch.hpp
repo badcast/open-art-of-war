@@ -253,6 +253,9 @@ public:
     // a camera view followed by a newer one). Order kept; returns how many were dropped. The sender does it,
     // so every peer applies the same stream.
     static std::size_t CoalesceTurn(std::vector<SimCommand> &commands);
+    // Commands of one player for one turn as the batches a turn bundle carries: at most kMaxCommandsPerTurn commands
+    // and kMaxPlayerCommandBytes bytes each (the limits every reader checks); a command too big on its own is left out
+    static std::vector<std::vector<std::uint8_t>> EncodeBatches(const std::vector<SimCommand> &commands);
     // The same files one by one (path, hash of the bytes); the last entry stands for the manifest's simulation part
     static std::vector<Net::DataEntry> DataManifest();
     // Joining a host whose data differ: the host's files are fetched and put into a session overlay (Assets::

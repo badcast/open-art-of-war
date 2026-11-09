@@ -45,6 +45,30 @@ Net::GameIdentity Identity()
 
 } // namespace
 
+std::vector<std::vector<std::uint8_t>> NetMatch::EncodeBatches(const std::vector<SimCommand> &commands)
+{
+    std::vector<std::vector<std::uint8_t>> out;
+    std::size_t begin = 0;
+    while (begin < commands.size())
+    {
+        std::size_t count = std::min(commands.size() - begin, SimCommandCodec::kMaxCommandsPerTurn);
+        std::vector<SimCommand> part(commands.begin() + begin, commands.begin() + begin + count);
+        std::vector<std::uint8_t> bytes = SimCommandCodec::Encode(part);
+        while (bytes.size() > Net::kMaxPlayerCommandBytes && count > 1)
+        {
+            count = (count + 1) / 2;
+            part.resize(count);
+            bytes = SimCommandCodec::Encode(part);
+        }
+        if (bytes.size() <= Net::kMaxPlayerCommandBytes)
+            out.push_back(std::move(bytes));
+        else
+            std::cerr << "[Net] A command too big for one batch was dropped" << std::endl;
+        begin += count;
+    }
+    return out;
+}
+
 std::size_t NetMatch::CoalesceTurn(std::vector<SimCommand> &commands)
 {
     // A move / attack-move without Shift releases the units from their march and clears their orders first
@@ -982,26 +1006,10 @@ void NetMatch::AfterTick(std::uint32_t tick, std::uint64_t checksum)
     {
         const std::uint32_t turn = tick / tpt + m_client->inputDelay();
         CoalesceTurn(m_outgoing);
-        // In batches the room accepts: at most kMaxCommandsPerTurn commands and kMaxPlayerCommandBytes bytes
-        // each (a bigger one was refused by the host and the orders were lost). The host keeps every batch.
-        std::size_t begin = 0;
-        while (begin < m_outgoing.size())
-        {
-            std::size_t count = std::min(m_outgoing.size() - begin, SimCommandCodec::kMaxCommandsPerTurn);
-            std::vector<SimCommand> part(m_outgoing.begin() + begin, m_outgoing.begin() + begin + count);
-            std::vector<std::uint8_t> bytes = SimCommandCodec::Encode(part);
-            while (bytes.size() > Net::kMaxPlayerCommandBytes && count > 1)
-            {
-                count = (count + 1) / 2;
-                part.resize(count);
-                bytes = SimCommandCodec::Encode(part);
-            }
-            if (bytes.size() <= Net::kMaxPlayerCommandBytes)
-                m_client->sendCommands(turn, bytes);
-            else
-                std::cerr << "[Net] A command too big for one batch was dropped" << std::endl;
-            begin += count;
-        }
+        // In batches the room accepts (a bigger one was refused by the host and the orders were lost); the host
+        // keeps every batch
+        for (const std::vector<std::uint8_t> &bytes : EncodeBatches(m_outgoing))
+            m_client->sendCommands(turn, bytes);
         m_outgoing.clear();
     }
     if (tick % kHashIntervalTicks == 0)

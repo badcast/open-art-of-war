@@ -494,6 +494,21 @@ bool TileMap::IsVisibleTo(int tileX, int tileY, std::uint8_t team) const
     return (m_sight[tileY][tileX] & TeamBit(team)) != 0;
 }
 
+void TileMap::ResetViewerFog()
+{
+    const std::uint8_t bit = TeamBit(m_viewerTeam);
+    for (int y = 0; y < m_height; ++y)
+    {
+        for (int x = 0; x < m_width; ++x)
+        {
+            const bool seen = (m_sight[y][x] & bit) != 0;
+            m_fog[y][x] = seen ? FogState::Visible : FogState::Hidden;
+            if (seen)
+                RememberWall(x, y);
+        }
+    }
+}
+
 void TileMap::ResetAllFog(FogState state)
 {
     for (int y = 0; y < m_height; ++y)

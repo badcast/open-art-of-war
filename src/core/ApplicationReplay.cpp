@@ -242,7 +242,9 @@ void Application::ReplayWatch(int slot)
     Players::setup(m_replaySetup.slots, static_cast<PlayerId>(slot));
     m_replaySetup.local = static_cast<PlayerId>(slot);
     m_map->SetViewerTeam(Players::TeamOf(static_cast<PlayerId>(slot)));
-    m_map->ResetAllFog(FogState::Hidden); // what this player has seen is not known: it is seen again from now on
+    // What this player has seen is not known: it is seen again from now on. Only the drawn fog: wiping what the teams
+    // see (ResetAllFog) made the next tick's commands find no visible enemy (an attack became a move: out of sync)
+    m_map->ResetViewerFog();
     // (the local economy stays the simulation's: handing it to the watched player updated that economy twice and
     // the local player's never - the world went out of sync)
     m_entities->RebuildBlueprints();
@@ -974,8 +976,19 @@ void Application::FinishLocalReplay(const std::string &outcome)
             std::map<PlayerId, std::vector<SimCommand>> bySlot;
             for (const SimCommand &c : it->second)
                 bySlot[c.player].push_back(c);
+            // In the batches a turn bundle carries, the same as a network game sends them: one block of everything
+            // (more than 64 commands, or a big selection) made the whole file unreadable
             for (const auto &[slot, commands] : bySlot)
-                bundle.players.push_back({slot, SimCommandCodec::Encode(commands)});
+            {
+                for (std::vector<std::uint8_t> &bytes : NetMatch::EncodeBatches(commands))
+                    bundle.players.push_back({slot, std::move(bytes)});
+            }
+            if (bundle.players.size() > Net::kMaxBatchesPerTurn)
+            {
+                std::cerr << "[Replay] Tick " << t << ": " << bundle.players.size() - Net::kMaxBatchesPerTurn
+                          << " batches of commands over the limit were left out" << std::endl;
+                bundle.players.resize(Net::kMaxBatchesPerTurn);
+            }
         }
         m_localRecorder->OnBundle(bundle);
     }
