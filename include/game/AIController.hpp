@@ -216,6 +216,8 @@ public:
 
     // Difficulty system
     bool LoadDifficultyConfig(const std::string &path); // LoaderResources::aiDifficulty()
+    // The difficulty file read again (the data of a network game or a replay), the chosen difficulty kept
+    void ReloadDifficultyConfig();
     void SetDifficulty(AIDifficulty difficulty);
     AIDifficulty GetDifficulty() const
     {

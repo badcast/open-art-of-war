@@ -204,6 +204,9 @@ void Application::ReloadGameData()
     Capabilities::Reload();
     EffectsConfig::reload();
     TileCollision::Reload();
+    // The campaign's computer player lives as long as the game: its difficulty file too must be the session's
+    if (m_aiController)
+        m_aiController->ReloadDifficultyConfig();
     if (Assets::HasSessionOverlay())
     {
         EnvironmentConfig host;

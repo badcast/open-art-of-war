@@ -232,6 +232,17 @@ void AIController::RefreshDifficulty()
     m_creditsPerSec = m_currentDifficultyConfig.creditsPerSec;
 }
 
+void AIController::ReloadDifficultyConfig()
+{
+    const AIDifficulty difficulty = m_difficulty;
+    const int credits = m_credits;
+    InitDifficultyDefaults(); // (a level the file leaves out falls back to the built-in one, as on a fresh start)
+    LoadDifficultyConfig(LoaderResources::aiDifficulty());
+    m_difficulty = difficulty;
+    m_credits = credits;
+    RefreshDifficulty();
+}
+
 void AIController::SetDifficulty(AIDifficulty difficulty)
 {
     m_difficulty = difficulty;
