@@ -519,6 +519,16 @@ private:
     float m_sectorThreat[8] {};
     float m_foeHostility[kMaxPlayers] {};
     int SectorOf(int x, int y) const; // 0..7 around the home (0: east, counter-clockwise by 45 degrees)
+    // Guard posts: on every road to an enemy, just inside the line of defense (PlanBaseDefenses); the home guard
+    // (HomeGuardCount) is spread over them, at least one each, the rest by the threat of the post's sector
+    std::vector<std::pair<int, int>> m_guardPosts;
+    std::map<int, int> m_guardOf; // unit id -> post index (ordered: the same iteration on every peer)
+    float m_guardTimer {0.0f};
+    void UpdateGuardPosts(EntityManager &entities, Pathfinder &pathfinder);
+    bool IsPostGuard(int unitId) const
+    {
+        return m_guardOf.count(unitId) != 0;
+    }
     int UnitThreatValue(const Unit &u, const EntityManager &entities) const; // its credit cost
     int m_lastThreatX {-1}; // where the player last showed up at the base
     int m_lastThreatY {-1};

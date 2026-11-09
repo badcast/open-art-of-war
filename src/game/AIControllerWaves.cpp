@@ -337,7 +337,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u))
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id)) // (a guard stays at its post)
             continue;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
         {
@@ -445,7 +445,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u))
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id)) // (the guards at the posts never leave with a wave)
             continue;
         if (u->targetEntityId != 0 || u->isAttackMoving)
             continue;
@@ -461,7 +461,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (u && IsReserveUnit(*u) && u->targetEntityId == 0 && !u->isAttackMoving && u->state == ActionState::Idle)
+        if (u && IsReserveUnit(*u) && !IsPostGuard(u->id) && u->targetEntityId == 0 && !u->isAttackMoving
+            && u->state == ActionState::Idle)
             idleReserve.push_back(u->id);
     }
 
@@ -491,7 +492,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     // March only with 100% of the planned wave plus the home guard that stays; without production left, send
     // whatever is assembled
-    const int guard = HomeGuardCount();
+    // (the guards already at the posts count toward it: the rest of the home guard stays at the staging area)
+    const int guard = std::max(0, HomeGuardCount() - static_cast<int>(m_guardOf.size()));
     bool full = static_cast<int>(ready.size()) >= required + guard;
     // A wave does not wait for its vehicles for ever: after the difficulty's wait it marches with what is there
     // (the vehicles still being built join the next wave)

@@ -179,6 +179,102 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     }
 }
 
+void AIController::UpdateGuardPosts(EntityManager &entities, Pathfinder &pathfinder)
+{
+    if (m_guardPosts.empty())
+        return;
+    // Guards that died, joined a squad or left the reserve are no guards any more
+    for (auto it = m_guardOf.begin(); it != m_guardOf.end();)
+    {
+        const Unit *u = entities.GetUnit(it->first);
+        if (!u || !IsReserveUnit(*u) || it->second >= static_cast<int>(m_guardPosts.size()))
+            it = m_guardOf.erase(it);
+        else
+            ++it;
+    }
+
+    // How many each post gets: one each first (the most threatened posts first, when there are too few guards),
+    // the rest one by one to the post whose threat per guard is highest
+    const int posts = static_cast<int>(m_guardPosts.size());
+    std::vector<float> weight(static_cast<std::size_t>(posts));
+    for (int i = 0; i < posts; ++i)
+        weight[i] = 1.0f + m_sectorThreat[SectorOf(m_guardPosts[i].first, m_guardPosts[i].second)];
+    std::vector<int> order(static_cast<std::size_t>(posts));
+    for (int i = 0; i < posts; ++i)
+        order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return weight[a] > weight[b]; });
+    std::vector<int> want(static_cast<std::size_t>(posts), 0);
+    int left = HomeGuardCount();
+    for (int i = 0; i < posts && left > 0; ++i, --left)
+        ++want[order[i]];
+    for (; left > 0; --left)
+    {
+        int best = 0;
+        for (int i = 1; i < posts; ++i)
+            if (weight[i] / static_cast<float>(want[i] + 1) > weight[best] / static_cast<float>(want[best] + 1))
+                best = i;
+        ++want[best];
+    }
+
+    // Too many at a post: the extra ones go back to the reserve
+    std::vector<int> have(static_cast<std::size_t>(posts), 0);
+    for (auto it = m_guardOf.begin(); it != m_guardOf.end();)
+    {
+        if (have[it->second] >= want[it->second])
+        {
+            it = m_guardOf.erase(it);
+            continue;
+        }
+        ++have[it->second];
+        ++it;
+    }
+    // Too few: the nearest idle troops of the reserve
+    for (int i = 0; i < posts; ++i)
+    {
+        while (have[i] < want[i])
+        {
+            const auto [px, py] = m_guardPosts[i];
+            int bestId = 0;
+            int bestDist = 1 << 30;
+            for (const auto &e : entities.GetAllEntities())
+            {
+                const Unit *u = e.AsUnit();
+                if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
+                    || u->state != ActionState::Idle || u->targetEntityId != 0 || u->isAttackMoving)
+                    continue;
+                const int d = std::max(std::abs(u->tileX - px), std::abs(u->tileY - py));
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestId = u->id;
+                }
+            }
+            if (bestId == 0)
+                break;
+            m_guardOf[bestId] = i;
+            ++have[i];
+        }
+    }
+
+    // Guards away from their post (it was the reserve, or it went for an intruder) walk back to it
+    std::vector<std::vector<int>> back(static_cast<std::size_t>(posts));
+    for (const auto &[id, post] : m_guardOf)
+    {
+        const Unit *u = entities.GetUnit(id);
+        const auto [px, py] = m_guardPosts[post];
+        if (u && u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving
+            && std::max(std::abs(u->tileX - px), std::abs(u->tileY - py)) > 2)
+            back[post].push_back(id);
+    }
+    for (int i = 0; i < posts; ++i)
+        if (!back[i].empty())
+            entities.IssueAttackMoveOrder(back[i], m_guardPosts[i].first, m_guardPosts[i].second, pathfinder);
+    ThinkOnce(
+        "guardposts",
+        "DEFENSE",
+        std::to_string(m_guardOf.size()) + " guard(s) at " + std::to_string(posts) + " post(s) on the roads in");
+}
+
 bool AIController::FindSiteNear(
     int &x,
     int &y,
@@ -294,6 +390,29 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
     };
 
     // Power plants, the barracks, the factory and the laboratory come from the core build order (UpdateCoreBuildOrder)
+
+    // Guard posts: on every road to an enemy, the last road tile two tiles inside the line of defense (posts closer
+    // than 6 tiles to each other are one)
+    m_guardPosts.clear();
+    m_guardOf.clear();
+    for (const auto &enemyRoad : m_enemyRoads)
+    {
+        int px = -1, py = -1;
+        for (const auto &[rx, ry] : enemyRoad)
+        {
+            if (DetMath::Hypot(static_cast<float>(rx - cx), static_cast<float>(ry - cy)) > wallRadius - 2.0f)
+                break;
+            px = rx;
+            py = ry;
+        }
+        if (px < 0)
+            continue;
+        bool near = false;
+        for (const auto &[gx, gy] : m_guardPosts)
+            near = near || std::max(std::abs(gx - px), std::abs(gy - py)) < 6;
+        if (!near)
+            m_guardPosts.emplace_back(px, py);
+    }
 
     // 1. Like the bases of the campaign: a wall straight across the narrowest passage of every road to an enemy,
     //    the gate on the road, a tower and a bunker behind it

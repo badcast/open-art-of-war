@@ -575,6 +575,9 @@ void AIController::Reset()
     m_knownBuildings.clear();
     std::fill(std::begin(m_sectorThreat), std::end(m_sectorThreat), 0.0f);
     std::fill(std::begin(m_foeHostility), std::end(m_foeHostility), 0.0f);
+    m_guardPosts.clear();
+    m_guardOf.clear();
+    m_guardTimer = 0.0f;
     m_eliminatedFoes = 0;
     m_noFoesLeft = false;
     m_foeAnchorTimer = 0.0f;
@@ -781,6 +784,12 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     {
         m_defenseCheckTimer = 0.0f;
         UpdateBaseDefense(entities, pathfinder);
+    }
+    m_guardTimer += deltaTime;
+    if (m_guardTimer >= 10.0f)
+    {
+        m_guardTimer = 0.0f;
+        UpdateGuardPosts(entities, pathfinder);
     }
 
     UpdateIntel(entities);

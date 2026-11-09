@@ -93,7 +93,7 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u) || m_repairing.count(u->id) || u->targetEntityId != 0)
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_repairing.count(u->id) || u->targetEntityId != 0)
             continue;
         const UnitConfig *cfg = entities.GetUnitConfig(u->archetypeId);
         const int cost = cfg ? cfg->creditCost : 1000;
