@@ -28,9 +28,9 @@ namespace
 // Tuning
 // per run of UpdateBaseDefense (every 2 s): 0.5 ^ (2 s / 180 s), the threat memory halves in 3 minutes
 constexpr float kThreatDecay = 0.99233f;
-constexpr float kHqZoneTiles = 18.0f;       // an enemy this close to the headquarters is at the base
-constexpr float kBuildingZoneTiles = 10.0f; // ... or this close to any structure of the base
-constexpr float kClusterTiles = 6.0f;       // enemies this close together are one attack
+constexpr float kHqZoneTiles = 18.0f;        // an enemy this close to the headquarters is at the base
+constexpr float kBuildingZoneTiles = 10.0f;  // ... or this close to any structure of the base
+constexpr float kClusterTiles = 6.0f;        // enemies this close together are one attack
 constexpr float kDefenderReachTiles = 22.0f; // idle troops this close to an attack go for it
 constexpr float kDefenseMargin = 1.2f;       // an attack wants this much more worth of defenders than it brings
 } // namespace
@@ -41,7 +41,7 @@ int AIController::SectorOf(int x, int y) const
     if (x == hx && y == hy)
         return 0;
     const float a = DetMath::Atan2(static_cast<float>(y - hy), static_cast<float>(x - hx)); // -pi..pi
-    const float turns = a / (2.0f * static_cast<float>(M_PI)) + 1.0f / 16.0f;                // centred on 0
+    const float turns = a / (2.0f * static_cast<float>(M_PI)) + 1.0f / 16.0f;               // centred on 0
     int s = static_cast<int>(std::floor(turns * 8.0f));
     return ((s % 8) + 8) % 8;
 }
@@ -62,14 +62,14 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         t *= kThreatDecay;
 
     // The base: the headquarters and every structure of this player
-    const float hqPx = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f, hqPy = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
+    const float hqPx = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f,
+                hqPy = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
     std::vector<const Building *> ownBuildings;
     for (const auto &e : entities.GetAllEntities())
         if (const Building *b = e.AsBuilding(); b && b->alive && b->state != ActionState::Die && b->owner == m_player)
             ownBuildings.push_back(b);
     auto atBase = [&](const Entity &e) {
-        if (DetMath::Hypot(e.GetUnitCenterPixelX() - hqPx, e.GetUnitCenterPixelY() - hqPy)
-            <= kHqZoneTiles * TILE_WIDTH)
+        if (DetMath::Hypot(e.GetUnitCenterPixelX() - hqPx, e.GetUnitCenterPixelY() - hqPy) <= kHqZoneTiles * TILE_WIDTH)
             return true;
         for (const Building *b : ownBuildings)
         {
@@ -175,10 +175,7 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     {
         if (!a.defenders.empty())
             entities.IssueAttackMoveOrder(
-                a.defenders,
-                static_cast<int>(std::lround(a.x)),
-                static_cast<int>(std::lround(a.y)),
-                pathfinder);
+                a.defenders, static_cast<int>(std::lround(a.x)), static_cast<int>(std::lround(a.y)), pathfinder);
     }
 }
 
@@ -332,10 +329,49 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
         };
         const float rad30 = 30.0f * static_cast<float>(M_PI) / 180.0f;
+        // Every way an enemy comes from gets its arc: the objective's first, then where each road to an enemy crosses
+        // the line (directions closer than 40 degrees share one arc). The tile where the road crosses is kept for
+        // the second exit.
+        struct ArcDir
+        {
+            float angle;
+            int roadX, roadY;
+        };
+        std::vector<ArcDir> arcs {{threatAngle, m_gateX[0], m_gateY[0]}};
+        const float rad40 = 40.0f * static_cast<float>(M_PI) / 180.0f;
+        for (const auto &enemyRoad : m_enemyRoads)
+        {
+            for (const auto &[rx, ry] : enemyRoad)
+            {
+                if (DetMath::Hypot(static_cast<float>(rx - cx), static_cast<float>(ry - cy)) < wallRadius - 0.5f)
+                    continue;
+                const float a = DetMath::Atan2(static_cast<float>(ry - cy), static_cast<float>(rx - cx));
+                bool merged = false;
+                for (const ArcDir &d : arcs)
+                    merged = merged || angleDiff(a, d.angle) < rad40;
+                if (!merged)
+                    arcs.push_back({a, rx, ry});
+                break;
+            }
+        }
+        // The second exit: toward the side most attacks came from (when one other than the objective's did)
+        float worst = 0.0f;
+        for (std::size_t i = 1; i < arcs.size(); ++i)
+        {
+            const float threat = m_sectorThreat[SectorOf(arcs[i].roadX, arcs[i].roadY)];
+            if (threat > worst)
+            {
+                worst = threat;
+                m_gateX[1] = arcs[i].roadX;
+                m_gateY[1] = arcs[i].roadY;
+            }
+        }
         const float firstSide
             = angleDiff(gateAngle + rad30, threatAngle) <= angleDiff(gateAngle - rad30, threatAngle) ? 1.0f : -1.0f;
         for (float side : {firstSide, -firstSide})
         {
+            if (m_gateX[1] >= 0)
+                break; // (set above, toward the worst side)
             const float a = gateAngle + side * rad30;
             const int gx
                 = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
@@ -350,42 +386,50 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         }
         const int rows = m_style.towersOnly ? 0 : std::clamp(m_style.wallThickness, 1, 2);
         const float halfArc = 40.0f * static_cast<float>(M_PI) / 180.0f;
-        for (int row = 0; row < rows; ++row)
-        {
-            const float radius = wallRadius + static_cast<float>(row);
-            const float step = 0.45f / radius;
-            for (float a = -halfArc; a <= halfArc; a += step)
+        for (const ArcDir &arc : arcs)
+            for (int row = 0; row < rows; ++row)
             {
-                const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(threatAngle + a) * radius));
-                const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(threatAngle + a) * radius));
-                if (wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
-                    continue;
-                if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
-                    continue;
-                bool nearGate = false;
-                for (int g = 0; g < 2; ++g)
+                const float radius = wallRadius + static_cast<float>(row);
+                const float step = 0.45f / radius;
+                for (float a = -halfArc; a <= halfArc; a += step)
                 {
-                    if (m_gateX[g] >= 0 && std::max(std::abs(wx - m_gateX[g]), std::abs(wy - m_gateY[g])) <= 1)
-                        nearGate = true;
+                    const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(arc.angle + a) * radius));
+                    const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(arc.angle + a) * radius));
+                    if (wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
+                        continue;
+                    if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
+                        continue;
+                    bool nearGate = false;
+                    for (int g = 0; g < 2; ++g)
+                    {
+                        if (m_gateX[g] >= 0 && std::max(std::abs(wx - m_gateX[g]), std::abs(wy - m_gateY[g])) <= 1)
+                            nearGate = true;
+                    }
+                    // A road to an ally or the band of one stays open (an extra opening), so does an ally's ground;
+                    // nothing walks over rock or water anyway
+                    if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy)
+                        || map.GetWall(wx, wy) > 0)
+                        continue;
+                    wallTiles.emplace_back(wx, wy);
+                    wallRow.push_back(row);
                 }
-                // A road to an ally or the band of one stays open (an extra opening), so does an ally's ground;
-                // nothing walks over rock or water anyway
-                if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy)
-                    || map.GetWall(wx, wy) > 0)
-                    continue;
-                wallTiles.emplace_back(wx, wy);
-                wallRow.push_back(row);
             }
-        }
-        // Towers right behind the main exit, a bunker covering the second one, the flanks of the arc
+        // Behind every arc: a tower in the middle, a bunker and a tower on its flanks
         const float innerRadius = wallRadius - 3.0f;
-        int x = 0, y = 0;
-        ringTile(innerRadius, 0.0f, x, y);
-        add(AIDefenseSite::Tower, x - 1, y - 1);
-        ringTile(innerRadius, -30.0f, x, y);
-        add(m_style.bunkerHeavy ? AIDefenseSite::Tower : AIDefenseSite::Bunker, x - 1, y - 1);
-        ringTile(innerRadius, 30.0f, x, y);
-        add(AIDefenseSite::Tower, x - 1, y - 1);
+        for (const ArcDir &arc : arcs)
+        {
+            const float offset = (arc.angle - threatAngle) * 180.0f / static_cast<float>(M_PI);
+            int x = 0, y = 0;
+            ringTile(innerRadius, offset, x, y);
+            add(AIDefenseSite::Tower, x - 1, y - 1);
+            ringTile(innerRadius, offset - 30.0f, x, y);
+            add(m_style.bunkerHeavy ? AIDefenseSite::Tower : AIDefenseSite::Bunker, x - 1, y - 1);
+            ringTile(innerRadius, offset + 30.0f, x, y);
+            add(AIDefenseSite::Tower, x - 1, y - 1);
+        }
+        Think(
+            "BUILD",
+            "Open ground: " + std::to_string(arcs.size()) + " wall arcs, one toward each way an enemy comes from");
     }
     // More firepower when the walls are few
     if (m_style.towersOnly)
