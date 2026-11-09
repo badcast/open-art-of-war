@@ -50,7 +50,7 @@ private:
     void Move(int index, int by);
     std::vector<std::string> EnabledIds() const;
 
-    std::vector<Entry> m_entries; // enabled ones first, in load order
+    std::vector<Entry> m_entries;       // enabled ones first, in load order
     std::vector<std::string> m_applied; // what is in place
     Mods::ActivateReport m_report;
     std::string m_notice;

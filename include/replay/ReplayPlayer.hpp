@@ -36,8 +36,8 @@ public:
         std::string source; // "client" or "server"
         std::string gameVersion;
         std::vector<std::string> mods; // "name version" of the mods it was recorded with
-        std::string map;     // the map's path as the room named it
-        std::string outcome; // "victory", "defeat", "left", ... (a client's replay)
+        std::string map;               // the map's path as the room named it
+        std::string outcome;           // "victory", "defeat", "left", ... (a client's replay)
         std::int64_t recordedAt {0};
         std::uint64_t mapHash {0};
         std::uint32_t turns {0};

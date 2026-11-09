@@ -63,7 +63,7 @@ bool HasSessionOverlay();
 struct ModLayer
 {
     std::string id;
-    std::string folder;                                      // an unpacked mod: its root; empty for an archive
+    std::string folder;                                     // an unpacked mod: its root; empty for an archive
     std::map<std::string, std::vector<std::uint8_t>> files; // an archive: every file by key
 };
 void SetModLayers(std::vector<ModLayer> layers);
@@ -71,8 +71,8 @@ void ClearModLayers();
 bool HasModLayers();
 // Every regular file of a tar archive (compressed as libarchive reads it: zstd, gzip...) into memory, by its path
 // inside; `only`: just that entry. False when it cannot be read.
-bool ReadArchive(const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files,
-    const std::string &only = "");
+bool ReadArchive(
+    const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only = "");
 bool Exists(const std::string &path);
 bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out);
 bool ReadText(const std::string &path, std::string &out);

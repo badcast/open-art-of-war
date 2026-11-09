@@ -348,7 +348,8 @@ bool AIController::KeepsWayOut(
             if (b < 0)
                 continue;
             int &m = mainPart[b];
-            if (m < 0 || partSize[a] > partSize[m] || (partSize[a] == partSize[m] && partImportant[a] && !partImportant[m]))
+            if (m < 0 || partSize[a] > partSize[m]
+                || (partSize[a] == partSize[m] && partImportant[a] && !partImportant[m]))
                 m = a;
         }
         constexpr int kDeadEndTiles = 32;

@@ -94,9 +94,9 @@ void CharacterEditor::DrawEditor()
     ImGui::SameLine();
     Hinted(ImGui::RadioButton(_("Buildings"), &filterCategory, 2), "Buildings");
     // Faction filter, the layout in columns and collapsing of all the groups
-    static int filterFaction = 0;  // 0 all, 1 Confederation, 2 Resistance
-    static int listColumns = 1;    // 1..3
-    static int forceOpen = -1;     // -1 as the user left it, 0 collapse all, 1 expand all (for one frame)
+    static int filterFaction = 0; // 0 all, 1 Confederation, 2 Resistance
+    static int listColumns = 1;   // 1..3
+    static int forceOpen = -1;    // -1 as the user left it, 0 collapse all, 1 expand all (for one frame)
     {
         const char *factionNames[] = {_("All factions"), _("Confederation"), _("Resistance")};
         ImGui::SetNextItemWidth(120.0f);
@@ -170,8 +170,8 @@ void CharacterEditor::DrawEditor()
             continue;
         if (filterCategory == 2 && file.type != "building")
             continue;
-        const OpenArtOfWar::Faction wantedFaction = filterFaction == 1 ? OpenArtOfWar::Faction::Confederation
-                                                                       : OpenArtOfWar::Faction::Resistance;
+        const OpenArtOfWar::Faction wantedFaction
+            = filterFaction == 1 ? OpenArtOfWar::Faction::Confederation : OpenArtOfWar::Faction::Resistance;
         if (filterFaction > 0
             && OpenArtOfWar::Utility::ParseFaction(file.faction, OpenArtOfWar::Faction::Neutral) != wantedFaction)
             continue;

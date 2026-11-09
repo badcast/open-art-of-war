@@ -133,7 +133,8 @@ void ScanDir(const fs::path &dir, bool fromUser, std::vector<ModInfo> &out)
                 continue;
             }
             const auto it = files.find("mod.yaml");
-            const std::string text = it == files.end() ? std::string() : std::string(it->second.begin(), it->second.end());
+            const std::string text
+                = it == files.end() ? std::string() : std::string(it->second.begin(), it->second.end());
             out.push_back(Describe(text, p, true, fromUser));
         }
     }
@@ -143,7 +144,8 @@ void ScanDir(const fs::path &dir, bool fromUser, std::vector<ModInfo> &out)
 void FolderKeys(const fs::path &root, std::vector<std::string> &keys)
 {
     std::error_code ec;
-    for (auto it = fs::recursive_directory_iterator(root, ec); it != fs::recursive_directory_iterator(); it.increment(ec))
+    for (auto it = fs::recursive_directory_iterator(root, ec); it != fs::recursive_directory_iterator();
+         it.increment(ec))
     {
         if (ec)
             break;

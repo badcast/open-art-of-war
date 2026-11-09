@@ -52,8 +52,9 @@ bool KeyOf(const std::string &path, std::string &key);
 
 struct ActivateReport
 {
-    std::vector<std::string> problems;                         // ids not found / unusable
-    std::map<std::string, std::vector<std::string>> conflicts; // a file several enabled mods bring -> their ids, in order
+    std::vector<std::string> problems; // ids not found / unusable
+    std::map<std::string, std::vector<std::string>>
+        conflicts; // a file several enabled mods bring -> their ids, in order
 };
 // Puts these mods (in this order, the last one wins) over the installed data; an empty list takes every mod away.
 // False when one of them could not be used (the others are still in place). Call LoaderResources::Reload() after.

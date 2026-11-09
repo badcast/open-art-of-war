@@ -210,7 +210,8 @@ private:
     fs::path SpriteMetaPath(const std::string &object) const;
     // metaFile / imageSuffix: read the frames from another file and the PNGs as `<name><suffix>` (the .bak files),
     // kept as unsaved changes
-    void LoadSpriteObject(const std::string &object, const fs::path &metaFile = {}, const std::string &imageSuffix = {});
+    void LoadSpriteObject(
+        const std::string &object, const fs::path &metaFile = {}, const std::string &imageSuffix = {});
     std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
     bool SaveSpriteObject(bool backup = true);         // backup: the files as they were go to .bak first
     std::vector<std::string> SpriteImageNames() const; // the sprite's PNGs (the faction variant too)
@@ -223,14 +224,15 @@ private:
     std::string SpriteGroupMoveBlocker(const std::vector<int> &frames, int dx, int dy) const;
     bool MoveSpriteFramesPixels(const std::vector<int> &frames, int dx, int dy);
     std::vector<int> SpriteSelection() const; // the main frame and the others picked with it, in frame order
-    bool RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmaller = false); // PNGs redrawn with the frames at new places, unsaved
+    bool RearrangeSpriteImage(
+        SpriteArrange mode, bool onlyIfSmaller = false); // PNGs redrawn with the frames at new places, unsaved
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
     // Pixel edits are kept in memory (spritePending) until Save: the PNGs on disk stay as they were
-    bool EnsurePending();                                // loads the sprite's PNGs into spritePending
+    bool EnsurePending();                                           // loads the sprite's PNGs into spritePending
     void SetPending(const std::string &name, SDL_Surface *surface); // takes the surface
-    void DiscardPending();                               // Revert / a new load: the unsaved pixels go
-    void RefreshPendingTexture();                        // the canvas picture of the pending image
-    SDL_Texture *SpriteCanvasTexture();                  // pending picture, else the registry's sheet
+    void DiscardPending();                                          // Revert / a new load: the unsaved pixels go
+    void RefreshPendingTexture();                                   // the canvas picture of the pending image
+    SDL_Texture *SpriteCanvasTexture();                             // pending picture, else the registry's sheet
     // Resamples the image (and the Resistance image) to w x h; the frames follow, the drawn sizes stay. `uniform`:
     // the same factor on both axes (an aspect-keeping size)
     bool ResizeSpriteImage(int w, int h, bool smooth, bool uniform);
@@ -517,10 +519,10 @@ private:
     float spriteScale {1.0f};
     int spriteRecolor {0};
     int spriteImageW {0}, spriteImageH {0};
-    int spriteFrameSel {-1};             // the main selected frame (its properties, its resize handles)
-    std::vector<char> spriteMulti;       // per frame: selected along with it (Ctrl / Shift click, a box, Ctrl+A)
+    int spriteFrameSel {-1};       // the main selected frame (its properties, its resize handles)
+    std::vector<char> spriteMulti; // per frame: selected along with it (Ctrl / Shift click, a box, Ctrl+A)
     std::vector<std::array<int, 5>> spriteGroupStart; // the dragged group at the press: frame, x, y, w, h
-    int spriteGroupMove[2] {0, 0};       // the offset of the group while it is dragged with its pixels
+    int spriteGroupMove[2] {0, 0};                    // the offset of the group while it is dragged with its pixels
     bool spriteDirty {false};
     std::map<std::string, SDL_Surface *> spritePending;   // edited PNGs (name -> RGBA), written by Save only
     std::map<std::string, SDL_Surface *> spriteScaleBase; // the pixels before the first resize, resampled from

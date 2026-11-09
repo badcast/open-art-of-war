@@ -210,7 +210,8 @@ void SpriteCanvasCamera(
     }
 }
 
-void CharacterEditor::LoadSpriteObject(const std::string &object, const fs::path &metaFile, const std::string &imageSuffix)
+void CharacterEditor::LoadSpriteObject(
+    const std::string &object, const fs::path &metaFile, const std::string &imageSuffix)
 {
     DiscardPending();
     spriteMetaBase.clear();
@@ -747,7 +748,8 @@ bool CharacterEditor::RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmalle
         }
     }
     const std::array<int, 2> extent = SM::PackExtent(sizes, pos);
-    if (onlyIfSmaller && static_cast<long long>(extent[0]) * extent[1] >= static_cast<long long>(spriteImageW) * spriteImageH)
+    if (onlyIfSmaller
+        && static_cast<long long>(extent[0]) * extent[1] >= static_cast<long long>(spriteImageW) * spriteImageH)
         return false;
     if (!EnsurePending())
         return false;
@@ -920,8 +922,9 @@ void CharacterEditor::ReloadSpriteData()
     // Re-resolve unsaved editor drafts as well as disk defaults.
     EffectsChanged();
     ProjectilesChanged();
-    fxAnim = selectedAnimation.empty() ? -1
-        : SpriteHandle(selectedAnimation, SpriteKind::Anim, "editor animation selection");
+    fxAnim = selectedAnimation.empty()
+                 ? -1
+                 : SpriteHandle(selectedAnimation, SpriteKind::Anim, "editor animation selection");
     // Live previews contain handles into the old registry.
     fxEvents.clear();
     projShots.clear();
@@ -1264,7 +1267,14 @@ void CharacterEditor::DrawSpriteTools()
         if (sel && !main)
             dl->AddRectFilled(a, b, IM_COL32(255, 180, 60, 40));
         dl->AddRect(
-            a, b, sel ? IM_COL32(255, 180, 60, 255) : IM_COL32(90, 200, 160, 200), 0.0f, 0, main ? 2.0f : sel ? 1.5f : 1.0f);
+            a,
+            b,
+            sel ? IM_COL32(255, 180, 60, 255) : IM_COL32(90, 200, 160, 200),
+            0.0f,
+            0,
+            main  ? 2.0f
+            : sel ? 1.5f
+                  : 1.0f);
         if (main || (inside && hovered))
             dl->AddText(
                 ImVec2(a.x + 2, a.y - ImGui::GetTextLineHeight() - 1), IM_COL32(255, 230, 180, 255), f.name.c_str());
@@ -1283,7 +1293,7 @@ void CharacterEditor::DrawSpriteTools()
     const bool magnet = spriteMagnet && !io.KeyAlt;
     const int snapThreshold = std::max(1, static_cast<int>(std::lround(8.0f / spriteZoom)));
     constexpr int kNoGuide = std::numeric_limits<int>::min();
-    constexpr int kSkipSelected = -2; // the targets leave out the whole selection (it is what moves)
+    constexpr int kSkipSelected = -2;         // the targets leave out the whole selection (it is what moves)
     int guideX = kNoGuide, guideY = kNoGuide; // the lines the dragged edge stuck to
     auto targetsFor = [&](bool xAxis, int skip) {
         std::vector<int> t = {0, xAxis ? spriteImageW : spriteImageH};
@@ -1452,9 +1462,10 @@ void CharacterEditor::DrawSpriteTools()
         }
         else if (spriteDrag == SpriteDrag::BoxSelect)
         {
-            const ImVec2 a = toScreen(std::min(spriteDragStart.x, std::floor(mx)), std::min(spriteDragStart.y, std::floor(my)));
-            const ImVec2 b
-                = toScreen(std::max(spriteDragStart.x, std::floor(mx)) + 1, std::max(spriteDragStart.y, std::floor(my)) + 1);
+            const ImVec2 a
+                = toScreen(std::min(spriteDragStart.x, std::floor(mx)), std::min(spriteDragStart.y, std::floor(my)));
+            const ImVec2 b = toScreen(
+                std::max(spriteDragStart.x, std::floor(mx)) + 1, std::max(spriteDragStart.y, std::floor(my)) + 1);
             dl->AddRectFilled(a, b, IM_COL32(80, 160, 255, 40));
             dl->AddRect(a, b, IM_COL32(80, 160, 255, 220), 0.0f, 0, 1.0f);
         }
@@ -1737,17 +1748,17 @@ void CharacterEditor::DrawSpritePropertiesBody()
         ImGui::Separator();
         ImGui::Text(_("Image size: %d x %d px"), spriteImageW, spriteImageH);
         static const int kPresets[] = {512, 1024, 2048, 4096};
-        const std::array<int, 2> target = SpriteMerge::FitToLongestSide(
-            spriteImageW, spriteImageH, kPresets[std::clamp(spriteSizePreset, 0, 3)]);
-        const std::string names[4] = {
-            "512 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 512)[0]) + "x"
-                + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 512)[1]) + ")",
-            "1024 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 1024)[0]) + "x"
-                + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 1024)[1]) + ")",
-            "2048 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 2048)[0]) + "x"
-                + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 2048)[1]) + ")",
-            "4096 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 4096)[0]) + "x"
-                + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 4096)[1]) + ")"};
+        const std::array<int, 2> target
+            = SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, kPresets[std::clamp(spriteSizePreset, 0, 3)]);
+        const std::string names[4]
+            = {"512 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 512)[0]) + "x"
+                   + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 512)[1]) + ")",
+               "1024 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 1024)[0]) + "x"
+                   + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 1024)[1]) + ")",
+               "2048 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 2048)[0]) + "x"
+                   + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 2048)[1]) + ")",
+               "4096 (" + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 4096)[0]) + "x"
+                   + std::to_string(SpriteMerge::FitToLongestSide(spriteImageW, spriteImageH, 4096)[1]) + ")"};
         ImGui::SetNextItemWidth(150.0f);
         if (ImGui::BeginCombo("##size-preset", names[std::clamp(spriteSizePreset, 0, 3)].c_str()))
         {

@@ -1122,7 +1122,7 @@ void Application::RenderMenuFade()
     const bool menuScreen = m_state == AppState::MainMenu || m_state == AppState::MenuHelp
                             || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
                             || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay
-                           || m_state == AppState::MenuMods;
+                            || m_state == AppState::MenuMods;
     const std::uint64_t now = SDL_GetTicks();
     if (menuScreen && !m_menuFadeWasMenu)
         m_menuFadeStartMs = m_state == AppState::MainMenu ? now : 0;

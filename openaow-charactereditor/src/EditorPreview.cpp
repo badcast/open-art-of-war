@@ -484,7 +484,9 @@ void CharacterEditor::DrawCanvasGuides(const ImVec2 &min, const ImVec2 &size)
     // The scene (ground, characters) is drawn here, in the order of the canvas' draw list: what the UI puts on the
     // canvas (guides, banners, popups, other windows) stays above it
     drawList->AddCallback(
-        [](const ImDrawList *, const ImDrawCmd *cmd) { static_cast<CharacterEditor *>(cmd->UserCallbackData)->DrawPreviewScene(); },
+        [](const ImDrawList *, const ImDrawCmd *cmd) {
+            static_cast<CharacterEditor *>(cmd->UserCallbackData)->DrawPreviewScene();
+        },
         this);
     drawList->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 

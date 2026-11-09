@@ -64,8 +64,7 @@ void ModsMenu::Toggle(int index)
     // Enabled ones stay together on top: a newly enabled one goes to the end of them (it wins over the others)
     Entry moved = e;
     m_entries.erase(m_entries.begin() + index);
-    const auto firstOff
-        = std::find_if(m_entries.begin(), m_entries.end(), [](const Entry &x) { return !x.enabled; });
+    const auto firstOff = std::find_if(m_entries.begin(), m_entries.end(), [](const Entry &x) { return !x.enabled; });
     const auto at = m_entries.insert(moved.enabled ? firstOff : firstOff, moved);
     m_selected = static_cast<int>(at - m_entries.begin());
 }
@@ -186,13 +185,23 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
     if (count == 0)
     {
         int y = l.list.y + 16;
-        font.DrawString(_("No mods found. Put them (.mod files or folders) into:"), l.list.x + 14, y, ui::FONT_BODY,
-            col::TextDim, false);
+        font.DrawString(
+            _("No mods found. Put them (.mod files or folders) into:"),
+            l.list.x + 14,
+            y,
+            ui::FONT_BODY,
+            col::TextDim,
+            false);
         for (const std::string &d : m_dirs)
         {
             y += font.GetTextHeight(ui::FONT_BODY) + 8;
-            font.DrawString(ui::FitText(font, d, ui::FONT_SMALL, l.list.w - 28), l.list.x + 14, y, ui::FONT_SMALL,
-                col::TextMuted, false);
+            font.DrawString(
+                ui::FitText(font, d, ui::FONT_SMALL, l.list.w - 28),
+                l.list.x + 14,
+                y,
+                ui::FONT_SMALL,
+                col::TextMuted,
+                false);
         }
     }
     int order = 0;
@@ -209,13 +218,30 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
             ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 255), ui::WithAlpha(col::Hover, 40));
         else if (r.Contains(m_mouseX, m_mouseY))
             renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 120));
-        ui::DrawCheckbox(renderer, font, {r.x + 8, r.CenterY() - 10, 20, 20}, "", e.enabled,
-            r.Contains(m_mouseX, m_mouseY) && m_mouseX < l.list.x + 40, e.info.error.empty());
+        ui::DrawCheckbox(
+            renderer,
+            font,
+            {r.x + 8, r.CenterY() - 10, 20, 20},
+            "",
+            e.enabled,
+            r.Contains(m_mouseX, m_mouseY) && m_mouseX < l.list.x + 40,
+            e.info.error.empty());
         std::string title = (e.enabled ? std::to_string(order) + ". " : std::string()) + e.info.name;
-        font.DrawString(ui::FitText(font, title, ui::FONT_BODY, r.w - 150), r.x + 40, r.CenterY(), ui::FONT_BODY,
-            e.info.error.empty() ? (selected ? col::Text : col::TextDim) : col::Danger, false,
+        font.DrawString(
+            ui::FitText(font, title, ui::FONT_BODY, r.w - 150),
+            r.x + 40,
+            r.CenterY(),
+            ui::FONT_BODY,
+            e.info.error.empty() ? (selected ? col::Text : col::TextDim) : col::Danger,
+            false,
             Anchor::LEFT | Anchor::VCENTER);
-        font.DrawString(e.info.version, r.Right() - 10, r.CenterY(), ui::FONT_SMALL, col::TextMuted, false,
+        font.DrawString(
+            e.info.version,
+            r.Right() - 10,
+            r.CenterY(),
+            ui::FONT_SMALL,
+            col::TextMuted,
+            false,
             Anchor::RIGHT | Anchor::VCENTER);
     }
     renderer.ResetClipRect();
@@ -236,9 +262,11 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
             line(std::string(_("Author")) + ": " + m.author, col::TextDim);
         if (!m.gameVersion.empty())
             line(std::string(_("Game version")) + ": " + m.gameVersion, col::TextDim);
-        line(std::string(m.fromUser ? _("In the user folder") : _("Next to the game")) + ", "
-                 + (m.archive ? _("archive") : _("folder")),
-            col::TextMuted, ui::FONT_SMALL);
+        line(
+            std::string(m.fromUser ? _("In the user folder") : _("Next to the game")) + ", "
+                + (m.archive ? _("archive") : _("folder")),
+            col::TextMuted,
+            ui::FONT_SMALL);
         line(m.path, col::TextMuted, ui::FONT_SMALL);
         if (!m.error.empty())
             line(m.error, col::Danger, ui::FONT_SMALL_BOLD);
@@ -285,17 +313,30 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
         }
     }
     if (!m_notice.empty())
-        font.DrawString(ui::FitText(font, m_notice, ui::FONT_SMALL, l.applyBtn.x - l.downBtn.Right() - 24),
-            (l.downBtn.Right() + l.applyBtn.x) / 2, l.backBtn.CenterY(), ui::FONT_SMALL, col::TextDim, false,
+        font.DrawString(
+            ui::FitText(font, m_notice, ui::FONT_SMALL, l.applyBtn.x - l.downBtn.Right() - 24),
+            (l.downBtn.Right() + l.applyBtn.x) / 2,
+            l.backBtn.CenterY(),
+            ui::FONT_SMALL,
+            col::TextDim,
+            false,
             Anchor::HCENTER | Anchor::VCENTER);
     const bool canMove = count > 0 && m_entries[m_selected].enabled;
-    ui::DrawButton(renderer, font, l.backBtn, _("BACK"), ui::ButtonStyle::Secondary, l.backBtn.Contains(m_mouseX, m_mouseY));
-    ui::DrawButton(renderer, font, l.upBtn, _("UP"), ui::ButtonStyle::Ghost, l.upBtn.Contains(m_mouseX, m_mouseY), canMove);
+    ui::DrawButton(
+        renderer, font, l.backBtn, _("BACK"), ui::ButtonStyle::Secondary, l.backBtn.Contains(m_mouseX, m_mouseY));
+    ui::DrawButton(
+        renderer, font, l.upBtn, _("UP"), ui::ButtonStyle::Ghost, l.upBtn.Contains(m_mouseX, m_mouseY), canMove);
     ui::DrawButton(
         renderer, font, l.downBtn, _("DOWN"), ui::ButtonStyle::Ghost, l.downBtn.Contains(m_mouseX, m_mouseY), canMove);
     const bool changed = EnabledIds() != m_applied;
-    ui::DrawButton(renderer, font, l.applyBtn, _("APPLY"), ui::ButtonStyle::Primary,
-        l.applyBtn.Contains(m_mouseX, m_mouseY), changed);
+    ui::DrawButton(
+        renderer,
+        font,
+        l.applyBtn,
+        _("APPLY"),
+        ui::ButtonStyle::Primary,
+        l.applyBtn.Contains(m_mouseX, m_mouseY),
+        changed);
     if (l.backBtn.Contains(m_mouseX, m_mouseY) || l.applyBtn.Contains(m_mouseX, m_mouseY)
         || l.list.Contains(m_mouseX, m_mouseY))
         SoundRequests::MarkHover();

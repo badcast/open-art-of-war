@@ -16,7 +16,7 @@ namespace OpenArtOfWar
 // editors, which may work on another copy of the assets, resolve the same layout below their own folder.
 class LoaderResources
 {
-    public:
+public:
     static constexpr const std::uint32_t kMinimalVersionManifest = 1;
     static constexpr const char *kDefaultRoot = "assets";
     static constexpr const char *kManifestPath = "assets/main.yaml";

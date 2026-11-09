@@ -17,9 +17,8 @@ abilities:
     {
         const auto deployed = CharEditor::ComputeStats(doc, true);
         const auto mobile = CharEditor::ComputeStats(doc, false);
-        if (deployed.damage != 30 || deployed.range != 9 || deployed.hp != 150
-            || mobile.damage != 10 || mobile.range != 4 || mobile.hp != 100
-            || YAML::Dump(doc) != before)
+        if (deployed.damage != 30 || deployed.range != 9 || deployed.hp != 150 || mobile.damage != 10
+            || mobile.range != 4 || mobile.hp != 100 || YAML::Dump(doc) != before)
         {
             std::puts("FAIL: previewing siege form changed the character document");
             return 1;

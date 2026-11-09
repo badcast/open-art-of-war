@@ -164,8 +164,9 @@ void CharacterEditor::DrawCharacter(YAML::Node doc, const VisualOffsets &vo, boo
                 // Destruction sequence: explosion starts, and from the middle of destruction the crater appears
                 const auto &fx = OpenArtOfWar::EffectsConfig::Get();
                 const int expAnim = (width <= 2 && height <= 2) ? fx.buildingSmallMain
-                    : (buildingIndex == 2 || buildingIndex == 4 || buildingIndex == 12)
-                        ? fx.buildingPowerMain : fx.buildingLargeMain;
+                                    : (buildingIndex == 2 || buildingIndex == 4 || buildingIndex == 12)
+                                        ? fx.buildingPowerMain
+                                        : fx.buildingLargeMain;
                 const auto expRange = textures->GetAnimRange(expAnim);
                 const int expFrames = std::max(0, expRange.end - expRange.start + 1);
                 const float expDur = expFrames * fx.frameTime;

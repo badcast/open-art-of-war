@@ -210,8 +210,8 @@ bodies:
         bool apart = true;
         for (std::size_t i = 0; i < sz.size(); ++i)
             for (std::size_t j = i + 1; j < sz.size(); ++j)
-                if (!(at[i][0] + sz[i][0] <= at[j][0] || at[j][0] + sz[j][0] <= at[i][0] || at[i][1] + sz[i][1] <= at[j][1]
-                      || at[j][1] + sz[j][1] <= at[i][1]))
+                if (!(at[i][0] + sz[i][0] <= at[j][0] || at[j][0] + sz[j][0] <= at[i][0]
+                      || at[i][1] + sz[i][1] <= at[j][1] || at[j][1] + sz[j][1] <= at[i][1]))
                     apart = false;
         CHECK(apart);
         // A building: its parts and the first picture of its animation in one block

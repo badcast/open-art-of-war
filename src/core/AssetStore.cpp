@@ -32,7 +32,7 @@ struct State
     std::mutex lock;
     std::map<std::string, std::vector<std::uint8_t>> blobFiles;
     std::map<std::string, std::vector<std::uint8_t>> overlay; // session overlay, see SetSessionOverlay
-    std::vector<ModLayer> mods;                                // enabled mods, see SetModLayers
+    std::vector<ModLayer> mods;                               // enabled mods, see SetModLayers
     std::string userDir;
     fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
@@ -385,7 +385,8 @@ bool HasModLayers()
     return !s.mods.empty();
 }
 
-bool ReadArchive(const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only)
+bool ReadArchive(
+    const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only)
 {
     return LoadBlob(fs::path(file), files, only);
 }

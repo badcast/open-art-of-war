@@ -15,6 +15,7 @@ assets
 assets/*
 
 CLAUDE.md
+AGENTS.md
 
 # Compiled object files & libraries
 *.o
