@@ -669,6 +669,7 @@ void HUDController::RenderGameHud(
             UiRect c = l.Cell(i, scroll);
             if (c.Bottom() < l.grid.y || c.y > l.grid.Bottom())
                 continue;
+            const int item = ItemAt(m_activeTab, i); // (the tech level hides what it leaves out)
             bool hovered = c.Contains(mx, my) && l.grid.Contains(mx, my);
             if (hovered)
                 SoundRequests::MarkHover();
@@ -677,8 +678,8 @@ void HUDController::RenderGameHud(
             {
                 case TabBuild:
                 {
-                    const auto &bp = EntityManager::GetBlueprints()[i];
-                    bool selected = (m_buildMode && m_selectedBlueprint == i);
+                    const auto &bp = EntityManager::GetBlueprints()[item];
+                    bool selected = (m_buildMode && m_selectedBlueprint == item);
                     bool canAfford = economy.CanAfford(bp.creditCost);
                     // Hard limits (data/limits.yaml): greyed out at the limit, "n/max" while one is set
                     const int limit = BuildLimits::LimitOf(entities, bp.buildingIndex);
@@ -731,7 +732,7 @@ void HUDController::RenderGameHud(
                 case TabVehicles:
                 {
                     bool inf = (m_activeTab == TabInfantry);
-                    const UnitCameoDef &def = unitCatalog(inf).items[i];
+                    const UnitCameoDef &def = unitCatalog(inf).items[item];
                     const auto &producers = inf ? barracksTargets : factoryTargets;
                     const bool unlocked = IsUnitUnlocked(Players::Local(), def.archetype);
                     bool available = (inf ? hasBarracks : hasFactory) && unlocked;

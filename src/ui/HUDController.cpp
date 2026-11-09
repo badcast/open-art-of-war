@@ -4,6 +4,7 @@
 #include "audio/SoundRequests.hpp"
 #include "game/Players.hpp"
 #include "game/BuildLimits.hpp"
+#include "game/Capabilities.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Localization.hpp"
 #include "graphics/Renderer.hpp"
@@ -302,20 +303,60 @@ bool HUDController::CancelUnitOrder(
     return true;
 }
 
-int HUDController::ItemCountForTab(int tab) const
+namespace
+{
+
+// Catalog entries of a tab, before the tech level
+int CatalogCount(int tab)
 {
     switch (tab)
     {
-        case TabBuild:
+        case HUDController::TabBuild:
             return std::min(8, static_cast<int>(EntityManager::GetBlueprints().size()));
-        case TabInfantry:
+        case HUDController::TabInfantry:
             return unitCatalog(true).count;
-        case TabVehicles:
+        case HUDController::TabVehicles:
             return unitCatalog(false).count;
-        case TabOrders:
+        case HUDController::TabOrders:
             return static_cast<int>(std::size(kOrders));
     }
     return 0;
+}
+
+// The local player's tech level leaves nothing of it out
+bool Shown(int tab, int index)
+{
+    switch (tab)
+    {
+        case HUDController::TabBuild:
+            return Capabilities::AllowsBuilding(
+                Players::Local(), EntityManager::GetBlueprints()[static_cast<std::size_t>(index)].buildingIndex);
+        case HUDController::TabInfantry:
+        case HUDController::TabVehicles:
+            return Capabilities::AllowsUnit(
+                Players::Local(), unitCatalog(tab == HUDController::TabInfantry).items[index].archetype);
+    }
+    return true;
+}
+
+} // namespace
+
+int HUDController::ItemCountForTab(int tab) const
+{
+    int count = 0;
+    for (int i = 0, n = CatalogCount(tab); i < n; ++i)
+        count += Shown(tab, i);
+    return count;
+}
+
+int HUDController::ItemAt(int tab, int slot) const
+{
+    for (int i = 0, n = CatalogCount(tab); i < n; ++i)
+    {
+        if (Shown(tab, i) && slot-- == 0)
+            return i;
+    }
+    return -1;
 }
 
 int HUDController::MaxScrollRows(int tab, int gridHeight) const

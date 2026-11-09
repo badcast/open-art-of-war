@@ -294,7 +294,10 @@ public:
     }
 
 private:
+    // Cells of a tab: what the local player's tech level (data/capabilities.yaml) allows, in catalog order
     int ItemCountForTab(int tab) const;
+    // The catalog index (blueprint / unit cameo / order) shown in the tab's cell `slot`, -1 past the end
+    int ItemAt(int tab, int slot) const;
     int MaxScrollRows(int tab, int gridHeight) const;
     void ActivateCell(
         int tab,

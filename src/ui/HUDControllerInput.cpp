@@ -291,7 +291,7 @@ bool HUDController::HandleHudClick(
             UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
             if (c.Contains(mx, my))
             {
-                ActivateCell(m_activeTab, i, true, economy, entities, map, selectedUnits);
+                ActivateCell(m_activeTab, ItemAt(m_activeTab, i), true, economy, entities, map, selectedUnits);
                 break;
             }
         }
@@ -412,12 +412,12 @@ bool HUDController::HandleHudClick(
                 if ((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && InfinityBtn(c).Contains(mx, my))
                 {
                     const bool inf = m_activeTab == TabInfantry;
-                    const int archetype = unitCatalog(inf).items[i].archetype;
+                    const int archetype = unitCatalog(inf).items[ItemAt(m_activeTab, i)].archetype;
                     if (IsUnitUnlocked(Players::Local(), archetype))
                         ToggleRepeat(archetype, inf ? UnitType::Barracks : UnitType::Factory, entities, selectedUnits);
                     break;
                 }
-                ActivateCell(m_activeTab, i, false, economy, entities, map, selectedUnits);
+                ActivateCell(m_activeTab, ItemAt(m_activeTab, i), false, economy, entities, map, selectedUnits);
                 break;
             }
         }

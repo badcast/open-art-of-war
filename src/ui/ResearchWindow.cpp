@@ -1,5 +1,6 @@
 #include "audio/SoundRequests.hpp"
 #include "core/Localization.hpp"
+#include "game/Capabilities.hpp"
 #include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Players.hpp"
@@ -55,14 +56,32 @@ WindowLayout windowLayout(int windowW, int windowH, float scale, int top = 0)
     windowLayout.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
     windowLayout.dialog.y += top;
     windowLayout.dialog.h -= top;
-    windowLayout.content = {windowLayout.dialog.x + 16, windowLayout.dialog.y + 60, windowLayout.dialog.w - 32, windowLayout.dialog.h - 60 - 16};
+    windowLayout.content
+        = {windowLayout.dialog.x + 16,
+           windowLayout.dialog.y + 60,
+           windowLayout.dialog.w - 32,
+           windowLayout.dialog.h - 60 - 16};
     const int kDetailsW = std::clamp(static_cast<int>(windowLayout.content.w * 0.26f), kDetailsW0, 440);
-    windowLayout.search = {windowLayout.content.x, windowLayout.content.y, std::clamp(static_cast<int>(windowLayout.content.w * 0.28f), 280, 460), 30};
-    windowLayout.filter = {windowLayout.search.Right() + 10, windowLayout.content.y, std::clamp(static_cast<int>(windowLayout.content.w * 0.18f), 200, 300), 30};
+    windowLayout.search
+        = {windowLayout.content.x,
+           windowLayout.content.y,
+           std::clamp(static_cast<int>(windowLayout.content.w * 0.28f), 280, 460),
+           30};
+    windowLayout.filter
+        = {windowLayout.search.Right() + 10,
+           windowLayout.content.y,
+           std::clamp(static_cast<int>(windowLayout.content.w * 0.18f), 200, 300),
+           30};
     windowLayout.closeBtn = {windowLayout.content.Right() - 130, windowLayout.content.y, 130, 30};
-    windowLayout.details = {windowLayout.content.Right() - kDetailsW, windowLayout.content.y + 42, kDetailsW, windowLayout.content.h - 42};
-    windowLayout.tree = {windowLayout.content.x, windowLayout.content.y + 42, windowLayout.details.x - 12 - windowLayout.content.x, windowLayout.content.h - 42};
-    windowLayout.startBtn = {windowLayout.details.x + 12, windowLayout.details.Bottom() - 52, windowLayout.details.w - 24, 40};
+    windowLayout.details = {
+        windowLayout.content.Right() - kDetailsW, windowLayout.content.y + 42, kDetailsW, windowLayout.content.h - 42};
+    windowLayout.tree
+        = {windowLayout.content.x,
+           windowLayout.content.y + 42,
+           windowLayout.details.x - 12 - windowLayout.content.x,
+           windowLayout.content.h - 42};
+    windowLayout.startBtn
+        = {windowLayout.details.x + 12, windowLayout.details.Bottom() - 52, windowLayout.details.w - 24, 40};
     // + / - at the bottom right of the tree, like the radar's zoom buttons
     windowLayout.zoomOut = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 30, 24, 24};
     windowLayout.zoomIn = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 58, 24, 24};
@@ -75,6 +94,8 @@ struct TreeLayout
 {
     std::vector<int> parent, depth;
     std::vector<float> row;
+    std::vector<bool> shown; // the local player's tech level (data/capabilities.yaml) has it
+    int first {-1};          // the first one shown
     int maxDepth {0};
     float rows {1.0f};
 };
@@ -86,6 +107,7 @@ TreeLayout buildTree(Faction faction)
     t.parent.assign(count, -1);
     t.depth.assign(count, 0);
     t.row.assign(count, 0.0f);
+    t.shown.assign(count, false);
     std::vector<std::vector<int>> children(count);
     std::vector<int> roots;
     auto dependsOn = [&](int candidate, int index) {
@@ -99,6 +121,12 @@ TreeLayout buildTree(Faction faction)
     };
     for (int i = 0; i < count; ++i)
     {
+        // Left out by the tech level: not placed (what needs it is left out as well)
+        if (!Capabilities::AllowsResearch(Players::Local(), i))
+            continue;
+        t.shown[i] = true;
+        if (t.first < 0)
+            t.first = i;
         int need = researchDef(faction, i).needs;
         if (need < 0 || need >= count || need == i || dependsOn(need, i))
             need = -1;
@@ -299,6 +327,8 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     const ResearchProgress researchNow = ResearchShown();
     const ResearchProgress *progress = &researchNow;
     m_researchSel = std::clamp(m_researchSel, 0, kResearchCount - 1);
+    if (!tree.shown[m_researchSel] && tree.first >= 0)
+        m_researchSel = tree.first;
     // The window covers the map as well: every wheel step is its own, over the map or the sidebar
     const int wheel = input.ConsumeWheel();
     input.ConsumeUiWheel();
@@ -444,6 +474,8 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             bool hitNode = false;
             for (int i = 0; i < kResearchCount; ++i)
             {
+                if (!tree.shown[i])
+                    continue;
                 const UiRect n {
                     l.tree.x + 8 + tree.depth[i] * (kNodeW + kGapX) - static_cast<int>(m_researchScrollX),
                     l.tree.y + 8 + static_cast<int>(tree.row[i] * (kNodeH + kGapY))
@@ -577,7 +609,7 @@ void HUDController::RenderResearchWindow(
     // Links first
     for (int i = 0; i < kResearchCount; ++i)
     {
-        if (tree.parent[i] < 0)
+        if (!tree.shown[i] || tree.parent[i] < 0)
             continue;
         const UiRect a = nodeRect(tree.parent[i]), b = nodeRect(i);
         const int midX = (a.Right() + b.x) / 2;
@@ -590,6 +622,8 @@ void HUDController::RenderResearchWindow(
     }
     for (int i = 0; i < kResearchCount; ++i)
     {
+        if (!tree.shown[i])
+            continue;
         const UiRect n = nodeRect(i);
         if (n.Right() < l.tree.x || n.x > l.tree.Right() || n.Bottom() < l.tree.y || n.y > l.tree.Bottom())
             continue;
@@ -674,8 +708,8 @@ void HUDController::RenderResearchWindow(
 
     // The selected technology
     ui::DrawPanel(renderer, l.details, col::PanelRaised, col::Border);
+    if (const int i = std::clamp(m_researchSel, 0, kResearchCount - 1); tree.shown[i])
     {
-        const int i = std::clamp(m_researchSel, 0, kResearchCount - 1);
         const auto &r = researchDef(faction, i);
         const State st = stateOf(i, progress);
         const int x = l.details.x + 12, w = l.details.w - 24;
