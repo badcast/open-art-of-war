@@ -14,6 +14,65 @@
 namespace OpenArtOfWar
 {
 
+namespace
+{
+// Queue at a gap in a hostile wall: the gap ahead (toward the goal) is shut by an ally that stands there (fighting,
+// or queueing itself). Returns the hostile wall segment beside that gap which the unit can shoot from where it
+// stands (the nearest one), so the ones held up widen the gap instead of waiting for it to clear.
+bool FindJammedGapWall(const Unit &u, const TileMap &map, const UnitDelegates &delegates, int &outX, int &outY)
+{
+    outX = outY = -1;
+    if (!delegates.getUnitAtTile || !delegates.getEntity || !u.HasMoveTarget())
+        return false;
+    const int w = map.GetWidth(), h = map.GetHeight();
+    auto inside = [&](int x, int y) { return x >= 0 && y >= 0 && x < w && y < h; };
+    auto closed = [&](int x, int y) { return !inside(x, y) || !map.IsPassable(x, y) || map.GetWall(x, y) > 0; };
+    const float range = u.attackRange * TILE_WIDTH;
+    const float ux = u.GetUnitCenterPixelX(), uy = u.GetUnitCenterPixelY();
+    const int ownGoalDist = std::max(std::abs(u.tileX - u.targetTileX), std::abs(u.tileY - u.targetTileY));
+    const int reach = std::clamp(static_cast<int>(std::ceil(u.attackRange)) + 1, 2, 8);
+    float best = 1e9f;
+    for (int gy = u.tileY - reach; gy <= u.tileY + reach; ++gy)
+    {
+        for (int gx = u.tileX - reach; gx <= u.tileX + reach; ++gx)
+        {
+            if ((gx == u.tileX && gy == u.tileY) || closed(gx, gy))
+                continue;
+            // a gap: shut on both sides across it
+            if (!((closed(gx - 1, gy) && closed(gx + 1, gy)) || (closed(gx, gy - 1) && closed(gx, gy + 1))))
+                continue;
+            // ahead of the unit, on its way to the goal
+            if (std::max(std::abs(gx - u.targetTileX), std::abs(gy - u.targetTileY)) >= ownGoalDist)
+                continue;
+            const int blockerId = delegates.getUnitAtTile(gx, gy, u.id);
+            const Entity *e = blockerId > 0 ? delegates.getEntity(blockerId) : nullptr;
+            const Unit *b = e ? e->AsUnit() : nullptr;
+            if (!b || !b->alive || b->state == ActionState::Die || Players::Hostile(b->owner, u.owner)
+                || b->HasReservation() || (b->state == ActionState::Move && !b->groupHold))
+                continue; // free, or the ally there is walking on
+            for (int wy = gy - 1; wy <= gy + 1; ++wy)
+            {
+                for (int wx = gx - 1; wx <= gx + 1; ++wx)
+                {
+                    if (!inside(wx, wy) || map.GetWall(wx, wy) <= 0
+                        || !Players::Hostile(map.GetWallOwner(wx, wy), u.owner))
+                        continue;
+                    const float d = DetMath::Hypot(
+                        wx * TILE_WIDTH + TILE_WIDTH * 0.5f - ux, wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f - uy);
+                    if (d <= range && d < best)
+                    {
+                        best = d;
+                        outX = wx;
+                        outY = wy;
+                    }
+                }
+            }
+        }
+    }
+    return outX >= 0;
+}
+} // namespace
+
 bool Unit::FindPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial)
 {
     int gx = target.tileX, gy = target.tileY;
@@ -472,30 +531,34 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             return;
         }
     }
-    if (targetEntityId == 0 && targetWallTileX < 0 && stuckWithGoal && HasMoveTarget() && CanBreachWalls()
-        && wallCheckCooldown <= 0.0f)
+    // Held up for a while at a gap that an ally standing in it shuts (one fighting from the gap, say)
+    constexpr float kGapJamSeconds = 2.0f;
+    const bool jammedAtGap
+        = HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && blockedTimer >= kGapJamSeconds;
+    if (targetEntityId == 0 && targetWallTileX < 0 && (stuckWithGoal || jammedAtGap) && HasMoveTarget()
+        && CanBreachWalls() && wallCheckCooldown <= 0.0f)
     {
         wallCheckCooldown = 1.0f;
-        const bool wallsInTheWay = ShouldBreachWalls(targetTileX, targetTileY, pathfinder);
-        if (wallsInTheWay && delegates.findWallTarget)
-        {
-            int wx = -1, wy = -1;
+        int wx = -1, wy = -1;
+        if (stuckWithGoal && delegates.findWallTarget && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
             delegates.findWallTarget(*this, wx, wy);
-            if (wx >= 0)
+        // The way through is open, only jammed: shoot the wall beside the gap, so it widens
+        if (wx < 0 && jammedAtGap)
+            FindJammedGapWall(*this, map, delegates, wx, wy);
+        if (wx >= 0)
+        {
+            targetWallTileX = wx;
+            targetWallTileY = wy;
+            if (state == ActionState::Move)
             {
-                targetWallTileX = wx;
-                targetWallTileY = wy;
-                if (state == ActionState::Move)
-                {
-                    // Keep the move goal: the route is planned again once the wall is down
-                    ClearPathState();
-                    state = ActionState::Idle;
-                    animFrame = 0;
-                }
-                waitingForPath = false;
-                blockedTimer = 0.0f;
-                return;
+                // Keep the move goal: the route is planned again once the wall is down
+                ClearPathState();
+                state = ActionState::Idle;
+                animFrame = 0;
             }
+            waitingForPath = false;
+            blockedTimer = 0.0f;
+            return;
         }
     }
 
