@@ -453,9 +453,10 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
     const Entity *best = nullptr;
     if (bestFoe >= 0)
     {
-        const bool switchFoe = !anchorHolds
-                               || (bestFoe != anchorOwner && m_anchorHoldSeconds <= 0.0f
-                                   && (!foes[anchorOwner].building || bestScore > scoreOf(anchorOwner) + kSwitchMargin));
+        const bool switchFoe
+            = !anchorHolds
+              || (bestFoe != anchorOwner && m_anchorHoldSeconds <= 0.0f
+                  && (!foes[anchorOwner].building || bestScore > scoreOf(anchorOwner) + kSwitchMargin));
         if (switchFoe)
         {
             best = foes[bestFoe].building;

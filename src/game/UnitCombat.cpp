@@ -25,8 +25,12 @@ bool FindJammedGapWall(const Unit &u, const TileMap &map, const UnitDelegates &d
     if (!delegates.getUnitAtTile || !delegates.getEntity || !u.HasMoveTarget())
         return false;
     const int w = map.GetWidth(), h = map.GetHeight();
-    auto inside = [&](int x, int y) { return x >= 0 && y >= 0 && x < w && y < h; };
-    auto closed = [&](int x, int y) { return !inside(x, y) || !map.IsPassable(x, y) || map.GetWall(x, y) > 0; };
+    auto inside = [&](int x, int y) {
+        return x >= 0 && y >= 0 && x < w && y < h;
+    };
+    auto closed = [&](int x, int y) {
+        return !inside(x, y) || !map.IsPassable(x, y) || map.GetWall(x, y) > 0;
+    };
     const float range = u.attackRange * TILE_WIDTH;
     const float ux = u.GetUnitCenterPixelX(), uy = u.GetUnitCenterPixelY();
     const int ownGoalDist = std::max(std::abs(u.tileX - u.targetTileX), std::abs(u.tileY - u.targetTileY));

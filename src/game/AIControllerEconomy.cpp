@@ -698,8 +698,8 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
     {
         ++m_expansions;
         m_defensePlan.push_back(extra);
-        static const char *const kSectorNames[8] = {"east", "south-east", "south", "south-west",
-                                                    "west", "north-west", "north", "north-east"};
+        static const char *const kSectorNames[8]
+            = {"east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"};
         Think(
             "BUILD",
             std::string("Attacks keep coming from the ") + kSectorNames[sector] + ": extra "

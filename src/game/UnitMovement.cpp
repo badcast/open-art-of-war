@@ -359,10 +359,9 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
             // C. Friendly Unit Occupation -> NO single-file column waiting!
             Unit *friendlyUnit = blocker->AsUnit();
             // (one waiting for its group stands: it is not about to free the tile)
-            const bool allyLeaving
-                = friendlyUnit
-                  && ((friendlyUnit->state == ActionState::Move && !friendlyUnit->groupHold)
-                      || friendlyUnit->HasReservation());
+            const bool allyLeaving = friendlyUnit
+                                     && ((friendlyUnit->state == ActionState::Move && !friendlyUnit->groupHold)
+                                         || friendlyUnit->HasReservation());
             //    1) If blocked tile is destination (or adjacent to destination), arrived at squad cluster!
             //       (not while a make-way chain is moving: the ally in front is about to free the tile)
             if (targetEntityId == 0 && !(allyWaitTimer > 0.0f && allyLeaving)
