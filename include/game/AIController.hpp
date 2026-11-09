@@ -441,6 +441,7 @@ private:
     std::uint32_t m_eliminatedFoes {0}; // bit per player: out of the match (UpdateElimination), never a target again
     bool m_noFoesLeft {false};
     float m_foeAnchorTimer {0.0f};
+    float m_anchorHoldSeconds {0.0f}; // the objective is kept at least this long (RefreshFoeAnchor)
     bool m_initialized {false};
 
     float m_gameTime {0.0f};

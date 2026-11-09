@@ -370,29 +370,97 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
     if (!newlyOut && m_foeAnchorTimer > 0.0f)
         return;
     m_foeAnchorTimer = 2.0f;
-    // The anchor stands while a foe's building is there; otherwise the nearest headquarters of a living foe, else
-    // any building of one
-    const Entity *best = nullptr;
-    bool bestHq = false, anchorHolds = false, anyFoe = false;
-    float bestDist = 1e9f;
+    m_anchorHoldSeconds = std::max(0.0f, m_anchorHoldSeconds - 2.0f);
+    // Every living foe gets a score: near (by its nearest headquarters, else any building), the one that keeps
+    // attacking this base (m_foeHostility) and the weak one (few structures known) are preferred. The objective is
+    // kept at least kAnchorHoldSeconds unless its building is gone. Tuning:
+    constexpr float kNearWeight = 1.0f, kHostileWeight = 1.0f, kWeakWeight = 0.5f;
+    constexpr float kAnchorHoldSeconds = 120.0f;
+    constexpr float kSwitchMargin = 0.15f; // a new foe must score this much more than the current one
+    struct FoeCandidate
+    {
+        const Building *building {nullptr};
+        bool hq {false};
+        float dist {1e9f};
+        int known {0};
+    };
+    FoeCandidate foes[kMaxPlayers];
+    bool anyFoe = false, anchorHolds = false;
+    int anchorOwner = -1;
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die || !IsFoe(e))
+        if (!b || !b->alive || b->state == ActionState::Die || !IsFoe(e) || b->owner >= kMaxPlayers)
             continue;
         anyFoe = true;
         if (m_playerHqX >= b->tileX && m_playerHqX < b->tileX + b->buildWidth && m_playerHqY >= b->tileY
             && m_playerHqY < b->tileY + b->buildHeight)
+        {
             anchorHolds = true;
+            anchorOwner = b->owner;
+        }
+        FoeCandidate &f = foes[b->owner];
         const bool hq = b->type == UnitType::Headquarters;
         const float d = DetMath::Hypot(
             static_cast<float>(b->tileX + b->buildWidth / 2 - m_enemyHqX),
             static_cast<float>(b->tileY + b->buildHeight / 2 - m_enemyHqY));
-        if ((hq && !bestHq) || (hq == bestHq && d < bestDist))
+        if ((hq && !f.hq) || (hq == f.hq && d < f.dist))
         {
-            best = &e;
-            bestHq = hq;
-            bestDist = d;
+            f.building = b;
+            f.hq = hq;
+            f.dist = d;
+        }
+    }
+    for (const auto &[id, tile] : m_knownBuildings)
+    {
+        (void) tile;
+        const Entity *e = entities.GetEntity(id);
+        if (e && e->alive && e->state != ActionState::Die && e->owner < kMaxPlayers)
+            ++foes[e->owner].known;
+    }
+    float maxDist = 1.0f, maxHostility = 0.0f;
+    int maxKnown = 0;
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if (!foes[p].building)
+            continue;
+        maxDist = std::max(maxDist, foes[p].dist);
+        maxHostility = std::max(maxHostility, m_foeHostility[p]);
+        maxKnown = std::max(maxKnown, foes[p].known);
+    }
+    auto scoreOf = [&](int p) {
+        const FoeCandidate &f = foes[p];
+        float score = kNearWeight * (1.0f - f.dist / maxDist);
+        if (maxHostility > 0.0f)
+            score += kHostileWeight * m_foeHostility[p] / maxHostility;
+        if (maxKnown > 0)
+            score += kWeakWeight * (1.0f - static_cast<float>(f.known) / static_cast<float>(maxKnown));
+        return score;
+    };
+    int bestFoe = -1;
+    float bestScore = -1e9f;
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        if (!foes[p].building)
+            continue;
+        const float sc = scoreOf(p);
+        if (sc > bestScore)
+        {
+            bestScore = sc;
+            bestFoe = p;
+        }
+    }
+    const Entity *best = nullptr;
+    if (bestFoe >= 0)
+    {
+        const bool switchFoe = !anchorHolds
+                               || (bestFoe != anchorOwner && m_anchorHoldSeconds <= 0.0f
+                                   && (!foes[anchorOwner].building || bestScore > scoreOf(anchorOwner) + kSwitchMargin));
+        if (switchFoe)
+        {
+            best = foes[bestFoe].building;
+            anchorHolds = false;
+            m_anchorHoldSeconds = kAnchorHoldSeconds;
         }
     }
     if (!anyFoe)
@@ -416,6 +484,9 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         std::ostringstream msg;
         msg << "New objective: the base at (" << m_playerHqX << ", " << m_playerHqY << ")";
         Think("ATTACK", msg.str());
+        std::ostringstream why;
+        why << "Objective chosen by score " << bestScore << " (near, attacks on this base, weakness)";
+        Think("ATTACK", why.str());
     }
     if (newlyOut)
     {
@@ -506,6 +577,7 @@ void AIController::Reset()
     m_eliminatedFoes = 0;
     m_noFoesLeft = false;
     m_foeAnchorTimer = 0.0f;
+    m_anchorHoldSeconds = 0.0f;
     m_seenEnemyUnits.clear();
     m_intelTimer = 0.0f;
     m_scoutId = 0;
