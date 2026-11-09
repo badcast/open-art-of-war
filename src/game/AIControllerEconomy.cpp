@@ -620,30 +620,90 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
             return; // one structure per step
     }
 
-    // Plan finished: every 45 s add a tower on the side the player keeps attacking from
+    // Plan finished: every 45 s a tower or bunker on the side the attacks keep coming from (the threat memory of
+    // the 8 sectors around the base, a sector that has towers already counts less), at the edge of the buildings
+    // on that side, by the road that leaves the base there
     m_expandTimer += 3.0f;
-    if (m_expandTimer < 45.0f || m_expansions >= 6 || m_credits < 900)
+    constexpr int kMaxExpansions = 8;
+    if (m_expandTimer < 45.0f || m_expansions >= kMaxExpansions || m_credits < 900)
         return;
     m_expandTimer = 0.0f;
-    int ax = m_lastThreatX >= 0 ? m_lastThreatX : m_playerHqX;
-    int ay = m_lastThreatY >= 0 ? m_lastThreatY : m_playerHqY;
-    const float dx = static_cast<float>(ax - m_enemyHqX);
-    const float dy = static_cast<float>(ay - m_enemyHqY);
-    const float len = std::max(1.0f, DetMath::Hypot(dx, dy));
-    const float radius = std::min(len - 2.0f, 9.0f + 2.0f * static_cast<float>(m_expansions % 3));
-    const float sideways = (m_expansions % 2 == 0 ? 1.0f : -1.0f) * 2.0f * static_cast<float>(m_expansions / 2);
+    const int hx = m_homeX >= 0 ? m_homeX : m_enemyHqX, hy = m_homeY >= 0 ? m_homeY : m_enemyHqY;
+    int defensesIn[8] = {};
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (b && b->alive && b->state != ActionState::Die && b->owner == m_player
+            && (b->type == UnitType::Tower || b->type == UnitType::Bunker))
+            ++defensesIn[SectorOf(b->tileX + b->buildWidth / 2, b->tileY + b->buildHeight / 2)];
+    }
+    int sector = -1;
+    float bestWeight = 0.0f;
+    for (int sct = 0; sct < 8; ++sct)
+    {
+        const float weight = m_sectorThreat[sct] / static_cast<float>(1 + defensesIn[sct]);
+        if (weight > bestWeight)
+        {
+            bestWeight = weight;
+            sector = sct;
+        }
+    }
+    if (sector < 0)
+        sector = SectorOf(m_playerHqX, m_playerHqY); // nothing came yet: the side of the objective
+    const float angle = static_cast<float>(sector) * static_cast<float>(M_PI) / 4.0f;
+    const float dx = DetMath::Cos(angle), dy = DetMath::Sin(angle);
+    // The edge of the base on that side: the farthest building within the sector's cone, two tiles past it
+    float edge = 4.0f;
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || b->type == UnitType::Tower
+            || b->type == UnitType::Bunker)
+            continue;
+        const float bx = static_cast<float>(b->tileX) + b->buildWidth * 0.5f - static_cast<float>(hx);
+        const float by = static_cast<float>(b->tileY) + b->buildHeight * 0.5f - static_cast<float>(hy);
+        const float along = bx * dx + by * dy;
+        const float across = std::abs(-bx * dy + by * dx);
+        if (along > 0.0f && across <= along + 3.0f) // within about 45 degrees either side
+            edge = std::max(edge, along + std::max(b->buildWidth, b->buildHeight) * 0.5f + 2.0f);
+    }
+    edge = std::min(edge, static_cast<float>(entities.GetBuildRadius(m_player)) - 1.0f);
+    // Beside the road that leaves the base on that side (when there is one): the spot along the edge nearest to it
+    float sideways = 0.0f;
+    float bestRoad = 1e9f;
+    for (int off = -6; off <= 6; ++off)
+    {
+        const int px = static_cast<int>(std::lround(hx + dx * edge - dy * off));
+        const int py = static_cast<int>(std::lround(hy + dy * edge + dx * off));
+        for (int ry = py - 3; ry <= py + 3; ++ry)
+            for (int rx = px - 3; rx <= px + 3; ++rx)
+                if (IsRoadCore(rx, ry))
+                {
+                    const float d = DetMath::Hypot(static_cast<float>(rx - px), static_cast<float>(ry - py))
+                                    + 0.1f * std::abs(static_cast<float>(off));
+                    if (d < bestRoad)
+                    {
+                        bestRoad = d;
+                        sideways = static_cast<float>(off);
+                    }
+                }
+    }
+    if (bestRoad >= 1e9f) // no road there: spread the towers of one sector to both sides of its middle
+        sideways = (defensesIn[sector] % 2 == 0 ? 1.0f : -1.0f) * 2.0f * static_cast<float>(defensesIn[sector] / 2);
     AIDefenseSite extra;
     extra.kind = (m_expansions % 3 == 2) ? AIDefenseSite::Bunker : AIDefenseSite::Tower;
-    extra.tileX = static_cast<int>(std::lround(m_enemyHqX + dx / len * radius - dy / len * sideways)) - 1;
-    extra.tileY = static_cast<int>(std::lround(m_enemyHqY + dy / len * radius + dx / len * sideways)) - 1;
+    extra.tileX = static_cast<int>(std::lround(hx + dx * edge - dy * sideways)) - 1;
+    extra.tileY = static_cast<int>(std::lround(hy + dy * edge + dx * sideways)) - 1;
     if (BuildDefenseSite(extra, map, entities))
     {
         ++m_expansions;
         m_defensePlan.push_back(extra);
+        static const char *const kSectorNames[8] = {"east", "south-east", "south", "south-west",
+                                                    "west", "north-west", "north", "north-east"};
         Think(
             "BUILD",
-            "Attacks keep coming from (" + std::to_string(ax) + ", " + std::to_string(ay) + "): extra "
-                + (extra.kind == AIDefenseSite::Bunker ? "bunker" : "tower") + " on that side");
+            std::string("Attacks keep coming from the ") + kSectorNames[sector] + ": extra "
+                + (extra.kind == AIDefenseSite::Bunker ? "bunker" : "tower") + " at the edge of the base there");
     }
 }
 
