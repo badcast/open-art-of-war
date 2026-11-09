@@ -30,6 +30,8 @@ struct MatchSetup
                              // (HQ + power only)
     bool night {false};      // time of day: night (only drawn and heard, not part of the simulation)
     bool allowSpeed {false}; // custom game: allow game speed control (x0.5..x32), off by default
+    std::int8_t techLevel {-1}; // tech level of every player without its own: index into Capabilities::Levels(),
+                                // -1 = the map's preset ("capabilities" in its JSON) or the file's default
 };
 
 } // namespace OpenArtOfWar

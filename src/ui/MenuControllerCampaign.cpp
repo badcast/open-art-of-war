@@ -89,12 +89,12 @@ UiRect CustomRow(const UiRect &d, int i)
 
 UiRect CustomCell(const UiRect &d, int i, int kind)
 {
-    // (i is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap, 8 army size)
-    // The cells share the width of the row, so they stretch with the window
-    static constexpr int kShare[6] = {26, 19, 9, 9, 13, 14};
+    // (i is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap, 8 army size,
+    // 9 tech level). The cells share the width of the row, so they stretch with the window
+    static constexpr int kShare[7] = {23, 17, 8, 8, 12, 15, 17};
     const UiRect r = CustomRow(d, i);
-    const int k = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : 0;
-    const int gap = 4, x0 = r.x + 24, total = r.w - 24 - 5 * gap - 4;
+    const int k = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : kind == 9 ? 6 : 0;
+    const int gap = 4, x0 = r.x + 24, total = r.w - 24 - 6 * gap - 4;
     int used = 0;
     for (int j = 0; j < k; ++j)
         used += kShare[j];
@@ -124,6 +124,7 @@ struct CampaignLayout
     UiRect speedCheckbox; // custom game: allow speed control checkbox
     UiRect creditsBtn;    // custom game: starting credits (top right of the details)
     UiRect timeBtn;       // custom game: time of day (left of the credits)
+    UiRect techBtn;       // custom game: tech level of the match (left of the time of day)
     int itemH {40};
     int itemGap {4};
 
@@ -150,6 +151,7 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
     l.creditsBtn = {l.details.Right() - 20 - 200, l.details.y + 12, 200, 32};
     l.timeBtn = {l.creditsBtn.x - 12 - 160, l.details.y + 12, 160, 32};
+    l.techBtn = {l.timeBtn.x - 12 - 180, l.details.y + 12, 180, 32};
     const UiRect pv = CustomPreviewArea(l.details);
     const int optX = pv.Right() + 20;
     l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
@@ -336,6 +338,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             match.allowSpeed = m_skirmishAllowSpeed;
             match.startingCredits = kStartingCredits[std::clamp(m_skirmishCredits, 0, 4)];
             match.night = m_skirmishNight;
+            match.techLevel = static_cast<std::int8_t>(m_skirmishTechLevel);
             // The person watches: he is no player, the computer players take the ids from 0 (a watcher's view belongs
             // to the first of them)
             match.local = 0;
@@ -361,6 +364,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
                 slot.color = static_cast<std::uint8_t>(cs.color);
                 slot.handicap = static_cast<std::uint8_t>(std::clamp(cs.handicap, 0, kHandicapCount - 1));
                 slot.armyCap = static_cast<std::uint8_t>(std::clamp(cs.armyCap, 0, kArmyCapCount - 1));
+                slot.techLevel = static_cast<std::int8_t>(cs.techLevel);
                 slot.aiLevel = static_cast<std::uint8_t>(std::clamp(cs.level, 0, 3));
                 match.startPosition[p] = static_cast<std::int8_t>(cs.position);
             }
@@ -475,11 +479,14 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
         return id == kComboSide      ? l.sideBtn[0]
                : id == kComboCredits ? l.creditsBtn
                : id == kComboTime    ? l.timeBtn
+               : id == kComboTech    ? l.techBtn
                                      : l.difficultyBtn;
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
-    if ((m_combo.open == kComboCredits || m_combo.open == kComboTime || m_combo.open >= kComboSlot) && !hasLayoutChoice)
+    if ((m_combo.open == kComboCredits || m_combo.open == kComboTime || m_combo.open == kComboTech
+         || m_combo.open >= kComboSlot)
+        && !hasLayoutChoice)
         m_combo.open = -1;
     if (m_combo.open >= kComboSlot && hasLayoutChoice
         && (m_combo.open - kComboSlot) / 10 >= std::min(m_skirmishMaps[m_skirmishSelected].players, kMaxPlayers))
@@ -534,6 +541,8 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             return openCombo(kComboCredits);
         if (hasLayoutChoice && l.timeBtn.Contains(mx, my))
             return openCombo(kComboTime);
+        if (hasLayoutChoice && l.techBtn.Contains(mx, my))
+            return openCombo(kComboTech);
         if (hasLayoutChoice && l.fogCheckbox.Contains(mx, my))
         {
             m_skirmishFogOfWar = !m_skirmishFogOfWar;
@@ -558,7 +567,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
                 const int si = CustomSlotAt(i);
                 if (si < 0)
                     continue;
-                for (int kind : {1, 2, 3, 7, 8})
+                for (int kind : {1, 2, 3, 7, 8, 9})
                     if (CustomCell(d, i, kind).Contains(mx, my))
                         return openCombo(kComboSlot + i * 10 + kind);
             }
@@ -750,7 +759,7 @@ void MenuController::RenderCampaignMissionSelect(
 
         int x = d.x + 20;
         int w = d.w - 40;
-        const int titleW = w - 220 - 172 - 118;
+        const int titleW = w - 220 - 172 - 192 - 118;
         fontRenderer.DrawString(
             ui::FitText(fontRenderer, info.DisplayName(), ui::FONT_H2, titleW),
             x,
@@ -772,6 +781,13 @@ void MenuController::RenderCampaignMissionSelect(
             ui::TimeOfDayChoices()[m_skirmishNight ? 1 : 0],
             m_combo.open == kComboTime,
             l.timeBtn.Contains(m_mouseX, m_mouseY));
+        ui::DrawComboField(
+            renderer,
+            fontRenderer,
+            l.techBtn,
+            ui::TechLevelLabel(m_skirmishTechLevel, false),
+            m_combo.open == kComboTech,
+            l.techBtn.Contains(m_mouseX, m_mouseY));
         renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
         ui::DrawCaption(
             fontRenderer,
@@ -787,7 +803,8 @@ void MenuController::RenderCampaignMissionSelect(
                  {2, _("Team")},
                  {3, _("Colour")},
                  {7, _("Handicap")},
-                 {8, _("Army")}})
+                 {8, _("Army")},
+                 {9, _("Tech")}})
         {
             const UiRect cell = CustomCell(d, 0, kind);
             fontRenderer.DrawString(
@@ -852,6 +869,7 @@ void MenuController::RenderCampaignMissionSelect(
             combo(2, std::to_string(cs.team + 1));
             combo(7, cs.handicap == 0 ? std::string("-") : HandicapText(cs.handicap));
             combo(8, ui::ArmyCapChoices()[std::clamp(cs.armyCap, 0, kArmyCapCount - 1)]);
+            combo(9, ui::TechLevelLabel(cs.techLevel, true), cs.techLevel < 0 ? col::TextDim : col::Text);
             combo(3, "");
             const UiRect cc = CustomCell(d, i, 3);
             renderer.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, ArmyColor(cs.color));
@@ -1032,6 +1050,7 @@ void MenuController::RenderCampaignMissionSelect(
                                   : id == kComboSide                            ? l.sideBtn[0]
                                   : id == kComboCredits                         ? l.creditsBtn
                                   : id == kComboTime                            ? l.timeBtn
+                                  : id == kComboTech                            ? l.techBtn
                                                                                 : l.difficultyBtn);
         std::vector<std::string> items = CampaignComboOptions(id);
         std::vector<bool> taken;
@@ -1097,6 +1116,10 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
         {
             out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"};
         }
+        else if (kind == 9)
+        {
+            out = ui::TechLevelChoices(true);
+        }
         else
         {
             out = ui::ArmyCapChoices();
@@ -1140,6 +1163,8 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
         return ui::CreditsChoices();
     if (id == kComboTime)
         return ui::TimeOfDayChoices();
+    if (id == kComboTech)
+        return ui::TechLevelChoices(false);
     return ui::LayoutChoices();
 }
 
@@ -1171,6 +1196,8 @@ int MenuController::CampaignComboCurrent(int id) const
             return cs.color - 1;
         if (kind == 7)
             return std::clamp(cs.handicap, 0, kHandicapCount - 1);
+        if (kind == 9)
+            return std::max(0, cs.techLevel + 1);
         return std::clamp(cs.armyCap, 0, kArmyCapCount - 1);
     }
     if (id == kComboMapPlayers)
@@ -1189,6 +1216,8 @@ int MenuController::CampaignComboCurrent(int id) const
         return std::clamp(static_cast<int>(m_difficulty), 0, 3);
     if (id == kComboTime)
         return m_skirmishNight ? 1 : 0;
+    if (id == kComboTech)
+        return std::max(0, m_skirmishTechLevel + 1);
     return std::clamp(m_skirmishCredits, 0, 4);
 }
 
@@ -1235,6 +1264,10 @@ void MenuController::CampaignComboApply(int id, int index)
         {
             cs.handicap = std::clamp(index, 0, kHandicapCount - 1);
         }
+        else if (kind == 9)
+        {
+            cs.techLevel = std::clamp(index - 1, -1, static_cast<int>(Capabilities::Levels().size()) - 1);
+        }
         else
         {
             cs.armyCap = std::clamp(index, 0, kArmyCapCount - 1);
@@ -1280,6 +1313,10 @@ void MenuController::CampaignComboApply(int id, int index)
     else if (id == kComboTime)
     {
         m_skirmishNight = index == 1;
+    }
+    else if (id == kComboTech)
+    {
+        m_skirmishTechLevel = std::clamp(index - 1, -1, static_cast<int>(Capabilities::Levels().size()) - 1);
     }
 }
 

@@ -7,6 +7,7 @@
 #include "core/LoaderResources.hpp"
 #include "core/Utility.hpp"
 #include "game/Missions.hpp"
+#include "game/Capabilities.hpp"
 #include "game/Research.hpp"
 #include "game/Sides.hpp"
 #include <utility>
@@ -198,6 +199,19 @@ void MissionController::SetDefensePacing(
     }
 }
 
+namespace
+{
+
+// The tech level a map or mission sets for its players: "capabilities": "<level>" in its JSON (none: the default)
+std::string TechPreset(const nlohmann::json &doc)
+{
+    if (doc.is_object() && doc.contains("capabilities") && doc["capabilities"].is_string())
+        return doc["capabilities"].get<std::string>();
+    return {};
+}
+
+} // namespace
+
 bool MissionController::LoadMission(
     int missionId, TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder)
 {
@@ -269,6 +283,12 @@ bool MissionController::LoadMission(
         return false;
     }
     pathfinder.SetMap(&map);
+    {
+        // The tech level of the mission (data/capabilities.yaml): its map may name one
+        std::string mapText;
+        Assets::ReadText(mapPath, mapText);
+        Capabilities::ApplyLevels(-1, TechPreset(nlohmann::json::parse(mapText, nullptr, false)), entities);
+    }
 
     // 3. Spawn preplaced authentic structures and walls from the mission
     for (const auto &item : jmi.entities)
@@ -1011,6 +1031,7 @@ bool MissionController::LoadSkirmish(
 
     ++m_loadSerial;
     ResetResearch();
+    Capabilities::ApplyLevels(-1, TechPreset(doc), entities); // tech levels: the map's, else the default
     m_currentMissionId = kSkirmishMissionId;
     m_customMapPath = mapPath;
     const std::string mapName = std::filesystem::path(mapPath).stem().string();
@@ -1224,6 +1245,8 @@ bool MissionController::LoadMatch(
 
     ++m_loadSerial;
     ResetResearch();
+    // Tech levels: each slot's own, else the match's, else the map's, else the default
+    Capabilities::ApplyLevels(setup.techLevel, TechPreset(doc), entities);
     m_currentMissionId = kMatchMissionId;
     m_customMapPath.clear();
     m_matchSetup = setup;

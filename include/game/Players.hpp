@@ -21,9 +21,10 @@ struct PlayerSlot
     std::uint8_t team {0};
     std::uint8_t color {0}; // army colour (0 = the faction's classic sheets)
     bool human {false};
-    std::uint8_t aiLevel {1};  // computer player: 0 easy .. 3 hardcore
-    std::uint8_t handicap {0}; // start credits: index into kHandicapPercent (0 = none)
-    std::uint8_t armyCap {7};  // most units alive at once: index into kArmyCapUnits (7 = unlimited)
+    std::uint8_t aiLevel {1};   // computer player: 0 easy .. 3 hardcore
+    std::uint8_t handicap {0};  // start credits: index into kHandicapPercent (0 = none)
+    std::uint8_t armyCap {7};   // most units alive at once: index into kArmyCapUnits (7 = unlimited)
+    std::int8_t techLevel {-1}; // tech level: index into Capabilities::Levels(), -1 = the match's
 };
 
 // The army size limit of a player: the choices of the lobby / custom game (0 units = unlimited)

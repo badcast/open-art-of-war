@@ -71,6 +71,19 @@ int main()
     CHECK(Capabilities::ResolveLevel(-1, -1) == "full");
     CHECK(Capabilities::ResolveLevel(0, -1) == "basic");
     CHECK(Capabilities::ResolveLevel(0, 1) == "full");
+    CHECK(Capabilities::ResolveLevel(-1, -1, "basic") == "basic");
+    CHECK(Capabilities::ResolveLevel(1, -1, "basic") == "full");
+    CHECK(Capabilities::ResolveLevel(-1, -1, "nope") == "full");
+
+    // Every active player at its slot's level, else the match's, else the preset
+    slots[1].techLevel = 1;
+    Players::Setup(slots, 0);
+    Capabilities::ApplyLevels(-1, "basic", entities);
+    CHECK(Capabilities::PlayerLevel(0) == "basic");
+    CHECK(Capabilities::PlayerLevel(1) == "full");
+    CHECK(Capabilities::PlayerLevel(2).empty());
+    slots[1].techLevel = -1;
+    Players::Setup(slots, 0);
 
     Capabilities::SetPlayerLevel(0, "basic", entities);
     CHECK(Capabilities::PlayerLevel(0) == "basic");

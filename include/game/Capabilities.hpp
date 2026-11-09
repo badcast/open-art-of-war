@@ -26,8 +26,12 @@ int LevelIndex(const std::string &name);
 // The file's `default` level (the last one when it names none; empty without levels)
 const std::string &DefaultLevel();
 
-// The level a player plays at: the slot's own when it has one (>= 0), else the match's (>= 0), else the default
-std::string ResolveLevel(int matchLevel, int slotLevel);
+// The level a player plays at: the slot's own when it has one (>= 0), else the match's (>= 0), else the map's or
+// mission's preset (when it names a level), else the default
+std::string ResolveLevel(int matchLevel, int slotLevel, const std::string &preset = {});
+// Sets every active player's level at the start of a game: its slot's (PlayerSlot::techLevel), else the match's,
+// else the map's preset; the others are unrestricted
+void ApplyLevels(int matchLevel, const std::string &preset, const EntityManager &entities);
 
 // Sets a player's level, the names resolved through the character configs; an unknown level restricts nothing
 void SetPlayerLevel(PlayerId player, const std::string &level, const EntityManager &entities);

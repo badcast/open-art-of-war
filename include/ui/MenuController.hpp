@@ -270,16 +270,18 @@ private:
     bool m_skirmishAllowSpeed {false}; // custom game: allow game speed control (off by default)
     int m_skirmishCredits {kDefaultCreditsIndex}; // custom game: index into kStartingCredits
     bool m_skirmishNight {false};                 // custom game: played at night
+    int m_skirmishTechLevel {-1}; // custom game: tech level (index into Capabilities::Levels(), -1 = the map's)
     // Custom game players, as the network room has them: [0] is the person, the rest are computer players
     struct CustomSlot
     {
         int faction {0}; // computer players: 0 random, 1 Resistance, 2 Confederation (the person's comes from the side)
         int team {0};
-        int color {1};    // 1..8
-        int level {1};    // computer player: 0 easy .. 3 hardcore
-        int handicap {0}; // start credits form (kHandicapPercent index); 0 = none
-        int position {0}; // start position of the map (0-based), never shared by two players
-        int armyCap {7};  // army size limit: index into kArmyCapUnits (7 = unlimited)
+        int color {1};      // 1..8
+        int level {1};      // computer player: 0 easy .. 3 hardcore
+        int handicap {0};   // start credits form (kHandicapPercent index); 0 = none
+        int position {0};   // start position of the map (0-based), never shared by two players
+        int armyCap {7};    // army size limit: index into kArmyCapUnits (7 = unlimited)
+        int techLevel {-1}; // tech level: index into Capabilities::Levels(), -1 = the match's
     };
     std::vector<CustomSlot> m_customSlots;
     void EnsureCustomSlots();
@@ -301,11 +303,12 @@ private:
                                                       // first visible row of the map list
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
-    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboCredits = 103, kComboTime = 107;
+    static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboCredits = 103, kComboTime = 107,
+                         kComboTech = 108;
     static constexpr int kComboMapPlayers = 104, kComboMapSize = 105, kComboMapSort = 106; // filters over the map list
     std::vector<int> MapPlayerCounts() const; // 0 (any) and the player counts of the maps
     static constexpr int kComboSlot
-        = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap)
+        = 200; // + row * 10 + kind (1 faction, 2 team, 3 colour, 4 level, 6 position, 7 handicap, 8 army, 9 tech)
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);

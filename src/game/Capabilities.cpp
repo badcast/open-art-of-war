@@ -134,14 +134,31 @@ const std::string &DefaultLevel()
     return Current().defaultLevel;
 }
 
-std::string ResolveLevel(int matchLevel, int slotLevel)
+std::string ResolveLevel(int matchLevel, int slotLevel, const std::string &preset)
 {
     const auto &names = Levels();
     if (slotLevel >= 0 && slotLevel < static_cast<int>(names.size()))
         return names[static_cast<std::size_t>(slotLevel)];
     if (matchLevel >= 0 && matchLevel < static_cast<int>(names.size()))
         return names[static_cast<std::size_t>(matchLevel)];
+    if (!preset.empty())
+    {
+        if (LevelIndex(preset) >= 0)
+            return preset;
+        std::cerr << "[Capabilities] the map names an unknown level '" << preset << "'" << std::endl;
+    }
     return DefaultLevel();
+}
+
+void ApplyLevels(int matchLevel, const std::string &preset, const EntityManager &entities)
+{
+    ResetLevels();
+    for (int p = 0; p < kMaxPlayers; ++p)
+    {
+        const auto id = static_cast<PlayerId>(p);
+        if (Players::IsActive(id))
+            SetPlayerLevel(id, ResolveLevel(matchLevel, Players::Slot(id).techLevel, preset), entities);
+    }
 }
 
 void SetPlayerLevel(PlayerId player, const std::string &level, const EntityManager &entities)
