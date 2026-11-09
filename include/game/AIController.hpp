@@ -513,6 +513,12 @@ private:
     int m_expansions {0};
     int m_gateX[2] {-1, -1}; // the two openings in the wall the attack groups march out of
     int m_gateY[2] {-1, -1};
+    // Threat memory (fades, half-life kThreatHalfLife): how much came at the base from each of the 8 sectors around
+    // the home, and how much each foe sent; the defense, the guard posts, the towers and the choice of target use it
+    float m_sectorThreat[8] {};
+    float m_foeHostility[kMaxPlayers] {};
+    int SectorOf(int x, int y) const; // 0..7 around the home (0: east, counter-clockwise by 45 degrees)
+    int UnitThreatValue(const Unit &u, const EntityManager &entities) const; // its credit cost
     int m_lastThreatX {-1}; // where the player last showed up at the base
     int m_lastThreatY {-1};
     int m_lastThreatId {0};

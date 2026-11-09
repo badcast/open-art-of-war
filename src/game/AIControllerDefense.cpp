@@ -18,72 +18,167 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
 
 namespace OpenArtOfWar
 {
 
+namespace
+{
+// Tuning
+// per run of UpdateBaseDefense (every 2 s): 0.5 ^ (2 s / 180 s), the threat memory halves in 3 minutes
+constexpr float kThreatDecay = 0.99233f;
+constexpr float kHqZoneTiles = 18.0f;       // an enemy this close to the headquarters is at the base
+constexpr float kBuildingZoneTiles = 10.0f; // ... or this close to any structure of the base
+constexpr float kClusterTiles = 6.0f;       // enemies this close together are one attack
+constexpr float kDefenderReachTiles = 22.0f; // idle troops this close to an attack go for it
+constexpr float kDefenseMargin = 1.2f;       // an attack wants this much more worth of defenders than it brings
+} // namespace
+
+int AIController::SectorOf(int x, int y) const
+{
+    const int hx = m_homeX >= 0 ? m_homeX : m_enemyHqX, hy = m_homeY >= 0 ? m_homeY : m_enemyHqY;
+    if (x == hx && y == hy)
+        return 0;
+    const float a = DetMath::Atan2(static_cast<float>(y - hy), static_cast<float>(x - hx)); // -pi..pi
+    const float turns = a / (2.0f * static_cast<float>(M_PI)) + 1.0f / 16.0f;                // centred on 0
+    int s = static_cast<int>(std::floor(turns * 8.0f));
+    return ((s % 8) + 8) % 8;
+}
+
+int AIController::UnitThreatValue(const Unit &u, const EntityManager &entities) const
+{
+    // Siege forms count as their mobile form: Sniper 14 -> 4, Rhino 15 -> 10, Grad 16 -> 13
+    const int arch = u.archetypeId == 14 ? 4 : u.archetypeId == 15 ? 10 : u.archetypeId == 16 ? 13 : u.archetypeId;
+    const UnitConfig *cfg = entities.GetUnitConfig(arch);
+    return std::max(50, cfg ? cfg->creditCost : 0);
+}
+
 void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfinder)
 {
-    // Find all player units trespassing within 18 tiles of enemy base
-    int threatEntityId = 0;
-    float closestDist = 18.0f * TILE_WIDTH;
+    for (float &t : m_sectorThreat)
+        t *= kThreatDecay;
+    for (float &t : m_foeHostility)
+        t *= kThreatDecay;
 
+    // The base: the headquarters and every structure of this player
+    const float hqPx = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f, hqPy = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
+    std::vector<const Building *> ownBuildings;
     for (const auto &e : entities.GetAllEntities())
-    {
-        if (!e.alive || e.state == ActionState::Die || !IsFoe(e))
-            continue;
-        if (!AiSees(e, entities))
-            continue; // AI only detects threats it actually sees!
-        float dx = e.GetUnitCenterPixelX() - (m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f);
-        float dy = e.GetUnitCenterPixelY() - (m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f);
-        float d = std::sqrt(dx * dx + dy * dy);
-        if (d < closestDist)
+        if (const Building *b = e.AsBuilding(); b && b->alive && b->state != ActionState::Die && b->owner == m_player)
+            ownBuildings.push_back(b);
+    auto atBase = [&](const Entity &e) {
+        if (DetMath::Hypot(e.GetUnitCenterPixelX() - hqPx, e.GetUnitCenterPixelY() - hqPy)
+            <= kHqZoneTiles * TILE_WIDTH)
+            return true;
+        for (const Building *b : ownBuildings)
         {
-            closestDist = d;
-            threatEntityId = e.id;
+            // tiles from the footprint's edge
+            const int dx = std::max({b->tileX - e.tileX, 0, e.tileX - (b->tileX + b->buildWidth - 1)});
+            const int dy = std::max({b->tileY - e.tileY, 0, e.tileY - (b->tileY + b->buildHeight - 1)});
+            if (DetMath::Hypot(static_cast<float>(dx), static_cast<float>(dy)) <= kBuildingZoneTiles)
+                return true;
         }
-    }
+        return false;
+    };
 
-    if (threatEntityId == 0)
-        return;
-
-    Entity *threat = entities.GetEntity(threatEntityId);
-    if (!threat)
-        return;
-    m_lastThreatX = threat->tileX; // the base builder reinforces this side
-    m_lastThreatY = threat->tileY;
-    if (threat->id != m_lastThreatId)
+    // Enemy troops at the base, gathered into attacks (several attacks from several sides are told apart)
+    struct Attack
     {
-        m_lastThreatId = threat->id;
-        Think(
-            "DEFENSE",
-            "Enemy spotted near the base at (" + std::to_string(threat->tileX) + ", " + std::to_string(threat->tileY)
-                + "): sending idle troops to intercept");
-    }
-
-    // Rally nearby idle reserve units to intercept the threat (marching groups keep their own orders)
-    std::vector<int> defenders;
+        float x {0.0f}, y {0.0f}; // centre, tiles
+        float strength {0.0f};
+        float assigned {0.0f};
+        int count {0};
+        int firstId {0};
+        std::vector<int> defenders;
+    };
+    std::vector<Attack> attacks;
     for (const auto &e : entities.GetAllEntities())
     {
-        if (!e.alive || e.state == ActionState::Die || e.isBuilding || e.owner != m_player)
+        const Unit *u = e.AsUnit();
+        if (!u || !u->alive || u->state == ActionState::Die || !IsFoe(e) || !AiSees(e, entities) || !atBase(e))
             continue;
-        if (m_squadController.IsSquadMember(e.id))
-            continue;
-        if (e.state == ActionState::Idle && e.targetEntityId == 0)
+        const float value = static_cast<float>(UnitThreatValue(*u, entities));
+        m_sectorThreat[SectorOf(u->tileX, u->tileY)] += value;
+        if (u->owner < kMaxPlayers)
+            m_foeHostility[u->owner] += value;
+        const float tx = static_cast<float>(u->tileX), ty = static_cast<float>(u->tileY);
+        Attack *into = nullptr;
+        for (Attack &a : attacks)
         {
-            float dx = e.GetUnitCenterPixelX() - threat->GetUnitCenterPixelX();
-            float dy = e.GetUnitCenterPixelY() - threat->GetUnitCenterPixelY();
-            float d = std::sqrt(dx * dx + dy * dy);
-            if (d <= 22.0f * TILE_WIDTH)
+            if (DetMath::Hypot(a.x - tx, a.y - ty) <= kClusterTiles)
             {
-                defenders.push_back(e.id);
+                into = &a;
+                break;
             }
         }
+        if (!into)
+        {
+            attacks.push_back({});
+            into = &attacks.back();
+            into->firstId = u->id;
+        }
+        into->x = (into->x * into->count + tx) / static_cast<float>(into->count + 1);
+        into->y = (into->y * into->count + ty) / static_cast<float>(into->count + 1);
+        ++into->count;
+        into->strength += value;
+    }
+    if (attacks.empty())
+        return;
+
+    const Attack *strongest = &attacks.front();
+    for (const Attack &a : attacks)
+        if (a.strength > strongest->strength)
+            strongest = &a;
+    m_lastThreatX = static_cast<int>(std::lround(strongest->x)); // the base builder reinforces this side
+    m_lastThreatY = static_cast<int>(std::lround(strongest->y));
+    if (strongest->firstId != m_lastThreatId)
+    {
+        m_lastThreatId = strongest->firstId;
+        std::ostringstream msg;
+        msg << attacks.size() << (attacks.size() == 1 ? " attack" : " attacks") << " on the base, the strongest near ("
+            << m_lastThreatX << ", " << m_lastThreatY << "): idle troops split between them";
+        Think("DEFENSE", msg.str());
     }
 
-    if (!defenders.empty())
+    // Idle troops (not in a squad) go where defenders are lacking most; ties: the nearer attack
+    for (const auto &e : entities.GetAllEntities())
     {
-        entities.IssueAttackMoveOrder(defenders, threat->tileX, threat->tileY, pathfinder);
+        const Unit *u = e.AsUnit();
+        if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f)
+            continue;
+        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id))
+            continue;
+        if (u->state != ActionState::Idle || u->targetEntityId != 0)
+            continue;
+        Attack *best = nullptr;
+        float bestNeed = 0.0f, bestDist = 0.0f;
+        for (Attack &a : attacks)
+        {
+            const float d = DetMath::Hypot(static_cast<float>(u->tileX) - a.x, static_cast<float>(u->tileY) - a.y);
+            if (d > kDefenderReachTiles)
+                continue;
+            const float need = a.strength * kDefenseMargin - a.assigned;
+            if (!best || need > bestNeed + 0.5f || (std::abs(need - bestNeed) <= 0.5f && d < bestDist))
+            {
+                best = &a;
+                bestNeed = need;
+                bestDist = d;
+            }
+        }
+        if (!best)
+            continue;
+        best->assigned += static_cast<float>(UnitThreatValue(*u, entities));
+        best->defenders.push_back(u->id);
+    }
+    for (const Attack &a : attacks)
+    {
+        if (!a.defenders.empty())
+            entities.IssueAttackMoveOrder(
+                a.defenders,
+                static_cast<int>(std::lround(a.x)),
+                static_cast<int>(std::lround(a.y)),
+                pathfinder);
     }
 }
 

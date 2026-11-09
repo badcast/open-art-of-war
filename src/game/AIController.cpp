@@ -18,6 +18,8 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
+#include <iterator>
 
 namespace OpenArtOfWar
 {
@@ -499,6 +501,8 @@ void AIController::Reset()
     m_lastThreatX = m_lastThreatY = -1;
     m_lastThreatId = 0;
     m_knownBuildings.clear();
+    std::fill(std::begin(m_sectorThreat), std::end(m_sectorThreat), 0.0f);
+    std::fill(std::begin(m_foeHostility), std::end(m_foeHostility), 0.0f);
     m_eliminatedFoes = 0;
     m_noFoesLeft = false;
     m_foeAnchorTimer = 0.0f;
