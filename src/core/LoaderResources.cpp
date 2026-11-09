@@ -349,6 +349,11 @@ std::string LoaderResources::Limits()
     return join(Str(nullptr, "limits"));
 }
 
+std::string LoaderResources::Capabilities()
+{
+    return join(Str(nullptr, "capabilities"));
+}
+
 std::string LoaderResources::Research(const std::string &faction)
 {
     return join(Str("research", faction.c_str()));

@@ -81,6 +81,8 @@ class LoaderResources
     }
     // Hard per-player building limits (data/limits.yaml)
     static std::string Limits();
+    // Tech levels: buildings, units and researches allowed per level (data/capabilities.yaml)
+    static std::string Capabilities();
     // Damage multipliers by projectile kind and target class (data/weapon_balance.yaml)
     static std::string WeaponBalance();
     static inline std::string weaponBalance()
