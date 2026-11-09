@@ -410,17 +410,10 @@ void EntityManager::UpdateTurretShift(Unit &u) const
         return;
     // Deployed siege units (14..16) keep a single hull sprite; everything else has one per facing
     const bool fixedHull = (u.archetypeId >= 14 && u.archetypeId <= 16);
-    float ax = 0.0f, ay = 0.0f, rx = 0.0f, ry = 0.0f;
-    if (m_texManager && m_texManager->GetTurretAnchor(u.archetypeId, fixedHull ? 0 : u.facingDirection, ax, ay)
-        && m_texManager->GetTurretAnchor(u.archetypeId, fixedHull ? 0 : 2, rx, ry))
-    {
-        u.turretShiftX = ax - rx;
-        u.turretShiftY = ay - ry;
-    }
-    else
-    {
-        TurretShift(u.archetypeId, fixedHull ? 0 : u.facingDirection, u.turretShiftX, u.turretShiftY);
-    }
+    // Always the fixed table, never the sprite's turret layer: the shift moves the muzzle, so the shots' start, spread
+    // and flight time. Sprites are a player's own business (not in the network hash, not in replays): reading them
+    // here put players with different sprite files out of sync and broke replays after a sprite was edited.
+    TurretShift(u.archetypeId, fixedHull ? 0 : u.facingDirection, u.turretShiftX, u.turretShiftY);
 }
 
 void EntityManager::NoteHit(PlayerId victim, int attackerId)
