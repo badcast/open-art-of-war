@@ -1,7 +1,9 @@
 // Capabilities: tech level parsing, the default level, what a level allows and the researches it takes away
+#include "core/LoaderResources.hpp"
 #include "game/Capabilities.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Research.hpp"
+#include "net/NetMatch.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -124,6 +126,24 @@ int main()
     CHECK(Capabilities::Levels().size() == 2);
     CHECK(Capabilities::LoadText("default: basic\n"));
     CHECK(Capabilities::Levels().empty() && Capabilities::DefaultLevel().empty());
+
+    // The match setup carries the levels to every computer and into replays
+    {
+        MatchSetup setup;
+        setup.mapPath = LoaderResources::MapsDir() + "/skirmish_1.json";
+        setup.slots[0].active = setup.slots[2].active = true;
+        setup.slots[0].human = true;
+        setup.slots[2].techLevel = 2;
+        setup.techLevel = 0;
+        for (const bool night : {false, true})
+        {
+            setup.night = night;
+            MatchSetup out;
+            CHECK(NetMatch::DecodeSetup(NetMatch::EncodeSetup(setup), out));
+            CHECK(out.night == night && out.techLevel == 0);
+            CHECK(out.slots[0].techLevel == -1 && out.slots[2].techLevel == 2);
+        }
+    }
 
     std::printf(fails ? "%d failed\n" : "all passed\n", fails);
     return fails ? 1 : 0;

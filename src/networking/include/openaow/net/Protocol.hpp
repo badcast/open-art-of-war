@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 3;
+constexpr std::uint16_t kProtocolVersion = 4;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -190,6 +190,9 @@ struct StartMatch
 // Picks of a player in the room. Faction and start position may be left to chance (kRandom): the host
 // resolves them with the match seed when it starts the match.
 constexpr std::uint8_t kRandom = 0x0F;
+// Tech levels travel as 4 bits: 0 the match's (for the match: the map's / the default), n = level n - 1 of the
+// game's list; kTechKeep in an owner's change leaves the player's level as it is
+constexpr std::uint8_t kTechKeep = 0x0F;
 constexpr std::size_t kMaxMapPathLength = 128;
 
 struct LobbyChoice
@@ -201,6 +204,7 @@ struct LobbyChoice
     std::uint8_t handicap {0};      // 0..5: start credits form, the host / room owner decides it
     std::uint8_t armyCap {
         7}; // 0..7: army size limit (the game's list, 7 = unlimited), the host / room owner decides it
+    std::uint8_t techLevel {0}; // 0..14: tech level (see kTechKeep), the host / room owner decides it
     bool ready {false};
 };
 
@@ -225,9 +229,10 @@ struct OwnerSetAi
 struct OwnerSetTeam
 {
     std::uint8_t slot {0};
-    std::uint8_t team {0};     // 0..7
-    std::uint8_t handicap {0}; // 0..5, see LobbyChoice
-    std::uint8_t armyCap {7};  // 0..7, see LobbyChoice
+    std::uint8_t team {0};              // 0..7
+    std::uint8_t handicap {0};          // 0..5, see LobbyChoice
+    std::uint8_t armyCap {7};           // 0..7, see LobbyChoice
+    std::uint8_t techLevel {kTechKeep}; // 0..14, see LobbyChoice; kTechKeep: unchanged
 };
 
 struct LobbyState
@@ -237,8 +242,9 @@ struct LobbyState
     std::uint8_t spawnCount {2}; // start positions of the map
     bool fogOfWar {true};        // match options, set by the room owner and shown to everybody
     bool prebuilt {true};
-    std::uint8_t credits {1}; // index into the game's list of starting credits (0..4)
-    bool night {false};       // time of day of the match (day / night)
+    std::uint8_t credits {1};   // index into the game's list of starting credits (0..4)
+    bool night {false};         // time of day of the match (day / night)
+    std::uint8_t techLevel {0}; // tech level of the match (see kTechKeep)
     std::uint8_t blockedMask {
         0}; // start positions nobody may take (bit per position): neither a player nor a computer player
     std::vector<LobbySlot> slots;
@@ -263,8 +269,9 @@ struct OwnerSetOptions
 {
     bool fogOfWar {true};
     bool prebuilt {true};
-    std::uint8_t credits {1}; // 0..4
-    bool night {false};       // time of day
+    std::uint8_t credits {1};   // 0..4
+    bool night {false};         // time of day
+    std::uint8_t techLevel {0}; // 0..14, see LobbyState
 };
 
 struct OwnerSetMap

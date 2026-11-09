@@ -62,6 +62,8 @@ std::vector<std::string> ComboChoices(int kind)
     }
     else if (kind == 8)
         out = ui::ArmyCapChoices();
+    else if (kind == 9)
+        out = ui::TechLevelChoices(true); // (choice n = the room's value n)
     return out;
 }
 
@@ -215,7 +217,12 @@ void DrawField(
 
 void NetworkMenu::PushOptions(NetMatch &net)
 {
-    net.SetOptions(m_fog, m_prebuilt, static_cast<std::uint8_t>(std::clamp(m_credits, 0, 4)), m_night);
+    net.SetOptions(
+        m_fog,
+        m_prebuilt,
+        static_cast<std::uint8_t>(std::clamp(m_credits, 0, 4)),
+        m_night,
+        static_cast<std::uint8_t>(std::clamp(m_tech, 0, Net::kTechKeep - 1)));
 }
 
 void NetworkMenu::Reset()
@@ -292,6 +299,7 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     // Match options: the time of day and the credits next to the title, the check boxes beside the picture
     l.creditsBtn = {d.Right() - 20 - 200, d.y + 12, 200, 32};
     l.timeBtn = {l.creditsBtn.x - 12 - 160, d.y + 12, 160, 32};
+    l.techBtn = {l.timeBtn.x - 12 - 180, d.y + 12, 180, 32};
     l.fogCheckbox = {optX, l.map.y, optW, 28};
     l.prebuiltBtn = {optX, l.map.y + 32, optW, 28}; // a check box: start with a base
     // Footer: Leave on the left, Ready and Start on the right - never on top of each other
@@ -588,6 +596,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         m_prebuilt = lobby->prebuilt;
         m_credits = lobby->credits;
         m_night = lobby->night;
+        m_tech = lobby->techLevel;
     }
     // Start positions from the room's map as this computer has it (the own file or the downloaded copy)
     if (net.LobbyMapFile() != m_spotsMap)
@@ -647,6 +656,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
             return l.creditsBtn;
         if (id == kTimeCombo)
             return l.timeBtn;
+        if (id == kTechCombo)
+            return l.techBtn;
         if (id >= kFilterPlayers && id <= kFilterSort)
             return l.Filter(id - kFilterPlayers);
         const int row = id / 10, kind = id % 10;
@@ -655,6 +666,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                : kind == 3 ? l.ColorCell(row)
                : kind == 7 ? l.HandicapCell(row)
                : kind == 8 ? l.ArmyCell(row)
+               : kind == 9 ? l.TechCell(row)
                            : l.TypeCell(row);
     };
     // The filter lists over the maps work for everybody in the room
@@ -714,6 +726,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                     comboField(id),
                     isMapList             ? static_cast<int>(m_maps.size())
                     : id == kTimeCombo    ? static_cast<int>(ui::TimeOfDayChoices().size())
+                    : id == kTechCombo    ? static_cast<int>(ui::TechLevelChoices(false).size())
                     : id == kCreditsCombo ? static_cast<int>(ui::CreditsChoices().size())
                     : kind == 0           ? static_cast<int>(SeatOptions(net, *lobby, row).size())
                                           : static_cast<int>(ComboChoices(kind).size()),
@@ -732,6 +745,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 else if (picked >= 0 && id == kTimeCombo)
                 {
                     m_night = picked == 1;
+                    PushOptions(net);
+                }
+                else if (picked >= 0 && id == kTechCombo)
+                {
+                    m_tech = picked; // (choice n = the room's value n)
                     PushOptions(net);
                 }
                 else if (picked >= 0 && kind == 0)
@@ -784,7 +802,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
-                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap);
+                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap, choice.techLevel);
                             return NetworkAction::None;
                         }
                     }
@@ -796,17 +814,20 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                         choice.color = static_cast<std::uint8_t>(picked + 1);
                         choice.ready = false; // like faction and team: the owner never starts with an old colour
                     }
-                    if (kind == 7 || kind == 8)
+                    if (kind == 7 || kind == 8 || kind == 9)
                     {
-                        // The form (start credits) and the army size limit are the owner's decision, for every player
+                        // The form (start credits), the army size limit and the tech level are the owner's decision,
+                        // for every player
                         if (kind == 7)
                             choice.handicap = static_cast<std::uint8_t>(picked);
-                        else
+                        else if (kind == 8)
                             choice.armyCap = static_cast<std::uint8_t>(picked);
+                        else
+                            choice.techLevel = static_cast<std::uint8_t>(std::clamp(picked, 0, Net::kTechKeep - 1));
                         if (!s.ai)
                         {
                             if (net.ControlsRoom())
-                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap);
+                                net.SetTeam(s.slot, choice.team, choice.handicap, choice.armyCap, choice.techLevel);
                             return NetworkAction::None;
                         }
                     }
@@ -900,6 +921,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
         return NetworkAction::Start;
     if (net.ControlsRoom() && l.timeBtn.Contains(mx, my))
         return openCombo(kTimeCombo);
+    if (net.ControlsRoom() && l.techBtn.Contains(mx, my))
+        return openCombo(kTechCombo);
     if (net.ControlsRoom() && l.creditsBtn.Contains(mx, my))
         return openCombo(kCreditsCombo);
     if (net.ControlsRoom() && l.fogCheckbox.Contains(mx, my))
@@ -966,6 +989,8 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 return openCombo(i * 10 + 7);
             if (net.ControlsRoom() && l.ArmyCell(i).Contains(mx, my))
                 return openCombo(i * 10 + 8);
+            if (net.ControlsRoom() && l.TechCell(i).Contains(mx, my))
+                return openCombo(i * 10 + 9);
         }
     }
     if (!haveMine)
@@ -1025,8 +1050,9 @@ void NetworkMenu::Render(
         ui::DrawCaption(font, r, l.players.x, l.players.y - 22, _("PLAYERS"));
         // Column captions: a row is a start position of the map; they sit over the same cells as the rows
         {
-            const char *names[6] = {_("Place"), _("Faction"), _("Team"), _("Colour"), _("Handicap"), _("Army")};
-            for (int k = 0; k < 6; ++k)
+            const char *names[7]
+                = {_("Place"), _("Faction"), _("Team"), _("Colour"), _("Handicap"), _("Army"), _("Tech")};
+            for (int k = 0; k < 7; ++k)
             {
                 const UiRect c = l.Col(0, k);
                 font.DrawString(
@@ -1146,17 +1172,20 @@ void NetworkMenu::Render(
                 }
                 const std::string form = ComboChoices(7)[std::min<int>(choice.handicap, 5)];
                 const std::string cap = ui::ArmyCapChoices()[std::min<int>(choice.armyCap, kArmyCapCount - 1)];
+                const std::string tech = ui::TechLevelLabel(static_cast<int>(choice.techLevel) - 1, true);
                 if (net->ControlsRoom())
                 {
                     combo(l.TeamCell(i), 2, std::to_string(choice.team + 1));
                     combo(l.HandicapCell(i), 7, form);
                     combo(l.ArmyCell(i), 8, cap);
+                    combo(l.TechCell(i), 9, tech);
                 }
                 else
                 {
                     cell(l.TeamCell(i), std::to_string(choice.team + 1));
                     cell(l.HandicapCell(i), form);
                     cell(l.ArmyCell(i), cap);
+                    cell(l.TechCell(i), tech);
                 }
                 if (!s->ai && choice.ready)
                 {
@@ -1185,7 +1214,7 @@ void NetworkMenu::Render(
                 mapName = lobby->map.substr(lobby->map.find_last_of('/') + 1);
         }
         font.DrawString(
-            ui::FitText(font, mapName, ui::FONT_H2, l.timeBtn.x - l.details.x - 40),
+            ui::FitText(font, mapName, ui::FONT_H2, l.techBtn.x - l.details.x - 40),
             l.details.x + 20,
             l.details.y + 18,
             ui::FONT_H2,
@@ -1321,7 +1350,16 @@ void NetworkMenu::Render(
             const int credits = owner ? m_credits : (lobby ? lobby->credits : kDefaultCreditsIndex);
             const bool fog = owner ? m_fog : (lobby ? lobby->fogOfWar : true);
             const bool night = owner ? m_night : (lobby && lobby->night);
+            const int tech = owner ? m_tech : (lobby ? lobby->techLevel : 0);
             const bool hoverOk = m_combo.open < 0;
+            ui::DrawComboField(
+                r,
+                font,
+                l.techBtn,
+                ui::TechLevelLabel(tech - 1, false),
+                m_combo.open == kTechCombo,
+                owner && hoverOk && l.techBtn.Contains(m_mouseX, m_mouseY),
+                owner);
             ui::DrawComboField(
                 r,
                 font,
@@ -1479,6 +1517,11 @@ void NetworkMenu::Render(
                 ui::DrawComboList(
                     r, font, l.timeBtn, ui::TimeOfDayChoices(), m_night ? 1 : 0, m_combo, h, m_mouseX, m_mouseY);
             }
+            else if (id == kTechCombo)
+            {
+                ui::DrawComboList(
+                    r, font, l.techBtn, ui::TechLevelChoices(false), m_tech, m_combo, h, m_mouseX, m_mouseY);
+            }
             else if (lobby && kind == 0 && row < std::min<int>(lobby->spawnCount, kMaxPlayers))
             {
                 const std::vector<SeatOption> options = SeatOptions(*net, *lobby, row);
@@ -1498,11 +1541,13 @@ void NetworkMenu::Render(
                                          : kind == 2 ? l.TeamCell(row)
                                          : kind == 3 ? l.ColorCell(row)
                                          : kind == 7 ? l.HandicapCell(row)
+                                         : kind == 9 ? l.TechCell(row)
                                                      : l.ArmyCell(row);
                 const int current = kind == 1   ? (sc.faction == Net::kRandom ? 0 : sc.faction + 1)
                                     : kind == 2 ? sc.team
                                     : kind == 3 ? std::max(0, sc.color - 1)
                                     : kind == 7 ? std::min<int>(sc.handicap, 5)
+                                    : kind == 9 ? static_cast<int>(sc.techLevel)
                                                 : std::min<int>(sc.armyCap, kArmyCapCount - 1);
                 std::vector<std::string> items = ComboChoices(kind);
                 std::vector<bool> taken;

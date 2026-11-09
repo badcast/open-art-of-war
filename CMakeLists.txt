@@ -443,7 +443,7 @@ set_target_properties(openaow-build-limits-tests PROPERTIES
 add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
 
 add_executable(openaow-capabilities-tests tests/CapabilitiesTests.cpp)
-target_link_libraries(openaow-capabilities-tests PRIVATE openaow-core)
+target_link_libraries(openaow-capabilities-tests PRIVATE openaow-core OpenAOWNetworking)
 set_target_properties(openaow-capabilities-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     BUILD_RPATH "${OAOW_RPATH}")

@@ -358,6 +358,7 @@ void writeChoice(BitWriter &w, const LobbyChoice &c)
     w.writeBits(c.spawn, 4);
     w.writeBits(c.handicap, 3);
     w.writeBits(c.armyCap, 3);
+    w.writeBits(c.techLevel, 4);
     w.writeBool(c.ready);
 }
 
@@ -369,7 +370,10 @@ void readChoice(BitReader &r, LobbyChoice &c)
     c.spawn = static_cast<std::uint8_t>(r.readBits(4));
     c.handicap = static_cast<std::uint8_t>(r.readBits(3));
     c.armyCap = static_cast<std::uint8_t>(r.readBits(3));
+    c.techLevel = static_cast<std::uint8_t>(r.readBits(4));
     c.ready = r.readBool();
+    if (c.techLevel == kTechKeep)
+        r.fail();
     if (c.handicap > 5)
         r.fail();
     if (c.faction > 1 && c.faction != kRandom)
@@ -402,6 +406,7 @@ void encode(BitWriter &w, const LobbyState &m)
     w.writeBool(m.prebuilt);
     w.writeBits(m.credits, 3);
     w.writeBool(m.night);
+    w.writeBits(m.techLevel, 4);
     w.writeBits(m.blockedMask, 8);
     w.writeRanged(static_cast<std::int32_t>(m.slots.size()), 0, kMaxPlayers);
     for (const LobbySlot &s : m.slots)
@@ -425,6 +430,9 @@ bool decode(BitReader &r, LobbyState &m)
     if (m.credits > 4)
         r.fail();
     m.night = r.readBool();
+    m.techLevel = static_cast<std::uint8_t>(r.readBits(4));
+    if (m.techLevel == kTechKeep)
+        r.fail();
     m.blockedMask = static_cast<std::uint8_t>(r.readBits(8));
     const int count = r.readRanged(0, kMaxPlayers);
     m.slots.resize(r.failed() ? 0 : static_cast<std::size_t>(count));
@@ -568,6 +576,7 @@ void encode(BitWriter &w, const OwnerSetTeam &m)
     w.writeBits(m.team, 3);
     w.writeBits(m.handicap, 3);
     w.writeBits(m.armyCap, 3);
+    w.writeBits(m.techLevel, 4);
 }
 
 bool decode(BitReader &r, OwnerSetTeam &m)
@@ -576,6 +585,7 @@ bool decode(BitReader &r, OwnerSetTeam &m)
     m.team = static_cast<std::uint8_t>(r.readBits(3));
     m.handicap = static_cast<std::uint8_t>(r.readBits(3));
     m.armyCap = static_cast<std::uint8_t>(r.readBits(3));
+    m.techLevel = static_cast<std::uint8_t>(r.readBits(4));
     if (m.handicap > 5)
         r.fail();
     return done(r);
@@ -606,6 +616,7 @@ void encode(BitWriter &w, const OwnerSetOptions &m)
     w.writeBool(m.prebuilt);
     w.writeBits(m.credits, 3);
     w.writeBool(m.night);
+    w.writeBits(m.techLevel, 4);
 }
 
 bool decode(BitReader &r, OwnerSetOptions &m)
@@ -616,6 +627,9 @@ bool decode(BitReader &r, OwnerSetOptions &m)
     if (m.credits > 4)
         r.fail();
     m.night = r.readBool();
+    m.techLevel = static_cast<std::uint8_t>(r.readBits(4));
+    if (m.techLevel == kTechKeep)
+        r.fail();
     return done(r);
 }
 

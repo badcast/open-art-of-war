@@ -1007,11 +1007,24 @@ void testLobby()
     a->sendOwnerSetTeam(OwnerSetTeam {1, 5, 3});
     pump();
     CHECK(a->lobby().slots[1].choice.handicap == 3 && a->lobby().slots[1].choice.team == 5);
+    // So is the tech level: B cannot pick its own, A can; a change without it keeps it
+    cb.techLevel = 2;
+    b->sendLobbyChoice(cb);
+    pump();
+    CHECK(a->lobby().slots[1].choice.techLevel == 0);
+    a->sendOwnerSetTeam(OwnerSetTeam {1, 5, 3, 7, 2});
+    pump();
+    CHECK(b->lobby().slots[1].choice.techLevel == 2);
+    a->sendOwnerSetTeam(OwnerSetTeam {1, 5, 3});
+    pump();
+    CHECK(b->lobby().slots[1].choice.techLevel == 2 && b->lobby().slots[1].choice.handicap == 3);
+    cb.techLevel = 2; // (what B sends next keeps the owner's value)
     // Match options: the owner sets them, everybody sees them, a plain player cannot
     CHECK(a->lobby().fogOfWar && a->lobby().prebuilt && a->lobby().credits == 1 && !a->lobby().night);
-    a->sendOwnerSetOptions(OwnerSetOptions {false, false, 3, true});
+    a->sendOwnerSetOptions(OwnerSetOptions {false, false, 3, true, 1});
     pump();
     CHECK(!b->lobby().fogOfWar && !b->lobby().prebuilt && b->lobby().credits == 3 && b->lobby().night);
+    CHECK(b->lobby().techLevel == 1);
     b->sendOwnerSetOptions(OwnerSetOptions {true, true, 0, false});
     pump();
     CHECK(!a->lobby().fogOfWar && a->lobby().credits == 3 && a->lobby().night);

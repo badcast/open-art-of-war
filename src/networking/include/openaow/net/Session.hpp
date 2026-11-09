@@ -81,11 +81,16 @@ public:
     // Computer players: add (slot kRandom: the first free one), change or remove (see OwnerSetAi)
     void setAiSlot(const OwnerSetAi &change);
     // The team of a player in the room (the host / room owner decides teams, see OwnerSetTeam)
-    void setTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap = 7);
+    void setTeam(
+        std::uint8_t slot,
+        std::uint8_t team,
+        std::uint8_t handicap,
+        std::uint8_t armyCap = 7,
+        std::uint8_t techLevel = kTechKeep);
     // What a start position holds (see OwnerSetSeat): the host / room owner decides
     void setSeat(const OwnerSetSeat &change);
     // Match options of the room (the host / room owner decides, everybody sees them in the lobby)
-    void setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night);
+    void setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night, std::uint8_t techLevel = 0);
     // Everybody connected has said ready (and there are at least `minPlayers`, computer players included)
     bool everyoneReady(int minPlayers) const;
 

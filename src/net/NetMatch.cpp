@@ -756,7 +756,8 @@ void NetMatch::SetAi(const Net::OwnerSetAi &change)
     else if (IsOwner())
         m_client->sendOwnerSetAi(change);
 }
-void NetMatch::SetTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap)
+void NetMatch::SetTeam(
+    std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap, std::uint8_t techLevel)
 {
     if (armyCap > 7)
     {
@@ -769,9 +770,9 @@ void NetMatch::SetTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handic
     if (m_hasPendingChoice && slot == LocalSlot())
         m_pendingChoice[1] = team;
     if (m_host)
-        m_host->setTeam(slot, team, handicap, armyCap);
+        m_host->setTeam(slot, team, handicap, armyCap, techLevel);
     else if (IsOwner())
-        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap, armyCap});
+        m_client->sendOwnerSetTeam(Net::OwnerSetTeam {slot, team, handicap, armyCap, techLevel});
 }
 void NetMatch::SetSeat(const Net::OwnerSetSeat &change)
 {
@@ -780,12 +781,12 @@ void NetMatch::SetSeat(const Net::OwnerSetSeat &change)
     else if (IsOwner())
         m_client->sendOwnerSetSeat(change);
 }
-void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night)
+void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night, std::uint8_t techLevel)
 {
     if (m_host)
-        m_host->setOptions(fogOfWar, prebuilt, credits, night);
+        m_host->setOptions(fogOfWar, prebuilt, credits, night, techLevel);
     else if (IsOwner())
-        m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits, night});
+        m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits, night, techLevel});
 }
 void NetMatch::SendChat(const std::string &text)
 {
@@ -822,6 +823,7 @@ void NetMatch::StartFromLobby(std::uint32_t nowMs)
     setup.prebuilt = lobby.prebuilt;
     setup.fogOfWar = lobby.fogOfWar;
     setup.night = lobby.night;
+    setup.techLevel = static_cast<std::int8_t>(lobby.techLevel) - 1; // (0 in the room: the map's / the default)
     std::mt19937 rng(setup.seed);
     // Start positions picked by the players first, the random ones get the free spots left
     std::vector<int> free;
@@ -845,6 +847,7 @@ void NetMatch::StartFromLobby(std::uint32_t nowMs)
         slot.team = s.choice.team;
         slot.handicap = s.choice.handicap <= 5 ? s.choice.handicap : 0;
         slot.armyCap = s.choice.armyCap < kArmyCapCount ? s.choice.armyCap : kArmyCapCount - 1;
+        slot.techLevel = static_cast<std::int8_t>(s.choice.techLevel) - 1; // (0 in the room: the match's)
         slot.color = s.choice.color <= 8 ? s.choice.color : static_cast<std::uint8_t>(1 + s.slot % 8);
         int spawn = s.choice.spawn;
         if (spawn == Net::kRandom)
@@ -1119,7 +1122,13 @@ std::vector<std::uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
         w.writeBits(s.handicap, 3);
         w.writeBits(s.armyCap, 3);
     }
-    w.writeBool(setup.night); // last: a setup written before it has none (day)
+    w.writeBool(setup.night); // a setup written before it has none (day)
+    // Tech levels (data/capabilities.yaml), after a mark: a setup written before them has none (the default)
+    w.writeBool(true);
+    w.writeBits(static_cast<std::uint32_t>(setup.techLevel + 1) & 15u, 4);
+    for (int i = 0; i < kMaxPlayers; ++i)
+        if (setup.slots[i].active)
+            w.writeBits(static_cast<std::uint32_t>(setup.slots[i].techLevel + 1) & 15u, 4);
     buf.resize(w.finish());
     return buf;
 }
@@ -1159,6 +1168,14 @@ bool NetMatch::DecodeSetup(const std::vector<std::uint8_t> &bytes, MatchSetup &o
     }
     // The time of day came later: an older setup (a replay) ends here with zero padding, a day
     out.night = !r.atEnd() && r.readBool();
+    // So did the tech levels: none (zero padding) in an older one
+    if (!r.atEnd() && r.readBool())
+    {
+        out.techLevel = static_cast<std::int8_t>(static_cast<int>(r.readBits(4)) - 1);
+        for (int i = 0; i < kMaxPlayers; ++i)
+            if (out.slots[i].active)
+                out.slots[i].techLevel = static_cast<std::int8_t>(static_cast<int>(r.readBits(4)) - 1);
+    }
     // Only maps of the game's own folder (the path comes from another computer)
     if (out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
         return false;

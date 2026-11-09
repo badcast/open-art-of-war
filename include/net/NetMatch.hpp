@@ -138,11 +138,13 @@ public:
         std::uint8_t slot,
         std::uint8_t team,
         std::uint8_t handicap,
-        std::uint8_t armyCap = 255); // 255: keep the player's limit
+        std::uint8_t armyCap = 255,               // 255: keep the player's limit
+        std::uint8_t techLevel = Net::kTechKeep); // the player's tech level (Net::kTechKeep: keep it)
     // Host / room owner: a start position open, blocked or taken by a computer player
     void SetSeat(const Net::OwnerSetSeat &change);
     // The owner sets the match options of the room
-    void SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night);
+    // (techLevel: 0 the map's / the default, n = level n - 1 of Capabilities::Levels())
+    void SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night, std::uint8_t techLevel);
     void SendChat(const std::string &text);
     std::vector<Net::Chat> TakeChat();
     // Host: everybody in the room is ready (two players at least)

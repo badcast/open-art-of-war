@@ -299,6 +299,8 @@ void SessionHost::applyChoice(std::uint8_t slot, LobbyChoice choice, bool ownerE
         choice.handicap = m_slots[slot].choice.handicap;
     if (!ownerEdit || choice.armyCap > 7)
         choice.armyCap = m_slots[slot].choice.armyCap;
+    if (!ownerEdit || choice.techLevel == kTechKeep)
+        choice.techLevel = m_slots[slot].choice.techLevel;
     // A colour somebody else has already picked: the player keeps the own one (two armies of one colour could not
     // be told apart)
     if (freeColor(slot, choice.color) != choice.color)
@@ -330,7 +332,8 @@ std::uint8_t SessionHost::freeColor(std::uint8_t slot, std::uint8_t preferred) c
     return preferred;
 }
 
-void SessionHost::setTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap)
+void SessionHost::setTeam(
+    std::uint8_t slot, std::uint8_t team, std::uint8_t handicap, std::uint8_t armyCap, std::uint8_t techLevel)
 {
     if (m_running || slot >= kMaxPlayers || !m_slots[slot].used)
         return;
@@ -339,13 +342,16 @@ void SessionHost::setTeam(std::uint8_t slot, std::uint8_t team, std::uint8_t han
         m_slots[slot].choice.handicap = handicap;
     if (armyCap <= 7)
         m_slots[slot].choice.armyCap = armyCap;
+    if (techLevel != kTechKeep)
+        m_slots[slot].choice.techLevel = techLevel & 15;
     broadcastLobby();
 }
 
-void SessionHost::setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night)
+void SessionHost::setOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night, std::uint8_t techLevel)
 {
-    if (m_running || credits > 4)
+    if (m_running || credits > 4 || techLevel == kTechKeep)
         return;
+    m_lobby.techLevel = techLevel;
     m_lobby.fogOfWar = fogOfWar;
     m_lobby.prebuilt = prebuilt;
     m_lobby.credits = credits;
@@ -688,7 +694,7 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
         {
             OwnerSetTeam m;
             if (slot == ownerSlot() && decode(r, m))
-                setTeam(m.slot, m.team, m.handicap, m.armyCap);
+                setTeam(m.slot, m.team, m.handicap, m.armyCap, m.techLevel);
             break;
         }
         case MsgType::OwnerSetSeat:
@@ -702,7 +708,7 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
         {
             OwnerSetOptions m;
             if (slot == ownerSlot() && decode(r, m))
-                setOptions(m.fogOfWar, m.prebuilt, m.credits, m.night);
+                setOptions(m.fogOfWar, m.prebuilt, m.credits, m.night, m.techLevel);
             break;
         }
         case MsgType::OwnerStart:

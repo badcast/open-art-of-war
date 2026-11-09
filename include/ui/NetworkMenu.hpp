@@ -55,11 +55,12 @@ class NetworkMenu
 public:
     static constexpr int kCreditsCombo = 1002; // starting credits list
     static constexpr int kTimeCombo = 1003;    // time of day list (day / night)
+    static constexpr int kTechCombo = 1004;    // tech level of the match (data/capabilities.yaml)
     static constexpr int kFilterPlayers = 1010, kFilterSize = 1011, kFilterSort = 1012; // the filter lists
 
     static bool IsOptionCombo(int id)
     {
-        return id == kCreditsCombo || id == kTimeCombo;
+        return id == kCreditsCombo || id == kTimeCombo || id == kTechCombo;
     }
 
     NetworkMenu() = default;
@@ -176,7 +177,7 @@ private:
     struct LobbyLayout
     {
         ui::UiRect dialog, details, mapSearch, mapList, players, map, chatLog, chatField, chatSend, readyBtn, startBtn,
-            leaveBtn, prebuiltBtn, creditsBtn, timeBtn, fogCheckbox;
+            leaveBtn, prebuiltBtn, creditsBtn, timeBtn, techBtn, fogCheckbox;
         int listRowH {28};
         int rowH {34};
         ui::UiRect Filter(int i) const
@@ -201,12 +202,12 @@ private:
             return Row(i);
         }
         // Columns of a row (a row is a start position of the map): what holds it, faction, team, colour, form, army
-        // size, ready; each is a share of the width of the table
+        // size, tech level, ready; each is a share of the width of the table
         ui::UiRect Col(int i, int k) const
         {
-            static constexpr int kShare[7] = {24, 17, 8, 8, 12, 13, 18};
+            static constexpr int kShare[8] = {22, 15, 7, 7, 11, 12, 12, 14};
             const ui::UiRect r = row(i);
-            const int gap = 4, x0 = r.x + 30, total = r.w - 30 - 6 * gap;
+            const int gap = 4, x0 = r.x + 30, total = r.w - 30 - 7 * gap;
             int used = 0;
             for (int j = 0; j < k; ++j)
                 used += kShare[j];
@@ -237,6 +238,10 @@ private:
         ui::UiRect ArmyCell(int i) const
         {
             return Col(i, 5);
+        }
+        ui::UiRect TechCell(int i) const
+        {
+            return Col(i, 6);
         }
     };
     static BrowserLayout browserLayout(int w, int h);
@@ -276,6 +281,7 @@ private:
     bool m_fog {true};          // host: fog of war
     int m_credits {1};          // host: index of the starting credits (kStartingCredits)
     bool m_night {false};       // host: the match is played at night
+    int m_tech {0};             // host: tech level of the match (0 the map's, n = level n - 1)
     bool m_optionsSent {false}; // the options of this room went to the room already
     bool m_prebuilt {true};     // host: prebuilt bases (else from scratch: HQ + power plant only)
     int m_mapIndex {0};

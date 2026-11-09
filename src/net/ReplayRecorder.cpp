@@ -2,6 +2,7 @@
 #include "core/Mods.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "game/Capabilities.hpp"
 #include "net/MapFiles.hpp"
 #include "net/NetMatch.hpp"
 #include "openaow/net/ReplayFile.hpp"
@@ -85,7 +86,8 @@ std::string ReplayRecorder::Finish(const std::string &outcome, std::uint32_t tic
              {"color", p.color},
              {"human", p.human},
              {"ai_level", p.aiLevel},
-             {"spawn", s.startPosition[i]}});
+             {"spawn", s.startPosition[i]},
+             {"tech", Capabilities::PlayerLevel(static_cast<PlayerId>(i))}}); // (the level it played at)
     }
     const std::uint32_t ticks = static_cast<std::uint32_t>(data.turns.size()) * m_info.ticksPerTurn;
     nlohmann::json meta
