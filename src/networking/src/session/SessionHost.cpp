@@ -998,7 +998,8 @@ void SessionHost::checkHashes()
     // A player that stopped sending hashes (beaten: it sits on its result screen and runs no more ticks, or far behind
     // after a reconnect) is not waited for, or the hashes of everybody else were never compared again
     constexpr std::uint32_t kStaleMs = 10000;
-    const std::uint32_t tickMs = std::max<std::uint32_t>(1, m_config.turnMs / std::max<std::uint32_t>(1, m_config.ticksPerTurn));
+    const std::uint32_t tickMs
+        = std::max<std::uint32_t>(1, m_config.turnMs / std::max<std::uint32_t>(1, m_config.ticksPerTurn));
     const std::uint32_t staleTicks = kStaleMs / tickMs;
     std::uint32_t newest = 0;
     for (const SlotState &s : m_slots)

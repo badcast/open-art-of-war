@@ -157,9 +157,9 @@ private:
         std::uint8_t pausesLeft {0};
         bool ai {false};
         std::uint8_t aiLevel {1};
-        std::uint32_t goneMs {0}; // when the connection was lost (a running match keeps the slot for a while)
-        bool hashed {false};          // sent a world hash in this match
-        std::uint32_t hashTick {0};   // the newest tick it sent a hash for
+        std::uint32_t goneMs {0};   // when the connection was lost (a running match keeps the slot for a while)
+        bool hashed {false};        // sent a world hash in this match
+        std::uint32_t hashTick {0}; // the newest tick it sent a hash for
     };
 
     // A team colour (1..8) nobody else in the room has: `preferred` when it is free, else the first free one.
