@@ -412,11 +412,44 @@ bool AIController::FindCoreSite(
     const float dlen = std::max(0.001f, DetMath::Hypot(dirX, dirY));
     dirX /= dlen;
     dirY /= dlen;
-    // Fanned out bases keep two tiles between buildings, the others one
-    int gap = m_style.layout == AIBaseStyle::Fan ? 2 : 1;
+    // The base is built tight around the headquarters: no gaps between the buildings, the only ways through are the
+    // roads (IsRoad, kept free below) and the ways out of the production buildings (KeepsWayOut). The style only
+    // chooses the side and the order.
     const int maxRing = entities.GetBuildRadius(m_player) + 2;
-    if (crowding >= 1)
-        gap = 0; // a crowded base: the buildings may stand side by side (the way out is still checked)
+    const int mapW = map.GetWidth(), mapH = map.GetHeight();
+    std::vector<std::uint8_t> builtOn(static_cast<std::size_t>(mapW) * mapH, 0);
+    for (const auto &e : entities.GetAllEntities())
+    {
+        const Building *b = e.AsBuilding();
+        if (!b || !b->alive || b->state == ActionState::Die)
+            continue;
+        for (int ty = std::max(0, b->tileY); ty < std::min(mapH, b->tileY + b->buildHeight); ++ty)
+            for (int tx = std::max(0, b->tileX); tx < std::min(mapW, b->tileX + b->buildWidth); ++tx)
+                builtOn[static_cast<std::size_t>(ty) * mapW + tx] = 1;
+    }
+    // Share of the tiles around the footprint (sides only) that are a building, rock / water or the map's edge:
+    // the more the new building leans on, the fewer holes are left in the base
+    auto contact = [&](int px, int py) {
+        int touching = 0, total = 0;
+        auto at = [&](int tx, int ty) {
+            ++total;
+            if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH || !map.IsPassable(tx, ty)
+                || builtOn[static_cast<std::size_t>(ty) * mapW + tx])
+                ++touching;
+        };
+        for (int tx = px; tx < px + w; ++tx)
+        {
+            at(tx, py - 1);
+            at(tx, py + h);
+        }
+        for (int ty = py; ty < py + h; ++ty)
+        {
+            at(px - 1, ty);
+            at(px + w, ty);
+        }
+        return total > 0 ? static_cast<float>(touching) / static_cast<float>(total) : 0.0f;
+    };
+    constexpr float kContactWeight = 0.8f;
 
     auto overlapsBuilding = [&](int px, int py, int pw, int ph) {
         for (const auto &e : entities.GetAllEntities())
@@ -447,6 +480,7 @@ bool AIController::FindCoreSite(
     {
         float score;
         int x, y;
+        float side; // toward the wanted direction only (-1..1)
     };
     for (int r = (crowding >= 3 ? 0 : std::max(1, minRing)); r <= maxRing; ++r)
     {
@@ -478,13 +512,14 @@ bool AIController::FindCoreSite(
                         ok = (crowding >= 3 || (crowding >= 2 ? !IsRoadCore(tx, ty) : !IsRoad(tx, ty)))
                              && IsOwnGround(tx, ty) && !entities.IsTileOccupiedByUnit(tx, ty);
                 }
-                if (!ok || (gap > 0 && overlapsBuilding(px - gap, py - gap, w + 2 * gap, h + 2 * gap)))
+                if (!ok || overlapsBuilding(px, py, w, h))
                 {
                     if (failure && failure->find("layout") == std::string::npos)
                         *failure += "layout/territory; ";
                     continue;
                 }
-                float score = (ox * dirX + oy * dirY) / ol;
+                const float side = (ox * dirX + oy * dirY) / ol;
+                float score = side + kContactWeight * contact(px, py);
                 if (m_style.layout == AIBaseStyle::Road)
                 {
                     // Along the road: next to the band of a road is better
@@ -494,7 +529,7 @@ bool AIController::FindCoreSite(
                             byRoad = IsRoad(tx, ty);
                     score += byRoad ? 0.35f : 0.0f;
                 }
-                ring.push_back({score, px, py});
+                ring.push_back({score, px, py, side});
             }
         }
         std::stable_sort(
@@ -504,8 +539,8 @@ bool AIController::FindCoreSite(
         int tried = 0;
         for (const Candidate &c : ring)
         {
-            if (crowding < 3 && c.score < -0.2f && m_style.layout != AIBaseStyle::Compact)
-                break;
+            if (crowding < 3 && c.side < -0.2f && m_style.layout != AIBaseStyle::Compact)
+                continue; // (sorted by the score with the contact bonus: the spots after it may face the right way)
             if (++tried > 24 && crowding < 3)
                 break; // the way-out check floods the map: a ring gets a limited number of tries
             if (KeepsWayOut(c.x, c.y, w, h, map, entities, needsExit))

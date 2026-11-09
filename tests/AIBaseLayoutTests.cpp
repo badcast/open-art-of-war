@@ -19,6 +19,13 @@ struct AIBaseLayoutTest
 
         return ai.FindCoreSite(x, y, 2, 2, -1, 0, false, 0, map, entities, crowding, false, centre, 4);
     }
+    // A 2x2 spot around (cx, cy), spaced as a base builds normally (crowding 0)
+    static bool TightSite(AIController &ai, TileMap &map, EntityManager &entities, int cx, int cy, int &x, int &y)
+    {
+        ai.m_homeX = cx;
+        ai.m_homeY = cy;
+        return ai.FindCoreSite(x, y, 2, 2, 1, 0, false, 0, map, entities, 0, false, cx, cy);
+    }
 };
 } // namespace OpenArtOfWar
 using namespace OpenArtOfWar;
@@ -99,6 +106,41 @@ int main()
             strip.SetPassable(20, y, false); // a cliff: the strip goes on through two rows at the bottom
         check(!AIBaseLayoutTest::Keeps(ai, strip, none, 21, 4, 1, 2), "narrow map: the last gap stays open");
         check(!AIBaseLayoutTest::Keeps(ai, strip, none, 21, 5, 1, 1), "narrow map: the gap stays wide for vehicles");
+    }
+    // Dense base: each new building is placed against the ones already standing (no gap between them)
+    {
+        EntityManager base;
+        TileMap open;
+        open.InitBlankArena(40, 40);
+        open.SetFogEnabled(false);
+        AIController builder;
+        builder.SetSeed(3);
+        base.SpawnBuildingByIndex(8, 18, 18, Faction::Resistance, 1.0f, builder.Player()); // headquarters 3x4
+        auto touchesBuilding = [&](int x, int y) {
+            for (const auto &e : base.GetAllEntities())
+            {
+                const Building *b = e.AsBuilding();
+                if (!b)
+                    continue;
+                const bool apartX = x + 2 < b->tileX || x > b->tileX + b->buildWidth;
+                const bool apartY = y + 2 < b->tileY || y > b->tileY + b->buildHeight;
+                const bool cornerOnly = (x + 2 == b->tileX || x == b->tileX + b->buildWidth)
+                                        && (y + 2 == b->tileY || y == b->tileY + b->buildHeight);
+                if (!apartX && !apartY && !cornerOnly)
+                    return true;
+            }
+            return false;
+        };
+        for (int i = 0; i < 3; ++i)
+        {
+            int x = -1, y = -1;
+            const bool found = AIBaseLayoutTest::TightSite(builder, open, base, 19, 20, x, y);
+            check(found, "dense base: a place is found");
+            if (!found)
+                break;
+            check(touchesBuilding(x, y), "dense base: the new building stands against another one");
+            base.SpawnBuildingByIndex(13, x, y, Faction::Resistance, 1.0f, builder.Player()); // 2x2
+        }
     }
     std::printf("AI layout: %d failures\n", failures);
     return failures ? 1 : 0;
