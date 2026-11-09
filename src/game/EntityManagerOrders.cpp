@@ -193,6 +193,7 @@ void EntityManager::IssueMoveOrder(
         u->holdPosition = false;
         u->orderedTargetId = 0;
         u->blockedTimer = 0.0f;
+        u->groupHold = false; // a new leg: the group decides again whether this one waits
 
         if (u->tileX == destX && u->tileY == destY && std::abs(u->subX) <= 0.001f && std::abs(u->subY) <= 0.001f)
         {

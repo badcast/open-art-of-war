@@ -469,7 +469,7 @@ void AISquadController::ReleaseUnit(AISquad &sq, int unitId, EntityManager &enti
         if (sq.focusTargetId != 0 && u->orderedTargetId == sq.focusTargetId)
             u->orderedTargetId = 0; // no longer the group's order
         u->flowMode = false;
-        u->paceScale = 1.0f;
+        u->groupHold = false;
         m_released.push_back(unitId);
     }
 }
@@ -979,21 +979,26 @@ int AISquadController::DamageDealtSinceLaunch(const AISquad &sq, const EntityMan
     return dealt;
 }
 
-// The column moves at the pace of its slowest member. Whoever is ahead of the group's centre (along the
-// way to the waypoint) slows down a bit more, whoever is behind walks at full speed: the group closes up
-// smoothly instead of stopping and starting again.
-void AISquadController::PaceGroup(
-    const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active)
+// Everyone walks at its own speed. A member that got more than a leash ahead of the group's centre (along the way
+// to the waypoint) stands on its tile until the ones behind have caught up (back within 0.6 leash: hysteresis, no
+// stop-and-go). Nobody waits in combat, near the objective, or inside a narrow passage (it would block the way for
+// the rest: it waits beyond it); a member behind that has not got any closer for kHoldStuckSeconds is not waited for.
+void AISquadController::HoldVanguard(
+    AISquad &sq,
+    EntityManager &entities,
+    const ChokepointMap &chokes,
+    float cx,
+    float cy,
+    float leash,
+    bool active,
+    bool nearObjective,
+    float dt)
 {
-    float slowest = 1e9f;
-    for (int id : sq.unitIds)
-    {
-        const Unit *u = entities.GetUnit(id);
-        if (u->moveSpeed > 0.0f)
-            slowest = std::min(slowest, u->moveSpeed);
-    }
+    constexpr float kHoldStuckSeconds = 4.0f;
+    constexpr float kResumeFraction = 0.6f;
+
     float dirX = 0.0f, dirY = 0.0f;
-    if (active && !sq.route.empty())
+    if (active && !nearObjective && !sq.route.empty())
     {
         const PathNode &wp = sq.route[std::clamp(sq.marchIndex, 0, static_cast<int>(sq.route.size()) - 1)];
         dirX = static_cast<float>(wp.x) - cx;
@@ -1009,27 +1014,83 @@ void AISquadController::PaceGroup(
             dirX = dirY = 0.0f;
         }
     }
+    if (dirX == 0.0f && dirY == 0.0f)
+    {
+        for (int id : sq.unitIds)
+            entities.GetUnit(id)->groupHold = false;
+        sq.holdBest.clear();
+        sq.holdTimer.clear();
+        return;
+    }
+
+    // Members behind that are stuck (no headway for a while) are left out of the centre the vanguard waits for
+    auto stuck = [&](int id) {
+        auto it = sq.holdTimer.find(id);
+        return it != sq.holdTimer.end() && it->second > kHoldStuckSeconds;
+    };
+    for (int id : sq.unitIds)
+    {
+        const Unit *u = entities.GetUnit(id);
+        const float d = DistTo(*u, cx, cy);
+        const float along = (UnitTileX(*u) - cx) * dirX + (UnitTileY(*u) - cy) * dirY;
+        if (d <= leash || along >= 0.0f)
+        {
+            sq.holdBest.erase(id);
+            sq.holdTimer.erase(id);
+            continue;
+        }
+        auto it = sq.holdBest.find(id);
+        if (it == sq.holdBest.end() || d < it->second - 0.5f)
+        {
+            sq.holdBest[id] = d;
+            sq.holdTimer[id] = 0.0f;
+        }
+        else
+        {
+            sq.holdTimer[id] += dt;
+        }
+    }
+    float rx = 0.0f, ry = 0.0f;
+    int counted = 0;
+    for (int id : sq.unitIds)
+    {
+        if (stuck(id))
+            continue;
+        const Unit *u = entities.GetUnit(id);
+        rx += UnitTileX(*u);
+        ry += UnitTileY(*u);
+        ++counted;
+    }
+    if (counted > 0)
+    {
+        rx /= static_cast<float>(counted);
+        ry /= static_cast<float>(counted);
+    }
+    else
+    {
+        rx = cx;
+        ry = cy;
+    }
+
     for (int id : sq.unitIds)
     {
         Unit *u = entities.GetUnit(id);
-        if (!active || u->moveSpeed <= 0.0f || slowest >= 1e8f)
+        if (u->moveSpeed <= 0.0f || u->state != ActionState::Move || IsEngaged(*u) || u->moveFireTargetId != 0)
         {
-            u->paceScale = 1.0f;
+            u->groupHold = false;
             continue;
         }
-        const float along = (UnitTileX(*u) - cx) * dirX + (UnitTileY(*u) - cy) * dirY;
-        const float apart = DetMath::Hypot(UnitTileX(*u) - cx, UnitTileY(*u) - cy);
-        float scale = slowest / u->moveSpeed;
-        if (along < -0.5f * leash || (along <= 0.0f && apart > leash))
+        const int width = chokes.OpenWidth(u->tileX, u->tileY);
+        if (width > 0 && width <= 4)
         {
-            scale = 1.0f; // behind (or off to the side, out of the leash): catches up at its own full speed
+            u->groupHold = false; // inside a passage: goes through, waits beyond it
+            continue;
         }
-        else if (along > 0.5f * leash)
-        {
-            // ahead: the further, the slower (down to a half of the pace, never a stop)
-            scale *= std::max(0.5f, 1.0f - 0.5f * (along - 0.5f * leash) / std::max(1.0f, leash));
-        }
-        u->paceScale = scale;
+        const float along = (UnitTileX(*u) - rx) * dirX + (UnitTileY(*u) - ry) * dirY;
+        if (along > leash)
+            u->groupHold = true;
+        else if (along <= kResumeFraction * leash)
+            u->groupHold = false;
     }
 }
 
@@ -1115,8 +1176,20 @@ void AISquadController::Tick(
             ++outsideResume;
     }
     const int tolerated = std::max(1, static_cast<int>(sq.unitIds.size()) / 4);
-    PaceGroup(
-        sq, entities, cx, cy, leash, sq.state == AISquadState::Marching || sq.state == AISquadState::ChokeApproach);
+    // Close to the objective the group goes straight into the attack instead of waiting
+    const int remainingRoute = static_cast<int>(sq.route.size()) - 1 - sq.progress;
+    const bool nearObjective = remainingRoute <= tactics.marchStrideTiles * 3 / 2
+                               || DetMath::Hypot(cx - sq.targetX, cy - sq.targetY) <= leash;
+    HoldVanguard(
+        sq,
+        entities,
+        chokes,
+        cx,
+        cy,
+        leash,
+        sq.state == AISquadState::Marching || sq.state == AISquadState::ChokeApproach,
+        nearObjective,
+        dt);
 
     sq.stateTimer += dt;
     sq.orderTimer += dt;
@@ -1237,29 +1310,8 @@ void AISquadController::Tick(
     {
         case AISquadState::Marching:
         {
-            // Hysteresis: stop only clearly beyond the radius, resume once back inside it,
-            // so a long column does not flicker between marching and waiting
-            // Inside a narrow passage the column cannot regroup (the waiting vanguard would only block the
-            // tail behind it), so the rule is suspended there and applies again in open ground.
-            const bool inCorridor = localWidth > 0 && localWidth <= 4;
-            // Close to the objective the group goes straight into the attack instead of stopping
-            const int remaining = static_cast<int>(sq.route.size()) - 1 - sq.progress;
-            const bool nearObjective = remaining <= tactics.marchStrideTiles * 3 / 2;
-            if (!inCorridor && !nearObjective && outsideStop > tolerated)
-            {
-                // Vanguard holds; stragglers get their own catch-up orders
-                std::vector<int> inside;
-                for (int id : sq.unitIds)
-                {
-                    if (DistTo(*entities.GetUnit(id), cx, cy) <= leash)
-                        inside.push_back(id);
-                }
-                HoldUnits(inside, entities);
-                sq.stragglerBest.clear();
-                sq.stragglerTimer.clear();
-                SetState(sq, AISquadState::Regrouping);
-                break;
-            }
+            // The whole group does not stop for stragglers any more: only the ones too far ahead wait for them
+            // (HoldVanguard), everyone else keeps walking at its own speed
 
             if (outsideStop > 0)
                 trackStragglers(leash * 1.2f, cx, cy);

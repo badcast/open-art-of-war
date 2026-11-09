@@ -66,7 +66,9 @@ public:
     int pendingArchetypeId {-1};
     float regenAccum {0.0f}; // fractions of a hit point healed so far
     float moveSpeed {1.8f};
-    float paceScale {1.0f}; // set by a marching group: the ones ahead walk slower, so the group stays together
+    // Set by a marching group: this one is too far ahead and stands on its tile (keeping its path and order)
+    // until the ones behind have caught up. Everyone walks at its own speed otherwise.
+    bool groupHold {false};
     int facingDirection {0};
     bool isSiegeMode {false};
     bool isAttackMoving {false};

@@ -371,7 +371,10 @@ void EntityManager::Render(
             renderer.SetDrawOwner(u->owner);
             renderer.DrawUnitWorld(
                 u->archetypeId,
-                static_cast<int>(u->state),
+                // Waiting for its group: stands, so it is drawn standing
+                static_cast<int>(
+                    u->groupHold && u->state == ActionState::Move && !u->HasReservation() ? ActionState::Idle
+                                                                                          : u->state),
                 u->facingDirection,
                 u->animFrame,
                 wx,

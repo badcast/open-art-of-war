@@ -16,7 +16,7 @@ namespace OpenArtOfWar
 
 void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder, const UnitDelegates &delegates)
 {
-    float budget = std::max(0.0f, moveSpeed) * std::clamp(paceScale, 0.1f, 1.0f) * (deltaTime * 60.0f);
+    float budget = std::max(0.0f, moveSpeed) * (deltaTime * 60.0f);
 
     if (allyWaitTimer > 0.0f)
         allyWaitTimer = std::max(0.0f, allyWaitTimer - deltaTime);
@@ -358,8 +358,11 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
 
             // C. Friendly Unit Occupation -> NO single-file column waiting!
             Unit *friendlyUnit = blocker->AsUnit();
+            // (one waiting for its group stands: it is not about to free the tile)
             const bool allyLeaving
-                = friendlyUnit && (friendlyUnit->state == ActionState::Move || friendlyUnit->HasReservation());
+                = friendlyUnit
+                  && ((friendlyUnit->state == ActionState::Move && !friendlyUnit->groupHold)
+                      || friendlyUnit->HasReservation());
             //    1) If blocked tile is destination (or adjacent to destination), arrived at squad cluster!
             //       (not while a make-way chain is moving: the ally in front is about to free the tile)
             if (targetEntityId == 0 && !(allyWaitTimer > 0.0f && allyLeaving)
@@ -469,6 +472,11 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
     // ------------------------------------------------------------------------
     // 3. Step Loop: start a new tile step, rotate the hull, then slide with the remaining budget
     // ------------------------------------------------------------------------
+    // Too far ahead of its marching group: stands on this tile (the step under way was finished above)
+    // with its path and order kept, until the group releases it
+    if (groupHold)
+        return;
+
     for (int guard = 0; guard < 6 && budget > 0.0f; ++guard)
     {
         if (state != ActionState::Move)

@@ -130,6 +130,8 @@ struct AISquad
 
     std::unordered_map<int, float> stragglerBest;  // best distance to the centroid while catching up
     std::unordered_map<int, float> stragglerTimer; // time without progress
+    std::unordered_map<int, float> holdBest;       // behind the group: best distance to the centre so far
+    std::unordered_map<int, float> holdTimer;      // behind the group: time without getting closer
     std::unordered_map<int, int> playerHpAtLaunch; // for the retreat check
 
     // Cached for debug drawing
@@ -248,7 +250,16 @@ private:
         EntityManager &entities,
         Pathfinder &pathfinder,
         const AITacticsConfig &tactics);
-    void PaceGroup(const AISquad &sq, EntityManager &entities, float cx, float cy, float leash, bool active);
+    void HoldVanguard(
+        AISquad &sq,
+        EntityManager &entities,
+        const ChokepointMap &chokes,
+        float cx,
+        float cy,
+        float leash,
+        bool active,
+        bool nearObjective,
+        float dt);
     // Index of the route node where the group lines up out of reach of the objective's known defenses;
     // -1 when there is nothing to line up for (no defenses, or the group is past that point)
     int FormUpIndex(const AISquad &sq, const EntityManager &entities) const;
