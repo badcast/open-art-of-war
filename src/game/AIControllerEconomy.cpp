@@ -1,4 +1,5 @@
 #include "graphics/RenderUtility.hpp"
+#include "game/Capabilities.hpp"
 #include "game/AIController.hpp"
 #include "AIControllerInternal.hpp"
 #include "game/BuildLimits.hpp"
@@ -230,8 +231,10 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
 void AIController::UpdateResearch(float deltaTime, EntityManager &entities)
 {
     const Faction faction = side();
-    // Skip technologies that only make sense for the player
-    while (m_researchIndex < kResearchCount && researchDef(faction, m_researchIndex).playerOnly)
+    // Skip technologies that only make sense for the player, and those its tech level leaves out
+    while (m_researchIndex < kResearchCount
+           && (researchDef(faction, m_researchIndex).playerOnly
+               || !Capabilities::AllowsResearch(m_player, m_researchIndex)))
     {
         ++m_researchIndex;
     }
@@ -385,13 +388,17 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
     };
     const int sparePower = m_style.sparePower;
     constexpr int kTroopReserve = 300;
-    const bool needLab = labCount == 0 && !rebuildPending(UnitType::ResearchLab);
+    // The tech level (data/capabilities.yaml) may leave a kind out: it is not wanted, and not waited for
+    auto allowed = [&](AIDefenseSite::Kind kind) {
+        return IsBuildingUnlocked(m_player, FactionBuildingIndex(kind, side()));
+    };
+    const bool needLab = labCount == 0 && !rebuildPending(UnitType::ResearchLab) && allowed(AIDefenseSite::Lab);
 
     // The base is ready for another headquarters (more income): everything works, the defense stands, there is
     // money to spare and the base has had peace for a minute
     auto baseReady = [&]() {
-        if (!full || hqCount >= Economy::kMaxIncomeHeadquarters || barracksDone == 0 || factoryDone == 0
-            || labDone == 0)
+        if (!full || hqCount >= Economy::kMaxIncomeHeadquarters || barracksDone == 0
+            || (factoryDone == 0 && allowed(AIDefenseSite::Factory)) || (labDone == 0 && allowed(AIDefenseSite::Lab)))
             return false;
         if (produced < consumed + sparePower || m_baseQuietSeconds < 60.0f)
             return false;
@@ -448,6 +455,9 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
             {AIDefenseSite::Barracks, kTroopReserve, "Credits to spare: another barracks to raise the army faster"});
     if (full && factoryCount < kMaxProduction)
         wants.push_back({AIDefenseSite::Factory, kTroopReserve, "Credits to spare: another factory for more vehicles"});
+
+    wants.erase(
+        std::remove_if(wants.begin(), wants.end(), [&](const Want &w) { return !allowed(w.kind); }), wants.end());
 
     if (m_homeX < 0)
     {

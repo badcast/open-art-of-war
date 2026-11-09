@@ -292,6 +292,7 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
         {
             wp.rebuildTimer += deltaTime;
             if (canBuild && wp.rebuildTimer >= 8.0f && m_credits >= wp.creditCost
+                && IsBuildingUnlocked(m_player, wp.faction == Faction::Confederation ? 15 : 25)
                 && BuildLimits::CanBuildMore(
                     entities, map, m_player, wp.faction == Faction::Confederation ? 15 : 25)) // (hard limits)
             {

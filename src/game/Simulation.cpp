@@ -568,6 +568,9 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             const Building *b = entities.GetBuilding(cmd.b);
             if (!Alive(b) || b->owner != cmd.player || !b->IsUnitProducer() || b->buildProgress < 1.0f)
                 return;
+            // A unit still waiting for its technology, or one the tech level leaves out (the interface says so too)
+            if (!IsUnitUnlocked(cmd.player, cmd.a))
+                return;
             const auto *cfg = entities.GetUnitConfig(cmd.a);
             // A batch (Shift: 5, Ctrl: 10): as many as the credits and the queue allow
             const int count = std::clamp(cmd.c, 1, 20);

@@ -188,8 +188,9 @@ void SetPlayerLevel(PlayerId player, const std::string &level, const EntityManag
     {
         const ResearchDef &def = researchDef(faction, i);
         if (list.researches.count(i)
-            && !(def.effect == ResearchEffect::UnlockUnit && def.archA >= 0 && !a.units.test(
-                     static_cast<std::size_t>(std::clamp(BaseArchetype(def.archA), 0, kSlots - 1)))))
+            && !(
+                def.effect == ResearchEffect::UnlockUnit && def.archA >= 0
+                && !a.units.test(static_cast<std::size_t>(std::clamp(BaseArchetype(def.archA), 0, kSlots - 1)))))
             a.researches.set(static_cast<std::size_t>(i));
     }
     for (bool changed = true; changed;)
@@ -240,7 +241,8 @@ bool AllowsResearch(PlayerId player, int index)
 {
     if (player >= kMaxPlayers || !PlayerTable()[player].restricted)
         return true;
-    return index >= 0 && index < kResearchCount && PlayerTable()[player].researches.test(static_cast<std::size_t>(index));
+    return index >= 0 && index < kResearchCount
+           && PlayerTable()[player].researches.test(static_cast<std::size_t>(index));
 }
 
 bool LoadText(const std::string &yamlText)

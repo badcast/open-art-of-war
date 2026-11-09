@@ -38,6 +38,7 @@
 #include "game/Projectiles.hpp"
 #include "game/WeaponBalance.hpp"
 #include "game/BuildLimits.hpp"
+#include "game/Capabilities.hpp"
 #include "game/Research.hpp"
 #include "storage/SaveManager.hpp"
 #include "debug/DebugOverlay.hpp"
@@ -200,6 +201,7 @@ void Application::ReloadGameData()
     Projectiles::reload();
     WeaponBalance::Reload();
     BuildLimits::Reload();
+    Capabilities::Reload();
     EffectsConfig::reload();
     TileCollision::Reload();
     if (Assets::HasSessionOverlay())

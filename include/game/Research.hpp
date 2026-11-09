@@ -86,7 +86,7 @@ void SetResearchAnimation(PlayerId player, bool researching, EntityManager &enti
 void ResetResearch();
 void ResetResearch(PlayerId player);
 bool IsResearched(PlayerId player, int index);
-// The technology's own requirement is done
+// The technology's own requirement is done and the player's tech level (Capabilities) has it
 bool IsResearchAvailable(PlayerId player, int index);
 
 // Marks the technology done and applies it to every unit of the player plus its global effects
@@ -101,12 +101,14 @@ float ResearchedAttackRange(PlayerId player, int archetypeId, float range);
 int ResearchTotal(PlayerId player, ResearchEffect effect);
 // A completed technology with that effect exists
 bool IsEffectResearched(PlayerId player, ResearchEffect effect);
-// Units that need a technology (flamethrower, sniper, Grad, Porcupine) can only be trained once it is done
+// Units that need a technology (flamethrower, sniper, Grad, Porcupine) can only be trained once it is done; none the
+// player's tech level (Capabilities) leaves out
 bool IsUnitUnlocked(PlayerId player, int archetype);
 // Index of the technology that unlocks the unit, -1 when it needs none
 int UnitUnlockResearch(Faction faction, int archetype);
 bool IsRadarUnlocked(PlayerId player);
-// May the player build this building kind (a building index)? Only the Radar Locator waits for a technology.
+// May the player build this building kind (a building index)? Only the Radar Locator waits for a technology; none
+// the player's tech level (Capabilities) leaves out can be built.
 bool IsBuildingUnlocked(PlayerId player, int buildingIndex);
 // The form a unit is trained in: the T-22 Zeus (11) comes without its rocket turret (17) until "Rocket launcher mount"
 // is researched; a Zeus that exists then gets the turret at once (CompleteResearch). Every other archetype as it is.

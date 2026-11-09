@@ -41,10 +41,14 @@ full:
 int main()
 {
     EntityManager entities;
-    for (const char *yaml : {"id: command_center_conf\nbuilding_index: 0\n", "id: tech_center_conf\nbuilding_index: 4\n",
-             "id: wall_conf\nbuilding_index: 15\n", "id: rifleman_conf\narchetype_id: 1\n",
-             "id: flamethrower_conf\narchetype_id: 5\n", "id: headquarters_res\nbuilding_index: 8\n",
-             "id: rifleman_res\narchetype_id: 0\n"})
+    for (const char *yaml :
+         {"id: command_center_conf\nbuilding_index: 0\n",
+          "id: tech_center_conf\nbuilding_index: 4\n",
+          "id: wall_conf\nbuilding_index: 15\n",
+          "id: rifleman_conf\narchetype_id: 1\n",
+          "id: flamethrower_conf\narchetype_id: 5\n",
+          "id: headquarters_res\nbuilding_index: 8\n",
+          "id: rifleman_res\narchetype_id: 0\n"})
         entities.LoadCharacterYaml(YAML::Load(yaml));
 
     std::array<PlayerSlot, kMaxPlayers> slots {};

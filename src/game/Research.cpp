@@ -1,4 +1,5 @@
 #include "game/Research.hpp"
+#include "game/Capabilities.hpp"
 #include "graphics/SpriteRegistry.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Sides.hpp"
@@ -340,6 +341,9 @@ bool IsResearched(PlayerId player, int index)
 
 bool IsResearchAvailable(PlayerId player, int index)
 {
+    // The player's tech level (data/capabilities.yaml) may leave it out
+    if (!Capabilities::AllowsResearch(player, index))
+        return false;
     const int req = researchDef(Players::FactionOf(player), index).needs;
     return req < 0 || IsResearched(player, req);
 }
@@ -448,6 +452,8 @@ int UnitUnlockResearch(Faction faction, int archetype)
 
 bool IsUnitUnlocked(PlayerId player, int archetype)
 {
+    if (!Capabilities::AllowsUnit(player, archetype))
+        return false;
     const int index = UnitUnlockResearch(Players::FactionOf(player), archetype);
     return index < 0 || IsResearched(player, index);
 }
@@ -463,6 +469,8 @@ int ProductionForm(PlayerId player, int archetype)
 
 bool IsBuildingUnlocked(PlayerId player, int buildingIndex)
 {
+    if (!Capabilities::AllowsBuilding(player, buildingIndex))
+        return false;
     return buildingIndex != 6 || IsRadarUnlocked(player);
 }
 

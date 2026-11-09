@@ -705,7 +705,8 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     {
         const int x = site.tileX, y = site.tileY;
         // Hard limits (data/limits.yaml) bind the computer as well: the segment is given up
-        if (!BuildLimits::CanBuildMore(entities, map, m_player, side() == Faction::Confederation ? 15 : 25))
+        if (!BuildLimits::CanBuildMore(entities, map, m_player, side() == Faction::Confederation ? 15 : 25)
+            || !IsBuildingUnlocked(m_player, side() == Faction::Confederation ? 15 : 25)) // (or the tech level)
         {
             site.done = true;
             ThinkOnce("limitwall", "BUILD", "Walls: the building limit is reached");
@@ -730,6 +731,17 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
         return true;
     }
 
+    // A tower the tech level (data/capabilities.yaml) leaves out: a bunker stands there instead, else nothing
+    if (site.kind == AIDefenseSite::Tower && !IsBuildingUnlocked(m_player, FactionBuildingIndex(site.kind, side()))
+        && IsBuildingUnlocked(m_player, FactionBuildingIndex(AIDefenseSite::Bunker, side())))
+        site.kind = AIDefenseSite::Bunker;
+    if (!IsBuildingUnlocked(m_player, FactionBuildingIndex(site.kind, side())))
+    {
+        site.done = true;
+        ThinkOnce(
+            "tech" + std::to_string(site.kind), "BUILD", "A defense the tech level leaves out: the spot is given up");
+        return false;
+    }
     const int index = FactionBuildingIndex(site.kind, side());
     // Hard limits (data/limits.yaml) bind the computer as well: no more of that kind, the spot is given up
     if (!BuildLimits::CanBuildMore(entities, map, m_player, index))
