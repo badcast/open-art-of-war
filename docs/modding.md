@@ -29,6 +29,35 @@ my_mod/
 
 A file with the same path as a game file replaces it. A new file is added. New sprites in `sprites/` are found on their own, like the game's.
 
+## Tech levels
+
+`data/capabilities.yaml` names tech levels. Each one lists, per faction, the buildings, units and researches a player may use:
+
+```yaml
+default: "full"          # the level when nothing else names one
+
+basic:
+    confederation:
+        builds: [command_center_conf, infantry_center_conf, power_generator_conf]   # `id:` of characters/*_build_*.yaml
+        units: [rifleman_conf]                                                       # `id:` of characters/*_unit_*.yaml
+        researches: [0, 1, 15]   # indexes into characters/research_confederation.yaml
+    resistance:
+        builds: [headquarters_res, powerplant_res, barracks_res]
+        units: [rifleman_res]
+        researches: []
+```
+
+Anything a level does not list cannot be built, trained or researched, by players and computer players alike, and the sidebar and research window do not show it. A research that unlocks a unit the level leaves out, or that needs a research the level leaves out, is not available either. Research numbers are per faction: the same number is a different technology for each side.
+
+A mod may add its own levels: they appear in the custom game window and the network room. Which level a player plays at, first match wins:
+
+1. the player's own choice (the Tech column of the custom game / network room),
+2. the match's choice (the Tech combo at the top),
+3. the map's or mission's preset: `"capabilities": "<level>"` in its JSON,
+4. `default` from the file.
+
+The file is simulation data (`net_hash`): every player of a network game uses the host's.
+
 ## mod.yaml
 
 ```yaml
