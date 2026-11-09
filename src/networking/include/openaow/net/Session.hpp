@@ -158,6 +158,8 @@ private:
         bool ai {false};
         std::uint8_t aiLevel {1};
         std::uint32_t goneMs {0}; // when the connection was lost (a running match keeps the slot for a while)
+        bool hashed {false};          // sent a world hash in this match
+        std::uint32_t hashTick {0};   // the newest tick it sent a hash for
     };
 
     // A team colour (1..8) nobody else in the room has: `preferred` when it is free, else the first free one.
@@ -179,6 +181,8 @@ private:
     std::uint8_t m_pausedBy {0};
     std::vector<std::pair<std::uint64_t, std::vector<std::uint8_t>>> m_files; // offered files, oldest first
     void closeTurn(std::uint32_t turn);
+    // Compares the world hashes of every tick all players that still send hashes have reported
+    void checkHashes();
     void adaptInputDelay();
     void reject(std::size_t connection, RejectReason reason, const std::string &detail);
 

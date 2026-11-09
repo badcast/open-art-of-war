@@ -874,12 +874,20 @@ void testLockstepSession()
         c->sendWorldHash(20, 0xAAAA);
     step(20);
     CHECK(!host.desynced());
-    clients[0]->sendWorldHash(40, 0xAAAA);
-    clients[1]->sendWorldHash(40, 0xAAAA);
-    clients[2]->sendWorldHash(40, 0xBBBB);
+    // A player that stops sending hashes (beaten: on its result screen) is waited for a while, then the others are
+    // compared without it (50 ms ticks: 10 s are 200 ticks)
+    for (std::uint32_t tick = 40; tick <= 260; tick += 20)
+    {
+        clients[0]->sendWorldHash(tick, 0xAAAA);
+        clients[1]->sendWorldHash(tick, 0xAAAA);
+        step(10);
+    }
+    CHECK(!host.desynced());
+    clients[0]->sendWorldHash(280, 0xAAAA);
+    clients[1]->sendWorldHash(280, 0xBBBB);
     step(20);
-    CHECK(host.desynced() && host.desyncTick() == 40);
-    CHECK(clients[1]->desynced() && clients[1]->desyncTick() == 40);
+    CHECK(host.desynced() && host.desyncTick() == 280);
+    CHECK(clients[1]->desynced() && clients[1]->desyncTick() == 280);
 
     // Client 2 drops and comes back with its token: same slot, the match and every turn again
     const SessionToken token = clients[2]->token();

@@ -578,6 +578,7 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
             if (!m_running)
                 m_slots[c.slot] = SlotState {};
             c.slot = -2;
+            checkHashes(); // the ticks only it was missing from can be compared now
             broadcastRoster();
             broadcastLobby();
         }
@@ -649,31 +650,11 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
             WorldHash m;
             if (!decode(r, m) || m_desynced)
                 return;
-            auto &byTick = m_hashes[m.tick];
-            byTick[slot] = m.hash;
-            int expected = 0;
-            for (const SlotState &s : m_slots)
-                expected += (s.used && s.connected) ? 1 : 0;
-            if (static_cast<int>(byTick.size()) >= expected)
-            {
-                bool same = true;
-                for (const auto &[s, h] : byTick)
-                    same = same && h == byTick.begin()->second;
-                if (!same)
-                {
-                    m_desynced = true;
-                    m_desyncTick = m.tick;
-                    BitWriter w(m_buffer.data(), m_buffer.size());
-                    encode(w, Desync {m.tick});
-                    broadcast(Channel::Lockstep, m_buffer.data(), w.finish());
-                    logLine("desync at tick " + std::to_string(m.tick));
-                }
-                else if (m_replayOpen)
-                {
-                    m_replayChecksums.emplace_back(m.tick, byTick.begin()->second);
-                }
-                m_hashes.erase(m_hashes.begin(), m_hashes.upper_bound(m.tick));
-            }
+            m_hashes[m.tick][slot] = m.hash;
+            SlotState &sender = m_slots[slot];
+            sender.hashTick = sender.hashed ? std::max(sender.hashTick, m.tick) : m.tick;
+            sender.hashed = true;
+            checkHashes();
             break;
         }
         case MsgType::OwnerSetMap:
@@ -981,6 +962,12 @@ void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowM
     m_leftPending.clear();
     m_announcedDelay = 0;
     m_replayChecksums.clear();
+    m_hashes.clear();
+    for (SlotState &s : m_slots)
+    {
+        s.hashed = false;
+        s.hashTick = 0;
+    }
     m_replayStartedAt = static_cast<std::int64_t>(std::time(nullptr));
     m_replayOpen = !m_config.replayDir.empty();
     logLine("match started on '" + m_lobby.map + "' with " + std::to_string(connectedCount()) + " players");
@@ -1004,6 +991,58 @@ void SessionHost::adaptInputDelay()
     const std::uint32_t turns = (needMs + m_config.turnMs - 1) / m_config.turnMs;
     m_inputDelay
         = static_cast<std::uint8_t>(std::clamp<std::uint32_t>(turns, m_config.inputDelayMin, m_config.inputDelayMax));
+}
+
+void SessionHost::checkHashes()
+{
+    // A player that stopped sending hashes (beaten: it sits on its result screen and runs no more ticks, or far behind
+    // after a reconnect) is not waited for, or the hashes of everybody else were never compared again
+    constexpr std::uint32_t kStaleMs = 10000;
+    const std::uint32_t tickMs = std::max<std::uint32_t>(1, m_config.turnMs / std::max<std::uint32_t>(1, m_config.ticksPerTurn));
+    const std::uint32_t staleTicks = kStaleMs / tickMs;
+    std::uint32_t newest = 0;
+    for (const SlotState &s : m_slots)
+    {
+        if (s.used && s.connected && s.hashed)
+            newest = std::max(newest, s.hashTick);
+    }
+    while (!m_hashes.empty() && !m_desynced)
+    {
+        const auto it = m_hashes.begin();
+        const std::uint32_t tick = it->first;
+        const auto &byTick = it->second;
+        // Waited for: a connected player that has not reported this tick yet, has not gone past it (its hashes come in
+        // order) and still keeps up
+        bool complete = true;
+        for (std::uint8_t s = 0; s < kMaxPlayers && complete; ++s)
+        {
+            const SlotState &slot = m_slots[s];
+            if (!slot.used || !slot.connected || byTick.count(s))
+                continue;
+            const std::uint32_t last = slot.hashed ? slot.hashTick : 0;
+            const bool stale = last + staleTicks < newest;
+            const bool passed = slot.hashed && last > tick;
+            complete = stale || passed;
+        }
+        if (!complete)
+            break;
+        bool same = true;
+        for (const auto &[s, h] : byTick)
+            same = same && h == byTick.begin()->second;
+        if (!same)
+        {
+            m_desynced = true;
+            m_desyncTick = tick;
+            BitWriter w(m_buffer.data(), m_buffer.size());
+            encode(w, Desync {tick});
+            broadcast(Channel::Lockstep, m_buffer.data(), w.finish());
+            logLine("desync at tick " + std::to_string(tick));
+            return;
+        }
+        if (m_replayOpen && (m_replayChecksums.empty() || m_replayChecksums.back().first < tick))
+            m_replayChecksums.emplace_back(tick, byTick.begin()->second);
+        m_hashes.erase(it);
+    }
 }
 
 void SessionHost::closeTurn(std::uint32_t turn)
