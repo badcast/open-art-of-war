@@ -53,7 +53,6 @@ find_package(PkgConfig QUIET)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_ttf REQUIRED CONFIG)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(Intl REQUIRED)  # gettext runtime (part of libc on glibc)
 find_package(yaml-cpp CONFIG QUIET)
 if(TARGET yaml-cpp::yaml-cpp)
     set(YAML_CPP_LIBRARIES yaml-cpp::yaml-cpp)
@@ -202,19 +201,13 @@ set(ENGINE_SOURCES
     src/debug/DebugOverlay.cpp
 )
 
-# Translations (gettext MO generation)
-find_program(MSGFMT_EXECUTABLE msgfmt)
-if(MSGFMT_EXECUTABLE)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES)
-    add_custom_target(translations ALL
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_en.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_ru.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow_character_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_character_editor_en.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow_character_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_character_editor_ru.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/en/LC_MESSAGES/openaow_map_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_map_editor_en.po
-        COMMAND ${MSGFMT_EXECUTABLE} -o ${CMAKE_CURRENT_SOURCE_DIR}/assets/locale/ru/LC_MESSAGES/openaow_map_editor.mo ${CMAKE_CURRENT_SOURCE_DIR}/po/openaow_map_editor_ru.po
-        COMMENT "Compiling gettext translation catalogs (.po -> .mo)..."
+# Translations: YAML catalogs in assets/locale/ (converted via tools/po2yaml.py)
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+    add_custom_target(translations
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/po2yaml.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Updating YAML translation catalogs from po/..."
     )
 endif()
 
@@ -306,7 +299,6 @@ target_link_libraries(openaow-core PUBLIC
     SDL3_ttf::SDL3_ttf
     ${YAML_CPP_LIBRARIES}
     nlohmann_json::nlohmann_json
-    Intl::Intl
     PkgConfig::LIBARCHIVE
 )
 target_link_libraries(openaow-core PRIVATE OpenAOWNetworking ${OAOW_ZSTD})

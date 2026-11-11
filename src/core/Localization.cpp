@@ -1,122 +1,183 @@
 #include "core/Localization.hpp"
 #include "core/AssetStore.hpp"
-#include <libintl.h>
-#include <locale.h>
-#include <cstdlib>
-#include <filesystem>
-#include <iostream>
 
-#if defined(__GLIBC__)
-extern "C" int _nl_msg_cat_cntr;
-#endif
+#include <yaml-cpp/yaml.h>
+
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace OpenArtOfWar
 {
 
 std::string Localization::s_currentLanguage = "en";
-std::string Localization::s_localeDir; // set by init() from LoaderResources::localeDir()
+std::string Localization::s_localeDir;
 std::string Localization::s_domain = "openaow";
 bool Localization::s_initialized = false;
 
-void Localization::Init(const std::string &localeDir, const std::string &defaultLang, const std::string &domain)
+namespace
 {
-    std::filesystem::path dir(Assets::RealDirectory(localeDir));
-    if (!std::filesystem::exists(dir))
-    {
-        if (std::filesystem::exists("../" + localeDir))
-        {
-            dir = "../" + localeDir;
-        }
-        else if (std::filesystem::exists("locale"))
-        {
-            dir = "locale";
-        }
-    }
 
-    try
+std::mutex s_mutex;
+std::unordered_map<std::string, std::string> s_translations;
+
+bool LoadYamlFile(const std::string &path)
+{
+    std::string text;
+    if (!Assets::ReadText(path, text) || text.empty())
     {
-        if (std::filesystem::exists(dir))
+        // Try fallback with assets/ prefix if needed
+        if (path.compare(0, 7, "assets/") != 0 && Assets::ReadText("assets/" + path, text) && !text.empty())
         {
-            s_localeDir = std::filesystem::absolute(dir).string();
+            // Successfully read with assets/ prefix
         }
         else
         {
-            s_localeDir = localeDir;
+            // Direct disk read as fallback for standalone tools / absolute paths
+            std::error_code ec;
+            if (std::filesystem::is_regular_file(path, ec))
+            {
+                std::ifstream fin(path, std::ios::binary);
+                if (fin)
+                {
+                    text.assign((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
+                }
+            }
         }
     }
-    catch (...)
+
+    if (text.empty())
+        return false;
+
+    try
     {
-        s_localeDir = localeDir;
+        YAML::Node root = YAML::Load(text);
+        if (!root.IsMap())
+            return false;
+
+        for (auto it = root.begin(); it != root.end(); ++it)
+        {
+            if (!it->first.IsScalar())
+                continue;
+            std::string key = it->first.as<std::string>();
+            std::string val;
+            if (it->second.IsScalar())
+                val = it->second.as<std::string>();
+            if (!key.empty())
+            {
+                s_translations[std::move(key)] = std::move(val);
+            }
+        }
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[Localization] Failed to parse " << path << ": " << e.what() << std::endl;
+        return false;
+    }
+}
+
+void ReloadTranslations(const std::string &localeDir, const std::string &domain, const std::string &lang)
+{
+    s_translations.clear();
+
+    // English is native in code: no catalog needed
+    if (lang == "en")
+    {
+        std::cout << "[Localization] Language 'en' active (native code strings)" << std::endl;
+        return;
     }
 
+    std::filesystem::path dir = localeDir.empty() ? "assets/locale" : localeDir;
+
+    // 1. Language subfolder: assets/locale/<lang>/openaow.yaml (or <domain>.yaml)
+    const std::string domainName = domain.empty() ? "openaow" : domain;
+    LoadYamlFile((dir / lang / (domainName + ".yaml")).generic_string());
+    if (domainName != "openaow")
+    {
+        // Fallback to base openaow.yaml for common strings
+        LoadYamlFile((dir / lang / "openaow.yaml").generic_string());
+    }
+
+    // Load any other .yaml in assets/locale/<lang>/ (e.g. additional catalogs or mod files)
+    const std::string langSubdir = (dir / lang).generic_string();
+    for (const std::string &path : Assets::List(langSubdir, ".yaml"))
+    {
+        LoadYamlFile(path);
+    }
+
+    // 2. Fallbacks for flat layout: assets/locale/<lang>.yaml or openaow_<lang>.yaml
+    LoadYamlFile((dir / (lang + ".yaml")).generic_string());
+    LoadYamlFile((dir / ("openaow_" + lang + ".yaml")).generic_string());
+
+    // 3. Active mods providing translation files in locale root directory:
+    for (const std::string &path : Assets::List(dir.generic_string(), ".yaml"))
+    {
+        const std::string filename = std::filesystem::path(path).filename().string();
+        const std::string suffix = "_" + lang + ".yaml";
+        if (filename.size() >= suffix.size() &&
+            filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0)
+        {
+            LoadYamlFile(path);
+        }
+    }
+
+    std::cout << "[Localization] Loaded " << s_translations.size() << " translations for '" << lang
+              << "' (domain: " << domain << ")" << std::endl;
+}
+
+} // namespace
+
+void Localization::Init(const std::string &localeDir, const std::string &defaultLang, const std::string &domain)
+{
+    std::lock_guard<std::mutex> guard(s_mutex);
+
+    s_localeDir = localeDir.empty() ? LoaderResources::LocaleDir() : localeDir;
     s_domain = domain.empty() ? "openaow" : domain;
-
-    setlocale(LC_ALL, "");
-#if defined(LC_MESSAGES)
-    setlocale(LC_MESSAGES, "");
-#endif
-
-    bindtextdomain(s_domain.c_str(), s_localeDir.c_str());
-    bind_textdomain_codeset(s_domain.c_str(), "UTF-8");
-    textdomain(s_domain.c_str());
-
-    if (s_domain != "openaow")
-    {
-        bindtextdomain("openaow", s_localeDir.c_str());
-        bind_textdomain_codeset("openaow", "UTF-8");
-    }
-
+    s_currentLanguage = (defaultLang == "ru") ? "ru" : "en";
     s_initialized = true;
-    SetLanguage(defaultLang.empty() ? "en" : defaultLang);
-    std::cout << "[Localization] Initialized gettext domain '" << s_domain << "' at " << s_localeDir
-              << ", default language: " << s_currentLanguage << std::endl;
+
+    ReloadTranslations(s_localeDir, s_domain, s_currentLanguage);
 }
 
 void Localization::SetLanguage(const std::string &langCode)
 {
+    std::lock_guard<std::mutex> guard(s_mutex);
     s_currentLanguage = (langCode == "ru") ? "ru" : "en";
-#if defined(_WIN32)
-    _putenv_s("LANGUAGE", s_currentLanguage.c_str());
-#else
-    setenv("LANGUAGE", s_currentLanguage.c_str(), 1);
-#endif
-
-#if defined(__GLIBC__)
-    ++_nl_msg_cat_cntr; // Invalidate glibc gettext cache
-#endif
-
-    const char *localeStr = (s_currentLanguage == "ru") ? "ru_RU.UTF-8" : "en_US.UTF-8";
-#if defined(LC_MESSAGES)
-    setlocale(LC_MESSAGES, localeStr);
-#else
-    (void) localeStr; // gettext reads LANGUAGE on platforms without LC_MESSAGES
-#endif
+    if (s_initialized)
+    {
+        ReloadTranslations(s_localeDir, s_domain, s_currentLanguage);
+    }
 }
 
 const std::string &Localization::GetLanguage()
 {
+    std::lock_guard<std::mutex> guard(s_mutex);
     return s_currentLanguage;
 }
 
 const std::string &Localization::GetDomain()
 {
+    std::lock_guard<std::mutex> guard(s_mutex);
     return s_domain;
 }
 
 void Localization::ToggleLanguage()
 {
-    if (s_currentLanguage == "en")
+    std::string next;
     {
-        SetLanguage("ru");
+        std::lock_guard<std::mutex> guard(s_mutex);
+        next = (s_currentLanguage == "en") ? "ru" : "en";
     }
-    else
-    {
-        SetLanguage("en");
-    }
+    SetLanguage(next);
 }
 
 bool Localization::IsRussian()
 {
+    std::lock_guard<std::mutex> guard(s_mutex);
     return s_currentLanguage == "ru";
 }
 
@@ -124,12 +185,18 @@ const char *Localization::Tr(const char *msgid)
 {
     if (!msgid || !msgid[0])
         return "";
-    const char *translation = gettext(msgid);
-    if (translation == msgid && s_domain != "openaow")
+
+    // English is the source language in the codebase: return immediately
+    if (s_currentLanguage == "en")
+        return msgid;
+
+    std::lock_guard<std::mutex> guard(s_mutex);
+    auto it = s_translations.find(msgid);
+    if (it != s_translations.end() && !it->second.empty())
     {
-        translation = dgettext("openaow", msgid);
+        return it->second.c_str();
     }
-    return translation;
+    return msgid;
 }
 
 std::string Localization::Tr(const std::string &msgid)

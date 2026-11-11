@@ -43,20 +43,14 @@ for tool in xgettext msgcat msgen msgfilter msgfmt msgattrib; do
     }
 done
 
-all_domains=(openaow openaow_character_editor openaow_map_editor)
+all_domains=(openaow)
 domains=()
 langs=()
 
 for a in "${args[@]}"; do
     case "$a" in
-        openaow|openaow_character_editor|openaow_map_editor)
+        openaow)
             domains+=("$a")
-            ;;
-        character-editor|character_editor)
-            domains+=(openaow_character_editor)
-            ;;
-        map-editor|map_editor)
-            domains+=(openaow_map_editor)
             ;;
         *)
             langs+=("$a")
