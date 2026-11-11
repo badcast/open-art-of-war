@@ -111,6 +111,8 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     f("straggler_timeout_seconds", t.stragglerTimeoutSeconds);
     i("march_stride_tiles", t.marchStrideTiles);
     i("max_attack_groups", t.maxAttackGroups);
+    i("dispatch_group_size", t.dispatchGroupSize);
+    i("dispatch_group_radius", t.dispatchGroupRadius);
     i("credits_per_extra_group", t.creditsPerExtraGroup);
     i("late_rifleman_percent", t.lateRiflemanPercent);
     b("build_defenses", t.buildDefenses);
@@ -121,6 +123,8 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     f("defense_time_scale", t.defenseTimeScale);
     t.defenseSquadPercent = std::clamp(t.defenseSquadPercent, 10, 100);
     t.maxAttackGroups = std::clamp(t.maxAttackGroups, 1, 5);
+    t.dispatchGroupSize = std::clamp(t.dispatchGroupSize, 1, 12);
+    t.dispatchGroupRadius = std::clamp(t.dispatchGroupRadius, 1, 12);
 }
 
 int FactionBuildingIndex(AIDefenseSite::Kind kind, Faction side)

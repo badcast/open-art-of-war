@@ -857,6 +857,7 @@ private:
     };
     std::vector<RevealPing> m_revealPings; // attackers spotted by their muzzle flash
     bool m_unlimitedPower {false};
+    bool LiveEntityLimitReached() const;
     EntityContainer m_entities;
     std::vector<Projectile> m_projectiles;
     float m_renderAlpha {1.0f}; // render interpolation between the last two ticks (see SnapshotRenderState)

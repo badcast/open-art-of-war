@@ -66,6 +66,35 @@ std::vector<int> MenuController::CustomSeatCodes(int position) const
     return {1, 2, 3, 4, 5, 6, 7};
 }
 
+void MenuController::AddCustomAi(int position, int level, bool autoFilled)
+{
+    CustomSlot add;
+    add.position = position;
+    add.level = level;
+    add.autoFilled = autoFilled;
+    const std::vector<bool> takenColors = CustomTakenColors(-1);
+    for (int c = 0; c < static_cast<int>(takenColors.size()); ++c)
+    {
+        if (!takenColors[c])
+        {
+            add.color = c + 1;
+            break;
+        }
+    }
+    for (int t = 0; t < kMaxPlayers; ++t)
+    { // the first team nobody is in yet
+        bool used = false;
+        for (const CustomSlot &cs : m_customSlots)
+            used = used || cs.team == t;
+        if (!used)
+        {
+            add.team = t;
+            break;
+        }
+    }
+    m_customSlots.push_back(add);
+}
+
 void MenuController::SetCustomSeat(int position, int code)
 {
     if (position < 0 || position >= kMaxPlayers || m_customSlots.empty())
@@ -79,6 +108,9 @@ void MenuController::SetCustomSeat(int position, int code)
         if (held > 0)
             m_customSlots.erase(m_customSlots.begin() + held);
         m_customBlocked &= ~(1u << position);
+        m_customOpen &= ~(1u << position);
+        if (m_customSlots[0].position >= 0)
+            m_customOpen |= 1u << m_customSlots[0].position; // the place he leaves is open
         m_customSlots[0].position = position;
         m_customSpectator = false;
         // While he watched, a computer player may have taken his colour
@@ -102,6 +134,8 @@ void MenuController::SetCustomSeat(int position, int code)
         // Anything but "you" on the person's own place: he does not take part, the computer players fight and he
         // watches (the place becomes Open, a computer player or blocked)
         m_customSpectator = true;
+        if (m_customSlots[0].position >= 0)
+            m_customOpen |= 1u << m_customSlots[0].position;
         m_customSlots[0].position = -1;
         SetCustomSeat(position, code);
         return;
@@ -109,40 +143,23 @@ void MenuController::SetCustomSeat(int position, int code)
     if (code >= 3 && code <= 6)
     {
         m_customBlocked &= ~(1u << position);
+        m_customOpen &= ~(1u << position);
         if (held > 0)
         {
             m_customSlots[held].level = code - 3;
+            m_customSlots[held].autoFilled = false; // chosen by hand now
             return;
         }
-        CustomSlot add;
-        add.position = position;
-        add.level = code - 3;
-        const std::vector<bool> takenColors = CustomTakenColors(-1);
-        for (int c = 0; c < static_cast<int>(takenColors.size()); ++c)
-        {
-            if (!takenColors[c])
-            {
-                add.color = c + 1;
-                break;
-            }
-        }
-        for (int t = 0; t < kMaxPlayers; ++t)
-        { // the first team nobody is in yet
-            bool used = false;
-            for (const CustomSlot &cs : m_customSlots)
-                used = used || cs.team == t;
-            if (!used)
-            {
-                add.team = t;
-                break;
-            }
-        }
-        m_customSlots.push_back(add);
+        AddCustomAi(position, code - 3, false);
         return;
     }
     // Open or blocked: nobody plays there
     if (held > 0)
         m_customSlots.erase(m_customSlots.begin() + held);
+    if (code == 2)
+        m_customOpen |= 1u << position;
+    else
+        m_customOpen &= ~(1u << position);
     if (code == 7)
         m_customBlocked |= 1u << position;
     else
@@ -158,12 +175,9 @@ void MenuController::EnsureCustomSlots()
         = static_cast<std::size_t>(std::clamp(m_skirmishMaps[m_skirmishSelected].players, 2, kMaxPlayers));
     if (m_customSlots.empty())
     {
-        m_customSlots.resize(2);
+        m_customSlots.resize(1);
         m_customSlots[0].color = 1;
-        m_customSlots[1].color = 2;
-        m_customSlots[1].team = 1;
-        m_customSlots[1].level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
-        m_customSlots[1].position = 1;
+        m_customSlots[0].position = 0;
     }
     // A watching person holds no start position: the computer players may fill every one of them
     const std::size_t slotsMost = most + (m_customSpectator ? 1u : 0u);
@@ -192,6 +206,18 @@ void MenuController::EnsureCustomSlots()
                 break;
             }
         }
+    }
+    // Automatic filling: every start position nobody holds, blocked or left Open by hand gets a computer player of
+    // the last chosen level; those not changed by hand follow that level when it changes
+    const int level = std::clamp(static_cast<int>(m_difficulty), 0, 3);
+    for (CustomSlot &cs : m_customSlots)
+        if (cs.autoFilled)
+            cs.level = level;
+    for (int pos = 0; pos < static_cast<int>(most); ++pos)
+    {
+        if (CustomSlotAt(pos) >= 0 || ((m_customBlocked >> pos) & 1u) || ((m_customOpen >> pos) & 1u))
+            continue;
+        AddCustomAi(pos, level, true);
     }
 }
 

@@ -108,6 +108,14 @@ struct AIDefenseTest
     {
         ai.m_style.lineOffset = tiles;
     }
+    static int Dispatched(const AIController &ai)
+    {
+        return ai.m_dispatchedInWave;
+    }
+    static void Replan(AIController &ai)
+    {
+        ai.PreparePlan(1, false, false);
+    }
     static int HomeGuard(AIController &ai, int planned, int lastPlan)
     {
         ai.m_currentPlan.archetypes.assign(static_cast<std::size_t>(planned), 1);
@@ -265,6 +273,72 @@ int main()
         Check(w.ai.GetWaveCount() == 1 && AIDefenseTest::Squads(w.ai) >= 1, "a wave leaves a quiet base");
         Check(AIDefenseTest::HomeGuard(w.ai, 0, 10) > 0, "the home guard is not zero between two wave plans");
         Check(AIDefenseTest::HomeGuard(w.ai, 20, 10) > AIDefenseTest::HomeGuard(w.ai, 0, 10), "the plan counts first");
+    }
+
+    // Hard/Hardcore send the outermost nearby troops, even far from staging and below a full wave.
+    for (auto level : {AIDifficulty::Easy, AIDifficulty::Medium, AIDifficulty::Hard, AIDifficulty::Hardcore})
+    {
+        World w(level);
+        const int rear = w.Own(20, 20);
+        const int front = w.Own(50, 40);
+        const int neighbor = w.Own(49, 40);
+        AIDefenseTest::Prepare(w.ai, {rear, front, neighbor}, 30, kHqX, kHqY);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        const bool immediate = level == AIDifficulty::Hard || level == AIDifficulty::Hardcore;
+        Check(
+            AIDefenseTest::Squads(w.ai) == (immediate ? 1 : 0),
+            "only Hard/Hardcore send incomplete groups away from staging");
+        if (!immediate)
+            continue;
+        const AISquad *sq = AIDefenseTest::FirstSquad(w.ai);
+        Check(
+            sq && sq->unitIds == std::vector<int>({front, neighbor}),
+            "outermost troops leave together without waiting for distant reserves");
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Squads(w.ai) == 2, "remaining singleton leaves on the next tick without a cooldown");
+        Check(w.ai.GetWaveCount() == 0, "small groups do not advance the composition once per dispatch");
+    }
+
+    // Hard: no group leaves while the base is attacked, a fresh plan restarts the dispatch count, a small group size
+    // from the configuration is obeyed
+    {
+        World w(AIDifficulty::Hard);
+        const int a = w.Own(50, 40), b = w.Own(49, 40);
+        AIDefenseTest::Prepare(w.ai, {a, b}, 30, kHqX, kHqY);
+        AIDefenseTest::SetAttacked(w.ai, 5.0f, 0.0f);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Squads(w.ai) == 0, "no front group leaves a base under attack");
+        AIDefenseTest::SetAttacked(w.ai, 0.0f, 0.0f);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Dispatched(w.ai) == 2, "dispatched troops are counted");
+        AIDefenseTest::Replan(w.ai);
+        Check(AIDefenseTest::Dispatched(w.ai) == 0, "a new plan restarts the dispatch count");
+    }
+    {
+        World w(AIDifficulty::Hard);
+        const int a = w.Own(20, 20, 1);
+        AIDefenseTest::Prepare(w.ai, {a}, 30, kHqX, kHqY);
+        for (int s = 0; s < 3; ++s)
+            AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf); // (units stay: the squad owns the only one)
+        Check(AIDefenseTest::Squads(w.ai) == 1, "a lone troop forms one group, not one per tick");
+    }
+
+    // The entity limit counts the living: dead ones stay in the list, and used to fill it for good (no spawn for
+    // anybody, the computer's production included, in a long match)
+    {
+        World w(AIDifficulty::Medium);
+        std::vector<int> ids;
+        for (int i = 0; i < MAX_UNITS + 5; ++i)
+        {
+            const int id = w.Own(5 + i % 60, 5 + (i / 60) % 50);
+            if (id == 0)
+                break;
+            ids.push_back(id);
+        }
+        Check(w.Own(3, 3) == 0, "no spawn while the limit of living entities is reached");
+        for (int id : ids)
+            w.entities.GetUnit(id)->alive = false;
+        Check(w.Own(3, 3) != 0, "dead entities do not use up the limit");
     }
 
     // 3. A group on the march turns back when the base lacks defenders; not on Easy, not a group that storms

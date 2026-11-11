@@ -282,10 +282,14 @@ private:
         int position {0};   // start position of the map (0-based), never shared by two players
         int armyCap {7};    // army size limit: index into kArmyCapUnits (7 = unlimited)
         int techLevel {-1}; // tech level: index into Capabilities::Levels(), -1 = the match's
+        bool autoFilled {false}; // put there by the map's automatic filling and not changed by hand since
     };
     std::vector<CustomSlot> m_customSlots;
     void EnsureCustomSlots();
     unsigned m_customBlocked {0}; // custom game: start positions nobody takes (bit per position)
+    unsigned m_customOpen {0};    // start positions left Open by hand: the automatic filling keeps off them
+    // A computer player of the given level on a start position (own colour and team)
+    void AddCustomAi(int position, int level, bool autoFilled);
     // What holds a start position: index into m_customSlots, -1 nobody
     int CustomSlotAt(int position) const;
     // The choices of the type combo of a start position (codes of SetCustomSeat)

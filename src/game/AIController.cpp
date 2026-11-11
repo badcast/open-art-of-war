@@ -270,6 +270,7 @@ void AIController::SetDebugConfig(const AIDebugConfig &config)
         m_infantryQueue.clear();
         m_vehicleQueue.clear();
         m_currentPlan.archetypes.clear();
+        m_dispatchedInWave = 0;
     }
 }
 
@@ -305,9 +306,14 @@ std::vector<std::string> AIController::CurrentIntentions() const
     if (required > 0)
     {
         std::ostringstream w;
-        w << "Assembling wave " << (m_waveCount + 1) << " (" << TierName(m_currentPlan.tier) << "): " << m_readyUnits
-          << "/" << required << " ready";
-        if (m_waveCooldown > 0.0f)
+        const auto difficulty = GetEffectiveDifficulty();
+        const bool immediate = difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore;
+        if (immediate)
+            w << "Sending front groups immediately: " << m_dispatchedInWave << "/" << required << " dispatched";
+        else
+            w << "Assembling wave " << (m_waveCount + 1) << " (" << TierName(m_currentPlan.tier)
+              << "): " << m_readyUnits << "/" << required << " ready";
+        if (!immediate && m_waveCooldown > 0.0f)
             w << ", may launch in " << static_cast<int>(m_waveCooldown) << " s";
         if (!m_hasProduction)
             w << " - no barracks / factory left";
@@ -511,6 +517,19 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         if (!marching.empty())
         {
             m_squadController.ReleaseUnits(marching, entities);
+            // Released troops must stop marching at the dead base: idle, they return to the staging area, join the
+            // reserve and the next wave, and production keeps counting them as home troops instead of stalling
+            for (int id : marching)
+            {
+                Unit *u = entities.GetUnit(id);
+                if (!u || !u->alive || u->state == ActionState::Die || u->targetEntityId != 0)
+                    continue;
+                u->ClearPathState();
+                u->ClearMoveTarget();
+                u->isAttackMoving = false;
+                if (u->state == ActionState::Move)
+                    u->state = ActionState::Idle;
+            }
             Think("ATTACK", "A foe is out of the game: the squads come back for a new objective");
         }
     }
@@ -543,6 +562,7 @@ void AIController::Reset()
     m_economyTimer = 0.0f;
     m_defenseCheckTimer = 0.0f;
     m_waveCount = 0;
+    m_dispatchedInWave = 0;
     m_startingBuildings.clear();
     m_startingWalls.clear();
     m_startingBaseRecorded = false;
@@ -625,6 +645,7 @@ void AIController::Reset()
 void AIController::PreparePlan(int waveNumber, bool hasFactory, bool hasFactoryPlan)
 {
     m_currentPlan = PlanWave(waveNumber, hasFactory, hasFactoryPlan);
+    m_dispatchedInWave = 0; // a new plan counts its own dispatched troops
     m_infantryQueue.clear();
     m_vehicleQueue.clear();
     for (int arch : m_currentPlan.archetypes)

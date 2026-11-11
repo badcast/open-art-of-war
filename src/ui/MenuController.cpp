@@ -125,6 +125,7 @@ void MenuController::ActivateMenuItem(
             m_skirmishAllowSpeed = false;
             m_customSlots.clear();
             m_customBlocked = 0;
+            m_customOpen = 0;
             m_customSpectator = false;
             m_skirmishSelected = 0;
             m_skirmishTop = 0;

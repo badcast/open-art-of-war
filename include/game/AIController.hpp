@@ -456,6 +456,7 @@ private:
 
     float m_defenseCheckTimer {0.0f};
     int m_waveCount {0};
+    int m_dispatchedInWave {0}; // Hard/Hardcore dispatch groups before the whole wave is assembled
     float m_aggressiveness {1.0f};
 
     // Director: wave plan, production queues and staging

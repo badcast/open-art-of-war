@@ -494,23 +494,74 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         return;
 
     const AIDifficulty difficulty = GetEffectiveDifficulty();
-    // Hard / Hardcore: the first raid leaves as soon as the first troops are ready
-    if (!m_firstRaidDone && m_trainedUnits > 0
-        && (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore) && !ready.empty())
+    // Hard/Hardcore dispatch the front of the reserve immediately, from its current
+    // position. No rally-point, full-wave, minimum-size or inter-wave wait.
+    if (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore)
     {
         int targetX, targetY;
         FindAttackObjective(entities, map, targetX, targetY);
-        if (targetX >= 0)
-        {
-            m_firstRaidDone = true;
-            const int squadId = m_squadController.CreateSquad(
-                ready, targetX, targetY, 0, entities, pathfinder, m_currentDifficultyConfig.tactics);
-            std::ostringstream msg;
-            msg << "Early raid G" << squadId << " with " << ready.size() << " unit(s) toward (" << targetX << ", "
-                << targetY << ")";
-            Think("ATTACK", msg.str());
+        if (targetX < 0)
             return;
+        std::vector<int> front;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (u && IsReserveUnit(*u) && !IsPostGuard(u->id) && !m_defenders.count(u->id) && !m_repairing.count(u->id)
+                && u->id != m_scoutId && u->targetEntityId == 0 && !u->isAttackMoving && u->state != ActionState::Attack
+                && u->state != ActionState::Transform)
+                front.push_back(u->id);
         }
+        if (front.empty())
+            return;
+        const long long dx = targetX - m_enemyHqX, dy = targetY - m_enemyHqY;
+        std::sort(front.begin(), front.end(), [&](int a, int b) {
+            const Unit *ua = entities.GetUnit(a), *ub = entities.GetUnit(b);
+            const long long pa = ua->tileX * dx + ua->tileY * dy;
+            const long long pb = ub->tileX * dx + ub->tileY * dy;
+            return pa != pb ? pa > pb : a < b;
+        });
+        const Unit *leader = entities.GetUnit(front.front());
+        const int lx = leader->tileX, ly = leader->tileY;
+        std::vector<int> group;
+        for (int id : front)
+        {
+            const Unit *u = entities.GetUnit(id);
+            // Distant troops leave in their own group instead of pulling this one back to regroup.
+            if (std::max(std::abs(u->tileX - lx), std::abs(u->tileY - ly)) <= m_currentDifficultyConfig.tactics.dispatchGroupRadius)
+                group.push_back(id);
+            if (static_cast<int>(group.size()) >= m_currentDifficultyConfig.tactics.dispatchGroupSize)
+                break;
+        }
+        for (int id : group)
+            entities.GetUnit(id)->groupHold = false;
+        const int wave = m_waveCount + 1;
+        const int squadId = m_squadController.CreateSquad(
+            group, targetX, targetY, wave, entities, pathfinder, m_currentDifficultyConfig.tactics);
+        if (squadId == 0)
+            return;
+        m_firstRaidDone = true;
+        if (m_trackedWave == 0)
+        {
+            m_trackedWave = wave;
+            m_trackedBuildingsKilled = entities.GetPlayerStats(m_player).buildingsDestroyed;
+        }
+        m_dispatchedInWave += static_cast<int>(group.size());
+        m_readyUnits = static_cast<int>(front.size() - group.size());
+        Think(
+            "ATTACK",
+            "Immediate front group G" + std::to_string(squadId) + " with " + std::to_string(group.size()) + " unit(s)");
+        // Advance the composition after a wave's worth has left; small groups must
+        // not advance the technology mix once per soldier or discard its queues.
+        if (!m_currentPlan.archetypes.empty()
+            && m_dispatchedInWave >= static_cast<int>(m_currentPlan.archetypes.size()))
+        {
+            ++m_waveCount;
+            m_dispatchedInWave = 0;
+            m_lastPlanSize = static_cast<int>(m_currentPlan.archetypes.size());
+            m_currentPlan.archetypes.clear();
+            m_waveAssemblyTimer = 0.0f;
+        }
+        return;
     }
 
     int required = static_cast<int>(m_currentPlan.archetypes.size());

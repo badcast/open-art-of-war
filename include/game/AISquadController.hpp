@@ -43,6 +43,8 @@ struct AITacticsConfig
     float stragglerTimeoutSeconds {6.0f}; // a straggler that cannot close in for this long leaves the group
     int marchStrideTiles {5};             // distance between consecutive march waypoints
     int maxAttackGroups {3};              // groups one wave may split into (1..5), each taking its own route
+    int dispatchGroupSize {5};            // Hard/Hardcore: troops of one immediately dispatched front group (1..12)
+    int dispatchGroupRadius {4};          // Hard/Hardcore: tiles around the front leader a troop may stand to leave with it
     int creditsPerExtraGroup {700};       // AI treasury needed for every extra attack group
     int lateRiflemanPercent {10};         // share (%) of plain riflemen in a wave once the tanks are there (tier 3+)
     bool buildDefenses {true};            // skirmish: wall in the base, towers / bunkers toward the enemy
