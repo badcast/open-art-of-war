@@ -20,6 +20,7 @@ constexpr int TILE_HEIGHT = 20;   // 20 pixels per tile height
 constexpr int TILE_SIZE = 30;     // legacy alias
 constexpr int MAX_MAP_SIZE = 128; // 128x128 max map dimension
 constexpr int MAX_UNITS = 512;    // max entities per match (buildings + units + waves)
+constexpr int MAX_WRECKS = 128;   // most entities sinking into the ground at once; the oldest fade early beyond it
 
 // Timesteps
 constexpr double SIMULATION_TICK_RATE = 20.0;                      // 20 TPS

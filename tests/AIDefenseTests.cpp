@@ -380,8 +380,8 @@ int main()
         Check(AIDefenseTest::Squads(w.ai) == 1, "without production what is assembled goes after a while");
     }
 
-    // The entity limit counts the living: dead ones stay in the list, and used to fill it for good (no spawn for
-    // anybody, the computer's production included, in a long match)
+    // The entity limit counts the living: wrecks stay in the list while they sink into the ground and must not
+    // use up the limit
     {
         World w(AIDifficulty::Medium);
         std::vector<int> ids;
@@ -396,6 +396,35 @@ int main()
         for (int id : ids)
             w.entities.GetUnit(id)->alive = false;
         Check(w.Own(3, 3) != 0, "dead entities do not use up the limit");
+    }
+    // ... and so do wrecks still sinking into the ground; a match of 3+ players splits the limit evenly, so the
+    // players updated first cannot take every place (the production of the last slots stood still for good)
+    {
+        World w(AIDifficulty::Medium);
+        std::array<PlayerSlot, kMaxPlayers> slots {};
+        for (int p = 0; p < 4; ++p)
+        {
+            slots[p] = Players::Slot(p < 2 ? p : 1);
+            slots[p].active = true;
+            slots[p].team = static_cast<std::uint8_t>(p);
+        }
+        Players::Setup(slots, 0);
+        const PlayerId own = w.ai.Player();
+        const int share = MAX_UNITS / 4;
+        std::vector<int> ids;
+        for (int i = 0; i < share + 5; ++i)
+        {
+            const int id = w.Own(5 + i % 60, 5 + (i / 60) % 50);
+            if (id == 0)
+                break;
+            ids.push_back(id);
+        }
+        Check(w.entities.FreeEntitySlots(own) == 0 && w.Own(3, 3) == 0, "a player gets its share of the limit only");
+        const PlayerId other = static_cast<PlayerId>(own == 3 ? 2 : 3);
+        Check(w.entities.SpawnUnitByArchetype(1, 3, 4, kOwn, other) != 0, "another player still has its share");
+        w.entities.GetUnit(ids.front())->state = ActionState::Die;
+        Check(w.Own(3, 3) != 0, "a wreck does not use up the limit");
+        Players::SetupSinglePlayer(kFoe);
     }
 
     // 3. A group on the march turns back when the base lacks defenders; not on Easy, not a group that storms

@@ -210,11 +210,11 @@ void AIController::UpdateRebuilding(float deltaTime, TileMap &map, EntityManager
                 }
                 if (siteClear)
                 {
-                    m_credits -= plan.creditCost;
                     int newId = entities.SpawnBuildingByIndex(
                         plan.rawBuildingType, plan.tileX, plan.tileY, side(), 0.0f, m_player);
-                    if (newId > 0)
+                    if (newId > 0) // (0: the entity limit; charged every tick for nothing before)
                     {
+                        m_credits -= plan.creditCost;
                         for (int ty = plan.tileY; ty < plan.tileY + plan.height && ty < map.GetHeight(); ++ty)
                         {
                             for (int tx = plan.tileX; tx < plan.tileX + plan.width && tx < map.GetWidth(); ++tx)

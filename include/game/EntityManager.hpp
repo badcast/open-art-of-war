@@ -803,6 +803,8 @@ public:
     // forces are destroyed as when a player leaves. Returns who dropped out on this call. Depends on the state of
     // the world only, so every peer does it on the same tick.
     std::vector<PlayerId> UpdateElimination(TileMap &map);
+    // How many more entities the player may get under MAX_UNITS (its even share of it in a match of 3+ players)
+    int FreeEntitySlots(PlayerId owner) const;
     bool IsEliminated(PlayerId player) const
     {
         return player < kMaxPlayers && m_eliminated[player];
@@ -857,7 +859,6 @@ private:
     };
     std::vector<RevealPing> m_revealPings; // attackers spotted by their muzzle flash
     bool m_unlimitedPower {false};
-    bool LiveEntityLimitReached() const;
     EntityContainer m_entities;
     std::vector<Projectile> m_projectiles;
     float m_renderAlpha {1.0f}; // render interpolation between the last two ticks (see SnapshotRenderState)

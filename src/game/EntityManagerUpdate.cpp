@@ -646,7 +646,25 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
         std::remove_if(m_explosions.begin(), m_explosions.end(), [](const ExplosionParticle &e) { return !e.active; }),
         m_explosions.end());
 
-    // 5. Clean up dead entities
+    // 5. Wrecks stay for minutes; a big battle leaves more of them than living entities, and every one costs time
+    // in each pass over the list. Beyond MAX_WRECKS the oldest go straight to their fade.
+    {
+        std::vector<Entity *> wrecks;
+        for (Entity &e : m_entities)
+            if (e.alive && e.state == ActionState::Die)
+                wrecks.push_back(&e);
+        if (wrecks.size() > static_cast<std::size_t>(MAX_WRECKS))
+        {
+            const std::size_t excess = wrecks.size() - static_cast<std::size_t>(MAX_WRECKS);
+            std::sort(wrecks.begin(), wrecks.end(), [](const Entity *a, const Entity *b) {
+                return a->deathTimer != b->deathTimer ? a->deathTimer < b->deathTimer : a->id < b->id;
+            });
+            for (std::size_t i = 0; i < excess; ++i)
+                wrecks[i]->deathTimer = std::min(wrecks[i]->deathTimer, 0.0f);
+        }
+    }
+
+    // 6. Clean up dead entities
     m_entities.Raw().erase(
         std::remove_if(
             m_entities.Raw().begin(),
@@ -654,7 +672,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
             [](const std::unique_ptr<Entity> &e) { return !e->alive; }),
         m_entities.Raw().end());
 
-    // 6. Update Fog of War post-movement
+    // 7. Update Fog of War post-movement
     UpdateFogOfWar(map);
 }
 

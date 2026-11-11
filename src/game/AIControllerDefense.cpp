@@ -1167,7 +1167,8 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     const int id = entities.SpawnBuildingByIndex(index, x, y, side(), 0.0f, m_player);
     if (id <= 0)
     {
-        site.done = true;
+        // Refused by the entity limit: the site stays planned and is tried again; anything else gives it up
+        site.done = entities.FreeEntitySlots(m_player) > 0;
         return false;
     }
     m_credits -= cost;

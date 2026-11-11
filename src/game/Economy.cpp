@@ -167,6 +167,7 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
         int rallyX, rallyY;
     };
     std::vector<Spawn> spawns; // spawning while iterating would invalidate the entity container
+    const int freeSlots = entities.FreeEntitySlots(player); // the entity limit: a unit without room waits as well
     // The army size limit of the player: a trained unit waits in its building until there is room for it
     const int armyCap = BuildLimits::EffectiveArmyCap(ArmyCapUnitsOf(Players::Slot(player).armyCap));
     int armySize = 0;
@@ -215,6 +216,8 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
 
         if (armyCap > 0 && armySize + static_cast<int>(spawns.size()) >= armyCap)
             continue; // the army is at its limit: the unit waits
+        if (static_cast<int>(spawns.size()) >= freeSlots)
+            continue; // no room under the entity limit: the unit waits (it used to vanish with its price)
         int sx = 0, sy = 0;
         if (!entities.GetBuildingSpawnPoint(b->id, map, sx, sy))
             continue; // exit blocked: retry next tick

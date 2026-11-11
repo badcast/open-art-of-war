@@ -559,13 +559,14 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
                 return;
             if (!economy.CanAfford(bp.creditCost))
                 return;
-            economy.SpendCredits(bp.creditCost);
             if (bp.isWall)
             {
+                economy.SpendCredits(bp.creditCost);
                 map.SetWall(cmd.x, cmd.y, faction, 100, cmd.player);
             }
             else if (entities.SpawnBuildingByIndex(bp.buildingIndex, cmd.x, cmd.y, faction, 0.0f, cmd.player) > 0)
             {
+                economy.SpendCredits(bp.creditCost); // (no charge when the entity limit refuses the building)
                 for (int ty = cmd.y; ty < cmd.y + bp.height && ty < map.GetHeight(); ++ty)
                 {
                     for (int tx = cmd.x; tx < cmd.x + bp.width && tx < map.GetWidth(); ++tx)

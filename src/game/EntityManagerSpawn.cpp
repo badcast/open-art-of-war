@@ -158,22 +158,38 @@ static void CopyUnitConfig(Unit &u, const UnitConfig &cfg)
     }
 }
 
-// The limit counts what lives: the dead stay in the list for the rest of the match, and counting them made every
-// spawn (of every player, the computer's production included) fail once MAX_UNITS entities had ever existed
-bool EntityManager::LiveEntityLimitReached() const
+// The room left under the entity limit for a player. Only what lives counts: the dead are in the list while their
+// wreck sinks into the ground (two minutes), and with them every slot was taken by wrecks in a big battle. A match of
+// more than two players splits the limit evenly among those still in it: the computer players are updated in slot
+// order, so the first slots took every freed place and the production of the last ones stood still for good.
+int EntityManager::FreeEntitySlots(PlayerId owner) const
 {
-    if (m_entities.size() < static_cast<std::size_t>(MAX_UNITS))
-        return false;
     int live = 0;
+    int own = 0;
     for (const Entity &e : m_entities)
-        if (e.alive)
-            ++live;
-    return live >= MAX_UNITS;
+    {
+        if (!e.alive || e.state == ActionState::Die)
+            continue;
+        ++live;
+        if (e.owner == owner)
+            ++own;
+    }
+    int room = MAX_UNITS - live;
+    if (owner < kMaxPlayers && Players::IsActive(owner))
+    {
+        int players = 0;
+        for (int p = 0; p < kMaxPlayers; ++p)
+            if (Players::IsActive(static_cast<PlayerId>(p)) && !m_eliminated[p])
+                ++players;
+        if (players > 2)
+            room = std::min(room, MAX_UNITS / players - own);
+    }
+    return std::max(room, 0);
 }
 
 int EntityManager::SpawnUnitByArchetype(int archetypeId, int tileX, int tileY, Faction faction, PlayerId owner)
 {
-    if (LiveEntityLimitReached())
+    if (FreeEntitySlots(owner) <= 0)
         return 0;
 
     archetypeId = std::clamp(archetypeId, 0, 18);
@@ -438,7 +454,7 @@ int EntityManager::SpawnBuilding(UnitType type, int tileX, int tileY, Faction fa
 int EntityManager::SpawnBuildingByIndex(
     int buildingIdx, int tileX, int tileY, Faction faction, float initialProgress, PlayerId owner)
 {
-    if (LiveEntityLimitReached())
+    if (FreeEntitySlots(owner) <= 0)
         return 0;
 
     static const std::uint8_t s_widths[15] = {4, 3, 3, 4, 3, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2};
