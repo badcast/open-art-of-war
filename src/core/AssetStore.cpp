@@ -25,6 +25,13 @@ namespace
 //
 constexpr const char *MainAssetBlobName = MAIN_ASSET_BLOB_NAME;
 
+struct LoadedBlob
+{
+    fs::path path;
+    std::string certificate;
+    std::map<std::string, std::string> fileHashes;
+};
+
 struct State
 {
     Mode mode = Mode::None;
@@ -36,6 +43,7 @@ struct State
     std::string userDir;
     fs::path root;        // the folder that holds "assets" or the filePath
     std::string blobPath; // the loaded blob (blob mode)
+    std::vector<LoadedBlob> loadedBlobs;
 };
 
 State &state()
@@ -103,7 +111,11 @@ bool ReadFile(const fs::path &p, std::vector<std::uint8_t> &out)
 
 // Unpacks every regular file of the tar.zst blob into memory (blobArhive tar stream has no random access)
 bool LoadBlob(
-    const fs::path &filePath, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only = "")
+    const fs::path &filePath,
+    std::map<std::string, std::vector<std::uint8_t>> &files,
+    const std::string &only = "",
+    std::string *outCertificate = nullptr,
+    std::map<std::string, std::string> *outFileHashes = nullptr)
 {
     archive *blobArhive = archive_read_new();
     archive_read_support_filter_all(blobArhive);
@@ -120,17 +132,19 @@ bool LoadBlob(
     {
         if (archive_entry_filetype(entry) != AE_IFREG)
             continue;
-        if (!only.empty())
+        std::string rawName = fs::path(archive_entry_pathname(entry)).lexically_normal().generic_string();
+        while (rawName.compare(0, 2, "./") == 0)
+            rawName.erase(0, 2);
+        std::string name = rawName;
+        if (name.compare(0, 7, "assets/") == 0)
+            name.erase(0, 7);
+
+        if (!only.empty() && name != only && rawName != only)
         {
-            std::string entryName = fs::path(archive_entry_pathname(entry)).lexically_normal().generic_string();
-            if (entryName.compare(0, 2, "./") == 0)
-                entryName.erase(0, 2);
-            if (entryName != only)
-            {
-                archive_read_data_skip(blobArhive);
-                continue;
-            }
+            archive_read_data_skip(blobArhive);
+            continue;
         }
+
         std::vector<std::uint8_t> data(static_cast<std::size_t>(archive_entry_size(entry)));
         std::size_t got = 0;
         while (got < data.size())
@@ -141,9 +155,13 @@ bool LoadBlob(
             got += static_cast<std::size_t>(n);
         }
         data.resize(got);
-        std::string name = fs::path(archive_entry_pathname(entry)).lexically_normal().generic_string();
-        if (name.compare(0, 2, "./") == 0)
-            name.erase(0, 2);
+
+        if (name == kCertificateName && outCertificate)
+            outCertificate->assign(reinterpret_cast<const char *>(data.data()), data.size());
+
+        if (outFileHashes)
+            (*outFileHashes)[name] = Sha256::Hex(data.data(), data.size());
+
         files[name] = std::move(data);
     }
     const bool ok = status == ARCHIVE_EOF;
@@ -194,25 +212,89 @@ bool Init()
         }
     }
 
-    // 2. data.blob with the packed contents of that directory
+    // 2. data.blob or multiple *.blob files with the packed contents
     for (const fs::path &root : roots)
     {
-        const fs::path blob = root / MainAssetBlobName;
-        if (!fs::is_regular_file(blob, ec))
+        std::vector<fs::path> blobPaths;
+        auto addBlobsFromDir = [&](const fs::path &dir) {
+            std::error_code dirEc;
+            if (!fs::is_directory(dir, dirEc))
+                return;
+            for (const auto &entry : fs::directory_iterator(dir, dirEc))
+            {
+                if (entry.is_regular_file(dirEc) && entry.path().extension() == ".blob")
+                {
+                    if (std::find(blobPaths.begin(), blobPaths.end(), entry.path()) == blobPaths.end())
+                        blobPaths.push_back(entry.path());
+                }
+            }
+        };
+
+        addBlobsFromDir(root);
+        addBlobsFromDir(root / "blobs");
+
+        const fs::path mainBlob = root / MainAssetBlobName;
+        if (fs::is_regular_file(mainBlob, ec))
+        {
+            if (std::find(blobPaths.begin(), blobPaths.end(), mainBlob) == blobPaths.end())
+                blobPaths.push_back(mainBlob);
+        }
+
+        if (blobPaths.empty())
             continue;
-        if (!LoadBlob(blob, s.blobFiles))
+
+        // Sort so that MainAssetBlobName comes first, then other blobs in alphabetical order
+        std::sort(blobPaths.begin(), blobPaths.end(), [](const fs::path &a, const fs::path &b) {
+            const bool aIsMain = (a.filename() == MainAssetBlobName);
+            const bool bIsMain = (b.filename() == MainAssetBlobName);
+            if (aIsMain != bIsMain)
+                return aIsMain;
+            return a.filename().string() < b.filename().string();
+        });
+
+        s.blobFiles.clear();
+        s.loadedBlobs.clear();
+
+        for (const fs::path &blob : blobPaths)
+        {
+            LoadedBlob lb;
+            lb.path = fs::weakly_canonical(blob, ec);
+            if (LoadBlob(blob, s.blobFiles, "", &lb.certificate, &lb.fileHashes))
+            {
+                s.loadedBlobs.push_back(std::move(lb));
+            }
+        }
+
+        if (s.loadedBlobs.empty())
         {
             s.blobFiles.clear();
             continue;
         }
+
         s.mode = Mode::Blob;
         s.root = fs::absolute(root, ec);
-        s.blobPath = fs::weakly_canonical(blob, ec).string();
-        s.description = "blob " + fs::weakly_canonical(blob, ec).string();
+        s.blobPath = s.loadedBlobs.front().path.string();
+
+        if (s.loadedBlobs.size() == 1)
+        {
+            s.description = "blob " + s.blobPath;
+        }
+        else
+        {
+            std::string desc = std::to_string(s.loadedBlobs.size()) + " blobs in " + fs::absolute(root, ec).string() + " (";
+            for (std::size_t i = 0; i < s.loadedBlobs.size(); ++i)
+            {
+                if (i > 0)
+                    desc += ", ";
+                desc += s.loadedBlobs[i].path.filename().string();
+            }
+            desc += ")";
+            s.description = std::move(desc);
+        }
         return true;
     }
 
-    std::cerr << "[Assets] Neither an \"assets\" directory nor " << MainAssetBlobName << " was found" << std::endl;
+    std::cerr << "[Assets] Neither an \"assets\" directory nor *.blob archives were found" << std::endl;
     return false;
 }
 
@@ -226,59 +308,138 @@ bool VerifyCertificate(std::vector<std::string> &problems, std::string &certific
     // developer's working copy and is not checked
     if (s.mode != Mode::Blob)
         return true;
-    certificatePath = s.blobPath + ":" + kCertificateName;
 
-    const auto cert = s.blobFiles.find(kCertificateName);
-    if (cert == s.blobFiles.end())
+    if (s.loadedBlobs.empty())
     {
-        problems.push_back(std::string("the blob carries no ") + kCertificateName);
+        problems.push_back("no blob loaded");
         return false;
     }
-    std::istringstream lines(std::string(cert->second.begin(), cert->second.end()));
-    std::string line;
-    int lineNo = 0;
-    std::set<std::string> listed;
-    while (std::getline(lines, line))
+
+    if (s.loadedBlobs.size() == 1)
     {
-        ++lineNo;
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
-            line.pop_back();
-        if (line.empty() || line[0] == '#')
-            continue;
-        // "<path>  <sha256>": the digest is the last 64 characters, the path may hold spaces
-        std::string path, expected;
-        if (line.size() > 65)
+        const auto &b = s.loadedBlobs.front();
+        certificatePath = b.path.string() + ":" + kCertificateName;
+        if (b.certificate.empty())
         {
-            expected = line.substr(line.size() - 64);
-            path = line.substr(0, line.size() - 64);
-            while (!path.empty() && (path.back() == ' ' || path.back() == '\t'))
-                path.pop_back();
+            problems.push_back(std::string("the blob carries no ") + kCertificateName);
+            return false;
         }
-        std::string key;
-        const bool hex
-            = expected.size() == 64 && expected.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos;
-        if (path.empty() || !hex || !AssetKey(path, key) || key.empty())
+
+        std::istringstream lines(b.certificate);
+        std::string line;
+        int lineNo = 0;
+        std::set<std::string> listed;
+        while (std::getline(lines, line))
         {
-            problems.push_back("line " + std::to_string(lineNo) + " of the certificate is malformed");
-            continue;
+            ++lineNo;
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+                line.pop_back();
+            if (line.empty() || line[0] == '#')
+                continue;
+            // "<path>  <sha256>": the digest is the last 64 characters, the path may hold spaces
+            std::string path, expected;
+            if (line.size() > 65)
+            {
+                expected = line.substr(line.size() - 64);
+                path = line.substr(0, line.size() - 64);
+                while (!path.empty() && (path.back() == ' ' || path.back() == '\t'))
+                    path.pop_back();
+            }
+            std::string key;
+            const bool hex
+                = expected.size() == 64 && expected.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos;
+            if (path.empty() || !hex || !AssetKey(path, key) || key.empty())
+            {
+                problems.push_back("line " + std::to_string(lineNo) + " of the certificate is malformed");
+                continue;
+            }
+            for (char &c : expected)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            listed.insert(key);
+
+            const auto it = b.fileHashes.find(key);
+            if (it == b.fileHashes.end())
+                problems.push_back(path + ": missing");
+            else if (it->second != expected)
+                problems.push_back(path + ": modified");
         }
-        for (char &c : expected)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        listed.insert(key);
-        // The packed original, never a per-user copy that shadows it
-        const auto it = s.blobFiles.find(key);
-        if (it == s.blobFiles.end())
-            problems.push_back(path + ": missing");
-        else if (Sha256::Hex(it->second.data(), it->second.size()) != expected)
-            problems.push_back(path + ": modified");
+
+        for (const auto &[key, hash] : b.fileHashes)
+        {
+            if (key != kCertificateName && listed.count(key) == 0)
+                problems.push_back("assets/" + key + ": not in the certificate");
+        }
+
+        std::cout << "[Assets] " << listed.size() << " files checked against " << certificatePath << ": "
+                  << (problems.empty() ? "all match" : std::to_string(problems.size()) + " problem(s)") << std::endl;
+        return problems.empty();
     }
-    // A file slipped into the blob after it was packed is not covered by the certificate
-    for (const auto &[key, data] : s.blobFiles)
+
+    // Multiple blobs
+    certificatePath = "multiple blobs (" + std::to_string(s.loadedBlobs.size()) + ")";
+    std::size_t totalChecked = 0;
+    std::size_t blobsWithCert = 0;
+
+    for (const auto &b : s.loadedBlobs)
     {
-        if (key != kCertificateName && listed.count(key) == 0)
-            problems.push_back("assets/" + key + ": not in the certificate");
+        if (b.certificate.empty())
+            continue;
+
+        ++blobsWithCert;
+        const std::string blobPrefix = b.path.filename().string() + ": ";
+        std::istringstream lines(b.certificate);
+        std::string line;
+        int lineNo = 0;
+        std::set<std::string> listed;
+        while (std::getline(lines, line))
+        {
+            ++lineNo;
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+                line.pop_back();
+            if (line.empty() || line[0] == '#')
+                continue;
+            std::string path, expected;
+            if (line.size() > 65)
+            {
+                expected = line.substr(line.size() - 64);
+                path = line.substr(0, line.size() - 64);
+                while (!path.empty() && (path.back() == ' ' || path.back() == '\t'))
+                    path.pop_back();
+            }
+            std::string key;
+            const bool hex
+                = expected.size() == 64 && expected.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos;
+            if (path.empty() || !hex || !AssetKey(path, key) || key.empty())
+            {
+                problems.push_back(blobPrefix + "line " + std::to_string(lineNo) + " of the certificate is malformed");
+                continue;
+            }
+            for (char &c : expected)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            listed.insert(key);
+
+            const auto it = b.fileHashes.find(key);
+            if (it == b.fileHashes.end())
+                problems.push_back(blobPrefix + path + ": missing");
+            else if (it->second != expected)
+                problems.push_back(blobPrefix + path + ": modified");
+        }
+
+        for (const auto &[key, hash] : b.fileHashes)
+        {
+            if (key != kCertificateName && listed.count(key) == 0)
+                problems.push_back(blobPrefix + "assets/" + key + ": not in the certificate");
+        }
+        totalChecked += listed.size();
     }
-    std::cout << "[Assets] " << listed.size() << " files checked against " << certificatePath << ": "
+
+    if (blobsWithCert == 0)
+    {
+        problems.push_back(std::string("none of the blobs carry ") + kCertificateName);
+        return false;
+    }
+
+    std::cout << "[Assets] " << totalChecked << " files checked across " << blobsWithCert << " blob certificate(s): "
               << (problems.empty() ? "all match" : std::to_string(problems.size()) + " problem(s)") << std::endl;
     return problems.empty();
 }
@@ -291,6 +452,31 @@ Mode GetMode()
 std::string Describe()
 {
     return state().description;
+}
+
+std::vector<std::string> LoadedBlobPaths()
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    std::vector<std::string> paths;
+    paths.reserve(s.loadedBlobs.size());
+    for (const auto &b : s.loadedBlobs)
+        paths.push_back(b.path.string());
+    return paths;
+}
+
+void ResetForTesting()
+{
+    State &s = state();
+    std::lock_guard<std::mutex> guard(s.lock);
+    s.mode = Mode::None;
+    s.description = "no assets located";
+    s.blobFiles.clear();
+    s.overlay.clear();
+    s.mods.clear();
+    s.root.clear();
+    s.blobPath.clear();
+    s.loadedBlobs.clear();
 }
 
 void SetSessionOverlay(std::map<std::string, std::vector<std::uint8_t>> files)

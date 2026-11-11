@@ -40,6 +40,12 @@ inline bool IsBlob()
 }
 std::string Describe();
 
+// All loaded blob archives in the order they were mounted (empty in Directory mode)
+std::vector<std::string> LoadedBlobPaths();
+
+// For unit tests: unloads all assets and resets state so Init() can run again.
+void ResetForTesting();
+
 // The integrity certificate of a blob: an entry of the blob itself, written by tools/pack_assets.py, one
 // "<path>  <sha256>" line per packed file
 inline constexpr const char *kCertificateName = "certificate.sha256";

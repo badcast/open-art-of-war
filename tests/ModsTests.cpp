@@ -2,6 +2,7 @@
 // merge, the order of the layers and the paths a mod may not reach
 #include "core/AssetStore.hpp"
 #include "core/Mods.hpp"
+#include "core/Sha256.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -142,6 +143,72 @@ manifest:
     Mods::Deactivate();
     CHECK(Mods::Active().empty() && !Assets::HasModLayers());
     CHECK(!Assets::Exists("assets/sprites/sprite_alpha_meta.yaml"));
+
+    // Multi-blob mounting and integrity check
+    {
+        std::error_code dirEc;
+        const fs::path blobDir = root / "blob_test";
+        fs::create_directories(blobDir, dirEc);
+
+        // Blob 1: base files + certificate
+        const std::string text1 = "version: 1\n";
+        const std::string textCommon = "from: base\n";
+        const std::string hash1 = Sha256::Hex(text1.data(), text1.size());
+        const std::string hashCommonBase = Sha256::Hex(textCommon.data(), textCommon.size());
+
+        std::string cert1 = "# Certificate 1\n";
+        cert1 += "assets/data/v1.yaml  " + hash1 + "\n";
+        cert1 += "assets/data/common.yaml  " + hashCommonBase + "\n";
+
+        WriteTar(blobDir / "00_base.blob", {
+            {"certificate.sha256", cert1},
+            {"data/v1.yaml", text1},
+            {"data/common.yaml", textCommon}
+        });
+
+        // Blob 2: overrides common.yaml, adds v2.yaml + certificate
+        const std::string text2 = "version: 2\n";
+        const std::string textCommonPatch = "from: patch\n";
+        const std::string hash2 = Sha256::Hex(text2.data(), text2.size());
+        const std::string hashCommonPatch = Sha256::Hex(textCommonPatch.data(), textCommonPatch.size());
+
+        std::string cert2 = "# Certificate 2\n";
+        cert2 += "assets/data/v2.yaml  " + hash2 + "\n";
+        cert2 += "assets/data/common.yaml  " + hashCommonPatch + "\n";
+
+        WriteTar(blobDir / "01_patch.blob", {
+            {"certificate.sha256", cert2},
+            {"data/v2.yaml", text2},
+            {"data/common.yaml", textCommonPatch}
+        });
+
+        const fs::path oldCwd = fs::current_path(dirEc);
+        fs::current_path(blobDir, dirEc);
+        Assets::ResetForTesting();
+
+        CHECK(Assets::Init());
+        CHECK(Assets::IsBlob());
+        CHECK(Assets::LoadedBlobPaths().size() == 2);
+
+        // Test layered reading
+        std::string content;
+        CHECK(Assets::ReadText("assets/data/v1.yaml", content) && content == text1);
+        CHECK(Assets::ReadText("assets/data/v2.yaml", content) && content == text2);
+        CHECK(Assets::ReadText("assets/data/common.yaml", content) && content == textCommonPatch); // Patch won!
+
+        // Test List across blobs
+        const std::vector<std::string> blobFiles = Assets::List("assets/data", ".yaml");
+        CHECK(blobFiles.size() == 3);
+
+        // Test certificate verification
+        std::vector<std::string> problems;
+        std::string certPath;
+        CHECK(Assets::VerifyCertificate(problems, certPath) && problems.empty());
+
+        // Restore cwd and reset
+        fs::current_path(oldCwd, dirEc);
+        Assets::ResetForTesting();
+    }
 
     std::error_code ec;
     fs::remove_all(root, ec);
