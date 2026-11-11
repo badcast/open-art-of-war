@@ -19,7 +19,7 @@ namespace OpenArtOfWar
 /**
  * @brief Background music player: Ogg Vorbis tracks streamed through an SDL3 audio stream.
  *
- * Music is configured by <assetRoot>/data/audio_tracks.json.
+ * Music is configured by <assetRoot>/data/audio_tracks.yaml.
  */
 class SoundEngine
 {
@@ -124,6 +124,8 @@ private:
     std::vector<std::size_t> m_shuffledTracks;
     std::size_t m_nextGameTrack {0};
     std::size_t m_lastGameTrack {static_cast<std::size_t>(-1)};
+    std::vector<Track> m_menuTracks;
+    std::size_t m_currentMenuTrack {0};
     Track m_menuTrack;
     bool m_hasMenuTrack {false};
     bool m_trackFinished {false};

@@ -1,5 +1,6 @@
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
+#include "core/JsonFile.hpp"
 #include "ui/MapFilter.hpp"
 #include "ui/MatchOptions.hpp"
 #include "audio/SoundRequests.hpp"
@@ -502,25 +503,35 @@ void MenuController::RenderMenuHelp(Renderer &renderer, BitmapFontRenderer &font
         renderer, fontRenderer, back, _("BACK"), ui::ButtonStyle::Secondary, back.Contains(m_mouseX, m_mouseY));
 }
 
-// Who made the music (assets/data/audio_tracks.json): every author once, with the link or licence given there
+// Who made the music (assets/data/audio_tracks.yaml): every author once, with the link or licence given there
 std::vector<std::string> MusicCredits()
 {
     static std::vector<std::string> credits = [] {
         std::vector<std::string> out;
         std::string text;
-        if (!Assets::ReadText(LoaderResources::Tracklist(), text))
+        std::string tracklistPath = LoaderResources::Tracklist();
+        if (!Assets::ReadText(tracklistPath, text))
+        {
+            if (tracklistPath.find(".yaml") != std::string::npos)
+            {
+                std::string alt = tracklistPath;
+                alt.replace(alt.find(".yaml"), 5, ".json");
+                Assets::ReadText(alt, text);
+            }
+        }
+        if (text.empty())
             return out;
-        const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
+        const nlohmann::json doc = JsonFile::ReadFromString(text);
         if (!doc.is_object())
             return out;
         for (const char *list : {"mainmenu", "tracks"})
         {
-            if (!doc.contains(list) || !doc[list].is_array())
+            if (!doc.contains(list))
                 continue;
-            for (const auto &track : doc[list])
-            {
+            const auto &section = doc[list];
+            auto processItem = [&](const nlohmann::json &track) {
                 if (!track.is_object() || !track.contains("author"))
-                    continue;
+                    return;
                 std::string line = "  " + track.value("author", std::string());
                 if (track.contains("link"))
                     line += " - " + track.value("link", std::string());
@@ -528,6 +539,15 @@ std::vector<std::string> MusicCredits()
                     line += " (" + track.value("license", std::string()) + ")";
                 if (std::find(out.begin(), out.end(), line) == out.end())
                     out.push_back(line);
+            };
+            if (section.is_array())
+            {
+                for (const auto &track : section)
+                    processItem(track);
+            }
+            else if (section.is_object())
+            {
+                processItem(section);
             }
         }
         return out;

@@ -1,9 +1,11 @@
 #include "audio/SoundEngine.hpp"
-#include "core/DebugEnv.hpp"
 #include "core/AssetStore.hpp"
+#include "core/DebugEnv.hpp"
+#include "core/JsonFile.hpp"
 #include "core/LoaderResources.hpp"
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <numeric>
 #include <random>
@@ -33,55 +35,126 @@ bool SoundEngine::Init()
         return true;
 
     std::string tracklistText;
-    if (Assets::ReadText(LoaderResources::Tracklist(), tracklistText))
+    std::string tracklistPath = LoaderResources::Tracklist();
+    if (!Assets::ReadText(tracklistPath, tracklistText))
     {
-        const nlohmann::json tracklist = nlohmann::json::parse(tracklistText, nullptr, false);
+        if (tracklistPath.find(".yaml") != std::string::npos)
+        {
+            std::string alt = tracklistPath;
+            alt.replace(alt.find(".yaml"), 5, ".json");
+            Assets::ReadText(alt, tracklistText);
+        }
+        else if (tracklistPath.find(".json") != std::string::npos)
+        {
+            std::string alt = tracklistPath;
+            alt.replace(alt.find(".json"), 5, ".yaml");
+            Assets::ReadText(alt, tracklistText);
+        }
+    }
+
+    if (!tracklistText.empty())
+    {
+        const nlohmann::json tracklist = JsonFile::ReadFromString(tracklistText);
         if (tracklist.is_object())
         {
-            auto parseTrack = [&](const nlohmann::json &item, Track &track) {
-                if (!item.is_object() || !item.contains("filename") || !item["filename"].is_string())
-                    return false;
-                const std::string filename = item["filename"].get<std::string>();
+            auto parseTrack = [&](const nlohmann::json &item, const std::string &overrideFilename, Track &track) -> bool {
+                std::string filename = overrideFilename;
+                if (filename.empty() && item.is_object() && item.contains("filename") && item["filename"].is_string())
+                    filename = item["filename"].get<std::string>();
                 if (filename.empty())
                     return false;
                 track.path = LoaderResources::AudioFile(filename);
-                track.name = item.contains("name") && item["name"].is_string()
-                                 ? item["name"].get<std::string>()
-                                 : filename.substr(0, filename.rfind('.'));
-                if ((item.contains("effective_min") && !item["effective_min"].is_number())
-                    || (item.contains("effective_max") && !item["effective_max"].is_number()))
+                if (!overrideFilename.empty())
                 {
-                    std::cerr << "[SoundEngine] Invalid time range for " << track.path << std::endl;
-                    return false;
+                    std::string stem = std::filesystem::path(filename).stem().string();
+                    if (item.is_object() && item.contains("name") && item["name"].is_string())
+                    {
+                        std::string base = item["name"].get<std::string>();
+                        track.name = (stem == "mainmenu" || stem.empty()) ? base : base + " (" + stem + ")";
+                    }
+                    else
+                    {
+                        track.name = stem;
+                    }
                 }
-                track.effectiveMin = item.value("effective_min", 0.0);
-                track.effectiveMax = item.value("effective_max", -1.0);
-                if (!std::isfinite(track.effectiveMin) || !std::isfinite(track.effectiveMax)
-                    || track.effectiveMin < 0.0)
+                else
                 {
-                    std::cerr << "[SoundEngine] Invalid time range for " << track.path << std::endl;
-                    return false;
+                    track.name = item.is_object() && item.contains("name") && item["name"].is_string()
+                                     ? item["name"].get<std::string>()
+                                     : filename.substr(0, filename.rfind('.'));
+                }
+                if (item.is_object())
+                {
+                    if ((item.contains("effective_min") && !item["effective_min"].is_number())
+                        || (item.contains("effective_max") && !item["effective_max"].is_number()))
+                    {
+                        std::cerr << "[SoundEngine] Invalid time range for " << track.path << std::endl;
+                        return false;
+                    }
+                    track.effectiveMin = item.value("effective_min", 0.0);
+                    track.effectiveMax = item.value("effective_max", -1.0);
+                    if (!std::isfinite(track.effectiveMin) || !std::isfinite(track.effectiveMax)
+                        || track.effectiveMin < 0.0)
+                    {
+                        std::cerr << "[SoundEngine] Invalid time range for " << track.path << std::endl;
+                        return false;
+                    }
                 }
                 return true;
             };
 
-            if (tracklist.contains("mainmenu") && tracklist["mainmenu"].is_array())
-            {
-                for (const auto &item : tracklist["mainmenu"])
+            auto parseMenuItem = [&](const nlohmann::json &item) {
+                if (item.is_object() && item.contains("multifiles") && item["multifiles"].is_array())
                 {
-                    if (parseTrack(item, m_menuTrack))
+                    for (const auto &mf : item["multifiles"])
                     {
-                        m_hasMenuTrack = true;
-                        break;
+                        if (mf.is_string())
+                        {
+                            Track t;
+                            if (parseTrack(item, mf.get<std::string>(), t))
+                                m_menuTracks.push_back(std::move(t));
+                        }
+                        else if (mf.is_object())
+                        {
+                            Track t;
+                            if (parseTrack(mf, "", t))
+                                m_menuTracks.push_back(std::move(t));
+                        }
                     }
                 }
+                else
+                {
+                    Track t;
+                    if (parseTrack(item, "", t))
+                        m_menuTracks.push_back(std::move(t));
+                }
+            };
+
+            if (tracklist.contains("mainmenu"))
+            {
+                const auto &mm = tracklist["mainmenu"];
+                if (mm.is_array())
+                {
+                    for (const auto &item : mm)
+                        parseMenuItem(item);
+                }
+                else if (mm.is_object())
+                {
+                    parseMenuItem(mm);
+                }
             }
+            if (!m_menuTracks.empty())
+            {
+                m_hasMenuTrack = true;
+                m_menuTrack = m_menuTracks.front();
+            }
+
             if (tracklist.contains("tracks") && tracklist["tracks"].is_array())
             {
                 for (const auto &item : tracklist["tracks"])
                 {
                     Track track;
-                    if (parseTrack(item, track))
+                    if (parseTrack(item, "", track))
                         m_gameTracks.push_back(std::move(track));
                 }
             }
@@ -381,14 +454,27 @@ bool SoundEngine::LoadTrack(const Track &track, bool loop)
 
 void SoundEngine::PlayMenuMusic()
 {
-    if (!m_initialized || !m_hasMenuTrack)
+    if (!m_initialized || !m_hasMenuTrack || m_menuTracks.empty())
         return;
     SDL_LockMutex(m_lock);
     const bool alreadyPlaying = m_decoder != nullptr;
     SDL_UnlockMutex(m_lock);
     if (m_musicContext == 1 && alreadyPlaying)
         return;
-    if (LoadTrack(m_menuTrack, true))
+
+    if (m_musicContext == 1 && m_menuTracks.size() > 1)
+    {
+        m_currentMenuTrack = (m_currentMenuTrack + 1) % m_menuTracks.size();
+    }
+    else if (m_musicContext != 1)
+    {
+        m_currentMenuTrack = m_currentMenuTrack % m_menuTracks.size();
+    }
+
+    const Track &track = m_menuTracks[m_currentMenuTrack];
+    m_menuTrack = track;
+    const bool loop = (m_menuTracks.size() == 1);
+    if (LoadTrack(track, loop))
     {
         m_musicContext = 1;
         m_currentTrack = 0;
@@ -438,8 +524,9 @@ void SoundEngine::PlayPlayerTrack(int index)
 {
     const bool menuTrack = index == 0 && m_hasMenuTrack;
     const int gameIndex = m_hasMenuTrack ? index - 1 : index;
-    const Track &track = menuTrack ? m_menuTrack : m_gameTracks[gameIndex];
-    if (LoadTrack(track, menuTrack))
+    const Track &track = menuTrack ? (m_menuTracks.empty() ? m_menuTrack : m_menuTracks[m_currentMenuTrack])
+                                   : m_gameTracks[gameIndex];
+    if (LoadTrack(track, menuTrack && m_menuTracks.size() == 1))
     {
         m_musicContext = menuTrack ? 1 : 2;
         m_currentTrack = menuTrack ? 0 : gameIndex + 1;
@@ -454,6 +541,19 @@ void SoundEngine::PlayPlayerTrack(int index)
 // In the game the playlist is the game tracks only; the main menu theme belongs to the menu
 void SoundEngine::NextTrack()
 {
+    if (m_lastArea == 1 && m_menuTracks.size() > 1)
+    {
+        m_currentMenuTrack = (m_currentMenuTrack + 1) % m_menuTracks.size();
+        const Track &track = m_menuTracks[m_currentMenuTrack];
+        m_menuTrack = track;
+        if (LoadTrack(track, false))
+        {
+            m_musicContext = 1;
+            m_currentTrack = 0;
+            m_manualPlayback = true;
+        }
+        return;
+    }
     const int count = GetTrackCount();
     const int first = (m_lastArea == 2 && m_hasMenuTrack && !m_gameTracks.empty()) ? 1 : 0;
     const int n = count - first;
@@ -466,6 +566,19 @@ void SoundEngine::NextTrack()
 
 void SoundEngine::PrevTrack()
 {
+    if (m_lastArea == 1 && m_menuTracks.size() > 1)
+    {
+        m_currentMenuTrack = (m_currentMenuTrack + m_menuTracks.size() - 1) % m_menuTracks.size();
+        const Track &track = m_menuTracks[m_currentMenuTrack];
+        m_menuTrack = track;
+        if (LoadTrack(track, false))
+        {
+            m_musicContext = 1;
+            m_currentTrack = 0;
+            m_manualPlayback = true;
+        }
+        return;
+    }
     const int count = GetTrackCount();
     const int first = (m_lastArea == 2 && m_hasMenuTrack && !m_gameTracks.empty()) ? 1 : 0;
     const int n = count - first;
@@ -526,7 +639,11 @@ std::string SoundEngine::GetCurrentTrackName() const
     if (m_currentTrack < 0)
         return {};
     if (m_currentTrack == 0 && m_hasMenuTrack)
+    {
+        if (m_currentMenuTrack < m_menuTracks.size())
+            return m_menuTracks[m_currentMenuTrack].name;
         return m_menuTrack.name;
+    }
     const std::size_t i = static_cast<std::size_t>(m_currentTrack - 1);
     return i < m_gameTracks.size() ? m_gameTracks[i].name : std::string();
 }

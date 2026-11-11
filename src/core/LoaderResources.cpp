@@ -264,7 +264,10 @@ std::string LoaderResources::AudioFile(const std::string &name)
 
 std::string LoaderResources::Tracklist()
 {
-    return join(Str("audio", "tracklist"));
+    std::string path = Str("audio", "tracklist");
+    if (path.empty())
+        path = "data/audio_tracks.yaml";
+    return join(path);
 }
 
 std::string LoaderResources::Ambient(bool night)
