@@ -19,6 +19,9 @@ class BitmapFontRenderer;
 class ModsMenu
 {
 public:
+    ModsMenu();
+    ~ModsMenu();
+
     struct Result
     {
         bool back {false};
@@ -49,6 +52,7 @@ private:
     void Toggle(int index);
     void Move(int index, int by);
     std::vector<std::string> EnabledIds() const;
+    void ClearPreview();
 
     std::vector<Entry> m_entries;       // enabled ones first, in load order
     std::vector<std::string> m_applied; // what is in place
@@ -58,6 +62,12 @@ private:
     int m_selected {0};
     int m_top {0};
     int m_mouseX {0}, m_mouseY {0};
+
+    SDL_Texture *m_previewTexture {nullptr};
+    int m_previewW {0};
+    int m_previewH {0};
+    int m_previewSelected {-1};
+    std::string m_previewModId;
 };
 
 } // namespace OpenArtOfWar

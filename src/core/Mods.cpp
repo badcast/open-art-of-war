@@ -89,6 +89,20 @@ ModInfo Describe(const std::string &text, const fs::path &path, bool archive, bo
     m.author = Text(j, "author");
     m.description = Text(j, "description");
     m.gameVersion = Text(j, "game_version");
+    m.preview = Text(j, "preview");
+    if (m.preview.empty())
+    {
+        std::error_code ec;
+        if (!archive)
+        {
+            if (fs::is_regular_file(path / "preview.png", ec))
+                m.preview = "preview.png";
+        }
+        else
+        {
+            m.preview = "preview.png";
+        }
+    }
     if (j.contains("manifest"))
     {
         if (j["manifest"].is_object())
@@ -184,6 +198,58 @@ std::vector<std::string> SearchDirs()
     if (user.empty())
         user = (fs::path(Assets::UserDataDir()) / "mods").string();
     return {app, user};
+}
+
+bool LoadPreview(const ModInfo &mod, std::vector<std::uint8_t> &out)
+{
+    out.clear();
+    std::string filename = mod.preview.empty() ? "preview.png" : mod.preview;
+    while (filename.rfind("./", 0) == 0)
+        filename = filename.substr(2);
+    while (!filename.empty() && filename.front() == '/')
+        filename = filename.substr(1);
+    if (filename.empty())
+        return false;
+
+    if (!mod.archive)
+    {
+        std::error_code ec;
+        fs::path p = fs::path(mod.path) / filename;
+        if (!fs::is_regular_file(p, ec))
+            return false;
+        std::ifstream in(p, std::ios::binary);
+        if (!in)
+            return false;
+        in.seekg(0, std::ios::end);
+        auto sz = in.tellg();
+        if (sz <= 0)
+            return false;
+        in.seekg(0, std::ios::beg);
+        out.resize(static_cast<std::size_t>(sz));
+        if (!in.read(reinterpret_cast<char *>(out.data()), sz))
+        {
+            out.clear();
+            return false;
+        }
+        return true;
+    }
+
+    std::map<std::string, std::vector<std::uint8_t>> files;
+    if (Assets::ReadArchive(mod.path, files, filename))
+    {
+        auto it = files.find(filename);
+        if (it != files.end() && !it->second.empty())
+        {
+            out = std::move(it->second);
+            return true;
+        }
+        if (!files.empty() && !files.begin()->second.empty())
+        {
+            out = std::move(files.begin()->second);
+            return true;
+        }
+    }
+    return false;
 }
 
 std::vector<ModInfo> Scan()

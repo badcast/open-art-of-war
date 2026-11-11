@@ -81,11 +81,13 @@ manifest:
 )");
     Write(user / "alpha" / "data" / "x.yaml", "from: alpha\n");
     Write(user / "alpha" / "sprites" / "sprite_alpha_meta.yaml", "frames: {}\n");
+    Write(user / "alpha" / "preview.png", "PNG_ALPHA_PREVIEW");
     // beta: 1.0 next to the game and in the user directory (the user's counts), both bring data/x.yaml
     WriteTar(app / "beta.mod", {{"mod.yaml", "id: beta\nversion: \"1.0\"\n"}, {"data/x.yaml", "from: beta app\n"}});
     WriteTar(user / "beta.mod",
         {{"mod.yaml", "id: beta\nversion: \"1.0\"\n"},
             {"data/x.yaml", "from: beta user\n"},
+            {"preview.png", "PNG_BETA_PREVIEW"},
             {"assets/data/y.yaml", "y: 1\n"},
             {"../evil.yaml", "no\n"}});
     // gamma: 2.0 next to the game wins over 1.5 of the user
@@ -106,6 +108,11 @@ manifest:
     CHECK(find("beta") && find("beta")->fromUser && find("beta")->archive);
     CHECK(find("gamma") && find("gamma")->version == "2.0" && !find("gamma")->fromUser);
     CHECK(find("broken") && !find("broken")->error.empty());
+
+    std::vector<std::uint8_t> pv;
+    CHECK(Mods::LoadPreview(*find("alpha"), pv) && std::string(pv.begin(), pv.end()) == "PNG_ALPHA_PREVIEW");
+    CHECK(Mods::LoadPreview(*find("beta"), pv) && std::string(pv.begin(), pv.end()) == "PNG_BETA_PREVIEW");
+    CHECK(!Mods::LoadPreview(*find("gamma"), pv));
 
     CHECK(Mods::CompareVersions("1.10", "1.9") > 0);
     CHECK(Mods::CompareVersions("1.0", "1.0") == 0);

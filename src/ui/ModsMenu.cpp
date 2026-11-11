@@ -5,6 +5,8 @@
 #include "graphics/Renderer.hpp"
 #include "input/InputManager.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 
 namespace OpenArtOfWar
@@ -15,8 +17,29 @@ namespace
 namespace col = ui::color;
 }
 
+ModsMenu::ModsMenu() = default;
+
+ModsMenu::~ModsMenu()
+{
+    ClearPreview();
+}
+
+void ModsMenu::ClearPreview()
+{
+    if (m_previewTexture)
+    {
+        SDL_DestroyTexture(m_previewTexture);
+        m_previewTexture = nullptr;
+    }
+    m_previewW = 0;
+    m_previewH = 0;
+    m_previewSelected = -1;
+    m_previewModId.clear();
+}
+
 void ModsMenu::Refresh(const std::vector<std::string> &enabled)
 {
+    ClearPreview();
     m_entries.clear();
     m_applied = enabled;
     m_dirs = Mods::SearchDirs();
@@ -181,6 +204,37 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
     const int count = static_cast<int>(m_entries.size());
     ui::DrawPanel(renderer, l.list, col::PanelSunken);
     ui::DrawPanel(renderer, l.details, col::PanelSunken);
+
+    // Update / load preview texture for selected mod
+    const std::string curId = (m_selected >= 0 && m_selected < count) ? m_entries[m_selected].info.id : "";
+    if (m_previewSelected != m_selected || m_previewModId != curId)
+    {
+        ClearPreview();
+        m_previewSelected = m_selected;
+        m_previewModId = curId;
+        if (!curId.empty())
+        {
+            std::vector<std::uint8_t> bytes;
+            if (Mods::LoadPreview(m_entries[m_selected].info, bytes) && !bytes.empty())
+            {
+                SDL_Surface *surf = SDL_LoadPNG_IO(SDL_IOFromConstMem(bytes.data(), bytes.size()), true);
+                if (!surf)
+                    surf = SDL_LoadBMP_IO(SDL_IOFromConstMem(bytes.data(), bytes.size()), true);
+                if (surf)
+                {
+                    m_previewTexture = SDL_CreateTextureFromSurface(renderer.GetSdlRenderer(), surf);
+                    if (m_previewTexture)
+                    {
+                        SDL_SetTextureScaleMode(m_previewTexture, SDL_SCALEMODE_LINEAR);
+                        m_previewW = surf->w;
+                        m_previewH = surf->h;
+                    }
+                    SDL_DestroySurface(surf);
+                }
+            }
+        }
+    }
+
     renderer.SetClipRect({l.list.x, l.list.y, l.list.w, l.list.h});
     if (count == 0)
     {
@@ -270,12 +324,17 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
         line(m.path, col::TextMuted, ui::FONT_SMALL);
         if (!m.error.empty())
             line(m.error, col::Danger, ui::FONT_SMALL_BOLD);
+        const bool hasConflicts = !m_report.problems.empty() || !m_report.conflicts.empty();
+        const int conflictsReserve = hasConflicts ? 110 : 0;
+        const int previewReserve = m_previewTexture ? 170 : 0;
+
         // The description, wrapped by words
         if (!m.description.empty())
         {
             y += 6;
+            const int maxDescY = l.details.Bottom() - conflictsReserve - previewReserve - 20;
             std::string rest = m.description, row;
-            while (!rest.empty() && y < l.details.Bottom() - 120)
+            while (!rest.empty() && y < maxDescY)
             {
                 const auto sp = rest.find(' ');
                 const std::string word = rest.substr(0, sp);
@@ -289,8 +348,32 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
                 else
                     row = next;
             }
-            if (!row.empty())
+            if (!row.empty() && y < maxDescY + font.GetTextHeight(ui::FONT_SMALL) + 6)
                 line(row, col::TextDim, ui::FONT_SMALL);
+        }
+
+        // Preview image
+        if (m_previewTexture && m_previewW > 0 && m_previewH > 0)
+        {
+            const int availH = (l.details.Bottom() - conflictsReserve) - y - 16;
+            if (availH >= 50)
+            {
+                const int boxH = std::min(availH, 170);
+                const int boxW = std::min(l.details.w - 32, 280);
+                const float scale = std::min(
+                    static_cast<float>(boxW) / static_cast<float>(m_previewW),
+                    static_cast<float>(boxH) / static_cast<float>(m_previewH));
+                const int drawW = std::max(1, static_cast<int>(m_previewW * scale));
+                const int drawH = std::max(1, static_cast<int>(m_previewH * scale));
+                const int drawX = l.details.x + (l.details.w - drawW) / 2;
+                const int drawY = y + 8 + (boxH - drawH) / 2;
+
+                const ui::UiRect frameRect {drawX - 2, drawY - 2, drawW + 4, drawH + 4};
+                renderer.FillRectScreen(frameRect.x, frameRect.y, frameRect.w, frameRect.h, col::PanelSunken);
+                renderer.DrawRectScreen(frameRect.x, frameRect.y, frameRect.w, frameRect.h, col::Border);
+                renderer.DrawTextureScreen(m_previewTexture, drawX, drawY, drawW, drawH);
+                y = drawY + drawH + 8;
+            }
         }
     }
     // What the last Apply found: problems and files several mods bring (the lower one in the list wins)

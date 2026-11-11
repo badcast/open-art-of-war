@@ -33,8 +33,12 @@ struct ModInfo
     bool archive {false};
     bool fromUser {false}; // found in the user directory (else next to the game)
     std::string error;     // why it cannot be used (a broken mod.yaml, no id...); empty when fine
+    std::string preview;   // relative path to preview image (e.g. "preview.png")
     nlohmann::json manifest = nlohmann::json::object(); // its "manifest:" section
 };
+
+// Reads the raw bytes of a mod's preview image (from folder or .mod archive)
+bool LoadPreview(const ModInfo &mod, std::vector<std::uint8_t> &out);
 
 // The folders searched (tests use their own); empty strings: the defaults
 void SetSearchDirs(const std::string &appMods, const std::string &userMods);
