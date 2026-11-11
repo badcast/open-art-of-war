@@ -169,6 +169,10 @@ void EntityManager::IssueMoveOrder(
         }
     }
 
+    // A group: one flow field toward the order's point gives everybody the road, each unit only searches the last
+    // few tiles to its own slot
+    const bool flow = validUnits.size() >= 2 && pathfinder.BuildFlowField(targetTileX, targetTileY);
+
     std::vector<std::pair<int, int>> assignedEndTiles;
     for (std::size_t i = 0; i < validUnits.size(); ++i)
     {
@@ -212,7 +216,9 @@ void EntityManager::IssueMoveOrder(
         u->burstTimer = 0.0f;
 
         bool isPartial = false;
-        if (pathfinder.FindPath(u->tileX, u->tileY, destX, destY, u->path, u->id, &isPartial) && !u->path.empty())
+        const bool found = flow ? pathfinder.FlowPath(u->tileX, u->tileY, destX, destY, u->path, u->id, &isPartial)
+                                : pathfinder.FindPath(u->tileX, u->tileY, destX, destY, u->path, u->id, &isPartial);
+        if (found && !u->path.empty())
         {
             if (isPartial && !u->path.empty())
             {

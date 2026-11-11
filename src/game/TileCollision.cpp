@@ -1,5 +1,6 @@
 #include "game/TileCollision.hpp"
 #include "core/AssetStore.hpp"
+#include "core/JsonFile.hpp"
 #include "core/LoaderResources.hpp"
 #include <nlohmann/json.hpp>
 #include <array>
@@ -33,16 +34,33 @@ Table FallbackTable()
 Table LoadTable()
 {
     std::string text;
-    if (!Assets::ReadText(LoaderResources::tileCollision(), text))
+    std::string path = LoaderResources::tileCollision();
+    if (!Assets::ReadText(path, text))
     {
-        std::cerr << "[TileCollision] assets/data/maps_tile_collision.json not found, using the water-tile rule"
+        if (path.find(".yaml") != std::string::npos)
+        {
+            std::string alt = path;
+            alt.replace(alt.find(".yaml"), 5, ".json");
+            Assets::ReadText(alt, text);
+        }
+        else if (path.find(".json") != std::string::npos)
+        {
+            std::string alt = path;
+            alt.replace(alt.find(".json"), 5, ".yaml");
+            Assets::ReadText(alt, text);
+        }
+    }
+
+    if (text.empty())
+    {
+        std::cerr << "[TileCollision] assets/data/maps_tile_collision.yaml not found, using the water-tile rule"
                   << std::endl;
         return FallbackTable();
     }
     Table table {};
     try
     {
-        const nlohmann::json doc = nlohmann::json::parse(text);
+        const nlohmann::json doc = JsonFile::ReadFromString(text);
         const auto &tilesets = doc.at("tilesets");
         for (int tileset = 0; tileset < kTilesets && tileset < static_cast<int>(tilesets.size()); ++tileset)
         {
@@ -56,9 +74,9 @@ Table LoadTable()
             }
         }
     }
-    catch (const nlohmann::json::exception &error)
+    catch (const std::exception &error)
     {
-        std::cerr << "[TileCollision] bad maps_tile_collision.json (" << error.what() << "), using the water-tile rule"
+        std::cerr << "[TileCollision] bad maps_tile_collision.yaml (" << error.what() << "), using the water-tile rule"
                   << std::endl;
         return FallbackTable();
     }

@@ -218,7 +218,7 @@ void AIController::UpdateWaveRoster(EntityManager &entities)
             if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f)
                 continue;
             if (m_waveRoster.count(u->id) || m_garrison.count(u->id) || m_squadController.IsSquadMember(u->id)
-                || u->id == m_scoutId || m_repairing.count(u->id))
+                || u->id == m_scoutId || m_repairing.count(u->id) || m_offensive.count(u->id))
                 continue;
             m_waveRoster.insert(u->id);
         }
@@ -256,8 +256,8 @@ void AIController::UpdateUnitStances(EntityManager &entities)
             wanted = UnitStance::HoldGround; // looks / pulls back, does not chase
         else if (artillery)
             wanted = UnitStance::HoldGround;
-        else if (m_squadController.IsSquadMember(id))
-            wanted = UnitStance::Pursue;
+        else if (m_squadController.IsSquadMember(id) || m_offensive.count(id))
+            wanted = UnitStance::Pursue; // on the attack: no way back to a home spot
         if (u->stance != wanted)
         {
             u->stance = wanted;
@@ -374,7 +374,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
     {
         const Unit *u = e.AsUnit();
         // (a guard stays at its post, a defender where the attack on the base is)
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_defenders.count(u->id))
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_defenders.count(u->id) || m_offensive.count(u->id))
             continue;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
         {

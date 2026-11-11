@@ -97,7 +97,6 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     b("sync_to_slowest", t.syncToSlowest);
     b("armor_front", t.armorFront);
     b("melee_ranged_pairs", t.meleeRangedPairs);
-    f("retreat_loss_ratio", t.retreatLossRatio);
     i("wave_base_size", t.waveBaseSize);
     i("wave_growth", t.waveGrowth);
     i("wave_max_size", t.waveMaxSize);
@@ -115,7 +114,6 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     i("credits_per_extra_group", t.creditsPerExtraGroup);
     i("late_rifleman_percent", t.lateRiflemanPercent);
     b("build_defenses", t.buildDefenses);
-    b("defense_recall_squads", t.defenseRecallSquads);
     f("defense_first_wave_seconds", t.defenseFirstWaveSeconds);
     f("defense_wave_gap_seconds", t.defenseWaveGapSeconds);
     i("defense_squad_percent", t.defenseSquadPercent);

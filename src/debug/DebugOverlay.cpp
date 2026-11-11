@@ -106,12 +106,11 @@ void DebugOverlay::Render(
 
             const AITacticsConfig &t = ai.GetTactics();
             ImGui::Text(
-                "In effect: %s | leash %.1f tiles | chokepoint gather: %s | slowest leads: %s | retreat: %s",
+                "In effect: %s | leash %.1f tiles | chokepoint gather: %s | slowest leads: %s",
                 DifficultyToString(ai.GetEffectiveDifficulty()).c_str(),
                 t.leashTiles,
                 t.waitAtChokepoints ? "yes" : "no",
-                t.syncToSlowest ? "yes" : "no",
-                t.retreatLossRatio > 0.0f ? "yes" : "no");
+                t.syncToSlowest ? "yes" : "no");
             ImGui::Text(
                 "Credits: %d | Waves sent: %d | Next wave: %d units, ready %d, cooldown %.0fs",
                 ai.GetEnemyCredits(),

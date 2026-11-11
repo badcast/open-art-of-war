@@ -12,6 +12,16 @@ namespace OpenArtOfWar
 
 class TileMap;
 class EntityManager;
+
+// Receives the decision state of the computer players for the world checksum and the desync dump
+// (Simulation::VisitState): a record per object, then its values. Floats go in with their exact bits.
+struct AIStateSink
+{
+    virtual ~AIStateSink() = default;
+    virtual void Record(const char *name) = 0;
+    virtual void I32(const char *name, std::int32_t value) = 0;
+    virtual void F32(const char *name, float value) = 0;
+};
 class Renderer;
 class BitmapFontRenderer;
 class Camera;
@@ -29,7 +39,6 @@ struct AITacticsConfig
     bool syncToSlowest {false};       // march pace set by the slowest unit (it becomes the leader)
     bool armorFront {false};          // tanks lead the formation
     bool meleeRangedPairs {true};     // close-combat units in front, ranged support behind
-    float retreatLossRatio {0.0f};    // >0: survivors fall back when this share of the wave died for nothing
     int waveBaseSize {12};            // units in wave 1 (never fewer than ten: the AI does not send a handful)
     int waveGrowth {2};               // extra units per following wave
     int waveMaxSize {18};
@@ -47,7 +56,6 @@ struct AITacticsConfig
     int creditsPerExtraGroup {700};       // AI treasury needed for every extra attack group
     int lateRiflemanPercent {10};         // share (%) of plain riflemen in a wave once the tanks are there (tier 3+)
     bool buildDefenses {true};            // skirmish: wall in the base, towers / bunkers toward the enemy
-    bool defenseRecallSquads {true};      // groups still on the march turn back when the base lacks defenders
     // Defense missions: the enemy's starting squads arrive one after another instead of all at once
     float defenseFirstWaveSeconds {40.0f}; // time the player has to prepare before the first squad
     float defenseWaveGapSeconds {20.0f};   // pause between two squads
@@ -103,8 +111,7 @@ enum class AISquadState
     Deploying,     // waiting past the passage until the whole group is out
     Engaged,       // fighting; cohesion paused until the area is quiet again
     FormingUp,     // in front of the enemy defenses: lining up (armour ahead, artillery behind) to go in together
-    Assault,       // objective reached: free attack on player structures
-    Retreating     // Hard: wave lost without effect, survivors fall back to staging
+    Assault        // objective reached: free attack on player structures (a wave never turns back)
 };
 
 const char *SquadStateName(AISquadState state);
@@ -135,7 +142,6 @@ struct AISquad
     std::unordered_map<int, float> stragglerTimer; // time without progress
     std::unordered_map<int, float> holdBest;       // behind the group: best distance to the centre so far
     std::unordered_map<int, float> holdTimer;      // behind the group: time without getting closer
-    std::unordered_map<int, int> playerHpAtLaunch; // for the retreat check
 
     // Cached for debug drawing
     float centroidX {0.0f};
@@ -217,6 +223,8 @@ public:
     {
         return m_squads;
     }
+    // The squads as they decide: state, leader, objective and members (for the checksum)
+    void VisitState(AIStateSink &sink) const;
 
     // Units dropped from groups (stuck stragglers, retreat survivors) since the last call
     std::vector<int> TakeReleasedUnits();
@@ -281,7 +289,6 @@ private:
     void SetState(AISquad &sq, AISquadState state);
     void RebuildRoute(AISquad &sq, EntityManager &entities, Pathfinder &pathfinder);
     int PickLeader(const AISquad &sq, EntityManager &entities, const AITacticsConfig &tactics) const;
-    int DamageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const;
 
     std::vector<AISquad> m_squads;
     std::vector<int> m_released;

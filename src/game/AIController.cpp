@@ -83,7 +83,6 @@ void AIController::InitDifficultyDefaults()
     easy.tactics.maxAttackGroups = 2;
     easy.tactics.creditsPerExtraGroup = 1200;
     easy.tactics.buildDefenses = false;
-    easy.tactics.defenseRecallSquads = false;
     easy.tactics.lateRiflemanPercent = 50;
     m_difficultyConfigs[AIDifficulty::Easy] = easy;
 
@@ -106,7 +105,7 @@ void AIController::InitDifficultyDefaults()
     med.tactics.lateRiflemanPercent = 25;
     m_difficultyConfigs[AIDifficulty::Medium] = med;
 
-    // Hard: + pace of the slowest unit, armor in front, retreat when a wave dies for nothing
+    // Hard: + pace of the slowest unit, armor in front
     AIDifficultyConfig hard;
     hard.id = "hard";
     hard.name = "Hard";
@@ -117,7 +116,6 @@ void AIController::InitDifficultyDefaults()
     hard.productionSpeedMultiplier = 1.00f;
     hard.tactics.syncToSlowest = true;
     hard.tactics.armorFront = true;
-    hard.tactics.retreatLossRatio = 0.6f;
     hard.tactics.waveBaseSize = 14;
     hard.tactics.waveMaxSize = 22;
     hard.tactics.waveIntervalSeconds = 30.0f;
@@ -518,22 +516,82 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         if (!marching.empty())
         {
             m_squadController.ReleaseUnits(marching, entities);
-            // Released troops must stop marching at the dead base: idle, they return to the staging area, join the
-            // reserve and the next wave, and production keeps counting them as home troops instead of stalling
+            // Released troops must stop marching at the dead base: idle, they go on to the new objective
+            // (UpdateOffensive), they never turn back home while a foe is left.
+            // Only a unit fighting a living foe keeps its fight: the target of the troops that have just destroyed
+            // the player is one of its (now dead) structures, the elimination came after the units' update
             for (int id : marching)
             {
                 Unit *u = entities.GetUnit(id);
-                if (!u || !u->alive || u->state == ActionState::Die || u->targetEntityId != 0)
+                if (!u || !u->alive || u->state == ActionState::Die)
                     continue;
+                if (const Entity *t = u->targetEntityId ? entities.GetEntity(u->targetEntityId) : nullptr;
+                    t && t->alive && t->state != ActionState::Die && IsFoe(*t))
+                    continue;
+                u->targetEntityId = 0;
+                u->orderedTargetId = 0;
                 u->ClearPathState();
                 u->ClearMoveTarget();
                 u->isAttackMoving = false;
                 if (u->state == ActionState::Move)
                     u->state = ActionState::Idle;
             }
-            Think("ATTACK", "A foe is out of the game: the squads come back for a new objective");
+            Think("ATTACK", "A foe is out of the game: the squads go on to a new objective");
         }
     }
+}
+
+void AIController::VisitState(AIStateSink &sink) const
+{
+    auto ids = [&sink](const char *name, const auto &set) {
+        sink.I32(name, static_cast<std::int32_t>(set.size()));
+        for (int id : set)
+            sink.I32("id", id);
+    };
+    sink.Record("ai");
+    sink.I32("player", m_player);
+    sink.I32("credits", m_credits);
+    sink.I32("income", m_creditsPerSec);
+    sink.F32("time", m_gameTime);
+    sink.I32("waves", m_waveCount);
+    sink.I32("dispatched", m_dispatchedInWave);
+    sink.F32("waveCooldown", m_waveCooldown);
+    sink.F32("assembly", m_waveAssemblyTimer);
+    sink.I32("plan", static_cast<std::int32_t>(m_currentPlan.archetypes.size()));
+    sink.I32("infantryQ", static_cast<std::int32_t>(m_infantryQueue.size()));
+    sink.I32("vehicleQ", static_cast<std::int32_t>(m_vehicleQueue.size()));
+    sink.I32("research", m_researchIndex);
+    sink.I32("objX", m_playerHqX);
+    sink.I32("objY", m_playerHqY);
+    sink.I32("stageX", m_stagingX);
+    sink.I32("stageY", m_stagingY);
+    sink.I32("foesOut", static_cast<std::int32_t>(m_eliminatedFoes));
+    sink.I32("noFoes", m_noFoesLeft ? 1 : 0);
+    sink.I32("scout", m_scoutId);
+    sink.I32("trackedWave", m_trackedWave);
+    sink.F32("attacked", m_baseAttackedTimer);
+    sink.I32("known", static_cast<std::int32_t>(m_knownBuildings.size()));
+    sink.Record("ai troops");
+    ids("roster", m_waveRoster);
+    ids("offensive", m_offensive);
+    ids("recalled", m_recalled);
+    ids("repairing", m_repairing);
+    sink.I32("defenders", static_cast<std::int32_t>(m_defenders.size()));
+    for (const auto &[id, goal] : m_defenders)
+    {
+        sink.I32("id", id);
+        sink.I32("x", goal.first);
+        sink.I32("y", goal.second);
+    }
+    sink.I32("guards", static_cast<std::int32_t>(m_guardOf.size()));
+    for (const auto &[id, post] : m_guardOf)
+    {
+        sink.I32("id", id);
+        sink.I32("post", post);
+    }
+    // (an unordered set: its size only, the order of its walk is no business of the checksum)
+    sink.I32("garrison", static_cast<std::int32_t>(m_garrison.size()));
+    m_squadController.VisitState(sink);
 }
 
 void AIController::SetPlayer(PlayerId player)
@@ -589,6 +647,7 @@ void AIController::Reset()
     m_garrison.clear();
     m_garrisonRecorded = false;
     m_recalled.clear();
+    m_offensive.clear();
     m_waveRoster.clear();
     m_rosterSeeded = false;
     m_hasLab = false;
@@ -612,7 +671,6 @@ void AIController::Reset()
     m_baseAttackedTimer = 0.0f;
     m_baseAttackedSeconds = 0.0f;
     m_lastPlanSize = 0;
-    m_recallReadyTime = 0.0f;
     m_knownBuildings.clear();
     std::fill(std::begin(m_sectorThreat), std::end(m_sectorThreat), 0.0f);
     std::fill(std::begin(m_foeHostility), std::end(m_foeHostility), 0.0f);
@@ -856,7 +914,8 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     UpdateWaveLaunch(deltaTime, map, entities, pathfinder);
     UpdateWaveRoster(entities);
     m_squadController.Update(deltaTime, map, entities, pathfinder, m_chokes, m_currentDifficultyConfig.tactics);
-    RecallReleasedUnits(entities); // released units rejoin the reserve through UpdateStaging
+    RecallReleasedUnits(entities); // released units stay on the offensive (home only when no foe is left)
+    UpdateOffensive(map, entities, pathfinder);
     UpdateIdleUnits(entities, pathfinder);
 }
 
@@ -868,8 +927,17 @@ void AIController::RecallReleasedUnits(EntityManager &entities)
         if (u && u->alive && u->owner == m_player && !m_garrison.count(id) && !m_squadController.IsSquadMember(id)
             && !m_repairing.count(id) && id != m_scoutId)
         {
-            m_recalled.insert(id);
-            m_waveRoster.insert(id); // released by its squad: back on the computer's list for the next wave
+            // It went on the attack: it stays there. Only with no foe left is there nothing to go on to
+            if (m_noFoesLeft)
+            {
+                m_recalled.insert(id);
+                m_waveRoster.insert(id); // back on the computer's list for the next wave
+            }
+            else
+            {
+                m_offensive.insert(id);
+                m_waveRoster.erase(id);
+            }
         }
     }
     // Back home (the reserve radius holds them now), dead, or taken into a new squad: forgotten
@@ -885,6 +953,53 @@ void AIController::RecallReleasedUnits(EntityManager &entities)
         else
             ++it;
     }
+}
+
+void AIController::UpdateOffensive(const TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+{
+    std::vector<int> idle;
+    for (auto it = m_offensive.begin(); it != m_offensive.end();)
+    {
+        Unit *u = entities.GetUnit(*it);
+        if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player
+            || m_squadController.IsSquadMember(*it))
+        {
+            it = m_offensive.erase(it);
+            continue;
+        }
+        // Every foe is out: nothing to attack any more, the troops go home and rejoin the reserve
+        if (m_noFoesLeft)
+        {
+            m_recalled.insert(*it);
+            m_waveRoster.insert(*it);
+            it = m_offensive.erase(it);
+            continue;
+        }
+        if (u->state == ActionState::Idle && u->targetEntityId == 0 && u->targetWallTileX < 0 && !u->waitingForPath
+            && (!u->isAttackMoving || !u->HasMoveTarget()) && !u->isSiegeMode && u->moveSpeed > 0.0f)
+            idle.push_back(*it);
+        ++it;
+    }
+    if (idle.empty())
+        return;
+    int tx = -1, ty = -1;
+    FindAttackObjective(entities, map, tx, ty);
+    if (tx < 0 || ty < 0)
+        return;
+    // Already at the objective with nothing in sight: the squad-less troops stand guard there until a foe shows up
+    std::vector<int> send;
+    for (int id : idle)
+    {
+        const Unit *u = entities.GetUnit(id);
+        if (std::max(std::abs(u->tileX - tx), std::abs(u->tileY - ty)) > 3)
+            send.push_back(id);
+    }
+    if (send.empty())
+        return;
+    entities.IssueAttackMoveOrder(send, tx, ty, pathfinder);
+    std::ostringstream msg;
+    msg << send.size() << " unit(s) on the offensive go on to (" << tx << ", " << ty << ")";
+    Think("ATTACK", msg.str());
 }
 
 } // namespace OpenArtOfWar

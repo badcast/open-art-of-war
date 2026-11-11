@@ -3,6 +3,11 @@
 #include <iostream>
 #include <string>
 
+#if defined(__ANDROID__)
+// Renames main() to SDL_main(): SDLActivity starts the game through it
+#include <SDL3/SDL_main.h>
+#endif
+
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

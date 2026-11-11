@@ -157,6 +157,9 @@ public:
     }
     // The player slot this AI commands (single player: set by init from the factions)
     void SetPlayer(PlayerId player);
+    // Everything the computer decides by (treasury, timers, objective, troop lists, squads) for the world checksum:
+    // two peers whose computer players think differently are out of sync at once, not when the troops move
+    void VisitState(AIStateSink &sink) const;
     // The seed of the match (mixed with the slot by the caller): picks the style of the base
     void SetSeed(std::uint32_t seed);
     const AIBaseStyle &BaseStyle() const
@@ -392,10 +395,9 @@ private:
     void UpdateIntel(EntityManager &entities);
     // A cheap unit looks for the enemy at the start and again every while (not on Hardcore: it sees all)
     void UpdateScouting(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-    // Badly hurt expensive units (as dear as a Zeus / Rhino or dearer) leave their squad for repairs,
-    // unless the squad is down to a few units; the HP share depends on the difficulty
+    // Units sent to repairs (m_repairing) walk to the factory / staging area and rejoin the reserve when healed;
+    // nobody is pulled out of a squad that went on the attack
     void UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder);
-    bool IsValuable(const Unit &u, const EntityManager &entities) const;
     // Share of the reserve that stays home when a wave leaves (Easy 40% ... Hardcore 10%)
     float HomeGuardShare() const;
     int HomeGuardCount() const;
@@ -428,9 +430,11 @@ private:
         const EntityManager &entities,
         bool *unitBlocked = nullptr,
         bool needsExit = false) const;
-    // Units a squad let go far from the base (stragglers, stuck in a passage, retreat timeout, assault over)
-    // walk back to the staging area and rejoin the reserve
+    // Units a squad let go (stragglers, stuck in a passage, a foe out of the game) went on the attack: they stay on
+    // the offensive (m_offensive). Only when no foe is left at all do they walk back and rejoin the reserve
     void RecallReleasedUnits(EntityManager &entities);
+    // Troops on the offensive with nothing to do attack-move to the current objective; they are never called home
+    void UpdateOffensive(const TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     void FlankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const;
     // Adds a line to the reasoning log (and the console)
     void Think(const std::string &category, const std::string &text);
@@ -482,7 +486,8 @@ private:
     // Units placed by the mission (base garrison) never join the waves
     std::unordered_set<int> m_garrison;
     bool m_garrisonRecorded {false};
-    std::set<int> m_recalled; // released squad members on their way back to the reserve
+    std::set<int> m_recalled;  // released squad members on their way back to the reserve (no foe left)
+    std::set<int> m_offensive; // went on the attack and left their squad: they go on to the objective, never home
     // The computer's own list of the troops for its next wave: a unit joins only explicitly (the computer trained it,
     // a squad released it, or it stood at the home base when the game began), never because it happens to stand
     // in some area. Squads keep their own lists (AISquad::unitIds).
@@ -546,7 +551,6 @@ private:
     std::map<int, std::pair<int, int>> m_defenders;
     float m_baseAttackedTimer {0.0f};   // > 0: the base was attacked within the last seconds
     float m_baseAttackedSeconds {0.0f}; // how long the current attack has lasted (waves wait only so long)
-    float m_recallReadyTime {0.0f};     // game time before which no further group is called back
     int m_lastPlanSize {0};             // size of the last wave plan (the home guard between two plans)
     int m_lastThreatX {-1};             // where the strongest attack on the base last was (debug view)
     int m_lastThreatY {-1};

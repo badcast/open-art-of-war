@@ -76,7 +76,8 @@ In `EngineCore`, `SimulationCore`, and `GameWorld`, unit entities are stored in 
   `difficulty.yaml`); extra groups march through a flank point or the second base exit.
 - **AI base defense** (`AIController::UpdateBaseDefense`, every 2 s): attackers are the enemy troops seen at the base
   and whoever hit a structure of it (`lastAttackerId`); home troops attack-move to them, waves wait (at most 60 s),
-  a marching group turns back when defenders lack (`defense_recall_squads`), a chase ends 12 tiles outside the base.
+  a chase ends 12 tiles outside the base. Troops that went on the attack are never called home (`m_offensive`: units a
+  squad let go attack-move on to the objective; home again only when no foe is left).
 - **Skirmish base builder**: wall arc facing the player with two exits (or walls across the passages), lab and power
   plants behind the HQ (`build_defenses`). Two bunkers right behind the wall on every way in, the towers deeper
   inside behind them; built bunkers, walls, towers. Later extras go to the side the attacks come from: a bunker at

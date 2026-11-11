@@ -61,6 +61,16 @@ std::vector<fs::path> CandidateRoots()
         roots.push_back(fs::path(base) / "..");
         roots.push_back(fs::path(base) / ".." / "share" / "openaow");
     }
+#if defined(__ANDROID__) || defined(ANDROID)
+    if (char *pref = SDL_GetPrefPath("badcast", "openaow"))
+    {
+        roots.push_back(fs::path(pref));
+        SDL_free(pref);
+    }
+    // /sdcard/Android/data/<package>/files: assets.blob can be put here with a plain "adb push"
+    if (const char *external = SDL_GetAndroidExternalStoragePath())
+        roots.push_back(fs::path(external));
+#endif
     return roots;
 }
 

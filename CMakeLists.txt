@@ -266,6 +266,28 @@ add_custom_command(OUTPUT ${OAOW_SHADER_OUT}/OaowShaders.inc
 set_source_files_properties(src/graphics/ShaderEffects.cpp PROPERTIES
     OBJECT_DEPENDS ${OAOW_SHADER_OUT}/OaowShaders.inc)
 
+# Fingerprint of the simulation code (NetMatch::SimBuildId): every source the simulation is built from, so any change
+# to AI, units, pathfinding, ... makes a build that refuses other builds' network matches and marks their replays.
+# Presentation-only folders are left out (a new folder counts until it is listed here).
+file(GLOB_RECURSE OAOW_SIM_SOURCES CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/library-brainmap/*)
+list(FILTER OAOW_SIM_SOURCES EXCLUDE REGEX
+    "^(src|include)/(ui|graphics|audio|input|debug|storage)/|^src/networking/(src/transport|tests)/|^src/main\\.cpp$")
+set(OAOW_SIM_OUT ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${OAOW_SIM_OUT})
+string(REPLACE ";" "\n" OAOW_SIM_LIST_TEXT "${OAOW_SIM_SOURCES}")
+file(CONFIGURE OUTPUT ${OAOW_SIM_OUT}/SimSources.txt CONTENT "${OAOW_SIM_LIST_TEXT}\n")
+list(TRANSFORM OAOW_SIM_SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/ OUTPUT_VARIABLE OAOW_SIM_DEPENDS)
+add_custom_command(OUTPUT ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp
+    COMMAND ${CMAKE_COMMAND} -DOUT=${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp -DROOT=${CMAKE_CURRENT_SOURCE_DIR}
+            -DLIST=${OAOW_SIM_OUT}/SimSources.txt -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimBuildId.cmake
+    DEPENDS ${OAOW_SIM_DEPENDS} ${OAOW_SIM_OUT}/SimSources.txt ${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimBuildId.cmake
+    COMMENT "Fingerprinting the simulation sources" VERBATIM)
+set_source_files_properties(src/net/NetMatch.cpp PROPERTIES
+    OBJECT_DEPENDS ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
+
 # Shared engine library: libopenaow.so (engine, game logic, UI, ImGui)
 add_library(openaow-core SHARED ${ENGINE_SOURCES} ${IMGUI_SOURCES} ${STB_VORBIS_SOURCE})
 set_target_properties(openaow-core PROPERTIES
@@ -302,8 +324,8 @@ target_link_libraries(openaow-core PUBLIC
     PkgConfig::LIBARCHIVE
 )
 target_link_libraries(openaow-core PRIVATE OpenAOWNetworking ${OAOW_ZSTD})
-target_sources(openaow-core PRIVATE ${OAOW_SHADER_OUT}/OaowShaders.inc)
-target_include_directories(openaow-core PRIVATE ${OAOW_SHADER_OUT})
+target_sources(openaow-core PRIVATE ${OAOW_SHADER_OUT}/OaowShaders.inc ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
+target_include_directories(openaow-core PRIVATE ${OAOW_SHADER_OUT} ${OAOW_SIM_OUT})
 target_compile_definitions(openaow-core PUBLIC
             $<$<BOOL:${AOW_DEBUG}>:AOW_DEBUG>
             MAIN_ASSET_BLOB_NAME="${MAIN_ASSET_BLOB_NAME}"
@@ -437,6 +459,22 @@ set_target_properties(openaow-ai-defense-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 # (it reads the unit and building definitions: run where ./assets is)
 add_test(NAME openaow-ai-defense-tests COMMAND openaow-ai-defense-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+add_executable(openaow-determinism-tests tests/DeterminismTests.cpp)
+target_link_libraries(openaow-determinism-tests PRIVATE openaow-core)
+set_target_properties(openaow-determinism-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+# (a skirmish of two computer players played twice; it reads the unit and building definitions: run where ./assets is)
+add_test(NAME openaow-determinism-tests COMMAND openaow-determinism-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+add_executable(openaow-flowfield-tests tests/FlowFieldTests.cpp)
+target_link_libraries(openaow-flowfield-tests PRIVATE openaow-core)
+set_target_properties(openaow-flowfield-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+# (it reads the unit definitions: run where ./assets is)
+add_test(NAME openaow-flowfield-tests COMMAND openaow-flowfield-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
 target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)

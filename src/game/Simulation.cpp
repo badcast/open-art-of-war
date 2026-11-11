@@ -139,7 +139,6 @@ const AITacticsConfig &Simulation::GroupTactics()
         c.syncToSlowest = false;
         c.armorFront = false;
         c.meleeRangedPairs = false;
-        c.retreatLossRatio = 0.0f;
         c.stragglerTimeoutSeconds = 6.0f;
         c.marchStrideTiles = 5;
         return c;
@@ -740,7 +739,8 @@ std::vector<SimEvent> Simulation::TakeEvents()
 
 const char *Simulation::ChecksumSectionName(int section)
 {
-    static const char *const kNames[kChecksumSections] = {"entities", "economies", "walls", "research", "random"};
+    static const char *const kNames[kChecksumSections]
+        = {"entities", "economies", "walls", "research", "random", "ai"};
     return section >= 0 && section < kChecksumSections ? kNames[section] : "?";
 }
 
@@ -876,6 +876,34 @@ void Simulation::VisitState(const SimContext &ctx, Sink &s) const
         s.F32("toY", p.targetY);
     }
     s.EndSection(4);
+
+    // What the computer players decide by, and every squad (theirs and the players' marching groups): an AI that
+    // thinks differently on two peers shows here first, before its troops move apart
+    struct Adapter final : AIStateSink
+    {
+        Sink &sink;
+        explicit Adapter(Sink &target) : sink(target) {}
+        void Record(const char *name) override
+        {
+            sink.Record(name);
+        }
+        void I32(const char *name, std::int32_t value) override
+        {
+            sink.I32(name, value);
+        }
+        void F32(const char *name, float value) override
+        {
+            sink.F32(name, value);
+        }
+    } adapter(s);
+    s.Section(ChecksumSectionName(5));
+    if (!m_matchComputerPlayers)
+        ctx.ai.VisitState(adapter);
+    for (const AIController *ai : m_computerPlayers)
+        ai->VisitState(adapter);
+    for (const AISquadController &squads : m_squads)
+        squads.VisitState(adapter);
+    s.EndSection(5);
 }
 
 std::uint64_t Simulation::Checksum(const SimContext &ctx) const

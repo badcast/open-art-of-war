@@ -742,6 +742,17 @@ void Application::RenderReplayBar()
             true,
             Anchor::HCENTER | Anchor::TOP);
     }
+    else if (replay && !m_replay->info().checksumsComparable)
+    {
+        m_fontRenderer->DrawString(
+            _("Recorded by another game build: it may play out differently."),
+            viewW / 2,
+            kBarHeight + 10,
+            ui::FONT_BODY_BOLD,
+            col::Accent,
+            true,
+            Anchor::HCENTER | Anchor::TOP);
+    }
     if (m_replayUi.finished)
     {
         m_fontRenderer->DrawString(

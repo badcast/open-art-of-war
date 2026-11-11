@@ -11,6 +11,7 @@
 #include "game/TileMap.hpp"
 #include "game/EntityManager.hpp"
 #include <cmath>
+#include <cstdlib>
 #include <algorithm>
 #include <iostream>
 
@@ -62,11 +63,13 @@ void Pathfinder::EnsureBrainMapSize(int width, int height)
     if (!m_brainMap || m_lastWidth != width || m_lastHeight != height)
     {
         m_brainMap = std::make_unique<brain::brain_map>(width, height);
+        m_brainMap->set_pathfinder(brain::pathfinder_algo::ThetaStar);
         m_brainMap->set_custom_weights(kStraightCost, kDiagonalCost);
         // Units walk diagonally between two locked tiles that only touch at their corners
         m_brainMap->set_custom_corner_cutting(true);
-        m_brainMap->set_identity(brain::MatrixIdentity::DiagonalMethod);
+        m_brainMap->set_identity(brain::matrix_identity::DiagonalMethod);
         m_brainMap->set_custom_heuristic(OctileHeuristic);
+        m_brainMap->set_search_mode(brain::search_mode::BiDirectional);
         m_lastWidth = width;
         m_lastHeight = height;
     }
@@ -150,6 +153,66 @@ void Pathfinder::SyncMap(int ignoreEntityId, bool lockUnits)
     }
 }
 
+bool Pathfinder::StraightenPath(int startX, int startY, std::vector<PathNode> &pathVec) const
+{
+    // A* returns one of many equally short paths, often a staircase (right, down, right, down...). Vehicles
+    // turn in place before every step, so a staircase means stop-turn-go on every tile (worst for the
+    // Fortress, which only turns by 90 degrees). Reorder the steps into long straight runs: same tiles
+    // count, same length, far fewer turns. A swap is only made when the new corner tile is free.
+    const int mapW = m_map->GetWidth();
+    const int mapH = m_map->GetHeight();
+    auto freeTile = [&](int x, int y) {
+        return x >= 0 && x < mapW && y >= 0 && y < mapH && m_map->IsPassable(x, y) && m_map->GetWall(x, y) == 0
+               && !m_brainMap->has_lock(brain::the_site {x, y});
+    };
+    // (a diagonal step needs only its own tile: corners may be cut, as everywhere else)
+    auto stepOk = [&](int fromX, int fromY, int dx, int dy) {
+        return freeTile(fromX + dx, fromY + dy);
+    };
+    const std::size_t n = pathVec.size();
+    if (n < 3)
+        return !pathVec.empty();
+    std::vector<PathNode> steps(n);
+    PathNode prev {startX, startY};
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        steps[i] = {pathVec[i].x - prev.x, pathVec[i].y - prev.y};
+        prev = pathVec[i];
+    }
+    for (int pass = 0; pass < 8; ++pass)
+    {
+        bool changed = false;
+        PathNode at {startX, startY};
+        at.x += steps[0].x;
+        at.y += steps[0].y;
+        for (std::size_t k = 1; k + 1 < n; ++k)
+        {
+            // ... A, B, A ... -> ... A, A, B ...: the second A joins the run before it
+            const PathNode a = steps[k - 1];
+            const PathNode b = steps[k];
+            const PathNode c = steps[k + 1];
+            if (!(b == c) && c == a && stepOk(at.x, at.y, c.x, c.y) && stepOk(at.x + c.x, at.y + c.y, b.x, b.y))
+            {
+                steps[k] = c;
+                steps[k + 1] = b;
+                changed = true;
+            }
+            at.x += steps[k].x;
+            at.y += steps[k].y;
+        }
+        if (!changed)
+            break;
+    }
+    PathNode cur {startX, startY};
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        cur.x += steps[i].x;
+        cur.y += steps[i].y;
+        pathVec[i] = cur;
+    }
+    return true;
+}
+
 bool Pathfinder::FindPath(
     int startX,
     int startY,
@@ -192,7 +255,7 @@ bool Pathfinder::FindPath(
     int origTargetY = targetY;
 
     EnsureBrainMapSize(mapW, mapH);
-    m_brainMap->set_identity(allowDiagonal ? brain::MatrixIdentity::DiagonalMethod : brain::MatrixIdentity::PlusMethod);
+    m_brainMap->set_identity(allowDiagonal ? brain::matrix_identity::DiagonalMethod : brain::matrix_identity::PlusMethod);
     m_brainMap->set_custom_heuristic(allowDiagonal ? OctileHeuristic : ManhattanHeuristic);
     m_avoidTiles.swap(avoidTiles);
     SyncMap(ignoreEntityId, !ignoreUnits);
@@ -201,10 +264,6 @@ bool Pathfinder::FindPath(
     // Ensure starting tile is unlocked for A* exploration
     m_brainMap->set_lock(brain::the_site {startX, startY}, false);
 
-    // If destination tile itself is locked (e.g. enemy building, wall, unit, or impassable terrain):
-    // 1. First check if (targetX, targetY) belongs to a multi-tile Building footprint [bx..bx+bw-1, by..by+bh-1].
-    //    If so, pick the closest unlocked tile along the building's entire perimeter facing startX, startY.
-    bool goalAdjustedBecauseLocked = false;
     if (m_brainMap->has_lock(brain::the_site {targetX, targetY}))
     {
         int bestDistSq = 999999;
@@ -285,7 +344,6 @@ bool Pathfinder::FindPath(
         {
             targetX = altX;
             targetY = altY;
-            goalAdjustedBecauseLocked = true;
         }
     }
 
@@ -343,63 +401,6 @@ bool Pathfinder::FindPath(
         return !pathVec.empty();
     };
 
-    // A* returns one of many equally short paths, often a staircase (right, down, right, down...). Vehicles
-    // turn in place before every step, so a staircase means stop-turn-go on every tile (worst for the
-    // Fortress, which only turns by 90 degrees). Reorder the steps into long straight runs: same tiles
-    // count, same length, far fewer turns. A swap is only made when the new corner tile is free.
-    auto freeTile = [&](int x, int y) {
-        return x >= 0 && x < mapW && y >= 0 && y < mapH && m_map->IsPassable(x, y) && m_map->GetWall(x, y) == 0
-               && !m_brainMap->has_lock(brain::the_site {x, y});
-    };
-    // (a diagonal step needs only its own tile: corners may be cut, as everywhere else)
-    auto stepOk = [&](int fromX, int fromY, int dx, int dy) {
-        return freeTile(fromX + dx, fromY + dy);
-    };
-    auto straighten = [&](std::vector<PathNode> &pathVec) -> bool {
-        const std::size_t n = pathVec.size();
-        if (n < 3)
-            return !pathVec.empty();
-        std::vector<PathNode> steps(n);
-        PathNode prev {startX, startY};
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            steps[i] = {pathVec[i].x - prev.x, pathVec[i].y - prev.y};
-            prev = pathVec[i];
-        }
-        for (int pass = 0; pass < 8; ++pass)
-        {
-            bool changed = false;
-            PathNode at {startX, startY};
-            at.x += steps[0].x;
-            at.y += steps[0].y;
-            for (std::size_t k = 1; k + 1 < n; ++k)
-            {
-                // ... A, B, A ... -> ... A, A, B ...: the second A joins the run before it
-                const PathNode a = steps[k - 1];
-                const PathNode b = steps[k];
-                const PathNode c = steps[k + 1];
-                if (!(b == c) && c == a && stepOk(at.x, at.y, c.x, c.y) && stepOk(at.x + c.x, at.y + c.y, b.x, b.y))
-                {
-                    steps[k] = c;
-                    steps[k + 1] = b;
-                    changed = true;
-                }
-                at.x += steps[k].x;
-                at.y += steps[k].y;
-            }
-            if (!changed)
-                break;
-        }
-        PathNode cur {startX, startY};
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            cur.x += steps[i].x;
-            cur.y += steps[i].y;
-            pathVec[i] = cur;
-        }
-        return true;
-    };
-
     // Clear previous search node data (g, h, f, flags, parent) while preserving obstacle locks
     m_brainMap->clear(false);
 
@@ -420,7 +421,7 @@ bool Pathfinder::FindPath(
         {
             outPath.push_back({navResult.connections[i].x, navResult.connections[i].y});
         }
-        return enforceValidOrthogonalPath(outPath) && straighten(outPath);
+        return enforceValidOrthogonalPath(outPath) && StraightenPath(startX, startY, outPath);
     }
 
     // If no complete path to goal exists (passage is closed by walls, buildings, or units),
@@ -501,7 +502,81 @@ bool Pathfinder::FindPath(
     std::reverse(revPath.begin(), revPath.end());
     outPath = std::move(revPath);
 
-    return enforceValidOrthogonalPath(outPath) && straighten(outPath);
+    return enforceValidOrthogonalPath(outPath) && StraightenPath(startX, startY, outPath);
+}
+
+bool Pathfinder::BuildFlowField(int goalX, int goalY)
+{
+    if (!m_map)
+        return false;
+    const int w = m_map->GetWidth(), h = m_map->GetHeight();
+    if (goalX < 0 || goalY < 0 || goalX >= w || goalY >= h)
+        return false;
+    EnsureBrainMapSize(w, h);
+    m_brainMap->set_identity(brain::matrix_identity::DiagonalMethod);
+    m_brainMap->set_custom_heuristic(OctileHeuristic);
+    // The road of a whole group goes by what stays put: units step aside for each other while they walk
+    m_avoidTiles.clear();
+    m_ignoreUnitsOnce = false;
+    SyncMap(0, false);
+    if (!m_flowField)
+        m_flowField = std::make_unique<brain::flow_field>();
+    return m_flowField->build(*m_brainMap, brain::the_site {goalX, goalY});
+}
+
+bool Pathfinder::FlowPath(
+    int startX,
+    int startY,
+    int destX,
+    int destY,
+    std::vector<PathNode> &outPath,
+    int ignoreEntityId,
+    bool *outIsPartial)
+{
+    outPath.clear();
+    if (outIsPartial)
+        *outIsPartial = false;
+    const brain::the_site start {startX, startY};
+    if (!m_map || !m_flowField || !m_flowField->is_built() || !m_flowField->reachable(start))
+        return FindPath(startX, startY, destX, destY, outPath, ignoreEntityId, outIsPartial);
+    if (startX == destX && startY == destY)
+        return true;
+
+    // The field's road, up to the first tile a few steps from the unit's own slot (or the goal itself)
+    constexpr int kJoinTiles = 3;
+    std::vector<brain::the_site> road;
+    m_flowField->path(start, road);
+    std::size_t join = road.size() - 1;
+    for (std::size_t i = 0; i < road.size(); ++i)
+    {
+        if (std::max(std::abs(road[i].x - destX), std::abs(road[i].y - destY)) <= kJoinTiles)
+        {
+            join = i;
+            break;
+        }
+    }
+    for (std::size_t i = 1; i <= join; ++i)
+        outPath.push_back({road[i].x, road[i].y});
+
+    // The rest to the slot: a short search that sees the units standing there
+    const int fromX = road[join].x, fromY = road[join].y;
+    if (fromX != destX || fromY != destY)
+    {
+        std::vector<PathNode> tail;
+        bool tailPartial = false;
+        if (!FindPath(fromX, fromY, destX, destY, tail, ignoreEntityId, &tailPartial) || tail.empty())
+        {
+            // No way from there: a search of its own from the start, as without the field
+            return FindPath(startX, startY, destX, destY, outPath, ignoreEntityId, outIsPartial);
+        }
+        if (outIsPartial)
+            *outIsPartial = tailPartial;
+        outPath.insert(outPath.end(), tail.begin(), tail.end());
+    }
+    if (outPath.empty())
+        return true; // (the start is the join tile and the slot)
+    // (the map holds the locks of the last search - the tail's, units included - for the corner checks)
+    return StraightenPath(startX, startY, outPath);
 }
 
 /*
@@ -679,7 +754,6 @@ std::vector<StormcastSlot> AINavigataionStormcastView::ComputeGroupSlots(
         targetTileY = bestY;
     }
 
-    // 1. Check center target tile first
     if (isSlotValid(targetTileX, targetTileY))
     {
         result.push_back({targetTileX, targetTileY});
@@ -741,8 +815,6 @@ std::vector<StormcastSlot> AINavigataionStormcastView::ComputeGroupSlots(
         }
     }
 
-    // Safe Fallback: Never return (0,0) unless (targetTileX, targetTileY) is legitimately (0,0).
-    // Reuse the closest found valid slot, or clamped (targetTileX, targetTileY).
     StormcastSlot safeFallback = !result.empty() ? result.front() : StormcastSlot {targetTileX, targetTileY};
     while (static_cast<int>(result.size()) < count)
     {

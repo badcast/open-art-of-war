@@ -3,6 +3,8 @@
 // Internal: ENet is visible only inside the networking library
 #include <enet/enet.h>
 
+#include <cstddef>
+
 namespace OpenArtOfWar::Net
 {
 

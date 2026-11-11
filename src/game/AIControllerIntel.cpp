@@ -143,25 +143,8 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     Think("SCOUT", msg.str());
 }
 
-bool AIController::IsValuable(const Unit &u, const EntityManager &entities) const
-{
-    // Siege forms count as their mobile form: Sniper 14 -> 4, Rhino 15 -> 10, Grad 16 -> 13
-    auto baseOf = [](int arch) {
-        return arch == 14 ? 4 : arch == 15 ? 10 : arch == 16 ? 13 : arch;
-    };
-    const int reference = side() == Faction::Confederation ? kZeus : 10; // Zeus / Rhino
-    const UnitConfig *ref = entities.GetUnitConfig(reference);
-    const UnitConfig *own = entities.GetUnitConfig(baseOf(u.archetypeId));
-    return ref && own && own->creditCost >= ref->creditCost;
-}
-
 void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder)
 {
-    const AIDifficulty difficulty = GetEffectiveDifficulty();
-    const float threshold = difficulty == AIDifficulty::Easy     ? 0.0f
-                            : difficulty == AIDifficulty::Medium ? 0.25f
-                            : difficulty == AIDifficulty::Hard   ? 0.30f
-                                                                 : 0.35f;
     // Where vehicles get repaired: next to an own Factory; otherwise (and for infantry) the staging area
     int factoryX = -1, factoryY = -1;
     for (const auto &e : entities.GetAllEntities())
@@ -210,40 +193,7 @@ void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pa
             entities.IssueMoveOrder({u->id}, rx, ry, pathfinder, false);
         ++it;
     }
-    if (threshold <= 0.0f)
-        return;
-    for (const AISquad &sq : m_squadController.GetSquads())
-    {
-        if (sq.playerSquad || sq.unitIds.size() <= 3)
-            continue; // a few units left: they fight to the end
-        std::vector<int> leaving;
-        for (int id : sq.unitIds)
-        {
-            const Unit *u = entities.GetUnit(id);
-            if (u && u->maxHp > 0 && static_cast<float>(u->currentHp) < threshold * static_cast<float>(u->maxHp)
-                && IsValuable(*u, entities) && sq.unitIds.size() - leaving.size() > 4)
-                leaving.push_back(id);
-        }
-        if (leaving.empty())
-            continue;
-        m_squadController.ReleaseUnits(leaving, entities);
-        for (int id : leaving)
-        {
-            m_waveRoster.erase(id);
-            m_repairing.insert(id);
-            if (Unit *u = entities.GetUnit(id))
-            {
-                u->targetEntityId = 0;
-                u->isAttackMoving = false;
-                const bool vehicle = !Utility::IsInfantryArchetype(u->archetypeId);
-                const int rx = vehicle && factoryX >= 0 ? factoryX : m_stagingX;
-                const int ry = vehicle && factoryX >= 0 ? factoryY : m_stagingY;
-                entities.IssueMoveOrder({id}, rx, ry, pathfinder, false);
-            }
-        }
-        Think("RETREAT", std::to_string(leaving.size()) + " badly hurt expensive unit(s) pull back for repairs");
-        break; // squads changed: the rest next time
-    }
+    // A unit that went on the attack is never pulled out of its group for repairs: the squads fight to the end
 }
 
 void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder)
@@ -256,8 +206,14 @@ void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfind
             continue;
         // A squad's members take orders from their squad only (a held member waits for its group); the scout
         // and units on their way to repairs do not pick fights either
-        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id))
+        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
+            || m_offensive.count(u->id))
             continue;
+        // An attack-move with nowhere left to go is over: such a unit counts as busy for the staging area, the
+        // waves and this very check, and would stand where it is for good
+        if (u->isAttackMoving && !u->HasMoveTarget() && u->targetEntityId == 0 && !u->waitingForPath
+            && u->state == ActionState::Idle)
+            u->isAttackMoving = false;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->waitingForPath && !u->isAttackMoving)
         {
             float closestDist = u->sightRadius * TILE_WIDTH;

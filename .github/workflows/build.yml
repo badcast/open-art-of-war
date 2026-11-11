@@ -44,13 +44,15 @@ jobs:
       - name: Network tests
         run: ./build/openaow-net-tests
       - name: Package
+        # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |
           mkdir dist
           cp -a build/openaow build/openaow-server build/openaow-charactereditor build/openaow-mapeditor build/libopenaow.so* dist/
+          tar -czf openaow-linux-x64.tar.gz -C dist .
       - uses: actions/upload-artifact@v4
         with:
           name: openaow-linux-x64
-          path: dist
+          path: openaow-linux-x64.tar.gz
 
   windows-msvc:
     name: Windows (MSVC)
@@ -179,13 +181,15 @@ jobs:
       - name: Network tests
         run: ./build/openaow-net-tests
       - name: Package
+        # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |
           mkdir dist
           cp -a build/openaow build/openaow-charactereditor build/openaow-mapeditor build/libopenaow*.dylib dist/
+          tar -czf openaow-macos-arm64.tar.gz -C dist .
       - uses: actions/upload-artifact@v4
         with:
           name: openaow-macos-arm64
-          path: dist
+          path: openaow-macos-arm64.tar.gz
 
   # Lockstep needs the simulation to give the same bits everywhere: the scripted skirmish of the
   # self-test must end with the same world checksum on every platform and compiler
@@ -205,3 +209,41 @@ jobs:
         run: |
           cat hashes/*.txt
           test "$(awk '{print $2}' hashes/*.txt | sort -u | wc -l)" -eq 1
+
+  # A tag v* (git tag v1.2.0 && git push origin v1.2.0) publishes the builds of all platforms as a GitHub Release.
+  # Pushes to main, pull requests and manual runs only build: their packages stay workflow artifacts.
+  release:
+    name: GitHub Release
+    needs: [linux, windows-msvc, windows-mingw, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: openaow-*
+          path: artifacts
+      - name: Name the packages after the tag
+        run: |
+          mkdir release
+          for dir in artifacts/*/; do
+            name=$(basename "$dir")
+            if ls "$dir"*.tar.gz >/dev/null 2>&1; then
+              cp "$dir"*.tar.gz "release/${name}-${GITHUB_REF_NAME}.tar.gz"
+            else
+              (cd "$dir" && zip -qr "$GITHUB_WORKSPACE/release/${name}-${GITHUB_REF_NAME}.zip" .)
+            fi
+          done
+          ls -l release
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # (a re-run of the same tag replaces the files of the release it made before)
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" \
+              --title "Open Art of War $GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi

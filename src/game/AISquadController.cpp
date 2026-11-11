@@ -93,8 +93,6 @@ const char *SquadStateName(AISquadState state)
             return "FORM UP";
         case AISquadState::Assault:
             return "ASSAULT";
-        case AISquadState::Retreating:
-            return "RETREAT";
     }
     return "?";
 }
@@ -240,17 +238,6 @@ int AISquadController::CreateSquad(
         }
     }
 
-    if (tactics.retreatLossRatio > 0.0f)
-    {
-        for (const auto &e : entities.GetAllEntities())
-        {
-            if (e.alive && e.state != ActionState::Die && e.owner < kMaxPlayers && Players::Hostile(e.owner, sq.owner))
-            {
-                sq.playerHpAtLaunch[e.id] = e.currentHp;
-            }
-        }
-    }
-
     RebuildRoute(sq, entities, pathfinder);
     sq.state = AISquadState::Marching;
     sq.orderTimer = 1e6f; // the first leg is ordered on the next tick, which has the map at hand
@@ -307,6 +294,35 @@ bool AISquadController::AddUnits(int squadId, const std::vector<int> &unitIds, c
         return true;
     }
     return false;
+}
+
+void AISquadController::VisitState(AIStateSink &sink) const
+{
+    sink.Record("squads");
+    sink.I32("next", m_nextSquadId);
+    sink.F32("tick", m_tickAccumulator);
+    sink.I32("released", static_cast<std::int32_t>(m_released.size()));
+    for (const AISquad &sq : m_squads)
+    {
+        sink.Record("squad");
+        sink.I32("id", sq.id);
+        sink.I32("wave", sq.waveNumber);
+        sink.I32("owner", sq.owner);
+        sink.I32("state", static_cast<std::int32_t>(sq.state));
+        sink.I32("resume", static_cast<std::int32_t>(sq.resumeState));
+        sink.I32("leader", sq.leaderId);
+        sink.I32("tx", sq.targetX);
+        sink.I32("ty", sq.targetY);
+        sink.I32("progress", sq.progress);
+        sink.I32("march", sq.marchIndex);
+        sink.I32("focus", sq.focusTargetId);
+        sink.I32("flags", (sq.attackMove ? 1 : 0) | (sq.playerSquad ? 2 : 0) | (sq.formedUp ? 4 : 0));
+        sink.F32("stateTimer", sq.stateTimer);
+        sink.F32("orderTimer", sq.orderTimer);
+        sink.F32("leash", sq.leashRadius);
+        for (int id : sq.unitIds)
+            sink.I32("u", id);
+    }
 }
 
 void AISquadController::ReleaseUnits(const std::vector<int> &unitIds, EntityManager &entities)
@@ -961,24 +977,6 @@ void AISquadController::BeginTransit(
     sq.orderTimer = 0.0f;
 }
 
-int AISquadController::DamageDealtSinceLaunch(const AISquad &sq, const EntityManager &entities) const
-{
-    int dealt = 0;
-    for (const auto &[id, hp] : sq.playerHpAtLaunch)
-    {
-        const Entity *e = entities.GetEntity(id);
-        if (!e || !e->alive || e->state == ActionState::Die)
-        {
-            dealt += hp;
-        }
-        else
-        {
-            dealt += std::max(0, hp - e->currentHp);
-        }
-    }
-    return dealt;
-}
-
 // Everyone walks at its own speed. A member that got more than a leash ahead of the group's centre (along the way
 // to the waypoint) stands on its tile until the ones behind have caught up (back within 0.6 leash: hysteresis, no
 // stop-and-go). Nobody waits in combat, near the objective, or inside a narrow passage (it would block the way for
@@ -1132,10 +1130,8 @@ void AISquadController::Tick(
     const int localWidth = chokes.OpenWidth(leader->tileX, leader->tileY);
     const float leash = EffectiveLeash(tactics, sq.unitIds.size(), localWidth > 0 && localWidth <= 4);
     sq.leashRadius = leash;
-    // Also catches re-paths the units made on their own (blocked by the crowd). Not while falling back: the
-    // way home may be long and winding, and a held unit would never get there
-    if (sq.state != AISquadState::Retreating)
-        CapDetours(sq, entities, &map);
+    // Also catches re-paths the units made on their own (blocked by the crowd)
+    CapDetours(sq, entities, &map);
 
     // Cohesion metrics: centroid of the group core and the farthest unit from it (Dmax).
     // The core is everyone within two leash radii of the leader, so one far straggler
@@ -1199,26 +1195,6 @@ void AISquadController::Tick(
     {
         AdvanceMarch(sq, map, entities, pathfinder, chokes, tactics);
         return;
-    }
-
-    // Hard: a wave that lost most of its strength without hurting the player falls back to staging
-    if (tactics.retreatLossRatio > 0.0f && sq.state != AISquadState::Retreating && sq.state != AISquadState::Assault)
-    {
-        float lost = 1.0f - static_cast<float>(sq.unitIds.size()) / static_cast<float>(std::max(1, sq.initialSize));
-        if (lost >= tactics.retreatLossRatio && DamageDealtSinceLaunch(sq, entities) < 100)
-        {
-            for (int id : sq.unitIds)
-            {
-                if (Unit *u = entities.GetUnit(id))
-                {
-                    u->flowMode = false;
-                    u->targetEntityId = 0;
-                }
-            }
-            entities.IssueMoveOrder(sq.unitIds, m_stagingX, m_stagingY, pathfinder, false);
-            SetState(sq, AISquadState::Retreating);
-            return;
-        }
     }
 
     // A plain move (player group) ignores enemies on the way: nobody stops to pick a fight
@@ -1582,26 +1558,6 @@ void AISquadController::Tick(
             break;
         }
 
-        case AISquadState::Retreating:
-        {
-            bool home = true;
-            for (int id : sq.unitIds)
-            {
-                if (DistTo(*entities.GetUnit(id), static_cast<float>(m_stagingX), static_cast<float>(m_stagingY))
-                    > 6.0f)
-                {
-                    home = false;
-                    break;
-                }
-            }
-            if (home || sq.stateTimer > 40.0f)
-            {
-                std::vector<int> all = sq.unitIds;
-                for (int id : all)
-                    ReleaseUnit(sq, id, entities); // they join the next wave
-            }
-            break;
-        }
     }
 }
 

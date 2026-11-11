@@ -143,9 +143,10 @@ public:
     std::uint64_t Checksum(const SimContext &ctx) const;
 
     // The same checksum, plus the running hash after each part (entities, economies, walls, research, random
-    // numbers & projectiles): the first part that differs between two peers shows where they diverged.
+    // numbers & projectiles, computer players & squads): the first part that differs between two peers shows where
+    // they diverged.
     // Debug aid (OAOW_NET_TRACE)
-    static constexpr int kChecksumSections = 5;
+    static constexpr int kChecksumSections = 6;
     static const char *ChecksumSectionName(int section);
     std::uint64_t ChecksumSections(const SimContext &ctx, std::uint64_t (&sections)[kChecksumSections]) const;
 
@@ -155,6 +156,15 @@ public:
 
     // Settings of the player-commanded marches (shared by every side)
     static const AITacticsConfig &GroupTactics();
+
+    // The computer players of a match (GameplayController owns them, perhaps none): their decision state is part of
+    // the checksum. Not a match: the mission's computer player (SimContext::ai) counts instead. In a match that one
+    // is idle and set up from the local player, so it differs between peers and must stay out
+    void SetComputerPlayers(std::vector<const AIController *> players, bool match)
+    {
+        m_computerPlayers = std::move(players);
+        m_matchComputerPlayers = match;
+    }
 
 private:
     // Walks the state the checksum covers, in a fixed order (Simulation.cpp: the hasher and the text dump)
@@ -178,6 +188,8 @@ private:
     std::vector<TimedCommand> m_log;
     bool m_recording {true};
     std::array<AISquadController, kMaxPlayers> m_squads;
+    std::vector<const AIController *> m_computerPlayers;
+    bool m_matchComputerPlayers {false};
     std::array<ResearchProgress, kMaxPlayers> m_research;
     std::vector<SimEvent> m_events;
     std::array<Economy, kMaxPlayers> m_economies;

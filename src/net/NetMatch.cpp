@@ -13,6 +13,7 @@
 #include "openaow/net/Discovery.hpp"
 #include "openaow/net/Rendezvous.hpp"
 #include "openaow/net/Session.hpp"
+#include "SimBuildIdGenerated.hpp"
 
 #include <nlohmann/json.hpp>
 #include <yaml-cpp/yaml.h>
@@ -118,11 +119,15 @@ std::size_t NetMatch::CoalesceTurn(std::vector<SimCommand> &commands)
 
 std::uint64_t NetMatch::SimBuildId()
 {
-    // The simulation code: the same version string means the same source (the build is deterministic
-    // across platforms, see DetMath / -ffp-contract=off). The tag changes whenever the simulation or its
-    // checksum changes without a new version string
+    // The simulation code: the fingerprint of its sources (cmake/SimBuildId.cmake, computed at build time) changes
+    // with any edit of AI, units, pathfinding, ..., so builds that would play differently never meet in a match
+    // and replays of another build are known as such. The build is deterministic across platforms (DetMath,
+    // -ffp-contract=off). The tag is only for a change outside the sources (a compiler option, say)
     const std::string v = std::string(OAOW_VERSION) + "|sim1";
-    return Net::crc32(v.data(), v.size());
+    std::uint32_t crc = Net::crc32(v.data(), v.size());
+    const std::uint64_t source = kSimSourceHash;
+    crc = Net::crc32(&source, sizeof(source), crc);
+    return (static_cast<std::uint64_t>(crc) << 32) ^ source;
 }
 
 NetMatch::NetMatch() = default;

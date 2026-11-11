@@ -40,10 +40,8 @@ constexpr float kBunkerBehindWall = 2.0f;
 constexpr float kTowerBehindWall = 5.0f;
 constexpr float kBunkerFlankDeg = 22.0f; // ... to both sides of the way the enemy comes
 constexpr float kTowerFlankDeg = 34.0f;
-constexpr float kRecallCooldownSeconds = 30.0f; // pause between two groups called back
 constexpr float kDefenseMargin = 1.2f;          // an attack wants this much more worth of defenders than it brings
 constexpr float kReaimTiles = 4.0f;             // a defender on its way is sent again when the attack moved this far
-constexpr float kRecallNeed = 300.0f;           // worth of defenders lacking before a group on the march turns back
 constexpr float kAttackMemorySeconds = 10.0f;   // the base counts as attacked this long after the last sighting
 } // namespace
 
@@ -273,7 +271,9 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f
             || u->isSiegeMode)
             continue;
-        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id))
+        // (troops that went on the attack are never called home to defend)
+        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
+            || m_offensive.count(u->id))
             continue;
         const float ux = static_cast<float>(u->tileX), uy = static_cast<float>(u->tileY);
         const float value = static_cast<float>(UnitThreatValue(*u, entities));
@@ -338,71 +338,7 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
             m_defenders[id] = {gx, gy};
     }
 
-    // Still too few: a group on the march to the enemy turns back (the nearest to home first, one per run). A group
-    // that fights already or storms the enemy base goes on
-    if (!m_currentDifficultyConfig.tactics.defenseRecallSquads)
-        return;
-    const Attack *neediest = nullptr;
-    float unmet = 0.0f, worstNeed = 0.0f;
-    for (const Attack &a : attacks)
-    {
-        const float need = a.strength * kDefenseMargin - a.assigned;
-        if (need <= 0.0f)
-            continue;
-        unmet += need;
-        if (!neediest || need > worstNeed)
-        {
-            neediest = &a;
-            worstNeed = need;
-        }
-    }
-    if (!neediest || unmet < kRecallNeed || m_gameTime < m_recallReadyTime)
-        return;
-    const AISquad *recall = nullptr;
-    float recallDist = 0.0f;
-    for (const AISquad &sq : m_squadController.GetSquads())
-    {
-        if (sq.playerSquad || sq.unitIds.empty())
-            continue;
-        if (sq.state == AISquadState::Engaged || sq.state == AISquadState::Assault
-            || sq.state == AISquadState::Retreating)
-            continue;
-        const Unit *lead = entities.GetUnit(sq.leaderId);
-        if (!lead)
-            lead = entities.GetUnit(sq.unitIds.front());
-        if (!lead)
-            continue;
-        const float d = DetMath::Hypot(
-            static_cast<float>(lead->tileX - m_enemyHqX), static_cast<float>(lead->tileY - m_enemyHqY));
-        // Past half of its way the group goes on: the enemy base is nearer than its own
-        if (d >= DetMath::Hypot(
-                static_cast<float>(lead->tileX - sq.targetX), static_cast<float>(lead->tileY - sq.targetY)))
-            continue;
-        if (!recall || d < recallDist || (d == recallDist && sq.id < recall->id))
-        {
-            recall = &sq;
-            recallDist = d;
-        }
-    }
-    if (!recall)
-        return;
-    const std::vector<int> ids = recall->unitIds; // (ReleaseUnits erases the squad)
-    const int squadId = recall->id;
-    if (recall->waveNumber == m_trackedWave)
-        m_trackedWave = 0; // called back: not a wave that broke nothing (UpdateWaveOutcome)
-    m_recallReadyTime = m_gameTime + kRecallCooldownSeconds;
-    m_squadController.ReleaseUnits(ids, entities);
-    const int gx = static_cast<int>(std::lround(neediest->x)), gy = static_cast<int>(std::lround(neediest->y));
-    entities.IssueAttackMoveOrder(ids, gx, gy, pathfinder);
-    for (int id : ids)
-    {
-        m_waveRoster.insert(id); // back on the list for the next wave
-        m_defenders[id] = {gx, gy};
-    }
-    std::ostringstream msg;
-    msg << "The base lacks defenders: group G" << squadId << " (" << ids.size() << " units) turns back to (" << gx
-        << ", " << gy << ")";
-    Think("DEFENSE", msg.str());
+    // Still too few: the base makes do with what it has. A group that left for the enemy never turns back
 }
 
 void AIController::UpdateGuardPosts(EntityManager &entities, Pathfinder &pathfinder)

@@ -428,11 +428,11 @@ void Unit::FinalizeArrivalIfPathDone()
     ClearPathState();
     if (!waitingForPath)
     {
-        if (isAttackMoving && HasMoveTarget() && std::abs(tileX - targetTileX) <= 1
-            && std::abs(tileY - targetTileY) <= 1)
-        {
-            isAttackMoving = false;
-        }
+        // The road is walked and no better one is being looked for: the order is over, also when the road ended
+        // short of the destination (a goal inside a building footprint is moved to its edge by the pathfinder).
+        // An attack-move left without a destination would mark the unit as busy for ever (the computer never
+        // gathers it for a wave again)
+        isAttackMoving = false;
         ClearMoveTarget();
     }
 }

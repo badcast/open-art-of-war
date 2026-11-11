@@ -2,6 +2,7 @@
 // groups on the march that turn back, the limit of a chase
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "core/Utility.hpp"
 #include "game/AIController.hpp"
 #include "game/BuildLimits.hpp"
 #include "game/EntityManager.hpp"
@@ -427,7 +428,7 @@ int main()
         Players::SetupSinglePlayer(kFoe);
     }
 
-    // 3. A group on the march turns back when the base lacks defenders; not on Easy, not a group that storms
+    // 3. A group on the march never turns back, even when the base lacks defenders
     for (int variant = 0; variant < 3; ++variant)
     {
         World w(variant == 1 ? AIDifficulty::Easy : AIDifficulty::Medium);
@@ -455,12 +456,11 @@ int main()
         AIDefenseTest::Defend(w.ai, w.entities, w.pf);
         const bool recalled = !members.empty() && AIDefenseTest::IsDefender(w.ai, members.front())
                               && !w.ai.GetSquadController().IsSquadMember(members.front());
-        if (variant == 0)
-            Check(recalled, "a group on the march turns back for the base");
-        else if (variant == 1)
-            Check(!recalled, "Easy: the groups march on");
-        else
-            Check(!recalled, "a group that storms the enemy base goes on");
+        // A wave that left never turns back, whatever the difficulty and however near home it still is
+        Check(!recalled && w.ai.GetSquadController().IsSquadMember(members.front()),
+            variant == 0 ? "a group on the march does not turn back for the base"
+            : variant == 1 ? "Easy: the groups march on"
+                           : "a group that storms the enemy base goes on");
     }
 
     // 4. A chase ends a little outside the base
@@ -483,6 +483,9 @@ int main()
     // 5. The same game twice gives the same world
     {
         auto run = [] {
+            // Every game starts from its seed (Simulation reseeds the gameplay generator); the second run must not
+            // carry on the first one's random sequence
+            Utility::Rng().Reseed(12345);
             World w;
             std::vector<int> troops;
             for (int i = 0; i < 6; ++i)

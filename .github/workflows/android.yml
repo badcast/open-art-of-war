@@ -1,0 +1,76 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-setup/**'
+      - 'src/**'
+      - 'include/**'
+      - '3rdParty/**'
+      - '.github/workflows/android.yml'
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - 'android-setup/**'
+      - 'src/**'
+      - 'include/**'
+      - '3rdParty/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Android (NDK & Gradle)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Install NDK and CMake via sdkmanager
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "ndk;26.1.10909125" "cmake;3.22.1"
+
+      - name: Build Android APK
+        working-directory: android-setup
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+        run: |
+          gradle assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openaow-android-debug
+          path: android-setup/app/build/outputs/apk/debug/*.apk
+
+      - name: Publish APK on Release Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK_PATH=$(ls android-setup/app/build/outputs/apk/debug/*.apk | head -n 1)
+          if [ -f "$APK_PATH" ]; then
+            cp "$APK_PATH" "openaow-android-${GITHUB_REF_NAME}.apk"
+            gh release upload "$GITHUB_REF_NAME" "openaow-android-${GITHUB_REF_NAME}.apk" --repo "$GITHUB_REPOSITORY" --clobber || true
+          fi

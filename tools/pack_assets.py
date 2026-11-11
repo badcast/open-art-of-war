@@ -61,7 +61,7 @@ def add_entry(tar, key, data):
 
 def manifest_paths(node, key=""):
     """Every file path named in main.yaml (the keys that hold names, not files, are skipped)"""
-    if key in ("_comment", "version", "default_language", "fallback_language", "dir"):
+    if key in ("_comment", "version", "default_language", "fallback_language", "dir") or key.endswith("_dir"):
         return
     if isinstance(node, str):
         yield node

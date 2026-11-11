@@ -10,6 +10,9 @@ struct the_neuron;
 template <typename ISite, typename INeuron>
 class basic_brain_map;
 typedef basic_brain_map<the_site, the_neuron> brain_map;
+template <typename ISite, typename INeuron>
+class basic_flow_field;
+typedef basic_flow_field<the_site, the_neuron> flow_field;
 } // namespace brain
 
 namespace OpenArtOfWar
@@ -90,12 +93,30 @@ public:
         m_ignoreUnitsOnce = true;
     }
 
+    // Group orders: one flow field (a Dijkstra map from the goal over terrain, water, walls and buildings) gives every
+    // unit of the group its way to that goal without a search of its own. False when the goal is blocked or outside.
+    bool BuildFlowField(int goalX, int goalY);
+    // The way from start to dest (a formation slot near the field's goal): the field's road up to a few tiles
+    // before dest, then a short search (units counted) for the rest. A start the field does not reach (walled in,
+    // another island) gets a plain findPath, partial paths and all. Same output contract as findPath.
+    bool FlowPath(
+        int startX,
+        int startY,
+        int destX,
+        int destY,
+        std::vector<PathNode> &outPath,
+        int ignoreEntityId = 0,
+        bool *outIsPartial = nullptr);
+
 private:
     void EnsureBrainMapSize(int width, int height);
+    // Reorders a staircase of steps into long straight runs (same tiles count, same length, fewer turns)
+    bool StraightenPath(int startX, int startY, std::vector<PathNode> &pathVec) const;
 
     const TileMap *m_map {nullptr};
     const EntityManager *m_entities {nullptr};
     std::unique_ptr<brain::brain_map> m_brainMap;
+    std::unique_ptr<brain::flow_field> m_flowField; // the last group order's field (its own copy of the data)
     int m_lastWidth {0};
     int m_lastHeight {0};
     std::vector<PathNode> m_avoidTiles;

@@ -2341,6 +2341,12 @@ msgstr "Loop: the flash layer repeats for as long as the unit fires. Once: it pl
 msgid "The other side uses another network protocol: both need the same version of the game."
 msgstr "The other side uses another network protocol: both need the same version of the game."
 
+msgid "Different game build: the same version, but the game logic differs (both need the same build)."
+msgstr ""
+
+msgid "Recorded by another game build: it may play out differently."
+msgstr ""
+
 msgid "Different game version"
 msgstr "Different game version"
 

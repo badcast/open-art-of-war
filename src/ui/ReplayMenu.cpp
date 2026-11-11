@@ -301,6 +301,9 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
                     + (result.empty() ? "" : "  -  " + result),
                 col::TextDim);
             line(std::string(_("Game version")) + ": " + in.gameVersion, col::TextMuted, ui::FONT_SMALL);
+            // The game logic of this build is not the one that recorded it: it plays, but not necessarily as it went
+            if (!in.checksumsComparable)
+                line(_("Recorded by another game build: it may play out differently."), col::Accent, ui::FONT_SMALL);
             if (!in.mods.empty())
             {
                 std::string mods;

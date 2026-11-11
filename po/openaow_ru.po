@@ -2341,6 +2341,12 @@ msgstr "Повтор: слой вспышки крутится, пока юни�
 msgid "The other side uses another network protocol: both need the same version of the game."
 msgstr "У другой стороны другой сетевой протокол: нужна одна и та же версия игры у обоих."
 
+msgid "Different game build: the same version, but the game logic differs (both need the same build)."
+msgstr "Другая сборка игры: версия та же, но игровая логика отличается (нужна одинаковая сборка)."
+
+msgid "Recorded by another game build: it may play out differently."
+msgstr "Записан другой сборкой игры: может воспроизводиться иначе."
+
 msgid "Different game version"
 msgstr "Другая версия игры"
 
