@@ -8,6 +8,7 @@
 #include "game/Pathfinder.hpp"
 #include "game/TileMap.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -111,6 +112,40 @@ struct AIDefenseTest
     static int Dispatched(const AIController &ai)
     {
         return ai.m_dispatchedInWave;
+    }
+    static bool InRoster(const AIController &ai, int id)
+    {
+        return ai.m_waveRoster.count(id) != 0;
+    }
+    static void UpdateRoster(AIController &ai, EntityManager &entities)
+    {
+        ai.UpdateWaveRoster(entities);
+    }
+    static void SendToRepair(AIController &ai, int id)
+    {
+        ai.m_waveRoster.erase(id);
+        ai.m_repairing.insert(id);
+    }
+    static bool Repairing(const AIController &ai, int id)
+    {
+        return ai.m_repairing.count(id) != 0;
+    }
+    static void Retreat(AIController &ai, EntityManager &entities, Pathfinder &pf)
+    {
+        ai.UpdateValuableRetreat(entities, pf);
+    }
+    static void SetPlan(AIController &ai, std::vector<int> archetypes)
+    {
+        ai.m_currentPlan.archetypes = std::move(archetypes);
+    }
+    static void SetGroupSize(AIController &ai, int size)
+    {
+        ai.m_currentDifficultyConfig.tactics.dispatchGroupSize = size;
+    }
+    static void Strand(AIController &ai, float assemblySeconds)
+    {
+        ai.m_hasProduction = false;
+        ai.m_waveAssemblyTimer = assemblySeconds;
     }
     static void Replan(AIController &ai)
     {
@@ -275,52 +310,74 @@ int main()
         Check(AIDefenseTest::HomeGuard(w.ai, 20, 10) > AIDefenseTest::HomeGuard(w.ai, 0, 10), "the plan counts first");
     }
 
-    // Hard/Hardcore send the outermost nearby troops, even far from staging and below a full wave.
+    // Hard/Hardcore do not wait for the whole wave, but a group leaves the staging area only once
+    // dispatch_group_size troops (beyond the home guard) are assembled there: a troop fresh from the barracks never
+    // marches off alone. Easy/Medium wait for the whole wave
     for (auto level : {AIDifficulty::Easy, AIDifficulty::Medium, AIDifficulty::Hard, AIDifficulty::Hardcore})
     {
         World w(level);
-        const int rear = w.Own(20, 20);
-        const int front = w.Own(50, 40);
-        const int neighbor = w.Own(49, 40);
-        AIDefenseTest::Prepare(w.ai, {rear, front, neighbor}, 30, kHqX, kHqY);
+        const int sx = kHqX + 4, sy = kHqY + 4;
+        AIDefenseTest::Prepare(w.ai, {}, 10, sx, sy);
+        AIDefenseTest::SetGroupSize(w.ai, 3);
+        const int guard = AIDefenseTest::HomeGuard(w.ai, 10, 10);
+        std::vector<int> troops;
+        const int fresh = w.Own(60, 50); // just out of a barracks far away
+        troops.push_back(fresh);
+        for (int i = 0; i < guard + 2; ++i)
+            troops.push_back(w.Own(sx - 2 + i % 5, sy + 1 + i / 5));
+        AIDefenseTest::Prepare(w.ai, troops, 10, sx, sy);
+        AIDefenseTest::SetGroupSize(w.ai, 3);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Squads(w.ai) == 0, "no group leaves before it is assembled at the staging area");
+        const int last = w.Own(sx + 3, sy + 5);
+        troops.push_back(last);
+        AIDefenseTest::Prepare(w.ai, troops, 10, sx, sy);
+        AIDefenseTest::SetGroupSize(w.ai, 3);
         AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
         const bool immediate = level == AIDifficulty::Hard || level == AIDifficulty::Hardcore;
         Check(
             AIDefenseTest::Squads(w.ai) == (immediate ? 1 : 0),
-            "only Hard/Hardcore send incomplete groups away from staging");
+            "Hard/Hardcore send an assembled group without the whole wave");
         if (!immediate)
             continue;
         const AISquad *sq = AIDefenseTest::FirstSquad(w.ai);
+        Check(sq && sq->unitIds.size() == 3, "the group has dispatch_group_size troops");
         Check(
-            sq && sq->unitIds == std::vector<int>({front, neighbor}),
-            "outermost troops leave together without waiting for distant reserves");
+            sq && std::find(sq->unitIds.begin(), sq->unitIds.end(), fresh) == sq->unitIds.end(),
+            "a troop not at the staging area does not leave with it");
+        Check(AIDefenseTest::Dispatched(w.ai) == 3, "dispatched troops are counted");
         AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
-        Check(AIDefenseTest::Squads(w.ai) == 2, "remaining singleton leaves on the next tick without a cooldown");
+        Check(AIDefenseTest::Squads(w.ai) == 1, "the home guard and the rest wait for the next group");
         Check(w.ai.GetWaveCount() == 0, "small groups do not advance the composition once per dispatch");
+        AIDefenseTest::Replan(w.ai);
+        Check(AIDefenseTest::Dispatched(w.ai) == 0, "a new plan restarts the dispatch count");
     }
 
-    // Hard: no group leaves while the base is attacked, a fresh plan restarts the dispatch count, a small group size
-    // from the configuration is obeyed
+    // Hard: no group leaves while the base is attacked; a lone troop never leaves while production goes on,
+    // without production the assembled troops go after a while
     {
         World w(AIDifficulty::Hard);
-        const int a = w.Own(50, 40), b = w.Own(49, 40);
-        AIDefenseTest::Prepare(w.ai, {a, b}, 30, kHqX, kHqY);
+        std::vector<int> troops;
+        for (int i = 0; i < 12; ++i)
+            troops.push_back(w.Own(kHqX + 2 + i % 6, kHqY + 5 + i / 6));
+        AIDefenseTest::Prepare(w.ai, troops, 2, kHqX + 4, kHqY + 4);
         AIDefenseTest::SetAttacked(w.ai, 5.0f, 0.0f);
         AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
         Check(AIDefenseTest::Squads(w.ai) == 0, "no front group leaves a base under attack");
         AIDefenseTest::SetAttacked(w.ai, 0.0f, 0.0f);
         AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
-        Check(AIDefenseTest::Dispatched(w.ai) == 2, "dispatched troops are counted");
-        AIDefenseTest::Replan(w.ai);
-        Check(AIDefenseTest::Dispatched(w.ai) == 0, "a new plan restarts the dispatch count");
+        Check(AIDefenseTest::Squads(w.ai) == 1, "... and leaves once the base is quiet");
     }
     {
         World w(AIDifficulty::Hard);
-        const int a = w.Own(20, 20, 1);
-        AIDefenseTest::Prepare(w.ai, {a}, 30, kHqX, kHqY);
+        const int a = w.Own(kHqX + 4, kHqY + 4);
+        AIDefenseTest::Prepare(w.ai, {a}, 0, kHqX + 4, kHqY + 4);
         for (int s = 0; s < 3; ++s)
-            AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf); // (units stay: the squad owns the only one)
-        Check(AIDefenseTest::Squads(w.ai) == 1, "a lone troop forms one group, not one per tick");
+            AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Squads(w.ai) == 0, "a lone troop does not march off on its own");
+        AIDefenseTest::Strand(w.ai, 25.0f);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        Check(AIDefenseTest::Squads(w.ai) == 1, "without production what is assembled goes after a while");
     }
 
     // The entity limit counts the living: dead ones stay in the list, and used to fill it for good (no spawn for
@@ -669,6 +726,66 @@ int main()
             w.entities.GetBuilding(factory)->isProducing
                 == (level == AIDifficulty::Hard || level == AIDifficulty::Hardcore),
             "continuous factory production is restricted to Hard and Hardcore");
+    }
+
+    // A free factory beyond the plan (an infantry-only wave) builds a mix of vehicles, not one light vehicle over
+    // and over
+    {
+        World w(AIDifficulty::Hard);
+        const int factory = w.entities.SpawnBuildingByIndex(3, 30, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(factory)->isPowered = true;
+        std::vector<int> built;
+        for (int round = 0; round < 4; ++round)
+        {
+            AIDefenseTest::PrepareVehicleProduction(w.ai, 10000);
+            AIDefenseTest::FinishProductionQueues(w.ai);
+            AIDefenseTest::SetPlan(w.ai, {1, 1, 1}); // (an infantry-only wave)
+            Building *f = w.entities.GetBuilding(factory);
+            f->isProducing = false;
+            f->productionTimer = 0.0f;
+            AIDefenseTest::Produce(w.ai, w.map, w.entities);
+            for (const auto &e : w.entities.GetAllEntities())
+            {
+                Unit *u = const_cast<Entity &>(e).AsUnit();
+                if (u && u->alive && u->owner == w.ai.Player() && !u->IsInfantry())
+                {
+                    built.push_back(u->archetypeId);
+                    u->alive = false; // (clears the exit for the next one)
+                }
+            }
+        }
+        std::sort(built.begin(), built.end());
+        Check(built.size() == 4, "a free factory keeps building");
+        Check(
+            std::unique(built.begin(), built.end()) - built.begin() >= 2,
+            "a free factory builds a mix of vehicles, not only the lightest one");
+    }
+
+    // Skirmish: no troop of the computer is forgotten - one that no list holds joins the reserve; a mission's
+    // troops stay its script's
+    for (bool skirmish : {true, false})
+    {
+        World w(AIDifficulty::Hard);
+        w.ai.SetSkirmish(skirmish);
+        AIDefenseTest::Prepare(w.ai, {}, 10, kHqX + 4, kHqY + 4);
+        const int lost = w.Own(60, 50);
+        AIDefenseTest::UpdateRoster(w.ai, w.entities);
+        Check(AIDefenseTest::InRoster(w.ai, lost) == skirmish, "a forgotten troop joins the reserve in a skirmish");
+    }
+
+    // A damaged vehicle without a factory is never repaired: it does not wait for it for good
+    {
+        World w(AIDifficulty::Hard);
+        w.ai.SetSkirmish(true);
+        const int tank = w.Own(kHqX + 6, kHqY + 6, 9);
+        AIDefenseTest::Prepare(w.ai, {tank}, 10, kHqX + 4, kHqY + 4);
+        Unit *t = w.entities.GetUnit(tank);
+        t->currentHp = t->maxHp / 4;
+        AIDefenseTest::SendToRepair(w.ai, tank);
+        AIDefenseTest::Retreat(w.ai, w.entities, w.pf);
+        Check(
+            !AIDefenseTest::Repairing(w.ai, tank) && AIDefenseTest::InRoster(w.ai, tank),
+            "a vehicle with no factory to repair it rejoins the reserve");
     }
 
     // A one-tile exit shared with an ally must drain before more units are spawned.

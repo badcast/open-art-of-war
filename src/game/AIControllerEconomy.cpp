@@ -108,15 +108,34 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
 
     // Wave readiness controls when troops march, never whether factories keep working.
     // Refill each production line independently, including a factory in an infantry-only wave.
+    // A free factory beyond the plan builds a mix that grows heavier with the wave tier, not one light vehicle
+    // over and over (it never depends on the seed: the same wave tier gives the same mix)
+    const auto extraVehicle = [&]() {
+        static const int kEarly[] = {kHammer, kFortress};
+        static const int kLate[] = {kHammer, kZeus, kHammer, kFortress, kGrad};
+        const bool late = m_currentPlan.tier >= AIWaveTier::Assault;
+        const int *mix = late ? kLate : kEarly;
+        const int count = late ? 5 : 2;
+        for (int i = 0; i < count; ++i)
+        {
+            const int arch = mix[(m_extraVehicles + i) % count];
+            if (IsUnitUnlocked(m_player, SideArchetype(arch, side())))
+            {
+                m_extraVehicles = (m_extraVehicles + i + 1) % count;
+                return arch;
+            }
+        }
+        ++m_extraVehicles;
+        return kFortress;
+    };
     const auto refill = [&](std::vector<int> &queue, bool vehicles, std::size_t idleBuildings) {
         if (!queue.empty() || idleBuildings == 0)
             return;
         for (int arch : m_currentPlan.archetypes)
             if (IsVehicleArchetype(arch) == vehicles)
                 queue.push_back(arch);
-        const int fallback = vehicles ? kFortress : kRifleman;
         while (queue.size() < idleBuildings)
-            queue.push_back(fallback);
+            queue.push_back(vehicles ? extraVehicle() : kRifleman);
     };
     if (continuous)
     {
@@ -194,7 +213,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         if (!IsUnitUnlocked(m_player, SideArchetype(arch, side())))
         {
             const int infantry[] = {kRifleman, kHeavyAssault, kFlamethrower};
-            const int vehicles[] = {kFortress, kHammer, kGrad, kZeus};
+            const int vehicles[] = {kHammer, kZeus, kFortress}; // (a locked MLRS gives a tank, not the lightest)
             int instead = -1;
             if (IsVehicleArchetype(arch))
             {

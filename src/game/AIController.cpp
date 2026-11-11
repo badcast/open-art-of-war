@@ -309,7 +309,8 @@ std::vector<std::string> AIController::CurrentIntentions() const
         const auto difficulty = GetEffectiveDifficulty();
         const bool immediate = difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore;
         if (immediate)
-            w << "Sending front groups immediately: " << m_dispatchedInWave << "/" << required << " dispatched";
+            w << "Assembling front group: " << m_readyUnits << "/" << m_currentDifficultyConfig.tactics.dispatchGroupSize
+              << " at staging, " << m_dispatchedInWave << "/" << required << " of the wave dispatched";
         else
             w << "Assembling wave " << (m_waveCount + 1) << " (" << TierName(m_currentPlan.tier)
               << "): " << m_readyUnits << "/" << required << " ready";
@@ -574,6 +575,7 @@ void AIController::Reset()
     m_waveAssemblyTimer = 0.0f;
     m_factoryReady = false;
     m_vehicleHoldSeconds = 0.0f;
+    m_extraVehicles = 0;
     m_readyUnits = 0;
     m_hasProduction = true;
 
@@ -629,6 +631,7 @@ void AIController::Reset()
     m_scoutIdleTimer = 0.0f;
     m_scoutTrips = 0;
     m_repairing.clear();
+    m_repairProgress.clear();
     m_retreatTimer = 0.0f;
     m_firstRaidDone = false;
     m_failedWaves = 0;
@@ -751,7 +754,9 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
         }
     }
 
-    if (!m_garrisonRecorded)
+    // A mission's pre-placed troops are its garrison and keep their posts; a skirmish / network game's starting
+    // troops are the computer's own army (the roster takes them)
+    if (!m_garrisonRecorded && !m_skirmish)
     {
         m_garrisonRecorded = true;
         for (const auto &e : entities.GetAllEntities())

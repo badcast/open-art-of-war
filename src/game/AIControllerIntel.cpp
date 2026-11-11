@@ -58,7 +58,17 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
 {
     const AIDifficulty difficulty = GetEffectiveDifficulty();
     if (difficulty == AIDifficulty::Hardcore || m_noFoesLeft || (m_playerHqX <= 0 && m_playerHqY <= 0))
+    {
+        // No more scouting: a scout still out comes back to the reserve instead of standing there for good
+        if (Unit *scout = m_scoutId ? entities.GetUnit(m_scoutId) : nullptr; scout && scout->alive)
+        {
+            entities.IssueMoveOrder({scout->id}, m_stagingX, m_stagingY, pathfinder, false);
+            m_waveRoster.insert(scout->id);
+            m_recalled.insert(scout->id);
+        }
+        m_scoutId = 0;
         return;
+    }
     m_scoutTimer -= deltaTime;
     Unit *scout = m_scoutId ? entities.GetUnit(m_scoutId) : nullptr;
     if (m_scoutId && (!scout || !scout->alive || scout->state == ActionState::Die))
@@ -170,17 +180,29 @@ void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pa
         Unit *u = entities.GetUnit(*it);
         if (!u || !u->alive || u->state == ActionState::Die)
         {
-            it = m_repairing.erase(it);
-            continue;
-        }
-        if (u->currentHp * 10 >= u->maxHp * 9)
-        {
-            m_waveRoster.insert(u->id);
-            Think("RETREAT", "A repaired unit rejoins the reserve");
+            m_repairProgress.erase(*it);
             it = m_repairing.erase(it);
             continue;
         }
         const bool vehicle = !Utility::IsInfantryArchetype(u->archetypeId);
+        // A vehicle without a factory is never repaired, and a unit whose HP has not risen for a while (it cannot
+        // get close enough) waits for nothing: both rejoin the reserve as they are
+        auto &progress = m_repairProgress[u->id];
+        if (u->currentHp > progress.first || progress.second <= 0.0f)
+            progress = {u->currentHp, m_gameTime};
+        constexpr float kRepairStallSeconds = 20.0f;
+        const bool stalled = m_gameTime - progress.second > kRepairStallSeconds;
+        if (u->currentHp * 10 >= u->maxHp * 9 || (vehicle && factoryX < 0) || stalled)
+        {
+            m_waveRoster.insert(u->id);
+            Think(
+                "RETREAT",
+                u->currentHp * 10 >= u->maxHp * 9 ? "A repaired unit rejoins the reserve"
+                                                  : "No repair for a damaged unit: it rejoins the reserve");
+            m_repairProgress.erase(u->id);
+            it = m_repairing.erase(it);
+            continue;
+        }
         const int rx = vehicle && factoryX >= 0 ? factoryX : m_stagingX;
         const int ry = vehicle && factoryX >= 0 ? factoryY : m_stagingY;
         if (u->state == ActionState::Idle && !u->HasMoveTarget()

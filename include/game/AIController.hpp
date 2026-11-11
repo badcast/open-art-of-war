@@ -467,6 +467,7 @@ private:
     float m_waveAssemblyTimer {0.0f};
     bool m_factoryReady {false};       // a finished factory was seen (the wave plan is made again once, with vehicles)
     float m_vehicleHoldSeconds {0.0f}; // how long the barracks have been saving credits for the next vehicle
+    int m_extraVehicles {0};           // vehicles a free factory added beyond the plan (picks the next of the mix)
     int m_readyUnits {0};
     bool m_hasProduction {true};
     int m_stagingX {0};
@@ -568,6 +569,7 @@ private:
     int m_scoutTrips {0};
     // Expensive units on their way to repairs (out of the waves until healed)
     std::set<int> m_repairing;
+    std::map<int, std::pair<int, float>> m_repairProgress; // unit -> (HP, game time it last rose): no repair, no wait
     float m_retreatTimer {0.0f};
     bool m_firstRaidDone {false};
     // Waves that broke nothing: Hard / Hardcore send more groups and more troops after them (as far as the treasury

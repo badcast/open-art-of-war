@@ -208,6 +208,21 @@ void AIController::UpdateWaveRoster(EntityManager &entities)
                 m_waveRoster.insert(u->id);
         }
     }
+    // Nobody is forgotten (skirmish / network game: a mission's script commands its own troops): an own mobile unit
+    // that no list holds (not in a squad, not the scout, not on its way to repairs) is a troop of the reserve
+    if (m_rosterSeeded && m_skirmish)
+    {
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f)
+                continue;
+            if (m_waveRoster.count(u->id) || m_garrison.count(u->id) || m_squadController.IsSquadMember(u->id)
+                || u->id == m_scoutId || m_repairing.count(u->id))
+                continue;
+            m_waveRoster.insert(u->id);
+        }
+    }
     // Dead troops leave the list, and so do the ones a wave took (their squad holds them now)
     for (auto it = m_waveRoster.begin(); it != m_waveRoster.end();)
     {
@@ -494,25 +509,39 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         return;
 
     const AIDifficulty difficulty = GetEffectiveDifficulty();
-    // Hard/Hardcore dispatch the front of the reserve immediately, from its current
-    // position. No rally-point, full-wave, minimum-size or inter-wave wait.
+    // Hard/Hardcore do not wait for the whole wave: a group leaves as soon as dispatch_group_size troops are
+    // assembled at the staging area (the home guard stays). No cooldown between the groups. A lone troop fresh
+    // from the barracks never marches off on its own
     if (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore)
     {
+        std::vector<int> front;
+        for (int id : ready)
+        {
+            const Unit *u = entities.GetUnit(id);
+            if (u && !m_defenders.count(id) && !m_repairing.count(id) && id != m_scoutId
+                && u->state != ActionState::Attack && u->state != ActionState::Transform)
+                front.push_back(id);
+        }
+        const int groupSize = m_currentDifficultyConfig.tactics.dispatchGroupSize;
+        const int guard = std::max(0, HomeGuardCount() - static_cast<int>(m_guardOf.size()));
+        int send = static_cast<int>(front.size()) - guard;
+        // Without production left nobody else comes: what is assembled goes after a while
+        const bool stranded = !m_hasProduction && send > 0 && m_waveAssemblyTimer > 20.0f;
+        // Troops that never reach the staging area (a crowded or walled-in base) leave from where they stand
+        constexpr float kStagingGiveUpSeconds = 120.0f;
+        if (send < groupSize && !stranded && m_waveAssemblyTimer > kStagingGiveUpSeconds
+            && static_cast<int>(idleReserve.size()) - guard >= groupSize)
+        {
+            front = idleReserve;
+            send = static_cast<int>(front.size()) - guard;
+        }
+        if (send < groupSize && !stranded)
+            return;
         int targetX, targetY;
         FindAttackObjective(entities, map, targetX, targetY);
         if (targetX < 0)
             return;
-        std::vector<int> front;
-        for (const auto &e : entities.GetAllEntities())
-        {
-            const Unit *u = e.AsUnit();
-            if (u && IsReserveUnit(*u) && !IsPostGuard(u->id) && !m_defenders.count(u->id) && !m_repairing.count(u->id)
-                && u->id != m_scoutId && u->targetEntityId == 0 && !u->isAttackMoving && u->state != ActionState::Attack
-                && u->state != ActionState::Transform)
-                front.push_back(u->id);
-        }
-        if (front.empty())
-            return;
+        // The troops closest to the objective leave, the rear ones stay as the home guard
         const long long dx = targetX - m_enemyHqX, dy = targetY - m_enemyHqY;
         std::sort(front.begin(), front.end(), [&](int a, int b) {
             const Unit *ua = entities.GetUnit(a), *ub = entities.GetUnit(b);
@@ -520,18 +549,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
             const long long pb = ub->tileX * dx + ub->tileY * dy;
             return pa != pb ? pa > pb : a < b;
         });
-        const Unit *leader = entities.GetUnit(front.front());
-        const int lx = leader->tileX, ly = leader->tileY;
-        std::vector<int> group;
-        for (int id : front)
-        {
-            const Unit *u = entities.GetUnit(id);
-            // Distant troops leave in their own group instead of pulling this one back to regroup.
-            if (std::max(std::abs(u->tileX - lx), std::abs(u->tileY - ly)) <= m_currentDifficultyConfig.tactics.dispatchGroupRadius)
-                group.push_back(id);
-            if (static_cast<int>(group.size()) >= m_currentDifficultyConfig.tactics.dispatchGroupSize)
-                break;
-        }
+        std::vector<int> group(front.begin(), front.begin() + std::min(send, groupSize));
         for (int id : group)
             entities.GetUnit(id)->groupHold = false;
         const int wave = m_waveCount + 1;
@@ -547,6 +565,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         }
         m_dispatchedInWave += static_cast<int>(group.size());
         m_readyUnits = static_cast<int>(front.size() - group.size());
+        m_waveAssemblyTimer = 0.0f;
         Think(
             "ATTACK",
             "Immediate front group G" + std::to_string(squadId) + " with " + std::to_string(group.size()) + " unit(s)");
