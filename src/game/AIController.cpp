@@ -83,6 +83,8 @@ void AIController::InitDifficultyDefaults()
     easy.tactics.maxAttackGroups = 2;
     easy.tactics.creditsPerExtraGroup = 1200;
     easy.tactics.buildDefenses = false;
+    easy.tactics.defenseRecallSquads = false;
+    easy.tactics.lateRiflemanPercent = 50;
     m_difficultyConfigs[AIDifficulty::Easy] = easy;
 
     // Medium (Normal): strict 3-tile leash, melee + ranged pairs, gathers before chokepoints
@@ -101,6 +103,7 @@ void AIController::InitDifficultyDefaults()
     med.tactics.siegeWave = 5;
     med.tactics.vehicleWaitSeconds = 60.0f;
     med.tactics.maxAttackGroups = 3;
+    med.tactics.lateRiflemanPercent = 25;
     m_difficultyConfigs[AIDifficulty::Medium] = med;
 
     // Hard: + pace of the slowest unit, armor in front, retreat when a wave dies for nothing
@@ -583,6 +586,11 @@ void AIController::Reset()
     m_stagingTimer = 0.0f;
     m_lastThreatX = m_lastThreatY = -1;
     m_lastThreatId = 0;
+    m_defenders.clear();
+    m_baseAttackedTimer = 0.0f;
+    m_baseAttackedSeconds = 0.0f;
+    m_lastPlanSize = 0;
+    m_recallReadyTime = 0.0f;
     m_knownBuildings.clear();
     std::fill(std::begin(m_sectorThreat), std::end(m_sectorThreat), 0.0f);
     std::fill(std::begin(m_foeHostility), std::end(m_foeHostility), 0.0f);
@@ -790,6 +798,13 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
         UpdateWaveOutcome(entities);
     }
 
+    if (m_baseAttackedTimer > 0.0f)
+    {
+        m_baseAttackedTimer -= deltaTime;
+        m_baseAttackedSeconds += deltaTime;
+    }
+    else
+        m_baseAttackedSeconds = 0.0f;
     m_defenseCheckTimer += deltaTime;
     if (m_defenseCheckTimer >= 2.0f)
     {

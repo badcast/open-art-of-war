@@ -18,6 +18,10 @@ inline constexpr int kFortress = 7;
 inline constexpr int kHammer = 9;
 inline constexpr int kZeus = 11;
 inline constexpr int kGrad = 13; // MLRS (artillery)
+// Troops of the base follow an enemy this far (tiles) out of the base zone, no farther
+inline constexpr float kBaseChaseTiles = 12.0f;
+// A wave waits at most this long for an attack on the base to end, then it leaves anyway
+inline constexpr float kWaveHoldMaxSeconds = 60.0f;
 
 int SideArchetype(int confederationArch, Faction side);
 bool IsVehicleArchetype(int arch);

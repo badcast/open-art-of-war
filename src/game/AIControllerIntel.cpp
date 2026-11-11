@@ -93,7 +93,8 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_repairing.count(u->id) || u->targetEntityId != 0)
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_repairing.count(u->id) || u->targetEntityId != 0
+            || m_defenders.count(u->id))
             continue;
         const UnitConfig *cfg = entities.GetUnitConfig(u->archetypeId);
         const int cost = cfg ? cfg->creditCost : 1000;
@@ -225,6 +226,7 @@ void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pa
 
 void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder)
 {
+    const std::vector<const Building *> ownStructures = OwnStructures(entities);
     for (auto &e : entities.GetAllEntities())
     {
         Unit *u = e.AsUnit();
@@ -238,6 +240,10 @@ void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfind
         {
             float closestDist = u->sightRadius * TILE_WIDTH;
             int targetId = 0;
+            // An attack order pursues without a leash: only against an enemy at the base or a little outside it.
+            // Farther out the unit fights by its stance (it takes what comes into sight and returns). The
+            // mission's garrisons stand anywhere and keep their order.
+            const bool leashed = !m_garrison.count(u->id);
 
             for (const auto &other : entities.GetAllEntities())
             {
@@ -248,7 +254,7 @@ void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfind
                 float dx = other.GetUnitCenterPixelX() - u->GetUnitCenterPixelX();
                 float dy = other.GetUnitCenterPixelY() - u->GetUnitCenterPixelY();
                 float d = DetMath::Hypot(dx, dy);
-                if (d < closestDist)
+                if (d < closestDist && (!leashed || IsNearBase(other, ownStructures, kBaseChaseTiles)))
                 {
                     closestDist = d;
                     targetId = other.id;

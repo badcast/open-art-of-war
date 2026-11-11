@@ -203,7 +203,8 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
             const auto *cfg = entities.GetUnitConfig(b->repeatArchetype);
             QueueUnit(b->repeatArchetype, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, b->id, entities);
         }
-        b->isProducing = !b->productionQueue.empty();
+        // (a computer player trains by its timer, not through the queue: Building::UpdateProduction)
+        b->isProducing = !b->productionQueue.empty() || b->productionTimer > 0.0f;
         if (b->productionQueue.empty() || b->buildProgress < 1.0f)
             continue;
 

@@ -680,13 +680,19 @@ bool AIController::PlanPassageWalls(
         }
         if (!newGate)
             continue; // the defenses of that passage are planned already
-        // A tower and a bunker behind the gate, on both sides of the road
-        const auto [hx, hy] = road[std::max(0, bestI - 3)];
+        // (three tiles in: nearer, the corridor kept free around the gate would push one of them aside)
+        // Two bunkers right behind the wall, one on each side of the road: they take the fire. The towers stand
+        // behind them, deeper in the base (they reach farther): two, or one for a style of many bunkers
         const int side = gateHi + 2;
-        AIDefenseSite::Kind first = m_style.bunkerHeavy ? AIDefenseSite::Bunker : AIDefenseSite::Tower;
-        AIDefenseSite::Kind second = m_style.bunkerHeavy ? AIDefenseSite::Tower : AIDefenseSite::Bunker;
-        m_defensePlan.push_back({first, hx + bestPx * side - 1, hy + bestPy * side - 1, false});
-        m_defensePlan.push_back({second, hx - bestPx * (side + 1) - 1, hy - bestPy * (side + 1) - 1, false});
+        const auto [bx, by] = road[std::max(0, bestI - 3)];
+        m_defensePlan.push_back({AIDefenseSite::Bunker, bx + bestPx * side - 1, by + bestPy * side - 1, false});
+        m_defensePlan.push_back(
+            {AIDefenseSite::Bunker, bx - bestPx * (side + 1) - 1, by - bestPy * (side + 1) - 1, false});
+        const auto [tx, ty] = road[std::max(0, bestI - 6)];
+        m_defensePlan.push_back({AIDefenseSite::Tower, tx + bestPx * side - 1, ty + bestPy * side - 1, false});
+        if (!m_style.bunkerHeavy)
+            m_defensePlan.push_back(
+                {AIDefenseSite::Tower, tx - bestPx * (side + 1) - 1, ty - bestPy * (side + 1) - 1, false});
     }
     return any;
 }

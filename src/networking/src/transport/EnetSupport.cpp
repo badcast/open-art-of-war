@@ -3,6 +3,7 @@
 #include "openaow/net/Net.hpp"
 
 #include <mutex>
+#include <cstdlib>
 
 namespace OpenArtOfWar::Net
 {

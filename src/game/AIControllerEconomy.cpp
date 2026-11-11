@@ -302,7 +302,9 @@ float AIController::HomeGuardShare() const
 
 int AIController::HomeGuardCount() const
 {
-    const int wave = static_cast<int>(m_currentPlan.archetypes.size());
+    // Between two plans (a wave just left) the last one counts: the guard is never zero for that second
+    const int wave
+        = m_currentPlan.archetypes.empty() ? m_lastPlanSize : static_cast<int>(m_currentPlan.archetypes.size());
     return static_cast<int>(std::lround(static_cast<float>(wave) * HomeGuardShare()));
 }
 
@@ -514,9 +516,42 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
             }
             rear = false;
         }
-        else if (kind == AIDefenseSite::Headquarters)
+        // A new HQ widens the building zone: as far from the first one as the zone allows, counted from the
+        // headquarters that stands farthest out already (the base grows away from where it began); nearer only
+        // when there is no room out there
+        std::vector<int> rings {minRing};
+        int centreX = -1, centreY = -1;
+        if (kind == AIDefenseSite::Headquarters)
         {
-            minRing += 5; // a new HQ widens the building zone: not right beside the old one
+            minRing += 5; // never right beside the old one
+            float farthest = 0.0f;
+            for (const auto &e : entities.GetAllEntities())
+            {
+                const Building *base = e.AsBuilding();
+                if (!base || !base->alive || base->state == ActionState::Die || base->owner != m_player
+                    || base->type != UnitType::Headquarters || base->buildProgress < 1.0f)
+                    continue;
+                const int bx = base->tileX + base->buildWidth / 2, by = base->tileY + base->buildHeight / 2;
+                const float d = DetMath::Hypot(static_cast<float>(bx - cx), static_cast<float>(by - cy));
+                if (d > farthest)
+                {
+                    farthest = d;
+                    centreX = bx;
+                    centreY = by;
+                }
+            }
+            if (centreX >= 0)
+            { // on from there, away from the first headquarters
+                ox = static_cast<float>(centreX - cx);
+                oy = static_cast<float>(centreY - cy);
+            }
+            // (FindCoreSite looks outward from the ring it is given: far out, half way, then the nearest allowed)
+            const int farRing = entities.GetBuildRadius(m_player) - std::max(w, h) / 2 - 1;
+            rings.clear();
+            for (int ring : {farRing, (farRing + minRing) / 2})
+                if (ring > minRing && (rings.empty() || rings.back() != ring))
+                    rings.push_back(ring);
+            rings.push_back(minRing);
         }
 
         int x = 0, y = 0;
@@ -524,13 +559,28 @@ bool AIController::UpdateCoreBuildOrder(TileMap &map, EntityManager &entities, b
         const bool needsExit
             = kind == AIDefenseSite::Barracks || kind == AIDefenseSite::Factory || kind == AIDefenseSite::Headquarters;
         // A gap around it first, then side by side, then also on the band along a road (never on the road itself)
-        for (int crowding = 0; crowding < 3 && !found; ++crowding)
-        {
-            found = FindCoreSite(x, y, w, h, ox, oy, rear, minRing, map, entities, crowding, needsExit);
-            if (!found && rear && kind != AIDefenseSite::PowerPlant)
+        for (std::size_t ri = 0; ri < rings.size() && !found; ++ri)
+            for (int crowding = 0; crowding < 3 && !found; ++crowding)
+            {
                 found = FindCoreSite(
-                    x, y, w, h, ox, oy, false, minRing, map, entities, crowding, needsExit); // the back is full
-        }
+                    x, y, w, h, ox, oy, rear, rings[ri], map, entities, crowding, needsExit, centreX, centreY);
+                if (!found && rear && kind != AIDefenseSite::PowerPlant)
+                    found = FindCoreSite(
+                        x,
+                        y,
+                        w,
+                        h,
+                        ox,
+                        oy,
+                        false,
+                        rings[ri],
+                        map,
+                        entities,
+                        crowding,
+                        needsExit,
+                        centreX,
+                        centreY); // the back is full
+            }
         std::string failure;
         // Exhaustive fallback: all finished HQ zones, no aesthetic exclusions.
         if (!found)
@@ -639,13 +689,17 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
         return;
     m_expandTimer = 0.0f;
     const int hx = m_homeX >= 0 ? m_homeX : m_enemyHqX, hy = m_homeY >= 0 ? m_homeY : m_enemyHqY;
-    int defensesIn[8] = {};
+    int defensesIn[8] = {}, bunkersIn[8] = {};
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();
         if (b && b->alive && b->state != ActionState::Die && b->owner == m_player
             && (b->type == UnitType::Tower || b->type == UnitType::Bunker))
-            ++defensesIn[SectorOf(b->tileX + b->buildWidth / 2, b->tileY + b->buildHeight / 2)];
+        {
+            const int sct = SectorOf(b->tileX + b->buildWidth / 2, b->tileY + b->buildHeight / 2);
+            ++defensesIn[sct];
+            bunkersIn[sct] += b->type == UnitType::Bunker ? 1 : 0;
+        }
     }
     int sector = -1;
     float bestWeight = 0.0f;
@@ -677,7 +731,6 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
         if (along > 0.0f && across <= along + 3.0f) // within about 45 degrees either side
             edge = std::max(edge, along + std::max(b->buildWidth, b->buildHeight) * 0.5f + 2.0f);
     }
-    edge = std::min(edge, static_cast<float>(entities.GetBuildRadius(m_player)) - 1.0f);
     // Beside the road that leaves the base on that side (when there is one): the spot along the edge nearest to it
     float sideways = 0.0f;
     float bestRoad = 1e9f;
@@ -700,11 +753,29 @@ void AIController::UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManage
     }
     if (bestRoad >= 1e9f) // no road there: spread the towers of one sector to both sides of its middle
         sideways = (defensesIn[sector] % 2 == 0 ? 1.0f : -1.0f) * 2.0f * static_cast<float>(defensesIn[sector] / 2);
+    // A bunker at the edge first: it takes the fire. A tower only behind the bunkers of that side, never ahead of
+    // them (a side has at least as many bunkers as towers)
+    const int towersThere = defensesIn[sector] - bunkersIn[sector];
+    AIDefenseSite::Kind kind = bunkersIn[sector] <= towersThere ? AIDefenseSite::Bunker : AIDefenseSite::Tower;
+    // (the building limit of that kind is reached: the other kind, rather than nothing for ever)
+    if (!BuildLimits::CanBuildMore(entities, map, m_player, FactionBuildingIndex(kind, side())))
+        kind = kind == AIDefenseSite::Bunker ? AIDefenseSite::Tower : AIDefenseSite::Bunker;
+    // As far out as building is allowed there: the zones of all headquarters decide, so a new headquarters moves
+    // the line out; step by step nearer until a spot is found
     AIDefenseSite extra;
-    extra.kind = (m_expansions % 3 == 2) ? AIDefenseSite::Bunker : AIDefenseSite::Tower;
-    extra.tileX = static_cast<int>(std::lround(hx + dx * edge - dy * sideways)) - 1;
-    extra.tileY = static_cast<int>(std::lround(hy + dy * edge + dx * sideways)) - 1;
-    if (BuildDefenseSite(extra, map, entities))
+    bool built = false;
+    for (float back = 0.0f; back <= 12.0f && !built; back += 2.0f)
+    {
+        const float out = edge - back - (kind == AIDefenseSite::Tower ? 3.0f : 0.0f);
+        if (out < 4.0f)
+            break;
+        extra = AIDefenseSite {};
+        extra.kind = kind;
+        extra.tileX = static_cast<int>(std::lround(hx + dx * out - dy * sideways)) - 1;
+        extra.tileY = static_cast<int>(std::lround(hy + dy * out + dx * sideways)) - 1;
+        built = BuildDefenseSite(extra, map, entities);
+    }
+    if (built)
     {
         ++m_expansions;
         m_defensePlan.push_back(extra);

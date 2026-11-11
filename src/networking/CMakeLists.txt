@@ -85,6 +85,7 @@ if(OAOW_BUILD_NET_TESTS)
     # The tests also reach into the internals (ENet setup)
     target_include_directories(openaow-net-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(openaow-net-tests PRIVATE OpenAOWNetworking oaow-enet)
-    set_target_properties(openaow-net-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    set_target_properties(openaow-net-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
     add_test(NAME openaow-net-tests COMMAND openaow-net-tests)
 endif()

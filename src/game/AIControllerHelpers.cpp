@@ -112,7 +112,9 @@ void ParseTactics(const YAML::Node &node, AITacticsConfig &t)
     i("march_stride_tiles", t.marchStrideTiles);
     i("max_attack_groups", t.maxAttackGroups);
     i("credits_per_extra_group", t.creditsPerExtraGroup);
+    i("late_rifleman_percent", t.lateRiflemanPercent);
     b("build_defenses", t.buildDefenses);
+    b("defense_recall_squads", t.defenseRecallSquads);
     f("defense_first_wave_seconds", t.defenseFirstWaveSeconds);
     f("defense_wave_gap_seconds", t.defenseWaveGapSeconds);
     i("defense_squad_percent", t.defenseSquadPercent);

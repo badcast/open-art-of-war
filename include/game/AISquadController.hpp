@@ -44,7 +44,9 @@ struct AITacticsConfig
     int marchStrideTiles {5};             // distance between consecutive march waypoints
     int maxAttackGroups {3};              // groups one wave may split into (1..5), each taking its own route
     int creditsPerExtraGroup {700};       // AI treasury needed for every extra attack group
+    int lateRiflemanPercent {10};         // share (%) of plain riflemen in a wave once the tanks are there (tier 3+)
     bool buildDefenses {true};            // skirmish: wall in the base, towers / bunkers toward the enemy
+    bool defenseRecallSquads {true};      // groups still on the march turn back when the base lacks defenders
     // Defense missions: the enemy's starting squads arrive one after another instead of all at once
     float defenseFirstWaveSeconds {40.0f}; // time the player has to prepare before the first squad
     float defenseWaveGapSeconds {20.0f};   // pause between two squads

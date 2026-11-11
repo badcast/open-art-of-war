@@ -33,9 +33,10 @@ CMake options: `OAOW_BUILD_NET_TESTS` (default ON, network unit tests), `OAOW_BU
 | Test | Source | Covers |
 | --- | --- | --- |
 | `openaow-net-tests` | `src/networking/tests/NetTests.cpp` | CRC32, bit stream, protocol codec round trips, fuzzing the decoder, ENet over localhost, the lockstep session (turn order, late commands, desync detection, reconnect with the token, takeover of a slot the host still holds), lobby rules, password and leaving, ENet session, LAN discovery, room server, player-hosted games through the server. Prints `N checks, 0 failed`. |
+| `openaow-ai-defense-tests` | `tests/AIDefenseTests.cpp` | Computer player: attackers known by the damage they do, who defends, waves that wait, marching groups that turn back, the limit of a chase, the share of riflemen in late waves, the fortification (bunkers behind the wall, towers behind them, build order, no duplicates, shared limits, further headquarters). Needs `./assets` (ctest runs it from the source directory). |
 | `openaow-charactereditor-tests` | `openaow-charactereditor/tests/ConfigMergeTests.cpp` | Saving YAML configs keeps what the editor does not know: unknown fields, comments, removed keys stay removed. |
 
-Run one binary directly to see its whole output: `./build/openaow-net-tests`.
+Run one binary directly to see its whole output: `./build/tests/openaow-net-tests` (the test programs are built into `build/tests/`).
 
 Not covered: packet loss, latency or reordering (the loopback transport has no loss model); the game side of a
 network match (`NetMatch`) and the world checksum. Use the bot matches below for those (there is no automated game-level test).

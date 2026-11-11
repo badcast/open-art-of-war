@@ -96,49 +96,6 @@ void AIController::RenderDebug(
     }
 }
 
-void AIController::OnEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
-{
-    Entity *victim = entities.GetEntity(victimId);
-    Entity *attacker = entities.GetEntity(attackerId);
-    if (!victim || !attacker || victim->owner != m_player)
-        return;
-
-    if (victim->targetEntityId == 0)
-    {
-        victim->targetEntityId = attackerId;
-    }
-
-    // Call for help: alert nearby allies within 14 tiles
-    std::vector<int> allies;
-    for (auto &ally : entities.GetAllEntities())
-    {
-        if (!ally.alive || ally.state == ActionState::Die || ally.isBuilding || ally.owner != m_player)
-            continue;
-        // Members of a squad are not called away: their squad leads them (it fights when attacked on the way)
-        if (m_squadController.IsSquadMember(ally.id))
-            continue;
-        if (ally.state == ActionState::Idle && ally.targetEntityId == 0)
-        {
-            float dx = ally.GetUnitCenterPixelX() - victim->GetUnitCenterPixelX();
-            float dy = ally.GetUnitCenterPixelY() - victim->GetUnitCenterPixelY();
-            if (std::sqrt(dx * dx + dy * dy) <= 14.0f * TILE_WIDTH)
-            {
-                allies.push_back(ally.id);
-            }
-        }
-    }
-    if (!allies.empty())
-    {
-        entities.IssueAttackMoveOrder(allies, attacker->tileX, attacker->tileY, pathfinder);
-    }
-}
-
-void AIController::OnStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder)
-{
-    m_baseQuietSeconds = 0.0f; // no new headquarters while the base is under fire
-    OnEntityAttacked(structureId, attackerId, entities, pathfinder);
-}
-
 void AIController::RecordStartingBase(const EntityManager &entities, const TileMap &map)
 {
     m_startingBuildings.clear();

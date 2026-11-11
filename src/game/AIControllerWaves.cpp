@@ -150,6 +150,27 @@ AIWavePlan AIController::PlanWave(int waveNumber, bool hasFactory, bool hasFacto
                 plan.archetypes.push_back(kGrad);
         }
     }
+    // From the middle of the game on the plain riflemen are only a small share of a wave: the rest of them become
+    // heavy infantry (rocket troopers / grenadiers). The vanguard waves are half way there.
+    if (plan.tier != AIWaveTier::Scout)
+    {
+        const int percent = std::clamp(t.lateRiflemanPercent, 0, 100);
+        const int allowedPercent = plan.tier == AIWaveTier::Vanguard ? (100 + percent) / 2 : percent;
+        const int total = static_cast<int>(plan.archetypes.size() + core.size());
+        int riflemenLeft = 0;
+        for (int arch : plan.archetypes)
+            riflemenLeft += arch == kRifleman ? 1 : 0;
+        int swaps = riflemenLeft - total * allowedPercent / 100;
+        // (from the end of the list: the first troops trained stay the cheap ones, the wave is not held up)
+        for (auto it = plan.archetypes.rbegin(); it != plan.archetypes.rend() && swaps > 0; ++it)
+        {
+            if (*it == kRifleman)
+            {
+                *it = kHeavyAssault;
+                --swaps;
+            }
+        }
+    }
     plan.archetypes.insert(plan.archetypes.end(), core.begin(), core.end());
     return plan;
 }
@@ -337,7 +358,8 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id)) // (a guard stays at its post)
+        // (a guard stays at its post, a defender where the attack on the base is)
+        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_defenders.count(u->id))
             continue;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
         {
@@ -466,6 +488,11 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
             idleReserve.push_back(u->id);
     }
 
+    // No wave leaves while the base is attacked: its troops are the defenders. Not for ever (an enemy nobody can
+    // reach must not pin the army down)
+    if (m_baseAttackedTimer > 0.0f && m_baseAttackedSeconds < kWaveHoldMaxSeconds)
+        return;
+
     const AIDifficulty difficulty = GetEffectiveDifficulty();
     // Hard / Hardcore: the first raid leaves as soon as the first troops are ready
     if (!m_firstRaidDone && m_trainedUnits > 0
@@ -515,7 +542,12 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     const bool lagging = !full && m_waveAssemblyTimer > kStagingGiveUpSeconds
                          && static_cast<int>(idleReserve.size()) >= std::max(kMinAttackWave, required * 3 / 4);
     if (lagging)
-        ready = idleReserve;
+    {
+        ready = idleReserve; // ... but for the home guard
+        const int send = std::max(kMinAttackWave, static_cast<int>(ready.size()) - guard);
+        if (static_cast<int>(ready.size()) > send)
+            ready.resize(static_cast<std::size_t>(send));
+    }
     if (!full && !stranded && !vehicleTimeout && !lagging)
         return;
 
@@ -606,6 +638,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     m_waveCooldown = m_currentDifficultyConfig.tactics.waveIntervalSeconds;
     m_waveAssemblyTimer = 0.0f;
+    m_lastPlanSize = required;        // (the home guard is counted by it until the next plan is there)
     m_currentPlan.archetypes.clear(); // next plan is prepared on the next economy tick
     m_infantryQueue.clear();
     m_vehicleQueue.clear();

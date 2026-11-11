@@ -378,7 +378,9 @@ Open UDP 38100, UDP 38110–38199 and TCP 38100 in the firewall. `server/openaow
 
 The AI (`src/game/AIController.cpp`, `src/game/AISquadController.cpp`) commands one player slot — the opposing side in single player, any computer slot in a network match — in three layers:
 
-* **Director**: plans waves along an escalation curve (light infantry, then flamethrowers and rocket troops, tanks, finally a siege fist with heavy tanks and MLRS). Troops gather at a staging area; a wave marches at full strength. Units placed by the mission stay home as the garrison. It researches the lab's technologies.
+* **Director**: plans waves along an escalation curve (light infantry, then flamethrowers and rocket troops, tanks, finally a siege fist with heavy tanks and MLRS; from the tank waves on plain riflemen are only `late_rifleman_percent` of a wave, the rest is heavy infantry). Troops gather at a staging area; a wave marches at full strength. Units placed by the mission stay home as the garrison. It researches the lab's technologies.
+* **Defense**: the base counts as attacked when enemy troops are seen at it or something shoots at its structures (also from out of sight). The troops at home go for the attackers, no wave leaves meanwhile, and a group still on the march turns back when the base lacks defenders (`defense_recall_squads`, not on Easy). Nobody chases an enemy far away from the base.
+* **Fortification** (custom and network games, not on Easy): walls toward the enemy, two bunkers right behind them on every way in and the towers deeper inside behind the bunkers; bunkers are built first, then the walls, then the towers. Further headquarters are built far from the first one and get bunkers, a tower and a wall of their own.
 * **Squads**: every wave is a group with a leader and a leash. The group walks at the pace of its slowest member and the front slows down while the rear catches up; one or two stragglers never stop the whole group (a stuck one is dropped), it waits only when a real part of it fell behind.
 * **Chokepoints**: passages up to 2 tiles wide are crossed single-file and the group redeploys past the exit.
 
@@ -393,7 +395,7 @@ Run with `--debug` (or start the test map) and click **IMGUI** on the debug tool
 The tests need a debug build (`-DAOW_DEBUG=ON`), except `openaow-net-tests` and `openaow-charactereditor-tests`.
 
 ```bash
-./build/openaow-net-tests                             # serializer, protocol fuzzing, sessions, discovery, server
+./build/tests/openaow-net-tests                             # serializer, protocol fuzzing, sessions, discovery, server
 
 ```
 

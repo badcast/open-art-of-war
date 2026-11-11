@@ -74,8 +74,15 @@ In `EngineCore`, `SimulationCore`, and `GameWorld`, unit entities are stored in 
   Laboratory (paused otherwise). The AI researches in order, the player in any order. See `docs/research/techs.html`.
 - **AI attack groups**: a wave splits into 1..5 groups (`max_attack_groups`, `credits_per_extra_group` in
   `difficulty.yaml`); extra groups march through a flank point or the second base exit.
-- **Skirmish base builder**: wall arc facing the player with two exits, towers / bunkers inside it, lab and power
-  plants behind the HQ, new towers toward the side the player attacks from (`build_defenses`).
+- **AI base defense** (`AIController::UpdateBaseDefense`, every 2 s): attackers are the enemy troops seen at the base
+  and whoever hit a structure of it (`lastAttackerId`); home troops attack-move to them, waves wait (at most 60 s),
+  a marching group turns back when defenders lack (`defense_recall_squads`), a chase ends 12 tiles outside the base.
+- **Skirmish base builder**: wall arc facing the player with two exits (or walls across the passages), lab and power
+  plants behind the HQ (`build_defenses`). Two bunkers right behind the wall on every way in, the towers deeper
+  inside behind them; built bunkers, walls, towers. Later extras go to the side the attacks come from: a bunker at
+  the edge first, a tower only behind bunkers. A further HQ is built as far out as the zone allows and gets a small
+  defense of its own (`PlanOutpostDefenses`); the building limits are shared (`FinishDefensePlan`), a re-plan never
+  builds twice.
 - **Fog of war**: soft rounded edges from a blurred per-frame mask; look set in `assets/data/game_environment.json`
   (`fog.rounding`, `texels_per_tile`, `explored_alpha`, `hidden_alpha`, `color`).
 - **Construction rule**: no building while a visible enemy unit / structure is within `construction.enemy_block_tiles`

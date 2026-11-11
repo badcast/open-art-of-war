@@ -43,6 +43,9 @@ if(APPLE)
 else()
     set(OAOW_RPATH "$ORIGIN")
 endif()
+# The test programs go into their own folder of the build directory (the engine library stays one level up)
+set(OAOW_TESTS_DIR "${CMAKE_BINARY_DIR}/tests")
+set(OAOW_TESTS_RPATH "${OAOW_RPATH}/..")
 
 # Find dependencies
 find_package(PkgConfig QUIET)
@@ -424,34 +427,42 @@ add_subdirectory(openaow-mapeditor mapeditor_build)
 add_executable(openaow-sprite-tests tests/SpriteRegistryTests.cpp)
 target_link_libraries(openaow-sprite-tests PRIVATE openaow-core)
 set_target_properties(openaow-sprite-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    BUILD_RPATH "${OAOW_RPATH}")
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-sprite-tests COMMAND openaow-sprite-tests)
 
 add_executable(openaow-ai-layout-tests tests/AIBaseLayoutTests.cpp)
 target_link_libraries(openaow-ai-layout-tests PRIVATE openaow-core)
 set_target_properties(openaow-ai-layout-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    BUILD_RPATH "${OAOW_RPATH}")
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-ai-layout-tests COMMAND openaow-ai-layout-tests)
+
+add_executable(openaow-ai-defense-tests tests/AIDefenseTests.cpp)
+target_link_libraries(openaow-ai-defense-tests PRIVATE openaow-core)
+set_target_properties(openaow-ai-defense-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+# (it reads the unit and building definitions: run where ./assets is)
+add_test(NAME openaow-ai-defense-tests COMMAND openaow-ai-defense-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
 target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)
 set_target_properties(openaow-build-limits-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    BUILD_RPATH "${OAOW_RPATH}")
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
 
 add_executable(openaow-capabilities-tests tests/CapabilitiesTests.cpp)
 target_link_libraries(openaow-capabilities-tests PRIVATE openaow-core OpenAOWNetworking)
 set_target_properties(openaow-capabilities-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    BUILD_RPATH "${OAOW_RPATH}")
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-capabilities-tests COMMAND openaow-capabilities-tests)
 
 add_executable(openaow-mods-tests tests/ModsTests.cpp)
 target_link_libraries(openaow-mods-tests PRIVATE openaow-core)
 set_target_properties(openaow-mods-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    BUILD_RPATH "${OAOW_RPATH}")
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-mods-tests COMMAND openaow-mods-tests)

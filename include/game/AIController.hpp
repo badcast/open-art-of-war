@@ -21,6 +21,7 @@ class Renderer;
 class BitmapFontRenderer;
 class Camera;
 class Unit;
+class Building;
 class Entity;
 
 enum class AIDifficulty
@@ -142,6 +143,7 @@ struct AIBaseStyle
 class AIController
 {
     friend struct AIBaseLayoutTest;
+    friend struct AIDefenseTest;
 
 public:
     AIController();
@@ -199,10 +201,6 @@ public:
     int AttackGroupCount(int readyUnits, const TileMap &map) const;
 
     void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-
-    // Callbacks for combat reactions
-    void OnEntityAttacked(int victimId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
-    void OnStructureAttacked(int structureId, int attackerId, EntityManager &entities, Pathfinder &pathfinder);
 
     // Configuration
     void SetAggressiveness(float aggro)
@@ -407,6 +405,12 @@ private:
     void UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder);
     void UpdateRebuilding(float deltaTime, TileMap &map, EntityManager &entities);
     void PlanBaseDefenses(const TileMap &map, const EntityManager &entities, Pathfinder &pathfinder);
+    // The headquarters of the base other than the first (cx, cy): two bunkers, a tower behind them and a short wall
+    // toward every way an enemy comes from, unless the main line of defense (wallRadius) covers them
+    void PlanOutpostDefenses(int cx, int cy, float wallRadius, const TileMap &map, const EntityManager &entities);
+    // The plan is put in order: what stands already is not built again, what the building limits leave out is
+    // dropped (the last planned first), and the order of building is bunkers, walls, towers
+    void FinishDefensePlan(const TileMap &map, const EntityManager &entities);
     void UpdateBaseBuilder(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     bool BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities);
     // The power of the base as the economy will count it (finished buildings, the power research bonus), looking
@@ -532,7 +536,18 @@ private:
         return m_guardOf.count(unitId) != 0;
     }
     int UnitThreatValue(const Unit &u, const EntityManager &entities) const; // its credit cost
-    int m_lastThreatX {-1}; // where the player last showed up at the base
+    // The base: the headquarters and every structure of this player. An entity is near it when it stands within
+    // the base zone widened by extraTiles
+    std::vector<const Building *> OwnStructures(const EntityManager &entities) const;
+    bool IsNearBase(const Entity &e, const std::vector<const Building *> &ownStructures, float extraTiles) const;
+    // Troops sent against an attack on the base -> the tile they were sent to (ordered: the same iteration on
+    // every peer). Emptied when the base is quiet again: the reserve and the guard posts take them back
+    std::map<int, std::pair<int, int>> m_defenders;
+    float m_baseAttackedTimer {0.0f};   // > 0: the base was attacked within the last seconds
+    float m_baseAttackedSeconds {0.0f}; // how long the current attack has lasted (waves wait only so long)
+    float m_recallReadyTime {0.0f};     // game time before which no further group is called back
+    int m_lastPlanSize {0};             // size of the last wave plan (the home guard between two plans)
+    int m_lastThreatX {-1};             // where the strongest attack on the base last was (debug view)
     int m_lastThreatY {-1};
     int m_lastThreatId {0};
 

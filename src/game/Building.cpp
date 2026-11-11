@@ -140,6 +140,16 @@ void Building::Update(float deltaTime, TileMap &map, const BuildingDelegates &de
         }
     }
 
+    // Who hit this building last counts for a few seconds only (as for a unit)
+    if (lastAttackedTimer > 0.0f)
+    {
+        lastAttackedTimer -= deltaTime;
+        if (lastAttackedTimer <= 0.0f)
+        {
+            lastAttackedTimer = 0.0f;
+            lastAttackerId = 0;
+        }
+    }
     UpdateConstruction(deltaTime);
     UpdateProduction(deltaTime);
     UpdateDefenseCombat(deltaTime, map, delegates);
