@@ -36,8 +36,10 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     }
     std::vector<Building *> availableBarracks, availableFactories; // up to three of each
 
-    int enemyUnitCount = 0;
+    const auto difficulty = GetEffectiveDifficulty();
+    const bool continuous = difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore;
     int reserveCount = 0;
+    int enemyUnitCount = 0;
     for (auto &e : entities.GetAllEntities())
     {
         if (!e.alive || e.state == ActionState::Die || e.owner != m_player)
@@ -65,7 +67,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         {
             enemyUnitCount++;
             if (const Unit *u = e.AsUnit(); u && IsReserveUnit(*u))
-                reserveCount++;
+                ++reserveCount;
         }
     }
     m_hasProduction = hasBarracks || hasFactory;
@@ -104,21 +106,33 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
                * std::min(
                    Economy::kMaxIncomeHeadquarters, entities.CountBuildingType(UnitType::Headquarters, m_player, true));
 
-    // Units lost while assembling are replaced so the wave can still reach 100% strength
-    int planned = static_cast<int>(m_currentPlan.archetypes.size());
-    int queued = static_cast<int>(m_infantryQueue.size() + m_vehicleQueue.size());
-    // ... and so is the home guard that stays when the wave leaves
-    const int withGuard = planned + HomeGuardCount();
-    if (queued == 0 && reserveCount < withGuard)
+    // Wave readiness controls when troops march, never whether factories keep working.
+    // Refill each production line independently, including a factory in an infantry-only wave.
+    const auto refill = [&](std::vector<int> &queue, bool vehicles, std::size_t idleBuildings) {
+        if (!queue.empty() || idleBuildings == 0)
+            return;
+        for (int arch : m_currentPlan.archetypes)
+            if (IsVehicleArchetype(arch) == vehicles)
+                queue.push_back(arch);
+        const int fallback = vehicles ? kFortress : kRifleman;
+        while (queue.size() < idleBuildings)
+            queue.push_back(fallback);
+    };
+    if (continuous)
     {
-        for (int i = reserveCount; i < withGuard; ++i)
+        refill(m_infantryQueue, false, availableBarracks.size());
+        refill(m_vehicleQueue, true, availableFactories.size());
+    }
+    else if (m_infantryQueue.empty() && m_vehicleQueue.empty())
+    {
+        const int needed = static_cast<int>(m_currentPlan.archetypes.size()) + HomeGuardCount();
+        for (int i = reserveCount; i < needed; ++i)
             m_infantryQueue.push_back(kRifleman);
     }
 
-    // Unit cap per match for performance & balance
-    // (a crowd of infantry must not keep the vehicles from the factory: they have a little more room)
-    const bool infantryAllowed = enemyUnitCount < 40;
-    if (enemyUnitCount >= 52)
+    // Use the same configured army limit as human players, not AI-only limits of 40/52.
+    const int armyCap = BuildLimits::EffectiveArmyCap(ArmyCapUnitsOf(Players::Slot(m_player).armyCap));
+    if ((armyCap > 0 && enemyUnitCount >= armyCap) || (!continuous && enemyUnitCount >= 52))
         return;
 
     float speedMult = m_currentDifficultyConfig.productionSpeedMultiplier;
@@ -132,14 +146,47 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         return cfg ? cfg->creditCost : FallbackArchetypeCost(arch);
     };
 
-    // While the lab waits for its next technology, the army only spends what exceeds that budget,
-    // so research keeps advancing instead of being starved by production
-    int researchReserve = (m_hasLab && !m_researchActive && m_researchIndex < kResearchCount)
-                              ? researchDef(side(), m_researchIndex).cost
-                              : 0;
+    // Count only ground reachable from the exit: cliffs must not make a narrow
+    // corridor look like an empty field. Allied armies share this capacity.
+    const auto crowdedExit = [&](int sx, int sy) {
+        constexpr int radius = 4, width = radius * 2 + 1;
+        bool seen[width][width] {};
+        std::vector<std::pair<int, int>> tiles {{sx, sy}};
+        seen[radius][radius] = true;
+        int occupied = 0;
+        for (std::size_t i = 0; i < tiles.size(); ++i)
+        {
+            const auto [x, y] = tiles[i];
+            occupied += entities.IsTileOccupiedByUnit(x, y) ? 1 : 0;
+            for (const auto [dx, dy] : {std::pair<int, int> {1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+            {
+                const int nx = x + dx, ny = y + dy;
+                const int ix = nx - sx + radius, iy = ny - sy + radius;
+                if (ix < 0 || iy < 0 || ix >= width || iy >= width || seen[iy][ix] || !map.IsPassable(nx, ny)
+                    || map.GetWall(nx, ny) != 0)
+                    continue;
+                seen[iy][ix] = true;
+                tiles.emplace_back(nx, ny);
+            }
+        }
+        int stalled = 0;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (!u || !u->alive || u->state == ActionState::Die || Players::Hostile(u->owner, m_player))
+                continue;
+            const int ix = u->tileX - sx + radius, iy = u->tileY - sy + radius;
+            if (ix >= 0 && iy >= 0 && ix < width && iy < width && seen[iy][ix] && u->blockedTimer >= 3.0f)
+                ++stalled;
+        }
+        return stalled >= 2 || (occupied >= 3 && occupied * 2 >= static_cast<int>(tiles.size()));
+    };
+    const int researchReserve = !continuous && m_hasLab && !m_researchActive && m_researchIndex < kResearchCount
+                                    ? researchDef(side(), m_researchIndex).cost
+                                    : 0;
 
     auto produce = [&](Building *building, std::vector<int> &queue, float buildTime, int savingFor = 0) {
-        if (!building || queue.empty())
+        if (!building || queue.empty() || (armyCap > 0 && enemyUnitCount >= armyCap))
             return;
         int arch = queue.front();
         // A unit its technology has not opened yet (a sniper, a heavy tank) cannot be trained, by the computer no
@@ -175,24 +222,23 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             queue.front() = arch = instead;
         }
         int cost = costOf(arch);
-        if (m_credits - cost < researchReserve + savingFor)
+        if (m_credits - cost < savingFor + researchReserve)
         {
-            ThinkOnce(
-                "economy",
-                "ECONOMY",
-                researchReserve > 0 ? "Holding back unit production to afford the next technology"
-                                    : "Not enough credits to train the next unit");
+            ThinkOnce("economy", "ECONOMY", "Not enough credits to train the next unit");
             return;
         }
         ThinkOnce("economy", "ECONOMY", "Training troops for the next wave");
         int sx = building->tileX;
         int sy = building->tileY;
-        if (!entities.GetBuildingSpawnPoint(building->id, map, sx, sy))
+        if (!entities.GetBuildingSpawnPoint(building->id, map, sx, sy) || crowdedExit(sx, sy))
             return;
-        m_credits -= cost;
-        queue.erase(queue.begin());
         int id = entities.SpawnUnitByArchetype(
             ProductionForm(m_player, SideArchetype(arch, side())), sx, sy, side(), m_player);
+        if (id == 0)
+            return; // no charge or cooldown when the global entity limit prevents spawning
+        m_credits -= cost;
+        queue.erase(queue.begin());
+        ++enemyUnitCount;
         // New troops get every technology the AI has already researched, and join the list of the next wave
         if (Unit *u = entities.GetUnit(id))
         {
@@ -204,28 +250,37 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         building->productionTimer = buildTime;
     };
 
-    // A free factory with a vehicle waiting comes first: the barracks leave enough credits for it, or cheap infantry
-    // would eat every credit before a tank (220-420) could ever be paid. Not for ever: if the vehicle cannot be
-    // trained (its exit is blocked), the barracks go on after a while.
-    constexpr float kVehicleHoldMax = 25.0f;
-    const bool vehicleWaits = !availableFactories.empty() && !m_vehicleQueue.empty();
-    int savingFor = 0;
-    if (vehicleWaits && m_vehicleHoldSeconds < kVehicleHoldMax)
-        savingFor = costOf(m_vehicleQueue.front());
-    if (vehicleWaits)
-        m_vehicleHoldSeconds += 1.0f;
-    else
-        m_vehicleHoldSeconds = 0.0f;
-    for (Building *barracks : availableBarracks)
-        if (infantryAllowed)
-            produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
+    // Factories spend first so cheap infantry cannot consume the tank budget.
     for (Building *factory : availableFactories)
     {
         const std::size_t before = m_vehicleQueue.size();
         produce(factory, m_vehicleQueue, factoryBuildTime);
         if (m_vehicleQueue.size() != before)
-            m_vehicleHoldSeconds = 0.0f; // a vehicle went out
+            m_vehicleHoldSeconds = 0.0f;
     }
+
+    // Give up reserving money only while every idle factory exit is blocked.
+    // Waiting for credits must never expire the reservation: that starves vehicles
+    // indefinitely when the barracks spend the income every second.
+    constexpr float kVehicleHoldMax = 25.0f;
+    bool vehicleWaits = false, exitAvailable = false;
+    for (Building *factory : availableFactories)
+    {
+        if (factory->isProducing || m_vehicleQueue.empty())
+            continue;
+        vehicleWaits = true;
+        int sx = factory->tileX, sy = factory->tileY;
+        exitAvailable
+            = (entities.GetBuildingSpawnPoint(factory->id, map, sx, sy) && !crowdedExit(sx, sy)) || exitAvailable;
+    }
+    if (vehicleWaits && !exitAvailable)
+        m_vehicleHoldSeconds += 1.0f;
+    else
+        m_vehicleHoldSeconds = 0.0f;
+    const int savingFor = vehicleWaits && m_vehicleHoldSeconds < kVehicleHoldMax ? costOf(m_vehicleQueue.front()) : 0;
+    for (Building *barracks : availableBarracks)
+        if (continuous || enemyUnitCount < 40)
+            produce(barracks, m_infantryQueue, barracksBuildTime, savingFor);
 }
 
 void AIController::UpdateResearch(float deltaTime, EntityManager &entities)

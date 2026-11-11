@@ -53,14 +53,20 @@ bool Unit::PassesBefore(const Unit &other) const
 
 bool Unit::CanMakeWayFor(const Unit &requester) const
 {
-    if (!alive || state == ActionState::Die || state == ActionState::Transform || state == ActionState::Attack
-        || state == ActionState::Move)
+    if (!alive || state == ActionState::Die || state == ActionState::Transform || state == ActionState::Attack)
         return false;
     if (id == requester.id || moveSpeed <= 0.0f || isSiegeMode || isDirectEngaged || HasReservation()
         || targetWallTileX >= 0)
         return false;
     if (Players::Hostile(owner, requester.owner))
         return false;
+    if (state == ActionState::Move)
+    {
+        const bool headOn
+            = pathIndex < path.size() && path[pathIndex].x == requester.tileX && path[pathIndex].y == requester.tileY;
+        if ((!headOn && blockedTimer < 1.5f && !groupHold) || !requester.PassesBefore(*this))
+            return false;
+    }
     const bool ownGoal = HasMoveTarget() || targetEntityId != 0;
     return !ownGoal || requester.PassesBefore(*this);
 }
@@ -74,6 +80,7 @@ void Unit::MakeWayStep(int x, int y)
         yieldHomeY = tileY;
         yieldHomeTries = 0;
     }
+    groupHold = false; // a yielding unit must actually step out of the lane
     yieldHomeTimer = 3.0f;
     path = {{x, y}};
     pathIndex = 0;
@@ -87,7 +94,7 @@ void Unit::MakeWayStep(int x, int y)
 
 bool Unit::RequestMakeWay(Unit &blocker, const TileMap &map, const UnitDelegates &delegates)
 {
-    if (!delegates.getUnitAtTile || !delegates.getEntity)
+    if (!blocker.CanMakeWayFor(*this) || !delegates.getUnitAtTile || !delegates.getEntity)
         return false;
     // Tuning: how far the chain may reach, how many tiles the search looks at, how long a chain may be
     constexpr int kRadius = 6;

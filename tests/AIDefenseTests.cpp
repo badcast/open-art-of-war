@@ -77,6 +77,29 @@ struct AIDefenseTest
         ai.PlanBaseDefenses(map, entities, pf);
         return ai.m_defensePlan;
     }
+    static void PrepareVehicleProduction(AIController &ai, int credits)
+    {
+        ai.m_factoryReady = true;
+        ai.m_currentPlan.archetypes = {1, 7};
+        ai.m_infantryQueue = {1};
+        ai.m_vehicleQueue = {7};
+        ai.m_vehicleHoldSeconds = 30.0f;
+        ai.m_credits = credits;
+        ai.m_creditsPerSec = 0;
+        ai.m_hasLab = false;
+    }
+    static void FinishProductionQueues(AIController &ai)
+    {
+        ai.m_infantryQueue.clear();
+        ai.m_vehicleQueue.clear();
+        ai.m_hasLab = true;
+        ai.m_researchActive = false;
+        ai.m_researchIndex = 0;
+    }
+    static void Produce(AIController &ai, TileMap &map, EntityManager &entities)
+    {
+        ai.UpdateEconomyAndProduction(1.0f, map, entities);
+    }
     static void SetCredits(AIController &ai, int credits)
     {
         ai.m_credits = credits;
@@ -372,7 +395,8 @@ int main()
     auto rank = [](const AIDefenseSite &site) {
         return site.kind == AIDefenseSite::Bunker ? 0 : site.kind == AIDefenseSite::Tower ? 2 : 1;
     };
-    for (unsigned seed = 1; seed <= 12; ++seed)
+    std::pair<int, int> defenseCounts[2] {};
+    for (unsigned seed = 1; seed <= 64; ++seed)
         for (const bool corridor : {false, true})
         {
             World w;
@@ -405,6 +429,11 @@ int main()
                     farthestTower = std::max(farthestTower, fromHq(plan[i]));
                 }
             }
+            if (seed == 1)
+                defenseCounts[corridor] = {bunkers, towers};
+            Check(
+                defenseCounts[corridor] == std::make_pair(bunkers, towers),
+                "seed does not change the number of bunkers or towers");
             Check(bunkers >= 2, "at least two bunkers on every way in");
             Check(towers >= 1, "towers are planned");
             Check(farthestTower < nearestBunker, "every tower stands behind the bunkers");
@@ -512,6 +541,159 @@ int main()
         Check(bunkers >= 2 && towers >= 1, "bunkers and towers are built");
         Check(bunkers <= 10 && towers <= 10, "the building limits hold");
         Check(headquarters >= 2 && farthestHq >= 12.0f * 12.0f, "a further headquarters is built far from the first");
+    }
+
+    // A long wait must not let infantry spend the factory's budget first.
+    {
+        World w;
+        const int barracks = w.entities.SpawnBuildingByIndex(2, 30, 30, kOwn, 1.0f, w.ai.Player());
+        const int factory = w.entities.SpawnBuildingByIndex(3, 40, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(barracks)->isPowered = true;
+        w.entities.GetBuilding(factory)->isPowered = true;
+        const int cost = w.entities.GetUnitConfig(7)->creditCost;
+        AIDefenseTest::PrepareVehicleProduction(w.ai, cost - 1);
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(!w.entities.GetBuilding(barracks)->isProducing, "infantry preserves vehicle savings after a long wait");
+        AIDefenseTest::PrepareVehicleProduction(w.ai, cost);
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(w.entities.GetBuilding(factory)->isProducing, "factory gets credits before barracks after a long wait");
+        Check(!w.entities.GetBuilding(barracks)->isProducing, "infantry cannot spend the last tank budget");
+    }
+
+    // Full waves, a large army and research savings must not idle production.
+    for (bool limited : {false, true})
+    {
+        World w(AIDifficulty::Hard);
+        BuildLimits::LoadText(limited ? "max_army: 53\n" : "max_army: 1024\n");
+        const int barracks = w.entities.SpawnBuildingByIndex(2, 30, 30, kOwn, 1.0f, w.ai.Player());
+        const int factory = w.entities.SpawnBuildingByIndex(3, 40, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(barracks)->isPowered = true;
+        w.entities.GetBuilding(factory)->isPowered = true;
+        for (int i = 0; i < 52; ++i)
+            w.Own(5 + i % 20, 55 + i / 20);
+        const int budget = w.entities.GetUnitConfig(7)->creditCost + w.entities.GetUnitConfig(1)->creditCost;
+        AIDefenseTest::PrepareVehicleProduction(w.ai, budget);
+        AIDefenseTest::FinishProductionQueues(w.ai);
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(w.entities.GetBuilding(factory)->isProducing, "empty vehicle queue refilled beyond old AI army cap");
+        Check(
+            w.entities.GetBuilding(barracks)->isProducing == !limited,
+            "infantry keeps producing unless the configured army cap is reached in this tick");
+    }
+    BuildLimits::LoadText("max_army: 1024\n");
+
+    // Lower difficulties still stop at a completed wave; only Hard/Hardcore refill forever.
+    for (auto level : {AIDifficulty::Easy, AIDifficulty::Medium, AIDifficulty::Hard, AIDifficulty::Hardcore})
+    {
+        World w(level);
+        const int factory = w.entities.SpawnBuildingByIndex(3, 30, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(factory)->isPowered = true;
+        AIDefenseTest::PrepareVehicleProduction(w.ai, 10000);
+        AIDefenseTest::FinishProductionQueues(w.ai);
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(
+            w.entities.GetBuilding(factory)->isProducing
+                == (level == AIDifficulty::Hard || level == AIDifficulty::Hardcore),
+            "continuous factory production is restricted to Hard and Hardcore");
+    }
+
+    // A one-tile exit shared with an ally must drain before more units are spawned.
+    {
+        World w(AIDifficulty::Hard);
+        std::array<PlayerSlot, kMaxPlayers> slots {};
+        slots[0] = Players::Slot(0);
+        slots[1] = Players::Slot(1);
+        slots[0].team = slots[1].team;
+        Players::Setup(slots, 0);
+        const int factory = w.entities.SpawnBuildingByIndex(3, 30, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(factory)->isPowered = true;
+        int sx = 0, sy = 0;
+        Check(w.entities.GetBuildingSpawnPoint(factory, w.map, sx, sy), "factory initially has a free exit");
+        for (int y = sy - 10; y <= sy + 10; ++y)
+            for (int x = sx - 10; x <= sx + 10; ++x)
+                w.map.SetPassable(x, y, y == sy && x >= sx - 4 && x <= sx + 4);
+        std::vector<int> blockers;
+        for (int dx = -4; dx <= 3; ++dx)
+            if (dx != 0)
+                blockers.push_back(w.entities.SpawnUnitByArchetype(0, sx + dx, sy, kFoe, 0));
+        AIDefenseTest::PrepareVehicleProduction(w.ai, 10000);
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(!w.entities.GetBuilding(factory)->isProducing, "allied congestion pauses factory production");
+        Check(w.ai.GetEnemyCredits() == 10000, "congestion does not spend credits");
+        for (int id : blockers)
+            w.entities.GetUnit(id)->alive = false;
+        AIDefenseTest::Produce(w.ai, w.map, w.entities);
+        Check(w.entities.GetBuilding(factory)->isProducing, "production resumes after the allied column leaves");
+    }
+
+    // Head-on allies may yield, including a moving chain held by its group.
+    {
+        World w;
+        std::array<PlayerSlot, kMaxPlayers> slots {};
+        slots[0] = Players::Slot(0);
+        slots[1] = Players::Slot(1);
+        slots[0].team = slots[1].team;
+        Players::Setup(slots, 0);
+        const int first = w.Own(30, 30);
+        const int second = w.Foe(31, 30);
+        const int third = w.Foe(32, 30);
+        Unit &tail = *w.entities.GetUnit(third);
+        tail.state = ActionState::Move;
+        tail.path = {{31, 30}};
+        tail.blockedTimer = 3.0f;
+        for (int y = 24; y <= 36; ++y)
+            for (int x = 24; x <= 38; ++x)
+                w.map.SetPassable(x, y, y == 30);
+        Unit &a = *w.entities.GetUnit(first), &b = *w.entities.GetUnit(second);
+        a.state = b.state = ActionState::Move;
+        a.path = {{31, 30}};
+        b.path = {{30, 30}};
+        b.groupHold = true;
+        Check(b.CanMakeWayFor(a), "head-on ally with lower priority can yield");
+        Check(!a.CanMakeWayFor(b), "head-on priority cannot reverse");
+        UnitDelegates delegates;
+        delegates.getEntity = [&](int id) -> Entity * {
+            return w.entities.GetUnit(id);
+        };
+        delegates.getUnitAtTile = [&](int x, int y, int ignore) {
+            for (int id : {first, second, third})
+            {
+                const Unit *u = w.entities.GetUnit(id);
+                if (id != ignore && u->tileX == x && u->tileY == y)
+                    return id;
+            }
+            return 0;
+        };
+        Check(a.RequestMakeWay(b, w.map, delegates), "head-on ally receives a make-way route");
+        Check(
+            !b.groupHold && !b.path.empty() && b.path.front().x == 32,
+            "group-held ally yields into the next tile of the narrow corridor");
+        Check(
+            !tail.path.empty() && tail.path.front().x == 33,
+            "the blocked moving tail steps back to release the allied column");
+        b.resTileX = 32;
+        b.resTileY = 30;
+        Check(!b.CanMakeWayFor(a), "a unit already stepping keeps its reservation");
+    }
+
+    // Elimination removes both physical walls and their remembered image under fog.
+    {
+        World w;
+        const PlayerId owner = w.ai.Player();
+        w.map.SetFogEnabled(true);
+        w.map.SetWall(25, 25, kOwn, 100, owner);
+        w.map.SetWall(26, 25, kFoe, 100, Players::Local());
+        w.map.RevealArea(25, 25, 4);
+        w.map.ResetVisibility();
+        Check(w.map.ViewerWall(25, 25) != 0, "enemy wall remembered under fog");
+        w.entities.GetBuilding(w.hq)->alive = false;
+        const auto eliminated = w.entities.UpdateElimination(w.map);
+        Check(eliminated.size() == 1 && eliminated.front() == owner, "only defeated owner is eliminated");
+        Check(w.entities.IsEliminated(owner), "defeat state available to statistics");
+        Check(w.map.GetWall(25, 25) == 0 && w.map.IsPassable(25, 25), "defeated player's wall destroyed and passable");
+        Check(w.map.ViewerWall(25, 25) == 0, "defeated player's remembered wall removed");
+        Check(w.map.GetWall(26, 25) != 0 && w.map.ViewerWall(26, 25) != 0, "surviving player's walls retained");
+        Check(w.entities.UpdateElimination(w.map).empty(), "elimination reported only once");
     }
 
     std::printf(failures ? "%d failed\n" : "all passed\n", failures);

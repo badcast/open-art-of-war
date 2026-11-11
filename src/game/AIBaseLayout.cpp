@@ -74,7 +74,7 @@ std::string AIBaseStyle::Describe() const
       << " deg, " << (labEarly ? "laboratory early" : "laboratory after the factory")
       << (barracksFirst ? ", two barracks first" : "") << ", " << sparePower << " spare power, "
       << (towersOnly ? "towers instead of walls" : std::to_string(wallThickness) + "-row walls") << ", gates "
-      << gateWidth << " wide, line +" << lineOffset << (bunkerHeavy ? ", bunkers first" : "");
+      << gateWidth << " wide, line +" << lineOffset;
     return s.str();
 }
 
@@ -95,7 +95,6 @@ void AIController::SetSeed(std::uint32_t seed)
     s.gateWidth = r.Range(2, 3);
     s.lineOffset = r.Range(0, 3);
     s.towersOnly = r.Range(0, 9) == 0;
-    s.bunkerHeavy = r.Range(0, 1) == 1;
     m_style = s;
 }
 
@@ -682,7 +681,7 @@ bool AIController::PlanPassageWalls(
             continue; // the defenses of that passage are planned already
         // (three tiles in: nearer, the corridor kept free around the gate would push one of them aside)
         // Two bunkers right behind the wall, one on each side of the road: they take the fire. The towers stand
-        // behind them, deeper in the base (they reach farther): two, or one for a style of many bunkers
+        // behind them, deeper in the base (they reach farther): two, independent of the seeded base style
         const int side = gateHi + 2;
         const auto [bx, by] = road[std::max(0, bestI - 3)];
         m_defensePlan.push_back({AIDefenseSite::Bunker, bx + bestPx * side - 1, by + bestPy * side - 1, false});
@@ -690,9 +689,8 @@ bool AIController::PlanPassageWalls(
             {AIDefenseSite::Bunker, bx - bestPx * (side + 1) - 1, by - bestPy * (side + 1) - 1, false});
         const auto [tx, ty] = road[std::max(0, bestI - 6)];
         m_defensePlan.push_back({AIDefenseSite::Tower, tx + bestPx * side - 1, ty + bestPy * side - 1, false});
-        if (!m_style.bunkerHeavy)
-            m_defensePlan.push_back(
-                {AIDefenseSite::Tower, tx - bestPx * (side + 1) - 1, ty - bestPy * (side + 1) - 1, false});
+        m_defensePlan.push_back(
+            {AIDefenseSite::Tower, tx - bestPx * (side + 1) - 1, ty - bestPy * (side + 1) - 1, false});
     }
     return any;
 }

@@ -468,10 +468,13 @@ void Application::UpdateRenderAlpha(double accumulator, double frameTime)
     {
         m_alphaSince += frameTime;
     }
-    // The accumulator is the exact phase while ticks run at the frame loop's pace; a replay or an observed match
-    // drives its ticks itself (no accumulator): there the time since the last tick stands in. A frame without a
-    // tick never goes back (a menu still eats the accumulator in steps without ticking).
-    double alpha = std::max(accumulator, m_alphaSince) / SIMULATION_TIMESTEP;
+    // Local clocks already contain scaled simulation time. Mixing in wall time makes
+    // slow playback reach the next position too early, then stall until the next tick.
+    // Replays and spectators own their accumulator separately from the frame loop.
+    const double phase = (m_replay || m_spectating)
+                             ? m_replayUi.accumulator
+                             : (InNetworkMatch() ? std::max(accumulator, m_alphaSince) : accumulator);
+    double alpha = phase / SIMULATION_TIMESTEP;
     if (!ticked)
         alpha = std::max(alpha, static_cast<double>(m_alphaLast));
     m_alphaLast = static_cast<float>(std::clamp(alpha, 0.0, 1.0));

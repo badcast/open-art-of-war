@@ -148,6 +148,7 @@ void EntityManager::DestroyPlayer(PlayerId player, TileMap &map)
             }
         }
     }
+    map.ForgetPlayerWalls(player);
 }
 
 std::vector<PlayerId> EntityManager::UpdateElimination(TileMap &map)

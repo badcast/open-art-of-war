@@ -136,7 +136,6 @@ struct AIBaseStyle
     int gateWidth {3};          // tiles left open in it for the road
     int lineOffset {0};         // the wall line this many tiles farther out than the nearest place allowed
     bool towersOnly {false};    // hardly any walls: the money goes into towers and bunkers
-    bool bunkerHeavy {false};   // more bunkers than towers
     std::string Describe() const;
 };
 

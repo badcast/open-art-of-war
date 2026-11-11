@@ -98,6 +98,7 @@ public:
     void DamageWall(int tileX, int tileY, int damage);
     // The wall is gone at once (rubble stays), whatever its armour
     void DestroyWall(int tileX, int tileY);
+    void ForgetPlayerWalls(PlayerId player); // defeat also clears walls remembered under fog
     int GetWallHp(int tileX, int tileY) const;
     int GetWallMaxHp(int /*tileX*/, int /*tileY*/) const
     {

@@ -345,6 +345,7 @@ void Application::UpdateReplayInput(double frameTime)
         = m_input->IsKeyJustPressed(SDL_SCANCODE_SPACE)
           || (!replay && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)));
     bool restart = replay && m_input->IsKeyJustPressed(SDL_SCANCODE_HOME);
+    const int previousSpeed = m_replayUi.speed;
     const bool allowSpeed = IsSpeedControlAllowed();
     if (!allowSpeed)
         m_replayUi.speed = 1;
@@ -439,6 +440,10 @@ void Application::UpdateReplayInput(double frameTime)
         m_replayUi.paused = !m_replayUi.paused;
     if (speedStep != 0)
         m_replayUi.speed = std::clamp(m_replayUi.speed + speedStep, 0, kSpeedCount - 1);
+    // Discard whole ticks owed at the old speed, retaining the interpolation phase.
+    // Otherwise a slow speed can keep running fast while a large backlog drains.
+    if (m_replayUi.speed != previousSpeed)
+        m_replayUi.accumulator = std::fmod(m_replayUi.accumulator, SIMULATION_TIMESTEP);
     if (toggleStats)
         m_replayUi.stats = !m_replayUi.stats;
     if (openResearch)
@@ -778,10 +783,17 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
         return;
     Simulation &sim = m_gameplayController->simulation();
     SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
+    auto sortedPlayers = players;
+    const auto defeated = [&](const ObserverPlayer &p) {
+        return m_entities->IsEliminated(static_cast<PlayerId>(p.slot));
+    };
+    std::stable_partition(
+        sortedPlayers.begin(), sortedPlayers.end(), [&](const ObserverPlayer &p) { return !defeated(p); });
+    const bool hasDefeated = std::any_of(players.begin(), players.end(), defeated);
     const int rowH = 28, headH = 64;
     const int colName = 14, colCredits = 220, colArmy = 300, colKills = 370, colLosses = 470, colResearch = 560;
     const int w = std::min(m_camera->GetViewportWidth() - 24, 900);
-    const int h = headH + static_cast<int>(players.size()) * rowH + 10;
+    const int h = headH + static_cast<int>(players.size()) * rowH + 10 + (hasDefeated ? rowH : 0);
     const int x = 12, y = kBarHeight + 34;
     m_renderer->FillRectScreen(x, y, w, h, ui::WithAlpha(col::Panel, 236));
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
@@ -803,13 +815,21 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
             col::TextDim,
             false);
     int ry = y + headH;
-    for (const ObserverPlayer &p : players)
+    bool defeatedHeading = false;
+    for (const ObserverPlayer &p : sortedPlayers)
     {
+        const bool isDefeated = defeated(p);
+        if (isDefeated && !defeatedHeading)
+        {
+            m_fontRenderer->DrawString(_("Defeated"), x + colName, ry + 6, ui::FONT_SMALL_BOLD, col::TextMuted, false);
+            ry += rowH;
+            defeatedHeading = true;
+        }
         const PlayerId id = static_cast<PlayerId>(p.slot);
         const int cy = ry + rowH / 2 - 1;
         if (p.slot == m_replayUi.watch)
             m_renderer->FillRectScreen(x + 4, ry, w - 8, rowH - 2, col::Hover);
-        m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, ArmyColor(p.color));
+        m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, isDefeated ? col::TextMuted : ArmyColor(p.color));
         m_renderer->DrawRectScreen(x + colName, cy - 7, 14, 14, col::Border);
         auto text = [&](int cx, const std::string &t, SDL_Color c, int width) {
             m_fontRenderer->DrawString(
@@ -817,7 +837,7 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
                 x + cx,
                 cy,
                 ui::FONT_BODY,
-                c,
+                isDefeated ? col::TextMuted : c,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
         };
@@ -839,7 +859,7 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
             done += IsResearched(id, i) ? 1 : 0;
         const int barW = w - colResearch - 16;
         std::string research = std::to_string(done) + "/" + std::to_string(kResearchCount);
-        if (r.active >= 0 && r.active < kResearchCount)
+        if (!isDefeated && r.active >= 0 && r.active < kResearchCount)
         {
             const float ratio = std::clamp(r.timer / std::max(0.01f, r.duration), 0.0f, 1.0f);
             ui::DrawProgressBar(*m_renderer, {x + colResearch, cy + 8, barW, 4}, ratio, col::Info);

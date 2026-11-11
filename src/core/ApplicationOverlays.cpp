@@ -335,6 +335,7 @@ void Application::RenderScoreboard()
         int kills;
         int losses;
         bool gone;
+        bool defeated;
     };
     std::vector<Row> rows;
     for (PlayerId id = 0; id < kMaxPlayers; ++id)
@@ -345,6 +346,7 @@ void Application::RenderScoreboard()
         Row r;
         r.id = id;
         r.gone = false;
+        r.defeated = m_entities->IsEliminated(id);
         if (!slot.human)
         {
             static const char *const kLevels[4] = {"Easy", "Medium", "Hard", "Hardcore"};
@@ -375,14 +377,19 @@ void Application::RenderScoreboard()
     if (rows.empty())
         return;
     // Best first; the same points: in slot order
-    std::stable_sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) { return a.points > b.points; });
+    std::stable_sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) {
+        if (a.defeated != b.defeated)
+            return !a.defeated;
+        return a.points > b.points;
+    });
+    const bool hasDefeated = std::any_of(rows.begin(), rows.end(), [](const Row &r) { return r.defeated; });
 
     const int viewW = m_camera->GetViewportWidth();
     const int rowH = 30, headH = 84;
     // Columns: colour swatch + name | faction | colour | efficiency | kills | losses
     const int colName = 16, colFaction = 250, colColor = 410, colPoints = 520, colKills = 620, colLosses = 700;
     const int w = std::min(viewW - 32, 780);
-    const int h = headH + static_cast<int>(rows.size()) * rowH + 34;
+    const int h = headH + static_cast<int>(rows.size()) * rowH + 34 + (hasDefeated ? rowH : 0);
     const int x = (viewW - w) / 2, y = std::max(60, (m_windowH - h) / 3);
     m_renderer->FillRectScreen(x, y, w, h, col::Panel);
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
@@ -419,14 +426,21 @@ void Application::RenderScoreboard()
     m_fontRenderer->DrawString(_("Kills"), x + colKills, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     m_fontRenderer->DrawString(_("Losses"), x + colLosses, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     int ry = y + headH;
+    bool defeatedHeading = false;
     for (const Row &r : rows)
     {
+        if (r.defeated && !defeatedHeading)
+        {
+            m_fontRenderer->DrawString(_("Defeated"), x + colName, ry + 6, ui::FONT_SMALL_BOLD, col::TextMuted, false);
+            ry += rowH;
+            defeatedHeading = true;
+        }
         const bool me = r.id == Players::Local();
         if (me)
             m_renderer->FillRectScreen(x + 4, ry, w - 8, rowH - 2, col::Hover);
         const int cy = ry + rowH / 2 - 1;
-        const SDL_Color text = r.gone ? col::TextMuted : col::Text;
-        m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, r.color);
+        const SDL_Color text = (r.gone || r.defeated) ? col::TextMuted : col::Text;
+        m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, r.defeated ? col::TextMuted : r.color);
         m_renderer->DrawRectScreen(x + colName, cy - 7, 14, 14, col::Border);
         std::string name = r.name;
         if (r.gone)
@@ -448,7 +462,7 @@ void Application::RenderScoreboard()
             x + colPoints,
             cy,
             ui::FONT_BODY_BOLD,
-            r.gone ? col::TextMuted : col::Accent,
+            (r.gone || r.defeated) ? col::TextMuted : col::Accent,
             false,
             Anchor::LEFT | Anchor::VCENTER);
         m_fontRenderer->DrawString(

@@ -761,8 +761,7 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
                 }
             }
         // Behind every arc: two bunkers right behind the wall (they take the fire), the towers deeper in the base
-        // behind them (they reach farther) - one in the middle, and one on each flank unless the style is of
-        // many bunkers
+        // behind them (they reach farther): one in the middle and one on each flank, for every seed.
         for (const ArcDir &arc : arcs)
         {
             const float offset = (arc.angle - threatAngle) * 180.0f / static_cast<float>(M_PI);
@@ -774,28 +773,19 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
             }
             ringTile(wallRadius - kTowerBehindWall, offset, x, y);
             add(AIDefenseSite::Tower, x - 1, y - 1);
-            if (!m_style.bunkerHeavy)
-                for (float flank : {-kTowerFlankDeg, kTowerFlankDeg})
-                {
-                    ringTile(wallRadius - kTowerBehindWall, offset + flank, x, y);
-                    add(AIDefenseSite::Tower, x - 1, y - 1);
-                }
+            for (float flank : {-kTowerFlankDeg, kTowerFlankDeg})
+            {
+                ringTile(wallRadius - kTowerBehindWall, offset + flank, x, y);
+                add(AIDefenseSite::Tower, x - 1, y - 1);
+            }
         }
         Think(
             "BUILD",
             "Open ground: " + std::to_string(arcs.size()) + " wall arcs, one toward each way an enemy comes from");
     }
-    // More firepower when the walls are few
-    if (m_style.towersOnly)
-    {
-        int x = 0, y = 0;
-        ringTile(wallRadius - kBunkerBehindWall, 10.0f, x, y);
-        add(AIDefenseSite::Bunker, x - 1, y - 1);
-        ringTile(wallRadius - kTowerBehindWall, -12.0f, x, y);
-        add(AIDefenseSite::Tower, x - 1, y - 1);
-        if (passages)
-            wallTiles.clear();
-    }
+    // This style changes walls only, never the number of towers or bunkers.
+    if (m_style.towersOnly && passages)
+        wallTiles.clear();
 
     // 3. Walls last, and only where an enemy can walk in: a ring tile that links the inside of the ring with
     //    the outside one reachable from a hostile base. Segments in front of trees, cliffs or a closed pocket

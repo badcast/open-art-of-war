@@ -404,6 +404,18 @@ void TileMap::DestroyWall(int tileX, int tileY)
     m_passable[tileY][tileX] = true;
 }
 
+void TileMap::ForgetPlayerWalls(PlayerId player)
+{
+    for (int y = 0; y < m_height; ++y)
+        for (int x = 0; x < m_width; ++x)
+            if (m_seenWall[y][x] != 0 && m_seenWallOwner[y][x] == player)
+            {
+                m_seenWall[y][x] = 0;
+                m_seenWallOwner[y][x] = kNoPlayer;
+                m_seenRubble[y][x] = 1778;
+            }
+}
+
 void TileMap::DamageWall(int tileX, int tileY, int damage)
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
