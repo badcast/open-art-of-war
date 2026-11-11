@@ -106,9 +106,16 @@ void Application::ApplySettings(SettingsArea area)
     {
         case SettingsArea::Video:
         {
+#if ANDROID
+            m_settings.windowMode = WindowMode::Borderless;
+#else
             const Settings before = m_confirmedVideo;
+#endif
             VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
             SyncWindowSize();
+#if ANDROID
+            m_confirmedVideo = m_settings;
+#else
             const bool windowChanged = before.windowMode != m_settings.windowMode
                                        || before.windowW != m_settings.windowW || before.windowH != m_settings.windowH
                                        || before.fullscreenW != m_settings.fullscreenW
@@ -121,6 +128,7 @@ void Application::ApplySettings(SettingsArea area)
             {
                 m_confirmedVideo = m_settings;
             }
+#endif
             break;
         }
         case SettingsArea::Graphics:
@@ -145,6 +153,9 @@ void Application::ApplySettings(SettingsArea area)
 // F11 / Alt+Enter: windowed <-> borderless fullscreen
 void Application::ToggleFullscreen()
 {
+#if ANDROID
+    return; // Android owns the fullscreen surface.
+#endif
     if (m_videoConfirmActive)
         return;
     m_settings.windowMode
@@ -173,6 +184,13 @@ void Application::SyncWindowSize(int w, int h)
     if (pw <= 0 || ph <= 0)
         return;
 
+#if ANDROID
+    // One shared coordinate space for menus, HUD, camera and touch hit testing.
+    // Preserve the display aspect ratio, with enough height for every dialog.
+    pw = std::max(960, static_cast<int>(std::lround(720.0 * pw / ph)));
+    ph = 720;
+    SDL_SetRenderLogicalPresentation(m_sdlRenderer, pw, ph, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+#endif
     if (m_windowW == pw && m_windowH == ph)
         return;
 

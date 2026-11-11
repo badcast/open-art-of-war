@@ -42,7 +42,7 @@ jobs:
           name: determinism-linux
           path: determinism-linux.txt
       - name: Network tests
-        run: ./build/openaow-net-tests
+        run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
       - name: Package
         # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |
@@ -87,7 +87,7 @@ jobs:
           name: determinism-windows-msvc
           path: determinism-windows-msvc.txt
       - name: Network tests
-        run: build\openaow-net-tests.exe
+        run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
       - name: Package
         shell: bash
         run: |
@@ -139,7 +139,7 @@ jobs:
           name: determinism-windows-mingw
           path: determinism-windows-mingw.txt
       - name: Network tests
-        run: ./build/openaow-net-tests.exe
+        run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
       - name: Package
         run: |
           mkdir dist
@@ -179,7 +179,7 @@ jobs:
           name: determinism-macos
           path: determinism-macos.txt
       - name: Network tests
-        run: ./build/openaow-net-tests
+        run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
       - name: Package
         # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |

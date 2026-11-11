@@ -1,63 +1,110 @@
 # Open Art of War — Android Build Setup
 
-В этой папке подготовлена базовая структура стандартного Android-проекта (Gradle + Android NDK + CMake + SDL3) для сборки **Open Art of War** под платформу Android.
+This directory contains the Android project for **Open Art of War**, built with Gradle, the Android NDK, CMake and SDL3.
 
----
+[Back to the project README](../README.md) · [Android CI workflow](../.github/workflows/android.yml)
 
-## Структура каталога
+## Project structure
 
-* **`build.gradle.kts`**, **`settings.gradle.kts`** — корневые конфигурации Gradle-проекта.
-* **`app/build.gradle.kts`** — конфигурация сборщика приложения:
-  * Целевой SDK: 34 (Android 14)
-  * Минимальный SDK: 24 (Android 7.0)
-  * Архитектуры (ABIs): `arm64-v8a`, `x86_64`
-  * Подключение C++17 и нативного CMake.
-* **`app/src/main/AndroidManifest.xml`** — манифест с ландшафтной ориентацией (`screenOrientation="landscape"`), правами доступа к сети/звуку и запуском нативной библиотеки `libopenaow.so` через стандартный класс `SDLActivity`.
-* **`app/src/main/cpp/CMakeLists.txt`** — конфигурация сборки нативной части:
-  * Автоматическая подгрузка зависимостей под Android через `FetchContent` (`SDL3`, `SDL3_ttf`, `nlohmann_json`, `yaml-cpp`).
-  * Сборка исходников движка, ImGui, enet, ronin-engine, stb_vorbis в единую разделяемую библиотеку `libopenaow.so`.
-  * Линковка с системными библиотеками Android: `libandroid`, `liblog`, `libGLESv3`, `libOpenSLES`.
+| File | Purpose |
+| --- | --- |
+| `build.gradle.kts`, `settings.gradle.kts` | Root Gradle configuration |
+| `app/build.gradle.kts` | Application configuration: SDK 34, Android 7.0+ (API 24), ARM64 and x86_64, C++17 and CMake |
+| `app/src/main/AndroidManifest.xml` | App permissions, launcher icon, landscape orientation and SDLActivity entry point |
+| `app/src/main/cpp/CMakeLists.txt` | Builds the game through the repository's root CMake configuration; disables desktop editors, server and tests |
+| `fetch-sdl-java.sh` | Downloads the SDL Java sources matching the native SDL version |
 
----
+Native dependencies are built from source through [`cmake/AndroidDeps.cmake`](../cmake/AndroidDeps.cmake). SDLActivity starts the game's `libmain.so`, which links the engine and Android system libraries.
 
-## Требования для сборки
+## Prerequisites
 
-1. **Android Studio** (рекомендуется последняя версия Iguana / Jellyfish / Koala) или консольные инструменты Android SDK.
-2. **Android NDK** (версии 25.x / 26.x / 27.x).
-3. **CMake** 3.22.1+.
-4. **Java Development Kit (JDK)** 17+.
+- Android Studio or the Android SDK command-line tools.
+- Android SDK Platform 34 and Build Tools 34.0.0.
+- Android NDK; CI uses version **26.1.10909125**.
+- CMake **3.22.1+**.
+- JDK **17** and Gradle **8.7**, matching the CI configuration.
+- Git and a POSIX shell to run the SDL Java source download script.
 
----
+The first build requires internet access to download dependencies.
 
-## Сборка через Android Studio
+## Prepare SDL Java sources
 
-1. Откройте Android Studio.
-2. Выберите **File -> Open...** и укажите папку `android-setup`.
-3. Дождитесь завершения Gradle Sync (CMake автоматически загрузит `SDL3` и зависимости).
-4. Запустите сборку: **Build -> Make Project** или **Build -> Build Bundle(s) / APK(s) -> Build APK(s)**.
+Run this once from the repository root before building:
 
----
+```bash
+./android-setup/fetch-sdl-java.sh
+```
 
-## Сборка из командной строки
+Run it again when the project's SDL version changes. On Windows, use Git Bash or another POSIX shell.
 
-Если установлены `ANDROID_HOME` и Gradle:
+## Build with Android Studio
+
+1. Prepare the SDL Java sources as described above.
+2. Open the `android-setup` directory using **File → Open**.
+3. Wait for Gradle Sync and dependency downloads to finish.
+4. Build the debug APK or run the app on a connected device or emulator.
+
+## Build from the command line
+
+With `ANDROID_HOME` pointing to the Android SDK and Gradle available on your `PATH`, run:
+
 ```bash
 cd android-setup
 gradle assembleDebug
 ```
-Итоговый APK будет находиться по пути:
-`android-setup/app/build/outputs/apk/debug/app-debug.apk`
 
----
+The resulting APK is located at this path relative to the repository root:
 
-## Ассеты (Ресурсы игры)
-
-В `app/build.gradle.kts` путь к ассетам настроен так, чтобы напрямую считывать корневую папку `assets/`:
-```kotlin
-sourceSets {
-    getByName("main") {
-        assets.srcDirs("src/main/assets", "../../../assets")
-    }
-}
+```text
+android-setup/app/build/outputs/apk/debug/app-debug.apk
 ```
-Файлы игры попадут внутрь APK в раздел `assets/` и будут прозрачно доступны через чтение SDL3 (`SDL_IOStream` / `SDL_GetBasePath`).
+
+To install it on a connected device, run from the repository root:
+
+```bash
+adb install -r android-setup/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Game assets
+
+The game reads `assets.blob` by filesystem path, so the archive is **not bundled inside the APK**.
+
+After installing and launching the app once, copy your prepared archive into the app's storage directory. Run this command from the repository root:
+
+```bash
+adb push build/assets.blob /sdcard/Android/data/org.openartofwar/files/assets.blob
+```
+
+Restart the app after copying the archive. See the [main asset instructions](../README.md#game-assets) for asset requirements and how to pack an existing `assets/` directory.
+
+## Android interface and controls
+
+CMake defines the numeric flag `ANDROID=1` for Android and `ANDROID=0` for other platforms. Platform-specific code uses `#if ANDROID`.
+
+- Fullscreen landscape mode supports both landscape orientations.
+- The interface uses a shared coordinate system with a height of 720, preserving the screen's aspect ratio.
+- HUD tabs use two rows of labelled, enlarged buttons.
+- The launcher icon comes from `docs/app-game-icon.png` and is included as `app/src/main/res/mipmap-nodpi/ic_launcher.png`.
+
+| Action | Gesture |
+| --- | --- |
+| Select a unit, place a building or activate a button | Tap |
+| Select multiple units | Drag with one finger on the map |
+| Move, attack or set a rally point | Hold for at least 0.5 seconds, then release |
+| Cancel a production order | Hold its production card, then release |
+| Move and zoom the camera | Drag or pinch with two fingers |
+| Switch HUD tabs | Tap the labelled sidebar buttons |
+| Back / game menu | System Back button, mapped to Escape |
+
+Camera gestures are disabled while menus are open.
+
+## Validation
+
+Run the touch input tests in a configured desktop build, without an Android device:
+
+```bash
+cmake --build build --target openaow-android-input-tests
+ctest --test-dir build -R android-input --output-on-failure
+```
+
+On a device, also check the HUD, menus, research window, on-screen keyboard, screen rotation, and background/resume behaviour.

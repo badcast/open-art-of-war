@@ -48,29 +48,34 @@ set(OAOW_TESTS_DIR "${CMAKE_BINARY_DIR}/tests")
 set(OAOW_TESTS_RPATH "${OAOW_RPATH}/..")
 
 # Find dependencies
-find_package(PkgConfig QUIET)
-# SDL3 core (window, renderer, input, audio streams, PNG loading) + SDL3_ttf for text
-find_package(SDL3 REQUIRED CONFIG)
-find_package(SDL3_ttf REQUIRED CONFIG)
-find_package(nlohmann_json CONFIG REQUIRED)
-find_package(yaml-cpp CONFIG QUIET)
-if(TARGET yaml-cpp::yaml-cpp)
-    set(YAML_CPP_LIBRARIES yaml-cpp::yaml-cpp)
-    set(YAML_CPP_INCLUDE_DIRS "")
+if(ANDROID)
+    # No system packages on the NDK: everything is built from source
+    include(cmake/AndroidDeps.cmake)
 else()
-    pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
-endif()
+    find_package(PkgConfig QUIET)
+    # SDL3 core (window, renderer, input, audio streams, PNG loading) + SDL3_ttf for text
+    find_package(SDL3 REQUIRED CONFIG)
+    find_package(SDL3_ttf REQUIRED CONFIG)
+    find_package(nlohmann_json CONFIG REQUIRED)
+    find_package(yaml-cpp CONFIG QUIET)
+    if(TARGET yaml-cpp::yaml-cpp)
+        set(YAML_CPP_LIBRARIES yaml-cpp::yaml-cpp)
+        set(YAML_CPP_INCLUDE_DIRS "")
+    else()
+        pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
+    endif()
 
-pkg_check_modules(LIBARCHIVE REQUIRED IMPORTED_TARGET libarchive)
-# zstd: maps sent between players in a network game are compressed with it (libarchive needs it anyway)
-find_package(zstd CONFIG QUIET)
-if(TARGET zstd::libzstd_shared)
-    set(OAOW_ZSTD zstd::libzstd_shared)
-elseif(TARGET zstd::libzstd_static)
-    set(OAOW_ZSTD zstd::libzstd_static)
-else()
-    pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
-    set(OAOW_ZSTD PkgConfig::ZSTD)
+    pkg_check_modules(LIBARCHIVE REQUIRED IMPORTED_TARGET libarchive)
+    # zstd: maps sent between players in a network game are compressed with it (libarchive needs it anyway)
+    find_package(zstd CONFIG QUIET)
+    if(TARGET zstd::libzstd_shared)
+        set(OAOW_ZSTD zstd::libzstd_shared)
+    elseif(TARGET zstd::libzstd_static)
+        set(OAOW_ZSTD zstd::libzstd_static)
+    else()
+        pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
+        set(OAOW_ZSTD PkgConfig::ZSTD)
+    endif()
 endif()
 
 # Include directories
@@ -203,7 +208,7 @@ set(ENGINE_SOURCES
 
 # Translations: YAML catalogs in assets/locale/ (converted via tools/po2yaml.py)
 find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND)
+if(Python3_FOUND AND NOT ANDROID)
     add_custom_target(translations
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/po2yaml.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -289,7 +294,13 @@ set_source_files_properties(src/net/NetMatch.cpp PROPERTIES
     OBJECT_DEPENDS ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
 
 # Shared engine library: libopenaow.so (engine, game logic, UI, ImGui)
-add_library(openaow-core SHARED ${ENGINE_SOURCES} ${IMGUI_SOURCES} ${STB_VORBIS_SOURCE})
+# On Android the engine is linked statically into libmain.so (the library SDLActivity loads)
+if(ANDROID)
+    set(OAOW_CORE_TYPE STATIC)
+else()
+    set(OAOW_CORE_TYPE SHARED)
+endif()
+add_library(openaow-core ${OAOW_CORE_TYPE} ${ENGINE_SOURCES} ${IMGUI_SOURCES} ${STB_VORBIS_SOURCE})
 set_target_properties(openaow-core PROPERTIES
     OUTPUT_NAME openaow
     VERSION ${PROJECT_VERSION}
@@ -327,6 +338,7 @@ target_link_libraries(openaow-core PRIVATE OpenAOWNetworking ${OAOW_ZSTD})
 target_sources(openaow-core PRIVATE ${OAOW_SHADER_OUT}/OaowShaders.inc ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
 target_include_directories(openaow-core PRIVATE ${OAOW_SHADER_OUT} ${OAOW_SIM_OUT})
 target_compile_definitions(openaow-core PUBLIC
+            ANDROID=$<BOOL:${ANDROID}>
             $<$<BOOL:${AOW_DEBUG}>:AOW_DEBUG>
             MAIN_ASSET_BLOB_NAME="${MAIN_ASSET_BLOB_NAME}"
             OAOW_VERSION="${OAOW_VERSION_FULL}"
@@ -428,6 +440,13 @@ function(openaow_executable target output)
     endif()
 endfunction()
 
+if(ANDROID)
+    # The game: libmain.so, started by SDLActivity through SDL_main
+    add_library(main SHARED src/main.cpp)
+    target_link_libraries(main PRIVATE openaow-core)
+    return()
+endif()
+
 # Game
 openaow_executable(openaow-game openaow src/main.cpp)
 
@@ -436,6 +455,15 @@ add_subdirectory(openaow-charactereditor charactereditor_build)
 
 # Map editor
 add_subdirectory(openaow-mapeditor mapeditor_build)
+
+# Exercise the Android input branch on desktop without linking an engine with a different class layout.
+add_executable(openaow-android-input-tests
+    tests/AndroidInputTests.cpp src/input/InputManager.cpp src/graphics/Camera.cpp)
+target_include_directories(openaow-android-input-tests PRIVATE include)
+target_compile_definitions(openaow-android-input-tests PRIVATE ANDROID=1)
+target_link_libraries(openaow-android-input-tests PRIVATE SDL3::SDL3)
+set_target_properties(openaow-android-input-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}")
+add_test(NAME openaow-android-input-tests COMMAND openaow-android-input-tests)
 
 # Engine unit tests (no window, no assets)
 add_executable(openaow-sprite-tests tests/SpriteRegistryTests.cpp)

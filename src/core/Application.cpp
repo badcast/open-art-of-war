@@ -142,6 +142,14 @@ bool Application::Init(int windowWidth, int windowHeight)
         LoaderResources::Reload();
     }
 
+#if ANDROID
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+    m_settings.windowMode = WindowMode::Borderless;
+    m_confirmedVideo = m_settings;
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS))
     {
         std::cerr << "[Application] SDL_Init failed: " << SDL_GetError() << std::endl;
@@ -180,6 +188,9 @@ bool Application::Init(int windowWidth, int windowHeight)
             m_windowH = size.h;
         }
     }
+#if ANDROID
+    SyncWindowSize();
+#endif
     m_resolutions = VideoModes::AvailableResolutions(m_window);
 
     // The language and the font first: the loading screen is up before the heavy part of the start-up
@@ -223,6 +234,9 @@ bool Application::Init(int windowWidth, int windowHeight)
     // The map viewport ends where the command sidebar begins
     m_camera = std::make_unique<Camera>(m_windowW - HUDController::kSidebarWidth, m_windowH);
     m_input = std::make_unique<InputManager>();
+#if ANDROID
+    m_input->SetRenderer(m_sdlRenderer);
+#endif
     m_input->SetEdgePanMargin(m_settings.edgePanMargin);
     ShowLoading(_("Loading sound and music..."), 0.65f);
     m_sound = std::make_unique<SoundEngine>();
@@ -747,6 +761,12 @@ void Application::HandleEvents()
 {
     SyncWindowSize();
     m_input->ResetFrameEvents();
+#if ANDROID
+    const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
+    m_input->SetMenuOpen(
+        !playing || (m_menuController && m_menuController->IsAnyMenuOpen())
+        || (m_hudController && m_hudController->IsResearchWindowOpen()));
+#endif
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -783,6 +803,9 @@ void Application::HandleEvents()
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT
             && SoundRequests::HoverFlag() && m_sound)
             m_sound->PlaySfx("ui_click");
+#if ANDROID
+        SDL_ConvertEventToRenderCoordinates(m_sdlRenderer, &event);
+#endif
         m_input->ProcessEvent(event, *m_camera);
     }
 

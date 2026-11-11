@@ -57,3 +57,10 @@ saves/
 *.sf2
 
 imgui.ini
+
+# Android: copied from SDL by android-setup/fetch-sdl-java.sh
+android-setup/app/src/main/java/
+android-setup/.gradle/
+android-setup/app/build/
+android-setup/app/.cxx/
+android-setup/local.properties

@@ -99,7 +99,12 @@ void Application::DrawLoadingFrame(
         }
     }
     int w = 0, h = 0;
+#if ANDROID
+    w = m_windowW;
+    h = m_windowH;
+#else
     SDL_GetRenderOutputSize(m_sdlRenderer, &w, &h);
+#endif
     SDL_SetRenderTarget(m_sdlRenderer, nullptr);
     SDL_SetRenderClipRect(m_sdlRenderer, nullptr);
     SDL_SetRenderDrawColor(m_sdlRenderer, 8, 10, 14, 255);

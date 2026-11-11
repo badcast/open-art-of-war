@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#if ANDROID
+#include <map>
+#endif
 
 #include <SDL3/SDL.h>
 #include "core/Config.hpp"
@@ -23,7 +26,13 @@ struct SelectionBox
 
     bool HasSignificantArea() const
     {
-        return std::abs(currentScreenX - startScreenX) > 6 || std::abs(currentScreenY - startScreenY) > 6;
+#if ANDROID
+        constexpr int threshold = 12;
+#else
+        constexpr int threshold = 6;
+#endif
+        return std::abs(currentScreenX - startScreenX) > threshold
+               || std::abs(currentScreenY - startScreenY) > threshold;
     }
 };
 
@@ -31,6 +40,12 @@ class InputManager
 {
 public:
     InputManager();
+#if ANDROID
+    void SetRenderer(SDL_Renderer *renderer)
+    {
+        m_touchRenderer = renderer;
+    }
+#endif
 
     void Update(float deltaTime, Camera &camera);
     void UpdateCamera(
@@ -166,6 +181,17 @@ public:
     void ResetFrameEvents();
 
 private:
+#if ANDROID
+    bool ProcessTouch(const SDL_Event &event, Camera &camera);
+    SDL_Renderer *m_touchRenderer {nullptr};
+    std::map<SDL_FingerID, SDL_FPoint> m_fingers;
+    bool m_touchPointer {false};
+    bool m_touchGesture {false};
+    bool m_touchMap {false};
+    bool m_touchMoved {false};
+    Uint64 m_touchStart {0};
+    SDL_FPoint m_touchOrigin {};
+#endif
     const bool *m_keystates {nullptr};
     std::uint8_t m_prevKeystates[SDL_SCANCODE_COUNT] {0};
     std::uint8_t m_keysJustPressed[SDL_SCANCODE_COUNT] {0};

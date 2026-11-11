@@ -190,6 +190,27 @@ inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showS
 
     l.info = {x + pad, windowH - 82, innerW, 72};
     l.grid = {x + pad, top + 366, innerW, std::max(SidebarLayout::kCellH, l.info.y - 8 - (top + 366))};
+#if ANDROID
+    l.radar.h = 104;
+    l.menuBtn = {x + pad, top + 166, (innerW - 8) / 2, 44};
+    l.objectivesBtn = {l.menuBtn.Right() + 8, l.menuBtn.y, innerW - l.menuBtn.w - 8, 44};
+    l.researchBtn = {x + pad, top + 216, innerW, 44};
+    int tabsY = top + 266;
+    if (showSpeed)
+    {
+        l.slowerBtn = {x + pad, tabsY, 60, 44};
+        l.speedBtn = {l.slowerBtn.Right() + 8, tabsY, innerW - 136, 44};
+        l.fasterBtn = {l.speedBtn.Right() + 8, tabsY, 60, 44};
+        tabsY += 50;
+    }
+    for (int t = 0; t < HUDController::TabCount; ++t)
+        l.tabs[t] = {x + pad + (t % 2) * ((innerW - 8) / 2 + 8), tabsY + (t / 2) * 52, (innerW - 8) / 2, 46};
+    l.strip = {x + pad, tabsY + 104, innerW, 44};
+    l.scrollDown = {l.strip.Right() - 44, l.strip.y, 44, 44};
+    l.scrollUp = {l.scrollDown.x - 48, l.strip.y, 44, 44};
+    l.primaryBtn = {l.strip.x + 90, l.strip.y, innerW - 186, 44};
+    l.grid = {x + pad, l.strip.Bottom() + 6, innerW, l.info.y - 8 - (l.strip.Bottom() + 6)};
+#endif
     return l;
 }
 
@@ -270,12 +291,20 @@ inline std::vector<const Building *> OwnSelectedBuildings(
 // Zoom buttons in the radar's bottom-right corner
 inline UiRect RadarZoomInBtn(const UiRect &radar)
 {
+#if ANDROID
+    return {radar.Right() - 44, radar.Bottom() - 44, 40, 40};
+#else
     return {radar.Right() - 22, radar.Bottom() - 22, 20, 20};
+#endif
 }
 
 inline UiRect RadarZoomOutBtn(const UiRect &radar)
 {
+#if ANDROID
+    return {radar.Right() - 88, radar.Bottom() - 44, 40, 40};
+#else
     return {radar.Right() - 44, radar.Bottom() - 22, 20, 20};
+#endif
 }
 
 // The infinity button in the bottom right corner of a unit cameo

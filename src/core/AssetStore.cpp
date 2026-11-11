@@ -61,7 +61,7 @@ std::vector<fs::path> CandidateRoots()
         roots.push_back(fs::path(base) / "..");
         roots.push_back(fs::path(base) / ".." / "share" / "openaow");
     }
-#if defined(__ANDROID__) || defined(ANDROID)
+#if ANDROID
     if (char *pref = SDL_GetPrefPath("badcast", "openaow"))
     {
         roots.push_back(fs::path(pref));

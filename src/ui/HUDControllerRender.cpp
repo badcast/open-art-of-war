@@ -557,6 +557,15 @@ void HUDController::RenderGameHud(
             if (active)
                 renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
 
+#if ANDROID
+            ui::DrawButton(
+                renderer,
+                fontRenderer,
+                tr,
+                _(kTabNames[t]),
+                active ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
+                hovered);
+#else
             if (TabIcon(t) >= 0)
             {
                 renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
@@ -576,6 +585,7 @@ void HUDController::RenderGameHud(
             {
                 DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
             }
+#endif
         }
 
         // --- Strip: tab title, primary building, scroll arrows ---------------------------------------

@@ -207,6 +207,7 @@ std::vector<SettingsRow> BuildSettingsRows(
 
     if (tab == 0)
     { // VIDEO
+#if !ANDROID
         static const char *const kModes[3] = {"Windowed", "Borderless", "Fullscreen"};
         choiceList(
             _("Window mode"),
@@ -254,6 +255,7 @@ std::vector<SettingsRow> BuildSettingsRows(
             !borderless,
             value);
 
+#endif
         toggle(_("VSync"), _("Wait for the monitor refresh, no tearing"), s.vsync, [&s, notify](bool on) {
             s.vsync = on;
             notify(SettingsArea::Video);

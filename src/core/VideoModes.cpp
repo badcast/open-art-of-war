@@ -73,6 +73,9 @@ void Apply(SDL_Window *window, SDL_Renderer *renderer, const Settings &settings)
 {
     if (!window)
         return;
+#if ANDROID
+    SDL_SetWindowFullscreen(window, true);
+#else
     const SDL_DisplayID display = DisplayOf(window);
 
     switch (settings.windowMode)
@@ -116,6 +119,7 @@ void Apply(SDL_Window *window, SDL_Renderer *renderer, const Settings &settings)
             break;
         }
     }
+#endif
     if (renderer)
         SDL_SetRenderVSync(renderer, settings.vsync ? 1 : 0);
     SDL_SyncWindow(window);

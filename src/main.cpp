@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#if defined(__ANDROID__)
+#if ANDROID
 // Renames main() to SDL_main(): SDLActivity starts the game through it
 #include <SDL3/SDL_main.h>
 #endif
