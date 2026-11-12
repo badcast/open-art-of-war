@@ -94,6 +94,7 @@ bool Settings::Save(const std::string &path) const
         j["difficulty"] = difficulty;
         j["edgePanMargin"] = edgePanMargin;
         j["showBuildGrid"] = showBuildGrid;
+        j["cameraShake"] = cameraShake;
 
         return JsonFile::WriteAtomic(path, j);
     }
@@ -179,6 +180,7 @@ void Settings::ApplyJson(const nlohmann::json &j)
     difficulty = j.value("difficulty", difficulty);
     edgePanMargin = j.value("edgePanMargin", edgePanMargin);
     showBuildGrid = j.value("showBuildGrid", showBuildGrid);
+    cameraShake = j.value("cameraShake", cameraShake);
     Clamp();
 }
 

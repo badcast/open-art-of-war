@@ -518,6 +518,14 @@ std::vector<SettingsRow> BuildSettingsRows(
                 s.showBuildGrid = on;
                 notify(SettingsArea::Game);
             });
+        toggle(
+            _("Camera shake"),
+            _("The picture trembles when a building blows up"),
+            s.cameraShake,
+            [&s, notify](bool on) {
+                s.cameraShake = on;
+                notify(SettingsArea::Game);
+            });
         rows.push_back(SliderRow(
             _("Default zoom"),
             _("Map zoom when a mission starts"),
@@ -613,6 +621,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.zoomMax = d.zoomMax;
         s.edgePanMargin = d.edgePanMargin;
         s.showBuildGrid = d.showBuildGrid;
+        s.cameraShake = d.cameraShake;
     }
 }
 

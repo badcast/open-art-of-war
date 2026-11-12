@@ -67,6 +67,7 @@ struct Settings
     std::string language {"en"};
     int difficulty {1};        // 0 = easy .. 3 = hardcore
     bool showBuildGrid {true}; // grid of allowed / forbidden tiles while a building is placed
+    bool cameraShake {true};   // the picture trembles when a building blows up
     int edgePanMargin {5};     // 5..30 pixels (screen border thickness for mouse scrolling)
 
     static constexpr int kArmyColors = 8;

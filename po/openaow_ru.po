@@ -2758,6 +2758,12 @@ msgstr "ПЕРЕТАЩИТЕ ПРИЗРАК И НАЖМИТЕ «СТРОИТЬ»
 msgid "BOX SELECT: DRAG OVER THE UNITS"
 msgstr "РАМКА: ПРОВЕДИТЕ ПО ЮНИТАМ"
 
+msgid "Camera shake"
+msgstr "Тряска камеры"
+
+msgid "The picture trembles when a building blows up"
+msgstr "Картинка трясётся, когда взрывается здание"
+
 msgid "Show grid when building"
 msgstr "Показывать сетку при строительстве"
 

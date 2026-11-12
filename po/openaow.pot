@@ -2752,6 +2752,12 @@ msgstr "DRAG THE GHOST, THEN BUILD HERE"
 msgid "BOX SELECT: DRAG OVER THE UNITS"
 msgstr "BOX SELECT: DRAG OVER THE UNITS"
 
+msgid "Camera shake"
+msgstr "Camera shake"
+
+msgid "The picture trembles when a building blows up"
+msgstr "The picture trembles when a building blows up"
+
 msgid "Show grid when building"
 msgstr "Show grid when building"
 

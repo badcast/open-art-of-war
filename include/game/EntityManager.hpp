@@ -798,6 +798,19 @@ public:
     {
         return m_generation;
     }
+    // Buildings that blew up since the last call (visual only: the camera shake)
+    struct BuildingBlast
+    {
+        float x {0.0f};
+        float y {0.0f};
+        float size {1.0f}; // ~1 for a medium building
+    };
+    std::vector<BuildingBlast> TakeBuildingBlasts()
+    {
+        std::vector<BuildingBlast> out;
+        out.swap(m_buildingBlasts);
+        return out;
+    }
     std::vector<SoundCueEvent> TakeSoundCues()
     {
         std::vector<SoundCueEvent> out;
@@ -918,6 +931,7 @@ private:
     std::vector<Mine> m_mines; // part of the simulation state (Simulation::VisitState)
     int m_nextMineId {1};
     std::vector<SoundCueEvent> m_soundCues;
+    std::vector<BuildingBlast> m_buildingBlasts;
     std::uint32_t m_generation {0};
     void Cue(SoundCue c, float x, float y, PlayerId owner, std::uint16_t sound = 0, float gain = 1.0f)
     {

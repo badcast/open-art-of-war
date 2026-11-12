@@ -28,6 +28,7 @@
 #include "game/Match.hpp"
 #include "game/Simulation.hpp"
 #include "graphics/Camera.hpp"
+#include "graphics/CameraShake.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
 #include "input/InputManager.hpp"
 #include "audio/SoundEngine.hpp"
@@ -291,6 +292,7 @@ bool Application::Init(int windowWidth, int windowHeight)
         m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
     HUDController::SetBuildGridConfig(m_env.Section("build_grid"));
+    m_cameraShake.Configure(m_env.Section("camera_shake"));
     HUDController::SetShowBuildGrid(m_settings.showBuildGrid);
     m_gameplayController = std::make_unique<GameplayController>();
     m_gameplayController->SetTouchMode(m_touchUi);
@@ -724,6 +726,7 @@ void Application::Run()
 
         UpdateRenderAlpha(accumulator, frameTime);
         UpdateSounds();
+        UpdateCameraShake(frameTime);
         Render();
 
         // Frame rate cap (also with vsync on, when the limit is below the refresh rate)
@@ -1102,6 +1105,31 @@ void Application::Update(float deltaTime)
         m_sound->StopAmbient();
 }
 
+void Application::UpdateCameraShake(double frameTime)
+{
+    const bool inMatch = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
+    if (!inMatch || !m_entities || !m_camera)
+    {
+        m_cameraShake.Reset();
+        if (m_entities)
+            m_entities->TakeBuildingBlasts();
+        return;
+    }
+    const float zoom = std::max(0.01f, m_camera->GetZoom());
+    const float midX = m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f;
+    const float midY = m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f;
+    for (const EntityManager::BuildingBlast &b : m_entities->TakeBuildingBlasts())
+    {
+        if (!m_settings.cameraShake)
+            continue;
+        const float dx = (b.x - midX) / TILE_WIDTH, dy = (b.y - midY) / TILE_HEIGHT;
+        m_cameraShake.AddBlast(std::sqrt(dx * dx + dy * dy), b.size);
+    }
+    if (!m_settings.cameraShake)
+        m_cameraShake.Reset();
+    m_cameraShake.Update(static_cast<float>(frameTime));
+}
+
 void Application::UpdateSounds()
 {
     if (!m_sound)
@@ -1270,6 +1298,31 @@ void Application::Render()
         {
             const int color = Players::Slot(p).color;
             m_renderer->SetArmyColor(p, Players::IsActive(p) && color > 0, ArmyColor(color));
+        }
+
+        // Camera shake: the world and its overlays are drawn from a shifted view, the HUD and the input are not
+        struct ShakeGuard
+        {
+            Camera *cam {nullptr};
+            float x {0.0f}, y {0.0f};
+            void Restore()
+            {
+                if (cam)
+                    cam->SetPosition(x, y);
+                cam = nullptr;
+            }
+            ~ShakeGuard()
+            {
+                Restore();
+            }
+        } shake;
+        if (m_cameraShake.Active() && m_settings.cameraShake)
+        {
+            float ox = 0.0f, oy = 0.0f;
+            m_cameraShake.Offset(ox, oy);
+            const float zoom = std::max(0.01f, m_camera->GetZoom());
+            shake = {m_camera.get(), m_camera->GetX(), m_camera->GetY()};
+            m_camera->SetPosition(shake.x + ox / zoom, shake.y + oy / zoom);
         }
 
         // The world is drawn into a smaller target at low / medium quality and scaled up afterwards
@@ -1452,6 +1505,8 @@ void Application::Render()
         m_hudController->RenderProductionOverlay(*m_renderer, *m_fontRenderer, *m_entities, *m_map, *m_camera);
         // Not enough power: blinking lightnings over the buildings that stopped
         m_hudController->RenderPowerAlerts(*m_renderer, *m_entities, *m_economy, *m_camera);
+
+        shake.Restore();
 
         // Render Selection Box
         if (!m_hudController->IsBuildMode() && !m_hudController->OwnsMapInput())

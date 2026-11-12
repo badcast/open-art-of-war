@@ -8,6 +8,7 @@
 #include "ui/MapPreview.hpp"
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
+#include "graphics/CameraShake.hpp"
 #include "graphics/RenderBackend.hpp"
 #include <array>
 #include <deque>
@@ -182,6 +183,7 @@ private:
     void RenderScoreboard();
     // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat
     void UpdateSounds();
+    void UpdateCameraShake(double frameTime);
     std::unique_ptr<GameSounds> m_gameSounds;
     float m_endScreenTimer {0.0f};                      // seconds on the Victory / Defeat screen
     static constexpr float kEndScreenInputDelay = 2.0f; // input is ignored this long after the match ends
@@ -384,6 +386,7 @@ private:
     std::unique_ptr<TextureManager> m_texManager;
     std::unique_ptr<Renderer> m_renderer;
     std::unique_ptr<Camera> m_camera;
+    CameraShake m_cameraShake; // building explosions (visual only)
     std::unique_ptr<BitmapFontRenderer> m_fontRenderer;
     std::unique_ptr<InputManager> m_input;
     std::unique_ptr<SoundEngine> m_sound;

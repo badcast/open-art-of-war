@@ -248,6 +248,7 @@ void EntityManager::Clear()
     m_mines.clear();
     m_nextMineId = 1;
     m_soundCues.clear();
+    m_buildingBlasts.clear();
     m_eliminated = {};
     // Muzzle-flash reveals name entity ids: the next game reuses them from 1, so old pings would show its units
     m_revealPings.clear();
