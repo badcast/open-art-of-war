@@ -36,6 +36,7 @@ concurrency:
 
 jobs:
   build-android:
+    environment: GAME_DATA_URLS
     name: Android (NDK, arm64-v8a + x86_64)
     runs-on: ubuntu-latest
     timeout-minutes: 60
