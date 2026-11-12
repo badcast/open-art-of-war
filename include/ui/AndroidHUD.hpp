@@ -107,6 +107,7 @@ private:
         bool active {false};
         bool disabled {false};
         ui::ButtonStyle style {ui::ButtonStyle::Secondary};
+        float fontScale = 1.0F;
     };
     struct Layout
     {

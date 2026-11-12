@@ -1123,16 +1123,61 @@ void GameplayController::Update(const FrameContext &ctx)
                     combatUnits.push_back(uid);
             }
             const Entity *tapped = entities.GetEntity(entities.GetUnitAt(lx, ly));
-            if (!combatUnits.empty() && !(tapped && IsLiveOwnUnit(tapped)))
+            // A tap on an own unit or building selects it (the unit selection ends), it is no order
+            const bool tappedOwn = tapped && tapped->alive && tapped->owner == Players::Local();
+            const std::uint64_t now = SDL_GetTicks();
+            const bool again = now - m_touchOrderTicks < 450 && std::abs(mx - m_touchOrderX) <= 40
+                               && std::abs(my - m_touchOrderY) <= 40;
+            if (!combatUnits.empty() && !tappedOwn)
             {
-                const std::uint64_t now = SDL_GetTicks();
-                const bool again = now - m_touchOrderTicks < 450 && std::abs(mx - m_touchOrderX) <= 40
-                                   && std::abs(my - m_touchOrderY) <= 40;
                 OrderAt(combatUnits, lx, ly, again ? OrderKind::AttackMove : OrderKind::Move, false);
                 m_touchOrderTicks = again ? 0 : now;
                 m_touchOrderX = mx;
                 m_touchOrderY = my;
                 touchOrdered = true;
+            }
+            else if (!tapped && combatUnits.empty() && !m_selectedUnits.empty())
+            {
+                // Barracks / Factories selected, a tap on empty ground: the selection ends, but the buildings
+                // are remembered for a moment: a second tap close by sets their rally point
+                m_touchRallyIds.clear();
+                for (int id : m_selectedUnits)
+                {
+                    const Building *b = entities.GetBuilding(id);
+                    if (b && b->alive && b->owner == Players::Local() && b->IsUnitProducer())
+                        m_touchRallyIds.push_back(id);
+                }
+                m_touchRallyTicks = now;
+                m_touchRallyX = mx;
+                m_touchRallyY = my;
+            }
+            else if (!tapped && m_selectedUnits.empty() && !m_touchRallyIds.empty())
+            {
+                const bool second = now - m_touchRallyTicks < 450 && std::abs(mx - m_touchRallyX) <= 40
+                                    && std::abs(my - m_touchRallyY) <= 40;
+                SimCommand c = Command(CommandType::SetRally);
+                if (second)
+                {
+                    for (int id : m_touchRallyIds)
+                    {
+                        Entity *e = entities.GetEntity(id);
+                        const Building *b = entities.GetBuilding(id);
+                        if (e && b && b->alive && b->owner == Players::Local())
+                        {
+                            c.ids.push_back(static_cast<std::uint32_t>(id));
+                            e->selected = true;
+                            m_selectedUnits.push_back(id); // the buildings stay in focus after the rally point
+                        }
+                    }
+                    c.x = static_cast<std::int32_t>(lx);
+                    c.y = static_cast<std::int32_t>(ly);
+                    if (!c.ids.empty())
+                    {
+                        m_sim.Issue(std::move(c));
+                        touchOrdered = true;
+                    }
+                }
+                m_touchRallyIds.clear();
             }
         }
 
@@ -1244,6 +1289,8 @@ void GameplayController::Update(const FrameContext &ctx)
             // otherwise select the first one's units, whose orders the simulation then refuses)
             const PlayerId selOwner
                 = (m_debugMode && m_controlAllFactions) ? Players::OwnerOf(AiFaction()) : Players::Local();
+            for (auto &e : entities.GetAllEntities())
+                e.selected = false; // an area selection ends the focus on a building
             entities.GetUnitsInBox(minX, minY, maxX, maxY, selOwner, m_selectedUnits);
             if (m_debugMode && m_controlAllFactions && m_selectedUnits.empty())
             {

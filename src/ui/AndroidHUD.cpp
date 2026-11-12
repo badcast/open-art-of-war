@@ -92,12 +92,12 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
            {"radar_zoom_out", Act::RadarZoomOut}};
 
     const uilayout::Solved solved = uilayout::Current().Solve("hud", "touch", windowW, windowH, cond);
-    Layout l;
-    l.u = solved.u;
-    l.resources = solved.Rect("resources");
-    l.radar = solved.Rect("radar");
-    l.cards = solved.Rect("cards");
-    l.notice = solved.Rect("notice");
+    Layout layout;
+    layout.u = solved.u;
+    layout.resources = solved.Rect("resources");
+    layout.radar = solved.Rect("radar");
+    layout.cards = solved.Rect("cards");
+    layout.notice = solved.Rect("notice");
     for (const uilayout::Node &n : solved.nodes)
     {
         if (!n.visible || n.type != "button")
@@ -111,58 +111,59 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
         b.label = _(n.label.c_str());
         b.active = n.active;
         b.disabled = n.disabled;
+        b.fontScale = n.fontScale;
         b.style = n.style == "danger"    ? ui::ButtonStyle::Danger
                   : n.style == "primary" ? ui::ButtonStyle::Primary
                                          : ui::ButtonStyle::Secondary;
-        l.buttons.push_back(std::move(b));
+        layout.buttons.push_back(std::move(b));
     }
-    if (l.cards.w > 0)
+    if (layout.cards.w > 0)
     {
-        const int arrow = static_cast<int>(std::lround(48 * l.u));
-        const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * l.u)) + 4 : 0;
-        l.cardsFit = std::max(1, (l.cards.w - 2 * arrow - offset) / (kCardW + kCardGap));
+        const int arrow = static_cast<int>(std::lround(48 * layout.u));
+        const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * layout.u)) + 4 : 0;
+        layout.cardsFit = std::max(1, (layout.cards.w - 2 * arrow - offset) / (kCardW + kCardGap));
     }
-    return l;
+    return layout;
 }
 
-UiRect AndroidHUD::CardRect(const Layout &l, int slot) const
+UiRect AndroidHUD::CardRect(const Layout &layout, int slot) const
 {
-    const int arrow = static_cast<int>(std::lround(48 * l.u));
-    const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * l.u)) + 4 : 0;
-    return {l.cards.x + arrow + offset + slot * (kCardW + kCardGap), l.cards.y, kCardW, kCardH};
+    const int arrow = static_cast<int>(std::lround(48 * layout.u));
+    const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * layout.u)) + 4 : 0;
+    return {layout.cards.x + arrow + offset + slot * (kCardW + kCardGap), layout.cards.y, kCardW, kCardH};
 }
 
-bool AndroidHUD::OverPanels(const Layout &l, int mx, int my) const
+bool AndroidHUD::OverPanels(const Layout &layout, int mx, int my) const
 {
-    if (l.resources.Contains(mx, my) || l.radar.Contains(mx, my))
+    if (layout.resources.Contains(mx, my) || layout.radar.Contains(mx, my))
         return true;
-    for (const Button &b : l.buttons)
+    for (const Button &b : layout.buttons)
         if (b.r.Contains(mx, my))
             return true;
-    if (m_panel != Panel::None && !m_placing && l.cards.Contains(mx, my))
+    if (m_panel != Panel::None && !m_placing && layout.cards.Contains(mx, my))
         return true;
     return false;
 }
 
 bool AndroidHUD::IsOverHud(int mx, int my, int windowW, int windowH) const
 {
-    const Layout l = MakeLayout(windowW, windowH, false, false, 0);
-    return OverPanels(l, mx, my);
+    const Layout layout = MakeLayout(windowW, windowH, false, false, 0);
+    return OverPanels(layout, mx, my);
 }
 
 std::vector<SDL_Rect> AndroidHUD::TouchPanels(int windowW, int windowH) const
 {
-    const Layout l = MakeLayout(windowW, windowH, true, true, 1);
+    const Layout layout = MakeLayout(windowW, windowH, true, true, 1);
     std::vector<SDL_Rect> out;
     auto push = [&](const UiRect &r) {
         out.push_back({r.x, r.y, r.w, r.h});
     };
-    push(l.resources);
-    push(l.radar);
-    for (const Button &b : l.buttons)
+    push(layout.resources);
+    push(layout.radar);
+    for (const Button &b : layout.buttons)
         push(b.r);
     if (m_panel != Panel::None && !m_placing)
-        push(l.cards);
+        push(layout.cards);
     if (m_placing && m_ghostRect.w > 0)
         out.push_back(m_ghostRect);
     return out;
@@ -266,7 +267,7 @@ void AndroidHUD::SyncPanelWithTab()
 
 void AndroidHUD::Press(
     Act act,
-    const Layout &l,
+    const Layout &layout,
     Economy &economy,
     EntityManager &entities,
     TileMap &map,
@@ -275,7 +276,7 @@ void AndroidHUD::Press(
     bool &outOpenObjectives,
     std::vector<int> &selectedUnits)
 {
-    (void) l;
+    (void) layout;
     // One mode at a time: any button but the two of the placement itself ends the placement
     if (m_placing && act != Act::Confirm && act != Act::Cancel)
         m_placing = false;
@@ -388,7 +389,7 @@ void AndroidHUD::Press(
         {
             const int slot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
             const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-            const int maxStart = std::max(0, ItemCountForTab(tab) - l.cardsFit);
+            const int maxStart = std::max(0, ItemCountForTab(tab) - layout.cardsFit);
             m_scroll[slot] = std::clamp(m_scroll[slot] + (act == Act::ScrollLeft ? -1 : 1), 0, maxStart);
             break;
         }
@@ -427,7 +428,7 @@ bool AndroidHUD::HandleHudClick(
         m_destroyArmed = 0.0f;
     const bool combat = HasCombatUnits(entities, selectedUnits);
     const bool building = !OwnSelectedBuildings(entities, selectedUnits).empty();
-    const Layout l = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selectedUnits.size()));
+    const Layout layout = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selectedUnits.size()));
     m_panels.clear();
 
     if (!leftMouseDown)
@@ -435,15 +436,15 @@ bool AndroidHUD::HandleHudClick(
 
     // The radar: a tap or a drag on it puts the camera there (the zoom buttons on it are buttons)
     bool onButton = false;
-    for (const Button &b : l.buttons)
+    for (const Button &b : layout.buttons)
         onButton = onButton || b.r.Contains(mx, my);
-    if (l.radar.Contains(mx, my) && !onButton && (leftMouseDown || leftClicked))
+    if (layout.radar.Contains(mx, my) && !onButton && (leftMouseDown || leftClicked))
         m_radarHeld = true;
     m_radarDragging = m_radarHeld && leftMouseDown; // a zoomed radar holds still while the camera follows the finger
     if (m_radarHeld)
     {
         const RadarView v
-            = radarView(l.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
+            = radarView(layout.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
         if (v.w > 0 && v.h > 0)
         {
             const float tx = std::clamp(
@@ -455,7 +456,8 @@ bool AndroidHUD::HandleHudClick(
         return true;
     }
 
-    const bool onPanel = OverPanels(l, mx, my) || (m_panel != Panel::None && !m_placing && l.cards.Contains(mx, my));
+    const bool onPanel
+        = OverPanels(layout, mx, my) || (m_panel != Panel::None && !m_placing && layout.cards.Contains(mx, my));
     UpdateGhostRect(camera);
     if (!leftMouseDown)
     {
@@ -526,12 +528,12 @@ bool AndroidHUD::HandleHudClick(
         return false;
     }
 
-    if (rightClicked && m_panel == Panel::Units && l.cards.Contains(mx, my))
+    if (rightClicked && m_panel == Panel::Units && layout.cards.Contains(mx, my))
     {
         // Holding a unit card takes one order back
-        for (int s = 0; s < l.cardsFit; ++s)
+        for (int s = 0; s < layout.cardsFit; ++s)
         {
-            if (!CardRect(l, s).Contains(mx, my))
+            if (!CardRect(layout, s).Contains(mx, my))
                 continue;
             const int idx = ItemAt(m_unitTab, m_scroll[m_unitTab == TabInfantry ? 1 : 2] + s);
             if (idx >= 0)
@@ -542,21 +544,21 @@ bool AndroidHUD::HandleHudClick(
     if (!leftClicked)
         return true;
 
-    for (const Button &b : l.buttons)
+    for (const Button &b : layout.buttons)
     {
         if (b.r.Contains(mx, my) && !b.disabled)
         {
-            Press(b.act, l, economy, entities, map, camera, outOpenMenu, outOpenObjectives, selectedUnits);
+            Press(b.act, layout, economy, entities, map, camera, outOpenMenu, outOpenObjectives, selectedUnits);
             return true;
         }
     }
-    if (m_panel != Panel::None && l.cards.Contains(mx, my))
+    if (m_panel != Panel::None && layout.cards.Contains(mx, my))
     {
         const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
         const int first = m_scroll[m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2)];
-        for (int s = 0; s < l.cardsFit; ++s)
+        for (int s = 0; s < layout.cardsFit; ++s)
         {
-            if (!CardRect(l, s).Contains(mx, my))
+            if (!CardRect(layout, s).Contains(mx, my))
                 continue;
             const int idx = ItemAt(tab, first + s);
             if (idx < 0)
@@ -737,10 +739,11 @@ void AndroidHUD::RenderGameHud(
             renderer,
             fontRenderer,
             b.r,
-            ui::FitText(fontRenderer, b.label, ui::FONT_SMALL_BOLD, b.r.w - 8),
+            b.label,
             b.active ? ui::ButtonStyle::Primary : b.style,
             b.r.Contains(mx, my),
-            b.disabled);
+            !b.disabled,
+            ui::ButtonFontForScale(b.fontScale));
     }
 
     // What is selected, over the orders

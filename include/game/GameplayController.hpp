@@ -215,6 +215,11 @@ private:
     std::uint64_t m_touchOrderTicks {0}; // the last tap that ordered (a second one close by is an attack-move)
     int m_touchOrderX {-1000};
     int m_touchOrderY {-1000};
+    std::vector<int>
+        m_touchRallyIds; // producers just deselected by a tap on the ground (a second tap sets their rally point)
+    std::uint64_t m_touchRallyTicks {0};
+    int m_touchRallyX {-1000};
+    int m_touchRallyY {-1000};
     std::uint64_t m_lastClickTicks {0};
     int m_lastClickX {-100}; // screen position of the last click (a double click on empty ground)
     int m_lastClickY {-100};

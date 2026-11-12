@@ -21,6 +21,8 @@ public:
     {
         return Load(assetPath);
     }
+    // The "settings" section of the factory file: the player's options as they are before settings.json is read
+    static nlohmann::json FactorySettings(const std::string &assetPath = LoaderResources::Environment());
     // Writes the runtime sections into settings.json if anything changed (atomically: temp file + rename)
     bool Save();
 

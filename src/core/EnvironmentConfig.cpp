@@ -58,6 +58,17 @@ bool EnvironmentConfig::Load(const std::string &assetPath)
     return found;
 }
 
+nlohmann::json EnvironmentConfig::FactorySettings(const std::string &assetPath)
+{
+    std::string text;
+    if (!Assets::ReadText(assetPath, text))
+        return nlohmann::json::object();
+    const nlohmann::json root = JsonFile::ReadFromString(text);
+    if (root.is_object() && root.contains("settings") && root["settings"].is_object())
+        return root["settings"];
+    return nlohmann::json::object();
+}
+
 const nlohmann::json &EnvironmentConfig::Section(const std::string &name) const
 {
     static const nlohmann::json kEmpty = nlohmann::json::object();

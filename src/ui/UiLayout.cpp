@@ -244,6 +244,7 @@ struct Layout::Def
         std::string gap {"0"};
         std::string size[2]; // a child of a flow
         std::vector<NodeDef> children;
+        float fontScale {1.0F};
     };
     std::string scale {"1"};
     std::vector<NodeDef> nodes;
@@ -266,6 +267,7 @@ Layout::Def::NodeDef ReadNode(const YAML::Node &n, std::string &error)
     d.action = Scalar(n["action"]);
     d.style = Scalar(n["style"]);
     d.visibleIf = Scalar(n["visible_if"]);
+    d.fontScale = Scalar(n["font_scale"]).empty() ? 1.0F : std::stof(Scalar(n["font_scale"]));
     d.activeIf = Scalar(n["active_if"]);
     d.disabledIf = Scalar(n["disabled_if"]);
     d.dir = Scalar(n["dir"]);
@@ -388,6 +390,7 @@ Solved Layout::Solve(
         n.visible = parentShown && EvalCond(d.visibleIf, cond);
         n.active = !d.activeIf.empty() && EvalCond(d.activeIf, cond);
         n.disabled = !d.disabledIf.empty() && EvalCond(d.disabledIf, cond);
+        n.fontScale = d.fontScale;
         return n;
     };
     auto rounded = [](float v) {
@@ -578,10 +581,11 @@ void DrawGeneric(Renderer &r, BitmapFontRenderer &font, const Solved &s, int mx,
                 r,
                 font,
                 n.rect,
-                ui::FitText(font, _(n.label.c_str()), ui::FONT_SMALL_BOLD, n.rect.w - 8),
+                _(n.label.c_str()),
                 n.active ? ui::ButtonStyle::Primary : st,
                 n.rect.Contains(mx, my),
-                !n.disabled);
+                !n.disabled,
+                ui::ButtonFontForScale(n.fontScale));
         }
     }
 }

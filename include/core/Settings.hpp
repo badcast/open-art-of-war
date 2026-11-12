@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -85,6 +86,11 @@ struct Settings
         return Load(path);
     }
     bool Save(const std::string &path) const;
+    // The factory defaults: the "settings" section of assets/data/game_environment.yaml (same keys as settings.json),
+    // laid over the built-in values before the player's own settings.json is read
+    void ApplyFactoryDefaults(const nlohmann::json &section);
+
+    void ApplyJson(const nlohmann::json &j);
 
     // settings.json in the per-user directory
     static std::string DefaultPath();

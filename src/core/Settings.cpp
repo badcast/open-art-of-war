@@ -114,47 +114,7 @@ bool Settings::Load(const std::string &path)
         const nlohmann::json j = nlohmann::json::parse(fh, nullptr, false);
         if (!j.is_object())
             return false;
-
-        windowMode = static_cast<WindowMode>(j.value("windowMode", static_cast<int>(windowMode)));
-        windowW = j.value("windowWidth", windowW);
-        windowH = j.value("windowHeight", windowH);
-        fullscreenW = j.value("fullscreenWidth", fullscreenW);
-        fullscreenH = j.value("fullscreenHeight", fullscreenH);
-        vsync = j.value("vsync", vsync);
-#if ANDROID
-        vsync = true; // without it the mobile builds glitch: not up to a stored choice of an older build
-#endif
-        fpsLimit = j.value("fpsLimit", fpsLimit);
-        enabledMods.clear();
-        if (j.contains("enabledMods") && j["enabledMods"].is_array())
-            for (const auto &m : j["enabledMods"])
-                if (m.is_string())
-                    enabledMods.push_back(m.get<std::string>());
-        showFps = j.value("showFps", showFps);
-        showNetStats = j.value("showNetStats", showNetStats);
-        graphicsQuality = j.value("graphicsQuality", graphicsQuality);
-        smoothing = j.value("smoothing", smoothing);
-        zoomDefault = j.value("zoomDefault", zoomDefault);
-        zoomMin = j.value("zoomMin", zoomMin);
-        zoomMax = j.value("zoomMax", zoomMax);
-        colorGrade = j.value("colorGrade", colorGrade);
-        glow = j.value("glow", glow);
-        sharpPixels = j.value("sharpPixels", sharpPixels);
-        generalVolume = j.value("generalVolume", generalVolume);
-        musicVolume = j.value("musicVolume", musicVolume);
-        fxVolume = j.value("fxVolume", fxVolume);
-        reverb = j.value("reverb", reverb);
-        voiceVolume = j.value("voiceVolume", voiceVolume);
-        ambientVolume = j.value("ambientVolume", ambientVolume);
-        uiVolume = j.value("uiVolume", uiVolume);
-        muted = j.value("muted", muted);
-        language = j.value("language", language);
-        playerName = j.value("playerName", playerName);
-        lastAddress = j.value("lastAddress", lastAddress);
-        difficulty = j.value("difficulty", difficulty);
-        edgePanMargin = j.value("edgePanMargin", edgePanMargin);
-        showBuildGrid = j.value("showBuildGrid", showBuildGrid);
-        Clamp();
+        ApplyJson(j);
         return true;
     }
     catch (const std::exception &e)
@@ -162,6 +122,64 @@ bool Settings::Load(const std::string &path)
         std::cerr << "[Settings] Load failed: " << e.what() << std::endl;
         return false;
     }
+}
+
+void Settings::ApplyFactoryDefaults(const nlohmann::json &section)
+{
+    if (!section.is_object())
+        return;
+    try
+    {
+        ApplyJson(section);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[Settings] Factory defaults ignored: " << e.what() << std::endl;
+    }
+}
+
+void Settings::ApplyJson(const nlohmann::json &j)
+{
+    windowMode = static_cast<WindowMode>(j.value("windowMode", static_cast<int>(windowMode)));
+    windowW = j.value("windowWidth", windowW);
+    windowH = j.value("windowHeight", windowH);
+    fullscreenW = j.value("fullscreenWidth", fullscreenW);
+    fullscreenH = j.value("fullscreenHeight", fullscreenH);
+    vsync = j.value("vsync", vsync);
+#if ANDROID
+    vsync = true; // without it the mobile builds glitch: not up to a stored choice of an older build
+#endif
+    fpsLimit = j.value("fpsLimit", fpsLimit);
+    enabledMods.clear();
+    if (j.contains("enabledMods") && j["enabledMods"].is_array())
+        for (const auto &m : j["enabledMods"])
+            if (m.is_string())
+                enabledMods.push_back(m.get<std::string>());
+    showFps = j.value("showFps", showFps);
+    showNetStats = j.value("showNetStats", showNetStats);
+    graphicsQuality = j.value("graphicsQuality", graphicsQuality);
+    smoothing = j.value("smoothing", smoothing);
+    zoomDefault = j.value("zoomDefault", zoomDefault);
+    zoomMin = j.value("zoomMin", zoomMin);
+    zoomMax = j.value("zoomMax", zoomMax);
+    colorGrade = j.value("colorGrade", colorGrade);
+    glow = j.value("glow", glow);
+    sharpPixels = j.value("sharpPixels", sharpPixels);
+    generalVolume = j.value("generalVolume", generalVolume);
+    musicVolume = j.value("musicVolume", musicVolume);
+    fxVolume = j.value("fxVolume", fxVolume);
+    reverb = j.value("reverb", reverb);
+    voiceVolume = j.value("voiceVolume", voiceVolume);
+    ambientVolume = j.value("ambientVolume", ambientVolume);
+    uiVolume = j.value("uiVolume", uiVolume);
+    muted = j.value("muted", muted);
+    language = j.value("language", language);
+    playerName = j.value("playerName", playerName);
+    lastAddress = j.value("lastAddress", lastAddress);
+    difficulty = j.value("difficulty", difficulty);
+    edgePanMargin = j.value("edgePanMargin", edgePanMargin);
+    showBuildGrid = j.value("showBuildGrid", showBuildGrid);
+    Clamp();
 }
 
 } // namespace OpenArtOfWar

@@ -208,6 +208,30 @@ UiRect DrawDialog(
     return {rect.x + 20, rect.y + titleH + 16, rect.w - 40, rect.h - titleH - 32};
 }
 
+int ButtonFontForScale(float scale)
+{
+    struct Option
+    {
+        int id;
+        float px;
+    };
+    static const Option kBold[]
+        = {{FONT_SMALL_BOLD, 13.0f}, {FONT_BODY_BOLD, 16.0f}, {FONT_H2, 22.0f}, {FONT_H1, 30.0f}, {FONT_HERO, 48.0f}};
+    const float want = 16.0f * (scale > 0.0f ? scale : 1.0f);
+    int best = FONT_BODY_BOLD;
+    float bestDiff = 1e9f;
+    for (const Option &o : kBold)
+    {
+        const float d = std::abs(o.px - want);
+        if (d < bestDiff)
+        {
+            bestDiff = d;
+            best = o.id;
+        }
+    }
+    return best;
+}
+
 void DrawButton(
     Renderer &r,
     BitmapFontRenderer &font,
@@ -215,7 +239,8 @@ void DrawButton(
     const std::string &label,
     ButtonStyle style,
     bool hovered,
-    bool enabled)
+    bool enabled,
+    int fontId)
 {
     if (hovered && enabled)
         SoundRequests::MarkHover();
@@ -255,12 +280,12 @@ void DrawButton(
     r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
     if (border.a > 0)
         r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
-    std::string shown = FitText(font, label, FONT_BODY_BOLD, rect.w - 16);
+    std::string shown = FitText(font, label, fontId, rect.w - 16);
     font.DrawString(
         shown,
         rect.CenterX(),
         rect.CenterY(),
-        FONT_BODY_BOLD,
+        fontId,
         text,
         style != ButtonStyle::Primary,
         Anchor::HCENTER | Anchor::VCENTER);

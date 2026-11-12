@@ -2,6 +2,7 @@
 #include "net/ReplayRecorder.hpp"
 #include "core/Localization.hpp"
 #include "core/AssetStore.hpp"
+#include "core/EnvironmentConfig.hpp"
 #include "core/LoaderResources.hpp"
 #include "core/Mods.hpp"
 #include "core/DebugEnv.hpp"
@@ -122,6 +123,7 @@ bool Application::Init(int windowWidth, int windowHeight)
 
     // Options and progress live in the per-user directory (Assets::userDataDir)
     m_saveManager = std::make_unique<SaveManager>();
+    m_settings.ApplyFactoryDefaults(EnvironmentConfig::FactorySettings()); // game_environment.yaml, "settings"
     m_settings.windowW = windowWidth;
     m_settings.windowH = windowHeight;
     if (!m_settings.load(Settings::DefaultPath()))

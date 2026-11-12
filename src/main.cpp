@@ -137,14 +137,12 @@ int main(int argc, char *argv[])
         {
             rendererOverride = arg.substr(11);
         }
+#if defined(AOW_DEBUG)
         if (arg == "--debug" || arg == "-d")
         {
-#if defined(AOW_DEBUG)
             debugMode = true;
-#else
-            std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
-#endif
         }
+#endif
         if (arg == "--touch-ui")
             touchUi = true;
         if (arg == "--testmap" || arg == "--test-map" || arg == "-tm")

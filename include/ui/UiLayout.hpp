@@ -39,6 +39,7 @@ struct Node
     bool visible {true};
     bool active {false};
     bool disabled {false};
+    float fontScale {1.0F};
 };
 
 // Answers a condition name (an unknown name is false)

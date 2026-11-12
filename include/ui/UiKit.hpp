@@ -120,7 +120,11 @@ void DrawButton(
     const std::string &label,
     ButtonStyle style,
     bool hovered,
-    bool enabled = true);
+    bool enabled = true,
+    int fontId = FONT_BODY_BOLD);
+
+// The bold font nearest to `scale` times the body size (16px): 1 = body, 2 = ~30px title, 3 = hero (48px)
+int ButtonFontForScale(float scale);
 
 void DrawCheckbox(
     Renderer &r,
