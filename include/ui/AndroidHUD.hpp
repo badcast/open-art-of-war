@@ -19,11 +19,6 @@ namespace OpenArtOfWar
 class AndroidHUD : public HUDController
 {
 public:
-    // The technology tree is drawn three times the size (fingers need big targets)
-    AndroidHUD()
-    {
-        m_researchScale = 3.0f;
-    }
     int ReservedWidth() const override
     {
         return 0;
@@ -146,10 +141,10 @@ private:
     int m_ghostX {0};
     int m_ghostY {0};
     bool m_boxSelect {false};
-    bool m_grab {false};     // the finger holds the ghost
-    bool m_fingerWas {false}; // the finger was down on the last call
+    bool m_grab {false};                        // the finger holds the ghost
+    bool m_fingerWas {false};                   // the finger was down on the last call
     float m_grabOffX {0.0f}, m_grabOffY {0.0f}; // ghost corner minus finger, world pixels, from where it was taken
-    mutable SDL_Rect m_ghostRect {0, 0, 0, 0}; // the ghost on the screen (with room for a finger)
+    mutable SDL_Rect m_ghostRect {0, 0, 0, 0};  // the ghost on the screen (with room for a finger)
     bool m_radarHeld {false};
     int m_seenTab {TabBuild};
     // The panels of the last frame, for the input layer (TouchPanels)

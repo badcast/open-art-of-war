@@ -141,7 +141,8 @@ CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
     // ui/layout.yaml (screen map_select, shared with the network room); the numbers below stand in without it
     if (uilayout::Current().Has("map_select", "pc"))
     {
-        const uilayout::Solved s = uilayout::Current().Solve("map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowW, windowH, {});
+        const uilayout::Solved s = uilayout::Current().Solve(
+            "map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowW, windowH, {});
         l.dialog = s.Rect("dialog");
         l.list = s.Rect("list");
         const int n = std::max(1, missionCount);

@@ -9,7 +9,7 @@ namespace OpenArtOfWar
 {
 
 // System environment of the game: assets/data/game_environment.json holds the factory defaults (fog look,
-// construction rules, network ports, render preferences) and is read-only, as it ships inside data.blob.
+// construction rules, network ports, render preferences) and is read-only, as it ships inside assets.blob.
 // What the game finds out at runtime (the "render" section: the API that works here) is kept in
 // settings.json of the per-user directory, key "environment", and laid over the defaults on load.
 class EnvironmentConfig

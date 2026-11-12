@@ -168,8 +168,8 @@ private:
 
     struct BrowserLayout
     {
-        ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, lanRefreshBtn, serverList,
-            refreshBtn, codeField, codeBtn, joinBtn, hostBtn, serverBtn, backBtn;
+        ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, lanRefreshBtn,
+            serverList, refreshBtn, codeField, codeBtn, joinBtn, hostBtn, serverBtn, backBtn;
         ui::UiRect ServerRow(int i) const
         {
             return {serverList.x + 4, serverList.y + 4 + i * 34, serverList.w - 8, 30};

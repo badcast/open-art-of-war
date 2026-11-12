@@ -34,13 +34,11 @@ State &state()
     return s;
 }
 
-// The manifest is the only source of resource paths: there is no built-in layout to fall back on
 bool LoadInto(State &s, const std::string &path)
 {
     nlohmann::json doc = nlohmann::json::object();
     std::string text;
     bool ok = false;
-    // The manifest is YAML, always (main.yaml): there is no other format and no other name to fall back on
     const std::string &actualPath = path;
     Assets::ReadText(actualPath, text);
     if (!text.empty())
@@ -68,7 +66,7 @@ bool LoadInto(State &s, const std::string &path)
         if (doc.is_object() && doc.contains("version") && doc["version"].is_number_integer())
         {
             s.version = doc["version"].get<int>();
-            if (s.version < LoaderResources::kMinimalVersionManifest)
+            if (s.version < LoaderResources::MinimalVersionManifest)
             {
                 doc.clear();
             }

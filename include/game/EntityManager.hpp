@@ -502,8 +502,8 @@ public:
     const UnitConfig *GetUnitConfigByUnitType(UnitType type, Faction faction) const;
 
     // `player` builds there: within the radius of one of its headquarters, on ground it sees (people)
-    // `checkBaseOpen` false: the (costly, whole-map) KeepsBaseOpen test of computer players is left to the caller, which
-    // then asks KeepsBaseOpen itself for the few spots it really considers
+    // `checkBaseOpen` false: the (costly, whole-map) KeepsBaseOpen test of computer players is left to the caller,
+    // which then asks KeepsBaseOpen itself for the few spots it really considers
     bool CanPlaceBuilding(
         int tileX,
         int tileY,
@@ -838,8 +838,8 @@ public:
         PlayerId owner {kNoPlayer};
         int tileX {0};
         int tileY {0};
-        int kind {0};          // index into Mines::Specs()
-        float armLeft {0.0f};  // seconds until it can fire
+        int kind {0};         // index into Mines::Specs()
+        float armLeft {0.0f}; // seconds until it can fire
     };
     const std::vector<Mine> &GetMines() const
     {

@@ -117,7 +117,7 @@ void Application::ShowLoading(const std::string &status, float progress)
 {
     if (m_headless || !m_sdlRenderer || !m_renderer || !m_fontRenderer)
         return;
-    DrawLoadingFrame("OPEN ART OF WAR", status, progress, nullptr, 0, 0);
+    DrawLoadingFrame("OPEN ART OF WAR: FREEDOM FOR LIBERTY", status, progress, nullptr, 0, 0);
 }
 
 void Application::BeginMapLoading(const std::string &title, const std::string &mapPath)
@@ -490,7 +490,7 @@ void Application::RenderFpsCounter()
     if (!m_settings.showFps)
         return;
     m_fontRenderer->DrawString(
-        "FPS " + std::to_string(static_cast<int>(m_fps + 0.5f)), 10, 8, ui::FONT_SMALL_BOLD, ui::color::Accent, true);
+        "FPS " + std::to_string(static_cast<int>(m_fps + 0.5f)), 1, 1, ui::FONT_SMALL_BOLD, ui::color::Accent, true);
 }
 
 void Application::RenderNetStats()

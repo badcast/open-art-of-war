@@ -57,7 +57,8 @@ bool SoundEngine::Init()
         const nlohmann::json tracklist = JsonFile::ReadFromString(tracklistText);
         if (tracklist.is_object())
         {
-            auto parseTrack = [&](const nlohmann::json &item, const std::string &overrideFilename, Track &track) -> bool {
+            auto parseTrack
+                = [&](const nlohmann::json &item, const std::string &overrideFilename, Track &track) -> bool {
                 std::string filename = overrideFilename;
                 if (filename.empty() && item.is_object() && item.contains("filename") && item["filename"].is_string())
                     filename = item["filename"].get<std::string>();
@@ -524,8 +525,8 @@ void SoundEngine::PlayPlayerTrack(int index)
 {
     const bool menuTrack = index == 0 && m_hasMenuTrack;
     const int gameIndex = m_hasMenuTrack ? index - 1 : index;
-    const Track &track = menuTrack ? (m_menuTracks.empty() ? m_menuTrack : m_menuTracks[m_currentMenuTrack])
-                                   : m_gameTracks[gameIndex];
+    const Track &track
+        = menuTrack ? (m_menuTracks.empty() ? m_menuTrack : m_menuTracks[m_currentMenuTrack]) : m_gameTracks[gameIndex];
     if (LoadTrack(track, menuTrack && m_menuTracks.size() == 1))
     {
         m_musicContext = menuTrack ? 1 : 2;
@@ -573,8 +574,9 @@ void SoundEngine::StepTrack(int direction)
     {
         const std::size_t menuCount = m_menuTracks.size();
         const std::size_t total = menuCount + m_gameTracks.size();
-        std::size_t at = m_musicContext == 2 && m_currentTrack > 0 ? menuCount + static_cast<std::size_t>(m_currentTrack - 1)
-                                                                    : m_currentMenuTrack % menuCount;
+        std::size_t at = m_musicContext == 2 && m_currentTrack > 0
+                             ? menuCount + static_cast<std::size_t>(m_currentTrack - 1)
+                             : m_currentMenuTrack % menuCount;
         PlayMenuPlaylist((at + (direction > 0 ? 1 : total - 1)) % total);
         return;
     }

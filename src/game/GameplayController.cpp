@@ -910,9 +910,10 @@ void GameplayController::Update(const FrameContext &ctx)
                 if (leftClicked && mx < mapViewW)
                 {
                     const bool isMine = bp.mineKind >= 0;
-                    bool canPlace = isMine ? entities.CanPlaceMine(bp.mineKind, curTileX, curTileY, map, Players::Local())
-                                           : entities.CanPlaceBuilding(
-                                               curTileX, curTileY, bp.width, bp.height, map, Players::Local());
+                    bool canPlace = isMine
+                                        ? entities.CanPlaceMine(bp.mineKind, curTileX, curTileY, map, Players::Local())
+                                        : entities.CanPlaceBuilding(
+                                              curTileX, curTileY, bp.width, bp.height, map, Players::Local());
                     bool canAfford = economy.CanAfford(bp.creditCost);
                     // Hard limits (data/limits.yaml): checked again by the simulation
                     const bool withinLimit

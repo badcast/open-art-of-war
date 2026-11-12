@@ -1,5 +1,9 @@
 # Open Art Of War: Freedom for Liberty
 
+<div align="center">
+
+<img src="docs/app-game-icon.png" alt="Open Art Of War: Logo" width="100" />
+
 A native, open-source, **cross-platform real-time strategy game** recreating **Art of War 2: Liberation of Peru** for **Linux, Windows, macOS and Android**. Build your base, command the Resistance or Confederation, and play campaigns or skirmishes against the AI. **LAN and online multiplayer support up to eight players**, with teams, direct connections and dedicated server rooms.
 
 [![Build](https://img.shields.io/github/actions/workflow/status/badcast/open-art-of-war/build.yml?branch=main&style=flat-square&label=build)](https://github.com/badcast/open-art-of-war/actions)
@@ -8,6 +12,17 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 
 [Website](https://openaow.imister.tech) · [Downloads](https://github.com/badcast/open-art-of-war/releases) · [Report an issue](https://github.com/badcast/open-art-of-war/issues) · [Telegram](https://t.me/+EkC17x8nKy05NDdi)
 
+<table>
+<tr><td align="center">
+<h3>Support development / Поддержать разработку</h3>
+<p>Help support Open Art Of War with a donation on Boosty.<br>Поддержите разработку Open Art Of War донатом на Boosty.</p>
+<a href="https://boosty.to/badcast/donate"><img src="https://img.shields.io/badge/Boosty-Donate%20%2F%20Поддержать-F15F2C?style=for-the-badge" alt="Donate on Boosty / Поддержать на Boosty"></a>
+<p><a href="https://boosty.to/badcast/donate">boosty.to/badcast/donate</a></p>
+</td></tr>
+</table>
+
+</div>
+
 > **In active development.** The game is being developed and tested. A **fan-made asset pack is also in development**, with original graphics and UI artwork still being designed. Game artwork and audio are separate from the engine; see [Game assets](#game-assets) before playing.
 
 ![Open Art Of War main menu](docs/Screenshots/screen-mainmenu.png)
@@ -15,21 +30,20 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 **On this page:** [Features](#features) · [Platforms](#platforms) · [Build & run](#build--run) · [Controls](#controls) · [Multiplayer](#multiplayer) · [Documentation](#documentation) · [Contributing](#contributing)
 
 <details>
-<summary>Кратко по-русски</summary>
+<summary>In Russian</summary>
 
-**Open Art Of War** — открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS и Android. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков и редакторы.
+**Open Art Of War: Freedom for Liberty** - открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS и Android. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков и редакторы.
 
-Проект находится в разработке и тестировании. Графика и звук оригинальной игры не входят в лицензию движка. Перед запуском необходимо подготовить игровые ресурсы.
+> **Статус:** проект находится в разработке и тестировании. Графика и звук оригинальной игры не входят в лицензию движка. Перед запуском необходимо подготовить игровые ресурсы.
 
-На Android добавлены альбомная ориентация, масштабирование интерфейса, крупные вкладки HUD и сенсорное управление. Инструкции по сборке, установке ресурсов и жестам находятся в [Android README](android-setup/README.md).
+**Android:** добавлены альбомная ориентация, масштабирование интерфейса, крупные вкладки HUD и сенсорное управление. Инструкции по сборке, установке ресурсов и жестам находятся в [Android README](android-setup/README.md).
 
-Помочь проекту можно кодом, тестированием, переводами, графикой и звуком. Задачи обсуждаем в Issues и чате Telegram, ссылки — в начале страницы.
-
+**Как помочь:** кодом, тестированием, переводами, графикой и звуком. Задачи обсуждаем в Issues и чате Telegram - ссылки в начале страницы.
 </details>
 
 ## Features
 
-- **Two factions and campaigns:** Resistance — *Liberation of Peru*; Confederation — *Global Confederation*.
+- **Two factions and campaigns:** Resistance - *Liberation of Peru*; Confederation - *Global Confederation*.
 - **Skirmishes and multiplayer:** custom maps, computer opponents, teams and up to eight players; LAN discovery, direct connections and server rooms.
 - **Classic RTS gameplay:** base building, power, economy, research, fog of war, attack-move and control groups.
 - **Desktop and touch controls:** mouse and keyboard on desktop; touch selection, contextual commands, camera gestures and a landscape HUD on Android.

@@ -78,7 +78,8 @@ SettingsLayout settingsLayout(int windowW, int windowH)
         l.defaultsBtn = s.Rect("defaults");
         const UiRect area = s.Rect("list");
         l.visible = std::max(1, (area.h + SettingsLayout::kGap) / (SettingsLayout::kRowH + SettingsLayout::kGap));
-        l.list = {area.x, area.y, area.w, l.visible * (SettingsLayout::kRowH + SettingsLayout::kGap) - SettingsLayout::kGap};
+        l.list = {
+            area.x, area.y, area.w, l.visible * (SettingsLayout::kRowH + SettingsLayout::kGap) - SettingsLayout::kGap};
         l.track = {l.list.Right() + 8, l.list.y, 4, l.list.h};
         return l;
     }
@@ -169,7 +170,7 @@ std::vector<SettingsRow> BuildSettingsRows(
     const std::vector<Resolution> &resolutions,
     const std::function<void(SettingsArea)> &notify,
     const RenderApiBinding &renderApi,
-    bool inGame)
+    [[maybe_unused]] bool inGame)
 {
     std::vector<SettingsRow> rows;
     // A row with a list of choices (shown as a combo box); the arrow keys still step through them
@@ -207,11 +208,11 @@ std::vector<SettingsRow> BuildSettingsRows(
                   [set](int i) { set(i == 0); },
                   enabled);
           };
-    auto choice = [&](std::string label,
-                      std::string hint,
-                      std::string value,
-                      std::function<void(int)> step,
-                      bool enabled = true) {
+    [[maybe_unused]] auto choice = [&](std::string label,
+                                       std::string hint,
+                                       std::string value,
+                                       std::function<void(int)> step,
+                                       bool enabled = true) {
         SettingsRow r;
         r.label = std::move(label);
         r.hint = std::move(hint);

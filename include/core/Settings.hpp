@@ -64,9 +64,9 @@ struct Settings
 
     // Game
     std::string language {"en"};
-    int difficulty {1};    // 0 = easy .. 3 = hardcore
+    int difficulty {1};        // 0 = easy .. 3 = hardcore
     bool showBuildGrid {true}; // grid of allowed / forbidden tiles while a building is placed
-    int edgePanMargin {5}; // 5..30 pixels (screen border thickness for mouse scrolling)
+    int edgePanMargin {5};     // 5..30 pixels (screen border thickness for mouse scrolling)
 
     static constexpr int kArmyColors = 8;
     static constexpr float kZoomLowest = 0.5f;

@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-// Read access to the game assets, either from an "assets" directory or from a "data.blob" (tar.zst) that
+// Read access to the game assets, either from an "assets" directory or from a "assets.blob" (tar.zst) that
 // holds the contents of that directory. The directory wins: it is searched for first, so a checkout
-// or a modded install keeps working, and data.blob is the packed fallback for distribution.
+// or a modded install keeps working, and assets.blob is the packed fallback for distribution.
 //
 // Every path is written as it is on disk ("assets/maps/m0.json", "../assets/fonts/x.ttf"); in blob
 // mode the leading "assets" component selects the entry inside the archive.

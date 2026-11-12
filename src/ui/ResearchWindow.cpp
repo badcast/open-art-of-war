@@ -11,10 +11,13 @@
 #include "input/InputManager.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/UiKit.hpp"
+#include "ui/UiLayout.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <functional>
+#include <map>
 
 // The window of the technology tree (button "RESEARCH NEW TECHNOLOGIES" under the objectives): the tree of the
 // player's faction as in the character editor, a search box, a filter and the selected technology with its button.
@@ -39,6 +42,9 @@ constexpr int kGapX0 = 34;
 constexpr int kGapY0 = 10;
 constexpr int kDetailsW0 = 270;
 constexpr float kScaleMin = 0.75f, kScaleMax = 4.0f, kScaleStep = 0.125f;
+// The glide of a flick on the tree after the finger lifts: px/s limit, the speed below which it stops, how fast it
+// slows
+constexpr float kGlideMax = 6000.0f, kGlideStop = 30.0f, kGlideFriction = 3.5f;
 int sz(int v, float scale)
 {
     return static_cast<int>(std::lround(v * scale));
@@ -47,10 +53,12 @@ int sz(int v, float scale)
 struct WindowLayout
 {
     UiRect dialog, content, search, filter, tree, details, closeBtn, startBtn, zoomIn, zoomOut;
+    float u {1.0f};     // the scale of the profile (the touch profile grows with the screen); the tree grows with it
+    bool touch {false}; // the touch profile: bigger fonts inside the nodes and the details, no scroll bar grabbing
 };
 
-// `top`: rows kept free above it (the bar of an observer)
-WindowLayout windowLayout(int windowW, int windowH, float scale, int top = 0)
+// The built-in numbers (without the `research` screen of ui/layout.yaml)
+WindowLayout builtinLayout(int windowW, int windowH, int top)
 {
     WindowLayout windowLayout;
     windowLayout.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
@@ -86,6 +94,50 @@ WindowLayout windowLayout(int windowW, int windowH, float scale, int top = 0)
     windowLayout.zoomOut = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 30, 24, 24};
     windowLayout.zoomIn = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 58, 24, 24};
     return windowLayout;
+}
+
+// Where the parts stand is ui/layout.yaml (screen research: profile pc, or touch with the touch interface: big
+// controls); `top`: rows kept free above the dialog (the bar of an observer). A file without the screen, or without
+// one of its nodes, gives the built-in numbers.
+WindowLayout windowLayout(int windowW, int windowH, int top = 0)
+{
+    const uilayout::Layout &file = uilayout::Current();
+    const std::string profile = uilayout::MenuProfile(file, "research");
+    if (file.Has("research", profile))
+    {
+        const std::map<std::string, float> extra {{"T", static_cast<float>(top)}};
+        const uilayout::Solved s = file.Solve("research", profile, windowW, windowH, {}, &extra);
+        WindowLayout l;
+        l.u = s.u;
+        l.touch = profile == "touch";
+        l.dialog = s.Rect("dialog");
+        l.content = s.Rect("content");
+        l.search = s.Rect("search");
+        l.filter = s.Rect("filter");
+        l.tree = s.Rect("tree");
+        l.details = s.Rect("details");
+        l.closeBtn = s.Rect("close");
+        l.startBtn = s.Rect("start");
+        l.zoomIn = s.Rect("zoom_in");
+        l.zoomOut = s.Rect("zoom_out");
+        const UiRect *all[]
+            = {&l.dialog,
+               &l.content,
+               &l.search,
+               &l.filter,
+               &l.tree,
+               &l.details,
+               &l.closeBtn,
+               &l.startBtn,
+               &l.zoomIn,
+               &l.zoomOut};
+        bool complete = true;
+        for (const UiRect *r : all)
+            complete = complete && r->w > 0 && r->h > 0;
+        if (complete)
+            return l;
+    }
+    return builtinLayout(windowW, windowH, top);
 }
 
 // Columns are the depth in the chain of requirements, rows are leaves in tree order, a parent sits in the middle of
@@ -157,7 +209,7 @@ TreeLayout buildTree(Faction faction)
     return t;
 }
 
-std::string lower(const std::string &s)
+[[maybe_unused]] std::string lower(const std::string &s)
 {
     std::string out;
     for (unsigned char c : s)
@@ -235,7 +287,10 @@ void HUDController::OpenResearchWindow()
     m_researchOpen = true;
     m_researchSearchFocus = false;
     m_researchCombo.open = -1;
-    m_researchPanning = false;
+    m_researchDrag = m_researchDragMoved = false;
+    m_researchGlideX = m_researchGlideY = 0.0f;
+    m_researchTickMs = SDL_GetTicks();
+    m_researchClickNode = -1;
     m_buildMode = false;
     m_attackMoveMode = false;
     SoundRequests::Play("ui_show_dialog");
@@ -246,7 +301,8 @@ void HUDController::CloseResearchWindow()
     m_researchOpen = false;
     m_researchSearchFocus = false;
     m_researchCombo.open = -1;
-    m_researchPanning = false;
+    m_researchDrag = m_researchDragMoved = false;
+    m_researchGlideX = m_researchGlideY = 0.0f;
 }
 
 ResearchProgress HUDController::ResearchShown() const
@@ -256,10 +312,10 @@ ResearchProgress HUDController::ResearchShown() const
     return m_sim ? m_sim->research(Players::Local()) : ResearchProgress {};
 }
 
-void HUDController::TryStartResearch(int index, Economy &economy, EntityManager &entities)
+bool HUDController::TryStartResearch(int index, Economy &economy, EntityManager &entities)
 {
     if (m_observer)
-        return; // an observer only looks at the research of the player he watches
+        return false; // an observer only looks at the research of the player he watches
     const auto &r = researchDef(PlayerFaction(), index);
     if (!HasResearchBuilding(Players::Local(), entities))
     {
@@ -289,12 +345,14 @@ void HUDController::TryStartResearch(int index, Economy &economy, EntityManager 
         c.type = CommandType::StartResearch;
         c.a = index;
         Issue(std::move(c));
+        return true;
     }
     else
     {
         SoundRequests::Announce("ann_insufficient_funds");
         SetNotification(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
     }
+    return false;
 }
 
 namespace
@@ -319,8 +377,8 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     EntityManager &entities = ctx.entities;
     if (!m_researchOpen)
         return false;
-    const WindowLayout l = windowLayout(windowW, windowH, 1.0f, m_observer ? kObserverBarHeight : 0);
-    const float sc = m_researchScale;
+    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
+    const float sc = m_researchScale * l.u; // (the touch profile: bigger with the screen)
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
@@ -406,49 +464,94 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         else
             m_researchScrollY -= wheel * 60.0f;
     }
-    // A finger dragging over the tree moves it in both directions
-    {
-        float dragX = 0.0f, dragY = 0.0f;
-        input.ConsumeTouchDrag(dragX, dragY);
-        if (l.tree.Contains(mx, my))
-        {
-            m_researchScrollX -= dragX;
-            m_researchScrollY -= dragY;
-        }
-    }
-    if (m_researchPanning)
-    {
-        if (input.IsLeftMouseDown())
-        {
-            m_researchScrollX -= static_cast<float>(mx - m_researchPanX);
-            m_researchScrollY -= static_cast<float>(my - m_researchPanY);
-            m_researchPanX = mx;
-            m_researchPanY = my;
-        }
-        else
-        {
-            m_researchPanning = false;
-        }
-    }
-    // The scroll bars along the right and the bottom edge of the tree: dragged, or a click on the track jumps there
+    // The tree follows the pointer (a finger, or the mouse held on it); the scroll bars along the right and the bottom
+    // edge are grabbed by a press (not with the touch profile: the finger pans the tree itself), or a click on the
+    // track jumps there
     const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
-    if (leftClicked && maxY > 0.0f && ui::OnScrollTrack(vTrack, mx, my))
-        m_researchScrollDrag = 1;
-    else if (leftClicked && maxX > 0.0f && ui::OnScrollTrack(hTrack, mx, my))
-        m_researchScrollDrag = 2;
-    if (m_researchScrollDrag != 0)
+    const std::uint32_t nowMs = SDL_GetTicks();
+    const float dtS = std::clamp(static_cast<float>(nowMs - m_researchTickMs) * 0.001f, 0.0f, 0.1f);
+    m_researchTickMs = nowMs;
+    const bool down = input.IsLeftMouseDown();
+    int pressX = 0, pressY = 0;
+    if (input.ConsumeLeftPress(pressX, pressY) && down) // (a press from before the window opened is long over)
     {
-        if (!input.IsLeftMouseDown() && !leftClicked)
-            m_researchScrollDrag = 0;
-        else if (m_researchScrollDrag == 1)
-            m_researchScrollY = ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h));
-        else
-            m_researchScrollX = ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w));
+        m_researchGlideX = m_researchGlideY = 0.0f; // a finger put on the tree stops the glide
+        m_researchDragMoved = false;
+        if (!l.touch && maxY > 0.0f && ui::OnScrollTrack(vTrack, pressX, pressY))
+            m_researchScrollDrag = 1;
+        else if (!l.touch && maxX > 0.0f && ui::OnScrollTrack(hTrack, pressX, pressY))
+            m_researchScrollDrag = 2;
+        m_researchDrag = m_researchScrollDrag == 0 && l.tree.Contains(pressX, pressY);
+        m_researchDragX = pressX;
+        m_researchDragY = pressY;
     }
-    m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
-    m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
-    if (m_researchScrollDrag != 0)
+    const bool wasDragging = m_researchDrag;
+    if (m_researchDrag)
+    {
+        // Within the slop it is a tap (the touch input counts 12 px as well); past it the tree follows, the travel
+        // since the press included, and the speed is kept (smoothed over a few frames) for the glide
+        constexpr float kSlop = 12.0f;
+        bool justMoved = false;
+        if (!m_researchDragMoved
+            && std::hypot(static_cast<float>(mx - m_researchDragX), static_cast<float>(my - m_researchDragY)) > kSlop)
+        {
+            m_researchDragMoved = true;
+            justMoved = true;
+        }
+        if (m_researchDragMoved)
+        {
+            const float dx = static_cast<float>(mx - m_researchDragX), dy = static_cast<float>(my - m_researchDragY);
+            m_researchScrollX -= dx;
+            m_researchScrollY -= dy;
+            m_researchDragX = mx;
+            m_researchDragY = my;
+            if (dtS > 0.0f && !justMoved)
+            {
+                const float k = std::min(1.0f, dtS / 0.08f);
+                m_researchGlideX += (std::clamp(-dx / dtS, -kGlideMax, kGlideMax) - m_researchGlideX) * k;
+                m_researchGlideY += (std::clamp(-dy / dtS, -kGlideMax, kGlideMax) - m_researchGlideY) * k;
+            }
+        }
+        if (!down)
+            m_researchDrag = false;
+    }
+    else if (m_researchGlideX != 0.0f || m_researchGlideY != 0.0f)
+    {
+        // After the lift the tree glides on at the speed of the flick and slows down
+        if (std::hypot(m_researchGlideX, m_researchGlideY) < kGlideStop)
+        {
+            m_researchGlideX = m_researchGlideY = 0.0f;
+        }
+        else
+        {
+            m_researchScrollX += m_researchGlideX * dtS;
+            m_researchScrollY += m_researchGlideY * dtS;
+            const float keep = std::exp(-dtS * kGlideFriction);
+            m_researchGlideX *= keep;
+            m_researchGlideY *= keep;
+        }
+    }
+    // A scroll bar that is held follows the pointer (also on the frame of the release)
+    const bool scrollDragFrame = m_researchScrollDrag != 0;
+    if (m_researchScrollDrag == 1)
+        m_researchScrollY = ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h));
+    else if (m_researchScrollDrag == 2)
+        m_researchScrollX = ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w));
+    if (!down)
+        m_researchScrollDrag = 0;
+    // Against an edge the glide stops
+    const float scrollX = std::clamp(m_researchScrollX, 0.0f, maxX),
+                scrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
+    if (scrollX != m_researchScrollX)
+        m_researchGlideX = 0.0f;
+    if (scrollY != m_researchScrollY)
+        m_researchGlideY = 0.0f;
+    m_researchScrollX = scrollX;
+    m_researchScrollY = scrollY;
+    if (scrollDragFrame)
         return true;
+    if (wasDragging && !m_researchDrag && m_researchDragMoved)
+        leftClicked = false; // the finger lifted at the end of a pan: not a tap on whatever it stopped over
 
     if (leftClicked)
     {
@@ -481,7 +584,6 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         }
         if (l.tree.Contains(mx, my))
         {
-            bool hitNode = false;
             for (int i = 0; i < kResearchCount; ++i)
             {
                 if (!tree.shown[i])
@@ -494,22 +596,20 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
                     kNodeH};
                 if (!n.Contains(mx, my))
                     continue;
-                hitNode = true;
                 const std::uint32_t now = SDL_GetTicks();
-                // Twice on the same technology starts it
-                if (m_researchClickNode == i && now - m_researchClickMs < 350)
-                    TryStartResearch(i, economy, entities);
+                m_researchSel = i;
+                // Twice on the same technology starts it, and the window closes (when it was not started, the reason
+                // shows in the window)
+                if (m_researchClickNode == i && now - m_researchClickMs < 400 && TryStartResearch(i, economy, entities))
+                {
+                    m_researchClickNode = -1;
+                    CloseResearchWindow();
+                    return true;
+                }
                 m_researchClickNode = i;
                 m_researchClickMs = now;
-                m_researchSel = i;
                 SoundRequests::Play("ui_click");
                 break;
-            }
-            if (!hitNode)
-            {
-                m_researchPanning = true;
-                m_researchPanX = mx;
-                m_researchPanY = my;
             }
         }
         else if (!l.dialog.Contains(mx, my))
@@ -533,14 +633,21 @@ void HUDController::RenderResearchWindow(
 {
     if (!m_researchOpen)
         return;
-    const WindowLayout l = windowLayout(windowW, windowH, 1.0f, m_observer ? kObserverBarHeight : 0);
-    const float sc = m_researchScale;
+    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
+    const float sc = m_researchScale * l.u; // (the touch profile: bigger with the screen)
     const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
     const ResearchProgress researchNow = ResearchShown();
     const ResearchProgress *progress = &researchNow;
     const bool hasLab = HasResearchBuilding(Players::Local(), entities);
+    // A finger leaves no hovering pointer behind; the touch profile also reads bigger text in the nodes and the details
+    auto over = [&](const UiRect &r) {
+        return !l.touch && r.Contains(mx, my);
+    };
+    const int nodeNameFont = l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD;
+    const int nodeStateFont = l.touch ? ui::FONT_BODY : ui::FONT_SMALL;
+    const int textFont = l.touch ? ui::FONT_BODY : ui::FONT_SMALL;
 
     ui::DrawDialog(
         renderer,
@@ -571,8 +678,8 @@ void HUDController::RenderResearchWindow(
         l.filter,
         std::string(_("Show")) + ": " + filters[std::clamp(m_researchFilter, 0, 4)],
         m_researchCombo.open == 0,
-        l.filter.Contains(mx, my));
-    ui::DrawButton(renderer, font, l.closeBtn, _("CLOSE"), ui::ButtonStyle::Secondary, l.closeBtn.Contains(mx, my));
+        over(l.filter));
+    ui::DrawButton(renderer, font, l.closeBtn, _("CLOSE"), ui::ButtonStyle::Secondary, over(l.closeBtn));
     // Credits
     font.DrawString(
         "$ " + std::to_string(economy.GetCredits()),
@@ -640,7 +747,7 @@ void HUDController::RenderResearchWindow(
         const auto &r = researchDef(faction, i);
         const State st = stateOf(i, progress);
         const bool selected = i == m_researchSel;
-        const bool hovered = n.Contains(mx, my) && l.tree.Contains(mx, my);
+        const bool hovered = over(n) && l.tree.Contains(mx, my);
         const bool lit = matches(i);
         SDL_Color fill = st == State::Done        ? SDL_Color {28, 52, 38, 255}
                          : st == State::Active    ? SDL_Color {26, 44, 66, 255}
@@ -668,17 +775,17 @@ void HUDController::RenderResearchWindow(
                                                         : "$" + std::to_string(r.cost);
         const int textX = n.x + 4 + iconBox + 6;
         font.DrawString(
-            ui::FitText(font, _(r.name), ui::FONT_SMALL_BOLD, n.Right() - 6 - textX),
+            ui::FitText(font, _(r.name), nodeNameFont, n.Right() - 6 - textX),
             textX,
             n.CenterY() - 20,
-            ui::FONT_SMALL_BOLD,
+            nodeNameFont,
             lit ? col::Text : col::TextMuted,
             false);
         font.DrawString(
             state,
             textX,
             n.CenterY() + 2,
-            ui::FONT_SMALL,
+            nodeStateFont,
             st == State::Done     ? col::Ok
             : st == State::Active ? col::Info
             : st == State::Locked ? col::TextDim
@@ -713,8 +820,8 @@ void HUDController::RenderResearchWindow(
             static_cast<float>(l.tree.w),
             m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
     }
-    ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, l.zoomIn.Contains(mx, my));
-    ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, l.zoomOut.Contains(mx, my));
+    ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, over(l.zoomIn));
+    ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, over(l.zoomOut));
 
     // The selected technology
     ui::DrawPanel(renderer, l.details, col::PanelRaised, col::Border);
@@ -751,12 +858,12 @@ void HUDController::RenderResearchWindow(
                 x,
                 y,
                 w,
-                ui::FONT_SMALL,
+                textFont,
                 IsResearched(Players::Local(), r.needs) ? col::Ok : col::Danger,
                 false);
-            y += 36;
+            y += l.touch ? 48 : 36;
         }
-        font.DrawTextWrapped(_(r.desc), x, y, w, ui::FONT_SMALL, col::TextDim, false);
+        font.DrawTextWrapped(_(r.desc), x, y, w, textFont, col::TextDim, false);
         // The state and the button
         const std::string stateText = st == State::Done     ? std::string(_("RESEARCHED"))
                                       : st == State::Active ? std::string(_("RESEARCHING"))
@@ -780,13 +887,7 @@ void HUDController::RenderResearchWindow(
         const bool canStart
             = st == State::Available && hasLab && economy.CanAfford(r.cost) && progress && progress->active < 0;
         ui::DrawButton(
-            renderer,
-            font,
-            l.startBtn,
-            _("START RESEARCH"),
-            ui::ButtonStyle::Primary,
-            l.startBtn.Contains(mx, my),
-            canStart);
+            renderer, font, l.startBtn, _("START RESEARCH"), ui::ButtonStyle::Primary, over(l.startBtn), canStart);
     }
     // What the last click said (no laboratory, not enough credits, ...)
     if (!m_hudNotification.empty())

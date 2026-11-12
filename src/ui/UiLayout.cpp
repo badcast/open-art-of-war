@@ -27,7 +27,7 @@ struct ExprParser
     const Vars &vars;
     float u;
     std::size_t i {0};
-    std::string error;
+    std::string error {};
 
     void Ws()
     {
@@ -94,7 +94,8 @@ struct ExprParser
             char *end = nullptr;
             const float v = std::strtof(s.c_str() + i, &end);
             i = static_cast<std::size_t>(end - s.c_str());
-            if (i < s.size() && s[i] == 'u' && (i + 1 >= s.size() || !std::isalnum(static_cast<unsigned char>(s[i + 1]))))
+            if (i < s.size() && s[i] == 'u'
+                && (i + 1 >= s.size() || !std::isalnum(static_cast<unsigned char>(s[i + 1]))))
             {
                 ++i;
                 return v * u;
@@ -389,17 +390,20 @@ Solved Layout::Solve(
         n.disabled = !d.disabledIf.empty() && EvalCond(d.disabledIf, cond);
         return n;
     };
-    auto rounded = [](float v) { return static_cast<int>(std::lround(v)); };
+    auto rounded = [](float v) {
+        return static_cast<int>(std::lround(v));
+    };
 
     for (const Def::NodeDef &d : it->second.nodes)
     {
         ui::UiRect r;
         if (d.hasRect)
         {
-            r = {rounded(Eval(d.rect[0], vars, out.u, &err)),
-                 rounded(Eval(d.rect[1], vars, out.u, &err)),
-                 rounded(Eval(d.rect[2], vars, out.u, &err)),
-                 rounded(Eval(d.rect[3], vars, out.u, &err))};
+            r
+                = {rounded(Eval(d.rect[0], vars, out.u, &err)),
+                   rounded(Eval(d.rect[1], vars, out.u, &err)),
+                   rounded(Eval(d.rect[2], vars, out.u, &err)),
+                   rounded(Eval(d.rect[3], vars, out.u, &err))};
         }
         Node n = make(d, r, true);
         publish(d.id, r);
@@ -419,7 +423,8 @@ Solved Layout::Solve(
         {
             const int cw = rounded(Eval(c.size[0].empty() ? "0" : c.size[0], vars, out.u, &err));
             const int ch = rounded(Eval(c.size[1].empty() ? "0" : c.size[1], vars, out.u, &err));
-            ui::UiRect cr = column ? ui::UiRect {r.x, cursor, cw > 0 ? cw : r.w, ch} : ui::UiRect {cursor, r.y, cw, ch > 0 ? ch : r.h};
+            ui::UiRect cr = column ? ui::UiRect {r.x, cursor, cw > 0 ? cw : r.w, ch}
+                                   : ui::UiRect {cursor, r.y, cw, ch > 0 ? ch : r.h};
             Node cn = make(c, cr, n.visible);
             if (cn.visible)
             {
@@ -518,7 +523,11 @@ bool Reload()
     if (!next.Load(text, err))
     {
         g_error = err;
-        std::fprintf(stderr, "[UiLayout] %s: %s (the last good layout stays)\n", LoaderResources::UiLayout().c_str(), err.c_str());
+        std::fprintf(
+            stderr,
+            "[UiLayout] %s: %s (the last good layout stays)\n",
+            LoaderResources::UiLayout().c_str(),
+            err.c_str());
         return false;
     }
     g_layout = next;
@@ -553,7 +562,11 @@ void DrawGeneric(Renderer &r, BitmapFontRenderer &font, const Solved &s, int mx,
         else if (n.type == "label")
             font.DrawString(
                 ui::FitText(font, _(n.label.c_str()), ui::FONT_SMALL_BOLD, n.rect.w),
-                n.rect.x, n.rect.CenterY(), ui::FONT_SMALL_BOLD, ui::color::Text, false,
+                n.rect.x,
+                n.rect.CenterY(),
+                ui::FONT_SMALL_BOLD,
+                ui::color::Text,
+                false,
                 Anchor::LEFT | Anchor::VCENTER);
         else if (n.type == "button")
         {
@@ -562,8 +575,13 @@ void DrawGeneric(Renderer &r, BitmapFontRenderer &font, const Solved &s, int mx,
                                  : n.style == "ghost"  ? ui::ButtonStyle::Ghost
                                                        : ui::ButtonStyle::Secondary;
             ui::DrawButton(
-                r, font, n.rect, ui::FitText(font, _(n.label.c_str()), ui::FONT_SMALL_BOLD, n.rect.w - 8),
-                n.active ? ui::ButtonStyle::Primary : st, n.rect.Contains(mx, my), !n.disabled);
+                r,
+                font,
+                n.rect,
+                ui::FitText(font, _(n.label.c_str()), ui::FONT_SMALL_BOLD, n.rect.w - 8),
+                n.active ? ui::ButtonStyle::Primary : st,
+                n.rect.Contains(mx, my),
+                !n.disabled);
         }
     }
 }

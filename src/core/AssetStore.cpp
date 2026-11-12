@@ -296,7 +296,7 @@ bool Init()
         }
     }
 
-    // 2. data.blob or multiple *.blob files with the packed contents
+    // 2. assets.blob or multiple *.blob files with the packed contents
     for (const fs::path &root : roots)
     {
         std::vector<fs::path> blobPaths;
@@ -365,7 +365,8 @@ bool Init()
         }
         else
         {
-            std::string desc = std::to_string(s.loadedBlobs.size()) + " blobs in " + fs::absolute(root, ec).string() + " (";
+            std::string desc
+                = std::to_string(s.loadedBlobs.size()) + " blobs in " + fs::absolute(root, ec).string() + " (";
             for (std::size_t i = 0; i < s.loadedBlobs.size(); ++i)
             {
                 if (i > 0)

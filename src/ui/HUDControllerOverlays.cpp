@@ -251,10 +251,13 @@ void HUDController::RenderBuildGhost(
         const int viewX0 = static_cast<int>(std::floor(camera.GetX() / TILE_WIDTH));
         const int viewY0 = static_cast<int>(std::floor(camera.GetY() / TILE_HEIGHT));
         const int viewX1 = static_cast<int>(std::ceil((camera.GetX() + camera.GetViewportWidth() / zoom) / TILE_WIDTH));
-        const int viewY1 = static_cast<int>(std::ceil((camera.GetY() + camera.GetViewportHeight() / zoom) / TILE_HEIGHT));
+        const int viewY1
+            = static_cast<int>(std::ceil((camera.GetY() + camera.GetViewportHeight() / zoom) / TILE_HEIGHT));
         const int r = s_grid.radius;
-        const int x0 = std::max({mouseTileX - r, viewX0, 0}), x1 = std::min({mouseTileX + r, viewX1, map.GetWidth() - 1});
-        const int y0 = std::max({mouseTileY - r, viewY0, 0}), y1 = std::min({mouseTileY + r, viewY1, map.GetHeight() - 1});
+        const int x0 = std::max({mouseTileX - r, viewX0, 0}),
+                  x1 = std::min({mouseTileX + r, viewX1, map.GetWidth() - 1});
+        const int y0 = std::max({mouseTileY - r, viewY0, 0}),
+                  y1 = std::min({mouseTileY + r, viewY1, map.GetHeight() - 1});
         const float t = s_grid.width;
         const float w = static_cast<float>(TILE_WIDTH), h = static_cast<float>(TILE_HEIGHT);
         for (int ty = y0; ty <= y1; ++ty)

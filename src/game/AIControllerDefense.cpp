@@ -40,9 +40,9 @@ constexpr float kBunkerBehindWall = 2.0f;
 constexpr float kTowerBehindWall = 5.0f;
 constexpr float kBunkerFlankDeg = 22.0f; // ... to both sides of the way the enemy comes
 constexpr float kTowerFlankDeg = 34.0f;
-constexpr float kDefenseMargin = 1.2f;          // an attack wants this much more worth of defenders than it brings
-constexpr float kReaimTiles = 4.0f;             // a defender on its way is sent again when the attack moved this far
-constexpr float kAttackMemorySeconds = 10.0f;   // the base counts as attacked this long after the last sighting
+constexpr float kDefenseMargin = 1.2f;        // an attack wants this much more worth of defenders than it brings
+constexpr float kReaimTiles = 4.0f;           // a defender on its way is sent again when the attack moved this far
+constexpr float kAttackMemorySeconds = 10.0f; // the base counts as attacked this long after the last sighting
 } // namespace
 
 int AIController::SectorOf(int x, int y) const

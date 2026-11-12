@@ -255,7 +255,8 @@ bool Pathfinder::FindPath(
     int origTargetY = targetY;
 
     EnsureBrainMapSize(mapW, mapH);
-    m_brainMap->set_identity(allowDiagonal ? brain::matrix_identity::DiagonalMethod : brain::matrix_identity::PlusMethod);
+    m_brainMap->set_identity(
+        allowDiagonal ? brain::matrix_identity::DiagonalMethod : brain::matrix_identity::PlusMethod);
     m_brainMap->set_custom_heuristic(allowDiagonal ? OctileHeuristic : ManhattanHeuristic);
     m_avoidTiles.swap(avoidTiles);
     SyncMap(ignoreEntityId, !ignoreUnits);

@@ -57,6 +57,10 @@ Each screen is centred or anchored by its own nodes; the rows and cards inside a
   (maps / missions), `details`, footer buttons `back start side editor difficulty`, match options `credits time tech`, and
   the room's own `room_search room_list room_chat_field room_chat_send room_chat_log room_leave room_start room_ready`.
   The picture and the check boxes inside the details are derived from `details` by the game.
+- `research`: the technology tree window, profiles `pc` and `touch` (finger-sized controls, the tree and its text grow with `u`).
+  Names: `dialog content search filter close details tree start zoom_out zoom_in` (all required, else the built-in numbers
+  are used). `T` is the bar of an observer at the top. In the `touch` profile a finger drags the tree and it glides on after
+  a flick, the scroll bars are only indicators, a double tap on a technology starts it and closes the window.
 Other dialogs (room seats, replays) keep their built-in layout for now.
 
 ## Touch profiles of the menus

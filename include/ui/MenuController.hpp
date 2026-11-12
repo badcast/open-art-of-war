@@ -276,12 +276,12 @@ private:
     {
         int faction {0}; // computer players: 0 random, 1 Resistance, 2 Confederation (the person's comes from the side)
         int team {0};
-        int color {1};      // 1..8
-        int level {1};      // computer player: 0 easy .. 3 hardcore
-        int handicap {0};   // start credits form (kHandicapPercent index); 0 = none
-        int position {0};   // start position of the map (0-based), never shared by two players
-        int armyCap {7};    // army size limit: index into kArmyCapUnits (7 = unlimited)
-        int techLevel {-1}; // tech level: index into Capabilities::Levels(), -1 = the match's
+        int color {1};           // 1..8
+        int level {1};           // computer player: 0 easy .. 3 hardcore
+        int handicap {0};        // start credits form (kHandicapPercent index); 0 = none
+        int position {0};        // start position of the map (0-based), never shared by two players
+        int armyCap {7};         // army size limit: index into kArmyCapUnits (7 = unlimited)
+        int techLevel {-1};      // tech level: index into Capabilities::Levels(), -1 = the match's
         bool autoFilled {false}; // put there by the map's automatic filling and not changed by hand since
     };
     std::vector<CustomSlot> m_customSlots;

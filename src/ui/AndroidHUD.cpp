@@ -111,7 +111,7 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
         b.label = _(n.label.c_str());
         b.active = n.active;
         b.disabled = n.disabled;
-        b.style = n.style == "danger" ? ui::ButtonStyle::Danger
+        b.style = n.style == "danger"    ? ui::ButtonStyle::Danger
                   : n.style == "primary" ? ui::ButtonStyle::Primary
                                          : ui::ButtonStyle::Secondary;
         l.buttons.push_back(std::move(b));
@@ -154,7 +154,9 @@ std::vector<SDL_Rect> AndroidHUD::TouchPanels(int windowW, int windowH) const
 {
     const Layout l = MakeLayout(windowW, windowH, true, true, 1);
     std::vector<SDL_Rect> out;
-    auto push = [&](const UiRect &r) { out.push_back({r.x, r.y, r.w, r.h}); };
+    auto push = [&](const UiRect &r) {
+        out.push_back({r.x, r.y, r.w, r.h});
+    };
     push(l.resources);
     push(l.radar);
     for (const Button &b : l.buttons)
@@ -178,9 +180,16 @@ void AndroidHUD::UpdateGhostRect(const Camera &camera)
     float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
     camera.WorldToScreen(static_cast<float>(m_ghostX * TILE_WIDTH), static_cast<float>(m_ghostY * TILE_HEIGHT), x0, y0);
     camera.WorldToScreen(
-        static_cast<float>((m_ghostX + bp.width) * TILE_WIDTH), static_cast<float>((m_ghostY + bp.height) * TILE_HEIGHT), x1, y1);
+        static_cast<float>((m_ghostX + bp.width) * TILE_WIDTH),
+        static_cast<float>((m_ghostY + bp.height) * TILE_HEIGHT),
+        x1,
+        y1);
     const int pad = 24; // a finger is not a pixel
-    m_ghostRect = {static_cast<int>(x0) - pad, static_cast<int>(y0) - pad, static_cast<int>(x1 - x0) + 2 * pad, static_cast<int>(y1 - y0) + 2 * pad};
+    m_ghostRect
+        = {static_cast<int>(x0) - pad,
+           static_cast<int>(y0) - pad,
+           static_cast<int>(x1 - x0) + 2 * pad,
+           static_cast<int>(y1 - y0) + 2 * pad};
 }
 
 void AndroidHUD::StartPlacing(const Camera &camera)
@@ -192,8 +201,7 @@ void AndroidHUD::StartPlacing(const Camera &camera)
     m_attackMoveMode = false;
     m_grab = m_fingerWas = false;
     float wx = 0.0f, wy = 0.0f;
-    camera.ScreenToWorld(
-        camera.GetViewportWidth() * 0.5f, camera.GetViewportHeight() * 0.5f - 40.0f, wx, wy);
+    camera.ScreenToWorld(camera.GetViewportWidth() * 0.5f, camera.GetViewportHeight() * 0.5f - 40.0f, wx, wy);
     m_ghostX = static_cast<int>(std::floor(wx / TILE_WIDTH));
     m_ghostY = static_cast<int>(std::floor(wy / TILE_HEIGHT));
 }
@@ -205,8 +213,9 @@ bool AndroidHUD::ConfirmPlacing(Economy &economy, const EntityManager &entities,
         return false;
     const BuildingBlueprint &bp = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
     const bool isMine = bp.mineKind >= 0;
-    const bool canPlace = isMine ? entities.CanPlaceMine(bp.mineKind, m_ghostX, m_ghostY, map, Players::Local())
-                                 : entities.CanPlaceBuilding(m_ghostX, m_ghostY, bp.width, bp.height, map, Players::Local());
+    const bool canPlace
+        = isMine ? entities.CanPlaceMine(bp.mineKind, m_ghostX, m_ghostY, map, Players::Local())
+                 : entities.CanPlaceBuilding(m_ghostX, m_ghostY, bp.width, bp.height, map, Players::Local());
     if (!isMine && !BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex))
     {
         SoundRequests::Play("ui_error");
@@ -433,11 +442,14 @@ bool AndroidHUD::HandleHudClick(
     m_radarDragging = m_radarHeld && leftMouseDown; // a zoomed radar holds still while the camera follows the finger
     if (m_radarHeld)
     {
-        const RadarView v = radarView(l.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
+        const RadarView v
+            = radarView(l.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
         if (v.w > 0 && v.h > 0)
         {
-            const float tx = std::clamp(v.viewX + static_cast<float>(mx - v.ox) / v.scale, 0.0f, static_cast<float>(map.GetWidth()));
-            const float ty = std::clamp(v.viewY + static_cast<float>(my - v.oy) / v.scale, 0.0f, static_cast<float>(map.GetHeight()));
+            const float tx = std::clamp(
+                v.viewX + static_cast<float>(mx - v.ox) / v.scale, 0.0f, static_cast<float>(map.GetWidth()));
+            const float ty = std::clamp(
+                v.viewY + static_cast<float>(my - v.oy) / v.scale, 0.0f, static_cast<float>(map.GetHeight()));
             camera.CenterOn(tx * TILE_WIDTH, ty * TILE_HEIGHT);
         }
         return true;
@@ -461,7 +473,8 @@ bool AndroidHUD::HandleHudClick(
             const auto &blueprints = EntityManager::GetBlueprints();
             float wx = 0.0f, wy = 0.0f;
             camera.ScreenToWorld(static_cast<float>(mx), static_cast<float>(my), wx, wy);
-            const int tx = static_cast<int>(std::floor(wx / TILE_WIDTH)), ty = static_cast<int>(std::floor(wy / TILE_HEIGHT));
+            const int tx = static_cast<int>(std::floor(wx / TILE_WIDTH)),
+                      ty = static_cast<int>(std::floor(wy / TILE_HEIGHT));
             bool onGhost = false;
             if (m_selectedBlueprint >= 0 && m_selectedBlueprint < static_cast<int>(blueprints.size()))
             {
@@ -572,8 +585,10 @@ void AndroidHUD::RenderGameHud(
 {
     const bool combat = HasCombatUnits(entities, selected);
     const bool building = !OwnSelectedBuildings(entities, selected).empty();
-    const Layout l = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selected.size()));
-    const auto S = [&](int v) { return static_cast<int>(std::lround(v * l.u)); };
+    const Layout layout = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selected.size()));
+    const auto S = [&](int v) {
+        return static_cast<int>(std::lround(v * layout.u));
+    };
 
     if (m_placing)
     {
@@ -583,7 +598,7 @@ void AndroidHUD::RenderGameHud(
 
     // Credits and power
     {
-        const UiRect &h = l.resources;
+        const UiRect &h = layout.resources;
         renderer.FillRectScreen(h.x, h.y, h.w, h.h, {10, 13, 18, 210});
         renderer.DrawRectScreen(h.x, h.y, h.w, h.h, col::BorderStrong);
         fontRenderer.DrawString(
@@ -615,23 +630,24 @@ void AndroidHUD::RenderGameHud(
     }
 
     // The radar (no zoom buttons: a tap puts the camera there)
-    DrawRadar(renderer, fontRenderer, l.radar, entities, map, camera, -1, -1, false);
+    DrawRadar(renderer, fontRenderer, layout.radar, entities, map, camera, -1, -1, false);
 
     // Cards
     if (m_panel != Panel::None && !m_placing)
     {
-        renderer.FillRectScreen(l.cards.x, l.cards.y - 4, l.cards.w, l.cards.h + 8, {10, 13, 18, 215});
+        renderer.FillRectScreen(
+            layout.cards.x, layout.cards.y - 4, layout.cards.w, layout.cards.h + 8, {10, 13, 18, 215});
         const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
         const int first = m_scroll[m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2)];
         const bool noHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true);
         const bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
         const bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
-        for (int s = 0; s < l.cardsFit; ++s)
+        for (int s = 0; s < layout.cardsFit; ++s)
         {
             const int idx = ItemAt(tab, first + s);
             if (idx < 0)
                 break;
-            const UiRect c = CardRect(l, s);
+            const UiRect c = CardRect(layout, s);
             const bool hot = c.Contains(mx, my);
             if (tab == TabBuild)
             {
@@ -639,10 +655,10 @@ void AndroidHUD::RenderGameHud(
                 const bool isMine = bp.mineKind >= 0;
                 const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(bp.mineKind)].maxPerPlayer
                                          : BuildLimits::LimitOf(entities, bp.buildingIndex);
-                const int owned = limit > 0 ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
-                                                      : BuildLimits::CountOwned(
-                                                          entities, map, Players::Local(), bp.buildingIndex))
-                                            : 0;
+                const int owned
+                    = limit > 0 ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
+                                          : BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex))
+                                : 0;
                 const bool locked = noHq || limit == 0 || (limit > 0 && owned >= limit)
                                     || (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local()));
                 DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hot, false, locked);
@@ -664,7 +680,8 @@ void AndroidHUD::RenderGameHud(
             {
                 const bool inf = tab == TabInfantry;
                 const UnitCameoDef &def = unitCatalog(inf).items[idx];
-                const bool available = (inf ? hasBarracks : hasFactory) && IsUnitUnlocked(Players::Local(), def.archetype);
+                const bool available
+                    = (inf ? hasBarracks : hasFactory) && IsUnitUnlocked(Players::Local(), def.archetype);
                 DrawCameo(
                     renderer,
                     fontRenderer,
@@ -677,7 +694,11 @@ void AndroidHUD::RenderGameHud(
                 const auto *cfg = entities.GetUnitConfig(def.archetype);
                 const int cost = cfg ? cfg->creditCost : def.cost;
                 DrawCostTag(
-                    renderer, fontRenderer, c, "$" + std::to_string(cost), economy.CanAfford(cost) ? col::Accent : col::Danger);
+                    renderer,
+                    fontRenderer,
+                    c,
+                    "$" + std::to_string(cost),
+                    economy.CanAfford(cost) ? col::Accent : col::Danger);
                 int queued = 0;
                 float progress = -1.0f;
                 for (int id : ProductionTargets(inf ? UnitType::Barracks : UnitType::Factory, entities, selected))
@@ -700,12 +721,17 @@ void AndroidHUD::RenderGameHud(
         const int count = ItemCountForTab(tab);
         if (count == 0)
             fontRenderer.DrawString(
-                _("NOTHING AVAILABLE"), l.cards.CenterX(), l.cards.CenterY(), ui::FONT_BODY, col::TextMuted, false,
+                _("NOTHING AVAILABLE"),
+                layout.cards.CenterX(),
+                layout.cards.CenterY(),
+                ui::FONT_BODY,
+                col::TextMuted,
+                false,
                 Anchor::HCENTER | Anchor::VCENTER);
     }
 
     // Buttons
-    for (const Button &b : l.buttons)
+    for (const Button &b : layout.buttons)
     {
         ui::DrawButton(
             renderer,
@@ -722,12 +748,7 @@ void AndroidHUD::RenderGameHud(
     {
         const std::string info = std::to_string(selected.size()) + " " + _("SELECTED");
         fontRenderer.DrawString(
-            info,
-            l.radar.Right() + S(8),
-            windowH - S(8) - S(60) - 18,
-            ui::FONT_SMALL_BOLD,
-            col::Text,
-            true);
+            info, layout.radar.Right() + S(8), windowH - S(8) - S(60) - 18, ui::FONT_SMALL_BOLD, col::Text, true);
     }
 
     // The line of text at the top: a notice, or what a mode wants from the next tap
@@ -741,11 +762,17 @@ void AndroidHUD::RenderGameHud(
     if (!notice.empty())
     {
         const int tw = fontRenderer.GetTextWidth(notice, ui::FONT_BODY_BOLD) + 24;
-        const UiRect n {windowW / 2 - tw / 2, l.notice.y, tw, l.notice.h};
+        const UiRect n {windowW / 2 - tw / 2, layout.notice.y, tw, layout.notice.h};
         renderer.FillRectScreen(n.x, n.y, n.w, n.h, {10, 13, 18, 220});
         renderer.DrawRectScreen(n.x, n.y, n.w, n.h, col::Accent);
         fontRenderer.DrawString(
-            notice, n.CenterX(), n.CenterY(), ui::FONT_BODY_BOLD, col::Accent, false, Anchor::HCENTER | Anchor::VCENTER);
+            notice,
+            n.CenterX(),
+            n.CenterY(),
+            ui::FONT_BODY_BOLD,
+            col::Accent,
+            false,
+            Anchor::HCENTER | Anchor::VCENTER);
     }
     (void) my;
 }

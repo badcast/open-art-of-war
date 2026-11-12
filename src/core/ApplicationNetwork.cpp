@@ -162,7 +162,8 @@ std::string RejectText(Net::RejectReason reason, const std::string &detail, bool
         case Net::RejectReason::VersionMismatch:
             // The same version string with other simulation code (a build with different AI, units, ...)
             if (detail == OAOW_VERSION)
-                return _("Different game build: the same version, but the game logic differs (both need the same build).");
+                return _(
+                    "Different game build: the same version, but the game logic differs (both need the same build).");
             return std::string(_("Different game version"))
                    + (detail.empty() ? std::string()
                                      : std::string(": ") + _("the host plays") + " " + detail + ", " + _("you have")

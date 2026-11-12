@@ -71,7 +71,8 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         else
         {
             enemyUnitCount++;
-            if (const Unit *u = e.AsUnit(); u && IsReserveUnit(*u) && !m_recalled.count(u->id)) // (troops still on the way back do not count)
+            if (const Unit *u = e.AsUnit();
+                u && IsReserveUnit(*u) && !m_recalled.count(u->id)) // (troops still on the way back do not count)
                 ++reserveCount;
         }
     }

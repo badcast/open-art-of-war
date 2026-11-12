@@ -23,9 +23,141 @@ import tarfile
 import posixpath
 import re
 
+try:
+    import yaml  # optional dependency for the main manifest and mod manifests
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environments
+    yaml = None
+
 FIXED_TIME = 1767225600  # 2026-01-01, reproducible archives
 ZSTD_LEVEL = 19
 CERTIFICATE_NAME = "certificate.sha256"
+
+
+def strip_yaml_comment(line):
+    """Strip comments outside of quoted strings, as YAML uses # for comments."""
+    out = []
+    in_single = False
+    in_double = False
+    escape = False
+    for ch in line:
+        if ch == "\\" and (in_double and not escape):
+            escape = True
+            out.append(ch)
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        elif ch == "#" and not in_single and not in_double:
+            break
+        out.append(ch)
+        escape = False
+    return "".join(out).rstrip()
+
+
+def parse_scalar(value):
+    value = value.strip()
+    if value == "":
+        return ""
+    if value in ("null", "Null", "NULL", "~"):
+        return None
+    lower = value.lower()
+    if lower == "true":
+        return True
+    if lower == "false":
+        return False
+    if value and value[0] in ('"', "'") and value[-1] == value[0]:
+        inner = value[1:-1]
+        return inner.encode("utf-8").decode("unicode_escape").replace("\\'", "'")
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
+    if re.fullmatch(r"-?\d+\.\d+([eE][-+]?\d+)?", value):
+        return float(value)
+    if value.startswith("[") and value.endswith("]"):
+        return [item.strip() for item in value[1:-1].split(",") if item.strip()]
+    return value
+
+
+def yaml_load_text(text):
+    if yaml is not None:
+        return yaml.safe_load(text)
+
+    lines = []
+    for raw in text.splitlines():
+        stripped = strip_yaml_comment(raw)
+        if not stripped.strip():
+            continue
+        indent = len(stripped) - len(stripped.lstrip(" "))
+        lines.append((indent, stripped.strip()))
+
+    def parse_block(index, indent):
+        if index >= len(lines):
+            return {}, index
+        current_indent, first = lines[index]
+        if current_indent < indent:
+            return {}, index
+        if first.startswith("- "):
+            items = []
+            while index < len(lines):
+                cur_indent, content = lines[index]
+                if cur_indent < indent:
+                    break
+                if cur_indent != indent or not content.startswith("- "):
+                    break
+                rest = content[2:].strip()
+                index += 1
+                if not rest:
+                    value, index = parse_block(index, indent + 2)
+                    items.append(value)
+                    continue
+                if ":" in rest:
+                    key, value_part = rest.split(":", 1)
+                    key = key.strip()
+                    value_part = value_part.strip()
+                    item = {key: parse_scalar(value_part) if value_part else None}
+                    if not value_part:
+                        nested, index = parse_block(index, indent + 2)
+                        item[key] = nested
+                    while index < len(lines) and lines[index][0] > indent:
+                        more, index = parse_block(index, indent + 2)
+                        if isinstance(more, dict):
+                            item.update(more)
+                        else:
+                            item[key] = more
+                            break
+                    items.append(item)
+                    continue
+                items.append(parse_scalar(rest))
+            return items, index
+
+        mapping = {}
+        while index < len(lines):
+            cur_indent, content = lines[index]
+            if cur_indent < indent:
+                break
+            if cur_indent != indent or content.startswith("- "):
+                break
+            if ":" not in content:
+                raise ValueError(f"Unsupported YAML line: {content!r}")
+            key, value_part = content.split(":", 1)
+            key = key.strip()
+            value_part = value_part.strip()
+            index += 1
+            if value_part:
+                mapping[key] = parse_scalar(value_part)
+                continue
+            # nested block
+            child, index = parse_block(index, indent + 2)
+            mapping[key] = child
+        return mapping, index
+
+    result, _ = parse_block(0, 0)
+    return result
+
+
+def yaml_load_file(path):
+    with open(path, "r", encoding="utf-8") as fh:
+        return yaml_load_text(fh.read())
 
 
 def compress(tar_bytes, output):
@@ -78,9 +210,7 @@ def check_manifest(assets_dir, keys):
     manifest_yaml = os.path.join(assets_dir, "main.yaml")
     if not os.path.isfile(manifest_yaml):
         raise SystemExit(f"pack_assets: main.yaml not found in {assets_dir}")
-    import yaml
-    with open(manifest_yaml, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    data = yaml_load_file(manifest_yaml)
     manifest_name = "main.yaml"
 
     named = set(manifest_paths(data))
@@ -112,9 +242,7 @@ def check_mod(mod_dir, keys, base_assets=None):
     path = os.path.join(mod_dir, "mod.yaml")
     if not os.path.isfile(path):
         raise SystemExit(f"pack_assets: {mod_dir} has no mod.yaml")
-    import yaml
-    with open(path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    data = yaml_load_file(path)
     if not isinstance(data, dict):
         raise SystemExit("pack_assets: mod.yaml is not a mapping")
     if not MOD_ID.match(str(data.get("id", ""))):

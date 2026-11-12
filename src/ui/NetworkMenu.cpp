@@ -272,7 +272,8 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
     // without it
     if (uilayout::Current().Has("map_select", "pc"))
     {
-        const uilayout::Solved s = uilayout::Current().Solve("map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), w, h, {});
+        const uilayout::Solved s = uilayout::Current().Solve(
+            "map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), w, h, {});
         l.dialog = s.Rect("dialog");
         l.mapSearch = s.Rect("room_search");
         l.mapList = s.Rect("room_list");
@@ -665,7 +666,6 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
     // Own picks
     Net::LobbyChoice mine;
     bool haveMine = false;
-    int myRow = -1;
     if (lobby)
     {
         for (std::size_t i = 0; i < lobby->slots.size(); ++i)
@@ -675,7 +675,6 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int w, int h, NetMat
                 mine = lobby->slots[i].choice;
                 net.LocalChoice(mine); // what was last sent, not the room's lagging echo
                 haveMine = true;
-                myRow = static_cast<int>(i);
             }
         }
     }
@@ -1674,8 +1673,7 @@ void NetworkMenu::Render(
         ui::FONT_SMALL,
         col::TextDim,
         false);
-    DrawField(
-        r, font, l.addressField, settings.lastAddress, _("IP address or hostname"), m_focus == Field::Address);
+    DrawField(r, font, l.addressField, settings.lastAddress, _("IP address or hostname"), m_focus == Field::Address);
     ui::DrawButton(
         r,
         font,
@@ -1789,7 +1787,7 @@ void NetworkMenu::Render(
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, row.w * 30 / 100 ),
+                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, row.w * 30 / 100),
                 row.x + 110,
                 row.CenterY(),
                 ui::FONT_BODY_BOLD,
@@ -1849,7 +1847,12 @@ void NetworkMenu::Render(
         r, font, l.hostBtn, _("CREATE GAME"), ui::ButtonStyle::Secondary, l.hostBtn.Contains(m_mouseX, m_mouseY));
     if (m_tab == Tab::Internet)
         ui::DrawButton(
-            r, font, l.serverBtn, _("CREATE ROOM"), ui::ButtonStyle::Secondary, l.serverBtn.Contains(m_mouseX, m_mouseY));
+            r,
+            font,
+            l.serverBtn,
+            _("CREATE ROOM"),
+            ui::ButtonStyle::Secondary,
+            l.serverBtn.Contains(m_mouseX, m_mouseY));
     const bool canJoin = m_tab == Tab::Internet
                              ? (m_serverSelected >= 0 && m_serverSelected < static_cast<int>(server.size()))
                              : (m_lanSelected >= 0 && m_lanSelected < static_cast<int>(lan.size()));

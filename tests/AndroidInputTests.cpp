@@ -84,16 +84,21 @@ int main()
     touch(SDL_EVENT_FINGER_UP, 1, 600, 380);
     Check(input.ConsumeWheel() == 2, "swiping down must scroll back");
 
-    // A window that scrolls both ways (the technology tree) takes the raw drag instead of wheel steps
+    // A window that scrolls both ways (the technology tree) follows the pointer itself: the press is reported, the
+    // pointer travels with the finger, and no wheel steps are made of the drag
     input.SetTouchWheelScroll(false);
     input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
     touch(SDL_EVENT_FINGER_DOWN, 1, 600, 500);
+    Check(input.ConsumeLeftPress(pressX, pressY) && pressX == 600 && pressY == 500, "the press must be reported");
+    touch(SDL_EVENT_FINGER_MOTION, 1, 595, 495);
+    Check(input.IsLeftMouseDown(), "the finger holds the pointer down while it is dragged");
     touch(SDL_EVENT_FINGER_MOTION, 1, 500, 420);
+    Check(input.GetMouseScreenX() == 500 && input.GetMouseScreenY() == 420, "the pointer must follow the finger");
     touch(SDL_EVENT_FINGER_UP, 1, 500, 420);
-    float dragX = 0.0f, dragY = 0.0f;
-    input.ConsumeTouchDrag(dragX, dragY);
-    Check(dragX < -90.0f && dragY < -70.0f, "the raw drag must reach the window");
-    Check(input.ConsumeWheel() == 0, "and no wheel steps are made of it");
+    Check(!input.IsLeftMouseDown(), "the lift must release the pointer");
+    Check(input.ConsumeWheel() == 0, "no wheel steps are made of the drag");
+    Check(!input.WasLeftClickIssued(x, y), "a drag must not click");
     input.SetTouchWheelScroll(true);
 
     touch(SDL_EVENT_FINGER_DOWN, 1, 1100, 300);

@@ -182,8 +182,8 @@ void CharacterEditor::DrawPreviewControls()
     }
     ImGui::Separator();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
-        || editorMode == EditorMode::SpriteMerge
-        || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
+        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::Environment
+        || editorMode == EditorMode::AiDifficulty)
         return;
     // Background of the canvas (black by default)
     Hinted(ImGui::ColorEdit3(_("Background"), previewBackground, ImGuiColorEditFlags_NoInputs), "Canvas background");

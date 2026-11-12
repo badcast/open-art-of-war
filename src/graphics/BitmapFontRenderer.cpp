@@ -41,7 +41,7 @@ BitmapFontRenderer::BitmapFontRenderer(
     std::string regPath = ResolveFontPath(regularFontPath, false);
     std::string bldPath = ResolveFontPath(boldFontPath, true);
 
-    // Fonts packed in data.blob are opened from memory (the buffers stay alive with the fonts)
+    // Fonts packed in assets.blob are opened from memory (the buffers stay alive with the fonts)
     const bool packedRegular = Assets::IsBlob() && Assets::ReadBytes(regularFontPath, m_fontDataRegular);
     const bool packedBold = Assets::IsBlob() && Assets::ReadBytes(boldFontPath, m_fontDataBold);
     auto openFont = [&](bool packed, bool bold, const std::string &path, float size) {

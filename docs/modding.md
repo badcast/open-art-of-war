@@ -9,7 +9,7 @@ A mod changes or adds game data: sprites, units and buildings, balance, maps, so
 
 A mod is either:
 
-- an archive `<name>.mod`: a tar compressed with zstd, the same format as `data.blob`;
+- an archive `<name>.mod`: a tar compressed with zstd, the same format as `assets.blob`;
 - or a folder `<name>/` with the same contents. A folder is handy while you make the mod, because a change shows up without packing it again.
 
 Two mods with the same `id`: the one with the higher `version` is used. On the same version the copy in the user directory wins.
@@ -95,7 +95,7 @@ When the game reads a data file, the first one found counts:
 
 1. the data of a network game or a replay (the host's data, mods included);
 2. the enabled mods, the last one first;
-3. the installed game data (`assets/` or `data.blob`, plus the user's saved files).
+3. the installed game data (`assets/` or `assets.blob`, plus the user's saved files).
 
 ## Network games and replays
 

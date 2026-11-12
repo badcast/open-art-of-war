@@ -55,16 +55,10 @@ public:
         m_touchPan = on;
     }
     // A finger drag in a menu or window scrolls it by wheel steps; a window that scrolls by itself (the technology
-    // tree: two directions) turns that off and takes the raw travel with ConsumeTouchDrag instead
+    // tree: two directions, it follows the pointer) turns that off
     void SetTouchWheelScroll(bool on)
     {
         m_touchWheelScroll = on;
-    }
-    void ConsumeTouchDrag(float &dx, float &dy)
-    {
-        dx = m_touchDragX;
-        dy = m_touchDragY;
-        m_touchDragX = m_touchDragY = 0.0f;
     }
     // Touch interface panels over the map (screen pixels): a finger that starts on one never pans the map
     void SetTouchUiRects(std::vector<SDL_Rect> rects)
@@ -207,8 +201,6 @@ public:
 
 private:
     bool m_touchPan {false};
-    float m_touchDragX {0.0f};
-    float m_touchDragY {0.0f};
     bool m_touchWheelScroll {true};
     float m_touchScroll {0.0f}; // finger travel not yet turned into wheel steps (menus scroll by swiping)
     std::vector<SDL_Rect> m_touchUiRects;

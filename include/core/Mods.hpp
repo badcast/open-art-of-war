@@ -7,7 +7,7 @@
 
 // Mods: data packages over the installed game data (docs/modding.md).
 //
-// A mod is either an archive "<name>.mod" (a tar.zst, packed like data.blob: tools/pack_assets.py --mod) or a folder
+// A mod is either an archive "<name>.mod" (a tar.zst, packed like assets.blob: tools/pack_assets.py --mod) or a folder
 // "<name>/" with the same contents. Its root holds mod.yaml and files laid out as below assets/ ("sprites/x.png",
 // "characters/y.yaml"): a file replaces the installed one with that path, a new one is simply added. mod.yaml may
 // also add to the manifest (main.yaml) in its "manifest:" section: maps merge, lists grow, values are replaced.

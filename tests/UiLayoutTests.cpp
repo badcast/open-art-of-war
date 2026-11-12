@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 using namespace OpenArtOfWar;
@@ -99,6 +100,27 @@ int main()
         const uilayout::Solved yn = shipped.Solve("confirm", "touch", 1280, 720, {});
         Check(yn.Rect("yes").h >= 70 && yn.Rect("no").h >= 70 && yn.Rect("yes").w >= 300, "touch Yes / No buttons are big");
         Check(shipped.Solve("pause", "touch", 1280, 720, {}).Rect("item0").h > 46, "touch pause buttons are bigger");
+        // The technology tree window: the old numbers on the PC, finger-sized controls inside the screen on touch
+        Check(shipped.Has("research", "pc") && shipped.Has("research", "touch"), "both research profiles");
+        const std::map<std::string, float> top {{"T", 0.0f}};
+        const uilayout::Solved tech = shipped.Solve("research", "pc", 1280, 720, {}, &top);
+        Check(tech.Rect("content").x == 16 && tech.Rect("content").y == 60 && tech.Rect("content").h == 644, "research content");
+        Check(tech.Rect("details").w == 324 && tech.Rect("tree").w == 912 && tech.Rect("zoom_out").x == 898, "research tree and details");
+        Check(tech.Rect("close").h == 30 && tech.Rect("zoom_in").w == 24 && tech.Rect("start").h == 40, "research PC controls");
+        for (const auto &size : {std::pair<int, int> {1280, 720}, {2400, 1080}, {1600, 720}})
+        {
+            const uilayout::Solved fingers = shipped.Solve("research", "touch", size.first, size.second, {}, &top);
+            const ui::UiRect tree = fingers.Rect("tree"), details = fingers.Rect("details");
+            Check(fingers.Rect("close").h >= 50 && fingers.Rect("search").h >= 50 && fingers.Rect("start").h >= 64,
+                  "research touch controls are finger-sized");
+            Check(fingers.Rect("zoom_in").w >= 56 && fingers.Rect("zoom_in").h >= 56, "research touch zoom buttons are big");
+            Check(tree.w > size.first / 2 && tree.Right() < details.x && details.Right() <= size.first,
+                  "research tree keeps most of the screen, details fit");
+            Check(fingers.Rect("start").Bottom() <= details.Bottom() && details.Bottom() <= size.second, "research start button fits");
+        }
+        const std::map<std::string, float> bar {{"T", 64.0f}};
+        const uilayout::Solved watched = shipped.Solve("research", "touch", 1280, 720, {}, &bar);
+        Check(watched.Rect("dialog").y == 64 && watched.Rect("dialog").h == 720 - 64, "research window leaves the observer bar");
         const uilayout::Solved net = shipped.Solve("network", "pc", 1280, 720, {});
         Check(net.Rect("dialog").w == 1000 && net.Rect("join").w == 220 && net.Rect("host").x == net.Rect("join").x - 232,
               "network numbers");

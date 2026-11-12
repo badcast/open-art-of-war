@@ -98,7 +98,7 @@ private:
     TTF_Font *m_fontTitle {nullptr};             // scale 4 (~30px bold)
     TTF_Font *m_fontSmallBold {nullptr};         // scale 5 (13px bold)
     TTF_Font *m_fontMediumBold {nullptr};        // scale 6 (16px bold)
-    std::vector<std::uint8_t> m_fontDataRegular; // font files from data.blob, read by m_font* via SDL IO
+    std::vector<std::uint8_t> m_fontDataRegular; // font files from assets.blob, read by m_font* via SDL IO
     std::vector<std::uint8_t> m_fontDataBold;
     TTF_Font *m_fontHero {nullptr}; // scale 7 (48px bold)
 

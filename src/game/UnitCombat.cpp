@@ -548,7 +548,8 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         const bool searchAllowed = pathfinder.TakeBackgroundSearch();
         if (!searchAllowed)
             wallCheckCooldown = 0.1f;
-        if (searchAllowed && stuckWithGoal && delegates.findWallTarget && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
+        if (searchAllowed && stuckWithGoal && delegates.findWallTarget
+            && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
             delegates.findWallTarget(*this, wx, wy);
         // The way through is open, only jammed: shoot the wall beside the gap, so it widens
         if (wx < 0 && jammedAtGap)
@@ -842,7 +843,11 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         float dist = ComputeDistanceToEntityPixels(*this, *target);
 
         // 5b'. The second gun fires on its own beside the main one, at the same target, in its own range
-        if (hasSecondary && secondaryCooldownTimer <= 0.0f && delegates.spawnProjectile
+        // (a Fortress placed without the base form, a map's own unit, has its flamethrower only once it is researched)
+        const bool secondaryLocked
+            = IsFortress()
+              && !(delegates.isFortressFlamethrowerUnlocked && delegates.isFortressFlamethrowerUnlocked(owner));
+        if (hasSecondary && !secondaryLocked && secondaryCooldownTimer <= 0.0f && delegates.spawnProjectile
             && dist <= secondaryRange * TILE_WIDTH && dist >= secondaryMinRange * TILE_WIDTH)
         {
             secondaryCooldownTimer = secondaryCooldown;

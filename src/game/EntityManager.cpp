@@ -114,14 +114,14 @@ EntityManager::EntityManager()
 
 void EntityManager::RebuildBlueprints()
 {
-    // Blueprints of the player's faction in canonical order: HQ, power, barracks, factory, lab, bunker, (Confederation: radar locator), tower, wall
-    // Both factions: commands of other players are looked up in their own faction's list
+    // Blueprints of the player's faction in canonical order: HQ, power, barracks, factory, lab, bunker, (Confederation:
+    // radar locator), tower, wall Both factions: commands of other players are looked up in their own faction's list
     for (int side = 0; side < 2; ++side)
     {
         std::vector<BuildingBlueprint> &list = s_factionBlueprints[side];
         list.clear();
-        const std::vector<int> bpOrder
-            = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 6, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
+        const std::vector<int> bpOrder = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 6, 7, 15}
+                                                   : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
         for (std::size_t slot = 0; slot < bpOrder.size(); ++slot)
         {
             const int bIdx = bpOrder[slot];

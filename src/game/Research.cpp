@@ -377,6 +377,16 @@ void CompleteResearch(PlayerId player, int index, EntityManager &entities)
     if (def.effect == ResearchEffect::FortressFlamethrower)
     {
         entities.SetFortressFlamethrowerUnlocked(player, true);
+        // The Fortresses that exist get the flamethrower now (they were made without it, as the base form)
+        std::vector<int> baseFortresses;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Unit *u = e.AsUnit();
+            if (u && u->alive && u->owner == player && u->archetypeId == 18)
+                baseFortresses.push_back(u->id);
+        }
+        for (int id : baseFortresses)
+            entities.UpgradeUnitForm(id, 7);
     }
     else if (def.effect == ResearchEffect::SiegeMode)
     {
@@ -461,9 +471,14 @@ bool IsUnitUnlocked(PlayerId player, int archetype)
 int ProductionForm(PlayerId player, int archetype)
 {
     constexpr int kZeus = 11, kZeusBase = 17;
+    constexpr int kFortress = 7, kFortressBase = 18;
     if (archetype == kZeus && Players::FactionOf(player) == Faction::Confederation
         && !IsEffectResearched(player, ResearchEffect::RocketTurret))
         return kZeusBase;
+    // Without the flamethrower technology a Fortress is the base form: the machine gun only
+    if (archetype == kFortress && Players::FactionOf(player) == Faction::Confederation
+        && !IsEffectResearched(player, ResearchEffect::FortressFlamethrower))
+        return kFortressBase;
     return archetype;
 }
 
@@ -472,6 +487,18 @@ bool IsBuildingUnlocked(PlayerId player, int buildingIndex)
     if (!Capabilities::AllowsBuilding(player, buildingIndex))
         return false;
     return buildingIndex != 6 || IsRadarUnlocked(player);
+}
+
+bool IsMineResearched(PlayerId player, int mineValue)
+{
+    const Faction faction = Players::FactionOf(player);
+    for (int i = 0; i < kResearchCount; ++i)
+    {
+        const ResearchDef &def = researchDef(faction, i);
+        if (def.effect == ResearchEffect::Mine && def.value == mineValue && IsResearched(player, i))
+            return true;
+    }
+    return false;
 }
 
 bool IsRadarUnlocked(PlayerId player)
@@ -489,18 +516,6 @@ int ReduceDamageByArmor(int damage, const Entity &target)
 {
     if (damage <= 0)
         return damage;
-bool IsMineResearched(PlayerId player, int mineValue)
-{
-    const Faction faction = Players::FactionOf(player);
-    for (int i = 0; i < kResearchCount; ++i)
-    {
-        const ResearchDef &def = researchDef(faction, i);
-        if (def.effect == ResearchEffect::Mine && def.value == mineValue && IsResearched(player, i))
-            return true;
-    }
-    return false;
-}
-
     int percent = 0;
     if (target.isBuilding)
     {

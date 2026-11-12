@@ -390,8 +390,8 @@ void CharacterEditor::DrawEditor()
             | ImGuiWindowFlags_NoBringToFrontOnFocus);
     DrawPreviewControls();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
-        || editorMode == EditorMode::SpriteMerge
-        || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
+        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::Environment
+        || editorMode == EditorMode::AiDifficulty)
     {
         previewRect = {0, 0, 0, 0};
         if (editorMode == EditorMode::Research)
@@ -1299,7 +1299,6 @@ void CharacterEditor::DrawProperties()
                     s["archetype_id"] = (curArch == 8) ? 16 : 15;
                     s["name"] = YamlString(document, "name", "Unit") + " (Siege Mode)";
                     YAML::Node sSt(YAML::NodeType::Map);
-                    sSt["max_hp"] = YamlInt(document["stats"], "max_hp", 500);
                     sSt["sight_radius"] = YamlInt(document["stats"], "sight_radius", 8);
                     sSt["move_speed"] = 0.0f;
                     s["stats"] = sSt;

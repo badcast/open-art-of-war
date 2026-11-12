@@ -207,8 +207,8 @@ inline SidebarLayout sidebarLayoutBuiltIn(int windowW, int windowH, int top, boo
     return l;
 }
 
-// The sidebar of the desktop interface: ui/layout.yaml (screen hud, profile pc); the built-in numbers above stand in when
-// the file has no such profile
+// The sidebar of the desktop interface: ui/layout.yaml (screen hud, profile pc); the built-in numbers above stand in
+// when the file has no such profile
 inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showSpeed = false)
 {
     const uilayout::Layout &file = uilayout::Current();

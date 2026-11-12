@@ -65,8 +65,7 @@ void HUDController::ActivateCell(
                 SetNotification(_("RESEARCH REQUIRED TO BUILD RADAR LOCATORS!"));
             }
             else if (
-                index < static_cast<int>(blueprints.size())
-                && blueprints[index].mineKind < 0
+                index < static_cast<int>(blueprints.size()) && blueprints[index].mineKind < 0
                 && !BuildLimits::CanBuildMore(entities, map, Players::Local(), blueprints[index].buildingIndex))
             {
                 SoundRequests::Play("ui_error");

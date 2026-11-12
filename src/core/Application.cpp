@@ -68,7 +68,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     if (!Assets::Init())
     {
         constexpr const char *errorMessage
-            = "Required game data was not found. Place the 'assets' directory or 'data.blob' in the game folder.";
+            = "Required game data was not found. Place the 'assets' directory or 'assets.blob' in the game folder.";
         std::cerr << "[Application] " << errorMessage << std::endl;
         if (!m_headless && SDL_Init(SDL_INIT_VIDEO))
         {
@@ -776,7 +776,7 @@ void Application::HandleEvents()
     SyncWindowSize();
     uilayout::Poll(SDL_GetTicks()); // the layout file was edited: the interface follows
     if (m_hudController)
-        m_input->SetTouchWheelScroll(!m_hudController->IsResearchWindowOpen()); // the tree takes the raw drag
+        m_input->SetTouchWheelScroll(!m_hudController->IsResearchWindowOpen()); // the tree follows the finger itself
     m_input->ResetFrameEvents();
     if (m_hudController && m_touchUi)
     {
@@ -1458,7 +1458,9 @@ void Application::Render()
         }
 
         // Render Build Ghost in Placement Mode (only while the cursor is over the map)
-        if (m_hudController->IsBuildMode() && !m_hudController->IsOverHud(m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
+        if (m_hudController->IsBuildMode()
+            && !m_hudController->IsOverHud(
+                m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
         {
             int mouseTileX = static_cast<int>(m_input->GetMouseWorldX() / TILE_WIDTH);
             int mouseTileY = static_cast<int>(m_input->GetMouseWorldY() / TILE_HEIGHT);
@@ -1473,7 +1475,9 @@ void Application::Render()
         }
 
         // Render Attack-Move Reticle in Attack-Move Mode ('Q' key)
-        if (m_hudController->IsAttackMoveMode() && !m_hudController->IsOverHud(m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
+        if (m_hudController->IsAttackMoveMode()
+            && !m_hudController->IsOverHud(
+                m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
         {
             int mx = m_input->GetMouseScreenX();
             int my = m_input->GetMouseScreenY();

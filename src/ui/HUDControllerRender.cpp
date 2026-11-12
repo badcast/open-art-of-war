@@ -360,8 +360,8 @@ void HUDController::DrawRadar(
                 renderer.FillRectScreen(
                     px + (pw - s) / 2, py + (ph - s) / 2, s, s, RadarOwnerColor(e.owner, e.faction, true));
             }
-            if (!enemyOnRadar && !own && e.faction != Faction::Neutral
-                && Players::Hostile(e.owner, Players::Local()) && (!b || m_radarAlert.config.includeBuildings))
+            if (!enemyOnRadar && !own && e.faction != Faction::Neutral && Players::Hostile(e.owner, Players::Local())
+                && (!b || m_radarAlert.config.includeBuildings))
             {
                 enemyOnRadar = true;
                 contactX = e.GetUnitCenterPixelX() / TILE_WIDTH;
@@ -666,7 +666,7 @@ void HUDController::RenderGameHud(
         std::string hoverText;
         bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
         bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
-        bool hasLab = HasResearchBuilding(Players::Local(), entities);
+        [[maybe_unused]] bool hasLab = HasResearchBuilding(Players::Local(), entities);
         const bool noHq
             = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true); // nothing can be built
         // Orders shown on unit cards come from the buildings that would train them
@@ -703,10 +703,11 @@ void HUDController::RenderGameHud(
                     const bool isMine = bp.mineKind >= 0;
                     const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(bp.mineKind)].maxPerPlayer
                                              : BuildLimits::LimitOf(entities, bp.buildingIndex);
-                    const int owned = limit > 0 ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
-                                                          : BuildLimits::CountOwned(
-                                                              entities, map, Players::Local(), bp.buildingIndex))
-                                                : 0;
+                    const int owned
+                        = limit > 0
+                              ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
+                                        : BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex))
+                              : 0;
                     const bool atLimit = limit == 0 || (limit > 0 && owned >= limit);
                     const bool radarLocked
                         = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;

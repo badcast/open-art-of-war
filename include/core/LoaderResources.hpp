@@ -17,7 +17,7 @@ namespace OpenArtOfWar
 class LoaderResources
 {
 public:
-    static constexpr const std::uint32_t kMinimalVersionManifest = 1;
+    static constexpr const std::uint32_t MinimalVersionManifest = 1U;
     static constexpr const char *kDefaultRoot = "assets";
     static constexpr const char *kManifestPath = "assets/main.yaml";
 

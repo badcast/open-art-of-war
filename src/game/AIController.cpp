@@ -307,8 +307,9 @@ std::vector<std::string> AIController::CurrentIntentions() const
         const auto difficulty = GetEffectiveDifficulty();
         const bool immediate = difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore;
         if (immediate)
-            w << "Assembling front group: " << m_readyUnits << "/" << m_currentDifficultyConfig.tactics.dispatchGroupSize
-              << " at staging, " << m_dispatchedInWave << "/" << required << " of the wave dispatched";
+            w << "Assembling front group: " << m_readyUnits << "/"
+              << m_currentDifficultyConfig.tactics.dispatchGroupSize << " at staging, " << m_dispatchedInWave << "/"
+              << required << " of the wave dispatched";
         else
             w << "Assembling wave " << (m_waveCount + 1) << " (" << TierName(m_currentPlan.tier)
               << "): " << m_readyUnits << "/" << required << " ready";

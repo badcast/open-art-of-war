@@ -328,7 +328,6 @@ CharacterStats ComputeStats(YAML::Node doc, bool siege)
             combat.reset(sNode["combat"]);
         if (sNode["stats"].IsMap())
         {
-            s.hp = YamlFloat(sNode["stats"], "max_hp", s.hp);
             s.sight = YamlFloat(sNode["stats"], "sight_radius", s.sight);
             s.speed = YamlFloat(sNode["stats"], "move_speed", 0.0f);
         }

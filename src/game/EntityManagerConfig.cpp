@@ -491,9 +491,10 @@ bool EntityManager::LoadCharacterYaml(YAML::Node root)
                                                        : UnitConfig::AutoSiege::Far;
                 }
 
+                // One maximum health for both forms: the unit's own max_hp (a "max_hp" in the siege stats is ignored)
+                siegeCfg.maxHp = cfg.maxHp;
                 if (sNode["stats"])
                 {
-                    siegeCfg.maxHp = getInt(sNode["stats"], "max_hp", cfg.maxHp);
                     siegeCfg.sightRadius = getInt(sNode["stats"], "sight_radius", cfg.sightRadius);
                     siegeCfg.moveSpeed = getFloat(sNode["stats"], "move_speed", 0.0f);
                 }

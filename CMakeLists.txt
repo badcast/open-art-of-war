@@ -508,6 +508,14 @@ set_target_properties(openaow-flowfield-tests PROPERTIES
 # (it reads the unit definitions: run where ./assets is)
 add_test(NAME openaow-flowfield-tests COMMAND openaow-flowfield-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
+add_executable(openaow-fortress-flame-tests tests/FortressFlameTests.cpp)
+target_link_libraries(openaow-fortress-flame-tests PRIVATE openaow-core)
+set_target_properties(openaow-fortress-flame-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+# (it reads the unit definitions: run where ./assets is)
+add_test(NAME openaow-fortress-flame-tests COMMAND openaow-fortress-flame-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
 add_executable(openaow-mines-tests tests/MinesTests.cpp)
 target_link_libraries(openaow-mines-tests PRIVATE openaow-core)
 set_target_properties(openaow-mines-tests PROPERTIES
@@ -515,14 +523,6 @@ set_target_properties(openaow-mines-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 # (it reads the unit definitions: run where ./assets is)
 add_test(NAME openaow-mines-tests COMMAND openaow-mines-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
-target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)
-set_target_properties(openaow-build-limits-tests PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
-    BUILD_RPATH "${OAOW_TESTS_RPATH}")
-add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
-
-add_executable(openaow-capabilities-tests tests/CapabilitiesTests.cpp)
 
 add_executable(openaow-ui-layout-tests tests/UiLayoutTests.cpp)
 target_link_libraries(openaow-ui-layout-tests PRIVATE openaow-core)
@@ -531,6 +531,14 @@ set_target_properties(openaow-ui-layout-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-ui-layout-tests COMMAND openaow-ui-layout-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
+add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
+target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)
+set_target_properties(openaow-build-limits-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
+
+add_executable(openaow-capabilities-tests tests/CapabilitiesTests.cpp)
 target_link_libraries(openaow-capabilities-tests PRIVATE openaow-core OpenAOWNetworking)
 set_target_properties(openaow-capabilities-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"

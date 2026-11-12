@@ -59,6 +59,6 @@ Passability follows the tile sprite, as in the original maps: bare earth and jun
 
 Maps are stored as JSON. Maps live in `assets/maps/`, the same place the game reads them from; the editor finds `assets` next to the executable (or one level up), like the game does, so it can be started from any directory.
 
-When the game is installed with only `data.blob` (no `assets/` directory), the editor reads the packed maps and saves new ones to the per-user data directory (`~/.local/share/openaow/openaow/maps/`), which the game also reads first.
+When the game is installed with only `assets.blob` (no `assets/` directory), the editor reads the packed maps and saves new ones to the per-user data directory (`~/.local/share/openaow/openaow/maps/`), which the game also reads first.
 
 The optional `"title"` key of a map file is the English name of the map and doubles as the gettext msgid: the game shows `_(title)`, so a translation goes into `po/openaow_<lang>.po` (see `tools/localegen.sh`) and the map file stays language-neutral. A title without a translation is shown as it is.

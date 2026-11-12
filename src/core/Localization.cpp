@@ -118,8 +118,8 @@ void ReloadTranslations(const std::string &localeDir, const std::string &domain,
     {
         const std::string filename = std::filesystem::path(path).filename().string();
         const std::string suffix = "_" + lang + ".yaml";
-        if (filename.size() >= suffix.size() &&
-            filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0)
+        if (filename.size() >= suffix.size()
+            && filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0)
         {
             LoadYamlFile(path);
         }

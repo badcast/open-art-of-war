@@ -752,8 +752,7 @@ std::vector<SimEvent> Simulation::TakeEvents()
 
 const char *Simulation::ChecksumSectionName(int section)
 {
-    static const char *const kNames[kChecksumSections]
-        = {"entities", "economies", "walls", "research", "random", "ai"};
+    static const char *const kNames[kChecksumSections] = {"entities", "economies", "walls", "research", "random", "ai"};
     return section >= 0 && section < kChecksumSections ? kNames[section] : "?";
 }
 
@@ -905,7 +904,9 @@ void Simulation::VisitState(const SimContext &ctx, Sink &s) const
     struct Adapter final : AIStateSink
     {
         Sink &sink;
-        explicit Adapter(Sink &target) : sink(target) {}
+        explicit Adapter(Sink &target)
+            : sink(target)
+        {}
         void Record(const char *name) override
         {
             sink.Record(name);

@@ -161,8 +161,8 @@ int CharacterEditor::run()
                 }
                 else if (
                     editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
-                    || editorMode == EditorMode::Projectiles
-                    || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
+                    || editorMode == EditorMode::Projectiles || editorMode == EditorMode::Environment
+                    || editorMode == EditorMode::AiDifficulty)
                     SaveActiveSettings();
                 else
                     SaveFile();

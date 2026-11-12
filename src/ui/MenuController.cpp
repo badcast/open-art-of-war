@@ -78,7 +78,7 @@ UiRect InfoDialogRect(int windowW, int windowH)
     return ui::CenteredRect(windowW, windowH, 700, 500);
 }
 
-std::string DifficultyDesc(AIDifficulty d)
+[[maybe_unused]] std::string DifficultyDesc(AIDifficulty d)
 {
     switch (d)
     {
@@ -94,7 +94,7 @@ std::string DifficultyDesc(AIDifficulty d)
     return {};
 }
 
-std::string OnOff(bool on)
+[[maybe_unused]] std::string OnOff(bool on)
 {
     return on ? _("ON") : _("OFF");
 }
@@ -353,7 +353,7 @@ void MenuController::RenderMainMenu(
     int x = MainMenuColumnX(windowW);
     int titleY = MainMenuTitleY(windowH);
     const uilayout::Layout &layoutFile = uilayout::Current();
-    const std::string &profile = uilayout::MenuProfile(layoutFile, "main_menu");
+    const std::string profile = uilayout::MenuProfile(layoutFile, "main_menu");
     const bool touchMenu = profile == "touch";
     if (layoutFile.Has("main_menu", profile))
     {

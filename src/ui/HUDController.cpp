@@ -336,7 +336,8 @@ bool Shown(int tab, int index)
             {
                 const auto &mines = Mines::Specs();
                 return bp.mineKind < static_cast<int>(mines.size())
-                       && IsMineResearched(Players::Local(), mines[static_cast<std::size_t>(bp.mineKind)].researchValue);
+                       && IsMineResearched(
+                           Players::Local(), mines[static_cast<std::size_t>(bp.mineKind)].researchValue);
             }
             return Capabilities::AllowsBuilding(Players::Local(), bp.buildingIndex);
         }

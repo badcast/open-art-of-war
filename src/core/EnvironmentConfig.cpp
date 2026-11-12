@@ -78,7 +78,7 @@ bool EnvironmentConfig::Save()
 {
     if (!m_dirty)
         return true;
-    // The asset file holds the factory defaults (and ends up in data.blob): only the runtime sections
+    // The asset file holds the factory defaults (and ends up in assets.blob): only the runtime sections
     // are written, into settings.json next to the player's options (which are left as they are)
     const std::string path = Settings::DefaultPath();
     nlohmann::json settings = JsonFile::ReadObjectFromFileName(path);

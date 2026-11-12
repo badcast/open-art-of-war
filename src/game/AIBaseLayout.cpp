@@ -240,14 +240,8 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
 }
 
 bool AIController::KeepsWayOut(
-    int x,
-    int y,
-    int w,
-    int h,
-    const TileMap &map,
-    const EntityManager &entities,
-    bool needsExit,
-    WayOutCache *cache) const
+    int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit, WayOutCache *cache)
+    const
 {
     const int mw = map.GetWidth(), mh = map.GetHeight();
     // Compare connected components before/after placement, at infantry and vehicle clearance.

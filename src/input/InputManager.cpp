@@ -348,8 +348,6 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
                 // A menu, a list, a window: the finger scrolls it. Every 32 px of travel is a wheel step (content
                 // follows the finger: dragging up goes to the later rows), so every list that takes the wheel works.
                 constexpr float kStepPx = 32.0f;
-                m_touchDragX += point.x - previous.x;
-                m_touchDragY += point.y - previous.y;
                 if (m_touchWheelScroll)
                     m_touchScroll += point.y - previous.y;
                 while (m_touchWheelScroll && std::fabs(m_touchScroll) >= kStepPx)
