@@ -1,4 +1,5 @@
 #include "game/Simulation.hpp"
+#include "net/WorldSnapshot.hpp"
 #include "game/AIController.hpp"
 #include "game/Building.hpp"
 #include "game/BuildLimits.hpp"
@@ -942,6 +943,63 @@ std::uint64_t Simulation::ChecksumSections(const SimContext &ctx, std::uint64_t 
     h.sections = sections;
     VisitState(ctx, h);
     return h.h;
+}
+
+void Simulation::FillEconomies(const SimContext &ctx, WorldSnapshot &out) const
+{
+    out.economies.clear();
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        const Economy *eco = nullptr;
+        if ((m_economyMask >> p) & 1u)
+            eco = &m_economies[p];
+        else if (p == ctx.economy.player())
+            eco = &ctx.economy;
+        if (!eco)
+            continue;
+        out.economies.push_back({static_cast<std::uint8_t>(p), eco->GetCredits(), eco->GetPowerProduced(), eco->GetPowerConsumed()});
+    }
+}
+
+void Simulation::ApplyEconomies(const WorldSnapshot &snapshot, SimContext &ctx)
+{
+    for (const EconomySnap &e : snapshot.economies)
+    {
+        // Only economies this world holds (EconomyOf would hand the local one to anybody else)
+        if (e.player >= kMaxPlayers || !(((m_economyMask >> e.player) & 1u) || e.player == ctx.economy.player()))
+            continue;
+        Economy &eco = EconomyOf(e.player, ctx);
+        eco.SetCredits(e.credits);
+        eco.SetPower(e.powerOut, e.powerUse);
+    }
+}
+
+void Simulation::FillResearch(WorldSnapshot &out) const
+{
+    out.research.clear();
+    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    {
+        std::uint32_t completed = 0;
+        for (int i = 0; i < kResearchCount; ++i)
+            if (IsResearched(p, i))
+                completed |= 1u << i;
+        const ResearchProgress &r = m_research[p];
+        out.research.push_back({p, completed, r.active, r.timer, r.duration});
+    }
+}
+
+void Simulation::ApplyResearch(const WorldSnapshot &snapshot, SimContext &ctx)
+{
+    for (const ResearchSnap &s : snapshot.research)
+    {
+        if (s.player >= kMaxPlayers || s.active < -1 || s.active >= kResearchCount)
+            continue;
+        for (int i = 0; i < kResearchCount; ++i)
+            if ((s.completed & (1u << i)) && !IsResearched(s.player, i))
+                CompleteResearch(s.player, i, ctx.entities);
+        m_research[s.player] = {s.active, s.timer, s.duration};
+        SetResearchAnimation(s.player, s.active >= 0 && ResearchBuildingPowered(s.player, ctx.entities), ctx.entities);
+    }
 }
 
 std::string Simulation::DumpState(const SimContext &ctx) const

@@ -1,6 +1,7 @@
 #include "core/Localization.hpp"
 #include <SDL3/SDL.h>
 #include "net/NetMatch.hpp"
+#include "net/WorldSnapshot.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
 #include "core/DebugEnv.hpp"
@@ -852,6 +853,7 @@ void NetMatch::StartFromLobby(std::uint32_t nowMs)
     setup.prebuilt = lobby.prebuilt;
     setup.fogOfWar = lobby.fogOfWar;
     setup.night = lobby.night;
+    setup.authorityMode = m_authorityMode; // the owner decides for everybody
     setup.techLevel = static_cast<std::int8_t>(lobby.techLevel) - 1; // (0 in the room: the map's / the default)
     std::mt19937 rng(setup.seed);
     // Start positions picked by the players first, the random ones get the free spots left
@@ -934,15 +936,160 @@ bool NetMatch::TakeStartedMatch(MatchSetup &out)
         m_recorder.Begin(std::move(info));
     }
     out.mapPath = file;
+    m_authorityMode = out.authorityMode;
     m_takenStarts = m_client->matchStarts();
     m_scheduledTurn = 0;
     m_outgoing.clear();
     return true;
 }
 
+bool NetMatch::IsAuthority() const
+{
+    return m_client && m_client->matchStarted() && m_client->authoritySlot() == m_client->slot();
+}
+
+void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManager &entities, const TileMap &map)
+{
+    if (!m_client || !IsAuthority())
+        return;
+    Net::AuthorityAck ack;
+    while (m_client->takeAuthorityAck(ack))
+    {
+        if (ack.sender >= kMaxPlayers)
+            continue;
+        auto &peer = m_snapshotPeers[ack.sender];
+        const auto found = std::find_if(peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return s.tick == ack.tick; });
+        if (found != peer.history.end() && (!peer.hasAck || ack.tick > peer.ack))
+        {
+            peer.ack = ack.tick;
+            peer.hasAck = true;
+        }
+    }
+    for (const Net::RosterEntry &p : m_client->roster().players)
+    {
+        if (p.slot >= kMaxPlayers || p.slot == m_client->slot())
+            continue;
+        auto &peer = m_snapshotPeers[p.slot];
+        if (!p.connected)
+        {
+            peer = SnapshotPeer {};
+            continue;
+        }
+        WorldSnapshot current = snapshot;
+        current.FilterForPlayer(entities, map, p.slot);
+        current.deaths.erase(std::remove_if(current.deaths.begin(), current.deaths.end(), [&](const DeathSnap &d) {
+            if (peer.history.empty())
+                return true;
+            const auto &previous = peer.history.back().entities;
+            return std::none_of(previous.begin(), previous.end(), [&](const EntitySnap &e) { return e.id == d.id; });
+        }), current.deaths.end());
+        for (const auto &entity : current.entities)
+            peer.knownEntities.insert(entity.id);
+        current.hiddenAlive.erase(std::remove_if(current.hiddenAlive.begin(), current.hiddenAlive.end(), [&](std::uint32_t id) {
+            return peer.knownEntities.count(id) == 0;
+        }), current.hiddenAlive.end());
+        const auto base = std::find_if(peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return peer.hasAck && s.tick == peer.ack; });
+        WorldSnapshot outgoing = (!peer.hasAck || snapshot.tick < peer.ack || snapshot.tick - peer.ack > 40 || base == peer.history.end() || snapshot.tick % 100 == 0)
+            ? current : current.DeltaFrom(*base);
+        Net::AuthorityState state;
+        state.tick = snapshot.tick;
+        state.recipient = p.slot;
+        state.bytes = outgoing.Encode();
+        if (state.bytes.empty() || !m_client->sendAuthorityState(state))
+            continue;
+        peer.bytes += state.bytes.size();
+        const std::uint32_t now = SDL_GetTicks();
+        if (!peer.traceStart)
+            peer.traceStart = now;
+        if (DebugEnv("OAOW_NET_TRACE") && now - peer.traceStart >= 1000)
+        {
+            std::printf("[Net] recipient %u snapshot bytes %llu in %u ms\n", p.slot, static_cast<unsigned long long>(peer.bytes), now - peer.traceStart);
+            peer.bytes = 0;
+            peer.traceStart = now;
+        }
+        current.projectiles.clear(); current.cues.clear(); current.blasts.clear(); current.explosions.clear(); current.deaths.clear(); current.groundMarks.clear();
+        current.hasWalls = false; current.walls.clear();
+        if (DebugEnv("OAOW_NET_TRACE") && current.tick % 20 == 0)
+        {
+            // What this recipient is entitled to see, hashed: the replica prints the hash of what it holds (`repl`)
+            std::uint64_t h = 1469598103934665603ull;
+            WorldSnapshot plain = current;
+            plain.hiddenAlive.clear();
+            const std::vector<std::uint8_t> bytes = plain.Encode();
+            for (std::uint8_t b : bytes)
+                h = (h ^ b) * 1099511628211ull;
+            std::printf("[Snap] auth tick %u entities %zu bytes %zu hash %016llx\n", current.tick, plain.entities.size(), bytes.size(),
+                static_cast<unsigned long long>(h));
+            std::fflush(stdout);
+        }
+        peer.history.push_back(std::move(current));
+        if (peer.history.size() > 64)
+            peer.history.pop_front();
+    }
+}
+
+bool NetMatch::TakeSnapshot(WorldSnapshot &out)
+{
+    Net::AuthorityState state;
+    while (m_client && m_client->takeAuthorityState(state))
+    {
+        if (!WorldSnapshot::Decode(state.bytes.data(), state.bytes.size(), out) || out.tick != state.tick)
+            continue;
+        if (!out.full)
+        {
+            const auto base = std::find_if(m_replicaSnapshots.begin(), m_replicaSnapshots.end(), [&](const WorldSnapshot &s) { return s.tick == out.baseTick; });
+            if (base == m_replicaSnapshots.end() || !out.ExpandFrom(*base))
+                continue;
+        }
+        return true;
+    }
+    return false;
+}
+
+void NetMatch::AckSnapshot(const WorldSnapshot &snapshot)
+{
+    if (!m_client)
+        return;
+    WorldSnapshot saved = snapshot;
+    saved.projectiles.clear(); saved.cues.clear(); saved.blasts.clear(); saved.explosions.clear(); saved.deaths.clear(); saved.groundMarks.clear();
+    saved.hasWalls = false; saved.walls.clear();
+    m_replicaSnapshots.push_back(std::move(saved));
+    if (m_replicaSnapshots.size() > 64)
+        m_replicaSnapshots.pop_front();
+    m_client->sendAuthorityAck(snapshot.tick);
+}
+
+void NetMatch::PumpReplica(std::uint32_t nowMs)
+{
+    (void)nowMs;
+    if (!IsReplica())
+        return;
+    // Nobody simulates the turns here: only the authority applies them
+    while (const Net::TurnBundle *bundle = m_client->turn(m_scheduledTurn))
+    {
+        m_recorder.OnBundle(*bundle);
+        m_client->dropTurnsBefore(m_scheduledTurn);
+        ++m_scheduledTurn;
+    }
+    if (m_outgoing.empty())
+        return;
+    // The host's newest turn is the clock here: what the player did goes out for a turn a little ahead of it
+    const std::uint32_t turn = m_client->turnsReceived() + m_client->inputDelay();
+    CoalesceTurn(m_outgoing);
+    for (const std::vector<std::uint8_t> &bytes : EncodeBatches(m_outgoing))
+        m_client->sendCommands(turn, bytes);
+    m_replicaSentTurn = turn + 1;
+    m_outgoing.clear();
+}
+
 void NetMatch::Attach(Simulation &sim)
 {
+    m_snapshotPeers = {};
+    m_replicaSnapshots.clear();
     m_sim = &sim;
+    sim.SetExecutionMode(
+        !m_authorityMode ? Simulation::ExecutionMode::Standalone
+                         : (IsAuthority() ? Simulation::ExecutionMode::Authority : Simulation::ExecutionMode::Replica));
     m_outgoing.clear();
     sim.SetCommandSink([this](SimCommand c) { m_outgoing.push_back(std::move(c)); });
 }
@@ -1103,7 +1250,7 @@ void NetMatch::SendView(float centerX, float centerY, float zoom)
 
 int NetMatch::TurnsAhead(std::uint32_t tick) const
 {
-    if (!m_client)
+    if (!m_client || IsReplica()) // a replica plays no turns: nothing to catch up with
         return 0;
     const std::uint32_t tpt = std::max<std::uint32_t>(1, m_client->ticksPerTurn());
     return static_cast<int>(m_client->turnsReceived()) - static_cast<int>(tick / tpt) - 1;
@@ -1142,6 +1289,7 @@ std::vector<std::uint8_t> NetMatch::EncodeSetup(const MatchSetup &setup)
     for (int i = 0; i < kMaxPlayers; ++i)
         if (setup.slots[i].active)
             w.writeBits(static_cast<std::uint32_t>(setup.slots[i].techLevel + 1) & 15u, 4);
+    w.writeBool(setup.authorityMode); // after the tech levels: an older setup has none (lockstep)
     buf.resize(w.finish());
     return buf;
 }
@@ -1189,6 +1337,7 @@ bool NetMatch::DecodeSetup(const std::vector<std::uint8_t> &bytes, MatchSetup &o
             if (out.slots[i].active)
                 out.slots[i].techLevel = static_cast<std::int8_t>(static_cast<int>(r.readBits(4)) - 1);
     }
+    out.authorityMode = !r.atEnd() && r.readBool();
     // Only maps of the game's own folder (the path comes from another computer)
     if (out.mapPath.rfind(LoaderResources::MapsDir() + "/", 0) != 0 || out.mapPath.find("..") != std::string::npos)
         return false;

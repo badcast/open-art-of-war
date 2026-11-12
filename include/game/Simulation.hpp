@@ -53,10 +53,24 @@ struct SimEvent
 // State of the match that belongs to the players rather than to the entities: queued commands, the
 // marching control groups, the running research. It is part of the simulation, so it lives here and
 // not in the interface; the interface only issues commands and reads it.
+struct WorldSnapshot;
+
 class Simulation
 {
 public:
     Simulation() = default;
+
+    // Replica worlds are populated by authoritative state, never advanced locally.
+    enum class ExecutionMode : std::uint8_t { Standalone, Authority, Replica };
+    void SetExecutionMode(ExecutionMode mode) { m_executionMode = mode; }
+    ExecutionMode GetExecutionMode() const { return m_executionMode; }
+    bool AdvancesWorld() const { return m_executionMode != ExecutionMode::Replica; }
+
+    // Economies of a snapshot (TASKNEW.md): the authority fills them in, a replica takes them over
+    void FillEconomies(const SimContext &ctx, WorldSnapshot &out) const;
+    void ApplyEconomies(const WorldSnapshot &snapshot, SimContext &ctx);
+    void FillResearch(WorldSnapshot &out) const;
+    void ApplyResearch(const WorldSnapshot &snapshot, SimContext &ctx);
 
     static constexpr std::uint32_t kDefaultSeed = 0x9e3779b9u;
 
@@ -181,6 +195,7 @@ private:
     bool MarchAsGroup(
         PlayerId player, const std::vector<int> &unitIds, int tileX, int tileY, bool attackMove, SimContext &ctx);
 
+    ExecutionMode m_executionMode {ExecutionMode::Standalone};
     std::uint32_t m_tick {0};
     std::vector<TimedCommand> m_pending;
     std::function<void(SimCommand)> m_sink;

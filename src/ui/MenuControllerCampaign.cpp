@@ -51,12 +51,12 @@ bool LaunchMapEditor(const std::string &mapPath)
         candidates.push_back(std::filesystem::path(base) / exeName);
     candidates.push_back(std::filesystem::path(".") / exeName);
     candidates.push_back(std::filesystem::path("build") / exeName);
-    std::error_code ec;
+    std::error_code errorCode;
     for (const auto &exe : candidates)
     {
-        if (!std::filesystem::is_regular_file(exe, ec))
+        if (!std::filesystem::is_regular_file(exe, errorCode))
             continue;
-        const std::string exePath = std::filesystem::absolute(exe, ec).string();
+        const std::string exePath = std::filesystem::absolute(exe, errorCode).string();
         const char *args[] = {exePath.c_str(), mapPath.c_str(), nullptr};
         SDL_Process *process = SDL_CreateProcess(args, false);
         if (!process)
@@ -70,43 +70,51 @@ bool LaunchMapEditor(const std::string &mapPath)
 // "-25%" ... "+100%" for a handicap index (the start credits form)
 std::string HandicapText(int index)
 {
-    const int pct = HandicapPercentOf(index) - 100;
-    return (pct > 0 ? "+" : "") + std::to_string(pct) + "%";
+    const int percent = HandicapPercentOf(index) - 100;
+    return (percent > 0 ? "+" : "") + std::to_string(percent) + "%";
 }
 
 // Custom game: the table of players in the details panel (columns: level / name, faction, team, colour, remove)
 // The seat table takes the whole width of the details (as in the network room); the map picture sits under it on the
 // left, the options and the map size on its right
-int CustomRowH(const UiRect &d)
+int CustomRowH(const UiRect &detailsRect)
 {
-    return std::clamp((d.h - 118 - 150 - 30) / 8, 30, 40);
+    return std::clamp((detailsRect.h - 118 - 150 - 30) / 8, 30, 40);
 }
 
-UiRect CustomRow(const UiRect &d, int i)
+UiRect CustomRow(const UiRect &detailsRect, int rowIndex)
 {
-    const int rowH = CustomRowH(d);
-    return {d.x + 20, d.y + 118 + i * rowH, d.w - 40, rowH - 4};
+    const int rowHeight = CustomRowH(detailsRect);
+    return {detailsRect.x + 20, detailsRect.y + 118 + rowIndex * rowHeight, detailsRect.w - 40, rowHeight - 4};
 }
 
-UiRect CustomCell(const UiRect &d, int i, int kind)
+UiRect CustomCell(const UiRect &detailsRect, int rowIndex, int kind)
 {
-    // (i is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap, 8 army size,
-    // 9 tech level). The cells share the width of the row, so they stretch with the window
-    static constexpr int kShare[7] = {23, 17, 8, 8, 12, 15, 17};
-    const UiRect r = CustomRow(d, i);
-    const int k = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : kind == 9 ? 6 : 0;
-    const int gap = 4, x0 = r.x + 24, total = r.w - 24 - 6 * gap - 4;
-    int used = 0;
-    for (int j = 0; j < k; ++j)
-        used += kShare[j];
-    return {x0 + total * used / 100 + k * gap, r.y, total * kShare[k] / 100, r.h};
+    // (rowIndex is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap,
+    // 8 army size, 9 tech level). The cells share the width of the row, so they stretch with the window
+    static constexpr int kColumnShare[7] = {23, 17, 8, 8, 12, 15, 17};
+    const UiRect rowRect = CustomRow(detailsRect, rowIndex);
+    const int columnIndex
+        = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : kind == 9 ? 6 : 0;
+    const int gap = 4;
+    const int contentX = rowRect.x + 24;
+    const int totalWidth = rowRect.w - 24 - 6 * gap - 4;
+    int usedPercent = 0;
+    for (int j = 0; j < columnIndex; ++j)
+        usedPercent += kColumnShare[j];
+    return {
+        contentX + totalWidth * usedPercent / 100 + columnIndex * gap,
+        rowRect.y,
+        totalWidth * kColumnShare[columnIndex] / 100,
+        rowRect.h};
 }
 
-UiRect CustomPreviewArea(const UiRect &d)
+UiRect CustomPreviewArea(const UiRect &detailsRect)
 {
-    const int top = d.y + 118 + 8 * CustomRowH(d) + 12;
-    const int size = std::clamp(std::min(d.Bottom() - 16 - top, static_cast<int>(d.w * 0.45f)), 120, 460);
-    return {d.x + 20, top, size, size};
+    const int top = detailsRect.y + 118 + 8 * CustomRowH(detailsRect) + 12;
+    const int size
+        = std::clamp(std::min(detailsRect.Bottom() - 16 - top, static_cast<int>(detailsRect.w * 0.45f)), 120, 460);
+    return {detailsRect.x + 20, top, size, size};
 }
 
 // Campaign mission select
@@ -129,124 +137,140 @@ struct CampaignLayout
     int itemH {40};
     int itemGap {4};
 
-    UiRect Item(int i) const
+    UiRect Item(int rowIndex) const
     {
-        return {list.x, list.y + i * (itemH + itemGap), list.w, itemH};
+        return {list.x, list.y + rowIndex * (itemH + itemGap), list.w, itemH};
     }
 };
 
-CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
+CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCount)
 {
-    CampaignLayout l;
+    CampaignLayout layout;
     // ui/layout.yaml (screen map_select, shared with the network room); the numbers below stand in without it
     if (uilayout::Current().Has("map_select", "pc"))
     {
-        const uilayout::Solved s = uilayout::Current().Solve(
-            "map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowW, windowH, {});
-        l.dialog = s.Rect("dialog");
-        l.list = s.Rect("list");
-        const int n = std::max(1, missionCount);
-        l.itemH = std::clamp((l.list.h - (n - 1) * l.itemGap) / n, 26, 44);
-        l.details = s.Rect("details");
-        l.backBtn = s.Rect("back");
-        l.startBtn = s.Rect("start");
-        l.sideBtn[0] = s.Rect("side");
-        l.editorBtn = s.Rect("editor");
-        l.difficultyBtn = s.Rect("difficulty");
-        l.creditsBtn = s.Rect("credits");
-        l.timeBtn = s.Rect("time");
-        l.techBtn = s.Rect("tech");
-        const UiRect pv = CustomPreviewArea(l.details);
-        const int optX = pv.Right() + 20;
-        l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
-        l.baseCheckbox = {optX, pv.y + 32, l.details.Right() - 20 - optX, 28};
-        l.speedCheckbox = {optX, pv.y + 64, l.details.Right() - 20 - optX, 28};
-        return l;
+        const uilayout::Solved solved = uilayout::Current().Solve(
+            "map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowWidth, windowHeight, {});
+        layout.dialog = solved.Rect("dialog");
+        layout.list = solved.Rect("list");
+        const int clampedCount = std::max(1, missionCount);
+        layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 26, 44);
+        layout.details = solved.Rect("details");
+        layout.backBtn = solved.Rect("back");
+        layout.startBtn = solved.Rect("start");
+        layout.sideBtn[0] = solved.Rect("side");
+        layout.editorBtn = solved.Rect("editor");
+        layout.difficultyBtn = solved.Rect("difficulty");
+        layout.creditsBtn = solved.Rect("credits");
+        layout.timeBtn = solved.Rect("time");
+        layout.techBtn = solved.Rect("tech");
+        const UiRect previewRect = CustomPreviewArea(layout.details);
+        const int optionsX = previewRect.Right() + 20;
+        layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 28};
+        layout.baseCheckbox = {optionsX, previewRect.y + 32, layout.details.Right() - 20 - optionsX, 28};
+        layout.speedCheckbox = {optionsX, previewRect.y + 64, layout.details.Right() - 20 - optionsX, 28};
+        return layout;
     }
-    l.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole screen
-    int contentY = l.dialog.y + 52 + 16;
-    int footerY = l.dialog.Bottom() - 64;
-    l.list = {
-        l.dialog.x + 20, contentY, std::clamp(static_cast<int>(l.dialog.w * 0.27f), 300, 460), footerY - contentY - 8};
-    int n = std::max(1, missionCount);
-    l.itemH = std::clamp((l.list.h - (n - 1) * l.itemGap) / n, 26, 44);
-    l.details = {l.list.Right() + 16, contentY, l.dialog.Right() - 20 - (l.list.Right() + 16), l.list.h};
-    l.backBtn = {l.dialog.Right() - 20 - 140, footerY + 10, 140, 40};
-    l.startBtn = {l.backBtn.x - 12 - 200, footerY + 10, 200, 40};
-    l.sideBtn[0] = {l.dialog.x + 20, footerY + 10, 240, 40};
-    l.editorBtn = {l.startBtn.x - 12 - 140, footerY + 10, 140, 40};
-    l.creditsBtn = {l.details.Right() - 20 - 200, l.details.y + 12, 200, 32};
-    l.timeBtn = {l.creditsBtn.x - 12 - 160, l.details.y + 12, 160, 32};
-    l.techBtn = {l.timeBtn.x - 12 - 180, l.details.y + 12, 180, 32};
-    const UiRect pv = CustomPreviewArea(l.details);
-    const int optX = pv.Right() + 20;
-    l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
-    l.baseCheckbox = {optX, pv.y + 32, l.details.Right() - 20 - optX, 28};
-    l.speedCheckbox = {optX, pv.y + 64, l.details.Right() - 20 - optX, 28};
-    l.difficultyBtn = {
-        l.sideBtn[0].Right() + 12, footerY + 10, std::max(180, l.editorBtn.x - 12 - (l.sideBtn[0].Right() + 12)), 40};
-    return l;
+    layout.dialog = ui::CenteredRect(windowWidth, windowHeight, windowWidth, windowHeight); // the whole screen
+    int contentY = layout.dialog.y + 52 + 16;
+    int footerY = layout.dialog.Bottom() - 64;
+    layout.list = {
+        layout.dialog.x + 20,
+        contentY,
+        std::clamp(static_cast<int>(layout.dialog.w * 0.27f), 300, 460),
+        footerY - contentY - 8};
+    int clampedCount = std::max(1, missionCount);
+    layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 26, 44);
+    layout.details
+        = {layout.list.Right() + 16, contentY, layout.dialog.Right() - 20 - (layout.list.Right() + 16), layout.list.h};
+    layout.backBtn = {layout.dialog.Right() - 20 - 140, footerY + 10, 140, 40};
+    layout.startBtn = {layout.backBtn.x - 12 - 200, footerY + 10, 200, 40};
+    layout.sideBtn[0] = {layout.dialog.x + 20, footerY + 10, 240, 40};
+    layout.editorBtn = {layout.startBtn.x - 12 - 140, footerY + 10, 140, 40};
+    layout.creditsBtn = {layout.details.Right() - 20 - 200, layout.details.y + 12, 200, 32};
+    layout.timeBtn = {layout.creditsBtn.x - 12 - 160, layout.details.y + 12, 160, 32};
+    layout.techBtn = {layout.timeBtn.x - 12 - 180, layout.details.y + 12, 180, 32};
+    const UiRect previewRect = CustomPreviewArea(layout.details);
+    const int optionsX = previewRect.Right() + 20;
+    layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 28};
+    layout.baseCheckbox = {optionsX, previewRect.y + 32, layout.details.Right() - 20 - optionsX, 28};
+    layout.speedCheckbox = {optionsX, previewRect.y + 64, layout.details.Right() - 20 - optionsX, 28};
+    layout.difficultyBtn = {
+        layout.sideBtn[0].Right() + 12,
+        footerY + 10,
+        std::max(180, layout.editorBtn.x - 12 - (layout.sideBtn[0].Right() + 12)),
+        40};
+    return layout;
 }
 
 // The custom game list shows as many fixed-height rows as fit and scrolls
 // A start marker stays inside its picture
-void SpotMarkerPos(const UiRect &pv, int mapW, int mapH, int tileX, int tileY, int &sx, int &sy)
+void SpotMarkerPos(
+    const UiRect &previewRect, int mapWidth, int mapHeight, int tileX, int tileY, int &screenX, int &screenY)
 {
-    const float sc = std::min((pv.w - 4) / static_cast<float>(mapW), (pv.h - 4) / static_cast<float>(mapH));
-    const float ox = pv.CenterX() - mapW * sc / 2, oy = pv.CenterY() - mapH * sc / 2;
-    sx = std::clamp(static_cast<int>(ox + (tileX + 0.5f) * sc), pv.x + 10, pv.Right() - 10);
-    sy = std::clamp(static_cast<int>(oy + (tileY + 0.5f) * sc), pv.y + 10, pv.Bottom() - 10);
+    const float scale = std::min(
+        (previewRect.w - 4) / static_cast<float>(mapWidth), (previewRect.h - 4) / static_cast<float>(mapHeight));
+    const float originX = previewRect.CenterX() - mapWidth * scale / 2;
+    const float originY = previewRect.CenterY() - mapHeight * scale / 2;
+    screenX = std::clamp(
+        static_cast<int>(originX + (tileX + 0.5f) * scale), previewRect.x + 10, previewRect.Right() - 10);
+    screenY = std::clamp(
+        static_cast<int>(originY + (tileY + 0.5f) * scale), previewRect.y + 10, previewRect.Bottom() - 10);
 }
 
 constexpr int kMapFilterBarH = 72; // search box and the three filter buttons over the list of maps
 
-UiRect MapSearchRect(const CampaignLayout &l)
+UiRect MapSearchRect(const CampaignLayout &layout)
 {
-    return {l.list.x, l.list.y - kMapFilterBarH, l.list.w, 30};
+    return {layout.list.x, layout.list.y - kMapFilterBarH, layout.list.w, 30};
 }
 
-UiRect MapFilterBtn(const CampaignLayout &l, int i)
+UiRect MapFilterBtn(const CampaignLayout &layout, int filterIndex)
 {
-    const int w = (l.list.w - 2 * 6) / 3;
-    return {l.list.x + i * (w + 6), l.list.y - kMapFilterBarH + 36, w, 28};
+    const int buttonWidth = (layout.list.w - 2 * 6) / 3;
+    return {layout.list.x + filterIndex * (buttonWidth + 6), layout.list.y - kMapFilterBarH + 36, buttonWidth, 28};
 }
 
-int CustomListRows(CampaignLayout &l)
+int CustomListRows(CampaignLayout &layout)
 {
     // (idempotent: the bar takes the top of the list for a custom game)
-    l.list.y += kMapFilterBarH;
-    l.list.h -= kMapFilterBarH;
-    l.itemH = 30;
-    return std::max(1, (l.list.h + l.itemGap) / (l.itemH + l.itemGap));
+    layout.list.y += kMapFilterBarH;
+    layout.list.h -= kMapFilterBarH;
+    layout.itemH = 30;
+    return std::max(1, (layout.list.h + layout.itemGap) / (layout.itemH + layout.itemGap));
 }
 
 // The picture of a map in the bottom part of the details panel, scaled to fit and centered
-void DrawMapPreviewIn(Renderer &renderer, SDL_Texture *tex, int texW, int texH, const UiRect &area)
+void DrawMapPreviewIn(
+    Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &area)
 {
     renderer.FillRectScreen(area.x, area.y, area.w, area.h, col::PanelSunken);
     renderer.DrawRectScreen(area.x, area.y, area.w, area.h, col::Border);
-    if (!tex || texW <= 0 || texH <= 0)
+    if (!texture || textureWidth <= 0 || textureHeight <= 0)
         return;
-    const float scale = std::min((area.w - 4) / static_cast<float>(texW), (area.h - 4) / static_cast<float>(texH));
-    const int w = std::max(1, static_cast<int>(texW * scale)), h = std::max(1, static_cast<int>(texH * scale));
-    SDL_FRect dst {
-        static_cast<float>(area.CenterX() - w / 2),
-        static_cast<float>(area.CenterY() - h / 2),
-        static_cast<float>(w),
-        static_cast<float>(h)};
-    SDL_RenderTexture(renderer.GetSdlRenderer(), tex, nullptr, &dst);
+    const float scale = std::min(
+        (area.w - 4) / static_cast<float>(textureWidth), (area.h - 4) / static_cast<float>(textureHeight));
+    const int drawWidth = std::max(1, static_cast<int>(textureWidth * scale));
+    const int drawHeight = std::max(1, static_cast<int>(textureHeight * scale));
+    SDL_FRect destRect {
+        static_cast<float>(area.CenterX() - drawWidth / 2),
+        static_cast<float>(area.CenterY() - drawHeight / 2),
+        static_cast<float>(drawWidth),
+        static_cast<float>(drawHeight)};
+    SDL_RenderTexture(renderer.GetSdlRenderer(), texture, nullptr, &destRect);
 }
 
-void DrawMapPreview(Renderer &renderer, SDL_Texture *tex, int texW, int texH, const UiRect &panel)
+void DrawMapPreview(
+    Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &panel)
 {
     const int margin = 20;
-    const int maxH = std::min(panel.h / 2 - 12, 220);
+    const int maxHeight = std::min(panel.h / 2 - 12, 220);
     DrawMapPreviewIn(
         renderer,
-        tex,
-        texW,
-        texH,
-        UiRect {panel.x + margin, panel.Bottom() - margin - maxH, panel.w - 2 * margin, maxH});
+        texture,
+        textureWidth,
+        textureHeight,
+        UiRect {panel.x + margin, panel.Bottom() - margin - maxHeight, panel.w - 2 * margin, maxHeight});
 }
 
 } // namespace
@@ -274,21 +298,21 @@ void MenuController::RebuildMapList()
     m_skirmishTop = 0;
 }
 
-bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int my, bool leftClicked)
+bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouseX, int mouseY, bool leftClicked)
 {
-    InputManager &input = ctx.input;
-    const int windowW = ctx.windowW;
-    const int windowH = ctx.windowH;
-    MissionController &mission = ctx.mission;
-    TileMap &map = ctx.map;
-    EntityManager &entities = ctx.entities;
-    Economy &economy = ctx.economy;
-    Pathfinder &pathfinder = ctx.pathfinder;
-    AppState &state = ctx.state;
+    InputManager &input = context.input;
+    const int windowWidth = context.windowW;
+    const int windowHeight = context.windowH;
+    MissionController &mission = context.mission;
+    TileMap &map = context.map;
+    EntityManager &entities = context.entities;
+    Economy &economy = context.economy;
+    Pathfinder &pathfinder = context.pathfinder;
+    AppState &state = context.state;
     if (!m_campaignSelectOpen)
         return false;
-    m_mouseX = mx;
-    m_mouseY = my;
+    m_mouseX = mouseX;
+    m_mouseY = mouseY;
     if (m_settings)
         m_difficulty = static_cast<AIDifficulty>(m_settings->difficulty);
 
@@ -301,35 +325,35 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             m_onSettingsChanged(SettingsArea::Game);
     };
 
-    const int mCount = m_customGame ? static_cast<int>(m_skirmishMaps.size())
-                                    : std::min(
-                                          MissionController::kCampaignMissionCount,
-                                          static_cast<int>(MissionController::GetAvailableMissions().size()));
-    if (mCount == 0 && !(m_customGame && !m_skirmishAll.empty()))
+    const int itemCount = m_customGame ? static_cast<int>(m_skirmishMaps.size())
+                                       : std::min(
+                                             MissionController::kCampaignMissionCount,
+                                             static_cast<int>(MissionController::GetAvailableMissions().size()));
+    if (itemCount == 0 && !(m_customGame && !m_skirmishAll.empty()))
     {
         m_campaignSelectOpen = false;
         return true;
     }
     int &selected = m_customGame ? m_skirmishSelected : m_campaignMissionSelected;
-    CampaignLayout l = campaignLayout(windowW, windowH, mCount);
-    const int rows = m_customGame ? CustomListRows(l) : mCount;
+    CampaignLayout layout = campaignLayout(windowWidth, windowHeight, itemCount);
+    const int visibleRows = m_customGame ? CustomListRows(layout) : itemCount;
 
     auto startSelected = [&]() {
-        if (m_customGame && mCount == 0)
+        if (m_customGame && itemCount == 0)
             return;
         if (m_customGame)
         {
             EnsureCustomSlots();
-            bool foes = false;
-            const std::size_t first = m_customSpectator ? 1 : 0;
-            if (m_customSlots.size() <= first + (m_customSpectator ? 1u : 0u))
+            bool hasFoes = false;
+            const std::size_t firstCheckSlot = m_customSpectator ? 1 : 0;
+            if (m_customSlots.size() <= firstCheckSlot + (m_customSpectator ? 1u : 0u))
             {
                 m_editorNotice = _("A watched match needs at least two computer players.");
                 return;
             }
-            for (std::size_t i = first; i < m_customSlots.size(); ++i)
-                foes = foes || m_customSlots[i].team != m_customSlots[first].team;
-            if (!foes)
+            for (std::size_t i = firstCheckSlot; i < m_customSlots.size(); ++i)
+                hasFoes = hasFoes || m_customSlots[i].team != m_customSlots[firstCheckSlot].team;
+            if (!hasFoes)
             {
                 m_editorNotice = _("Everybody is in one team: there is nobody to fight.");
                 return;
@@ -346,8 +370,8 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             }
             else
             {
-                const auto &data = Missions::Campaign(PlayerFaction())[m_campaignMissionSelected];
-                m_beginLoading(_(data.info.name), LoaderResources::MissionMapPath(data.data.mapFile));
+                const auto &missionEntry = Missions::Campaign(PlayerFaction())[m_campaignMissionSelected];
+                m_beginLoading(_(missionEntry.info.name), LoaderResources::MissionMapPath(missionEntry.data.mapFile));
             }
         }
         // A custom game is a match of this computer alone: every player at a start position of the map, the person at
@@ -355,9 +379,9 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
         MatchSetup match;
         if (m_customGame)
         {
-            std::random_device rd;
+            std::random_device randomDevice;
             match.mapPath = m_skirmishMaps[m_skirmishSelected].path;
-            match.seed = rd();
+            match.seed = randomDevice();
             match.localOnly = true;
             match.prebuilt = m_skirmishPrebuilt;
             match.fogOfWar = m_skirmishFogOfWar;
@@ -368,31 +392,33 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             // The person watches: he is no player, the computer players take the ids from 0 (a watcher's view belongs
             // to the first of them)
             match.local = 0;
-            const int firstSlot = m_customSpectator ? 1 : 0;
-            for (int i = firstSlot; i < static_cast<int>(m_customSlots.size()) && i - firstSlot < kMaxPlayers; ++i)
+            const int firstSlotIndex = m_customSpectator ? 1 : 0;
+            for (int slotIndex = firstSlotIndex;
+                 slotIndex < static_cast<int>(m_customSlots.size()) && slotIndex - firstSlotIndex < kMaxPlayers;
+                 ++slotIndex)
             {
-                const int p = i - firstSlot;
-                const CustomSlot &cs = m_customSlots[i];
-                PlayerSlot &slot = match.slots[p];
+                const int playerIndex = slotIndex - firstSlotIndex;
+                const CustomSlot &customSlot = m_customSlots[slotIndex];
+                PlayerSlot &slot = match.slots[playerIndex];
                 slot.active = true;
-                slot.human = i == 0;
-                if (i == 0)
+                slot.human = slotIndex == 0;
+                if (slotIndex == 0)
                 {
                     if (m_sideRandom)
-                        SetPlayerFaction((rd() & 1u) ? Faction::Confederation : Faction::Resistance); // drawn now
+                        SetPlayerFaction((randomDevice() & 1u) ? Faction::Confederation : Faction::Resistance); // drawn now
                     slot.faction = PlayerFaction();
                 }
-                else if (cs.faction == 0)
-                    slot.faction = (rd() & 1u) ? Faction::Confederation : Faction::Resistance;
+                else if (customSlot.faction == 0)
+                    slot.faction = (randomDevice() & 1u) ? Faction::Confederation : Faction::Resistance;
                 else
-                    slot.faction = cs.faction == 2 ? Faction::Confederation : Faction::Resistance;
-                slot.team = static_cast<std::uint8_t>(cs.team);
-                slot.color = static_cast<std::uint8_t>(cs.color);
-                slot.handicap = static_cast<std::uint8_t>(std::clamp(cs.handicap, 0, kHandicapCount - 1));
-                slot.armyCap = static_cast<std::uint8_t>(std::clamp(cs.armyCap, 0, kArmyCapCount - 1));
-                slot.techLevel = static_cast<std::int8_t>(cs.techLevel);
-                slot.aiLevel = static_cast<std::uint8_t>(std::clamp(cs.level, 0, 3));
-                match.startPosition[p] = static_cast<std::int8_t>(cs.position);
+                    slot.faction = customSlot.faction == 2 ? Faction::Confederation : Faction::Resistance;
+                slot.team = static_cast<std::uint8_t>(customSlot.team);
+                slot.color = static_cast<std::uint8_t>(customSlot.color);
+                slot.handicap = static_cast<std::uint8_t>(std::clamp(customSlot.handicap, 0, kHandicapCount - 1));
+                slot.armyCap = static_cast<std::uint8_t>(std::clamp(customSlot.armyCap, 0, kArmyCapCount - 1));
+                slot.techLevel = static_cast<std::int8_t>(customSlot.techLevel);
+                slot.aiLevel = static_cast<std::uint8_t>(std::clamp(customSlot.level, 0, 3));
+                match.startPosition[playerIndex] = static_cast<std::int8_t>(customSlot.position);
             }
         }
         const bool started = m_customGame
@@ -412,14 +438,14 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
     {
         if (leftClicked)
         {
-            m_mapSearchFocus = MapSearchRect(l).Contains(mx, my);
+            m_mapSearchFocus = MapSearchRect(layout).Contains(mouseX, mouseY);
             if (m_mapSearchFocus)
                 return true;
         }
         if (m_mapSearchFocus)
         {
             const std::string before = m_mapSearch;
-            for (int n = input.TakeBackspaces(); n > 0; --n)
+            for (int backspaceCount = input.TakeBackspaces(); backspaceCount > 0; --backspaceCount)
                 PopLastUtf8(m_mapSearch);
             m_mapSearch += input.TakeTypedText();
             while (m_mapSearch.size() > 40)
@@ -434,41 +460,42 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             }
         }
     }
-    if (mCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_UP))
+    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_UP))
     {
-        selected = (selected - 1 + mCount) % mCount;
+        selected = (selected - 1 + itemCount) % itemCount;
     }
-    if (mCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
+    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
     {
-        selected = (selected + 1) % mCount;
+        selected = (selected + 1) % itemCount;
     }
-    if (m_customGame && mCount > 0)
+    if (m_customGame && itemCount > 0)
     {
         if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP))
-            selected = std::max(0, selected - rows);
+            selected = std::max(0, selected - visibleRows);
         if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
-            selected = std::min(mCount - 1, selected + rows);
+            selected = std::min(itemCount - 1, selected + visibleRows);
         // The wheel scrolls the list, the selection stays where it is
-        m_skirmishTop = std::clamp(m_skirmishTop - input.ConsumeWheel(), 0, std::max(0, mCount - rows));
+        m_skirmishTop = std::clamp(m_skirmishTop - input.ConsumeWheel(), 0, std::max(0, itemCount - visibleRows));
         if (input.IsKeyJustPressed(SDL_SCANCODE_UP) || input.IsKeyJustPressed(SDL_SCANCODE_DOWN)
             || input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP) || input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
         {
             if (selected < m_skirmishTop)
                 m_skirmishTop = selected;
-            if (selected >= m_skirmishTop + rows)
-                m_skirmishTop = selected - rows + 1;
+            if (selected >= m_skirmishTop + visibleRows)
+                m_skirmishTop = selected - visibleRows + 1;
         }
     }
-    if (m_customGame && mCount > rows)
+    if (m_customGame && itemCount > visibleRows)
     {
-        const UiRect bar {l.list.Right() + 4, l.list.y, 4, l.list.h};
-        int px = 0, py = 0;
-        if (input.ConsumeLeftPress(px, py) && input.IsLeftMouseDown() && OnScrollBar(bar, px, py))
+        const UiRect scrollBarRect {layout.list.Right() + 4, layout.list.y, 4, layout.list.h};
+        int pressX = 0, pressY = 0;
+        if (input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown()
+            && OnScrollBar(scrollBarRect, pressX, pressY))
             m_scrollDrag = 1;
         if (m_scrollDrag == 1)
         {
             if (input.IsLeftMouseDown())
-                m_skirmishTop = ScrollTopFromMouse(bar, my, mCount, rows);
+                m_skirmishTop = ScrollTopFromMouse(scrollBarRect, mouseY, itemCount, visibleRows);
             else
                 m_scrollDrag = 0;
             return true;
@@ -497,16 +524,16 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
     // players
     if (hasLayoutChoice)
         EnsureCustomSlots();
-    auto comboField = [&](int id) {
-        if (id >= kComboSlot)
-            return CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10);
-        if (id >= kComboMapPlayers && id <= kComboMapSort)
-            return MapFilterBtn(l, id - kComboMapPlayers);
-        return id == kComboSide      ? l.sideBtn[0]
-               : id == kComboCredits ? l.creditsBtn
-               : id == kComboTime    ? l.timeBtn
-               : id == kComboTech    ? l.techBtn
-                                     : l.difficultyBtn;
+    auto comboField = [&](int comboId) {
+        if (comboId >= kComboSlot)
+            return CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10);
+        if (comboId >= kComboMapPlayers && comboId <= kComboMapSort)
+            return MapFilterBtn(layout, comboId - kComboMapPlayers);
+        return comboId == kComboSide      ? layout.sideBtn[0]
+               : comboId == kComboCredits ? layout.creditsBtn
+               : comboId == kComboTime    ? layout.timeBtn
+               : comboId == kComboTech    ? layout.techBtn
+                                          : layout.difficultyBtn;
     };
     if (m_combo.open >= 0 && m_combo.open < kComboSide)
         m_combo.open = -1; // one of the settings screen's
@@ -519,21 +546,21 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
         m_combo.open = -1;
     if (m_combo.open >= 0)
     {
-        const int id = m_combo.open;
-        int picked = -1;
+        const int comboId = m_combo.open;
+        int pickedIndex = -1;
         if (ui::ComboUpdate(
                 m_combo,
-                comboField(id),
-                static_cast<int>(CampaignComboOptions(id).size()),
-                windowH,
-                mx,
-                my,
+                comboField(comboId),
+                static_cast<int>(CampaignComboOptions(comboId).size()),
+                windowHeight,
+                mouseX,
+                mouseY,
                 leftClicked,
                 input.ConsumeWheel(),
-                picked))
+                pickedIndex))
         {
-            if (picked >= 0)
-                CampaignComboApply(id, picked);
+            if (pickedIndex >= 0)
+                CampaignComboApply(comboId, pickedIndex);
             return true;
         }
         if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
@@ -544,38 +571,38 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
     }
     if (leftClicked)
     {
-        auto openCombo = [&](int id) {
-            m_combo.open = id;
+        auto openCombo = [&](int comboId) {
+            m_combo.open = comboId;
             m_combo.scroll = 0;
             return true;
         };
         if (m_customGame)
-            for (int k = kComboMapPlayers; k <= kComboMapSort; ++k)
-                if (MapFilterBtn(l, k - kComboMapPlayers).Contains(mx, my))
-                    return openCombo(k);
-        if (l.sideBtn[0].Contains(mx, my))
+            for (int comboId = kComboMapPlayers; comboId <= kComboMapSort; ++comboId)
+                if (MapFilterBtn(layout, comboId - kComboMapPlayers).Contains(mouseX, mouseY))
+                    return openCombo(comboId);
+        if (layout.sideBtn[0].Contains(mouseX, mouseY))
             return openCombo(kComboSide);
-        if (l.difficultyBtn.Contains(mx, my))
+        if (layout.difficultyBtn.Contains(mouseX, mouseY))
             return openCombo(kComboDifficulty);
-        if (hasLayoutChoice && l.baseCheckbox.Contains(mx, my))
+        if (hasLayoutChoice && layout.baseCheckbox.Contains(mouseX, mouseY))
         {
             m_skirmishPrebuilt = !m_skirmishPrebuilt;
             SoundRequests::Play("ui_confirm");
             return true;
         }
-        if (hasLayoutChoice && l.creditsBtn.Contains(mx, my))
+        if (hasLayoutChoice && layout.creditsBtn.Contains(mouseX, mouseY))
             return openCombo(kComboCredits);
-        if (hasLayoutChoice && l.timeBtn.Contains(mx, my))
+        if (hasLayoutChoice && layout.timeBtn.Contains(mouseX, mouseY))
             return openCombo(kComboTime);
-        if (hasLayoutChoice && l.techBtn.Contains(mx, my))
+        if (hasLayoutChoice && layout.techBtn.Contains(mouseX, mouseY))
             return openCombo(kComboTech);
-        if (hasLayoutChoice && l.fogCheckbox.Contains(mx, my))
+        if (hasLayoutChoice && layout.fogCheckbox.Contains(mouseX, mouseY))
         {
             m_skirmishFogOfWar = !m_skirmishFogOfWar;
             SoundRequests::Play("ui_confirm");
             return true;
         }
-        if (hasLayoutChoice && l.speedCheckbox.Contains(mx, my))
+        if (hasLayoutChoice && layout.speedCheckbox.Contains(mouseX, mouseY))
         {
             m_skirmishAllowSpeed = !m_skirmishAllowSpeed;
             SoundRequests::Play("ui_confirm");
@@ -583,34 +610,43 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
         }
         if (hasLayoutChoice)
         {
-            const UiRect &d = l.details;
-            const SkirmishMapInfo &mi = m_skirmishMaps[m_skirmishSelected];
-            const int places = std::min(mi.players, kMaxPlayers);
-            for (int i = 0; i < places; ++i)
+            const UiRect &detailsRect = layout.details;
+            const SkirmishMapInfo &mapInfo = m_skirmishMaps[m_skirmishSelected];
+            const int spotCount = std::min(mapInfo.players, kMaxPlayers);
+            for (int spotIndex = 0; spotIndex < spotCount; ++spotIndex)
             {
-                if (CustomCell(d, i, 0).Contains(mx, my))
-                    return openCombo(kComboSlot + i * 10);
-                const int si = CustomSlotAt(i);
-                if (si < 0)
+                if (CustomCell(detailsRect, spotIndex, 0).Contains(mouseX, mouseY))
+                    return openCombo(kComboSlot + spotIndex * 10);
+                const int slotIndex = CustomSlotAt(spotIndex);
+                if (slotIndex < 0)
                     continue;
                 for (int kind : {1, 2, 3, 7, 8, 9})
-                    if (CustomCell(d, i, kind).Contains(mx, my))
-                        return openCombo(kComboSlot + i * 10 + kind);
+                    if (CustomCell(detailsRect, spotIndex, kind).Contains(mouseX, mouseY))
+                        return openCombo(kComboSlot + spotIndex * 10 + kind);
             }
             // An open start position on the map: the person takes it
             {
-                const UiRect pv = CustomPreviewArea(d);
-                if (m_spotsPath == mi.path && mi.width > 0 && mi.height > 0 && pv.Contains(mx, my))
+                const UiRect previewRect = CustomPreviewArea(detailsRect);
+                if (m_spotsPath == mapInfo.path && mapInfo.width > 0 && mapInfo.height > 0
+                    && previewRect.Contains(mouseX, mouseY))
                 {
-                    for (int n = 0; n < static_cast<int>(m_spots.size()) && n < places; ++n)
+                    for (int spotIndex = 0; spotIndex < static_cast<int>(m_spots.size()) && spotIndex < spotCount;
+                         ++spotIndex)
                     {
-                        int sx = 0, sy = 0;
-                        SpotMarkerPos(pv, mi.width, mi.height, m_spots[n].first, m_spots[n].second, sx, sy);
-                        if (std::abs(mx - sx) > 10 || std::abs(my - sy) > 10)
+                        int spotX = 0, spotY = 0;
+                        SpotMarkerPos(
+                            previewRect,
+                            mapInfo.width,
+                            mapInfo.height,
+                            m_spots[spotIndex].first,
+                            m_spots[spotIndex].second,
+                            spotX,
+                            spotY);
+                        if (std::abs(mouseX - spotX) > 10 || std::abs(mouseY - spotY) > 10)
                             continue;
-                        if (CustomSlotAt(n) < 0 && !((m_customBlocked >> n) & 1u))
+                        if (CustomSlotAt(spotIndex) < 0 && !((m_customBlocked >> spotIndex) & 1u))
                         {
-                            SetCustomSeat(n, 1);
+                            SetCustomSeat(spotIndex, 1);
                             SoundRequests::Play("ui_confirm");
                         }
                         return true;
@@ -619,7 +655,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
             }
         }
         // Side the player commands in this mission
-        if (l.editorBtn.Contains(mx, my) && (!m_customGame || mCount > 0))
+        if (layout.editorBtn.Contains(mouseX, mouseY) && (!m_customGame || itemCount > 0))
         {
             const std::string mapPath
                 = m_customGame ? m_skirmishMaps[m_skirmishSelected].path
@@ -629,29 +665,29 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
                 = LaunchMapEditor(mapPath) ? "" : _("Map editor (openaow-mapeditor) not found next to the game");
             return true;
         }
-        const int first = m_customGame ? m_skirmishTop : 0;
-        for (int row = 0; row < rows && first + row < mCount; ++row)
+        const int firstVisible = m_customGame ? m_skirmishTop : 0;
+        for (int row = 0; row < visibleRows && firstVisible + row < itemCount; ++row)
         {
-            if (l.Item(row).Contains(mx, my))
+            if (layout.Item(row).Contains(mouseX, mouseY))
             {
                 // First click selects, clicking the selected mission or map starts it
-                if (selected == first + row)
+                if (selected == firstVisible + row)
                 {
                     startSelected();
                 }
                 else
                 {
-                    selected = first + row;
+                    selected = firstVisible + row;
                 }
                 return true;
             }
         }
-        if (l.startBtn.Contains(mx, my))
+        if (layout.startBtn.Contains(mouseX, mouseY))
         {
             startSelected();
             return true;
         }
-        if (l.backBtn.Contains(mx, my))
+        if (layout.backBtn.Contains(mouseX, mouseY))
         {
             m_campaignSelectOpen = false;
             return true;
@@ -666,80 +702,89 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &ctx, int mx, int m
 }
 
 void MenuController::RenderCampaignMissionSelect(
-    Renderer &renderer, TextureManager &texManager, BitmapFontRenderer &fontRenderer, int windowW, int windowH)
+    Renderer &renderer,
+    TextureManager &textureManager,
+    BitmapFontRenderer &fontRenderer,
+    int windowWidth,
+    int windowHeight)
 {
     const auto &missions = MissionController::GetAvailableMissions();
     const int missionCount = std::min(MissionController::kCampaignMissionCount, static_cast<int>(missions.size()));
-    const int count = m_customGame ? static_cast<int>(m_skirmishMaps.size()) : missionCount;
-    CampaignLayout l = campaignLayout(windowW, windowH, count);
-    const int rows = m_customGame ? CustomListRows(l) : count;
-    const int first = m_customGame ? std::clamp(m_skirmishTop, 0, std::max(0, count - rows)) : 0;
+    const int itemCount = m_customGame ? static_cast<int>(m_skirmishMaps.size()) : missionCount;
+    CampaignLayout layout = campaignLayout(windowWidth, windowHeight, itemCount);
+    const int visibleRows = m_customGame ? CustomListRows(layout) : itemCount;
+    const int firstVisible = m_customGame ? std::clamp(m_skirmishTop, 0, std::max(0, itemCount - visibleRows)) : 0;
     const int selected = m_customGame ? m_skirmishSelected : m_campaignMissionSelected;
     ui::DrawDialog(
         renderer,
         fontRenderer,
-        windowW,
-        windowH,
-        l.dialog,
+        windowWidth,
+        windowHeight,
+        layout.dialog,
         m_customGame ? _("SELECT MAP") : _("SELECT CAMPAIGN MISSION"));
     if (m_customGame)
     {
-        const UiRect sb = MapSearchRect(l);
-        ui::DrawPanel(renderer, sb, col::PanelSunken, m_mapSearchFocus ? col::Accent : col::Border);
+        const UiRect searchBoxRect = MapSearchRect(layout);
+        ui::DrawPanel(renderer, searchBoxRect, col::PanelSunken, m_mapSearchFocus ? col::Accent : col::Border);
         const bool blink = (SDL_GetTicks() / 500) % 2 == 0;
-        const std::string shown = m_mapSearch.empty() && !m_mapSearchFocus
-                                      ? std::string(_("Search map..."))
-                                      : m_mapSearch + (m_mapSearchFocus && blink ? "|" : "");
+        const std::string displayText = m_mapSearch.empty() && !m_mapSearchFocus
+                                            ? std::string(_("Search map..."))
+                                            : m_mapSearch + (m_mapSearchFocus && blink ? "|" : "");
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, shown, ui::FONT_BODY, sb.w - 20),
-            sb.x + 10,
-            sb.CenterY(),
+            ui::FitText(fontRenderer, displayText, ui::FONT_BODY, searchBoxRect.w - 20),
+            searchBoxRect.x + 10,
+            searchBoxRect.CenterY(),
             ui::FONT_BODY,
             m_mapSearch.empty() && !m_mapSearchFocus ? col::TextMuted : col::Text,
             false,
             Anchor::LEFT | Anchor::VCENTER);
-        for (int k = kComboMapPlayers; k <= kComboMapSort; ++k)
+        for (int comboId = kComboMapPlayers; comboId <= kComboMapSort; ++comboId)
         {
-            const UiRect b = MapFilterBtn(l, k - kComboMapPlayers);
+            const UiRect filterBtnRect = MapFilterBtn(layout, comboId - kComboMapPlayers);
             ui::DrawComboField(
                 renderer,
                 fontRenderer,
-                b,
-                CampaignComboOptions(k)[CampaignComboCurrent(k)],
-                m_combo.open == k,
-                b.Contains(m_mouseX, m_mouseY));
+                filterBtnRect,
+                CampaignComboOptions(comboId)[CampaignComboCurrent(comboId)],
+                m_combo.open == comboId,
+                filterBtnRect.Contains(m_mouseX, m_mouseY));
         }
-        if (count == 0)
+        if (itemCount == 0)
             fontRenderer.DrawString(
                 _("No maps match."),
-                l.list.CenterX(),
-                l.list.y + 30,
+                layout.list.CenterX(),
+                layout.list.y + 30,
                 ui::FONT_BODY,
                 col::TextMuted,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
     }
 
-    for (int row = 0; row < rows && first + row < count; ++row)
+    for (int row = 0; row < visibleRows && firstVisible + row < itemCount; ++row)
     {
-        const int i = first + row;
-        UiRect r = l.Item(row);
-        bool isSelected = (i == selected);
-        bool hovered = r.Contains(m_mouseX, m_mouseY);
+        const int itemIndex = firstVisible + row;
+        UiRect itemRect = layout.Item(row);
+        bool isSelected = (itemIndex == selected);
+        bool hovered = itemRect.Contains(m_mouseX, m_mouseY);
         if (hovered)
             SoundRequests::MarkHover();
 
         renderer.FillRectScreen(
-            r.x, r.y, r.w, r.h, isSelected ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-        renderer.DrawRectScreen(r.x, r.y, r.w, r.h, isSelected ? col::BorderStrong : col::Border);
+            itemRect.x,
+            itemRect.y,
+            itemRect.w,
+            itemRect.h,
+            isSelected ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
+        renderer.DrawRectScreen(
+            itemRect.x, itemRect.y, itemRect.w, itemRect.h, isSelected ? col::BorderStrong : col::Border);
         if (isSelected)
-            renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
+            renderer.FillRectScreen(itemRect.x, itemRect.y, 3, itemRect.h, col::Accent);
 
-        std::string num = std::to_string(i + 1);
+        std::string numberText = std::to_string(itemIndex + 1);
         fontRenderer.DrawString(
-            num,
-            r.x + 26,
-            r.CenterY(),
+            numberText,
+            itemRect.x + 26,
+            itemRect.CenterY(),
             ui::FONT_BODY_BOLD,
             isSelected ? col::Accent : col::TextMuted,
             false,
@@ -747,79 +792,80 @@ void MenuController::RenderCampaignMissionSelect(
         std::string name;
         if (m_customGame)
         {
-            name = m_skirmishMaps[i].DisplayName();
+            name = m_skirmishMaps[itemIndex].DisplayName();
         }
         else
         {
             // Mission names are "Mission N: Title" - show just the title next to the number
-            name = _(missions[i].name);
+            name = _(missions[itemIndex].name);
             std::size_t colon = name.find(": ");
             if (colon != std::string::npos)
                 name = name.substr(colon + 2);
         }
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, name, ui::FONT_BODY, r.w - 56),
-            r.x + 48,
-            r.CenterY(),
+            ui::FitText(fontRenderer, name, ui::FONT_BODY, itemRect.w - 56),
+            itemRect.x + 48,
+            itemRect.CenterY(),
             ui::FONT_BODY,
             isSelected ? col::Text : col::TextDim,
             false,
             Anchor::LEFT | Anchor::VCENTER);
     }
 
-    if (m_customGame && count > rows)
+    if (m_customGame && itemCount > visibleRows)
     {
         // Scroll bar beside the list
-        const int trackX = l.list.Right() + 4;
-        renderer.FillRectScreen(trackX, l.list.y, 4, l.list.h, col::PanelSunken);
-        const int thumbH = std::max(20, l.list.h * rows / count);
-        const int thumbY = l.list.y + (l.list.h - thumbH) * first / std::max(1, count - rows);
+        const int trackX = layout.list.Right() + 4;
+        renderer.FillRectScreen(trackX, layout.list.y, 4, layout.list.h, col::PanelSunken);
+        const int thumbH = std::max(20, layout.list.h * visibleRows / itemCount);
+        const int thumbY
+            = layout.list.y + (layout.list.h - thumbH) * firstVisible / std::max(1, itemCount - visibleRows);
         renderer.FillRectScreen(trackX, thumbY, 4, thumbH, col::BorderStrong);
     }
 
-    if (m_customGame && selected >= 0 && selected < count)
+    if (m_customGame && selected >= 0 && selected < itemCount)
     {
-        const SkirmishMapInfo &info = m_skirmishMaps[selected];
-        const UiRect &d = l.details;
-        ui::DrawPanel(renderer, d, col::PanelSunken, col::Border);
+        const SkirmishMapInfo &mapInfo = m_skirmishMaps[selected];
+        const UiRect &detailsRect = layout.details;
+        ui::DrawPanel(renderer, detailsRect, col::PanelSunken, col::Border);
 
-        int x = d.x + 20;
-        int w = d.w - 40;
-        const int titleW = w - 220 - 172 - 192 - 118;
+        int contentX = detailsRect.x + 20;
+        int contentWidth = detailsRect.w - 40;
+        const int titleWidth = contentWidth - 220 - 172 - 192 - 118;
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, info.DisplayName(), ui::FONT_H2, titleW),
-            x,
-            d.y + 18,
+            ui::FitText(fontRenderer, mapInfo.DisplayName(), ui::FONT_H2, titleWidth),
+            contentX,
+            detailsRect.y + 18,
             ui::FONT_H2,
             col::Accent,
             true);
         ui::DrawComboField(
             renderer,
             fontRenderer,
-            l.creditsBtn,
+            layout.creditsBtn,
             ui::CreditsLabel(m_skirmishCredits),
             m_combo.open == kComboCredits,
-            l.creditsBtn.Contains(m_mouseX, m_mouseY));
+            layout.creditsBtn.Contains(m_mouseX, m_mouseY));
         ui::DrawComboField(
             renderer,
             fontRenderer,
-            l.timeBtn,
+            layout.timeBtn,
             ui::TimeOfDayChoices()[m_skirmishNight ? 1 : 0],
             m_combo.open == kComboTime,
-            l.timeBtn.Contains(m_mouseX, m_mouseY));
+            layout.timeBtn.Contains(m_mouseX, m_mouseY));
         ui::DrawComboField(
             renderer,
             fontRenderer,
-            l.techBtn,
+            layout.techBtn,
             ui::TechLevelLabel(m_skirmishTechLevel, false),
             m_combo.open == kComboTech,
-            l.techBtn.Contains(m_mouseX, m_mouseY));
-        renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
+            layout.techBtn.Contains(m_mouseX, m_mouseY));
+        renderer.FillRectScreen(contentX, detailsRect.y + 74, contentWidth, 1, col::Border);
         ui::DrawCaption(
             fontRenderer,
             renderer,
-            x,
-            d.y + 80,
+            contentX,
+            detailsRect.y + 80,
             std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u))
                 + ")");
         // Column captions, the same order as in the network room
@@ -832,186 +878,231 @@ void MenuController::RenderCampaignMissionSelect(
                  {8, _("Army")},
                  {9, _("Tech")}})
         {
-            const UiRect cell = CustomCell(d, 0, kind);
+            const UiRect cell = CustomCell(detailsRect, 0, kind);
             fontRenderer.DrawString(
                 ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w),
                 cell.x + 2,
-                d.y + 100,
+                detailsRect.y + 100,
                 ui::FONT_SMALL,
                 col::TextMuted,
                 false);
         }
-        const int places = std::min(info.players, kMaxPlayers);
-        for (int i = 0; i < places; ++i)
+        const int spotCount = std::min(mapInfo.players, kMaxPlayers);
+        for (int spotIndex = 0; spotIndex < spotCount; ++spotIndex)
         {
-            const int si = CustomSlotAt(i);
-            const bool blocked = ((m_customBlocked >> i) & 1u) != 0;
-            const UiRect row = CustomRow(d, i);
+            const int slotIndex = CustomSlotAt(spotIndex);
+            const bool blocked = ((m_customBlocked >> spotIndex) & 1u) != 0;
+            const UiRect rowRect = CustomRow(detailsRect, spotIndex);
             ui::DrawPanel(
                 renderer,
-                row,
-                si == 0 ? col::Hover : (blocked ? col::PanelSunken : col::PanelRaised),
-                si == 0 ? col::Accent : col::Border);
+                rowRect,
+                slotIndex == 0 ? col::Hover : (blocked ? col::PanelSunken : col::PanelRaised),
+                slotIndex == 0 ? col::Accent : col::Border);
             fontRenderer.DrawString(
-                std::to_string(i + 1),
-                row.x + 12,
-                row.CenterY(),
+                std::to_string(spotIndex + 1),
+                rowRect.x + 12,
+                rowRect.CenterY(),
                 ui::FONT_BODY_BOLD,
-                si >= 0 ? ArmyColor(m_customSlots[si].color) : col::TextMuted,
+                slotIndex >= 0 ? ArmyColor(m_customSlots[slotIndex].color) : col::TextMuted,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
-            auto combo = [&](int kind, const std::string &text, SDL_Color c = col::Text) {
-                const UiRect cell = CustomCell(d, i, kind);
+            auto combo = [&](int kind, const std::string &text, SDL_Color textColor = col::Text) {
+                const UiRect cell = CustomCell(detailsRect, spotIndex, kind);
                 ui::DrawComboField(
                     renderer,
                     fontRenderer,
                     cell,
                     ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w - 34),
-                    m_combo.open == kComboSlot + i * 10 + kind,
+                    m_combo.open == kComboSlot + spotIndex * 10 + kind,
                     cell.Contains(m_mouseX, m_mouseY),
                     true,
-                    c);
+                    textColor);
             };
-            if (si < 0)
+            if (slotIndex < 0)
             {
                 combo(0, blocked ? _("Blocked") : _("Open"), blocked ? col::Danger : col::TextDim);
                 continue;
             }
-            const CustomSlot &cs = m_customSlots[si];
-            if (si == 0)
+            const CustomSlot &customSlot = m_customSlots[slotIndex];
+            if (slotIndex == 0)
                 combo(0, _("YOU"), col::Text);
             else
                 combo(
                     0,
                     std::string(_("AI")) + " - "
-                        + DifficultyName(static_cast<AIDifficulty>(std::clamp(cs.level, 0, 3))),
+                        + DifficultyName(static_cast<AIDifficulty>(std::clamp(customSlot.level, 0, 3))),
                     col::Info);
             combo(
                 1,
-                si == 0 ? (m_sideRandom
-                               ? _("Random")
-                               : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
-                        : (cs.faction == 0 ? _("Random") : (cs.faction == 1 ? _("Resistance") : _("Confederation"))));
-            combo(2, std::to_string(cs.team + 1));
-            combo(7, cs.handicap == 0 ? std::string("-") : HandicapText(cs.handicap));
-            combo(8, ui::ArmyCapChoices()[std::clamp(cs.armyCap, 0, kArmyCapCount - 1)]);
-            combo(9, ui::TechLevelLabel(cs.techLevel, true), cs.techLevel < 0 ? col::TextDim : col::Text);
+                slotIndex == 0
+                    ? (m_sideRandom ? _("Random")
+                                    : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
+                    : (customSlot.faction == 0
+                           ? _("Random")
+                           : (customSlot.faction == 1 ? _("Resistance") : _("Confederation"))));
+            combo(2, std::to_string(customSlot.team + 1));
+            combo(7, customSlot.handicap == 0 ? std::string("-") : HandicapText(customSlot.handicap));
+            combo(8, ui::ArmyCapChoices()[std::clamp(customSlot.armyCap, 0, kArmyCapCount - 1)]);
+            combo(
+                9,
+                ui::TechLevelLabel(customSlot.techLevel, true),
+                customSlot.techLevel < 0 ? col::TextDim : col::Text);
             combo(3, "");
-            const UiRect cc = CustomCell(d, i, 3);
-            renderer.FillRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, ArmyColor(cs.color));
-            renderer.DrawRectScreen(cc.x + 6, cc.y + 6, cc.w - 28, cc.h - 12, col::BorderStrong);
+            const UiRect colorCellRect = CustomCell(detailsRect, spotIndex, 3);
+            renderer.FillRectScreen(
+                colorCellRect.x + 6,
+                colorCellRect.y + 6,
+                colorCellRect.w - 28,
+                colorCellRect.h - 12,
+                ArmyColor(customSlot.color));
+            renderer.DrawRectScreen(
+                colorCellRect.x + 6, colorCellRect.y + 6, colorCellRect.w - 28, colorCellRect.h - 12, col::BorderStrong);
         }
-        const UiRect pv = CustomPreviewArea(d);
-        int pw = 0, ph = 0;
-        SDL_Texture *tex = m_mapPreview.Get(renderer.GetSdlRenderer(), texManager, info.path, info.path, {}, pw, ph);
-        DrawMapPreviewIn(renderer, tex, pw, ph, pv);
+        const UiRect previewRect = CustomPreviewArea(detailsRect);
+        int previewWidth = 0, previewHeight = 0;
+        SDL_Texture *previewTexture = m_mapPreview.Get(
+            renderer.GetSdlRenderer(), textureManager, mapInfo.path, mapInfo.path, {}, previewWidth, previewHeight);
+        DrawMapPreviewIn(renderer, previewTexture, previewWidth, previewHeight, previewRect);
         // The start positions with their numbers, in the colour of the player who takes each
-        if (m_spotsPath != info.path)
+        if (m_spotsPath != mapInfo.path)
         {
-            m_spotsPath = info.path;
-            m_spots = MissionController::StartPositions(info.path);
+            m_spotsPath = mapInfo.path;
+            m_spots = MissionController::StartPositions(mapInfo.path);
         }
-        if (info.width > 0 && info.height > 0)
+        if (mapInfo.width > 0 && mapInfo.height > 0)
         {
-            for (int n = 0; n < static_cast<int>(m_spots.size()); ++n)
+            for (int spotIndex = 0; spotIndex < static_cast<int>(m_spots.size()); ++spotIndex)
             {
-                SDL_Color c = col::TextDim;
-                for (const CustomSlot &cs : m_customSlots)
-                    if (cs.position == n)
-                        c = ArmyColor(cs.color);
-                int sx = 0, sy = 0;
-                SpotMarkerPos(pv, info.width, info.height, m_spots[n].first, m_spots[n].second, sx, sy);
-                const bool blockedSpot = ((m_customBlocked >> n) & 1u) != 0;
-                renderer.FillRectScreen(sx - 8, sy - 8, 16, 16, blockedSpot ? SDL_Color {40, 20, 20, 255} : c);
-                renderer.DrawRectScreen(sx - 8, sy - 8, 16, 16, blockedSpot ? col::Danger : col::Text);
+                SDL_Color spotColor = col::TextDim;
+                for (const CustomSlot &customSlot : m_customSlots)
+                    if (customSlot.position == spotIndex)
+                        spotColor = ArmyColor(customSlot.color);
+                int spotX = 0, spotY = 0;
+                SpotMarkerPos(
+                    previewRect,
+                    mapInfo.width,
+                    mapInfo.height,
+                    m_spots[spotIndex].first,
+                    m_spots[spotIndex].second,
+                    spotX,
+                    spotY);
+                const bool blockedSpot = ((m_customBlocked >> spotIndex) & 1u) != 0;
+                renderer.FillRectScreen(
+                    spotX - 8, spotY - 8, 16, 16, blockedSpot ? SDL_Color {40, 20, 20, 255} : spotColor);
+                renderer.DrawRectScreen(spotX - 8, spotY - 8, 16, 16, blockedSpot ? col::Danger : col::Text);
                 if (blockedSpot)
                 {
-                    renderer.DrawLineScreen(sx - 7, sy - 7, sx + 7, sy + 7, col::Danger);
-                    renderer.DrawLineScreen(sx - 7, sy + 7, sx + 7, sy - 7, col::Danger);
+                    renderer.DrawLineScreen(spotX - 7, spotY - 7, spotX + 7, spotY + 7, col::Danger);
+                    renderer.DrawLineScreen(spotX - 7, spotY + 7, spotX + 7, spotY - 7, col::Danger);
                 }
                 fontRenderer.DrawString(
-                    std::to_string(n + 1),
-                    sx,
-                    sy,
+                    std::to_string(spotIndex + 1),
+                    spotX,
+                    spotY,
                     ui::FONT_SMALL_BOLD,
                     col::AccentText,
                     false,
                     Anchor::HCENTER | Anchor::VCENTER);
             }
         }
-        const std::string size = std::to_string(info.width) + " x " + std::to_string(info.height);
+        const std::string sizeText = std::to_string(mapInfo.width) + " x " + std::to_string(mapInfo.height);
         DrawTextSection(
             renderer,
             fontRenderer,
-            l.fogCheckbox.x,
-            l.speedCheckbox.Bottom() + 10,
-            l.fogCheckbox.w,
+            layout.fogCheckbox.x,
+            layout.speedCheckbox.Bottom() + 10,
+            layout.fogCheckbox.w,
             _("MAP SIZE:"),
-            size,
+            sizeText,
             col::Ok,
             ui::FONT_BODY);
         ui::DrawCheckbox(
             renderer,
             fontRenderer,
-            l.baseCheckbox,
+            layout.baseCheckbox,
             _("START WITH A BASE"),
             m_skirmishPrebuilt,
-            l.baseCheckbox.Contains(m_mouseX, m_mouseY));
+            layout.baseCheckbox.Contains(m_mouseX, m_mouseY));
         ui::DrawCheckbox(
             renderer,
             fontRenderer,
-            l.fogCheckbox,
+            layout.fogCheckbox,
             _("FOG OF WAR"),
             m_skirmishFogOfWar,
-            l.fogCheckbox.Contains(m_mouseX, m_mouseY));
+            layout.fogCheckbox.Contains(m_mouseX, m_mouseY));
         ui::DrawCheckbox(
             renderer,
             fontRenderer,
-            l.speedCheckbox,
+            layout.speedCheckbox,
             _("ALLOW SPEED CONTROL"),
             m_skirmishAllowSpeed,
-            l.speedCheckbox.Contains(m_mouseX, m_mouseY));
+            layout.speedCheckbox.Contains(m_mouseX, m_mouseY));
     }
-    else if (!m_customGame && selected >= 0 && selected < count)
+    else if (!m_customGame && selected >= 0 && selected < itemCount)
     {
-        const auto &minfo = missions[selected];
-        const UiRect &d = l.details;
-        ui::DrawPanel(renderer, d, col::PanelSunken, col::Border);
+        const auto &missionInfo = missions[selected];
+        const UiRect &detailsRect = layout.details;
+        ui::DrawPanel(renderer, detailsRect, col::PanelSunken, col::Border);
 
-        int x = d.x + 20;
-        int w = d.w - 40;
+        int contentX = detailsRect.x + 20;
+        int contentWidth = detailsRect.w - 40;
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, _(minfo.name), ui::FONT_H2, w), x, d.y + 18, ui::FONT_H2, col::Accent, true);
-        fontRenderer.DrawString(_(minfo.mapName), x, d.y + 50, ui::FONT_SMALL, col::TextMuted, false);
-        renderer.FillRectScreen(x, d.y + 74, w, 1, col::Border);
+            ui::FitText(fontRenderer, _(missionInfo.name), ui::FONT_H2, contentWidth),
+            contentX,
+            detailsRect.y + 18,
+            ui::FONT_H2,
+            col::Accent,
+            true);
+        fontRenderer.DrawString(
+            _(missionInfo.mapName), contentX, detailsRect.y + 50, ui::FONT_SMALL, col::TextMuted, false);
+        renderer.FillRectScreen(contentX, detailsRect.y + 74, contentWidth, 1, col::Border);
 
-        int y = DrawTextSection(
-            renderer, fontRenderer, x, d.y + 90, w, _("OBJECTIVES:"), _(minfo.objective), col::Ok, ui::FONT_BODY);
+        int sectionY = DrawTextSection(
+            renderer,
+            fontRenderer,
+            contentX,
+            detailsRect.y + 90,
+            contentWidth,
+            _("OBJECTIVES:"),
+            _(missionInfo.objective),
+            col::Ok,
+            ui::FONT_BODY);
         DrawTextSection(
-            renderer, fontRenderer, x, y, w, _("BRIEFING:"), _(minfo.briefing), col::TextDim, ui::FONT_SMALL);
+            renderer,
+            fontRenderer,
+            contentX,
+            sectionY,
+            contentWidth,
+            _("BRIEFING:"),
+            _(missionInfo.briefing),
+            col::TextDim,
+            ui::FONT_SMALL);
 
         // The mission's map with its preplaced bases: Resistance red, Confederation blue
-        const MissionData &data = Missions::Campaign(PlayerFaction())[selected].data;
+        const MissionData &missionData = Missions::Campaign(PlayerFaction())[selected].data;
         std::vector<PreviewMarker> markers;
-        for (const MissionEntity &e : data.entities)
+        for (const MissionEntity &missionEntity : missionData.entities)
         {
-            if (e.type >= 15)
+            if (missionEntity.type >= 15)
                 continue;
-            markers.push_back({e.x, e.y, e.type >= 8 ? SDL_Color {230, 70, 60, 255} : SDL_Color {70, 150, 240, 255}});
+            markers.push_back(
+                {missionEntity.x,
+                 missionEntity.y,
+                 missionEntity.type >= 8 ? SDL_Color {230, 70, 60, 255} : SDL_Color {70, 150, 240, 255}});
         }
-        int pw = 0, ph = 0;
+        int previewWidth = 0, previewHeight = 0;
         // Each side has its own campaign: the key keeps their pictures apart
         const std::string previewKey = std::string("mission:") + (PlayerFaction() == Faction::Confederation ? "c" : "r")
                                        + std::to_string(selected);
-        SDL_Texture *tex = m_mapPreview.Get(
+        SDL_Texture *previewTexture = m_mapPreview.Get(
             renderer.GetSdlRenderer(),
-            texManager,
+            textureManager,
             previewKey,
-            LoaderResources::MissionMapPath(data.mapFile),
+            LoaderResources::MissionMapPath(missionData.mapFile),
             markers,
-            pw,
-            ph);
-        DrawMapPreview(renderer, tex, pw, ph, d);
+            previewWidth,
+            previewHeight);
+        DrawMapPreview(renderer, previewTexture, previewWidth, previewHeight, detailsRect);
     }
 
     // Side and difficulty: drop-down lists
@@ -1021,33 +1112,33 @@ void MenuController::RenderCampaignMissionSelect(
         ui::DrawComboField(
             renderer,
             fontRenderer,
-            l.sideBtn[0],
+            layout.sideBtn[0],
             CampaignComboOptions(kComboSide)[CampaignComboCurrent(kComboSide)],
             m_combo.open == kComboSide,
-            l.sideBtn[0].Contains(m_mouseX, m_mouseY),
+            layout.sideBtn[0].Contains(m_mouseX, m_mouseY),
             true,
             sideColor);
         ui::DrawComboField(
             renderer,
             fontRenderer,
-            l.difficultyBtn,
+            layout.difficultyBtn,
             std::string(_("DIFFICULTY")) + ": " + DifficultyName(m_difficulty),
             m_combo.open == kComboDifficulty,
-            l.difficultyBtn.Contains(m_mouseX, m_mouseY));
+            layout.difficultyBtn.Contains(m_mouseX, m_mouseY));
     }
     ui::DrawButton(
         renderer,
         fontRenderer,
-        l.editorBtn,
+        layout.editorBtn,
         _("MAP EDITOR"),
         ui::ButtonStyle::Secondary,
-        l.editorBtn.Contains(m_mouseX, m_mouseY));
+        layout.editorBtn.Contains(m_mouseX, m_mouseY));
     if (!m_editorNotice.empty())
     {
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, m_editorNotice, ui::FONT_SMALL, l.dialog.w - 280),
-            l.dialog.Right() - 20,
-            l.dialog.y + 26,
+            ui::FitText(fontRenderer, m_editorNotice, ui::FONT_SMALL, layout.dialog.w - 280),
+            layout.dialog.Right() - 20,
+            layout.dialog.y + 26,
             ui::FONT_SMALL,
             col::Danger,
             false,
@@ -1056,36 +1147,37 @@ void MenuController::RenderCampaignMissionSelect(
     ui::DrawButton(
         renderer,
         fontRenderer,
-        l.startBtn,
+        layout.startBtn,
         m_customGame ? _("START GAME") : _("START MISSION"),
         ui::ButtonStyle::Primary,
-        l.startBtn.Contains(m_mouseX, m_mouseY));
+        layout.startBtn.Contains(m_mouseX, m_mouseY));
     ui::DrawButton(
         renderer,
         fontRenderer,
-        l.backBtn,
+        layout.backBtn,
         _("BACK"),
         ui::ButtonStyle::Secondary,
-        l.backBtn.Contains(m_mouseX, m_mouseY));
+        layout.backBtn.Contains(m_mouseX, m_mouseY));
     if (m_combo.open >= kComboSide)
     { // the open list, over everything
-        const int id = m_combo.open;
-        const UiRect field
-            = id >= kComboSlot ? CustomCell(l.details, (id - kComboSlot) / 10, (id - kComboSlot) % 10)
-                               : (id >= kComboMapPlayers && id <= kComboMapSort ? MapFilterBtn(l, id - kComboMapPlayers)
-                                  : id == kComboSide                            ? l.sideBtn[0]
-                                  : id == kComboCredits                         ? l.creditsBtn
-                                  : id == kComboTime                            ? l.timeBtn
-                                  : id == kComboTech                            ? l.techBtn
-                                                                                : l.difficultyBtn);
-        std::vector<std::string> items = CampaignComboOptions(id);
+        const int comboId = m_combo.open;
+        const UiRect fieldRect = comboId >= kComboSlot
+                                     ? CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10)
+                                     : (comboId >= kComboMapPlayers && comboId <= kComboMapSort
+                                            ? MapFilterBtn(layout, comboId - kComboMapPlayers)
+                                        : comboId == kComboSide    ? layout.sideBtn[0]
+                                        : comboId == kComboCredits ? layout.creditsBtn
+                                        : comboId == kComboTime    ? layout.timeBtn
+                                        : comboId == kComboTech    ? layout.techBtn
+                                                                   : layout.difficultyBtn);
+        std::vector<std::string> items = CampaignComboOptions(comboId);
         std::vector<bool> taken;
         std::vector<SDL_Color> swatches;
-        const bool colors = id >= kComboSlot && (id - kComboSlot) % 10 == 3;
-        if (colors)
+        const bool hasColorSwatches = comboId >= kComboSlot && (comboId - kComboSlot) % 10 == 3;
+        if (hasColorSwatches)
         {
-            taken = CustomTakenColors(CustomSlotAt((id - kComboSlot) / 10));
-            const int current = CampaignComboCurrent(id);
+            taken = CustomTakenColors(CustomSlotAt((comboId - kComboSlot) / 10));
+            const int current = CampaignComboCurrent(comboId);
             for (int i = 1; i <= Settings::kArmyColors; ++i)
                 swatches.push_back(ArmyColor(i));
             for (std::size_t i = 0; i < items.size() && i < taken.size(); ++i)
@@ -1097,28 +1189,28 @@ void MenuController::RenderCampaignMissionSelect(
         ui::DrawComboList(
             renderer,
             fontRenderer,
-            field,
+            fieldRect,
             items,
-            CampaignComboCurrent(id),
+            CampaignComboCurrent(comboId),
             m_combo,
-            windowH,
+            windowHeight,
             m_mouseX,
             m_mouseY,
-            colors ? &taken : nullptr,
-            colors ? &swatches : nullptr);
+            hasColorSwatches ? &taken : nullptr,
+            hasColorSwatches ? &swatches : nullptr);
     }
 }
 
-std::vector<std::string> MenuController::CampaignComboOptions(int id) const
+std::vector<std::string> MenuController::CampaignComboOptions(int comboId) const
 {
-    if (id >= kComboSlot)
+    if (comboId >= kComboSlot)
     {
-        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
-        std::vector<std::string> out;
+        const int row = (comboId - kComboSlot) / 10, kind = (comboId - kComboSlot) % 10;
+        std::vector<std::string> options;
         if (kind == 0)
         {
             for (int code : CustomSeatCodes(row))
-                out.push_back(
+                options.push_back(
                     code == 1   ? std::string(CustomSlotAt(row) == 0 ? _("YOU") : _("Occupy"))
                     : code == 2 ? std::string(_("Open"))
                     : code == 7 ? std::string(_("Blocked"))
@@ -1126,58 +1218,60 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
         }
         else if (kind == 1)
         {
-            out = {_("Random"), _("Resistance"), _("Confederation")};
+            options = {_("Random"), _("Resistance"), _("Confederation")};
         }
         else if (kind == 2)
         {
             for (int i = 1; i <= kMaxPlayers; ++i)
-                out.push_back(std::string(_("Team")) + " " + std::to_string(i));
+                options.push_back(std::string(_("Team")) + " " + std::to_string(i));
         }
         else if (kind == 3)
         {
             for (int i = 1; i <= Settings::kArmyColors; ++i)
-                out.push_back(_(ArmyColorName(i)));
+                options.push_back(_(ArmyColorName(i)));
         }
         else if (kind == 7)
         {
-            out = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"};
+            options = {_("None"), "-25%", "-50%", "+25%", "+50%", "+100%"};
         }
         else if (kind == 9)
         {
-            out = ui::TechLevelChoices(true);
+            options = ui::TechLevelChoices(true);
         }
         else
         {
-            out = ui::ArmyCapChoices();
+            options = ui::ArmyCapChoices();
         }
-        return out;
+        return options;
     }
-    if (id == kComboMapPlayers)
+    if (comboId == kComboMapPlayers)
     {
-        std::vector<std::string> out;
-        for (int n : MapPlayerCounts())
-            out.push_back(std::string(_("Players")) + ": " + (n == 0 ? std::string(_("Any")) : std::to_string(n)));
-        return out;
+        std::vector<std::string> options;
+        for (int playerCount : MapPlayerCounts())
+            options.push_back(
+                std::string(_("Players")) + ": "
+                + (playerCount == 0 ? std::string(_("Any")) : std::to_string(playerCount)));
+        return options;
     }
-    if (id == kComboMapSize)
+    if (comboId == kComboMapSize)
     {
         const char *sizes[] = {_("Any"), _("Small"), _("Medium"), _("Large")};
-        std::vector<std::string> out;
-        for (const char *z : sizes)
-            out.push_back(std::string(_("Size")) + ": " + z);
-        return out;
+        std::vector<std::string> options;
+        for (const char *sizeLabel : sizes)
+            options.push_back(std::string(_("Size")) + ": " + sizeLabel);
+        return options;
     }
-    if (id == kComboMapSort)
+    if (comboId == kComboMapSort)
     {
         const char *sorts[] = {_("Name"), _("Players"), _("Size")};
-        std::vector<std::string> out;
-        for (const char *z : sorts)
-            out.push_back(std::string(_("Sort")) + ": " + z);
-        return out;
+        std::vector<std::string> options;
+        for (const char *sortLabel : sorts)
+            options.push_back(std::string(_("Sort")) + ": " + sortLabel);
+        return options;
     }
-    if (id == kComboSide)
+    if (comboId == kComboSide)
         return {_("Resistance"), _("Confederation"), _("Random")};
-    if (id == kComboDifficulty)
+    if (comboId == kComboDifficulty)
     {
         return {
             DifficultyName(AIDifficulty::Easy),
@@ -1185,73 +1279,74 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
             DifficultyName(AIDifficulty::Hard),
             DifficultyName(AIDifficulty::Hardcore)};
     }
-    if (id == kComboCredits)
+    if (comboId == kComboCredits)
         return ui::CreditsChoices();
-    if (id == kComboTime)
+    if (comboId == kComboTime)
         return ui::TimeOfDayChoices();
-    if (id == kComboTech)
+    if (comboId == kComboTech)
         return ui::TechLevelChoices(false);
     return ui::LayoutChoices();
 }
 
-int MenuController::CampaignComboCurrent(int id) const
+int MenuController::CampaignComboCurrent(int comboId) const
 {
-    if (id >= kComboSlot)
+    if (comboId >= kComboSlot)
     {
-        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
-        const int si = CustomSlotAt(row);
+        const int row = (comboId - kComboSlot) / 10, kind = (comboId - kComboSlot) % 10;
+        const int slotIndex = CustomSlotAt(row);
         if (kind == 0)
         {
             const std::vector<int> codes = CustomSeatCodes(row);
-            const int now = si == 0 ? 1
-                                    : (si > 0 ? 3 + std::clamp(m_customSlots[si].level, 0, 3)
-                                              : (((m_customBlocked >> row) & 1u) ? 7 : 2));
+            const int currentCode = slotIndex == 0 ? 1
+                                                   : (slotIndex > 0 ? 3 + std::clamp(m_customSlots[slotIndex].level, 0, 3)
+                                                                    : (((m_customBlocked >> row) & 1u) ? 7 : 2));
             for (std::size_t i = 0; i < codes.size(); ++i)
-                if (codes[i] == now)
+                if (codes[i] == currentCode)
                     return static_cast<int>(i);
             return 0;
         }
-        if (si < 0)
+        if (slotIndex < 0)
             return 0;
-        const CustomSlot &cs = m_customSlots[si];
+        const CustomSlot &customSlot = m_customSlots[slotIndex];
         if (kind == 1)
-            return si == 0 ? (m_sideRandom ? 0 : (PlayerFaction() == Faction::Confederation ? 2 : 1)) : cs.faction;
+            return slotIndex == 0 ? (m_sideRandom ? 0 : (PlayerFaction() == Faction::Confederation ? 2 : 1))
+                                  : customSlot.faction;
         if (kind == 2)
-            return cs.team;
+            return customSlot.team;
         if (kind == 3)
-            return cs.color - 1;
+            return customSlot.color - 1;
         if (kind == 7)
-            return std::clamp(cs.handicap, 0, kHandicapCount - 1);
+            return std::clamp(customSlot.handicap, 0, kHandicapCount - 1);
         if (kind == 9)
-            return std::max(0, cs.techLevel + 1);
-        return std::clamp(cs.armyCap, 0, kArmyCapCount - 1);
+            return std::max(0, customSlot.techLevel + 1);
+        return std::clamp(customSlot.armyCap, 0, kArmyCapCount - 1);
     }
-    if (id == kComboMapPlayers)
+    if (comboId == kComboMapPlayers)
     {
         const std::vector<int> counts = MapPlayerCounts();
-        const auto it = std::find(counts.begin(), counts.end(), m_mapPlayersFilter);
-        return it == counts.end() ? 0 : static_cast<int>(it - counts.begin());
+        const auto foundIt = std::find(counts.begin(), counts.end(), m_mapPlayersFilter);
+        return foundIt == counts.end() ? 0 : static_cast<int>(foundIt - counts.begin());
     }
-    if (id == kComboMapSize)
+    if (comboId == kComboMapSize)
         return std::clamp(m_mapSizeFilter, 0, 3);
-    if (id == kComboMapSort)
+    if (comboId == kComboMapSort)
         return std::clamp(m_mapSort, 0, 2);
-    if (id == kComboSide)
+    if (comboId == kComboSide)
         return m_sideRandom ? 2 : (PlayerFaction() == Faction::Confederation ? 1 : 0);
-    if (id == kComboDifficulty)
+    if (comboId == kComboDifficulty)
         return std::clamp(static_cast<int>(m_difficulty), 0, 3);
-    if (id == kComboTime)
+    if (comboId == kComboTime)
         return m_skirmishNight ? 1 : 0;
-    if (id == kComboTech)
+    if (comboId == kComboTech)
         return std::max(0, m_skirmishTechLevel + 1);
     return std::clamp(m_skirmishCredits, 0, 4);
 }
 
-void MenuController::CampaignComboApply(int id, int index)
+void MenuController::CampaignComboApply(int comboId, int index)
 {
-    if (id >= kComboSlot)
+    if (comboId >= kComboSlot)
     {
-        const int row = (id - kComboSlot) / 10, kind = (id - kComboSlot) % 10;
+        const int row = (comboId - kComboSlot) / 10, kind = (comboId - kComboSlot) % 10;
         if (kind == 0)
         {
             const std::vector<int> codes = CustomSeatCodes(row);
@@ -1259,13 +1354,13 @@ void MenuController::CampaignComboApply(int id, int index)
                 SetCustomSeat(row, codes[index]);
             return;
         }
-        const int si = CustomSlotAt(row);
-        if (si < 0)
+        const int slotIndex = CustomSlotAt(row);
+        if (slotIndex < 0)
             return;
-        CustomSlot &cs = m_customSlots[si];
+        CustomSlot &customSlot = m_customSlots[slotIndex];
         if (kind == 1)
         {
-            if (si == 0)
+            if (slotIndex == 0)
             {
                 m_sideRandom = index == 0;
                 if (index != 0)
@@ -1273,41 +1368,41 @@ void MenuController::CampaignComboApply(int id, int index)
             }
             else
             {
-                cs.faction = index;
+                customSlot.faction = index;
             }
         }
         else if (kind == 2)
         {
-            cs.team = std::clamp(index, 0, kMaxPlayers - 1);
+            customSlot.team = std::clamp(index, 0, kMaxPlayers - 1);
         }
         else if (kind == 3)
         {
-            const std::vector<bool> taken = CustomTakenColors(si);
+            const std::vector<bool> taken = CustomTakenColors(slotIndex);
             if (index >= 0 && index < static_cast<int>(taken.size()) && !taken[index])
-                cs.color = index + 1;
+                customSlot.color = index + 1;
         }
         else if (kind == 7)
         {
-            cs.handicap = std::clamp(index, 0, kHandicapCount - 1);
+            customSlot.handicap = std::clamp(index, 0, kHandicapCount - 1);
         }
         else if (kind == 9)
         {
-            cs.techLevel = std::clamp(index - 1, -1, static_cast<int>(Capabilities::Levels().size()) - 1);
+            customSlot.techLevel = std::clamp(index - 1, -1, static_cast<int>(Capabilities::Levels().size()) - 1);
         }
         else
         {
-            cs.armyCap = std::clamp(index, 0, kArmyCapCount - 1);
+            customSlot.armyCap = std::clamp(index, 0, kArmyCapCount - 1);
         }
         return;
     }
-    if (id >= kComboMapPlayers && id <= kComboMapSort)
+    if (comboId >= kComboMapPlayers && comboId <= kComboMapSort)
     {
-        if (id == kComboMapPlayers)
+        if (comboId == kComboMapPlayers)
         {
             const std::vector<int> counts = MapPlayerCounts();
             m_mapPlayersFilter = counts[std::clamp(index, 0, static_cast<int>(counts.size()) - 1)];
         }
-        else if (id == kComboMapSize)
+        else if (comboId == kComboMapSize)
         {
             m_mapSizeFilter = std::clamp(index, 0, 3);
         }
@@ -1317,13 +1412,13 @@ void MenuController::CampaignComboApply(int id, int index)
         }
         RebuildMapList();
     }
-    else if (id == kComboSide)
+    else if (comboId == kComboSide)
     {
         m_sideRandom = index == 2;
         if (index != 2)
             SetPlayerFaction(index == 1 ? Faction::Confederation : Faction::Resistance);
     }
-    else if (id == kComboDifficulty)
+    else if (comboId == kComboDifficulty)
     {
         if (!m_settings)
             return;
@@ -1332,15 +1427,15 @@ void MenuController::CampaignComboApply(int id, int index)
         if (m_onSettingsChanged)
             m_onSettingsChanged(SettingsArea::Game);
     }
-    else if (id == kComboCredits)
+    else if (comboId == kComboCredits)
     {
         m_skirmishCredits = std::clamp(index, 0, 4);
     }
-    else if (id == kComboTime)
+    else if (comboId == kComboTime)
     {
         m_skirmishNight = index == 1;
     }
-    else if (id == kComboTech)
+    else if (comboId == kComboTech)
     {
         m_skirmishTechLevel = std::clamp(index - 1, -1, static_cast<int>(Capabilities::Levels().size()) - 1);
     }

@@ -206,11 +206,6 @@ public:
         int goalY,
         std::vector<PathNode> &outPath);
 
-    void SetStagingPoint(int x, int y)
-    {
-        m_stagingX = x;
-        m_stagingY = y;
-    }
     bool IsSquadMember(int unitId) const;
     AISquad *FindSquad(int squadId);
     // Takes units out of their squads (they got a new order of their own)
@@ -293,8 +288,6 @@ private:
     std::vector<AISquad> m_squads;
     std::vector<int> m_released;
     int m_nextSquadId {1};
-    int m_stagingX {0};
-    int m_stagingY {0};
     bool m_seesAll {false};
     float m_tickAccumulator {0.0f};
 };

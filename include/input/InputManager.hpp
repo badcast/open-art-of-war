@@ -48,8 +48,8 @@ public:
     }
 #endif
 
-    // Touch screen: one finger dragging over the map moves the camera (instead of drawing a selection box) while this
-    // is on; the touch interface turns it off for a box-select mode and while it drags a building ghost
+    // Touch screen: one finger dragging over the map draws a selection box by default (two fingers pan/pinch);
+    // the touch interface turns TouchPan on while placing a building so dragging outside the ghost pans the camera
     void SetTouchPan(bool on)
     {
         m_touchPan = on;

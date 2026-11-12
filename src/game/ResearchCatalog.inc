@@ -49,7 +49,7 @@ const ResearchDef kConfederationResearch[kResearchCount] = {
     {2107, "MOTIVATION SYSTEM", 300, "Reward for every destroyed enemy unit +50%.",
      ResearchEffect::KillReward, 50, 0, -1, -1, -1, false},
     {2108, "COMMUNICATION SYSTEM", 350, "Base building radius +25%.",
-     ResearchEffect::BuildRadius, 25, 0, -1, -1, -1, true},
+     ResearchEffect::BuildRadius, 25, 0, -1, -1, -1, false},
 };
 
 // Resistance: Laboratory
@@ -101,5 +101,5 @@ const ResearchDef kResistanceResearch[kResearchCount] = {
     {2131, "MOTIVATION SYSTEM", 300, "Reward for every destroyed enemy unit +50%.",
      ResearchEffect::KillReward, 50, 0, -1, -1, -1, false},
     {2132, "COMMUNICATION SYSTEM", 350, "Base building radius +25%.",
-     ResearchEffect::BuildRadius, 25, 0, -1, -1, -1, true},
+     ResearchEffect::BuildRadius, 25, 0, -1, -1, -1, false},
 };

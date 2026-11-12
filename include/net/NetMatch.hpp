@@ -3,14 +3,17 @@
 #include "game/Match.hpp"
 #include "game/SimCommand.hpp"
 #include "net/ReplayRecorder.hpp"
+#include "net/WorldSnapshot.hpp"
 #include "openaow/net/Protocol.hpp"
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 namespace OpenArtOfWar
 {
@@ -35,6 +38,8 @@ struct Chat;
 // The game's side of a network match: hosts (listen server, with its own client through memory) or
 // joins, turns the match setup into bytes and back, sends the local player's commands once per turn
 // and lets the simulation run a tick only when its turn has arrived from the host.
+struct WorldSnapshot;
+
 class NetMatch
 {
 public:
@@ -161,6 +166,33 @@ public:
     // Once, when the host's setup has arrived (local set to this computer's slot)
     bool TakeStartedMatch(MatchSetup &out);
 
+    // Authority mode (setting network.authority_mode, off by default while snapshots are being built): the room owner's
+    // game simulates the world, the other games are replicas that only send commands (TASKNEW.md)
+    // On the room owner this is the wish that goes into the match setup; on every game the setup of the started
+    // match overrides it (TakeStartedMatch), so everybody plays the same way.
+    void SetAuthorityMode(bool on)
+    {
+        m_authorityMode = on;
+    }
+    bool AuthorityModeOn() const
+    {
+        return m_authorityMode;
+    }
+    // This game is the match authority (the room owner at the start of the match)
+    bool IsAuthority() const;
+    // Authority mode on and this game is not the authority: it never advances the world
+    bool IsReplica() const
+    {
+        return m_authorityMode && m_sim && m_client && !IsAuthority();
+    }
+    // Authority: sends the snapshot to every other connected player (not more often than the caller decides)
+    void PublishSnapshot(const WorldSnapshot &snapshot, const EntityManager &entities, const TileMap &map);
+    // Replica: the newest snapshot of the authority, if a new one has come
+    bool TakeSnapshot(WorldSnapshot &out);
+    void AckSnapshot(const WorldSnapshot &snapshot);
+    // Replica, once per frame: drops the turns nobody simulates here and sends the local commands to the host
+    void PumpReplica(std::uint32_t nowMs);
+
     // In the match: the local player's commands go to the host from now on
     void Attach(Simulation &sim);
     void Detach();
@@ -275,6 +307,16 @@ public:
     static constexpr std::uint32_t kHashIntervalTicks = 20;
 
 private:
+    struct SnapshotPeer {
+        std::deque<WorldSnapshot> history;
+        std::unordered_set<std::uint32_t> knownEntities;
+        std::uint32_t ack {0};
+        bool hasAck {false};
+        std::uint64_t bytes {0};
+        std::uint32_t traceStart {0};
+    };
+    std::array<SnapshotPeer, kMaxPlayers> m_snapshotPeers;
+    std::deque<WorldSnapshot> m_replicaSnapshots;
     std::string m_password; // see setPassword
     std::unique_ptr<Net::SessionHost> m_host;
     std::unique_ptr<Net::SessionClient> m_client;
@@ -289,6 +331,8 @@ private:
     std::uint32_t m_lastTick {0};
     std::int32_t m_lastViewX {-100000}, m_lastViewY {-100000}, m_lastViewZoom {0};
     std::uint32_t m_scheduledTurn {0}; // turns below this have their commands scheduled
+    bool m_authorityMode {false};
+    std::uint32_t m_replicaSentTurn {0}; // replica: the last turn its commands went out for (+1, 0 = none)
     std::uint32_t m_takenStarts {0};   // StartMatch messages turned into a match so far
     void UpdateMapFile();
     // Data sync (see TakeDataChanged)

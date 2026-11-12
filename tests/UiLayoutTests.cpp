@@ -1,10 +1,16 @@
 // The layout file of the interface: expressions, references between nodes, flows, conditions, profiles, bad files.
+#include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
+#include "ui/AndroidHUD.hpp"
 #include "ui/UiLayout.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <utility>
 
 using namespace OpenArtOfWar;
 
@@ -91,7 +97,7 @@ int main()
         const uilayout::Solved menu = shipped.Solve("main_menu", "pc", 1280, 720, {});
         Check(menu.Rect("item0").x == 91 && menu.Rect("item0").y == 176 && menu.Rect("item9").y == 626, "main menu numbers");
         const uilayout::Solved pause = shipped.Solve("pause", "pc", 1280, 720, {});
-        Check(pause.Rect("dialog").y == 154 && pause.Rect("item5").y == 154 + 342, "pause numbers");
+        Check(pause.Rect("dialog").y == 142 && pause.Rect("item5").y == 142 + 362, "pause numbers");
         const uilayout::Solved maps = shipped.Solve("map_select", "pc", 1280, 720, {});
         Check(maps.Rect("list").x == 20 && maps.Rect("list").y == 68 && maps.Rect("list").w == 358 && maps.Rect("list").h == 580,
               "map window list");
@@ -124,6 +130,107 @@ int main()
         const uilayout::Solved net = shipped.Solve("network", "pc", 1280, 720, {});
         Check(net.Rect("dialog").w == 1000 && net.Rect("join").w == 220 && net.Rect("host").x == net.Rect("join").x - 232,
               "network numbers");
+
+        // Touch HUD layout across landscape resolutions and aspect ratios: no BOX toggle, no overlaps or off-screen clipping
+        const std::pair<int, int> touchSizes[] = {
+            {800, 480},
+            {800, 600},
+            {960, 720},
+            {1024, 768},
+            {1152, 720},
+            {1280, 720},
+            {1600, 720},
+            {1680, 720},
+            {1920, 1080},
+            {2400, 1080},
+            {2560, 1440},
+        };
+        auto inBounds = [](const ui::UiRect &r, int w, int h) {
+            return r.w > 0 && r.h > 0 && r.x >= 0 && r.y >= 0 && r.Right() <= w && r.Bottom() <= h;
+        };
+        for (const auto &sz : touchSizes)
+        {
+            const int w = sz.first, h = sz.second;
+            const uilayout::Conditions normalCond = [](const std::string &n) {
+                return n == "has_combat" || n == "has_building" || n == "has_selection";
+            };
+            const uilayout::Solved hudTouch = shipped.Solve("hud", "touch", w, h, normalCond);
+            Check(!hudTouch.Find("dock_box"), "BOX toggle button must be removed from hud/touch");
+            for (const uilayout::Node &n : hudTouch.nodes)
+            {
+                Check(n.action != "dock_box" && n.label != "BOX", "no BOX action or label in hud/touch");
+                if (n.visible && n.type != "flow" && n.type != "cards")
+                    Check(inBounds(n.rect, w, h), "visible touch HUD node fits inside viewport");
+            }
+            const ui::UiRect res = hudTouch.Rect("resources");
+            const ui::UiRect techBtn = hudTouch.Rect("tech");
+            const ui::UiRect radar = hudTouch.Rect("radar");
+            const ui::UiRect dockBuild = hudTouch.Rect("dock_build");
+            const ui::UiRect dockUnits = hudTouch.Rect("dock_units");
+            Check(res.Right() < techBtn.x, "resources panel does not overlap top-right tech button");
+            Check(radar.Right() < dockBuild.x && dockBuild.Right() < dockUnits.x && dockUnits.Right() <= w,
+                  "radar and dock buttons do not overlap across landscape resolutions");
+            const ui::UiRect orders = hudTouch.Rect("orders");
+            Check(orders.x > radar.Right() && orders.Right() < dockBuild.x,
+                  "orders bar sits cleanly between radar and dock");
+
+            // Units drawer open: cards and INF/VEH tabs fit and scale with u
+            const uilayout::Conditions unitsCond = [](const std::string &n) {
+                return n == "panel_open" || n == "panel_units" || n == "units_inf";
+            };
+            const uilayout::Solved unitsHud = shipped.Solve("hud", "touch", w, h, unitsCond);
+            const ui::UiRect cards = unitsHud.Rect("cards");
+            const ui::UiRect scrollL = unitsHud.Rect("scroll_left");
+            const ui::UiRect scrollR = unitsHud.Rect("scroll_right");
+            const ui::UiRect infBtn = unitsHud.Rect("units_inf");
+            const ui::UiRect vehBtn = unitsHud.Rect("units_veh");
+            Check(inBounds(cards, w, h) && inBounds(scrollL, w, h) && inBounds(scrollR, w, h),
+                  "touch card drawer and scroll arrows stay in bounds");
+            Check(cards.h == static_cast<int>(std::lround(88 * unitsHud.u)), "card drawer height scales with u");
+            Check(infBtn.x > scrollL.Right() && vehBtn.x > scrollL.Right() && vehBtn.Bottom() <= cards.Bottom(),
+                  "INF/VEH buttons fit inside card drawer without overlapping scroll arrow");
+
+            // Building placement mode: CANCEL and BUILD HERE stay in bounds and clear the radar
+            const uilayout::Conditions placingCond = [](const std::string &n) { return n == "placing"; };
+            const uilayout::Solved placingHud = shipped.Solve("hud", "touch", w, h, placingCond);
+            const ui::UiRect cancelBtn = placingHud.Rect("cancel");
+            const ui::UiRect confirmBtn = placingHud.Rect("confirm");
+            Check(inBounds(cancelBtn, w, h) && inBounds(confirmBtn, w, h), "placing buttons stay in bounds");
+            Check(placingHud.Rect("radar").Right() < cancelBtn.x && cancelBtn.Right() < confirmBtn.x,
+                  "placing buttons do not overlap radar or each other");
+
+            // Touch main menu items stay inside viewport across short and tall landscape screens
+            const uilayout::Solved mmTouch = shipped.Solve("main_menu", "touch", w, h, {});
+            for (int i = 0; i < 10; ++i)
+                Check(inBounds(mmTouch.Rect("item" + std::to_string(i)), w, h), "touch main menu items fit in viewport");
+        }
+
+        // AndroidHUD runtime behavior: box selection always on except when placing/building; responsive TouchPanels
+        Check(Assets::Init() && LoaderResources::Init() && uilayout::Reload(), "load shipped layout into UiLayout");
+        AndroidHUD androidHud;
+        Check(androidHud.ReservedWidth() == 0, "AndroidHUD reserves zero sidebar width");
+        Check(!androidHud.TouchPansCamera(), "AndroidHUD defaults to always-on box selection (no single-finger pan)");
+        Check(!androidHud.OwnsMapInput(), "AndroidHUD does not own map input when not placing");
+        const auto panels1280 = androidHud.TouchPanels(1280, 720);
+        const auto panels1600 = androidHud.TouchPanels(1600, 720);
+        const auto panels1920 = androidHud.TouchPanels(1920, 1080);
+        auto maxRight = [](const std::vector<SDL_Rect> &rects) {
+            int mr = 0;
+            for (const SDL_Rect &r : rects)
+                mr = std::max(mr, r.x + r.w);
+            return mr;
+        };
+        Check(!panels1280.empty() && panels1280.size() == panels1600.size(), "TouchPanels adapts across widths");
+        Check(maxRight(panels1600) > maxRight(panels1280),
+              "TouchPanels shifts right-anchored HUD panels right on wider aspect ratio");
+        Check(panels1920[0].w > panels1280[0].w, "TouchPanels scales panels up on higher resolution");
+
+        androidHud.SetBuildMode(true);
+        Check(androidHud.TouchPansCamera(), "AndroidHUD disables box selection (enables pan) during building mode");
+        Check(androidHud.OwnsMapInput(), "AndroidHUD owns map input during building mode");
+        androidHud.SetBuildMode(false);
+        Check(!androidHud.TouchPansCamera() && !androidHud.OwnsMapInput(),
+              "AndroidHUD restores always-on box selection when leaving building mode");
     }
 
     if (g_failures == 0)

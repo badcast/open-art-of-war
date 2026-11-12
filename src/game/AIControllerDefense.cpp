@@ -47,46 +47,51 @@ constexpr float kAttackMemorySeconds = 10.0f; // the base counts as attacked thi
 
 int AIController::SectorOf(int x, int y) const
 {
-    const int hx = m_homeX >= 0 ? m_homeX : m_enemyHqX, hy = m_homeY >= 0 ? m_homeY : m_enemyHqY;
-    if (x == hx && y == hy)
+    const int homeX = m_homeX >= 0 ? m_homeX : m_enemyHqX;
+    const int homeY = m_homeY >= 0 ? m_homeY : m_enemyHqY;
+    if (x == homeX && y == homeY)
         return 0;
-    const float a = DetMath::Atan2(static_cast<float>(y - hy), static_cast<float>(x - hx)); // -pi..pi
-    const float turns = a / (2.0f * static_cast<float>(M_PI)) + 1.0f / 16.0f;               // centred on 0
-    int s = static_cast<int>(std::floor(turns * 8.0f));
-    return ((s % 8) + 8) % 8;
+    const float angle = DetMath::Atan2(static_cast<float>(y - homeY), static_cast<float>(x - homeX)); // -pi..pi
+    const float turns = angle / (2.0f * static_cast<float>(M_PI)) + 1.0f / 16.0f;                   // centred on 0
+    const int sector = static_cast<int>(std::floor(turns * 8.0f));
+    return ((sector % 8) + 8) % 8;
 }
 
-int AIController::UnitThreatValue(const Unit &u, const EntityManager &entities) const
+int AIController::UnitThreatValue(const Unit &unit, const EntityManager &entities) const
 {
     // Siege forms count as their mobile form: Sniper 14 -> 4, Rhino 15 -> 10, Grad 16 -> 13
-    const int arch = u.archetypeId == 14 ? 4 : u.archetypeId == 15 ? 10 : u.archetypeId == 16 ? 13 : u.archetypeId;
-    const UnitConfig *cfg = entities.GetUnitConfig(arch);
-    return std::max(50, cfg ? cfg->creditCost : 0);
+    const int archetypeId
+        = unit.archetypeId == 14 ? 4 : unit.archetypeId == 15 ? 10 : unit.archetypeId == 16 ? 13 : unit.archetypeId;
+    const UnitConfig *unitConfig = entities.GetUnitConfig(archetypeId);
+    return std::max(50, unitConfig ? unitConfig->creditCost : 0);
 }
 
 std::vector<const Building *> AIController::OwnStructures(const EntityManager &entities) const
 {
-    std::vector<const Building *> own;
-    for (const auto &e : entities.GetAllEntities())
-        if (const Building *b = e.AsBuilding(); b && b->alive && b->state != ActionState::Die && b->owner == m_player)
-            own.push_back(b);
-    return own;
+    std::vector<const Building *> structures;
+    for (const auto &entity : entities.GetAllEntities())
+        if (const Building *building = entity.AsBuilding();
+            building && building->alive && building->state != ActionState::Die && building->owner == m_player)
+            structures.push_back(building);
+    return structures;
 }
 
 bool AIController::IsNearBase(
-    const Entity &e, const std::vector<const Building *> &ownStructures, float extraTiles) const
+    const Entity &entity, const std::vector<const Building *> &ownStructures, float extraTiles) const
 {
-    const float hqPx = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f,
-                hqPy = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-    if (DetMath::Hypot(e.GetUnitCenterPixelX() - hqPx, e.GetUnitCenterPixelY() - hqPy)
+    const float hqPixelX = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f;
+    const float hqPixelY = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
+    if (DetMath::Hypot(entity.GetUnitCenterPixelX() - hqPixelX, entity.GetUnitCenterPixelY() - hqPixelY)
         <= (kHqZoneTiles + extraTiles) * TILE_WIDTH)
         return true;
-    for (const Building *b : ownStructures)
+    for (const Building *building : ownStructures)
     {
         // tiles from the footprint's edge
-        const int dx = std::max({b->tileX - e.tileX, 0, e.tileX - (b->tileX + b->buildWidth - 1)});
-        const int dy = std::max({b->tileY - e.tileY, 0, e.tileY - (b->tileY + b->buildHeight - 1)});
-        if (DetMath::Hypot(static_cast<float>(dx), static_cast<float>(dy)) <= kBuildingZoneTiles + extraTiles)
+        const int deltaX
+            = std::max({building->tileX - entity.tileX, 0, entity.tileX - (building->tileX + building->buildWidth - 1)});
+        const int deltaY = std::max(
+            {building->tileY - entity.tileY, 0, entity.tileY - (building->tileY + building->buildHeight - 1)});
+        if (DetMath::Hypot(static_cast<float>(deltaX), static_cast<float>(deltaY)) <= kBuildingZoneTiles + extraTiles)
             return true;
     }
     return false;
@@ -94,33 +99,33 @@ bool AIController::IsNearBase(
 
 void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfinder)
 {
-    for (float &t : m_sectorThreat)
-        t *= kThreatDecay;
-    for (float &t : m_foeHostility)
-        t *= kThreatDecay;
+    for (float &threat : m_sectorThreat)
+        threat *= kThreatDecay;
+    for (float &hostility : m_foeHostility)
+        hostility *= kThreatDecay;
 
     const std::vector<const Building *> ownBuildings = OwnStructures(entities);
-    auto atBase = [&](const Entity &e) {
-        return IsNearBase(e, ownBuildings, 0.0f);
+    auto atBase = [&](const Entity &entity) {
+        return IsNearBase(entity, ownBuildings, 0.0f);
     };
 
     // Who attacks the base: the enemy troops seen at it, and whoever hit a structure or a unit of the base a moment
     // ago - also from out of sight or from beyond the zone (artillery, snipers, an enemy tower built next door)
     std::vector<int> threatIds;
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        if (!e.alive || e.state == ActionState::Die)
+        if (!entity.alive || entity.state == ActionState::Die)
             continue;
-        if (e.AsUnit() && IsFoe(e) && AiSees(e, entities) && atBase(e))
+        if (entity.AsUnit() && IsFoe(entity) && AiSees(entity, entities) && atBase(entity))
         {
-            threatIds.push_back(e.id);
+            threatIds.push_back(entity.id);
             continue;
         }
-        if (e.owner != m_player || e.lastAttackedTimer <= 0.0f || e.lastAttackerId == 0)
+        if (entity.owner != m_player || entity.lastAttackedTimer <= 0.0f || entity.lastAttackerId == 0)
             continue;
-        if (!e.isBuilding && (m_squadController.IsSquadMember(e.id) || !atBase(e)))
+        if (!entity.isBuilding && (m_squadController.IsSquadMember(entity.id) || !atBase(entity)))
             continue; // (a squad fights its own fights, so does a unit away from the base)
-        const Entity *attacker = entities.GetEntity(e.lastAttackerId);
+        const Entity *attacker = entities.GetEntity(entity.lastAttackerId);
         if (attacker && attacker->alive && attacker->state != ActionState::Die && IsFoe(*attacker)
             && IsNearBase(*attacker, ownBuildings, kShooterZoneTiles))
             threatIds.push_back(attacker->id);
@@ -128,30 +133,26 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     std::sort(threatIds.begin(), threatIds.end());
     threatIds.erase(std::unique(threatIds.begin(), threatIds.end()), threatIds.end());
 
-    // Troops that left the base after an enemy come back: an attack order of the computer (UpdateIdleUnits) and
-    // an attack-move of a defender both pursue without a leash
-    for (auto &e : entities.GetAllEntities())
+    // Troops chasing an enemy outside the base switch to the offensive and never return to base
+    for (auto &entity : entities.GetAllEntities())
     {
-        Unit *u = e.AsUnit();
-        if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->targetEntityId == 0)
+        Unit *unit = entity.AsUnit();
+        if (!unit || !unit->alive || unit->state == ActionState::Die || unit->owner != m_player
+            || unit->targetEntityId == 0)
             continue;
-        if (m_squadController.IsSquadMember(u->id) || m_garrison.count(u->id))
+        if (m_squadController.IsSquadMember(unit->id) || m_garrison.count(unit->id))
             continue;
-        const bool defender = m_defenders.count(u->id) != 0;
-        if (!defender && u->orderedTargetId != u->targetEntityId)
-            continue; // a target the unit took by itself: its stance leashes it
-        if (std::binary_search(threatIds.begin(), threatIds.end(), u->targetEntityId))
+        const bool isDefender = m_defenders.count(unit->id) != 0;
+        if (!isDefender && unit->orderedTargetId != unit->targetEntityId)
+            continue; // a target the unit took by itself: its stance handles it
+        if (std::binary_search(threatIds.begin(), threatIds.end(), unit->targetEntityId))
             continue; // it still attacks the base
-        const Entity *target = entities.GetEntity(u->targetEntityId);
+        const Entity *target = entities.GetEntity(unit->targetEntityId);
         if (!target || IsNearBase(*target, ownBuildings, kBaseChaseTiles))
             continue;
-        u->ClearPathState();
-        u->ClearMoveTarget();
-        u->targetEntityId = 0;
-        u->orderedTargetId = 0;
-        u->isAttackMoving = false;
-        u->state = ActionState::Idle; // the reserve / its guard post takes it back
-        m_defenders.erase(u->id);
+        m_defenders.erase(unit->id);
+        m_waveRoster.erase(unit->id);
+        m_offensive.insert(unit->id);
     }
 
     // Enemy troops at the base, gathered into attacks (several attacks from several sides are told apart)
@@ -165,51 +166,60 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         std::vector<int> defenders;
     };
     std::vector<Attack> attacks;
-    for (int id : threatIds)
+    for (int threatId : threatIds)
     {
-        const Entity *e = entities.GetEntity(id);
-        if (!e)
+        const Entity *entity = entities.GetEntity(threatId);
+        if (!entity)
             continue;
         float value = 0.0f;
-        if (const Unit *u = e->AsUnit())
-            value = static_cast<float>(UnitThreatValue(*u, entities));
-        else if (const Building *b = e->AsBuilding())
+        if (const Unit *unit = entity->AsUnit())
+            value = static_cast<float>(UnitThreatValue(*unit, entities));
+        else if (const Building *building = entity->AsBuilding())
         {
-            const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
-            value = static_cast<float>(std::max(50, cfg ? cfg->creditCost : 0));
+            const BuildingConfig *buildingConfig = entities.GetBuildingConfig(building->rawBuildingType);
+            value = static_cast<float>(std::max(50, buildingConfig ? buildingConfig->creditCost : 0));
         }
-        m_sectorThreat[SectorOf(e->tileX, e->tileY)] += value;
-        if (e->owner < kMaxPlayers)
-            m_foeHostility[e->owner] += value;
-        const float tx = static_cast<float>(e->tileX), ty = static_cast<float>(e->tileY);
-        Attack *into = nullptr;
-        for (Attack &a : attacks)
+        m_sectorThreat[SectorOf(entity->tileX, entity->tileY)] += value;
+        if (entity->owner < kMaxPlayers)
+            m_foeHostility[entity->owner] += value;
+        const float tileX = static_cast<float>(entity->tileX);
+        const float tileY = static_cast<float>(entity->tileY);
+        Attack *matchedAttack = nullptr;
+        for (Attack &attack : attacks)
         {
-            if (DetMath::Hypot(a.x - tx, a.y - ty) <= kClusterTiles)
+            if (DetMath::Hypot(attack.x - tileX, attack.y - tileY) <= kClusterTiles)
             {
-                into = &a;
+                matchedAttack = &attack;
                 break;
             }
         }
-        if (!into)
+        if (!matchedAttack)
         {
             attacks.push_back({});
-            into = &attacks.back();
-            into->firstId = id;
+            matchedAttack = &attacks.back();
+            matchedAttack->firstId = threatId;
         }
-        into->x = (into->x * into->count + tx) / static_cast<float>(into->count + 1);
-        into->y = (into->y * into->count + ty) / static_cast<float>(into->count + 1);
-        ++into->count;
-        into->strength += value;
+        matchedAttack->x = (matchedAttack->x * matchedAttack->count + tileX) / static_cast<float>(matchedAttack->count + 1);
+        matchedAttack->y = (matchedAttack->y * matchedAttack->count + tileY) / static_cast<float>(matchedAttack->count + 1);
+        ++matchedAttack->count;
+        matchedAttack->strength += value;
     }
 
     // Defenders that died or joined a squad are none any more; with the base quiet again all of them are released
     for (auto it = m_defenders.begin(); it != m_defenders.end();)
     {
-        const Unit *u = entities.GetUnit(it->first);
-        if (attacks.empty() || !u || !u->alive || u->state == ActionState::Die || u->owner != m_player
-            || m_squadController.IsSquadMember(it->first) || it->first == m_scoutId || m_repairing.count(it->first))
+        const Unit *unit = entities.GetUnit(it->first);
+        if (attacks.empty() || !unit || !unit->alive || unit->state == ActionState::Die || unit->owner != m_player
+            || m_squadController.IsSquadMember(it->first) || it->first == m_scoutId)
+        {
+            if (unit && unit->alive && unit->state != ActionState::Die && unit->owner == m_player
+                && !m_squadController.IsSquadMember(it->first) && !m_garrison.count(it->first) && !atBase(*unit))
+            {
+                m_waveRoster.erase(it->first);
+                m_offensive.insert(it->first);
+            }
             it = m_defenders.erase(it);
+        }
         else
             ++it;
     }
@@ -222,9 +232,9 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     m_baseAttackedTimer = kAttackMemorySeconds; // no wave leaves either (UpdateWaveLaunch)
 
     const Attack *strongest = &attacks.front();
-    for (const Attack &a : attacks)
-        if (a.strength > strongest->strength)
-            strongest = &a;
+    for (const Attack &attack : attacks)
+        if (attack.strength > strongest->strength)
+            strongest = &attack;
     m_lastThreatX = static_cast<int>(std::lround(strongest->x));
     m_lastThreatY = static_cast<int>(std::lround(strongest->y));
     if (strongest->firstId != m_lastThreatId)
@@ -239,210 +249,115 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     auto nearestAttack = [&](float x, float y, float reach) {
         Attack *best = nullptr;
         float bestDist = reach;
-        for (Attack &a : attacks)
+        for (Attack &attack : attacks)
         {
-            const float d = DetMath::Hypot(x - a.x, y - a.y);
-            if (d <= bestDist)
+            const float dist = DetMath::Hypot(x - attack.x, y - attack.y);
+            if (dist <= bestDist)
             {
-                bestDist = d;
-                best = &a;
+                bestDist = dist;
+                best = &attack;
             }
         }
         return best;
     };
     // The towers and bunkers that reach an attack count as its defenders
-    for (const Building *b : ownBuildings)
+    for (const Building *building : ownBuildings)
     {
-        if (b->attackDamage <= 0 || b->attackRange <= 0.0f || b->buildProgress < 1.0f)
+        if (building->attackDamage <= 0 || building->attackRange <= 0.0f || building->buildProgress < 1.0f)
             continue;
-        if (Attack *a
-            = nearestAttack(static_cast<float>(b->tileX), static_cast<float>(b->tileY), b->attackRange + 2.0f))
+        if (Attack *attack = nearestAttack(
+                static_cast<float>(building->tileX), static_cast<float>(building->tileY), building->attackRange + 2.0f))
         {
-            const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
-            a->assigned += static_cast<float>(std::max(50, cfg ? cfg->creditCost : 0));
+            const BuildingConfig *buildingConfig = entities.GetBuildingConfig(building->rawBuildingType);
+            attack->assigned += static_cast<float>(std::max(50, buildingConfig ? buildingConfig->creditCost : 0));
         }
     }
 
     // The troops at home (not in a squad) go where defenders are lacking most; ties: the nearer attack. Not only
     // the idle ones: also those walking to the staging area, and the defenders whose attack moved on
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        const Unit *u = e.AsUnit();
-        if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f
-            || u->isSiegeMode)
+        const Unit *unit = entity.AsUnit();
+        if (!unit || !unit->alive || unit->state == ActionState::Die || unit->owner != m_player || unit->moveSpeed <= 0.0f
+            || unit->isSiegeMode)
             continue;
         // (troops that went on the attack are never called home to defend)
-        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
-            || m_offensive.count(u->id))
+        if (m_squadController.IsSquadMember(unit->id) || unit->id == m_scoutId || m_offensive.count(unit->id))
             continue;
-        const float ux = static_cast<float>(u->tileX), uy = static_cast<float>(u->tileY);
-        const float value = static_cast<float>(UnitThreatValue(*u, entities));
-        if (u->targetEntityId != 0)
+        const float unitX = static_cast<float>(unit->tileX);
+        const float unitY = static_cast<float>(unit->tileY);
+        const float value = static_cast<float>(UnitThreatValue(*unit, entities));
+        if (unit->targetEntityId != 0)
         {
             // Fighting already: it counts for the attack it stands at
-            if (Attack *a = nearestAttack(ux, uy, kDefenderReachTiles))
-                a->assigned += value;
+            if (Attack *attack = nearestAttack(unitX, unitY, kDefenderReachTiles))
+                attack->assigned += value;
             continue;
         }
-        const auto defender = m_defenders.find(u->id);
-        if (defender != m_defenders.end()
-            && ((u->state == ActionState::Move && u->isAttackMoving)
-                || (u->state == ActionState::Idle
+        const auto defenderIt = m_defenders.find(unit->id);
+        if (defenderIt != m_defenders.end()
+            && ((unit->state == ActionState::Move && unit->isAttackMoving)
+                || (unit->state == ActionState::Idle
                     && std::max(
-                           std::abs(u->tileX - defender->second.first), std::abs(u->tileY - defender->second.second))
+                           std::abs(unit->tileX - defenderIt->second.first),
+                           std::abs(unit->tileY - defenderIt->second.second))
                            <= 3)))
         {
             // On its way or arrived: left alone while the attack is still about where it was sent
-            if (Attack *a = nearestAttack(
-                    static_cast<float>(defender->second.first),
-                    static_cast<float>(defender->second.second),
+            if (Attack *attack = nearestAttack(
+                    static_cast<float>(defenderIt->second.first),
+                    static_cast<float>(defenderIt->second.second),
                     kReaimTiles))
             {
-                a->assigned += value;
+                attack->assigned += value;
                 continue;
             }
         }
         else if (
-            defender == m_defenders.end() && u->state != ActionState::Idle
-            && !(u->state == ActionState::Move && !u->isAttackMoving))
+            defenderIt == m_defenders.end() && unit->state != ActionState::Idle
+            && !(unit->state == ActionState::Move && !unit->isAttackMoving))
             continue; // (firing, transforming, attack-moving to its guard post)
         // The computer's own troops come from all over the base; the mission's garrisons only from close by
-        const float reach = atBase(*u) && !m_garrison.count(u->id) ? kHomeReachTiles : kDefenderReachTiles;
-        Attack *best = nullptr;
+        const float reach = atBase(*unit) && !m_garrison.count(unit->id) ? kHomeReachTiles : kDefenderReachTiles;
+        Attack *bestAttack = nullptr;
         float bestNeed = 0.0f, bestDist = 0.0f;
-        for (Attack &a : attacks)
+        for (Attack &attack : attacks)
         {
-            const float d = DetMath::Hypot(ux - a.x, uy - a.y);
-            if (d > reach)
+            const float dist = DetMath::Hypot(unitX - attack.x, unitY - attack.y);
+            if (dist > reach)
                 continue;
-            const float need = a.strength * kDefenseMargin - a.assigned;
-            if (!best || need > bestNeed + 0.5f || (std::abs(need - bestNeed) <= 0.5f && d < bestDist))
+            const float need = attack.strength * kDefenseMargin - attack.assigned;
+            if (!bestAttack || need > bestNeed + 0.5f || (std::abs(need - bestNeed) <= 0.5f && dist < bestDist))
             {
-                best = &a;
+                bestAttack = &attack;
                 bestNeed = need;
-                bestDist = d;
+                bestDist = dist;
             }
         }
-        if (!best)
+        if (!bestAttack)
             continue;
-        best->assigned += value;
-        best->defenders.push_back(u->id);
+        bestAttack->assigned += value;
+        bestAttack->defenders.push_back(unit->id);
     }
-    for (const Attack &a : attacks)
+    for (const Attack &attack : attacks)
     {
-        if (a.defenders.empty())
+        if (attack.defenders.empty())
             continue;
-        const int gx = static_cast<int>(std::lround(a.x)), gy = static_cast<int>(std::lround(a.y));
-        entities.IssueAttackMoveOrder(a.defenders, gx, gy, pathfinder);
-        for (int id : a.defenders)
-            m_defenders[id] = {gx, gy};
+        const int goalX = static_cast<int>(std::lround(attack.x));
+        const int goalY = static_cast<int>(std::lround(attack.y));
+        entities.IssueAttackMoveOrder(attack.defenders, goalX, goalY, pathfinder);
+        for (int defenderId : attack.defenders)
+            m_defenders[defenderId] = {goalX, goalY};
     }
 
     // Still too few: the base makes do with what it has. A group that left for the enemy never turns back
 }
 
-void AIController::UpdateGuardPosts(EntityManager &entities, Pathfinder &pathfinder)
-{
-    if (m_guardPosts.empty())
-        return;
-    // Guards that died, joined a squad or left the reserve are no guards any more
-    for (auto it = m_guardOf.begin(); it != m_guardOf.end();)
-    {
-        const Unit *u = entities.GetUnit(it->first);
-        if (!u || !IsReserveUnit(*u) || it->second >= static_cast<int>(m_guardPosts.size()))
-            it = m_guardOf.erase(it);
-        else
-            ++it;
-    }
-
-    // How many each post gets: one each first (the most threatened posts first, when there are too few guards),
-    // the rest one by one to the post whose threat per guard is highest
-    const int posts = static_cast<int>(m_guardPosts.size());
-    std::vector<float> weight(static_cast<std::size_t>(posts));
-    for (int i = 0; i < posts; ++i)
-        weight[i] = 1.0f + m_sectorThreat[SectorOf(m_guardPosts[i].first, m_guardPosts[i].second)];
-    std::vector<int> order(static_cast<std::size_t>(posts));
-    for (int i = 0; i < posts; ++i)
-        order[i] = i;
-    std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return weight[a] > weight[b]; });
-    std::vector<int> want(static_cast<std::size_t>(posts), 0);
-    int left = HomeGuardCount();
-    for (int i = 0; i < posts && left > 0; ++i, --left)
-        ++want[order[i]];
-    for (; left > 0; --left)
-    {
-        int best = 0;
-        for (int i = 1; i < posts; ++i)
-            if (weight[i] / static_cast<float>(want[i] + 1) > weight[best] / static_cast<float>(want[best] + 1))
-                best = i;
-        ++want[best];
-    }
-
-    // Too many at a post: the extra ones go back to the reserve
-    std::vector<int> have(static_cast<std::size_t>(posts), 0);
-    for (auto it = m_guardOf.begin(); it != m_guardOf.end();)
-    {
-        if (have[it->second] >= want[it->second])
-        {
-            it = m_guardOf.erase(it);
-            continue;
-        }
-        ++have[it->second];
-        ++it;
-    }
-    // Too few: the nearest idle troops of the reserve
-    for (int i = 0; i < posts; ++i)
-    {
-        while (have[i] < want[i])
-        {
-            const auto [px, py] = m_guardPosts[i];
-            int bestId = 0;
-            int bestDist = 1 << 30;
-            for (const auto &e : entities.GetAllEntities())
-            {
-                const Unit *u = e.AsUnit();
-                if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
-                    || m_defenders.count(u->id) || u->state != ActionState::Idle || u->targetEntityId != 0
-                    || u->isAttackMoving)
-                    continue;
-                const int d = std::max(std::abs(u->tileX - px), std::abs(u->tileY - py));
-                if (d < bestDist)
-                {
-                    bestDist = d;
-                    bestId = u->id;
-                }
-            }
-            if (bestId == 0)
-                break;
-            m_guardOf[bestId] = i;
-            ++have[i];
-        }
-    }
-
-    // Guards away from their post (it was the reserve, or it went for an intruder) walk back to it
-    std::vector<std::vector<int>> back(static_cast<std::size_t>(posts));
-    for (const auto &[id, post] : m_guardOf)
-    {
-        const Unit *u = entities.GetUnit(id);
-        const auto [px, py] = m_guardPosts[post];
-        if (u && u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving
-            && std::max(std::abs(u->tileX - px), std::abs(u->tileY - py)) > 2)
-            back[post].push_back(id);
-    }
-    for (int i = 0; i < posts; ++i)
-        if (!back[i].empty() && m_baseAttackedTimer <= 0.0f) // (during an attack the guards fight where it is)
-            entities.IssueAttackMoveOrder(back[i], m_guardPosts[i].first, m_guardPosts[i].second, pathfinder);
-    ThinkOnce(
-        "guardposts",
-        "DEFENSE",
-        std::to_string(m_guardOf.size()) + " guard(s) at " + std::to_string(posts) + " post(s) on the roads in");
-}
-
 bool AIController::FindSiteNear(
     int &x,
     int &y,
-    int w,
-    int h,
+    int width,
+    int height,
     int searchRadius,
     const TileMap &map,
     const EntityManager &entities,
@@ -452,44 +367,46 @@ bool AIController::FindSiteNear(
     if (unitBlocked)
         *unitBlocked = false;
     WayOutCache wayOutCache; // (the buildings do not change during one search)
-    auto clearOfGates = [&](int px, int py) {
-        for (int g = 0; g < 2; ++g)
+    auto clearOfGates = [&](int siteX, int siteY) {
+        for (int gateIndex = 0; gateIndex < 2; ++gateIndex)
         {
-            if (m_gateX[g] < 0)
+            if (m_gateX[gateIndex] < 0)
                 continue;
             // keep a 2-tile corridor around each exit free of structures
-            if (px + w + 1 >= m_gateX[g] && px - 2 <= m_gateX[g] && py + h + 1 >= m_gateY[g] && py - 2 <= m_gateY[g])
+            if (siteX + width + 1 >= m_gateX[gateIndex] && siteX - 2 <= m_gateX[gateIndex]
+                && siteY + height + 1 >= m_gateY[gateIndex] && siteY - 2 <= m_gateY[gateIndex])
                 return false;
         }
         return true;
     };
-    for (int r = 0; r <= searchRadius; ++r)
+    for (int radius = 0; radius <= searchRadius; ++radius)
     {
-        for (int oy = -r; oy <= r; ++oy)
+        for (int offsetY = -radius; offsetY <= radius; ++offsetY)
         {
-            for (int ox = -r; ox <= r; ++ox)
+            for (int offsetX = -radius; offsetX <= radius; ++offsetX)
             {
-                if (std::max(std::abs(ox), std::abs(oy)) != r)
+                if (std::max(std::abs(offsetX), std::abs(offsetY)) != radius)
                     continue;
-                const int px = x + ox, py = y + oy;
-                if (!clearOfGates(px, py))
+                const int siteX = x + offsetX;
+                const int siteY = y + offsetY;
+                if (!clearOfGates(siteX, siteY))
                     continue;
-                if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player))
+                if (!entities.CanPlaceBuilding(siteX, siteY, width, height, map, m_player))
                     continue;
                 // Not on a road between the bases, not on an ally's ground
-                bool free = true;
-                for (int ty = py; ty < py + h && free; ++ty)
+                bool isTerrainFree = true;
+                for (int tileY = siteY; tileY < siteY + height && isTerrainFree; ++tileY)
                 {
-                    for (int tx = px; tx < px + w && free; ++tx)
-                        free = !IsRoad(tx, ty) && IsOwnGround(tx, ty);
+                    for (int tileX = siteX; tileX < siteX + width && isTerrainFree; ++tileX)
+                        isTerrainFree = !IsRoad(tileX, tileY) && IsOwnGround(tileX, tileY);
                 }
-                if (!free)
+                if (!isTerrainFree)
                     continue;
                 bool unitInside = false;
-                for (int ty = py; ty < py + h && !unitInside; ++ty)
+                for (int tileY = siteY; tileY < siteY + height && !unitInside; ++tileY)
                 {
-                    for (int tx = px; tx < px + w && !unitInside; ++tx)
-                        unitInside = entities.IsTileOccupiedByUnit(tx, ty);
+                    for (int tileX = siteX; tileX < siteX + width && !unitInside; ++tileX)
+                        unitInside = entities.IsTileOccupiedByUnit(tileX, tileY);
                 }
                 if (unitInside)
                 {
@@ -497,10 +414,10 @@ bool AIController::FindSiteNear(
                         *unitBlocked = true;
                     continue;
                 }
-                if (!KeepsWayOut(px, py, w, h, map, entities, needsExit, &wayOutCache))
+                if (!KeepsWayOut(siteX, siteY, width, height, map, entities, needsExit, &wayOutCache))
                     continue; // it would close the base in (or itself)
-                x = px;
-                y = py;
+                x = siteX;
+                y = siteY;
                 return true;
             }
         }
@@ -515,16 +432,17 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
     m_gateX[0] = m_gateX[1] = m_gateY[0] = m_gateY[1] = -1;
 
     // Base centre: the AI headquarters; threat direction: toward the player's base
-    int cx = m_enemyHqX, cy = m_enemyHqY;
+    int centerX = m_enemyHqX;
+    int centerY = m_enemyHqY;
     int hqRadius = 2;
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        const Building *b = e.AsBuilding();
-        if (b && b->alive && b->owner == m_player && b->type == UnitType::Headquarters)
+        const Building *building = entity.AsBuilding();
+        if (building && building->alive && building->owner == m_player && building->type == UnitType::Headquarters)
         {
-            cx = b->tileX + b->buildWidth / 2;
-            cy = b->tileY + b->buildHeight / 2;
-            hqRadius = std::max(b->buildWidth, b->buildHeight) / 2 + 1;
+            centerX = building->tileX + building->buildWidth / 2;
+            centerY = building->tileY + building->buildHeight / 2;
+            hqRadius = std::max(building->buildWidth, building->buildHeight) / 2 + 1;
             break;
         }
     }
@@ -533,56 +451,34 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         PlanTerritory(map, entities, pathfinder);
     Think("BUILD", m_style.Describe());
 
-    float tdx = static_cast<float>(m_playerHqX - cx);
-    float tdy = static_cast<float>(m_playerHqY - cy);
-    const float tlen = std::max(1.0f, DetMath::Hypot(tdx, tdy));
-    tdx /= tlen;
-    tdy /= tlen;
-    const float threatAngle = DetMath::Atan2(tdy, tdx);
+    float threatDeltaX = static_cast<float>(m_playerHqX - centerX);
+    float threatDeltaY = static_cast<float>(m_playerHqY - centerY);
+    const float threatDist = std::max(1.0f, DetMath::Hypot(threatDeltaX, threatDeltaY));
+    threatDeltaX /= threatDist;
+    threatDeltaY /= threatDist;
+    const float threatAngle = DetMath::Atan2(threatDeltaY, threatDeltaX);
     // The line of defense: as far out as the building zone allows (a wall near the HQ would close the base in)
-    const float maxD = static_cast<float>(entities.GetBuildRadius(m_player)) - 0.5f;
+    const float maxBuildDist = static_cast<float>(entities.GetBuildRadius(m_player)) - 0.5f;
     const float wallRadius = std::max(
         static_cast<float>(hqRadius + 4),
-        std::min(static_cast<float>(hqRadius + 10 + m_style.lineOffset), maxD - 1.0f));
-    auto ringTile = [&](float radius, float angleOffsetDeg, int &x, int &y) {
-        const float a = threatAngle + angleOffsetDeg * static_cast<float>(M_PI) / 180.0f;
-        x = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * radius)), 1, map.GetWidth() - 2);
-        y = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * radius)), 1, map.GetHeight() - 2);
+        std::min(static_cast<float>(hqRadius + 10 + m_style.lineOffset), maxBuildDist - 1.0f));
+    auto ringTile = [&](float radius, float angleOffsetDeg, int &outX, int &outY) {
+        const float angleRad = threatAngle + angleOffsetDeg * static_cast<float>(M_PI) / 180.0f;
+        outX = std::clamp(static_cast<int>(std::lround(centerX + DetMath::Cos(angleRad) * radius)), 1, map.GetWidth() - 2);
+        outY
+            = std::clamp(static_cast<int>(std::lround(centerY + DetMath::Sin(angleRad) * radius)), 1, map.GetHeight() - 2);
     };
-    auto add = [&](AIDefenseSite::Kind kind, int x, int y) {
+    auto addSite = [&](AIDefenseSite::Kind kind, int x, int y) {
         m_defensePlan.push_back({kind, x, y, false});
     };
 
     // Power plants, the barracks, the factory and the laboratory come from the core build order (UpdateCoreBuildOrder)
 
-    // Guard posts: on every road to an enemy, the last road tile two tiles inside the line of defense (posts closer
-    // than 6 tiles to each other are one)
-    m_guardPosts.clear();
-    m_guardOf.clear();
-    for (const auto &enemyRoad : m_enemyRoads)
-    {
-        int px = -1, py = -1;
-        for (const auto &[rx, ry] : enemyRoad)
-        {
-            if (DetMath::Hypot(static_cast<float>(rx - cx), static_cast<float>(ry - cy)) > wallRadius - 2.0f)
-                break;
-            px = rx;
-            py = ry;
-        }
-        if (px < 0)
-            continue;
-        bool near = false;
-        for (const auto &[gx, gy] : m_guardPosts)
-            near = near || std::max(std::abs(gx - px), std::abs(gy - py)) < 6;
-        if (!near)
-            m_guardPosts.emplace_back(px, py);
-    }
-
     // 1. Like the bases of the campaign: a wall straight across the narrowest passage of every road to an enemy,
     //    the gate on the road, a tower and a bunker behind it
     std::vector<std::pair<int, int>> wallTiles;
     std::vector<int> wallRow; // arc only: 0 the inner row, 1 the outer one
-    const bool passages = PlanPassageWalls(cx, cy, hqRadius, map, entities, wallTiles);
+    const bool passages = PlanPassageWalls(centerX, centerY, hqRadius, map, entities, wallTiles);
     if (passages)
     {
         Think("BUILD", "Closing " + std::to_string(wallTiles.size()) + " tiles of the passages toward the enemy");
@@ -594,22 +490,23 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         std::vector<PathNode> road;
         bool partial = false;
         pathfinder.SetIgnoreUnitsOnce();
-        pathfinder.FindPath(cx, cy + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
-        for (const auto &n : road)
+        pathfinder.FindPath(centerX, centerY + hqRadius + 1, m_playerHqX, m_playerHqY, road, 0, &partial, true);
+        for (const auto &node : road)
         {
-            if (DetMath::Hypot(static_cast<float>(n.x - cx), static_cast<float>(n.y - cy)) >= wallRadius - 0.5f)
+            if (DetMath::Hypot(static_cast<float>(node.x - centerX), static_cast<float>(node.y - centerY))
+                >= wallRadius - 0.5f)
             {
-                m_gateX[0] = n.x;
-                m_gateY[0] = n.y;
+                m_gateX[0] = node.x;
+                m_gateY[0] = node.y;
                 break;
             }
         }
         if (m_gateX[0] < 0)
             ringTile(wallRadius, 0.0f, m_gateX[0], m_gateY[0]);
         const float gateAngle
-            = DetMath::Atan2(static_cast<float>(m_gateY[0] - cy), static_cast<float>(m_gateX[0] - cx));
-        auto angleDiff = [](float a, float b) {
-            return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
+            = DetMath::Atan2(static_cast<float>(m_gateY[0] - centerY), static_cast<float>(m_gateX[0] - centerX));
+        auto angleDiff = [](float angleA, float angleB) {
+            return std::abs(std::remainder(angleA - angleB, 2.0f * static_cast<float>(M_PI)));
         };
         const float rad30 = 30.0f * static_cast<float>(M_PI) / 180.0f;
         // Every way an enemy comes from gets its arc: the objective's first, then where each road to an enemy crosses
@@ -624,27 +521,29 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         const float rad40 = 40.0f * static_cast<float>(M_PI) / 180.0f;
         for (const auto &enemyRoad : m_enemyRoads)
         {
-            for (const auto &[rx, ry] : enemyRoad)
+            for (const auto &[roadX, roadY] : enemyRoad)
             {
-                if (DetMath::Hypot(static_cast<float>(rx - cx), static_cast<float>(ry - cy)) < wallRadius - 0.5f)
+                if (DetMath::Hypot(static_cast<float>(roadX - centerX), static_cast<float>(roadY - centerY))
+                    < wallRadius - 0.5f)
                     continue;
-                const float a = DetMath::Atan2(static_cast<float>(ry - cy), static_cast<float>(rx - cx));
+                const float roadAngle
+                    = DetMath::Atan2(static_cast<float>(roadY - centerY), static_cast<float>(roadX - centerX));
                 bool merged = false;
-                for (const ArcDir &d : arcs)
-                    merged = merged || angleDiff(a, d.angle) < rad40;
+                for (const ArcDir &existingArc : arcs)
+                    merged = merged || angleDiff(roadAngle, existingArc.angle) < rad40;
                 if (!merged)
-                    arcs.push_back({a, rx, ry});
+                    arcs.push_back({roadAngle, roadX, roadY});
                 break;
             }
         }
         // The second exit: toward the side most attacks came from (when one other than the objective's did)
-        float worst = 0.0f;
+        float worstThreat = 0.0f;
         for (std::size_t i = 1; i < arcs.size(); ++i)
         {
             const float threat = m_sectorThreat[SectorOf(arcs[i].roadX, arcs[i].roadY)];
-            if (threat > worst)
+            if (threat > worstThreat)
             {
-                worst = threat;
+                worstThreat = threat;
                 m_gateX[1] = arcs[i].roadX;
                 m_gateY[1] = arcs[i].roadY;
             }
@@ -655,15 +554,15 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         {
             if (m_gateX[1] >= 0)
                 break; // (set above, toward the worst side)
-            const float a = gateAngle + side * rad30;
-            const int gx
-                = std::clamp(static_cast<int>(std::lround(cx + DetMath::Cos(a) * wallRadius)), 1, map.GetWidth() - 2);
-            const int gy
-                = std::clamp(static_cast<int>(std::lround(cy + DetMath::Sin(a) * wallRadius)), 1, map.GetHeight() - 2);
-            if (map.IsPassable(gx, gy))
+            const float exitAngle = gateAngle + side * rad30;
+            const int gateX = std::clamp(
+                static_cast<int>(std::lround(centerX + DetMath::Cos(exitAngle) * wallRadius)), 1, map.GetWidth() - 2);
+            const int gateY = std::clamp(
+                static_cast<int>(std::lround(centerY + DetMath::Sin(exitAngle) * wallRadius)), 1, map.GetHeight() - 2);
+            if (map.IsPassable(gateX, gateY))
             {
-                m_gateX[1] = gx;
-                m_gateY[1] = gy;
+                m_gateX[1] = gateX;
+                m_gateY[1] = gateY;
                 break;
             }
         }
@@ -672,28 +571,32 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         for (const ArcDir &arc : arcs)
             for (int row = 0; row < rows; ++row)
             {
-                const float radius = wallRadius + static_cast<float>(row);
-                const float step = 0.45f / radius;
-                for (float a = -halfArc; a <= halfArc; a += step)
+                const float ringRadius = wallRadius + static_cast<float>(row);
+                const float step = 0.45f / ringRadius;
+                for (float angleOffset = -halfArc; angleOffset <= halfArc; angleOffset += step)
                 {
-                    const int wx = static_cast<int>(std::lround(cx + DetMath::Cos(arc.angle + a) * radius));
-                    const int wy = static_cast<int>(std::lround(cy + DetMath::Sin(arc.angle + a) * radius));
-                    if (wx < 1 || wy < 1 || wx >= map.GetWidth() - 1 || wy >= map.GetHeight() - 1)
+                    const int wallX
+                        = static_cast<int>(std::lround(centerX + DetMath::Cos(arc.angle + angleOffset) * ringRadius));
+                    const int wallY
+                        = static_cast<int>(std::lround(centerY + DetMath::Sin(arc.angle + angleOffset) * ringRadius));
+                    if (wallX < 1 || wallY < 1 || wallX >= map.GetWidth() - 1 || wallY >= map.GetHeight() - 1)
                         continue;
-                    if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wx, wy)) != wallTiles.end())
+                    if (std::find(wallTiles.begin(), wallTiles.end(), std::make_pair(wallX, wallY)) != wallTiles.end())
                         continue;
                     bool nearGate = false;
-                    for (int g = 0; g < 2; ++g)
+                    for (int gateIndex = 0; gateIndex < 2; ++gateIndex)
                     {
-                        if (m_gateX[g] >= 0 && std::max(std::abs(wx - m_gateX[g]), std::abs(wy - m_gateY[g])) <= 1)
+                        if (m_gateX[gateIndex] >= 0
+                            && std::max(std::abs(wallX - m_gateX[gateIndex]), std::abs(wallY - m_gateY[gateIndex]))
+                                   <= 1)
                             nearGate = true;
                     }
                     // A road to an ally or the band of one stays open (an extra opening), so does an ally's ground;
                     // nothing walks over rock or water anyway
-                    if (nearGate || IsRoad(wx, wy) || !IsOwnGround(wx, wy) || !map.IsPassable(wx, wy)
-                        || map.GetWall(wx, wy) > 0)
+                    if (nearGate || IsRoad(wallX, wallY) || !IsOwnGround(wallX, wallY) || !map.IsPassable(wallX, wallY)
+                        || map.GetWall(wallX, wallY) > 0)
                         continue;
-                    wallTiles.emplace_back(wx, wy);
+                    wallTiles.emplace_back(wallX, wallY);
                     wallRow.push_back(row);
                 }
             }
@@ -702,18 +605,18 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         for (const ArcDir &arc : arcs)
         {
             const float offset = (arc.angle - threatAngle) * 180.0f / static_cast<float>(M_PI);
-            int x = 0, y = 0;
+            int tileX = 0, tileY = 0;
             for (float flank : {-kBunkerFlankDeg, kBunkerFlankDeg})
             {
-                ringTile(wallRadius - kBunkerBehindWall, offset + flank, x, y);
-                add(AIDefenseSite::Bunker, x - 1, y - 1);
+                ringTile(wallRadius - kBunkerBehindWall, offset + flank, tileX, tileY);
+                addSite(AIDefenseSite::Bunker, tileX - 1, tileY - 1);
             }
-            ringTile(wallRadius - kTowerBehindWall, offset, x, y);
-            add(AIDefenseSite::Tower, x - 1, y - 1);
+            ringTile(wallRadius - kTowerBehindWall, offset, tileX, tileY);
+            addSite(AIDefenseSite::Tower, tileX - 1, tileY - 1);
             for (float flank : {-kTowerFlankDeg, kTowerFlankDeg})
             {
-                ringTile(wallRadius - kTowerBehindWall, offset + flank, x, y);
-                add(AIDefenseSite::Tower, x - 1, y - 1);
+                ringTile(wallRadius - kTowerBehindWall, offset + flank, tileX, tileY);
+                addSite(AIDefenseSite::Tower, tileX - 1, tileY - 1);
             }
         }
         Think(
@@ -729,66 +632,77 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
     //    stop nobody and are left out.
     if (!passages)
     {
-        const int mw = map.GetWidth(), mh = map.GetHeight();
-        auto idx = [mw](int px, int py) {
-            return py * mw + px;
+        const int mapWidth = map.GetWidth();
+        const int mapHeight = map.GetHeight();
+        auto tileIndex = [mapWidth](int tileX, int tileY) {
+            return tileY * mapWidth + tileX;
         };
-        auto open = [&](int px, int py) {
-            return px >= 0 && py >= 0 && px < mw && py < mh && map.IsPassable(px, py) && map.GetWall(px, py) == 0;
+        auto isPassableOpen = [&](int tileX, int tileY) {
+            return tileX >= 0 && tileY >= 0 && tileX < mapWidth && tileY < mapHeight && map.IsPassable(tileX, tileY)
+                   && map.GetWall(tileX, tileY) == 0;
         };
-        std::vector<std::uint8_t> ring(static_cast<std::size_t>(mw) * mh, 0), inside(ring.size(), 0),
+        std::vector<std::uint8_t> ring(static_cast<std::size_t>(mapWidth) * mapHeight, 0), inside(ring.size(), 0),
             outside(ring.size(), 0);
         for (std::size_t i = 0; i < wallTiles.size(); ++i)
             if (wallRow[i] == 0)
-                ring[idx(wallTiles[i].first, wallTiles[i].second)] = 1; // the outer row lies outside the ring
-        auto distOf = [&](int px, int py) {
-            return DetMath::Hypot(static_cast<float>(px - cx), static_cast<float>(py - cy));
+                ring[tileIndex(wallTiles[i].first, wallTiles[i].second)] = 1; // the outer row lies outside the ring
+        auto distFromCenter = [&](int tileX, int tileY) {
+            return DetMath::Hypot(static_cast<float>(tileX - centerX), static_cast<float>(tileY - centerY));
         };
-        auto flood = [&](std::vector<std::uint8_t> &mark, std::vector<std::pair<int, int>> frontier, bool in) {
+        auto flood = [&](std::vector<std::uint8_t> &visited, std::vector<std::pair<int, int>> frontier, bool insideRing) {
             for (std::size_t i = 0; i < frontier.size(); ++i)
             {
-                const auto [fx, fy] = frontier[i];
-                for (int dy = -1; dy <= 1; ++dy)
+                const auto [frontX, frontY] = frontier[i];
+                for (int deltaY = -1; deltaY <= 1; ++deltaY)
                 {
-                    for (int dx = -1; dx <= 1; ++dx)
+                    for (int deltaX = -1; deltaX <= 1; ++deltaX)
                     {
-                        const int nx = fx + dx, ny = fy + dy;
-                        if ((dx == 0 && dy == 0) || !open(nx, ny) || ring[idx(nx, ny)] || mark[idx(nx, ny)])
+                        const int nextX = frontX + deltaX;
+                        const int nextY = frontY + deltaY;
+                        if ((deltaX == 0 && deltaY == 0) || !isPassableOpen(nextX, nextY)
+                            || ring[tileIndex(nextX, nextY)] || visited[tileIndex(nextX, nextY)])
                             continue;
-                        if (in != (distOf(nx, ny) < wallRadius))
+                        if (insideRing != (distFromCenter(nextX, nextY) < wallRadius))
                             continue;
-                        mark[idx(nx, ny)] = 1;
-                        frontier.emplace_back(nx, ny);
+                        visited[tileIndex(nextX, nextY)] = 1;
+                        frontier.emplace_back(nextX, nextY);
                     }
                 }
             }
         };
         std::vector<std::pair<int, int>> seedsIn, seedsOut;
-        for (int py = std::max(0, cy - hqRadius - 2); py <= std::min(mh - 1, cy + hqRadius + 2); ++py)
+        for (int tileY = std::max(0, centerY - hqRadius - 2);
+             tileY <= std::min(mapHeight - 1, centerY + hqRadius + 2);
+             ++tileY)
         {
-            for (int px = std::max(0, cx - hqRadius - 2); px <= std::min(mw - 1, cx + hqRadius + 2); ++px)
+            for (int tileX = std::max(0, centerX - hqRadius - 2);
+                 tileX <= std::min(mapWidth - 1, centerX + hqRadius + 2);
+                 ++tileX)
             {
-                if (open(px, py) && !ring[idx(px, py)] && distOf(px, py) < wallRadius)
+                if (isPassableOpen(tileX, tileY) && !ring[tileIndex(tileX, tileY)]
+                    && distFromCenter(tileX, tileY) < wallRadius)
                 {
-                    inside[idx(px, py)] = 1;
-                    seedsIn.emplace_back(px, py);
+                    inside[tileIndex(tileX, tileY)] = 1;
+                    seedsIn.emplace_back(tileX, tileY);
                 }
             }
         }
-        for (const auto &e : entities.GetAllEntities())
+        for (const auto &entity : entities.GetAllEntities())
         {
-            if (!e.alive || e.state == ActionState::Die || !Players::Hostile(e.owner, m_player)
-                || e.faction == Faction::Neutral)
+            if (!entity.alive || entity.state == ActionState::Die || !Players::Hostile(entity.owner, m_player)
+                || entity.faction == Faction::Neutral)
                 continue;
-            for (int dy = -2; dy <= 2; ++dy)
+            for (int deltaY = -2; deltaY <= 2; ++deltaY)
             {
-                for (int dx = -2; dx <= 2; ++dx)
+                for (int deltaX = -2; deltaX <= 2; ++deltaX)
                 {
-                    const int px = e.tileX + dx, py = e.tileY + dy;
-                    if (open(px, py) && !ring[idx(px, py)] && !outside[idx(px, py)] && distOf(px, py) >= wallRadius)
+                    const int seedX = entity.tileX + deltaX;
+                    const int seedY = entity.tileY + deltaY;
+                    if (isPassableOpen(seedX, seedY) && !ring[tileIndex(seedX, seedY)]
+                        && !outside[tileIndex(seedX, seedY)] && distFromCenter(seedX, seedY) >= wallRadius)
                     {
-                        outside[idx(px, py)] = 1;
-                        seedsOut.emplace_back(px, py);
+                        outside[tileIndex(seedX, seedY)] = 1;
+                        seedsOut.emplace_back(seedX, seedY);
                     }
                 }
             }
@@ -804,17 +718,18 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
         {
             if (wallRow[i] != 0)
                 continue;
-            const auto [wx, wy] = wallTiles[i];
+            const auto [wallX, wallY] = wallTiles[i];
             bool linksIn = false, linksOut = false;
-            for (int dy = -1; dy <= 1; ++dy)
+            for (int deltaY = -1; deltaY <= 1; ++deltaY)
             {
-                for (int dx = -1; dx <= 1; ++dx)
+                for (int deltaX = -1; deltaX <= 1; ++deltaX)
                 {
-                    const int nx = wx + dx, ny = wy + dy;
-                    if (nx < 0 || ny < 0 || nx >= mw || ny >= mh)
+                    const int neighborX = wallX + deltaX;
+                    const int neighborY = wallY + deltaY;
+                    if (neighborX < 0 || neighborY < 0 || neighborX >= mapWidth || neighborY >= mapHeight)
                         continue;
-                    linksIn = linksIn || inside[idx(nx, ny)];
-                    linksOut = linksOut || outside[idx(nx, ny)];
+                    linksIn = linksIn || inside[tileIndex(neighborX, neighborY)];
+                    linksOut = linksOut || outside[tileIndex(neighborX, neighborY)];
                 }
             }
             kept[i] = !knowsEnemy || (linksIn && linksOut);
@@ -837,7 +752,7 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
                 ++skipped;
                 continue;
             }
-            add(AIDefenseSite::Wall, wallTiles[i].first, wallTiles[i].second);
+            addSite(AIDefenseSite::Wall, wallTiles[i].first, wallTiles[i].second);
         }
         if (skipped > 0)
             Think("BUILD", "Leaving out " + std::to_string(skipped) + " wall tiles nobody can walk through");
@@ -845,12 +760,12 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
 
     else
     {
-        for (const auto &[wx, wy] : wallTiles)
-            add(AIDefenseSite::Wall, wx, wy);
+        for (const auto &[wallX, wallY] : wallTiles)
+            addSite(AIDefenseSite::Wall, wallX, wallY);
     }
 
     // The other headquarters of the base get their own, smaller defense
-    PlanOutpostDefenses(cx, cy, wallRadius, map, entities);
+    PlanOutpostDefenses(centerX, centerY, wallRadius, map, entities);
     FinishDefensePlan(map, entities);
 
     std::ostringstream plan;
@@ -861,77 +776,84 @@ void AIController::PlanBaseDefenses(const TileMap &map, const EntityManager &ent
 }
 
 void AIController::PlanOutpostDefenses(
-    int cx, int cy, float wallRadius, const TileMap &map, const EntityManager &entities)
+    int homeCenterX, int homeCenterY, float wallRadius, const TileMap &map, const EntityManager &entities)
 {
     constexpr float kPi = static_cast<float>(M_PI);
-    auto angleDiff = [](float a, float b) {
-        return std::abs(std::remainder(a - b, 2.0f * static_cast<float>(M_PI)));
+    auto angleDiff = [](float angleA, float angleB) {
+        return std::abs(std::remainder(angleA - angleB, 2.0f * static_cast<float>(M_PI)));
     };
     std::set<std::pair<int, int>> walled;
     for (const AIDefenseSite &site : m_defensePlan)
         if (site.kind == AIDefenseSite::Wall)
             walled.insert({site.tileX, site.tileY});
     int outposts = 0;
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die || b->owner != m_player || b->type != UnitType::Headquarters
-            || b->buildProgress < 1.0f)
+        const Building *building = entity.AsBuilding();
+        if (!building || !building->alive || building->state == ActionState::Die || building->owner != m_player
+            || building->type != UnitType::Headquarters || building->buildProgress < 1.0f)
             continue;
-        const int ox = b->tileX + b->buildWidth / 2, oy = b->tileY + b->buildHeight / 2;
-        const float fromHome = DetMath::Hypot(static_cast<float>(ox - cx), static_cast<float>(oy - cy));
+        const int outpostX = building->tileX + building->buildWidth / 2;
+        const int outpostY = building->tileY + building->buildHeight / 2;
+        const float fromHome
+            = DetMath::Hypot(static_cast<float>(outpostX - homeCenterX), static_cast<float>(outpostY - homeCenterY));
         if (fromHome <= wallRadius - 4.0f)
             continue; // the first headquarters itself, or one well inside the main line
-        const float radius = static_cast<float>(std::max(b->buildWidth, b->buildHeight) / 2 + 1);
+        const float radius = static_cast<float>(std::max(building->buildWidth, building->buildHeight) / 2 + 1);
         // The ways an enemy comes from: the objective and every enemy the roads lead to; not the side of the main
         // base (its line stands there)
-        const float homeAngle = DetMath::Atan2(static_cast<float>(cy - oy), static_cast<float>(cx - ox));
+        const float homeAngle
+            = DetMath::Atan2(static_cast<float>(homeCenterY - outpostY), static_cast<float>(homeCenterX - outpostX));
         std::vector<float> angles;
-        auto addAngle = [&](int tx, int ty) {
-            if (tx == ox && ty == oy)
+        auto addAngle = [&](int targetX, int targetY) {
+            if (targetX == outpostX && targetY == outpostY)
                 return;
-            const float a = DetMath::Atan2(static_cast<float>(ty - oy), static_cast<float>(tx - ox));
-            if (angleDiff(a, homeAngle) < 50.0f * kPi / 180.0f)
+            const float angle
+                = DetMath::Atan2(static_cast<float>(targetY - outpostY), static_cast<float>(targetX - outpostX));
+            if (angleDiff(angle, homeAngle) < 50.0f * kPi / 180.0f)
                 return;
             for (float known : angles)
-                if (angleDiff(a, known) < 40.0f * kPi / 180.0f)
+                if (angleDiff(angle, known) < 40.0f * kPi / 180.0f)
                     return;
-            angles.push_back(a);
+            angles.push_back(angle);
         };
         addAngle(m_playerHqX, m_playerHqY);
         for (const auto &road : m_enemyRoads)
             if (!road.empty())
                 addAngle(road.back().first, road.back().second);
-        auto tileAt = [&](float a, float r, int &x, int &y) {
-            x = std::clamp(static_cast<int>(std::lround(ox + DetMath::Cos(a) * r)), 1, map.GetWidth() - 2);
-            y = std::clamp(static_cast<int>(std::lround(oy + DetMath::Sin(a) * r)), 1, map.GetHeight() - 2);
+        auto tileAt = [&](float angle, float dist, int &outX, int &outY) {
+            outX = std::clamp(
+                static_cast<int>(std::lround(outpostX + DetMath::Cos(angle) * dist)), 1, map.GetWidth() - 2);
+            outY = std::clamp(
+                static_cast<int>(std::lround(outpostY + DetMath::Sin(angle) * dist)), 1, map.GetHeight() - 2);
         };
-        for (float a : angles)
+        for (float angle : angles)
         {
-            int x = 0, y = 0;
+            int siteX = 0, siteY = 0;
             for (float flank : {-kBunkerFlankDeg, kBunkerFlankDeg})
             {
-                tileAt(a + flank * kPi / 180.0f, radius + 7.0f, x, y);
-                m_defensePlan.push_back({AIDefenseSite::Bunker, x - 1, y - 1, false});
+                tileAt(angle + flank * kPi / 180.0f, radius + 7.0f, siteX, siteY);
+                m_defensePlan.push_back({AIDefenseSite::Bunker, siteX - 1, siteY - 1, false});
             }
-            tileAt(a, radius + 4.0f, x, y);
-            m_defensePlan.push_back({AIDefenseSite::Tower, x - 1, y - 1, false});
+            tileAt(angle, radius + 4.0f, siteX, siteY);
+            m_defensePlan.push_back({AIDefenseSite::Tower, siteX - 1, siteY - 1, false});
             if (m_style.towersOnly)
                 continue;
             // A short wall in front of them, open in the middle
-            const float ring = radius + 9.0f;
+            const float wallRingRadius = radius + 9.0f;
             int midX = 0, midY = 0;
-            tileAt(a, ring, midX, midY);
-            const float half = 35.0f * kPi / 180.0f;
-            for (float off = -half; off <= half; off += 0.45f / ring)
+            tileAt(angle, wallRingRadius, midX, midY);
+            const float halfArcRad = 35.0f * kPi / 180.0f;
+            for (float angleOffset = -halfArcRad; angleOffset <= halfArcRad; angleOffset += 0.45f / wallRingRadius)
             {
-                tileAt(a + off, ring, x, y);
-                if (std::max(std::abs(x - midX), std::abs(y - midY)) <= 1)
+                tileAt(angle + angleOffset, wallRingRadius, siteX, siteY);
+                if (std::max(std::abs(siteX - midX), std::abs(siteY - midY)) <= 1)
                     continue;
-                if (IsRoad(x, y) || !IsOwnGround(x, y) || !map.IsPassable(x, y) || map.GetWall(x, y) > 0)
+                if (IsRoad(siteX, siteY) || !IsOwnGround(siteX, siteY) || !map.IsPassable(siteX, siteY)
+                    || map.GetWall(siteX, siteY) > 0)
                     continue;
-                if (walled.insert({x, y}).second)
-                    m_defensePlan.push_back({AIDefenseSite::Wall, x, y, false});
+                if (walled.insert({siteX, siteY}).second)
+                    m_defensePlan.push_back({AIDefenseSite::Wall, siteX, siteY, false});
             }
         }
         outposts += angles.empty() ? 0 : 1;
@@ -945,10 +867,11 @@ void AIController::FinishDefensePlan(const TileMap &map, const EntityManager &en
     // 1. What stands already (the plan is made again when a headquarters is finished or lost): not built twice
     const bool towerUnlocked = IsBuildingUnlocked(m_player, FactionBuildingIndex(AIDefenseSite::Tower, side()));
     std::vector<const Building *> standing;
-    for (const auto &e : entities.GetAllEntities())
-        if (const Building *b = e.AsBuilding(); b && b->alive && b->state != ActionState::Die && b->owner == m_player
-                                                && (b->type == UnitType::Tower || b->type == UnitType::Bunker))
-            standing.push_back(b);
+    for (const auto &entity : entities.GetAllEntities())
+        if (const Building *building = entity.AsBuilding();
+            building && building->alive && building->state != ActionState::Die && building->owner == m_player
+            && (building->type == UnitType::Tower || building->type == UnitType::Bunker))
+            standing.push_back(building);
     std::vector<bool> taken(standing.size(), false);
     for (AIDefenseSite &site : m_defensePlan)
     {
@@ -992,9 +915,10 @@ void AIController::FinishDefensePlan(const TileMap &map, const EntityManager &en
     auto rank = [](const AIDefenseSite &site) {
         return site.kind == AIDefenseSite::Bunker ? 0 : site.kind == AIDefenseSite::Tower ? 2 : 1;
     };
-    std::stable_sort(m_defensePlan.begin(), m_defensePlan.end(), [&](const AIDefenseSite &a, const AIDefenseSite &b) {
-        return rank(a) < rank(b);
-    });
+    std::stable_sort(
+        m_defensePlan.begin(), m_defensePlan.end(), [&](const AIDefenseSite &lhs, const AIDefenseSite &rhs) {
+            return rank(lhs) < rank(rhs);
+        });
 }
 
 bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityManager &entities)
@@ -1057,9 +981,9 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
                 + " is started: the building limit is reached");
         return false;
     }
-    const BuildingConfig *cfg = entities.GetBuildingConfig(index);
-    const int w = cfg ? cfg->width : 2;
-    const int h = cfg ? cfg->height : 2;
+    const BuildingConfig *buildingConfig = entities.GetBuildingConfig(index);
+    const int width = buildingConfig ? buildingConfig->width : 2;
+    const int height = buildingConfig ? buildingConfig->height : 2;
     static const char *const kKindNames[]
         = {"tower",
            "bunker",
@@ -1095,24 +1019,24 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
     bool unitBlocked = false;
     const bool needsExit = site.kind == AIDefenseSite::Barracks || site.kind == AIDefenseSite::Factory
                            || site.kind == AIDefenseSite::Headquarters;
-    if (!FindSiteNear(x, y, w, h, searchRadius, map, entities, &unitBlocked, needsExit))
+    if (!FindSiteNear(x, y, width, height, searchRadius, map, entities, &unitBlocked, needsExit))
     {
         // No room around the planned spot; when only units were in the way, try again later
         site.done = !unitBlocked || ++site.attempts >= kMaxUnitWaits;
         return false;
     }
-    const int id = entities.SpawnBuildingByIndex(index, x, y, side(), 0.0f, m_player);
-    if (id <= 0)
+    const int buildingId = entities.SpawnBuildingByIndex(index, x, y, side(), 0.0f, m_player);
+    if (buildingId <= 0)
     {
         // Refused by the entity limit: the site stays planned and is tried again; anything else gives it up
         site.done = entities.FreeEntitySlots(m_player) > 0;
         return false;
     }
     m_credits -= cost;
-    for (int ty = y; ty < y + h && ty < map.GetHeight(); ++ty)
+    for (int tileY = y; tileY < y + height && tileY < map.GetHeight(); ++tileY)
     {
-        for (int tx = x; tx < x + w && tx < map.GetWidth(); ++tx)
-            map.SetPassable(tx, ty, false);
+        for (int tileX = x; tileX < x + width && tileX < map.GetWidth(); ++tileX)
+            map.SetPassable(tileX, tileY, false);
     }
     if (site.kind == AIDefenseSite::PowerPlant)
         m_powerNeeded = 0; // the plant for what waited is coming
@@ -1120,15 +1044,15 @@ bool AIController::BuildDefenseSite(AIDefenseSite &site, TileMap &map, EntityMan
         "BUILD",
         std::string("Building a ") + kKindNames[site.kind] + " at (" + std::to_string(x) + ", " + std::to_string(y)
             + ") for $" + std::to_string(cost));
-    if (const Building *b = entities.GetBuilding(id))
+    if (const Building *building = entities.GetBuilding(buildingId))
     {
         AIStructurePlan plan;
-        plan.type = b->type;
+        plan.type = building->type;
         plan.rawBuildingType = index;
         plan.tileX = x;
         plan.tileY = y;
-        plan.width = w;
-        plan.height = h;
+        plan.width = width;
+        plan.height = height;
         plan.creditCost = cost;
         m_startingBuildings.push_back(plan); // remembered for rebuilding
     }

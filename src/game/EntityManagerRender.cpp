@@ -31,6 +31,8 @@ void EntityManager::AddGroundMark(float x, float y, int composite, float seconds
     if (m_groundMarks.size() >= kMaxMarks)
         m_groundMarks.erase(m_groundMarks.begin());
     m_groundMarks.push_back({x, y, composite, seconds});
+    if (m_collectEvents && m_eventGroundMarks.size() < 20000)
+        m_eventGroundMarks.push_back({x, y, composite, seconds});
 }
 
 void EntityManager::RenderGroundRemnants(

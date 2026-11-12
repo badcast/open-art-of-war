@@ -291,6 +291,8 @@ void encode(BitWriter &w, const StartMatch &m)
 {
     writeType(w, MsgType::StartMatch);
     w.writeVarUint(m.firstTurnDelayMs);
+    w.writeU8(m.authoritySlot);
+    w.writeU32(m.matchId);
     writeBlob(w, m.setup);
 }
 
@@ -300,6 +302,10 @@ bool decode(BitReader &r, StartMatch &m)
     if (delay > 60000)
         r.fail();
     m.firstTurnDelayMs = static_cast<std::uint32_t>(delay);
+    m.authoritySlot = r.readU8();
+    if (m.authoritySlot >= kMaxPlayers)
+        r.fail();
+    m.matchId = r.readU32();
     readBlob(r, m.setup, kMaxMatchSetupBytes);
     return done(r);
 }
@@ -481,6 +487,42 @@ void encode(BitWriter &w, const FileData &m)
     writeType(w, MsgType::FileData);
     w.writeU64(m.hash);
     writeBlob(w, m.bytes);
+}
+
+void encode(BitWriter &w, const AuthorityState &m)
+{
+    writeType(w, MsgType::AuthorityState);
+    w.writeU8(m.recipient);
+    w.writeU32(m.matchId);
+    w.writeU32(m.tick);
+    writeBlob(w, m.bytes);
+}
+
+bool decode(BitReader &r, AuthorityState &m)
+{
+    m.recipient = r.readU8();
+    m.matchId = r.readU32();
+    m.tick = r.readU32();
+    if (m.recipient >= kMaxPlayers)
+        return false;
+    readBlob(r, m.bytes, kMaxAuthorityStateBytes);
+    return done(r);
+}
+
+void encode(BitWriter &w, const AuthorityAck &m)
+{
+    writeType(w, MsgType::AuthorityAck);
+    w.writeU8(m.sender);
+    w.writeU32(m.matchId);
+    w.writeU32(m.tick);
+}
+
+bool decode(BitReader &r, AuthorityAck &m)
+{
+    m.sender = r.readU8();
+    m.matchId = r.readU32();
+    m.tick = r.readU32();
+    return m.sender < kMaxPlayers && done(r);
 }
 
 bool decode(BitReader &r, FileData &m)

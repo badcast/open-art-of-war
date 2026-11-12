@@ -187,6 +187,8 @@ set(ENGINE_SOURCES
     src/net/NetMatch.cpp
     src/net/MapFiles.cpp
     src/net/ReplayRecorder.cpp
+    src/net/WorldSnapshot.cpp
+    src/game/EntityManagerReplica.cpp
     src/replay/ReplayPlayer.cpp
     src/ui/ReplayMenu.cpp
     src/ui/ModsMenu.cpp
@@ -491,6 +493,13 @@ set_target_properties(openaow-ai-defense-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 # (it reads the unit and building definitions: run where ./assets is)
 add_test(NAME openaow-ai-defense-tests COMMAND openaow-ai-defense-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+add_executable(openaow-worldsnapshot-tests tests/WorldSnapshotTests.cpp)
+target_link_libraries(openaow-worldsnapshot-tests PRIVATE openaow-core)
+set_target_properties(openaow-worldsnapshot-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-worldsnapshot-tests COMMAND openaow-worldsnapshot-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_executable(openaow-determinism-tests tests/DeterminismTests.cpp)
 target_link_libraries(openaow-determinism-tests PRIVATE openaow-core)

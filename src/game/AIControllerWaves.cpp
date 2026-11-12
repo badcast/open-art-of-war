@@ -209,7 +209,7 @@ void AIController::UpdateWaveRoster(EntityManager &entities)
         }
     }
     // Nobody is forgotten (skirmish / network game: a mission's script commands its own troops): an own mobile unit
-    // that no list holds (not in a squad, not the scout, not on its way to repairs) is a troop of the reserve
+    // that no list holds (not in a squad, not the scout, not on the offensive) is a troop of the reserve
     if (m_rosterSeeded && m_skirmish)
     {
         for (const auto &e : entities.GetAllEntities())
@@ -218,7 +218,7 @@ void AIController::UpdateWaveRoster(EntityManager &entities)
             if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player || u->moveSpeed <= 0.0f)
                 continue;
             if (m_waveRoster.count(u->id) || m_garrison.count(u->id) || m_squadController.IsSquadMember(u->id)
-                || u->id == m_scoutId || m_repairing.count(u->id) || m_offensive.count(u->id))
+                || u->id == m_scoutId || m_offensive.count(u->id))
                 continue;
             m_waveRoster.insert(u->id);
         }
@@ -251,13 +251,11 @@ void AIController::UpdateUnitStances(EntityManager &entities)
         // Artillery and units with a siege form: Porcupine / Grad MLRS, Sniper, Rhino
         const int a = u->archetypeId;
         const bool artillery = a == 4 || a == 10 || a == 12 || a == 13 || a == 14 || a == 15 || a == 16;
-        UnitStance wanted = UnitStance::PursueAndReturn;
-        if (id == m_scoutId || m_repairing.count(id))
-            wanted = UnitStance::HoldGround; // looks / pulls back, does not chase
-        else if (artillery)
+        UnitStance wanted = UnitStance::Pursue;
+        if (artillery)
             wanted = UnitStance::HoldGround;
-        else if (m_squadController.IsSquadMember(id) || m_offensive.count(id))
-            wanted = UnitStance::Pursue; // on the attack: no way back to a home spot
+        else if (m_garrison.count(id))
+            wanted = UnitStance::PursueAndReturn;
         if (u->stance != wanted)
         {
             u->stance = wanted;
@@ -368,17 +366,26 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
         return;
     pathfinder.SetEntityManager(&entities);
 
-    // Fresh troops (and units that fell back) gather at the staging area instead of attacking piecemeal
+    const std::vector<const Building *> ownStructures = OwnStructures(entities);
+    // Fresh troops gather at the staging area instead of attacking piecemeal; units that already left the base
+    // never return to the base and switch to the offensive instead
     std::vector<int> toStage;
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        // (a guard stays at its post, a defender where the attack on the base is)
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_defenders.count(u->id) || m_offensive.count(u->id))
+        // (a defender stays where the attack on the base is)
+        if (!u || !IsReserveUnit(*u) || m_defenders.count(u->id) || m_offensive.count(u->id) || u->id == m_scoutId)
             continue;
+        const int distStaging = std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY));
+        if (distStaging > 16 && !IsNearBase(*u, ownStructures, kBaseChaseTiles))
+        {
+            m_waveRoster.erase(u->id);
+            m_offensive.insert(u->id);
+            continue;
+        }
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
         {
-            if (std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY)) > 5)
+            if (distStaging > 5)
             {
                 toStage.push_back(u->id);
             }
@@ -397,11 +404,13 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
             continue;
         int slotX = slots[i].x;
         int slotY = slots[i].y;
-        if (std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1)
+        const int curDist = std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY));
+        const int slotDist = std::max(std::abs(slotX - m_stagingX), std::abs(slotY - m_stagingY));
+        if ((std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1) && ( curDist > 8 || slotDist < curDist))
         {
             bool isPartial = false;
             bool found = pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial);
-            if (!found)
+            if (!found && curDist > 8)
             {
                 // Boxed in by its own crowd (troops standing about in a crowded base block each other): plan the
                 // road through them, the units make way for each other when they walk
@@ -477,31 +486,46 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 {
     m_waveCooldown -= deltaTime;
 
-    // Troops assembled at the staging area and ready to march
-    std::vector<int> ready;
-    for (const auto &e : entities.GetAllEntities())
+    const std::vector<const Building *> ownStructures = OwnStructures(entities);
+    bool isProducing = false;
+    for (const Building *b : ownStructures)
     {
-        const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id)) // (the guards at the posts never leave with a wave)
+        if ((b->type == UnitType::Barracks || b->type == UnitType::Factory)
+            && b->buildProgress >= 1.0f && b->isPowered && (b->isProducing || !b->productionQueue.empty()))
+        {
+            isProducing = true;
+            break;
+        }
+    }
+
+    // Troops assembled at the staging area or standing idle in the base and ready to march
+    std::vector<int> ready;
+    std::vector<int> idleReserve;
+    for (auto &e : entities.GetAllEntities())
+    {
+        Unit *u = e.AsUnit();
+        if (!u || !IsReserveUnit(*u) || u->id == m_scoutId)
             continue;
-        if (u->targetEntityId != 0 || u->isAttackMoving)
+        if (u->state == ActionState::Idle && u->path.empty() && !u->waitingForPath && u->targetEntityId == 0
+            && u->targetWallTileX < 0 && !u->isSiegeMode)
+        {
+            u->isAttackMoving = false;
+            u->ClearMoveTarget();
+        }
+        if (u->targetEntityId != 0 || u->state == ActionState::Attack || u->state == ActionState::Transform)
             continue;
-        if (std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY)) <= 7)
+        const int distStaging = std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY));
+        const bool idle = (u->state == ActionState::Idle && !u->isAttackMoving) || u->blockedTimer >= 2.0f;
+        if (idle)
+            idleReserve.push_back(u->id);
+        if (!u->isAttackMoving
+            && (distStaging <= 7
+                || (idle && (distStaging <= 16 || IsNearBase(*u, ownStructures, 4.0f)))))
         {
             ready.push_back(u->id);
         }
     }
     m_readyUnits = static_cast<int>(ready.size());
-    // Troops that stand about idle in the base but never made it to the staging area (a crowded or walled-in base):
-    // after a long wait the wave marches from where they are instead of waiting for ever
-    std::vector<int> idleReserve;
-    for (const auto &e : entities.GetAllEntities())
-    {
-        const Unit *u = e.AsUnit();
-        if (u && IsReserveUnit(*u) && !IsPostGuard(u->id) && u->targetEntityId == 0 && !u->isAttackMoving
-            && u->state == ActionState::Idle)
-            idleReserve.push_back(u->id);
-    }
 
     // No wave leaves while the base is attacked: its troops are the defenders. Not for ever (an enemy nobody can
     // reach must not pin the army down)
@@ -510,38 +534,33 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     const AIDifficulty difficulty = GetEffectiveDifficulty();
     // Hard/Hardcore do not wait for the whole wave: a group leaves as soon as dispatch_group_size troops are
-    // assembled at the staging area (the home guard stays). No cooldown between the groups. A lone troop fresh
-    // from the barracks never marches off on its own
+    // assembled at the staging area, or whenever idle troops have been waiting without a launch
     if (difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore)
     {
-        std::vector<int> front;
-        for (int id : ready)
-        {
-            const Unit *u = entities.GetUnit(id);
-            if (u && !m_defenders.count(id) && !m_repairing.count(id) && id != m_scoutId
-                && u->state != ActionState::Attack && u->state != ActionState::Transform)
-                front.push_back(id);
-        }
+        std::vector<int> front = ready;
         const int groupSize = m_currentDifficultyConfig.tactics.dispatchGroupSize;
-        const int guard = std::max(0, HomeGuardCount() - static_cast<int>(m_guardOf.size()));
-        int send = static_cast<int>(front.size()) - guard;
-        // Without production left nobody else comes: what is assembled goes after a while
-        const bool stranded = !m_hasProduction && send > 0 && m_waveAssemblyTimer > 20.0f;
-        // Troops that never reach the staging area (a crowded or walled-in base) leave from where they stand
-        constexpr float kStagingGiveUpSeconds = 120.0f;
-        if (send < groupSize && !stranded && m_waveAssemblyTimer > kStagingGiveUpSeconds
-            && static_cast<int>(idleReserve.size()) - guard >= groupSize)
+        int send = static_cast<int>(front.size());
+        const bool idleTimeout
+            = (!front.empty() || !idleReserve.empty())
+              && (m_waveAssemblyTimer >= 15.0f || (!m_hasProduction && m_waveAssemblyTimer >= 5.0f)
+                  || (!isProducing && m_waveAssemblyTimer >= 8.0f));
+        if (send < groupSize
+            && (idleTimeout || (m_waveAssemblyTimer >= 10.0f && static_cast<int>(idleReserve.size()) >= groupSize)))
         {
-            front = idleReserve;
-            send = static_cast<int>(front.size()) - guard;
+            for (int id : idleReserve)
+            {
+                if (std::find(front.begin(), front.end(), id) == front.end())
+                    front.push_back(id);
+            }
+            send = static_cast<int>(front.size());
         }
-        if (send < groupSize && !stranded)
+        if (send == 0 || (send < groupSize && !idleTimeout))
             return;
         int targetX, targetY;
         FindAttackObjective(entities, map, targetX, targetY);
         if (targetX < 0)
             return;
-        // The troops closest to the objective leave, the rear ones stay as the home guard
+        // The troops closest to the objective leave first
         const long long dx = targetX - m_enemyHqX, dy = targetY - m_enemyHqY;
         std::sort(front.begin(), front.end(), [&](int a, int b) {
             const Unit *ua = entities.GetUnit(a), *ub = entities.GetUnit(b);
@@ -551,7 +570,10 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         });
         std::vector<int> group(front.begin(), front.begin() + std::min(send, groupSize));
         for (int id : group)
+        {
             entities.GetUnit(id)->groupHold = false;
+            m_defenders.erase(id);
+        }
         const int wave = m_waveCount + 1;
         const int squadId = m_squadController.CreateSquad(
             group, targetX, targetY, wave, entities, pathfinder, m_currentDifficultyConfig.tactics);
@@ -576,87 +598,53 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         {
             ++m_waveCount;
             m_dispatchedInWave = 0;
-            m_lastPlanSize = static_cast<int>(m_currentPlan.archetypes.size());
             m_currentPlan.archetypes.clear();
             m_waveAssemblyTimer = 0.0f;
         }
         return;
     }
 
-    int required = static_cast<int>(m_currentPlan.archetypes.size());
-    if (required == 0 || m_waveCooldown > 0.0f)
+    std::vector<int> allReady = ready;
+    for (int id : idleReserve)
+    {
+        if (std::find(allReady.begin(), allReady.end(), id) == allReady.end())
+            allReady.push_back(id);
+    }
+    if (allReady.empty())
         return;
 
-    // March only with 100% of the planned wave plus the home guard that stays; without production left, send
-    // whatever is assembled
-    // (the guards already at the posts count toward it: the rest of the home guard stays at the staging area)
-    const int guard = std::max(0, HomeGuardCount() - static_cast<int>(m_guardOf.size()));
-    bool full = static_cast<int>(ready.size()) >= required + guard;
+    int required = static_cast<int>(m_currentPlan.archetypes.size());
+    const bool idleWave = (!isProducing && m_waveAssemblyTimer >= 12.0f)
+                          || (m_waveCooldown <= 0.0f && m_waveAssemblyTimer >= 20.0f);
+    if ((required == 0 || m_waveCooldown > 0.0f) && !idleWave)
+        return;
+
+    bool full = required > 0 && m_waveCooldown <= 0.0f && static_cast<int>(ready.size()) >= required;
     // A wave does not wait for its vehicles for ever: after the difficulty's wait it marches with what is there
     // (the vehicles still being built join the next wave)
     int plannedVehicles = 0, readyVehicles = 0;
     for (int arch : m_currentPlan.archetypes)
         plannedVehicles += IsVehicleArchetype(arch) ? 1 : 0;
-    for (int id : ready)
+    for (int id : allReady)
         if (const Unit *ru = entities.GetUnit(id); ru && !ru->IsInfantry())
             ++readyVehicles;
     const int missingVehicles = std::max(0, plannedVehicles - readyVehicles);
     const bool vehicleTimeout
-        = !full && missingVehicles > 0 && m_waveAssemblyTimer > m_currentDifficultyConfig.tactics.vehicleWaitSeconds
-          && static_cast<int>(ready.size()) >= std::max(kMinAttackWave, required - missingVehicles + guard);
-    // Without production left the AI sends what is assembled, but still not a handful: ten troops, or after a long wait
-    bool stranded = !m_hasProduction && !ready.empty()
-                    && ((static_cast<int>(ready.size()) >= kMinAttackWave && m_waveAssemblyTimer > 20.0f)
-                        || m_waveAssemblyTimer > 90.0f);
-    constexpr float kStagingGiveUpSeconds = 120.0f;
-    const bool lagging = !full && m_waveAssemblyTimer > kStagingGiveUpSeconds
-                         && static_cast<int>(idleReserve.size()) >= std::max(kMinAttackWave, required * 3 / 4);
-    if (lagging)
-    {
-        ready = idleReserve; // ... but for the home guard
-        const int send = std::max(kMinAttackWave, static_cast<int>(ready.size()) - guard);
-        if (static_cast<int>(ready.size()) > send)
-            ready.resize(static_cast<std::size_t>(send));
-    }
-    if (!full && !stranded && !vehicleTimeout && !lagging)
+        = !full && required > 0 && m_waveCooldown <= 0.0f && missingVehicles > 0
+          && m_waveAssemblyTimer > m_currentDifficultyConfig.tactics.vehicleWaitSeconds
+          && static_cast<int>(allReady.size()) >= std::max(1, required - missingVehicles);
+    bool stranded = !m_hasProduction && !allReady.empty() && m_waveAssemblyTimer > 5.0f;
+    if (!full && !stranded && !vehicleTimeout && !idleWave)
         return;
+
+    ready = std::move(allReady);
+    for (int id : ready)
+        m_defenders.erase(id);
 
     int targetX, targetY;
     FindAttackObjective(entities, map, targetX, targetY);
     if (targetX < 0)
         return;
-
-    // More troops ready than planned: the plan's unit types first, then the rest in list order
-    if (static_cast<int>(ready.size()) > required)
-    {
-        std::vector<int> picked;
-        std::vector<bool> used(ready.size(), false);
-        for (int arch : m_currentPlan.archetypes)
-        {
-            const int wanted = SideArchetype(arch, side());
-            for (std::size_t i = 0; i < ready.size(); ++i)
-            {
-                const Unit *u = entities.GetUnit(ready[i]);
-                if (!used[i] && u && u->archetypeId == wanted)
-                {
-                    used[i] = true;
-                    picked.push_back(ready[i]);
-                    break;
-                }
-            }
-        }
-        for (std::size_t i = 0; i < ready.size() && static_cast<int>(picked.size()) < required; ++i)
-        {
-            if (!used[i])
-            {
-                used[i] = true;
-                picked.push_back(ready[i]);
-            }
-        }
-        if (static_cast<int>(picked.size()) > required)
-            picked.resize(required);
-        ready = std::move(picked);
-    }
 
     m_waveCount++;
     if (m_trackedWave == 0)
@@ -708,7 +696,6 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     m_waveCooldown = m_currentDifficultyConfig.tactics.waveIntervalSeconds;
     m_waveAssemblyTimer = 0.0f;
-    m_lastPlanSize = required;        // (the home guard is counted by it until the next plan is there)
     m_currentPlan.archetypes.clear(); // next plan is prepared on the next economy tick
     m_infantryQueue.clear();
     m_vehicleQueue.clear();

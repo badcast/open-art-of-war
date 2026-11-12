@@ -196,6 +196,8 @@ void EntityManager::SpawnDeathExplosions(const Entity &e)
         SpawnExplosion(cx, cy, main);
         if (m_buildingBlasts.size() < 64) // nobody takes them (headless, editor)
             m_buildingBlasts.push_back({cx, cy, std::sqrt(static_cast<float>(b->buildWidth * b->buildHeight) / 9.0f)});
+        if (m_collectEvents && m_eventBlasts.size() < 64)
+            m_eventBlasts.push_back({cx, cy, std::sqrt(static_cast<float>(b->buildWidth * b->buildHeight) / 9.0f)});
         // The rest of the structure goes up over the next half second, spread over its whole footprint
         const int extra = std::clamp(b->buildWidth * b->buildHeight / 2, fx.buildingExtraMin, fx.buildingExtraMax);
         for (int i = 0; i < extra; ++i)
@@ -226,6 +228,8 @@ void EntityManager::SpawnExplosion(float worldX, float worldY, int animId, float
 {
     if (animId < 0)
         return;
+    if (m_collectEvents && m_eventExplosions.size() < 512)
+        m_eventExplosions.push_back({worldX, worldY, animId, delay});
     ExplosionParticle exp;
     exp.x = worldX;
     exp.y = worldY;

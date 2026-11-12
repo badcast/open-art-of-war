@@ -10,10 +10,11 @@ namespace OpenArtOfWar
 /**
  * @brief The touch interface: no sidebar, the whole screen is the map and the controls float over it.
  *
- * Bottom left the radar, bottom right the dock (BUILD, UNITS, BOX), between them the orders of what is selected;
+ * Bottom left the radar, bottom right the dock (BUILD, UNITS), between them the orders of what is selected;
  * the cards of what can be built or trained open above the dock. A building is placed with a ghost: pick the card,
  * drag the ghost with a finger, confirm with the green button (walls and mines keep the placement going). Taps on the
- * map are handled by GameplayController (tap = move, second tap = attack-move, tap on an own unit = select).
+ * map are handled by GameplayController (tap = move, second tap = attack-move, tap on an own unit = select), and
+ * dragging on the map always draws a selection box unless building placement is active.
  * Used instead of HUDController on Android (and with --touch-ui).
  */
 class AndroidHUD : public HUDController
@@ -24,16 +25,16 @@ public:
         return 0;
     }
     bool IsOverHud(int mx, int my, int windowW, int windowH) const override;
-    // Not in the box-select mode (a finger drag is the box then). While a building is placed a drag that starts on
-    // the ghost moves it (the ghost is a panel of TouchPanels), one that starts elsewhere moves the camera
+    // Box selection is always active for single-finger map drags except while placing a building: then a drag that
+    // starts on the ghost moves it (the ghost is a panel of TouchPanels), and one that starts elsewhere pans the camera
     bool TouchPansCamera() const override
     {
-        return !m_boxSelect;
+        return m_placing || m_buildMode;
     }
     std::vector<SDL_Rect> TouchPanels(int windowW, int windowH) const override;
     bool OwnsMapInput() const override
     {
-        return m_placing;
+        return m_placing || m_buildMode;
     }
 
     bool HandleHudClick(
@@ -81,7 +82,6 @@ private:
         Tech,
         DockBuild,
         DockUnits,
-        DockBox,
         AttackMove,
         Stop,
         Hold,
@@ -141,15 +141,15 @@ private:
     bool m_placing {false};
     int m_ghostX {0};
     int m_ghostY {0};
-    bool m_boxSelect {false};
     bool m_grab {false};                        // the finger holds the ghost
     bool m_fingerWas {false};                   // the finger was down on the last call
     float m_grabOffX {0.0f}, m_grabOffY {0.0f}; // ghost corner minus finger, world pixels, from where it was taken
     mutable SDL_Rect m_ghostRect {0, 0, 0, 0};  // the ghost on the screen (with room for a finger)
     bool m_radarHeld {false};
     int m_seenTab {TabBuild};
-    // The panels of the last frame, for the input layer (TouchPanels)
-    mutable std::vector<SDL_Rect> m_panels;
+    mutable bool m_lastHasCombat {false};
+    mutable bool m_lastHasBuilding {false};
+    mutable int m_lastSelectedCount {0};
 };
 
 } // namespace OpenArtOfWar

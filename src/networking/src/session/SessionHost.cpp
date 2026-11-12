@@ -507,6 +507,7 @@ void SessionHost::update(std::uint32_t nowMs)
     if (m_running)
     {
         bool changed = false;
+        bool authorityGone = false;
         int humans = 0;
         for (SlotState &slot : m_slots)
         {
@@ -514,6 +515,8 @@ void SessionHost::update(std::uint32_t nowMs)
                 continue;
             if (!slot.connected && nowMs - slot.goneMs > m_config.reconnectWindowMs)
             {
+                if (&slot - m_slots.data() == m_authoritySlot)
+                    authorityGone = true; // the one who simulates the world is lost: nobody can go on
                 slot = SlotState {};
                 m_leftPending.push_back(static_cast<std::uint8_t>(&slot - m_slots.data()));
                 changed = true;
@@ -523,9 +526,9 @@ void SessionHost::update(std::uint32_t nowMs)
                 ++humans;
             }
         }
-        if (humans == 0)
+        if (humans == 0 || authorityGone)
         {
-            finishReplay("all players left");
+            finishReplay(authorityGone ? "the match authority left" : "all players left");
             for (SlotState &slot : m_slots)
                 slot = SlotState {};
             m_running = false;
@@ -631,6 +634,35 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
     const std::uint8_t slot = static_cast<std::uint8_t>(c.slot);
     switch (type)
     {
+        case MsgType::AuthorityAck:
+        {
+            AuthorityAck ack;
+            if (!m_running || slot == m_authoritySlot || !decode(r, ack) || ack.matchId != m_matchId)
+                return;
+            const SlotState &authority = m_slots[m_authoritySlot];
+            if (authority.used && authority.connected && authority.connection < m_connections.size())
+            {
+                ack.sender = slot;
+                BitWriter w(m_buffer.data(), m_buffer.size());
+                encode(w, ack);
+                sendTo(authority.connection, Channel::Control, m_buffer.data(), w.finish());
+            }
+            break;
+        }
+        case MsgType::AuthorityState:
+        {
+            if (!m_running || slot != m_authoritySlot || e.data.size() > kMaxAuthorityStateBytes + 32)
+                return;
+            AuthorityState state;
+            if (!decode(r, state))
+                return;
+            if (state.matchId != m_matchId || state.recipient == slot)
+                return;
+            const SlotState &recipient = m_slots[state.recipient];
+            if (recipient.used && recipient.connected && recipient.connection < m_connections.size())
+                sendTo(recipient.connection, Channel::Bulk, e.data.data(), e.data.size());
+            break;
+        }
         case MsgType::Commands:
         {
             Commands m;
@@ -920,7 +952,7 @@ void SessionHost::handleHello(std::size_t connection, const Hello &hello, std::u
     {
         // Back into a running match: the setup and every turn so far, the game plays them through
         BitWriter sw(m_buffer.data(), m_buffer.size());
-        encode(sw, StartMatch {0, m_setup});
+        encode(sw, StartMatch {0, static_cast<std::uint8_t>(m_authoritySlot), m_matchId, m_setup});
         sendTo(connection, Channel::Lockstep, m_buffer.data(), sw.finish());
         for (const std::vector<std::uint8_t> &bundle : m_turnLog)
             sendTo(connection, Channel::Lockstep, bundle.data(), bundle.size());
@@ -952,6 +984,8 @@ void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowM
     if (m_running)
         return;
     m_setup = std::move(setup);
+    m_authoritySlot = ownerSlot();
+    ++m_matchId;
     m_running = true;
     m_paused = false;
     for (SlotState &s : m_slots)
@@ -972,7 +1006,7 @@ void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowM
     m_replayOpen = !m_config.replayDir.empty();
     logLine("match started on '" + m_lobby.map + "' with " + std::to_string(connectedCount()) + " players");
     BitWriter w(m_buffer.data(), m_buffer.size());
-    encode(w, StartMatch {firstTurnDelayMs, m_setup});
+    encode(w, StartMatch {firstTurnDelayMs, static_cast<std::uint8_t>(m_authoritySlot), m_matchId, m_setup});
     // On the lockstep channel: it must come before the first turn
     broadcast(Channel::Lockstep, m_buffer.data(), w.finish());
 }

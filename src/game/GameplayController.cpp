@@ -93,38 +93,41 @@ static const std::vector<DebugSpawnItem> &GetDebugSpawnCatalog()
 namespace
 {
 
-bool IsLiveOwnUnit(const Entity *e)
+bool IsLiveOwnUnit(const Entity *entity)
 {
-    return e && e->alive && e->state != ActionState::Die && !e->isBuilding && e->owner == Players::Local();
+    return entity && entity->alive && entity->state != ActionState::Die && !entity->isBuilding
+           && entity->owner == Players::Local();
 }
 
-constexpr int kGroupSlotW = 96;
-constexpr int kGroupSlotH = 62;
+constexpr int kGroupSlotWidth = 96;
+constexpr int kGroupSlotHeight = 62;
 constexpr int kGroupSlotGap = 6;
 
 } // namespace
 
 void GameplayController::PruneGroups(const EntityManager &entities)
 {
-    for (auto &g : m_groups)
+    for (auto &group : m_groups)
     {
-        g.unitIds.erase(
+        group.unitIds.erase(
             std::remove_if(
-                g.unitIds.begin(), g.unitIds.end(), [&](int id) { return !IsLiveOwnUnit(entities.GetEntity(id)); }),
-            g.unitIds.end());
-        if (g.unitIds.empty())
+                group.unitIds.begin(),
+                group.unitIds.end(),
+                [&](int unitId) { return !IsLiveOwnUnit(entities.GetEntity(unitId)); }),
+            group.unitIds.end());
+        if (group.unitIds.empty())
         {
-            g.leaderId = 0;
+            group.leaderId = 0;
             continue;
         }
-        if (std::find(g.unitIds.begin(), g.unitIds.end(), g.leaderId) != g.unitIds.end())
+        if (std::find(group.unitIds.begin(), group.unitIds.end(), group.leaderId) != group.unitIds.end())
             continue;
         // Leader: the toughest unit of the group
-        g.leaderId = g.unitIds.front();
-        for (int id : g.unitIds)
+        group.leaderId = group.unitIds.front();
+        for (int unitId : group.unitIds)
         {
-            if (entities.GetEntity(id)->maxHp > entities.GetEntity(g.leaderId)->maxHp)
-                g.leaderId = id;
+            if (entities.GetEntity(unitId)->maxHp > entities.GetEntity(group.leaderId)->maxHp)
+                group.leaderId = unitId;
         }
     }
 }
@@ -134,30 +137,31 @@ void GameplayController::SelectGroup(int index, EntityManager &entities)
     if (index < 0 || index >= static_cast<int>(m_groups.size()) || m_groups[index].unitIds.empty())
         return;
     m_selectedUnits = m_groups[index].unitIds;
-    for (auto &e : entities.GetAllEntities())
-        e.selected = false;
-    for (int id : m_selectedUnits)
-        entities.GetEntity(id)->selected = true;
+    for (auto &entity : entities.GetAllEntities())
+        entity.selected = false;
+    for (int unitId : m_selectedUnits)
+        entities.GetEntity(unitId)->selected = true;
 }
 
 void GameplayController::SelectOwnUnits(
     EntityManager &entities, const Camera &camera, bool onScreen, const std::function<bool(const Unit &)> &pick)
 {
     const float zoom = std::max(0.01f, camera.GetZoom());
-    const float x0 = camera.GetX(), y0 = camera.GetY();
-    const float x1 = x0 + camera.GetViewportWidth() / zoom, y1 = y0 + camera.GetViewportHeight() / zoom;
+    const float viewLeft = camera.GetX(), viewTop = camera.GetY();
+    const float viewRight = viewLeft + camera.GetViewportWidth() / zoom;
+    const float viewBottom = viewTop + camera.GetViewportHeight() / zoom;
     m_selectedUnits.clear();
-    for (auto &e : entities.GetAllEntities())
+    for (auto &entity : entities.GetAllEntities())
     {
-        e.selected = false;
-        const Unit *u = e.AsUnit();
-        if (!u || !IsLiveOwnUnit(&e) || !pick(*u))
+        entity.selected = false;
+        const Unit *unit = entity.AsUnit();
+        if (!unit || !IsLiveOwnUnit(&entity) || !pick(*unit))
             continue;
-        const float cx = e.GetUnitCenterPixelX(), cy = e.GetUnitCenterPixelY();
-        if (onScreen && (cx < x0 || cx > x1 || cy < y0 || cy > y1))
+        const float centerX = entity.GetUnitCenterPixelX(), centerY = entity.GetUnitCenterPixelY();
+        if (onScreen && (centerX < viewLeft || centerX > viewRight || centerY < viewTop || centerY > viewBottom))
             continue;
-        e.selected = true;
-        m_selectedUnits.push_back(e.id);
+        entity.selected = true;
+        m_selectedUnits.push_back(entity.id);
     }
 }
 
@@ -169,7 +173,7 @@ void GameplayController::HandleControlGroupKeys(InputManager &input, EntityManag
         SelectOwnUnits(entities, camera, false, [](const Unit &) { return true; });
         return;
     }
-    static const SDL_Scancode kKeys[10]
+    static const SDL_Scancode kGroupKeys[10]
         = {SDL_SCANCODE_1,
            SDL_SCANCODE_2,
            SDL_SCANCODE_3,
@@ -180,46 +184,47 @@ void GameplayController::HandleControlGroupKeys(InputManager &input, EntityManag
            SDL_SCANCODE_8,
            SDL_SCANCODE_9,
            SDL_SCANCODE_0};
-    const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
-    for (int k = 0; k < 10; ++k)
+    const bool ctrlHeld = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
+    for (int groupIndex = 0; groupIndex < 10; ++groupIndex)
     {
-        if (!input.IsKeyJustPressed(kKeys[k]))
+        if (!input.IsKeyJustPressed(kGroupKeys[groupIndex]))
             continue;
-        if (ctrl)
+        if (ctrlHeld)
         {
             // Ctrl+N: the selected own units become group N (a unit belongs to one group at a time)
             std::vector<int> units;
-            for (int id : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                if (IsLiveOwnUnit(entities.GetEntity(id)))
-                    units.push_back(id);
+                if (IsLiveOwnUnit(entities.GetEntity(unitId)))
+                    units.push_back(unitId);
             }
-            for (auto &g : m_groups)
+            for (auto &group : m_groups)
             {
-                g.unitIds.erase(
+                group.unitIds.erase(
                     std::remove_if(
-                        g.unitIds.begin(),
-                        g.unitIds.end(),
-                        [&](int id) { return std::find(units.begin(), units.end(), id) != units.end(); }),
-                    g.unitIds.end());
+                        group.unitIds.begin(),
+                        group.unitIds.end(),
+                        [&](int unitId) { return std::find(units.begin(), units.end(), unitId) != units.end(); }),
+                    group.unitIds.end());
             }
-            m_groups[k].unitIds = units;
-            m_groups[k].leaderId = 0;
+            m_groups[groupIndex].unitIds = units;
+            m_groups[groupIndex].leaderId = 0;
             PruneGroups(entities);
         }
         else
         {
             // N selects the group, pressing it twice quickly brings the camera to its leader
-            const std::uint64_t now = SDL_GetTicks();
-            if (m_lastGroupKey == k && now - m_lastGroupTicks < 400 && m_groups[k].leaderId > 0)
+            const std::uint64_t nowTicks = SDL_GetTicks();
+            if (m_lastGroupKey == groupIndex && nowTicks - m_lastGroupTicks < 400
+                && m_groups[groupIndex].leaderId > 0)
             {
-                const Entity *leader = entities.GetEntity(m_groups[k].leaderId);
+                const Entity *leader = entities.GetEntity(m_groups[groupIndex].leaderId);
                 if (leader)
                     camera.CenterOn(leader->GetUnitCenterPixelX(), leader->GetUnitCenterPixelY());
             }
-            m_lastGroupKey = k;
-            m_lastGroupTicks = now;
-            SelectGroup(k, entities);
+            m_lastGroupKey = groupIndex;
+            m_lastGroupTicks = nowTicks;
+            SelectGroup(groupIndex, entities);
         }
     }
 }
@@ -228,20 +233,20 @@ int GameplayController::GroupOfUnits(const std::vector<int> &unitIds) const
 {
     if (unitIds.empty())
         return -1;
-    for (int k = 0; k < static_cast<int>(m_groups.size()); ++k)
+    for (int groupIndex = 0; groupIndex < static_cast<int>(m_groups.size()); ++groupIndex)
     {
-        const auto &g = m_groups[k].unitIds;
-        bool all = true;
-        for (int id : unitIds)
+        const auto &groupUnitIds = m_groups[groupIndex].unitIds;
+        bool allInGroup = true;
+        for (int unitId : unitIds)
         {
-            if (std::find(g.begin(), g.end(), id) == g.end())
+            if (std::find(groupUnitIds.begin(), groupUnitIds.end(), unitId) == groupUnitIds.end())
             {
-                all = false;
+                allInGroup = false;
                 break;
             }
         }
-        if (all)
-            return k;
+        if (allInGroup)
+            return groupIndex;
     }
     return -1;
 }
@@ -253,50 +258,51 @@ void GameplayController::CreateMatchAis(const MissionController &mission, Entity
     if (!mission.IsMatch())
         return;
     const MatchSetup &setup = mission.matchSetup();
-    auto hqOf = [&](PlayerId p, int &x, int &y) {
-        for (const Entity &e : entities.GetAllEntities())
+    auto findHqTile = [&](PlayerId playerId, int &hqTileX, int &hqTileY) {
+        for (const Entity &entity : entities.GetAllEntities())
         {
-            if (e.alive && e.isBuilding && e.type == UnitType::Headquarters && e.owner == p)
+            if (entity.alive && entity.isBuilding && entity.type == UnitType::Headquarters && entity.owner == playerId)
             {
-                x = e.tileX;
-                y = e.tileY;
+                hqTileX = entity.tileX;
+                hqTileY = entity.tileY;
                 return true;
             }
         }
         return false;
     };
-    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    for (PlayerId playerId = 0; playerId < kMaxPlayers; ++playerId)
     {
-        const PlayerSlot &slot = setup.slots[p];
+        const PlayerSlot &slot = setup.slots[playerId];
         if (!slot.active || slot.human)
             continue;
         int ownX = 0, ownY = 0;
-        if (!hqOf(p, ownX, ownY))
+        if (!findHqTile(playerId, ownX, ownY))
             continue;
         // It goes for the nearest enemy headquarters
         int targetX = -1, targetY = -1;
-        float best = 1e9f;
-        for (PlayerId q = 0; q < kMaxPlayers; ++q)
+        float bestDist = 1e9f;
+        for (PlayerId otherPlayerId = 0; otherPlayerId < kMaxPlayers; ++otherPlayerId)
         {
-            int x = 0, y = 0;
-            if (!setup.slots[q].active || !Players::Hostile(p, q) || !hqOf(q, x, y))
+            int otherHqX = 0, otherHqY = 0;
+            if (!setup.slots[otherPlayerId].active || !Players::Hostile(playerId, otherPlayerId)
+                || !findHqTile(otherPlayerId, otherHqX, otherHqY))
                 continue;
-            const float d = DetMath::Hypot(static_cast<float>(x - ownX), static_cast<float>(y - ownY));
-            if (d < best)
+            const float dist = DetMath::Hypot(static_cast<float>(otherHqX - ownX), static_cast<float>(otherHqY - ownY));
+            if (dist < bestDist)
             {
-                best = d;
-                targetX = x;
-                targetY = y;
+                bestDist = dist;
+                targetX = otherHqX;
+                targetY = otherHqY;
             }
         }
         if (targetX < 0)
             continue;
         auto ai = std::make_unique<AIController>();
-        ai->SetPlayer(p);
+        ai->SetPlayer(playerId);
         ai->SetDifficulty(static_cast<AIDifficulty>(std::min<int>(slot.aiLevel, 3)));
         ai->Init(ownX, ownY, targetX, targetY);
         // Its own style of base: the seed of the match mixed with the slot (two computer players build differently)
-        ai->SetSeed(setup.seed ^ (static_cast<std::uint32_t>(p) + 1u) * 0x9E3779B9u);
+        ai->SetSeed(setup.seed ^ (static_cast<std::uint32_t>(playerId) + 1u) * 0x9E3779B9u);
         ai->ApplyHandicap(HandicapPercentOf(slot.handicap));
         ai->RecordStartingBase(entities, map);
         ai->SetSkirmish(true);
@@ -314,8 +320,8 @@ void GameplayController::ResetForMission(
     // A new mission reuses entity ids: forget the selection and groups of the previous one
     m_missionSerial = mission.GetLoadSerial();
     m_selectedUnits.clear();
-    for (auto &g : m_groups)
-        g = ControlGroup {};
+    for (auto &group : m_groups)
+        group = ControlGroup {};
     if (mission.IsMatch())
         m_sim.startMatch(mission.matchSetup());
     else
@@ -323,9 +329,9 @@ void GameplayController::ResetForMission(
     hud.ResetForMission();
     // A campaign mission tells its story a few seconds after it starts (MissionDialogs)
     const int missionId = mission.GetCurrentMissionId();
-    const bool campaign = !mission.IsMatch() && !mission.IsSkirmish() && missionId >= 0
-                          && missionId < MissionController::kCampaignMissionCount;
-    m_pendingDialogId = campaign ? MissionDialogs::IdForMission(PlayerFaction(), missionId) : 0;
+    const bool isCampaign = !mission.IsMatch() && !mission.IsSkirmish() && missionId >= 0
+                            && missionId < MissionController::kCampaignMissionCount;
+    m_pendingDialogId = isCampaign ? MissionDialogs::IdForMission(PlayerFaction(), missionId) : 0;
     m_dialogTimer = 0.0f;
     entities.RebuildBlueprints(); // build menu of the faction picked for this mission
     CreateMatchAis(mission, entities, map);
@@ -343,60 +349,60 @@ ResearchProgress GameplayController::ResearchOf(PlayerId player) const
 {
     if (const AIController *ai = MatchAi(player))
     {
-        ResearchProgress r;
+        ResearchProgress progress;
         if (ai->IsResearchActive())
         {
-            r.active = ai->GetResearchIndex();
-            r.duration = 1.0f;
-            r.timer = ai->GetResearchProgress();
+            progress.active = ai->GetResearchIndex();
+            progress.duration = 1.0f;
+            progress.timer = ai->GetResearchProgress();
         }
-        return r;
+        return progress;
     }
     return m_sim.research(player);
 }
 
 SimCommand GameplayController::Command(CommandType type) const
 {
-    SimCommand c;
-    c.type = type;
-    c.player = Players::Local();
-    c.debug = m_debugMode && m_controlAllFactions;
-    return c;
+    SimCommand command;
+    command.type = type;
+    command.player = Players::Local();
+    command.debug = m_debugMode && m_controlAllFactions;
+    return command;
 }
 
 void GameplayController::OrderAt(const std::vector<int> &units, float worldX, float worldY, OrderKind kind, bool queued)
 {
-    SimCommand c = Command(CommandType::OrderAt);
-    c.ids.assign(units.begin(), units.end());
-    c.x = static_cast<std::int32_t>(worldX);
-    c.y = static_cast<std::int32_t>(worldY);
-    c.a = static_cast<std::int32_t>(kind);
+    SimCommand command = Command(CommandType::OrderAt);
+    command.ids.assign(units.begin(), units.end());
+    command.x = static_cast<std::int32_t>(worldX);
+    command.y = static_cast<std::int32_t>(worldY);
+    command.a = static_cast<std::int32_t>(kind);
     // bit 0: march as a group (only a control group: the column keeps together at the pace of its slowest,
     // stragglers catch up at their own speed); bit 1: Shift - after the orders the units have
-    c.b = (units.size() >= 2 && GroupOfUnits(units) >= 0) ? 1 : 0;
+    command.b = (units.size() >= 2 && GroupOfUnits(units) >= 0) ? 1 : 0;
     if (queued)
-        c.b |= 2;
-    m_sim.Issue(std::move(c));
+        command.b |= 2;
+    m_sim.Issue(std::move(command));
     SoundRequests::Play(kind == OrderKind::AttackMove ? "@attack" : "@move"); // the units answer
 }
 
-int GameplayController::GroupBarHit(int mx, int my, int mapViewW, int windowH) const
+int GameplayController::GroupBarHit(int mouseX, int mouseY, int mapViewWidth, int windowHeight) const
 {
     int count = 0;
-    for (const auto &g : m_groups)
-        count += g.unitIds.empty() ? 0 : 1;
+    for (const auto &group : m_groups)
+        count += group.unitIds.empty() ? 0 : 1;
     if (count == 0)
         return -1;
-    const int totalW = count * kGroupSlotW + (count - 1) * kGroupSlotGap;
-    int x = (mapViewW - totalW) / 2;
-    const int y = windowH - kGroupSlotH - 10;
-    for (int k = 0; k < static_cast<int>(m_groups.size()); ++k)
+    const int totalWidth = count * kGroupSlotWidth + (count - 1) * kGroupSlotGap;
+    int slotX = (mapViewWidth - totalWidth) / 2;
+    const int slotY = windowHeight - kGroupSlotHeight - 10;
+    for (int groupIndex = 0; groupIndex < static_cast<int>(m_groups.size()); ++groupIndex)
     {
-        if (m_groups[k].unitIds.empty())
+        if (m_groups[groupIndex].unitIds.empty())
             continue;
-        if (mx >= x && mx < x + kGroupSlotW && my >= y && my < y + kGroupSlotH)
-            return k;
-        x += kGroupSlotW + kGroupSlotGap;
+        if (mouseX >= slotX && mouseX < slotX + kGroupSlotWidth && mouseY >= slotY && mouseY < slotY + kGroupSlotHeight)
+            return groupIndex;
+        slotX += kGroupSlotWidth + kGroupSlotGap;
     }
     return -1;
 }
@@ -405,24 +411,25 @@ void GameplayController::RenderGroupLeaders(
     Renderer &renderer, const Camera &camera, const EntityManager &entities) const
 {
     const SDL_Color gold {255, 214, 64, 255};
-    for (const ControlGroup &g : m_groups)
+    for (const ControlGroup &group : m_groups)
     {
-        if (g.unitIds.empty())
+        if (group.unitIds.empty())
             continue;
         bool anySelected = false;
-        for (int id : g.unitIds)
+        for (int unitId : group.unitIds)
         {
-            const Entity *e = entities.GetEntity(id);
-            anySelected = anySelected || (e && e->selected);
+            const Entity *entity = entities.GetEntity(unitId);
+            anySelected = anySelected || (entity && entity->selected);
         }
-        int leaderId = g.leaderId;
+        int leaderId = group.leaderId;
         const AISquad *squad = nullptr;
-        for (const auto &sq : m_sim.Squads(Players::Local()).GetSquads())
+        for (const auto &candidateSquad : m_sim.Squads(Players::Local()).GetSquads())
         {
-            if (std::find(sq.unitIds.begin(), sq.unitIds.end(), g.unitIds.front()) != sq.unitIds.end())
+            if (std::find(candidateSquad.unitIds.begin(), candidateSquad.unitIds.end(), group.unitIds.front())
+                != candidateSquad.unitIds.end())
             {
-                squad = &sq;
-                leaderId = sq.leaderId;
+                squad = &candidateSquad;
+                leaderId = candidateSquad.leaderId;
                 break;
             }
         }
@@ -431,32 +438,40 @@ void GameplayController::RenderGroupLeaders(
         const Entity *leader = entities.GetEntity(leaderId);
         if (!leader)
             continue;
-        const float lx = leader->GetUnitCenterPixelX();
-        const float ly = leader->GetUnitCenterPixelY();
+        const float leaderCenterX = leader->GetUnitCenterPixelX();
+        const float leaderCenterY = leader->GetUnitCenterPixelY();
 
         // Marching: who follows whom (green inside the leash, yellow beyond it)
         if (squad)
         {
-            for (int id : squad->unitIds)
+            for (int unitId : squad->unitIds)
             {
-                const Entity *u = entities.GetEntity(id);
-                if (!u || id == leaderId)
+                const Entity *memberEntity = entities.GetEntity(unitId);
+                if (!memberEntity || unitId == leaderId)
                     continue;
-                const float d = DetMath::Hypot(
-                    u->tileX - static_cast<float>(leader->tileX), u->tileY - static_cast<float>(leader->tileY));
-                const SDL_Color c
-                    = d <= squad->leashRadius ? SDL_Color {90, 220, 120, 90} : SDL_Color {255, 200, 60, 140};
-                renderer.DrawLineWorld(u->GetUnitCenterPixelX(), u->GetUnitCenterPixelY(), lx, ly, camera, c);
+                const float dist = DetMath::Hypot(
+                    memberEntity->tileX - static_cast<float>(leader->tileX),
+                    memberEntity->tileY - static_cast<float>(leader->tileY));
+                const SDL_Color lineColor
+                    = dist <= squad->leashRadius ? SDL_Color {90, 220, 120, 90} : SDL_Color {255, 200, 60, 140};
+                renderer.DrawLineWorld(
+                    memberEntity->GetUnitCenterPixelX(),
+                    memberEntity->GetUnitCenterPixelY(),
+                    leaderCenterX,
+                    leaderCenterY,
+                    camera,
+                    lineColor);
             }
         }
 
         // Leader marker: small gold triangle above the unit
-        float sx = 0.0f, sy = 0.0f;
-        camera.WorldToScreen(lx, ly, sx, sy);
-        const int top = static_cast<int>(sy - 26.0f * camera.GetZoom());
-        for (int i = 0; i < 6; ++i)
+        float screenX = 0.0f, screenY = 0.0f;
+        camera.WorldToScreen(leaderCenterX, leaderCenterY, screenX, screenY);
+        const int markerTopY = static_cast<int>(screenY - 26.0f * camera.GetZoom());
+        for (int row = 0; row < 6; ++row)
         {
-            renderer.FillRectScreen(static_cast<int>(sx) - (5 - i), top + i, 2 * (5 - i) + 1, 1, gold);
+            renderer.FillRectScreen(
+                static_cast<int>(screenX) - (5 - row), markerTopY + row, 2 * (5 - row) + 1, 1, gold);
         }
     }
 }
@@ -465,82 +480,85 @@ void GameplayController::RenderGroupBar(
     Renderer &renderer,
     BitmapFontRenderer &font,
     const EntityManager &entities,
-    int mapViewW,
-    int windowH,
-    int mx,
-    int my) const
+    int mapViewWidth,
+    int windowHeight,
+    int mouseX,
+    int mouseY) const
 {
     int count = 0;
-    for (const auto &g : m_groups)
-        count += g.unitIds.empty() ? 0 : 1;
+    for (const auto &group : m_groups)
+        count += group.unitIds.empty() ? 0 : 1;
     if (count == 0)
         return;
 
-    const int totalW = count * kGroupSlotW + (count - 1) * kGroupSlotGap;
-    int x = (mapViewW - totalW) / 2;
-    const int y = windowH - kGroupSlotH - 10;
-    const SDL_Color top {28, 70, 92, 235};
-    const SDL_Color bottom {12, 30, 44, 235};
-    const SDL_Color edge {70, 150, 180, 255};
+    const int totalWidth = count * kGroupSlotWidth + (count - 1) * kGroupSlotGap;
+    int slotX = (mapViewWidth - totalWidth) / 2;
+    const int slotY = windowHeight - kGroupSlotHeight - 10;
+    const SDL_Color topColor {28, 70, 92, 235};
+    const SDL_Color bottomColor {12, 30, 44, 235};
+    const SDL_Color edgeColor {70, 150, 180, 255};
 
-    for (int k = 0; k < static_cast<int>(m_groups.size()); ++k)
+    for (int groupIndex = 0; groupIndex < static_cast<int>(m_groups.size()); ++groupIndex)
     {
-        const ControlGroup &g = m_groups[k];
-        if (g.unitIds.empty())
+        const ControlGroup &group = m_groups[groupIndex];
+        if (group.unitIds.empty())
             continue;
-        const ui::UiRect slot {x, y, kGroupSlotW, kGroupSlotH};
-        x += kGroupSlotW + kGroupSlotGap;
+        const ui::UiRect slot {slotX, slotY, kGroupSlotWidth, kGroupSlotHeight};
+        slotX += kGroupSlotWidth + kGroupSlotGap;
 
-        const bool selected = (m_selectedUnits.size() == g.unitIds.size() && GroupOfUnits(m_selectedUnits) == k);
-        const bool hovered = slot.Contains(mx, my);
-        int leaderId = g.leaderId;
+        const bool selected
+            = (m_selectedUnits.size() == group.unitIds.size() && GroupOfUnits(m_selectedUnits) == groupIndex);
+        const bool hovered = slot.Contains(mouseX, mouseY);
+        int leaderId = group.leaderId;
         bool marching = false;
-        for (const auto &sq : m_sim.Squads(Players::Local()).GetSquads())
+        for (const auto &squad : m_sim.Squads(Players::Local()).GetSquads())
         {
-            if (std::find(sq.unitIds.begin(), sq.unitIds.end(), g.leaderId) != sq.unitIds.end()
-                || std::find(sq.unitIds.begin(), sq.unitIds.end(), g.unitIds.front()) != sq.unitIds.end())
+            if (std::find(squad.unitIds.begin(), squad.unitIds.end(), group.leaderId) != squad.unitIds.end()
+                || std::find(squad.unitIds.begin(), squad.unitIds.end(), group.unitIds.front()) != squad.unitIds.end())
             {
-                leaderId = sq.leaderId;
+                leaderId = squad.leaderId;
                 marching = true;
                 break;
             }
         }
 
-        ui::FillVerticalGradient(renderer, slot, hovered ? ui::Mix(top, edge, 0.25f) : top, bottom);
+        ui::FillVerticalGradient(
+            renderer, slot, hovered ? ui::Mix(topColor, edgeColor, 0.25f) : topColor, bottomColor);
         const Unit *leader = entities.GetUnit(leaderId);
         if (leader)
         {
-            int comp = UnitCameoCompId(leader->archetypeId);
-            if (comp >= 0)
+            int cameoCompId = UnitCameoCompId(leader->archetypeId);
+            if (cameoCompId >= 0)
                 renderer.SetDrawOwner(leader->owner);
             renderer.SetStructureFaction(leader->faction);
-            renderer.DrawCompositeScreen(comp, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
+            renderer.DrawCompositeScreen(cameoCompId, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
             renderer.SetStructureFaction(Faction::Neutral);
             renderer.SetDrawOwner(kNoPlayer);
         }
 
         // Group health
-        int hp = 0, maxHp = 0;
-        for (int id : g.unitIds)
+        int totalHp = 0, totalMaxHp = 0;
+        for (int unitId : group.unitIds)
         {
             // A unit may have died since the groups were pruned at the start of the frame
-            const Entity *e = entities.GetEntity(id);
-            if (!e)
+            const Entity *entity = entities.GetEntity(unitId);
+            if (!entity)
                 continue;
-            hp += e->currentHp;
-            maxHp += e->maxHp;
+            totalHp += entity->currentHp;
+            totalMaxHp += entity->maxHp;
         }
-        const float ratio = maxHp > 0 ? static_cast<float>(hp) / static_cast<float>(maxHp) : 0.0f;
-        const SDL_Color hpCol = ratio > 0.6f ? ui::color::Ok : (ratio > 0.3f ? ui::color::Accent : ui::color::Danger);
+        const float hpRatio = totalMaxHp > 0 ? static_cast<float>(totalHp) / static_cast<float>(totalMaxHp) : 0.0f;
+        const SDL_Color hpColor
+            = hpRatio > 0.6f ? ui::color::Ok : (hpRatio > 0.3f ? ui::color::Accent : ui::color::Danger);
         renderer.FillRectScreen(slot.x + 4, slot.Bottom() - 7, slot.w - 8, 3, {6, 10, 14, 220});
-        renderer.FillRectScreen(slot.x + 4, slot.Bottom() - 7, static_cast<int>((slot.w - 8) * ratio), 3, hpCol);
+        renderer.FillRectScreen(slot.x + 4, slot.Bottom() - 7, static_cast<int>((slot.w - 8) * hpRatio), 3, hpColor);
 
         // Key chip, unit count, march indicator
-        const std::string key = std::to_string((k + 1) % 10);
+        const std::string keyLabel = std::to_string((groupIndex + 1) % 10);
         renderer.FillRectScreen(
             slot.x + 3, slot.y + 3, 18, 18, selected ? ui::color::Accent : SDL_Color {8, 20, 30, 230});
         font.DrawString(
-            key,
+            keyLabel,
             slot.x + 12,
             slot.y + 12,
             ui::FONT_SMALL_BOLD,
@@ -548,7 +566,7 @@ void GameplayController::RenderGroupBar(
             false,
             Anchor::HCENTER | Anchor::VCENTER);
         font.DrawString(
-            "\xC3\x97" + std::to_string(g.unitIds.size()),
+            "\xC3\x97" + std::to_string(group.unitIds.size()),
             slot.Right() - 6,
             slot.Bottom() - 16,
             ui::FONT_SMALL_BOLD,
@@ -567,8 +585,8 @@ void GameplayController::RenderGroupBar(
                 Anchor::LEFT | Anchor::VCENTER);
         }
 
-        SDL_Color border = selected ? ui::color::Accent : (hovered ? edge : SDL_Color {40, 90, 112, 255});
-        renderer.DrawRectScreen(slot.x, slot.y, slot.w, slot.h, border);
+        SDL_Color borderColor = selected ? ui::color::Accent : (hovered ? edgeColor : SDL_Color {40, 90, 112, 255});
+        renderer.DrawRectScreen(slot.x, slot.y, slot.w, slot.h, borderColor);
         if (selected)
             renderer.DrawRectScreen(
                 slot.x + 1, slot.y + 1, slot.w - 2, slot.h - 2, ui::WithAlpha(ui::color::Accent, 110));
@@ -587,22 +605,22 @@ void GameplayController::SetDebugMode(bool enabled)
     }
 }
 
-void GameplayController::Update(const FrameContext &ctx)
+void GameplayController::Update(const FrameContext &context)
 {
-    const float deltaTime = ctx.deltaTime;
-    const int windowW = ctx.windowW;
-    const int windowH = ctx.windowH;
-    InputManager &input = ctx.input;
-    Camera &camera = ctx.camera;
-    TileMap &map = ctx.map;
-    Pathfinder &pathfinder = ctx.pathfinder;
-    EntityManager &entities = ctx.entities;
-    Economy &economy = ctx.economy;
-    AIController &aiController = ctx.ai;
-    MissionController &mission = ctx.mission;
-    HUDController &hud = ctx.hud;
-    MenuController &menu = ctx.menu;
-    AppState &appState = ctx.state;
+    const float deltaTime = context.deltaTime;
+    const int windowWidth = context.windowW;
+    const int windowHeight = context.windowH;
+    InputManager &input = context.input;
+    Camera &camera = context.camera;
+    TileMap &map = context.map;
+    Pathfinder &pathfinder = context.pathfinder;
+    EntityManager &entities = context.entities;
+    Economy &economy = context.economy;
+    AIController &aiController = context.ai;
+    MissionController &mission = context.mission;
+    HUDController &hud = context.hud;
+    MenuController &menu = context.menu;
+    AppState &appState = context.state;
 
     input.Update(deltaTime, camera);
     camera.ClampToBounds(map.GetWidth(), map.GetHeight());
@@ -624,12 +642,12 @@ void GameplayController::Update(const FrameContext &ctx)
         input.ConsumeWheel(); // the generic counter is for menu lists only (and the technology tree window: it
                               // covers the map, its steps come from anywhere)
 
-    int mx = input.GetMouseScreenX();
-    int my = input.GetMouseScreenY();
-    float lx = 0.0f, ly = 0.0f;
-    bool leftClicked = input.WasLeftClickIssued(lx, ly);
-    float rx = 0.0f, ry = 0.0f;
-    bool rightClicked = input.WasRightClickIssued(rx, ry);
+    int mouseX = input.GetMouseScreenX();
+    int mouseY = input.GetMouseScreenY();
+    float leftClickWorldX = 0.0f, leftClickWorldY = 0.0f;
+    bool leftClicked = input.WasLeftClickIssued(leftClickWorldX, leftClickWorldY);
+    float rightClickWorldX = 0.0f, rightClickWorldY = 0.0f;
+    bool rightClicked = input.WasRightClickIssued(rightClickWorldX, rightClickWorldY);
 
     // 1. Objectives Dialog
     if (menu.IsObjectivesDialogOpen())
@@ -647,7 +665,7 @@ void GameplayController::Update(const FrameContext &ctx)
     if (hud.IsResearchWindowOpen())
     {
         hud.SetTopInset(m_debugMode ? 32 : 0);
-        hud.UpdateResearchWindow(ctx, mx, my, leftClicked);
+        hud.UpdateResearchWindow(context, mouseX, mouseY, leftClicked);
         // (an observer's window stops nothing; a held tick - a replay frame without one - stays held)
         if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
         {
@@ -658,20 +676,21 @@ void GameplayController::Update(const FrameContext &ctx)
             // The game stands still, but what the window ordered (a research started) takes effect now instead of
             // waiting for the window to close: the command carries this tick, so it is the same as applying it at
             // the start of the tick that runs next (a recording replays it alike)
-            SimContext simCtx {entities, map, pathfinder, economy, aiController};
-            m_sim.ApplyCommands(simCtx);
+            SimContext simContext {entities, map, pathfinder, economy, aiController};
+            m_sim.ApplyCommands(simContext);
         }
         return;
     }
 
     // 1b. Campaign mission dialogue: the mission waits while it is read
-    if (menu.IsMissionDialogOpen() && menu.UpdateMissionDialog(input, mx, my, leftClicked, windowW, windowH))
+    if (menu.IsMissionDialogOpen()
+        && menu.UpdateMissionDialog(input, mouseX, mouseY, leftClicked, windowWidth, windowHeight))
         return;
 
     // 2. In-Game Pause Menu
     if (menu.IsInGameMenuOpen())
     {
-        if (menu.UpdateInGameMenu(ctx, mx, my, leftClicked))
+        if (menu.UpdateInGameMenu(context, mouseX, mouseY, leftClicked))
         {
             if ((mission.IsOnlineMatch() || hud.IsObserver()) && appState == AppState::SkirmishPlaying && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
@@ -684,14 +703,14 @@ void GameplayController::Update(const FrameContext &ctx)
     bool openMenu = false;
     bool openObjectives = false;
     bool mapInputConsumed = hud.HandleHudClick(
-        mx,
-        my,
+        mouseX,
+        mouseY,
         leftClicked,
         rightClicked,
         input.IsLeftMouseDown(),
         input.ConsumeUiWheel(),
-        windowW,
-        windowH,
+        windowWidth,
+        windowHeight,
         economy,
         entities,
         map,
@@ -710,30 +729,30 @@ void GameplayController::Update(const FrameContext &ctx)
     }
 
     // Everything left of the sidebar is the map viewport
-    const int mapViewW = camera.GetViewportWidth();
+    const int mapViewWidth = camera.GetViewportWidth();
 
     // Control group bar at the bottom of the map: click selects the group
     if (!mapInputConsumed && (leftClicked || rightClicked || input.IsLeftMouseDown()))
     {
-        int slot = GroupBarHit(mx, my, mapViewW, windowH);
-        if (slot >= 0)
+        int groupSlot = GroupBarHit(mouseX, mouseY, mapViewWidth, windowHeight);
+        if (groupSlot >= 0)
         {
             if (leftClicked)
-                SelectGroup(slot, entities);
+                SelectGroup(groupSlot, entities);
             mapInputConsumed = true;
             input.CancelSelectionBox();
         }
     }
 
     // Camera zoom: wheel over the open map, not over the group bar or the debug spawn list
-    if (mapWheel != 0 && mx < mapViewW && GroupBarHit(mx, my, mapViewW, windowH) < 0
+    if (mapWheel != 0 && mouseX < mapViewWidth && GroupBarHit(mouseX, mouseY, mapViewWidth, windowHeight) < 0
         && !(m_debugMode && m_spawnDropdownOpen))
     {
         const float zoomDelta = mapWheel > 0 ? 1.15f : (1.0f / 1.15f);
         float zoom = camera.GetZoom();
         for (int i = 0; i < std::abs(mapWheel); ++i)
             zoom *= zoomDelta;
-        camera.SetZoom(zoom, static_cast<float>(mx), static_cast<float>(my));
+        camera.SetZoom(zoom, static_cast<float>(mouseX), static_cast<float>(mouseY));
     }
 
     // 4.4. Debug Spawn Dropdown Click Handling (--debug mode)
@@ -741,34 +760,35 @@ void GameplayController::Update(const FrameContext &ctx)
     {
         if (leftClicked)
         {
-            int dropX = 450;
-            int dropY = 32;
-            int colW = 170;
-            int dropW = colW * 3;
-            int dropH = 370;
+            int dropdownX = 450;
+            int dropdownY = 32;
+            int columnWidth = 170;
+            int dropdownWidth = columnWidth * 3;
+            int dropdownHeight = 370;
 
             bool itemSelected = false;
-            if (mx >= dropX && mx <= dropX + dropW && my >= dropY && my <= dropY + dropH)
+            if (mouseX >= dropdownX && mouseX <= dropdownX + dropdownWidth && mouseY >= dropdownY
+                && mouseY <= dropdownY + dropdownHeight)
             {
                 // Column 1: HUMANS (items 0..5)
-                if (mx < dropX + colW)
+                if (mouseX < dropdownX + columnWidth)
                 {
-                    int itemIdx = (my - (dropY + 24)) / 22;
-                    if (itemIdx >= 0 && itemIdx < 6)
+                    int itemIndex = (mouseY - (dropdownY + 24)) / 22;
+                    if (itemIndex >= 0 && itemIndex < 6)
                     {
-                        m_selectedSpawnIndex = itemIdx;
+                        m_selectedSpawnIndex = itemIndex;
                         m_spawnMode = true;
                         m_spawnDropdownOpen = false;
                         itemSelected = true;
                     }
                 }
                 // Column 2: VEHICLES (items 6..13)
-                else if (mx < dropX + colW * 2)
+                else if (mouseX < dropdownX + columnWidth * 2)
                 {
-                    int itemIdx = (my - (dropY + 24)) / 22;
-                    if (itemIdx >= 0 && itemIdx < 8)
+                    int itemIndex = (mouseY - (dropdownY + 24)) / 22;
+                    if (itemIndex >= 0 && itemIndex < 8)
                     {
-                        m_selectedSpawnIndex = 6 + itemIdx;
+                        m_selectedSpawnIndex = 6 + itemIndex;
                         m_spawnMode = true;
                         m_spawnDropdownOpen = false;
                         itemSelected = true;
@@ -777,10 +797,10 @@ void GameplayController::Update(const FrameContext &ctx)
                 // Column 3: BUILDINGS (items 14..29)
                 else
                 {
-                    int itemIdx = (my - (dropY + 24)) / 20;
-                    if (itemIdx >= 0 && itemIdx < 16)
+                    int itemIndex = (mouseY - (dropdownY + 24)) / 20;
+                    if (itemIndex >= 0 && itemIndex < 16)
                     {
-                        m_selectedSpawnIndex = 14 + itemIdx;
+                        m_selectedSpawnIndex = 14 + itemIndex;
                         m_spawnMode = true;
                         m_spawnDropdownOpen = false;
                         itemSelected = true;
@@ -801,32 +821,32 @@ void GameplayController::Update(const FrameContext &ctx)
     }
 
     // 4.5. Top Debug Toolbar Click Handling (--debug mode)
-    if (m_debugMode && leftClicked && my <= 30)
+    if (m_debugMode && leftClicked && mouseY <= 30)
     {
-        if (mx >= 98 && mx <= 198)
+        if (mouseX >= 98 && mouseX <= 198)
         {
             m_showNavLines = !m_showNavLines;
         }
-        else if (mx >= 202 && mx <= 322)
+        else if (mouseX >= 202 && mouseX <= 322)
         {
             m_controlAllFactions = !m_controlAllFactions;
         }
-        else if (mx >= 326 && mx <= 436)
+        else if (mouseX >= 326 && mouseX <= 436)
         {
             m_pauseAI = !m_pauseAI;
         }
-        else if (mx >= 440 && mx <= 545)
+        else if (mouseX >= 440 && mouseX <= 545)
         {
             m_revealFog = !m_revealFog;
         }
-        else if (mx >= 549 && mx <= 624)
+        else if (mouseX >= 549 && mouseX <= 624)
         {
-            SimCommand c = Command(CommandType::DebugCredits);
-            c.debug = true;
-            c.a = 1000;
-            m_sim.Issue(std::move(c));
+            SimCommand command = Command(CommandType::DebugCredits);
+            command.debug = true;
+            command.a = 1000;
+            m_sim.Issue(std::move(command));
         }
-        else if (mx >= 628 && mx <= 748)
+        else if (mouseX >= 628 && mouseX <= 748)
         {
             m_spawnMode = !m_spawnMode;
             if (m_spawnMode)
@@ -834,21 +854,21 @@ void GameplayController::Update(const FrameContext &ctx)
                 m_spawnDropdownOpen = false;
             }
         }
-        else if (mx >= 752 && mx <= 960)
+        else if (mouseX >= 752 && mouseX <= 960)
         {
             m_spawnDropdownOpen = !m_spawnDropdownOpen;
         }
-        else if (mx >= 964 && mx <= 1049)
+        else if (mouseX >= 964 && mouseX <= 1049)
         {
-            SimCommand c = Command(CommandType::ToggleSiege);
-            c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
-            m_sim.Issue(std::move(c));
+            SimCommand command = Command(CommandType::ToggleSiege);
+            command.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
+            m_sim.Issue(std::move(command));
         }
-        else if (mx >= 1053 && mx <= 1153)
+        else if (mouseX >= 1053 && mouseX <= 1153)
         {
             m_showDebugGrid = !m_showDebugGrid;
         }
-        else if (mx >= 1157 && mx <= 1237)
+        else if (mouseX >= 1157 && mouseX <= 1237)
         {
             m_debugOverlayToggleRequested = true;
         }
@@ -863,27 +883,27 @@ void GameplayController::Update(const FrameContext &ctx)
             m_spawnMode = false;
             mapInputConsumed = true;
         }
-        else if (leftClicked && my >= 32 && mx < mapViewW)
+        else if (leftClicked && mouseY >= 32 && mouseX < mapViewWidth)
         {
             const auto &catalog = GetDebugSpawnCatalog();
             if (m_selectedSpawnIndex >= 0 && m_selectedSpawnIndex < static_cast<int>(catalog.size()))
             {
                 const auto &item = catalog[m_selectedSpawnIndex];
-                int curTileX = static_cast<int>(lx / TILE_WIDTH);
-                int curTileY = static_cast<int>(ly / TILE_HEIGHT);
+                int tileX = static_cast<int>(leftClickWorldX / TILE_WIDTH);
+                int tileY = static_cast<int>(leftClickWorldY / TILE_HEIGHT);
 
-                SimCommand c = Command(CommandType::DebugSpawn);
-                c.debug = true;
-                c.player = Players::OwnerOf(item.faction);
-                c.a = item.archetypeOrBuildingIdx;
-                c.b = static_cast<std::int32_t>(
+                SimCommand command = Command(CommandType::DebugSpawn);
+                command.debug = true;
+                command.player = Players::OwnerOf(item.faction);
+                command.a = item.archetypeOrBuildingIdx;
+                command.b = static_cast<std::int32_t>(
                     item.isWall ? DebugSpawnKind::Wall
                                 : (item.isBuilding ? DebugSpawnKind::Building : DebugSpawnKind::Unit));
-                c.c = item.width;
-                c.d = item.height;
-                c.x = curTileX;
-                c.y = curTileY;
-                m_sim.Issue(std::move(c));
+                command.c = item.width;
+                command.d = item.height;
+                command.x = tileX;
+                command.y = tileY;
+                m_sim.Issue(std::move(command));
             }
             mapInputConsumed = true;
         }
@@ -900,30 +920,31 @@ void GameplayController::Update(const FrameContext &ctx)
         else
         {
             const auto &blueprints = EntityManager::GetBlueprints();
-            int selectedBp = hud.GetSelectedBlueprint();
-            if (selectedBp >= 0 && selectedBp < static_cast<int>(blueprints.size()))
+            int selectedBlueprintIndex = hud.GetSelectedBlueprint();
+            if (selectedBlueprintIndex >= 0 && selectedBlueprintIndex < static_cast<int>(blueprints.size()))
             {
-                const auto &bp = blueprints[selectedBp];
-                int curTileX = static_cast<int>(input.GetMouseWorldX() / TILE_WIDTH);
-                int curTileY = static_cast<int>(input.GetMouseWorldY() / TILE_HEIGHT);
+                const auto &blueprint = blueprints[selectedBlueprintIndex];
+                int tileX = static_cast<int>(input.GetMouseWorldX() / TILE_WIDTH);
+                int tileY = static_cast<int>(input.GetMouseWorldY() / TILE_HEIGHT);
 
-                if (leftClicked && mx < mapViewW)
+                if (leftClicked && mouseX < mapViewWidth)
                 {
-                    const bool isMine = bp.mineKind >= 0;
+                    const bool isMine = blueprint.mineKind >= 0;
                     bool canPlace = isMine
-                                        ? entities.CanPlaceMine(bp.mineKind, curTileX, curTileY, map, Players::Local())
+                                        ? entities.CanPlaceMine(blueprint.mineKind, tileX, tileY, map, Players::Local())
                                         : entities.CanPlaceBuilding(
-                                              curTileX, curTileY, bp.width, bp.height, map, Players::Local());
-                    bool canAfford = economy.CanAfford(bp.creditCost);
+                                              tileX, tileY, blueprint.width, blueprint.height, map, Players::Local());
+                    bool canAfford = economy.CanAfford(blueprint.creditCost);
                     // Hard limits (data/limits.yaml): checked again by the simulation
                     const bool withinLimit
-                        = isMine || BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex);
+                        = isMine || BuildLimits::CanBuildMore(entities, map, Players::Local(), blueprint.buildingIndex);
                     if (!withinLimit)
                     {
                         SoundRequests::Play("ui_error");
                         hud.SetNotification(
-                            BuildLimits::LimitOf(entities, bp.buildingIndex) == 0 ? _("THIS BUILDING IS NOT ALLOWED!")
-                                                                                  : _("BUILDING LIMIT REACHED!"));
+                            BuildLimits::LimitOf(entities, blueprint.buildingIndex) == 0
+                                ? _("THIS BUILDING IS NOT ALLOWED!")
+                                : _("BUILDING LIMIT REACHED!"));
                         hud.SetBuildMode(false);
                     }
                     else if (!canAfford)
@@ -939,16 +960,16 @@ void GameplayController::Update(const FrameContext &ctx)
                     if (withinLimit && canPlace && canAfford)
                     {
                         // The simulation checks both again when it places it (a network turn later)
-                        SimCommand c = Command(CommandType::PlaceBuilding);
-                        c.a = bp.blueprintId; // canonical slot: the same on every peer
-                        c.x = curTileX;
-                        c.y = curTileY;
-                        m_sim.Issue(std::move(c));
+                        SimCommand command = Command(CommandType::PlaceBuilding);
+                        command.a = blueprint.blueprintId; // canonical slot: the same on every peer
+                        command.x = tileX;
+                        command.y = tileY;
+                        m_sim.Issue(std::move(command));
                         SoundRequests::Play("build_place");
-                        if (!bp.isWall && !isMine)
+                        if (!blueprint.isWall && !isMine)
                             SoundRequests::Announce("ann_building");
                         // Walls and mines are laid one after the other; a building ends the placement
-                        if (!bp.isWall && !isMine)
+                        if (!blueprint.isWall && !isMine)
                             hud.SetBuildMode(false);
                     }
                 }
@@ -972,22 +993,23 @@ void GameplayController::Update(const FrameContext &ctx)
             hud.SetAttackMoveMode(false);
             mapInputConsumed = true;
         }
-        else if (leftClicked && mx < mapViewW)
+        else if (leftClicked && mouseX < mapViewWidth)
         {
             std::vector<int> combatUnits;
-            for (int uid : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                const Entity *e = entities.GetEntity(uid);
-                if (e && e->alive && !e->isBuilding)
+                const Entity *entity = entities.GetEntity(unitId);
+                if (entity && entity->alive && !entity->isBuilding)
                 {
-                    combatUnits.push_back(uid);
+                    combatUnits.push_back(unitId);
                 }
             }
 
             if (!combatUnits.empty())
             {
-                const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-                OrderAt(combatUnits, lx, ly, OrderKind::AttackMove, shift);
+                const bool shiftHeld
+                    = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
+                OrderAt(combatUnits, leftClickWorldX, leftClickWorldY, OrderKind::AttackMove, shiftHeld);
             }
             // With Shift the attack-move mode stays on for the next point of the route
             if (!(input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT)))
@@ -1003,10 +1025,10 @@ void GameplayController::Update(const FrameContext &ctx)
         if (input.IsKeyJustPressed(SDL_SCANCODE_Q))
         {
             bool hasCombatUnits = false;
-            for (int uid : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                const Entity *e = entities.GetEntity(uid);
-                if (e && e->alive && !e->isBuilding)
+                const Entity *entity = entities.GetEntity(unitId);
+                if (entity && entity->alive && !entity->isBuilding)
                 {
                     hasCombatUnits = true;
                     break;
@@ -1026,10 +1048,10 @@ void GameplayController::Update(const FrameContext &ctx)
         {
             // A unit whose siege mode waits for a technology says so instead of ignoring the key
             bool locked = false;
-            for (int id : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                const Unit *su = entities.GetUnit(id);
-                if (su && su->owner == Players::Local() && !entities.CanDeploySiege(*su))
+                const Unit *unit = entities.GetUnit(unitId);
+                if (unit && unit->owner == Players::Local() && !entities.CanDeploySiege(*unit))
                     locked = true;
             }
             if (locked)
@@ -1037,9 +1059,9 @@ void GameplayController::Update(const FrameContext &ctx)
                 SoundRequests::Play("ui_error");
                 hud.SetNotification(_("RESEARCH SIEGE MODE FIRST!"));
             }
-            SimCommand c = Command(CommandType::ToggleSiege);
-            c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
-            m_sim.Issue(std::move(c));
+            SimCommand command = Command(CommandType::ToggleSiege);
+            command.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
+            m_sim.Issue(std::move(command));
         }
 
         // Z / X / C - stances: guard (chase and return), hold ground, pursue
@@ -1049,10 +1071,10 @@ void GameplayController::Update(const FrameContext &ctx)
             {
                 if (!input.IsKeyJustPressed(kStanceKeys[i]) || m_selectedUnits.empty())
                     continue;
-                SimCommand c = Command(CommandType::SetStance);
-                c.a = i;
-                c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
-                m_sim.Issue(std::move(c));
+                SimCommand command = Command(CommandType::SetStance);
+                command.a = i;
+                command.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
+                m_sim.Issue(std::move(command));
                 SoundRequests::Play("@hold");
             }
         }
@@ -1060,15 +1082,15 @@ void GameplayController::Update(const FrameContext &ctx)
         // R - repair on / off for the selected own buildings
         if (input.IsKeyJustPressed(SDL_SCANCODE_R))
         {
-            SimCommand c = Command(CommandType::ToggleRepair);
-            for (int id : m_selectedUnits)
+            SimCommand command = Command(CommandType::ToggleRepair);
+            for (int unitId : m_selectedUnits)
             {
-                const Building *b = entities.GetBuilding(id);
-                if (b && b->owner == Players::Local())
-                    c.ids.push_back(static_cast<std::uint32_t>(id));
+                const Building *building = entities.GetBuilding(unitId);
+                if (building && building->owner == Players::Local())
+                    command.ids.push_back(static_cast<std::uint32_t>(unitId));
             }
-            if (!c.ids.empty())
-                m_sim.Issue(std::move(c));
+            if (!command.ids.empty())
+                m_sim.Issue(std::move(command));
         }
 
         // ESC - In-game Pause Menu
@@ -1081,99 +1103,108 @@ void GameplayController::Update(const FrameContext &ctx)
         }
 
         // Right-Click orders on map (Move / Attack / Attack Wall / Siege Context Menu)
-        if (rightClicked && mx < mapViewW && (!m_debugMode || my > 30))
+        if (rightClicked && mouseX < mapViewWidth && (!m_debugMode || mouseY > 30))
         {
             std::vector<int> combatUnits;
-            for (int uid : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                const Entity *e = entities.GetEntity(uid);
-                if (e && e->alive && !e->isBuilding)
+                const Entity *entity = entities.GetEntity(unitId);
+                if (entity && entity->alive && !entity->isBuilding)
                 {
-                    combatUnits.push_back(uid);
+                    combatUnits.push_back(unitId);
                 }
             }
 
             // Only Barracks / Factories selected: right click moves their rally point
             if (combatUnits.empty())
             {
-                SimCommand c = Command(CommandType::SetRally);
-                c.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
-                c.x = static_cast<std::int32_t>(rx);
-                c.y = static_cast<std::int32_t>(ry);
-                if (!c.ids.empty())
-                    m_sim.Issue(std::move(c));
+                SimCommand command = Command(CommandType::SetRally);
+                command.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
+                command.x = static_cast<std::int32_t>(rightClickWorldX);
+                command.y = static_cast<std::int32_t>(rightClickWorldY);
+                if (!command.ids.empty())
+                    m_sim.Issue(std::move(command));
             }
             else
             {
                 // Shift: the point is queued after the current orders (a route, as in other RTS games)
-                const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-                OrderAt(combatUnits, rx, ry, OrderKind::Move, shift);
+                const bool shiftHeld
+                    = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
+                OrderAt(combatUnits, rightClickWorldX, rightClickWorldY, OrderKind::Move, shiftHeld);
             }
         }
 
         // Touch: a tap on the ground or an enemy orders the selected units (move; twice on a spot: attack-move)
         bool touchOrdered = false;
-        if (m_touchMode && !hud.IsAttackMoveMode() && leftClicked && mx < mapViewW && (!m_debugMode || my > 30))
+        if (m_touchMode && !hud.IsAttackMoveMode() && leftClicked && mouseX < mapViewWidth
+            && (!m_debugMode || mouseY > 30))
         {
             std::vector<int> combatUnits;
-            for (int uid : m_selectedUnits)
+            for (int unitId : m_selectedUnits)
             {
-                const Entity *e = entities.GetEntity(uid);
-                if (e && e->alive && !e->isBuilding)
-                    combatUnits.push_back(uid);
+                const Entity *entity = entities.GetEntity(unitId);
+                if (entity && entity->alive && !entity->isBuilding)
+                    combatUnits.push_back(unitId);
             }
-            const Entity *tapped = entities.GetEntity(entities.GetUnitAt(lx, ly));
+            const Entity *tappedEntity = entities.GetEntity(entities.GetUnitAt(leftClickWorldX, leftClickWorldY));
             // A tap on an own unit or building selects it (the unit selection ends), it is no order
-            const bool tappedOwn = tapped && tapped->alive && tapped->owner == Players::Local();
-            const std::uint64_t now = SDL_GetTicks();
-            const bool again = now - m_touchOrderTicks < 450 && std::abs(mx - m_touchOrderX) <= 40
-                               && std::abs(my - m_touchOrderY) <= 40;
+            const bool tappedOwn = tappedEntity && tappedEntity->alive && tappedEntity->owner == Players::Local();
+            const std::uint64_t nowTicks = SDL_GetTicks();
+            const bool isSecondOrderTap = nowTicks - m_touchOrderTicks < 450
+                                          && std::abs(mouseX - m_touchOrderX) <= 40
+                                          && std::abs(mouseY - m_touchOrderY) <= 40;
             if (!combatUnits.empty() && !tappedOwn)
             {
-                OrderAt(combatUnits, lx, ly, again ? OrderKind::AttackMove : OrderKind::Move, false);
-                m_touchOrderTicks = again ? 0 : now;
-                m_touchOrderX = mx;
-                m_touchOrderY = my;
+                OrderAt(
+                    combatUnits,
+                    leftClickWorldX,
+                    leftClickWorldY,
+                    isSecondOrderTap ? OrderKind::AttackMove : OrderKind::Move,
+                    false);
+                m_touchOrderTicks = isSecondOrderTap ? 0 : nowTicks;
+                m_touchOrderX = mouseX;
+                m_touchOrderY = mouseY;
                 touchOrdered = true;
             }
-            else if (!tapped && combatUnits.empty() && !m_selectedUnits.empty())
+            else if (!tappedEntity && combatUnits.empty() && !m_selectedUnits.empty())
             {
                 // Barracks / Factories selected, a tap on empty ground: the selection ends, but the buildings
                 // are remembered for a moment: a second tap close by sets their rally point
                 m_touchRallyIds.clear();
-                for (int id : m_selectedUnits)
+                for (int unitId : m_selectedUnits)
                 {
-                    const Building *b = entities.GetBuilding(id);
-                    if (b && b->alive && b->owner == Players::Local() && b->IsUnitProducer())
-                        m_touchRallyIds.push_back(id);
+                    const Building *building = entities.GetBuilding(unitId);
+                    if (building && building->alive && building->owner == Players::Local() && building->IsUnitProducer())
+                        m_touchRallyIds.push_back(unitId);
                 }
-                m_touchRallyTicks = now;
-                m_touchRallyX = mx;
-                m_touchRallyY = my;
+                m_touchRallyTicks = nowTicks;
+                m_touchRallyX = mouseX;
+                m_touchRallyY = mouseY;
             }
-            else if (!tapped && m_selectedUnits.empty() && !m_touchRallyIds.empty())
+            else if (!tappedEntity && m_selectedUnits.empty() && !m_touchRallyIds.empty())
             {
-                const bool second = now - m_touchRallyTicks < 450 && std::abs(mx - m_touchRallyX) <= 40
-                                    && std::abs(my - m_touchRallyY) <= 40;
-                SimCommand c = Command(CommandType::SetRally);
-                if (second)
+                const bool isSecondRallyTap = nowTicks - m_touchRallyTicks < 450
+                                              && std::abs(mouseX - m_touchRallyX) <= 40
+                                              && std::abs(mouseY - m_touchRallyY) <= 40;
+                SimCommand command = Command(CommandType::SetRally);
+                if (isSecondRallyTap)
                 {
-                    for (int id : m_touchRallyIds)
+                    for (int unitId : m_touchRallyIds)
                     {
-                        Entity *e = entities.GetEntity(id);
-                        const Building *b = entities.GetBuilding(id);
-                        if (e && b && b->alive && b->owner == Players::Local())
+                        Entity *entity = entities.GetEntity(unitId);
+                        const Building *building = entities.GetBuilding(unitId);
+                        if (entity && building && building->alive && building->owner == Players::Local())
                         {
-                            c.ids.push_back(static_cast<std::uint32_t>(id));
-                            e->selected = true;
-                            m_selectedUnits.push_back(id); // the buildings stay in focus after the rally point
+                            command.ids.push_back(static_cast<std::uint32_t>(unitId));
+                            entity->selected = true;
+                            m_selectedUnits.push_back(unitId); // the buildings stay in focus after the rally point
                         }
                     }
-                    c.x = static_cast<std::int32_t>(lx);
-                    c.y = static_cast<std::int32_t>(ly);
-                    if (!c.ids.empty())
+                    command.x = static_cast<std::int32_t>(leftClickWorldX);
+                    command.y = static_cast<std::int32_t>(leftClickWorldY);
+                    if (!command.ids.empty())
                     {
-                        m_sim.Issue(std::move(c));
+                        m_sim.Issue(std::move(command));
                         touchOrdered = true;
                     }
                 }
@@ -1182,116 +1213,118 @@ void GameplayController::Update(const FrameContext &ctx)
         }
 
         // Left-Click single unit selection on map
-        if (!touchOrdered && !hud.IsAttackMoveMode() && leftClicked && mx < mapViewW && (!m_debugMode || my > 30))
+        if (!touchOrdered && !hud.IsAttackMoveMode() && leftClicked && mouseX < mapViewWidth
+            && (!m_debugMode || mouseY > 30))
         {
-            int clickedId = entities.GetUnitAt(lx, ly);
-            const Building *clickedBuilding = entities.GetBuilding(clickedId);
+            int clickedEntityId = entities.GetUnitAt(leftClickWorldX, leftClickWorldY);
+            const Building *clickedBuilding = entities.GetBuilding(clickedEntityId);
             const bool ownProducer
                 = clickedBuilding && clickedBuilding->owner == Players::Local() && clickedBuilding->IsUnitProducer();
-            const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-            const Uint64 now = SDL_GetTicks();
+            const bool shiftHeld = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
+            const Uint64 nowTicks = SDL_GetTicks();
             // Twice on the same unit, or twice on the same spot of empty ground
-            const bool samePlace = std::abs(static_cast<int>(mx) - m_lastClickX) <= 8
-                                   && std::abs(static_cast<int>(my) - m_lastClickY) <= 8;
-            const bool doubleClick
-                = clickedId == m_lastClickId && now - m_lastClickTicks < 350 && (clickedId > 0 || samePlace);
-            m_lastClickId = clickedId;
-            m_lastClickTicks = now;
-            m_lastClickX = static_cast<int>(mx);
-            m_lastClickY = static_cast<int>(my);
-            const Entity *clickedEntity = clickedId > 0 ? entities.GetEntity(clickedId) : nullptr;
+            const bool isSamePlace = std::abs(static_cast<int>(mouseX) - m_lastClickX) <= 8
+                                     && std::abs(static_cast<int>(mouseY) - m_lastClickY) <= 8;
+            const bool isDoubleClick = clickedEntityId == m_lastClickId && nowTicks - m_lastClickTicks < 350
+                                       && (clickedEntityId > 0 || isSamePlace);
+            m_lastClickId = clickedEntityId;
+            m_lastClickTicks = nowTicks;
+            m_lastClickX = static_cast<int>(mouseX);
+            m_lastClickY = static_cast<int>(mouseY);
+            const Entity *clickedEntity = clickedEntityId > 0 ? entities.GetEntity(clickedEntityId) : nullptr;
             const Unit *clickedUnit = clickedEntity ? clickedEntity->AsUnit() : nullptr;
             const bool ownClickedUnit = clickedUnit && IsLiveOwnUnit(clickedEntity);
 
             // Shift+click on a Barracks / Factory adds it to the selected ones of the same type
-            bool sameTypeSelected = ownProducer && shift;
+            bool sameTypeSelected = ownProducer && shiftHeld;
             if (sameTypeSelected)
             {
-                for (int id : m_selectedUnits)
+                for (int unitId : m_selectedUnits)
                 {
-                    const Building *b = entities.GetBuilding(id);
-                    if (!b || b->type != clickedBuilding->type)
+                    const Building *building = entities.GetBuilding(unitId);
+                    if (!building || building->type != clickedBuilding->type)
                         sameTypeSelected = false;
                 }
             }
             if (sameTypeSelected)
             {
-                Entity *e = entities.GetEntity(clickedId);
-                if (e->selected)
+                Entity *entity = entities.GetEntity(clickedEntityId);
+                if (entity->selected)
                 {
-                    e->selected = false;
+                    entity->selected = false;
                     m_selectedUnits.erase(
-                        std::remove(m_selectedUnits.begin(), m_selectedUnits.end(), clickedId), m_selectedUnits.end());
+                        std::remove(m_selectedUnits.begin(), m_selectedUnits.end(), clickedEntityId),
+                        m_selectedUnits.end());
                 }
                 else
                 {
-                    e->selected = true;
-                    m_selectedUnits.push_back(clickedId);
-                    hud.FocusBuilding(clickedId, entities);
+                    entity->selected = true;
+                    m_selectedUnits.push_back(clickedEntityId);
+                    hud.FocusBuilding(clickedEntityId, entities);
                 }
             }
             else
             {
                 m_selectedUnits.clear();
-                for (auto &e : entities.GetAllEntities())
-                    e.selected = false;
-                if (doubleClick && ownClickedUnit)
+                for (auto &entity : entities.GetAllEntities())
+                    entity.selected = false;
+                if (isDoubleClick && ownClickedUnit)
                 {
                     // Double click on a unit: every own unit of that kind on the screen
                     const int archetype = clickedUnit->archetypeId;
                     SelectOwnUnits(
-                        entities, camera, true, [archetype](const Unit &u) { return u.archetypeId == archetype; });
+                        entities, camera, true, [archetype](const Unit &unit) { return unit.archetypeId == archetype; });
                 }
-                else if (doubleClick && clickedId == 0)
+                else if (isDoubleClick && clickedEntityId == 0)
                 {
                     // Double click on empty ground: every own unit on the screen
                     SelectOwnUnits(entities, camera, true, [](const Unit &) { return true; });
                 }
-                else if (ownProducer && doubleClick)
+                else if (ownProducer && isDoubleClick)
                 {
                     // Double click: every own building of that type
-                    for (auto &e : entities.GetAllEntities())
+                    for (auto &entity : entities.GetAllEntities())
                     {
-                        const Building *b = e.AsBuilding();
-                        if (b && b->alive && b->state != ActionState::Die && b->owner == Players::Local()
-                            && b->type == clickedBuilding->type)
+                        const Building *building = entity.AsBuilding();
+                        if (building && building->alive && building->state != ActionState::Die
+                            && building->owner == Players::Local() && building->type == clickedBuilding->type)
                         {
-                            e.selected = true;
-                            m_selectedUnits.push_back(e.id);
+                            entity.selected = true;
+                            m_selectedUnits.push_back(entity.id);
                         }
                     }
-                    hud.FocusBuilding(clickedId, entities);
+                    hud.FocusBuilding(clickedEntityId, entities);
                 }
-                else if (clickedId > 0)
+                else if (clickedEntityId > 0)
                 {
-                    Entity *e = entities.GetEntity(clickedId);
-                    if (e && (e->owner == Players::Local() || (m_debugMode && m_controlAllFactions)))
+                    Entity *entity = entities.GetEntity(clickedEntityId);
+                    if (entity && (entity->owner == Players::Local() || (m_debugMode && m_controlAllFactions)))
                     {
-                        e->selected = true;
-                        m_selectedUnits.push_back(clickedId);
-                        if (e->isBuilding)
-                            hud.FocusBuilding(clickedId, entities);
+                        entity->selected = true;
+                        m_selectedUnits.push_back(clickedEntityId);
+                        if (entity->isBuilding)
+                            hud.FocusBuilding(clickedEntityId, entities);
                     }
                 }
             }
         }
 
         // Box selection on map
-        const auto &sbox = input.GetSelectionBox();
-        if (!hud.IsAttackMoveMode() && sbox.active && sbox.HasSignificantArea() && sbox.startScreenX < mapViewW
-            && (!m_debugMode || sbox.startScreenY > 30))
+        const auto &selectionBox = input.GetSelectionBox();
+        if (!hud.IsAttackMoveMode() && selectionBox.active && selectionBox.HasSignificantArea()
+            && selectionBox.startScreenX < mapViewWidth && (!m_debugMode || selectionBox.startScreenY > 30))
         {
-            float minX = std::min(sbox.startWorldX, sbox.currentWorldX);
-            float maxX = std::max(sbox.startWorldX, sbox.currentWorldX);
-            float minY = std::min(sbox.startWorldY, sbox.currentWorldY);
-            float maxY = std::max(sbox.startWorldY, sbox.currentWorldY);
+            float minX = std::min(selectionBox.startWorldX, selectionBox.currentWorldX);
+            float maxX = std::max(selectionBox.startWorldX, selectionBox.currentWorldX);
+            float minY = std::min(selectionBox.startWorldY, selectionBox.currentWorldY);
+            float maxY = std::max(selectionBox.startWorldY, selectionBox.currentWorldY);
             // The local player's own units: by player, not by faction (two players of one faction would
             // otherwise select the first one's units, whose orders the simulation then refuses)
-            const PlayerId selOwner
+            const PlayerId selectionOwner
                 = (m_debugMode && m_controlAllFactions) ? Players::OwnerOf(AiFaction()) : Players::Local();
-            for (auto &e : entities.GetAllEntities())
-                e.selected = false; // an area selection ends the focus on a building
-            entities.GetUnitsInBox(minX, minY, maxX, maxY, selOwner, m_selectedUnits);
+            for (auto &entity : entities.GetAllEntities())
+                entity.selected = false; // an area selection ends the focus on a building
+            entities.GetUnitsInBox(minX, minY, maxX, maxY, selectionOwner, m_selectedUnits);
             if (m_debugMode && m_controlAllFactions && m_selectedUnits.empty())
             {
                 entities.GetUnitsInBox(minX, minY, maxX, maxY, Players::Local(), m_selectedUnits);
@@ -1327,22 +1360,25 @@ void GameplayController::SimulationStep(
     HUDController &hud,
     AppState &appState)
 {
+    if (!m_sim.AdvancesWorld())
+        return;
+
     // 8. Simulation updates: the commands of this tick first, then the world
     entities.SnapshotRenderState(); // the picture glides from here to where this tick leaves things
-    SimContext ctx {entities, map, pathfinder, economy, aiController};
-    m_sim.ApplyCommands(ctx);
-    m_sim.UpdateResearch(deltaTime, ctx);
+    SimContext simContext {entities, map, pathfinder, economy, aiController};
+    m_sim.ApplyCommands(simContext);
+    m_sim.UpdateResearch(deltaTime, simContext);
     hud.Update(deltaTime, entities, economy, m_sim.TakeEvents());
     entities.Update(deltaTime, map, pathfinder);
     // A match: whoever has no building left is out, computer players too (their controllers stop)
     if (mission.IsMatch())
     {
-        for (PlayerId out : entities.UpdateElimination(map))
-            m_sim.NoteEvent({SimEvent::Type::PlayerEliminated, out, 0});
+        for (PlayerId eliminatedPlayer : entities.UpdateElimination(map))
+            m_sim.NoteEvent({SimEvent::Type::PlayerEliminated, eliminatedPlayer, 0});
     }
-    m_sim.UpdateOrderQueues(ctx);
-    m_sim.UpdateSquads(deltaTime, ctx, aiController.GetChokepoints());
-    m_sim.UpdateEconomies(deltaTime, ctx); // the local economy included, in slot order
+    m_sim.UpdateOrderQueues(simContext);
+    m_sim.UpdateSquads(deltaTime, simContext, aiController.GetChokepoints());
+    m_sim.UpdateEconomies(deltaTime, simContext); // the local economy included, in slot order
     // A match has its own computer players (one per computer slot), the mission's commander stays out
     if (mission.IsMatch())
     {
@@ -1373,129 +1409,148 @@ void GameplayController::SimulationStep(
 void GameplayController::RenderSelectionBox(Renderer &renderer, const Camera &camera, const InputManager &input)
 {
     (void) camera;
-    const auto &sbox = input.GetSelectionBox();
-    if (sbox.active && sbox.HasSignificantArea())
+    const auto &selectionBox = input.GetSelectionBox();
+    if (selectionBox.active && selectionBox.HasSignificantArea())
     {
-        int bx = std::min(sbox.startScreenX, sbox.currentScreenX);
-        int by = std::min(sbox.startScreenY, sbox.currentScreenY);
-        int bw = std::abs(sbox.currentScreenX - sbox.startScreenX);
-        int bh = std::abs(sbox.currentScreenY - sbox.startScreenY);
-        renderer.FillRectScreen(bx, by, bw, bh, {0, 255, 0, 45});
-        renderer.DrawRectScreen(bx, by, bw, bh, {0, 255, 0, 255});
+        int boxX = std::min(selectionBox.startScreenX, selectionBox.currentScreenX);
+        int boxY = std::min(selectionBox.startScreenY, selectionBox.currentScreenY);
+        int boxWidth = std::abs(selectionBox.currentScreenX - selectionBox.startScreenX);
+        int boxHeight = std::abs(selectionBox.currentScreenY - selectionBox.startScreenY);
+        renderer.FillRectScreen(boxX, boxY, boxWidth, boxHeight, {0, 255, 0, 45});
+        renderer.DrawRectScreen(boxX, boxY, boxWidth, boxHeight, {0, 255, 0, 255});
     }
 }
 
 void GameplayController::LoadOverlayStyle(const EnvironmentConfig &env)
 {
-    const nlohmann::json &o = env.Section("overlay");
+    const nlohmann::json &overlayJson = env.Section("overlay");
     m_overlay = OverlayStyle {};
-    if (!o.is_object())
+    if (!overlayJson.is_object())
         return;
-    m_overlay.opacity = std::clamp(o.value("line_opacity", m_overlay.opacity), 0.0f, 1.0f);
-    auto read = [&](const char *key, LineStyle &style) {
-        if (!o.contains(key) || !o[key].is_object())
+    m_overlay.opacity = std::clamp(overlayJson.value("line_opacity", m_overlay.opacity), 0.0f, 1.0f);
+    auto readLineStyle = [&](const char *key, LineStyle &style) {
+        if (!overlayJson.contains(key) || !overlayJson[key].is_object())
             return;
-        style.color = RenderUtility::ParseHexColor(o[key].value("color", std::string()), style.color);
-        style.width = std::clamp(o[key].value("width", style.width), 0.5f, 12.0f);
+        style.color = RenderUtility::ParseHexColor(overlayJson[key].value("color", std::string()), style.color);
+        style.width = std::clamp(overlayJson[key].value("width", style.width), 0.5f, 12.0f);
     };
-    read("move_line", m_overlay.move);
-    read("attack_line", m_overlay.attack);
-    read("wall_line", m_overlay.wall);
+    readLineStyle("move_line", m_overlay.move);
+    readLineStyle("attack_line", m_overlay.attack);
+    readLineStyle("wall_line", m_overlay.wall);
 }
 
 void GameplayController::RenderOrderLines(
     Renderer &renderer, const Camera &camera, const EntityManager &entities, const TileMap &map, bool showAll) const
 {
-    auto drawLine = [&](float x0, float y0, float x1, float y1, const LineStyle &style) {
-        SDL_Color c = style.color;
-        c.a = static_cast<Uint8>(std::clamp(c.a * m_overlay.opacity, 0.0f, 255.0f));
-        RenderUtility::DrawLine(renderer, camera, x0, y0, x1, y1, c, style.width);
+    auto drawLine = [&](float startX, float startY, float endX, float endY, const LineStyle &style) {
+        SDL_Color lineColor = style.color;
+        lineColor.a = static_cast<Uint8>(std::clamp(lineColor.a * m_overlay.opacity, 0.0f, 255.0f));
+        RenderUtility::DrawLine(renderer, camera, startX, startY, endX, endY, lineColor, style.width);
     };
-    auto drawOrders = [&](const Entity &e) {
-        const Unit *u = e.AsUnit();
-        if (!u || !u->alive || u->state == ActionState::Die)
+    auto drawOrders = [&](const Entity &entity) {
+        const Unit *unit = entity.AsUnit();
+        if (!unit || !unit->alive || unit->state == ActionState::Die)
             return;
-        const float x = u->GetUnitCenterPixelX(), y = u->GetUnitCenterPixelY();
-        if (u->targetEntityId != 0)
+        const float unitCenterX = unit->GetUnitCenterPixelX(), unitCenterY = unit->GetUnitCenterPixelY();
+        if (unit->targetEntityId != 0)
         {
-            const Entity *target = entities.GetEntity(u->targetEntityId);
+            const Entity *target = entities.GetEntity(unit->targetEntityId);
             if (target && target->alive && target->state != ActionState::Die
                 && (target->owner == Players::Local()
                     || entities.IsEntityVisibleToPlayer(*target, Players::Local(), map)))
             {
-                drawLine(x, y, target->GetUnitCenterPixelX(), target->GetUnitCenterPixelY(), m_overlay.attack);
+                drawLine(
+                    unitCenterX,
+                    unitCenterY,
+                    target->GetUnitCenterPixelX(),
+                    target->GetUnitCenterPixelY(),
+                    m_overlay.attack);
             }
         }
-        if (u->targetWallTileX >= 0 && u->targetWallTileY >= 0)
+        if (unit->targetWallTileX >= 0 && unit->targetWallTileY >= 0)
         {
             drawLine(
-                x,
-                y,
-                u->targetWallTileX * TILE_WIDTH + TILE_WIDTH * 0.5f,
-                u->targetWallTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f,
+                unitCenterX,
+                unitCenterY,
+                unit->targetWallTileX * TILE_WIDTH + TILE_WIDTH * 0.5f,
+                unit->targetWallTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f,
                 m_overlay.wall);
         }
         // A move / attack-move order: the line ends at the clicked point (not at the unit's own formation tile),
         // then the Shift-queued points follow, each with a small mark
-        auto mark = [&](float px, float py, const LineStyle &style) {
+        auto drawOrderMark = [&](float worldX, float worldY, const LineStyle &style) {
             // The end of an order looks like a rally point (a filled square in a frame), in the colour of its line
-            float sx = 0, sy = 0;
-            camera.WorldToScreen(px, py, sx, sy);
-            SDL_Color c = style.color;
-            c.a = static_cast<Uint8>(std::clamp(c.a * m_overlay.opacity * 1.5f, 0.0f, 255.0f));
-            const int m = std::max(4, static_cast<int>(5 * camera.GetZoom()));
-            renderer.FillRectScreen(static_cast<int>(sx) - m / 2, static_cast<int>(sy) - m / 2, m, m, c);
-            renderer.DrawRectScreen(static_cast<int>(sx) - m, static_cast<int>(sy) - m, 2 * m, 2 * m, c);
+            float screenX = 0, screenY = 0;
+            camera.WorldToScreen(worldX, worldY, screenX, screenY);
+            SDL_Color markColor = style.color;
+            markColor.a = static_cast<Uint8>(std::clamp(markColor.a * m_overlay.opacity * 1.5f, 0.0f, 255.0f));
+            const int markSize = std::max(4, static_cast<int>(5 * camera.GetZoom()));
+            renderer.FillRectScreen(
+                static_cast<int>(screenX) - markSize / 2,
+                static_cast<int>(screenY) - markSize / 2,
+                markSize,
+                markSize,
+                markColor);
+            renderer.DrawRectScreen(
+                static_cast<int>(screenX) - markSize,
+                static_cast<int>(screenY) - markSize,
+                2 * markSize,
+                2 * markSize,
+                markColor);
         };
-        float fromX = x, fromY = y;
+        float fromX = unitCenterX, fromY = unitCenterY;
         // Red while the unit has a target to fight (a unit, a building, a wall, or what it shoots at on the move),
         // green otherwise
-        const bool fighting = u->targetEntityId != 0 || u->moveFireTargetId != 0
-                              || (u->targetWallTileX >= 0 && u->targetWallTileY >= 0);
-        if (u->orderX >= 0 && u->orderY >= 0)
-        {
-            const LineStyle &style = (u->isAttackMoving || fighting) ? m_overlay.attack : m_overlay.move;
-            const float px = static_cast<float>(u->orderX), py = static_cast<float>(u->orderY);
-            if (u->targetEntityId == 0)
-                drawLine(x, y, px, py, style);
-            mark(px, py, style);
-            fromX = px;
-            fromY = py;
-        }
-        else if (u->HasMoveTarget())
-        {
-            fromX = u->targetTileX * TILE_WIDTH + TILE_WIDTH * 0.5f;
-            fromY = u->targetTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-            drawLine(x, y, fromX, fromY, fighting ? m_overlay.attack : m_overlay.move);
-        }
-        for (const Unit::QueuedOrder &q : u->orderQueue)
+        const bool hasCombatTarget = unit->targetEntityId != 0 || unit->moveFireTargetId != 0
+                                     || (unit->targetWallTileX >= 0 && unit->targetWallTileY >= 0);
+        if (unit->orderX >= 0 && unit->orderY >= 0)
         {
             const LineStyle &style
-                = static_cast<OrderKind>(q.kind) == OrderKind::AttackMove ? m_overlay.attack : m_overlay.move;
-            const float px = static_cast<float>(q.x), py = static_cast<float>(q.y);
-            drawLine(fromX, fromY, px, py, style);
-            mark(px, py, style);
-            fromX = px;
-            fromY = py;
+                = (unit->isAttackMoving || hasCombatTarget) ? m_overlay.attack : m_overlay.move;
+            const float orderWorldX = static_cast<float>(unit->orderX);
+            const float orderWorldY = static_cast<float>(unit->orderY);
+            if (unit->targetEntityId == 0)
+                drawLine(unitCenterX, unitCenterY, orderWorldX, orderWorldY, style);
+            drawOrderMark(orderWorldX, orderWorldY, style);
+            fromX = orderWorldX;
+            fromY = orderWorldY;
+        }
+        else if (unit->HasMoveTarget())
+        {
+            fromX = unit->targetTileX * TILE_WIDTH + TILE_WIDTH * 0.5f;
+            fromY = unit->targetTileY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
+            drawLine(unitCenterX, unitCenterY, fromX, fromY, hasCombatTarget ? m_overlay.attack : m_overlay.move);
+        }
+        for (const Unit::QueuedOrder &queuedOrder : unit->orderQueue)
+        {
+            const LineStyle &style = static_cast<OrderKind>(queuedOrder.kind) == OrderKind::AttackMove
+                                         ? m_overlay.attack
+                                         : m_overlay.move;
+            const float orderWorldX = static_cast<float>(queuedOrder.x);
+            const float orderWorldY = static_cast<float>(queuedOrder.y);
+            drawLine(fromX, fromY, orderWorldX, orderWorldY, style);
+            drawOrderMark(orderWorldX, orderWorldY, style);
+            fromX = orderWorldX;
+            fromY = orderWorldY;
         }
     };
 
     if (showAll)
     {
-        for (const Entity &e : entities.GetAllEntities())
+        for (const Entity &entity : entities.GetAllEntities())
         {
             // Only the player's own and allied units: the orders of an enemy are not for the eyes of the other side
-            if (!e.IsUnitEntity() || e.owner == kNoPlayer || Players::Hostile(e.owner, Players::Local()))
+            if (!entity.IsUnitEntity() || entity.owner == kNoPlayer || Players::Hostile(entity.owner, Players::Local()))
                 continue;
-            drawOrders(e);
+            drawOrders(entity);
         }
         return;
     }
-    for (int uid : m_selectedUnits)
+    for (int unitId : m_selectedUnits)
     {
-        const Entity *e = entities.GetEntity(uid);
-        if (e && e->owner == Players::Local())
-            drawOrders(*e);
+        const Entity *entity = entities.GetEntity(unitId);
+        if (entity && entity->owner == Players::Local())
+            drawOrders(*entity);
     }
 }
 
@@ -1506,29 +1561,29 @@ void GameplayController::RenderDebugNavigation(
     if (!m_debugMode || !m_showNavLines)
         return;
 
-    for (int uid : m_selectedUnits)
+    for (int unitId : m_selectedUnits)
     {
-        const Entity *e = entities.GetEntity(uid);
-        if (!e || !e->alive || e->state == ActionState::Die)
+        const Entity *entity = entities.GetEntity(unitId);
+        if (!entity || !entity->alive || entity->state == ActionState::Die)
             continue;
 
-        float wx = e->GetUnitCenterPixelX();
-        float wy = e->GetUnitCenterPixelY();
+        float unitWorldX = entity->GetUnitCenterPixelX();
+        float unitWorldY = entity->GetUnitCenterPixelY();
 
         // 1. Attack Range Ellipse
-        const SDL_Color rangeCol {255, 60, 60, 110}; // red
-        RenderUtility::DrawRangeRing(renderer, camera, wx, wy, e->attackRange, rangeCol, 1.5f);
+        const SDL_Color rangeColor {255, 60, 60, 110}; // red
+        RenderUtility::DrawRangeRing(renderer, camera, unitWorldX, unitWorldY, entity->attackRange, rangeColor, 1.5f);
 
         // 2. Navigation Path Lines & Waypoints
-        const Unit *u = e->AsUnit();
-        if (u && !u->path.empty() && u->pathIndex < u->path.size())
+        const Unit *unit = entity->AsUnit();
+        if (unit && !unit->path.empty() && unit->pathIndex < unit->path.size())
         {
-            float prevX = wx;
-            float prevY = wy;
-            for (std::size_t i = u->pathIndex; i < u->path.size(); ++i)
+            float prevX = unitWorldX;
+            float prevY = unitWorldY;
+            for (std::size_t i = unit->pathIndex; i < unit->path.size(); ++i)
             {
-                float nodeX = u->path[i].x * TILE_WIDTH + (TILE_WIDTH * 0.5f);
-                float nodeY = u->path[i].y * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
+                float nodeX = unit->path[i].x * TILE_WIDTH + (TILE_WIDTH * 0.5f);
+                float nodeY = unit->path[i].y * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
                 renderer.DrawLineWorld(prevX, prevY, nodeX, nodeY, camera, {0, 255, 200, 220});
                 renderer.DrawRectWorld(nodeX - 3.0f, nodeY - 3.0f, 6.0f, 6.0f, camera, {0, 255, 200, 255});
                 prevX = nodeX;
@@ -1539,43 +1594,44 @@ void GameplayController::RenderDebugNavigation(
         }
 
         // 3. Combat Target Line (Red)
-        if (e->targetEntityId != 0)
+        if (entity->targetEntityId != 0)
         {
-            const Entity *tgt = entities.GetEntity(e->targetEntityId);
-            if (tgt && tgt->alive && tgt->state != ActionState::Die)
+            const Entity *targetEntity = entities.GetEntity(entity->targetEntityId);
+            if (targetEntity && targetEntity->alive && targetEntity->state != ActionState::Die)
             {
-                float twx = tgt->GetUnitCenterPixelX();
-                float twy = tgt->GetUnitCenterPixelY();
-                renderer.DrawLineWorld(wx, wy, twx, twy, camera, {255, 30, 30, 255});
-                renderer.DrawRectWorld(twx - 8.0f, twy - 8.0f, 16.0f, 16.0f, camera, {255, 30, 30, 255});
+                float targetWorldX = targetEntity->GetUnitCenterPixelX();
+                float targetWorldY = targetEntity->GetUnitCenterPixelY();
+                renderer.DrawLineWorld(unitWorldX, unitWorldY, targetWorldX, targetWorldY, camera, {255, 30, 30, 255});
+                renderer.DrawRectWorld(
+                    targetWorldX - 8.0f, targetWorldY - 8.0f, 16.0f, 16.0f, camera, {255, 30, 30, 255});
             }
         }
 
         // 4. Wall Target Line (Orange)
-        if (e->targetWallTileX >= 0 && e->targetWallTileY >= 0)
+        if (entity->targetWallTileX >= 0 && entity->targetWallTileY >= 0)
         {
-            float twx = e->targetWallTileX * TILE_WIDTH + (TILE_WIDTH * 0.5f);
-            float twy = e->targetWallTileY * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
-            renderer.DrawLineWorld(wx, wy, twx, twy, camera, {255, 140, 0, 255});
-            renderer.DrawRectWorld(twx - 6.0f, twy - 6.0f, 12.0f, 12.0f, camera, {255, 140, 0, 255});
+            float wallWorldX = entity->targetWallTileX * TILE_WIDTH + (TILE_WIDTH * 0.5f);
+            float wallWorldY = entity->targetWallTileY * TILE_HEIGHT + (TILE_HEIGHT * 0.5f);
+            renderer.DrawLineWorld(unitWorldX, unitWorldY, wallWorldX, wallWorldY, camera, {255, 140, 0, 255});
+            renderer.DrawRectWorld(wallWorldX - 6.0f, wallWorldY - 6.0f, 12.0f, 12.0f, camera, {255, 140, 0, 255});
         }
 
         // 5. Waiting/Blocked indicator
-        if (u && u->waitingForPath)
+        if (unit && unit->waitingForPath)
         {
-            renderer.FillRectWorld(wx - 10.0f, wy - 24.0f, 20.0f, 6.0f, camera, {255, 180, 0, 220});
+            renderer.FillRectWorld(unitWorldX - 10.0f, unitWorldY - 24.0f, 20.0f, 6.0f, camera, {255, 180, 0, 220});
         }
     }
 }
 
-void GameplayController::RenderDebugToolbar(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW)
+void GameplayController::RenderDebugToolbar(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowWidth)
 {
     if (!m_debugMode)
         return;
 
     // Background bar
-    renderer.FillRectScreen(0, 0, windowW, 30, {16, 20, 28, 240});
-    renderer.DrawLineScreen(0, 30, windowW, 30, {0, 200, 255, 180});
+    renderer.FillRectScreen(0, 0, windowWidth, 30, {16, 20, 28, 240});
+    renderer.DrawLineScreen(0, 30, windowWidth, 30, {0, 200, 255, 180});
 
     // Button 1: Badge
     renderer.FillRectScreen(4, 3, 90, 24, {20, 70, 40, 255});
@@ -1583,26 +1639,26 @@ void GameplayController::RenderDebugToolbar(Renderer &renderer, BitmapFontRender
     fontRenderer.DrawString("--DEBUG--", 12, 7, 1, {40, 255, 90, 255});
 
     // Button 2: Nav Lines
-    SDL_Color navBg = m_showNavLines ? SDL_Color {30, 80, 100, 255} : SDL_Color {40, 40, 50, 255};
-    renderer.FillRectScreen(98, 3, 100, 24, navBg);
+    SDL_Color navBgColor = m_showNavLines ? SDL_Color {30, 80, 100, 255} : SDL_Color {40, 40, 50, 255};
+    renderer.FillRectScreen(98, 3, 100, 24, navBgColor);
     renderer.DrawRectScreen(98, 3, 100, 24, {0, 200, 255, 255});
     fontRenderer.DrawString(m_showNavLines ? "NAV: ON" : "NAV: OFF", 108, 7, 1, {255, 255, 255, 255});
 
     // Button 3: Enemy Control
-    SDL_Color ctrlBg = m_controlAllFactions ? SDL_Color {110, 40, 40, 255} : SDL_Color {40, 40, 50, 255};
-    renderer.FillRectScreen(202, 3, 120, 24, ctrlBg);
+    SDL_Color ctrlBgColor = m_controlAllFactions ? SDL_Color {110, 40, 40, 255} : SDL_Color {40, 40, 50, 255};
+    renderer.FillRectScreen(202, 3, 120, 24, ctrlBgColor);
     renderer.DrawRectScreen(202, 3, 120, 24, {255, 100, 100, 255});
     fontRenderer.DrawString(m_controlAllFactions ? "CTRL: ALL" : "CTRL: PLAYER", 210, 7, 1, {255, 255, 255, 255});
 
     // Button 4: AI Pause
-    SDL_Color aiBg = m_pauseAI ? SDL_Color {100, 80, 20, 255} : SDL_Color {40, 40, 50, 255};
-    renderer.FillRectScreen(326, 3, 110, 24, aiBg);
+    SDL_Color aiBgColor = m_pauseAI ? SDL_Color {100, 80, 20, 255} : SDL_Color {40, 40, 50, 255};
+    renderer.FillRectScreen(326, 3, 110, 24, aiBgColor);
     renderer.DrawRectScreen(326, 3, 110, 24, {255, 200, 50, 255});
     fontRenderer.DrawString(m_pauseAI ? "AI: PAUSED" : "AI: ACTIVE", 336, 7, 1, {255, 255, 255, 255});
 
     // Button 5: Fog of War
-    SDL_Color fogBg = m_revealFog ? SDL_Color {40, 80, 60, 255} : SDL_Color {40, 40, 50, 255};
-    renderer.FillRectScreen(440, 3, 105, 24, fogBg);
+    SDL_Color fogBgColor = m_revealFog ? SDL_Color {40, 80, 60, 255} : SDL_Color {40, 40, 50, 255};
+    renderer.FillRectScreen(440, 3, 105, 24, fogBgColor);
     renderer.DrawRectScreen(440, 3, 105, 24, {100, 255, 150, 255});
     fontRenderer.DrawString(m_revealFog ? "FOG: REVEAL" : "FOG: ON", 448, 7, 1, {255, 255, 255, 255});
 
@@ -1612,28 +1668,28 @@ void GameplayController::RenderDebugToolbar(Renderer &renderer, BitmapFontRender
     fontRenderer.DrawString("+$1000", 559, 7, 1, {120, 255, 120, 255});
 
     // Button 7: SPAWN MODE Toggle
-    SDL_Color spawnBg = m_spawnMode ? SDL_Color {25, 100, 50, 255} : SDL_Color {40, 40, 50, 255};
-    SDL_Color spawnBorder = m_spawnMode ? SDL_Color {40, 255, 100, 255} : SDL_Color {120, 140, 160, 255};
-    renderer.FillRectScreen(628, 3, 120, 24, spawnBg);
-    renderer.DrawRectScreen(628, 3, 120, 24, spawnBorder);
+    SDL_Color spawnBgColor = m_spawnMode ? SDL_Color {25, 100, 50, 255} : SDL_Color {40, 40, 50, 255};
+    SDL_Color spawnBorderColor = m_spawnMode ? SDL_Color {40, 255, 100, 255} : SDL_Color {120, 140, 160, 255};
+    renderer.FillRectScreen(628, 3, 120, 24, spawnBgColor);
+    renderer.DrawRectScreen(628, 3, 120, 24, spawnBorderColor);
     fontRenderer.DrawString(m_spawnMode ? "SPAWN: ON" : "SPAWN: OFF", 638, 7, 1, {255, 255, 255, 255});
 
     // Button 8: SPAWN Dropdown Combobox
     const auto &catalog = GetDebugSpawnCatalog();
-    std::string selName = "SELECT ENTITY";
-    Faction selFac = Faction::Resistance;
+    std::string selectedName = "SELECT ENTITY";
+    Faction selectedFaction = Faction::Resistance;
     if (m_selectedSpawnIndex >= 0 && m_selectedSpawnIndex < static_cast<int>(catalog.size()))
     {
-        selName = catalog[m_selectedSpawnIndex].name;
-        selFac = catalog[m_selectedSpawnIndex].faction;
+        selectedName = catalog[m_selectedSpawnIndex].name;
+        selectedFaction = catalog[m_selectedSpawnIndex].faction;
     }
     renderer.FillRectScreen(752, 3, 208, 24, {28, 36, 52, 255});
     renderer.DrawRectScreen(752, 3, 208, 24, {0, 200, 255, 255});
     // Faction indicator pip
-    SDL_Color facColor
-        = (selFac == Faction::Confederation) ? SDL_Color {0, 200, 255, 255} : SDL_Color {255, 80, 80, 255};
-    renderer.FillRectScreen(758, 10, 8, 10, facColor);
-    std::string comboLabel = selName + " v";
+    SDL_Color factionColor
+        = (selectedFaction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255} : SDL_Color {255, 80, 80, 255};
+    renderer.FillRectScreen(758, 10, 8, 10, factionColor);
+    std::string comboLabel = selectedName + " v";
     fontRenderer.DrawString(comboLabel, 772, 7, 1, {255, 255, 255, 255});
 
     // Button 9: Siege Mode Toggle
@@ -1642,10 +1698,10 @@ void GameplayController::RenderDebugToolbar(Renderer &renderer, BitmapFontRender
     fontRenderer.DrawString("SIEGE(G)", 972, 7, 1, {255, 220, 100, 255});
 
     // Button 10: Passability Grid (70% Transparency Green/Red)
-    SDL_Color gridBg = m_showDebugGrid ? SDL_Color {25, 90, 45, 255} : SDL_Color {40, 40, 50, 255};
-    SDL_Color gridBorder = m_showDebugGrid ? SDL_Color {40, 255, 100, 255} : SDL_Color {120, 140, 160, 255};
-    renderer.FillRectScreen(1053, 3, 100, 24, gridBg);
-    renderer.DrawRectScreen(1053, 3, 100, 24, gridBorder);
+    SDL_Color gridBgColor = m_showDebugGrid ? SDL_Color {25, 90, 45, 255} : SDL_Color {40, 40, 50, 255};
+    SDL_Color gridBorderColor = m_showDebugGrid ? SDL_Color {40, 255, 100, 255} : SDL_Color {120, 140, 160, 255};
+    renderer.FillRectScreen(1053, 3, 100, 24, gridBgColor);
+    renderer.DrawRectScreen(1053, 3, 100, 24, gridBorderColor);
     fontRenderer.DrawString(m_showDebugGrid ? "GRID: ON" : "GRID: OFF", 1063, 7, 1, {255, 255, 255, 255});
 
     // Button 11: Dear ImGui inspector overlay
@@ -1671,24 +1727,24 @@ void GameplayController::RenderDebugGrid(
 
     // User requirement: "green at 70% opacity - walkable ground, red at 70% - blocked paths (buildings included)"
     // 70% transparency = 30% alpha (~76)
-    const SDL_Color passableCol {0, 220, 0, 76};
-    const SDL_Color impassableCol {220, 0, 0, 76};
+    const SDL_Color passableColor {0, 220, 0, 76};
+    const SDL_Color impassableColor {220, 0, 0, 76};
 
-    for (int ty = startTileY; ty < endTileY; ++ty)
+    for (int tileY = startTileY; tileY < endTileY; ++tileY)
     {
-        for (int tx = startTileX; tx < endTileX; ++tx)
+        for (int tileX = startTileX; tileX < endTileX; ++tileX)
         {
-            bool passable = map.IsPassable(tx, ty) && (map.GetWall(tx, ty) == 0);
+            bool passable = map.IsPassable(tileX, tileY) && (map.GetWall(tileX, tileY) == 0);
             if (passable)
             {
                 // Check if tile is covered by any stationary living building
-                for (const auto &e : entities.GetAllEntities())
+                for (const auto &entity : entities.GetAllEntities())
                 {
-                    const Building *b = e.AsBuilding();
-                    if (!b || !b->alive || b->state == ActionState::Die)
+                    const Building *building = entity.AsBuilding();
+                    if (!building || !building->alive || building->state == ActionState::Die)
                         continue;
-                    if (tx >= b->tileX && tx < b->tileX + b->buildWidth && ty >= b->tileY
-                        && ty < b->tileY + b->buildHeight)
+                    if (tileX >= building->tileX && tileX < building->tileX + building->buildWidth
+                        && tileY >= building->tileY && tileY < building->tileY + building->buildHeight)
                     {
                         passable = false;
                         break;
@@ -1696,83 +1752,92 @@ void GameplayController::RenderDebugGrid(
                 }
             }
 
-            SDL_Color color = passable ? passableCol : impassableCol;
+            SDL_Color color = passable ? passableColor : impassableColor;
             // "drawn as a filled rectangle shrunk by 2 pixels on every side (like a grid)"
-            float rx = tx * TILE_WIDTH + 2.0f;
-            float ry = ty * TILE_HEIGHT + 2.0f;
-            float rw = TILE_WIDTH - 4.0f;
-            float rh = TILE_HEIGHT - 4.0f;
-            renderer.FillRectWorld(rx, ry, rw, rh, camera, color);
+            float rectX = tileX * TILE_WIDTH + 2.0f;
+            float rectY = tileY * TILE_HEIGHT + 2.0f;
+            float rectWidth = TILE_WIDTH - 4.0f;
+            float rectHeight = TILE_HEIGHT - 4.0f;
+            renderer.FillRectWorld(rectX, rectY, rectWidth, rectHeight, camera, color);
         }
     }
 }
 
-void GameplayController::RenderDebugSpawnDropdown(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowH)
+void GameplayController::RenderDebugSpawnDropdown(
+    Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowHeight)
 {
-    (void) windowH;
+    (void) windowHeight;
     if (!m_debugMode || !m_spawnDropdownOpen)
         return;
 
-    int dropX = 450;
-    int dropY = 32;
-    int colW = 170;
-    int dropW = colW * 3;
-    int dropH = 370;
+    int dropdownX = 450;
+    int dropdownY = 32;
+    int columnWidth = 170;
+    int dropdownWidth = columnWidth * 3;
+    int dropdownHeight = 370;
 
     // Dropdown background box
-    renderer.FillRectScreen(dropX, dropY, dropW, dropH, {16, 22, 32, 252});
-    renderer.DrawRectScreen(dropX, dropY, dropW, dropH, {0, 200, 255, 255});
-    renderer.DrawLineScreen(dropX + colW, dropY, dropX + colW, dropY + dropH, {40, 60, 80, 200});
-    renderer.DrawLineScreen(dropX + colW * 2, dropY, dropX + colW * 2, dropY + dropH, {40, 60, 80, 200});
+    renderer.FillRectScreen(dropdownX, dropdownY, dropdownWidth, dropdownHeight, {16, 22, 32, 252});
+    renderer.DrawRectScreen(dropdownX, dropdownY, dropdownWidth, dropdownHeight, {0, 200, 255, 255});
+    renderer.DrawLineScreen(
+        dropdownX + columnWidth, dropdownY, dropdownX + columnWidth, dropdownY + dropdownHeight, {40, 60, 80, 200});
+    renderer.DrawLineScreen(
+        dropdownX + columnWidth * 2,
+        dropdownY,
+        dropdownX + columnWidth * 2,
+        dropdownY + dropdownHeight,
+        {40, 60, 80, 200});
 
     const auto &catalog = GetDebugSpawnCatalog();
 
     // Column 1: HUMANS (items 0..5)
-    fontRenderer.DrawString("-- HUMANS --", dropX + 10, dropY + 6, 1, {255, 220, 80, 255});
+    fontRenderer.DrawString("-- HUMANS --", dropdownX + 10, dropdownY + 6, 1, {255, 220, 80, 255});
     for (int i = 0; i < 6 && i < static_cast<int>(catalog.size()); ++i)
     {
-        int itemY = dropY + 26 + i * 22;
+        int itemY = dropdownY + 26 + i * 22;
         if (i == m_selectedSpawnIndex)
         {
-            renderer.FillRectScreen(dropX + 4, itemY - 2, colW - 8, 20, {20, 70, 90, 255});
-            renderer.DrawRectScreen(dropX + 4, itemY - 2, colW - 8, 20, {0, 255, 220, 255});
+            renderer.FillRectScreen(dropdownX + 4, itemY - 2, columnWidth - 8, 20, {20, 70, 90, 255});
+            renderer.DrawRectScreen(dropdownX + 4, itemY - 2, columnWidth - 8, 20, {0, 255, 220, 255});
         }
-        SDL_Color fc = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
-                                                                      : SDL_Color {255, 80, 80, 255};
-        renderer.FillRectScreen(dropX + 8, itemY + 4, 6, 8, fc);
-        fontRenderer.DrawString(catalog[i].name, dropX + 18, itemY, 1, {230, 240, 255, 255});
+        SDL_Color factionColor = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
+                                                                                : SDL_Color {255, 80, 80, 255};
+        renderer.FillRectScreen(dropdownX + 8, itemY + 4, 6, 8, factionColor);
+        fontRenderer.DrawString(catalog[i].name, dropdownX + 18, itemY, 1, {230, 240, 255, 255});
     }
 
     // Column 2: VEHICLES (items 6..13)
-    fontRenderer.DrawString("-- VEHICLES --", dropX + colW + 10, dropY + 6, 1, {255, 220, 80, 255});
+    fontRenderer.DrawString("-- VEHICLES --", dropdownX + columnWidth + 10, dropdownY + 6, 1, {255, 220, 80, 255});
     for (int i = 6; i < 14 && i < static_cast<int>(catalog.size()); ++i)
     {
-        int itemY = dropY + 26 + (i - 6) * 22;
+        int itemY = dropdownY + 26 + (i - 6) * 22;
         if (i == m_selectedSpawnIndex)
         {
-            renderer.FillRectScreen(dropX + colW + 4, itemY - 2, colW - 8, 20, {20, 70, 90, 255});
-            renderer.DrawRectScreen(dropX + colW + 4, itemY - 2, colW - 8, 20, {0, 255, 220, 255});
+            renderer.FillRectScreen(dropdownX + columnWidth + 4, itemY - 2, columnWidth - 8, 20, {20, 70, 90, 255});
+            renderer.DrawRectScreen(dropdownX + columnWidth + 4, itemY - 2, columnWidth - 8, 20, {0, 255, 220, 255});
         }
-        SDL_Color fc = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
-                                                                      : SDL_Color {255, 80, 80, 255};
-        renderer.FillRectScreen(dropX + colW + 8, itemY + 4, 6, 8, fc);
-        fontRenderer.DrawString(catalog[i].name, dropX + colW + 18, itemY, 1, {230, 240, 255, 255});
+        SDL_Color factionColor = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
+                                                                                : SDL_Color {255, 80, 80, 255};
+        renderer.FillRectScreen(dropdownX + columnWidth + 8, itemY + 4, 6, 8, factionColor);
+        fontRenderer.DrawString(catalog[i].name, dropdownX + columnWidth + 18, itemY, 1, {230, 240, 255, 255});
     }
 
     // Column 3: BUILDINGS (items 14..29)
-    fontRenderer.DrawString("-- BUILDINGS --", dropX + colW * 2 + 10, dropY + 6, 1, {255, 220, 80, 255});
+    fontRenderer.DrawString(
+        "-- BUILDINGS --", dropdownX + columnWidth * 2 + 10, dropdownY + 6, 1, {255, 220, 80, 255});
     for (int i = 14; i < 30 && i < static_cast<int>(catalog.size()); ++i)
     {
-        int itemY = dropY + 26 + (i - 14) * 20;
+        int itemY = dropdownY + 26 + (i - 14) * 20;
         if (i == m_selectedSpawnIndex)
         {
-            renderer.FillRectScreen(dropX + colW * 2 + 4, itemY - 1, colW - 8, 18, {20, 70, 90, 255});
-            renderer.DrawRectScreen(dropX + colW * 2 + 4, itemY - 1, colW - 8, 18, {0, 255, 220, 255});
+            renderer.FillRectScreen(dropdownX + columnWidth * 2 + 4, itemY - 1, columnWidth - 8, 18, {20, 70, 90, 255});
+            renderer.DrawRectScreen(
+                dropdownX + columnWidth * 2 + 4, itemY - 1, columnWidth - 8, 18, {0, 255, 220, 255});
         }
-        SDL_Color fc = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
-                                                                      : SDL_Color {255, 80, 80, 255};
-        renderer.FillRectScreen(dropX + colW * 2 + 8, itemY + 3, 6, 8, fc);
-        fontRenderer.DrawString(catalog[i].name, dropX + colW * 2 + 18, itemY, 1, {230, 240, 255, 255});
+        SDL_Color factionColor = (catalog[i].faction == Faction::Confederation) ? SDL_Color {0, 200, 255, 255}
+                                                                                : SDL_Color {255, 80, 80, 255};
+        renderer.FillRectScreen(dropdownX + columnWidth * 2 + 8, itemY + 3, 6, 8, factionColor);
+        fontRenderer.DrawString(catalog[i].name, dropdownX + columnWidth * 2 + 18, itemY, 1, {230, 240, 255, 255});
     }
 }
 
@@ -1786,8 +1851,8 @@ void GameplayController::RenderDebugSpawnGhost(
     if (!m_debugMode || !m_spawnMode)
         return;
 
-    int msY = input.GetMouseScreenY();
-    if (msY < 32 || input.GetMouseScreenX() >= camera.GetViewportWidth())
+    int mouseScreenY = input.GetMouseScreenY();
+    if (mouseScreenY < 32 || input.GetMouseScreenX() >= camera.GetViewportWidth())
         return;
 
     const auto &catalog = GetDebugSpawnCatalog();
@@ -1803,13 +1868,13 @@ void GameplayController::RenderDebugSpawnGhost(
         return;
     }
 
-    float wx = tileX * TILE_WIDTH;
-    float wy = tileY * TILE_HEIGHT;
-    float ww = item.width * TILE_WIDTH;
-    float wh = item.height * TILE_HEIGHT;
+    float worldX = tileX * TILE_WIDTH;
+    float worldY = tileY * TILE_HEIGHT;
+    float worldWidth = item.width * TILE_WIDTH;
+    float worldHeight = item.height * TILE_HEIGHT;
 
-    renderer.FillRectWorld(wx, wy, ww, wh, camera, {0, 220, 255, 70});
-    renderer.DrawRectWorld(wx, wy, ww, wh, camera, {0, 255, 220, 240});
+    renderer.FillRectWorld(worldX, worldY, worldWidth, worldHeight, camera, {0, 220, 255, 70});
+    renderer.DrawRectWorld(worldX, worldY, worldWidth, worldHeight, camera, {0, 255, 220, 240});
 
     // Cursor tag
     fontRenderer.DrawString(

@@ -67,6 +67,12 @@ public:
     {
         m_credits = credits;
     }
+    // Replicas only: the power balance as the authority computed it
+    void SetPower(int produced, int consumed)
+    {
+        m_powerProduced = produced;
+        m_powerConsumed = consumed;
+    }
     bool SpendCredits(int amount);
 
     // Pays and appends a unit (by archetype) to the queue of that Barracks / Factory

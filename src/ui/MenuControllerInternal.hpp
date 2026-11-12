@@ -182,9 +182,9 @@ inline void RenderMusicPlayer(
     renderer.FillRectScreen(barX + static_cast<int>(barW * ratio) - 3, l.seek.CenterY() - 7, 6, 14, col::Text);
 }
 
-inline UiRect DialogFooterButton(const UiRect &dialog, int w = 180)
+inline UiRect DialogFooterButton(const UiRect &dialog, int w = 200)
 {
-    return {dialog.Right() - 20 - w, dialog.Bottom() - 20 - 40, w, 40};
+    return {dialog.Right() - 20 - w, dialog.Bottom() - 20 - 48, w, 48};
 }
 
 inline std::string DifficultyName(AIDifficulty d)

@@ -245,6 +245,16 @@ void testProtocol()
 {
     std::printf("[protocol]\n");
     {
+        AuthorityState sent, received;
+        sent.recipient = 3;
+        sent.tick = 12345;
+        sent.bytes = {0, 1, 42, 255};
+        CHECK(roundTrip(sent, MsgType::AuthorityState, received));
+        CHECK(received.recipient == sent.recipient && received.tick == sent.tick && received.bytes == sent.bytes);
+        sent.recipient = kMaxPlayers;
+        CHECK(!roundTrip(sent, MsgType::AuthorityState, received));
+    }
+    {
         // Data sync messages
         DataManifest m, o;
         m.files = {{"assets/characters/a.yaml", 0x1122334455667788ull}, {"assets/main.yaml", 7}};
@@ -797,6 +807,31 @@ void testLockstepSession()
     for (auto &c : clients)
         started = started && c->matchStarted() && c->matchSetup() == std::vector<std::uint8_t> {7, 7, 7};
     CHECK(started);
+    for (auto &c : clients)
+        CHECK(c->authoritySlot() == clients[0]->slot()); // every peer knows who simulates
+
+    // Only the player who owned the room at match start may publish a private state.
+    AuthorityState state {1, 0, 10, {3, 4, 5}}, received;
+    CHECK(clients[2]->sendAuthorityState(state));
+    step(10);
+    CHECK(!clients[1]->takeAuthorityState(received));
+    CHECK(clients[0]->sendAuthorityState(state));
+    step(10);
+    CHECK(clients[1]->takeAuthorityState(received) && received.tick == 10 && received.bytes == state.bytes);
+    CHECK(!clients[2]->takeAuthorityState(received));
+    AuthorityAck ack;
+    CHECK(clients[1]->sendAuthorityAck(10));
+    CHECK(!clients[0]->sendAuthorityAck(10));
+    step(10);
+    CHECK(clients[0]->takeAuthorityAck(ack) && ack.sender == clients[1]->slot() && ack.tick == 10);
+    CHECK(!clients[1]->takeAuthorityAck(ack));
+    CHECK(!clients[2]->takeAuthorityAck(ack));
+    AuthorityState self {0, 0, 11, {1}};
+    CHECK(!clients[0]->sendAuthorityState(self)); // not to itself
+    state.tick = 9;
+    CHECK(clients[0]->sendAuthorityState(state));
+    step(10);
+    CHECK(!clients[1]->takeAuthorityState(received));
 
     // Turn 2: client 1 and 2 send commands; client 0 sends for turn 0 when turn 0 is already gone (late)
     clients[1]->sendCommands(2, {11});
@@ -1574,6 +1609,109 @@ void testPasswordAndLeave()
     CHECK(host.playerCount() == 0 && !host.matchRunning());
 }
 
+// AuthorityState relay: max payload size, truncation failure, non-authority rejection, and authority disconnect ending
+// the match past the reconnect window
+void testAuthorityRelay()
+{
+    std::printf("[authority relay]\n");
+
+    // A truncated encoded AuthorityState fails decode at every prefix length
+    {
+        AuthorityState msg {1, 42, 77, {10, 20, 30, 40}};
+        std::uint8_t buf[64];
+        BitWriter w(buf, sizeof buf);
+        encode(w, msg);
+        const std::size_t size = w.finish();
+        CHECK(!w.overflowed() && size > 1);
+        for (std::size_t cut = 0; cut < size; ++cut)
+        {
+            BitReader tr(buf, cut);
+            if (cut >= 1)
+                CHECK(readType(tr) == MsgType::AuthorityState);
+            AuthorityState decoded;
+            CHECK(!decode(tr, decoded));
+        }
+    }
+
+    LoopbackHub hub;
+    HostConfig hc;
+    hc.identity = testIdentity();
+    hc.turnMs = 100;
+    hc.reconnectWindowMs = 300;
+    SessionHost host(hc);
+    host.addTransport(hub.server());
+    std::vector<std::unique_ptr<SessionClient>> clients;
+    for (int i = 0; i < 3; ++i)
+        clients.push_back(std::make_unique<SessionClient>(hub.client(), clientConfig("A" + std::to_string(i))));
+    std::uint32_t now = 0;
+    auto step = [&](std::uint32_t ms) {
+        for (std::uint32_t t = 0; t < ms; t += 10)
+        {
+            now += 10;
+            for (auto &c : clients)
+                if (c)
+                    c->update(now);
+            host.update(now);
+            for (auto &c : clients)
+                if (c)
+                    c->update(now);
+        }
+    };
+
+    step(50);
+    CHECK(host.playerCount() == 3);
+    host.startMatch({7, 7, 7}, now, 200);
+    step(20);
+    CHECK(host.matchRunning());
+    CHECK(clients[0]->authoritySlot() == 0);
+
+    // Non-authority snapshots are never delivered (neither to another peer nor to the authority)
+    AuthorityState received;
+    {
+        AuthorityState fromPeer1 {2, 0, 10, {1, 2, 3}};
+        AuthorityState fromPeer2 {0, 0, 11, {4, 5, 6}};
+        CHECK(clients[1]->sendAuthorityState(fromPeer1));
+        CHECK(clients[2]->sendAuthorityState(fromPeer2));
+        step(20);
+        CHECK(!clients[0]->takeAuthorityState(received));
+        CHECK(!clients[1]->takeAuthorityState(received));
+        CHECK(!clients[2]->takeAuthorityState(received));
+    }
+
+    // Exactly kMaxAuthorityStateBytes is delivered through the loopback session; one byte more is refused by sender
+    {
+        AuthorityState exact;
+        exact.recipient = 1;
+        exact.tick = 12;
+        exact.bytes.assign(kMaxAuthorityStateBytes, 0x5A);
+        exact.bytes.front() = 0x11;
+        exact.bytes.back() = 0x99;
+        CHECK(clients[0]->sendAuthorityState(exact));
+        step(20);
+        CHECK(clients[1]->takeAuthorityState(received));
+        CHECK(received.tick == 12 && received.bytes.size() == kMaxAuthorityStateBytes && received.bytes == exact.bytes);
+        CHECK(!clients[2]->takeAuthorityState(received));
+
+        AuthorityState tooBig;
+        tooBig.recipient = 1;
+        tooBig.tick = 13;
+        tooBig.bytes.assign(kMaxAuthorityStateBytes + 1, 0xCD);
+        CHECK(!clients[0]->sendAuthorityState(tooBig));
+        step(20);
+        CHECK(!clients[1]->takeAuthorityState(received));
+    }
+
+    // Authority stays disconnected past reconnectWindowMs: host ends the match even with other players connected
+    clients[0].reset();
+    step(100);
+    CHECK(host.matchRunning());
+    CHECK(host.playerCount() == 3);
+    CHECK(!host.players()[0].connected);
+    step(300);
+    CHECK(!host.matchRunning());
+    CHECK(host.playerCount() == 0);
+}
+
 } // namespace
 
 int main()
@@ -1585,6 +1723,7 @@ int main()
     testReplayFile();
     testEnetLoopback();
     testLockstepSession();
+    testAuthorityRelay();
     testServerReplay();
     testDataSync();
     testLobby();

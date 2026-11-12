@@ -38,120 +38,137 @@ const char *const kConfederationTabIcons[HUDController::TabCount]
 
 int TabIcon(int tab)
 {
-    const char *name = (PlayerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
-    return SpriteHandle(name, SpriteKind::Part, "sidebar tab icon");
+    const char *iconName
+        = (PlayerFaction() == Faction::Confederation ? kConfederationTabIcons : kResistanceTabIcons)[tab];
+    return SpriteHandle(iconName, SpriteKind::Part, "sidebar tab icon");
 }
 
-constexpr int kCameoW = 60; // native cameo composite size
+constexpr int kCameoWidth = 60; // native cameo composite size
 
 // A true circle outline in screen pixels (64 segments)
-void DrawCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+void DrawCircleScreen(Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color)
 {
     constexpr int kSegments = 64;
-    float px = cx + radius, py = cy;
+    float prevX = centerX + radius;
+    float prevY = centerY;
     for (int i = 1; i <= kSegments; ++i)
     {
-        const float a = 6.28318530718f * static_cast<float>(i) / kSegments;
-        const float nx = cx + radius * std::cos(a), ny = cy + radius * std::sin(a);
+        const float angle = 6.28318530718f * static_cast<float>(i) / kSegments;
+        const float nextX = centerX + radius * std::cos(angle);
+        const float nextY = centerY + radius * std::sin(angle);
         renderer.DrawLineScreen(
-            static_cast<int>(std::lround(px)),
-            static_cast<int>(std::lround(py)),
-            static_cast<int>(std::lround(nx)),
-            static_cast<int>(std::lround(ny)),
+            static_cast<int>(std::lround(prevX)),
+            static_cast<int>(std::lround(prevY)),
+            static_cast<int>(std::lround(nextX)),
+            static_cast<int>(std::lround(nextY)),
             color);
-        px = nx;
-        py = ny;
+        prevX = nextX;
+        prevY = nextY;
     }
 }
 
 // A filled disc, one horizontal span per pixel row
-void FillCircleScreen(Renderer &renderer, float cx, float cy, float radius, SDL_Color color)
+void FillCircleScreen(Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color)
 {
-    const int r = static_cast<int>(std::ceil(radius));
-    for (int dy = -r; dy <= r; ++dy)
+    const int intRadius = static_cast<int>(std::ceil(radius));
+    for (int offsetY = -intRadius; offsetY <= intRadius; ++offsetY)
     {
-        const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(dy * dy)));
-        const int x0 = static_cast<int>(std::lround(cx - span)), x1 = static_cast<int>(std::lround(cx + span));
-        renderer.FillRectScreen(x0, static_cast<int>(std::lround(cy)) + dy, std::max(1, x1 - x0), 1, color);
+        const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(offsetY * offsetY)));
+        const int leftX = static_cast<int>(std::lround(centerX - span));
+        const int rightX = static_cast<int>(std::lround(centerX + span));
+        renderer.FillRectScreen(leftX, static_cast<int>(std::lround(centerY)) + offsetY, std::max(1, rightX - leftX), 1, color);
     }
 }
 
-SDL_Color RadarFactionColor(Faction f, bool unit);
+SDL_Color RadarFactionColor(Faction faction, bool isUnit);
 
 // A player's own army colour on the radar when it has one, else the classic colour of its faction
-SDL_Color RadarOwnerColor(PlayerId owner, Faction f, bool unit)
+SDL_Color RadarOwnerColor(PlayerId owner, Faction faction, bool isUnit)
 {
     if (owner < kMaxPlayers && Players::IsActive(owner) && Players::Slot(owner).color > 0)
     {
-        SDL_Color c = ArmyColor(Players::Slot(owner).color);
-        if (unit) // units a little lighter than buildings, as with the classic colours
-            c
-                = {static_cast<Uint8>(c.r + (255 - c.r) / 3),
-                   static_cast<Uint8>(c.g + (255 - c.g) / 3),
-                   static_cast<Uint8>(c.b + (255 - c.b) / 3),
+        SDL_Color color = ArmyColor(Players::Slot(owner).color);
+        if (isUnit) // units a little lighter than buildings, as with the classic colours
+            color
+                = {static_cast<Uint8>(color.r + (255 - color.r) / 3),
+                   static_cast<Uint8>(color.g + (255 - color.g) / 3),
+                   static_cast<Uint8>(color.b + (255 - color.b) / 3),
                    255};
-        return c;
+        return color;
     }
-    return RadarFactionColor(f, unit);
+    return RadarFactionColor(faction, isUnit);
 }
 
-SDL_Color RadarFactionColor(Faction f, bool unit)
+SDL_Color RadarFactionColor(Faction faction, bool isUnit)
 {
-    switch (f)
+    switch (faction)
     {
         case Faction::Resistance:
-            return unit ? SDL_Color {255, 160, 140, 255} : SDL_Color {236, 92, 76, 255};
+            return isUnit ? SDL_Color {255, 160, 140, 255} : SDL_Color {236, 92, 76, 255};
         case Faction::Confederation:
-            return unit ? SDL_Color {150, 215, 255, 255} : SDL_Color {72, 170, 236, 255};
+            return isUnit ? SDL_Color {150, 215, 255, 255} : SDL_Color {72, 170, 236, 255};
         default:
-            return unit ? SDL_Color {190, 230, 150, 255} : SDL_Color {120, 190, 90, 255};
+            return isUnit ? SDL_Color {190, 230, 150, 255} : SDL_Color {120, 190, 90, 255};
     }
 }
 
-std::string UnitName(const UnitCameoDef &def, const EntityManager &entities)
+std::string UnitName(const UnitCameoDef &unitDef, const EntityManager &entities)
 {
-    const auto *cfg = entities.GetUnitConfig(def.archetype);
-    return (cfg && !cfg->name.empty()) ? cfg->name : std::string(def.name);
+    const auto *unitConfig = entities.GetUnitConfig(unitDef.archetype);
+    return (unitConfig && !unitConfig->name.empty()) ? unitConfig->name : std::string(unitDef.name);
 }
 
-int UnitCost(const UnitCameoDef &def, const EntityManager &entities)
+int UnitCost(const UnitCameoDef &unitDef, const EntityManager &entities)
 {
-    const auto *cfg = entities.GetUnitConfig(def.archetype);
-    return cfg ? cfg->creditCost : def.cost;
+    const auto *unitConfig = entities.GetUnitConfig(unitDef.archetype);
+    return unitConfig ? unitConfig->creditCost : unitDef.cost;
 }
 
-std::string UnitDesc(const UnitCameoDef &def, const EntityManager &entities)
+std::string UnitDesc(const UnitCameoDef &unitDef, const EntityManager &entities)
 {
-    const auto *cfg = entities.GetUnitConfig(def.archetype);
-    return (cfg && !cfg->description.empty()) ? cfg->description : std::string(def.desc);
+    const auto *unitConfig = entities.GetUnitConfig(unitDef.archetype);
+    return (unitConfig && !unitConfig->description.empty()) ? unitConfig->description : std::string(unitDef.desc);
 }
 
-void DrawInfinity(Renderer &r, const UiRect &b, bool on, bool hovered)
+void DrawInfinity(Renderer &renderer, const UiRect &buttonRect, bool active, bool hovered)
 {
-    r.FillRectScreen(
-        b.x, b.y, b.w, b.h, on ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
-    r.DrawRectScreen(b.x, b.y, b.w, b.h, on ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+    renderer.FillRectScreen(
+        buttonRect.x,
+        buttonRect.y,
+        buttonRect.w,
+        buttonRect.h,
+        active ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
+    renderer.DrawRectScreen(
+        buttonRect.x,
+        buttonRect.y,
+        buttonRect.w,
+        buttonRect.h,
+        active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
     // two rings side by side: the infinity sign
-    const SDL_Color c = on ? col::Accent : col::TextDim;
-    r.DrawRingScreen(static_cast<float>(b.x + 7), static_cast<float>(b.CenterY()), 4.0f, 3.5f, 1.6f, c, 24);
-    r.DrawRingScreen(static_cast<float>(b.x + 17), static_cast<float>(b.CenterY()), 4.0f, 3.5f, 1.6f, c, 24);
+    const SDL_Color ringColor = active ? col::Accent : col::TextDim;
+    renderer.DrawRingScreen(
+        static_cast<float>(buttonRect.x + 7), static_cast<float>(buttonRect.CenterY()), 4.0f, 3.5f, 1.6f, ringColor, 24);
+    renderer.DrawRingScreen(
+        static_cast<float>(buttonRect.x + 17), static_cast<float>(buttonRect.CenterY()), 4.0f, 3.5f, 1.6f, ringColor, 24);
 }
 
 } // namespace
 
-void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color)
+void DrawCostTag(
+    Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell, const std::string &text, SDL_Color color)
 {
-    int tw = font.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
-    UiRect tag {cell.Right() - tw - 3, cell.y + 3, tw, 18};
-    r.FillRectScreen(tag.x, tag.y, tag.w, tag.h, {6, 8, 12, 215});
-    font.DrawString(
-        text, tag.CenterX(), tag.CenterY(), ui::FONT_SMALL_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
+    int tagWidth = fontRenderer.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
+    const int tagHeight = std::clamp(cell.h * 18 / 84, 15, 28);
+    UiRect tagRect {cell.Right() - tagWidth - 3, cell.y + 3, tagWidth, tagHeight};
+    renderer.FillRectScreen(tagRect.x, tagRect.y, tagRect.w, tagRect.h, {6, 8, 12, 215});
+    fontRenderer.DrawString(
+        text, tagRect.CenterX(), tagRect.CenterY(), ui::FONT_SMALL_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
 }
 
 // Common cameo frame: icon, bottom name band, hover/selection border
 void DrawCameo(
-    Renderer &r,
-    BitmapFontRenderer &font,
+    Renderer &renderer,
+    BitmapFontRenderer &fontRenderer,
     const UiRect &cell,
     int compId,
     const std::string &name,
@@ -159,51 +176,57 @@ void DrawCameo(
     bool selected,
     bool locked)
 {
-    r.FillRectScreen(cell.x, cell.y, cell.w, cell.h, col::PanelSunken);
+    renderer.FillRectScreen(cell.x, cell.y, cell.w, cell.h, col::PanelSunken);
+    const int bandHeight = std::clamp(cell.h * 20 / 84, 16, 36);
     if (compId >= 0)
     {
-        int iconX = cell.x + (cell.w - kCameoW * 2) / 2;
+        const float iconScale
+            = 2.0f * std::min(static_cast<float>(cell.w) / 136.0f, static_cast<float>(cell.h) / 84.0f);
+        const int iconWidth = static_cast<int>(std::lround(kCameoWidth * iconScale));
+        int iconX = cell.x + (cell.w - iconWidth) / 2;
         int iconY = cell.y + 3;
         // The icons wear the player's army colour, like its buildings and units
-        r.SetDrawOwner(Players::Local());
-        r.SetStructureFaction(PlayerFaction());
-        r.DrawCompositeScreen(compId, iconX, iconY, 2.0f, PlayerFaction());
-        r.SetStructureFaction(Faction::Neutral);
-        r.SetDrawOwner(kNoPlayer);
+        renderer.SetDrawOwner(Players::Local());
+        renderer.SetStructureFaction(PlayerFaction());
+        renderer.DrawCompositeScreen(compId, iconX, iconY, iconScale, PlayerFaction());
+        renderer.SetStructureFaction(Faction::Neutral);
+        renderer.SetDrawOwner(kNoPlayer);
     }
     if (locked)
     {
-        r.FillRectScreen(cell.x, cell.y, cell.w, cell.h, {10, 12, 16, 170});
+        renderer.FillRectScreen(cell.x, cell.y, cell.w, cell.h, {10, 12, 16, 170});
     }
-    UiRect band {cell.x, cell.Bottom() - 20, cell.w, 20};
-    r.FillRectScreen(band.x, band.y, band.w, band.h, {6, 8, 12, 225});
-    font.DrawString(
-        ui::FitText(font, name, ui::FONT_SMALL_BOLD, band.w - 10),
-        band.CenterX(),
-        band.CenterY(),
+    UiRect bandRect {cell.x, cell.Bottom() - bandHeight, cell.w, bandHeight};
+    renderer.FillRectScreen(bandRect.x, bandRect.y, bandRect.w, bandRect.h, {6, 8, 12, 225});
+    fontRenderer.DrawString(
+        ui::FitText(fontRenderer, name, ui::FONT_SMALL_BOLD, std::max(16, bandRect.w - 10)),
+        bandRect.CenterX(),
+        bandRect.CenterY(),
         ui::FONT_SMALL_BOLD,
         locked ? col::TextMuted : (selected ? col::Accent : col::Text),
         false,
         Anchor::HCENTER | Anchor::VCENTER);
 
     SDL_Color border = selected ? col::Accent : (hovered ? col::BorderStrong : col::Border);
-    r.DrawRectScreen(cell.x, cell.y, cell.w, cell.h, border);
+    renderer.DrawRectScreen(cell.x, cell.y, cell.w, cell.h, border);
     if (selected)
-        r.DrawRectScreen(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2, ui::WithAlpha(col::Accent, 120));
+        renderer.DrawRectScreen(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2, ui::WithAlpha(col::Accent, 120));
 }
 
 // Progress "shutter" that uncovers the cameo from the top while an item is being produced
-void DrawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, float progress, SDL_Color tint)
+void DrawProgressShutter(
+    Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell, float progress, SDL_Color tint)
 {
-    int coverH = static_cast<int>((cell.h - 20) * (1.0f - std::clamp(progress, 0.0f, 1.0f)));
-    if (coverH > 0)
-        r.FillRectScreen(cell.x + 1, cell.Bottom() - 20 - coverH, cell.w - 2, coverH, {6, 8, 12, 160});
-    r.FillRectScreen(cell.x + 1, cell.Bottom() - 22, static_cast<int>((cell.w - 2) * progress), 2, tint);
-    std::string pct = std::to_string(static_cast<int>(progress * 100.0f)) + "%";
-    font.DrawString(
-        pct,
+    const int bandHeight = std::clamp(cell.h * 20 / 84, 16, 36);
+    int coverHeight = static_cast<int>((cell.h - bandHeight) * (1.0f - std::clamp(progress, 0.0f, 1.0f)));
+    if (coverHeight > 0)
+        renderer.FillRectScreen(cell.x + 1, cell.Bottom() - bandHeight - coverHeight, cell.w - 2, coverHeight, {6, 8, 12, 160});
+    renderer.FillRectScreen(cell.x + 1, cell.Bottom() - bandHeight - 2, static_cast<int>((cell.w - 2) * progress), 2, tint);
+    std::string percentText = std::to_string(static_cast<int>(progress * 100.0f)) + "%";
+    fontRenderer.DrawString(
+        percentText,
         cell.CenterX(),
-        cell.y + (cell.h - 20) / 2,
+        cell.y + (cell.h - bandHeight) / 2,
         ui::FONT_H2,
         ui::color::Text,
         true,
@@ -213,9 +236,9 @@ void DrawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &ce
 namespace
 {
 
-void DrawLockBadge(Renderer &r, BitmapFontRenderer &font, const UiRect &cell)
+void DrawLockBadge(Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell)
 {
-    font.DrawString(
+    fontRenderer.DrawString(
         _("LOCK"),
         cell.CenterX(),
         cell.y + (cell.h - 20) / 2,
@@ -223,15 +246,15 @@ void DrawLockBadge(Renderer &r, BitmapFontRenderer &font, const UiRect &cell)
         col::Danger,
         true,
         Anchor::HCENTER | Anchor::VCENTER);
-    (void) r;
+    (void) renderer;
 }
 
 // Crosshair glyph used as the Orders tab icon
-void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
+void DrawCrosshair(Renderer &renderer, int centerX, int centerY, int size, SDL_Color color)
 {
-    r.DrawRectScreen(cx - size / 2, cy - size / 2, size, size, c);
-    r.FillRectScreen(cx - size / 2 - 4, cy, size + 9, 1, c);
-    r.FillRectScreen(cx, cy - size / 2 - 4, 1, size + 9, c);
+    renderer.DrawRectScreen(centerX - size / 2, centerY - size / 2, size, size, color);
+    renderer.FillRectScreen(centerX - size / 2 - 4, centerY, size + 9, 1, color);
+    renderer.FillRectScreen(centerX, centerY - size / 2 - 4, 1, size + 9, color);
 }
 
 } // namespace
@@ -239,17 +262,17 @@ void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
 void HUDController::DrawRadar(
     Renderer &renderer,
     BitmapFontRenderer &fontRenderer,
-    const UiRect &rd,
+    const UiRect &radarRect,
     const EntityManager &entities,
     const TileMap &map,
     const Camera &camera,
-    int mx,
-    int my,
+    int mouseX,
+    int mouseY,
     bool zoomButtons)
 {
-    renderer.FillRectScreen(rd.x, rd.y, rd.w, rd.h, {6, 12, 10, 255});
-    const int mapW = map.GetWidth();
-    const int mapH = map.GetHeight();
+    renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
+    const int mapWidth = map.GetWidth();
+    const int mapHeight = map.GetHeight();
     // A zoomed radar follows the camera, except while the player drags on it (that moves the camera)
     const float camCenterX = (camera.GetX() + camera.GetViewportWidth() * 0.5f / camera.GetZoom()) / TILE_WIDTH;
     const float camCenterY = (camera.GetY() + camera.GetViewportHeight() * 0.5f / camera.GetZoom()) / TILE_HEIGHT;
@@ -258,51 +281,66 @@ void HUDController::DrawRadar(
         m_radarCenterX = camCenterX;
         m_radarCenterY = camCenterY;
     }
-    RadarView v = radarView(rd, mapW, mapH, m_radarZoom, m_radarCenterX, m_radarCenterY);
-    if (v.w > 0 && v.h > 0)
+    RadarView view = radarView(radarRect, mapWidth, mapHeight, m_radarZoom, m_radarCenterX, m_radarCenterY);
+    if (view.w > 0 && view.h > 0)
     {
-        renderer.SetClipRect({v.ox, v.oy, v.w, v.h});
-        renderer.FillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
-        const bool fog = m_radarFog && map.IsFogEnabled() && !m_showAll;
-        const int tx0 = std::max(0, static_cast<int>(v.viewX));
-        const int ty0 = std::max(0, static_cast<int>(v.viewY));
-        const int tx1 = std::min(mapW, static_cast<int>(std::ceil(v.viewX + v.w / v.scale)) + 1);
-        const int ty1 = std::min(mapH, static_cast<int>(std::ceil(v.viewY + v.h / v.scale)) + 1);
+        renderer.SetClipRect({view.ox, view.oy, view.w, view.h});
+        renderer.FillRectScreen(view.ox, view.oy, view.w, view.h, {14, 30, 22, 255});
+        const bool fogEnabled = m_radarFog && map.IsFogEnabled() && !m_showAll;
+        const int minTileX = std::max(0, static_cast<int>(view.viewX));
+        const int minTileY = std::max(0, static_cast<int>(view.viewY));
+        const int maxTileX = std::min(mapWidth, static_cast<int>(std::ceil(view.viewX + view.w / view.scale)) + 1);
+        const int maxTileY = std::min(mapHeight, static_cast<int>(std::ceil(view.viewY + view.h / view.scale)) + 1);
         // Cells from rounded edges: neighbours meet exactly, nothing shimmers as the view moves
-        auto cellRect = [&](float x, float y, float w, float h, int &px, int &py, int &pw, int &ph) {
-            px = static_cast<int>(std::lround(v.ToScreenX(x)));
-            py = static_cast<int>(std::lround(v.ToScreenY(y)));
-            pw = std::max(1, static_cast<int>(std::lround(v.ToScreenX(x + w))) - px);
-            ph = std::max(1, static_cast<int>(std::lround(v.ToScreenY(y + h))) - py);
+        auto cellRect = [&](float tileX,
+                            float tileY,
+                            float tileWidth,
+                            float tileHeight,
+                            int &pixelX,
+                            int &pixelY,
+                            int &pixelWidth,
+                            int &pixelHeight) {
+            pixelX = static_cast<int>(std::lround(view.ToScreenX(tileX)));
+            pixelY = static_cast<int>(std::lround(view.ToScreenY(tileY)));
+            pixelWidth = std::max(1, static_cast<int>(std::lround(view.ToScreenX(tileX + tileWidth))) - pixelX);
+            pixelHeight = std::max(1, static_cast<int>(std::lround(view.ToScreenY(tileY + tileHeight))) - pixelY);
         };
-        const SDL_Color hiddenCol {4, 6, 8, 255};
-        for (int ty = ty0; ty < ty1; ++ty)
+        const SDL_Color hiddenColor {4, 6, 8, 255};
+        for (int tileY = minTileY; tileY < maxTileY; ++tileY)
         {
-            for (int tx = tx0; tx < tx1; ++tx)
+            for (int tileX = minTileX; tileX < maxTileX; ++tileX)
             {
-                int px, py, pw, ph;
-                cellRect(static_cast<float>(tx), static_cast<float>(ty), 1.0f, 1.0f, px, py, pw, ph);
-                const FogState fs = fog ? map.GetFogState(tx, ty) : FogState::Visible;
-                if (fs == FogState::Hidden)
+                int pixelX, pixelY, pixelWidth, pixelHeight;
+                cellRect(
+                    static_cast<float>(tileX),
+                    static_cast<float>(tileY),
+                    1.0f,
+                    1.0f,
+                    pixelX,
+                    pixelY,
+                    pixelWidth,
+                    pixelHeight);
+                const FogState fogState = fogEnabled ? map.GetFogState(tileX, tileY) : FogState::Visible;
+                if (fogState == FogState::Hidden)
                 {
-                    renderer.FillRectScreen(px, py, pw, ph, hiddenCol);
+                    renderer.FillRectScreen(pixelX, pixelY, pixelWidth, pixelHeight, hiddenColor);
                     continue;
                 }
                 // Walls as the local player knows them: under the fog of war the ones seen there last
-                const std::uint16_t wall = fog ? map.ViewerWall(tx, ty) : map.GetWall(tx, ty);
+                const std::uint16_t wall = fogEnabled ? map.ViewerWall(tileX, tileY) : map.GetWall(tileX, tileY);
                 if (wall > 0)
                 {
-                    const PlayerId owner = fog ? map.ViewerWallOwner(tx, ty) : map.GetWallOwner(tx, ty);
+                    const PlayerId owner = fogEnabled ? map.ViewerWallOwner(tileX, tileY) : map.GetWallOwner(tileX, tileY);
                     renderer.FillRectScreen(
-                        px,
-                        py,
-                        pw,
-                        ph,
+                        pixelX,
+                        pixelY,
+                        pixelWidth,
+                        pixelHeight,
                         RadarOwnerColor(owner, wall >= 1101 ? Faction::Resistance : Faction::Confederation, false));
                 }
-                else if (map.GetWall(tx, ty) == 0 && !map.IsPassable(tx, ty)) // an unseen wall is no terrain
+                else if (map.GetWall(tileX, tileY) == 0 && !map.IsPassable(tileX, tileY)) // an unseen wall is no terrain
                 {
-                    renderer.FillRectScreen(px, py, pw, ph, {30, 54, 40, 255});
+                    renderer.FillRectScreen(pixelX, pixelY, pixelWidth, pixelHeight, {30, 54, 40, 255});
                 }
             }
         }
@@ -310,66 +348,75 @@ void HUDController::DrawRadar(
         // First enemy drawn on the radar this frame: the radar alarm's contact point
         bool enemyOnRadar = false;
         float contactX = 0.0f, contactY = 0.0f;
-        for (const auto &e : entities.GetAllEntities())
+        for (const auto &entity : entities.GetAllEntities())
         {
-            if (!e.alive || e.state == ActionState::Die)
+            if (!entity.alive || entity.state == ActionState::Die)
                 continue;
-            const bool own = (e.owner == Players::Local());
-            const Building *b = e.AsBuilding();
-            if (fog && !own)
+            const bool isOwn = (entity.owner == Players::Local());
+            const Building *building = entity.AsBuilding();
+            if (fogEnabled && !isOwn)
             {
-                if (b)
+                if (building)
                 {
                     // Enemy structures appear once they have been seen (never while they are being built out of
                     // sight)
-                    if (!entities.IsHostileBuildingShown(*b, map))
+                    if (!entities.IsHostileBuildingShown(*building, map))
                         continue;
                 }
-                else if (!entities.IsEntityVisibleToPlayer(e, Players::Local(), map))
+                else if (!entities.IsEntityVisibleToPlayer(entity, Players::Local(), map))
                 {
                     continue; // units only while in sight
                 }
             }
-            int px, py, pw, ph;
-            if (b)
+            int pixelX, pixelY, pixelWidth, pixelHeight;
+            if (building)
             {
                 cellRect(
-                    static_cast<float>(b->tileX),
-                    static_cast<float>(b->tileY),
-                    static_cast<float>(b->buildWidth),
-                    static_cast<float>(b->buildHeight),
-                    px,
-                    py,
-                    pw,
-                    ph);
+                    static_cast<float>(building->tileX),
+                    static_cast<float>(building->tileY),
+                    static_cast<float>(building->buildWidth),
+                    static_cast<float>(building->buildHeight),
+                    pixelX,
+                    pixelY,
+                    pixelWidth,
+                    pixelHeight);
                 renderer.FillRectScreen(
-                    px, py, std::max(3, pw), std::max(3, ph), RadarOwnerColor(e.owner, e.faction, false));
+                    pixelX,
+                    pixelY,
+                    std::max(3, pixelWidth),
+                    std::max(3, pixelHeight),
+                    RadarOwnerColor(entity.owner, entity.faction, false));
             }
             else
             {
                 cellRect(
-                    e.GetUnitCenterPixelX() / TILE_WIDTH - 0.5f,
-                    e.GetUnitCenterPixelY() / TILE_HEIGHT - 0.5f,
+                    entity.GetUnitCenterPixelX() / TILE_WIDTH - 0.5f,
+                    entity.GetUnitCenterPixelY() / TILE_HEIGHT - 0.5f,
                     1.0f,
                     1.0f,
-                    px,
-                    py,
-                    pw,
-                    ph);
-                const int s = std::max(2, std::min(pw, ph));
+                    pixelX,
+                    pixelY,
+                    pixelWidth,
+                    pixelHeight);
+                const int unitSize = std::max(2, std::min(pixelWidth, pixelHeight));
                 renderer.FillRectScreen(
-                    px + (pw - s) / 2, py + (ph - s) / 2, s, s, RadarOwnerColor(e.owner, e.faction, true));
+                    pixelX + (pixelWidth - unitSize) / 2,
+                    pixelY + (pixelHeight - unitSize) / 2,
+                    unitSize,
+                    unitSize,
+                    RadarOwnerColor(entity.owner, entity.faction, true));
             }
-            if (!enemyOnRadar && !own && e.faction != Faction::Neutral && Players::Hostile(e.owner, Players::Local())
-                && (!b || m_radarAlert.config.includeBuildings))
+            if (!enemyOnRadar && !isOwn && entity.faction != Faction::Neutral
+                && Players::Hostile(entity.owner, Players::Local())
+                && (!building || m_radarAlert.config.includeBuildings))
             {
                 enemyOnRadar = true;
-                contactX = e.GetUnitCenterPixelX() / TILE_WIDTH;
-                contactY = e.GetUnitCenterPixelY() / TILE_HEIGHT;
-                if (b)
+                contactX = entity.GetUnitCenterPixelX() / TILE_WIDTH;
+                contactY = entity.GetUnitCenterPixelY() / TILE_HEIGHT;
+                if (building)
                 {
-                    contactX = b->tileX + b->buildWidth * 0.5f;
-                    contactY = b->tileY + b->buildHeight * 0.5f;
+                    contactX = building->tileX + building->buildWidth * 0.5f;
+                    contactY = building->tileY + building->buildHeight * 0.5f;
                 }
             }
         }
@@ -379,75 +426,82 @@ void HUDController::DrawRadar(
         m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
         if (m_radarAlert.Active())
         {
-            const RadarAlertConfig &ac = m_radarAlert.config;
-            const float cx = v.ToScreenX(m_radarAlert.TileX());
-            const float cy = v.ToScreenY(m_radarAlert.TileY());
-            for (int i = 0; i < ac.waveCount; ++i)
+            const RadarAlertConfig &alertConfig = m_radarAlert.config;
+            const float centerX = view.ToScreenX(m_radarAlert.TileX());
+            const float centerY = view.ToScreenY(m_radarAlert.TileY());
+            for (int i = 0; i < alertConfig.waveCount; ++i)
             {
                 float radius = 0.0f, opacity = 0.0f;
                 if (!m_radarAlert.Wave(i, nowMs, radius, opacity))
                     continue;
-                SDL_Color wc = ac.color;
-                wc.a = static_cast<Uint8>(ac.color.a * opacity);
-                for (int k = 0; k < ac.waveThicknessPx; ++k)
-                    DrawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
+                SDL_Color waveColor = alertConfig.color;
+                waveColor.a = static_cast<Uint8>(alertConfig.color.a * opacity);
+                for (int k = 0; k < alertConfig.waveThicknessPx; ++k)
+                    DrawCircleScreen(renderer, centerX, centerY, radius + static_cast<float>(k), waveColor);
             }
-            if (m_radarAlert.BlinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
-                FillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
+            if (m_radarAlert.BlinkOn(nowMs) && alertConfig.dotRadiusPx > 0.0f)
+                FillCircleScreen(renderer, centerX, centerY, alertConfig.dotRadiusPx, alertConfig.color);
         }
 
         // Camera frame from rounded edges (truncating position and size separately made it wobble)
-        const float camWorldW = camera.GetViewportWidth() / camera.GetZoom();
-        const float camWorldH = camera.GetViewportHeight() / camera.GetZoom();
-        int fx, fy, fw, fh;
+        const float camWorldWidth = camera.GetViewportWidth() / camera.GetZoom();
+        const float camWorldHeight = camera.GetViewportHeight() / camera.GetZoom();
+        int frameX, frameY, frameWidth, frameHeight;
         cellRect(
             camera.GetX() / TILE_WIDTH,
             camera.GetY() / TILE_HEIGHT,
-            camWorldW / TILE_WIDTH,
-            camWorldH / TILE_HEIGHT,
-            fx,
-            fy,
-            fw,
-            fh);
-        renderer.DrawRectScreen(fx, fy, std::max(6, fw), std::max(4, fh), {255, 255, 255, 220});
+            camWorldWidth / TILE_WIDTH,
+            camWorldHeight / TILE_HEIGHT,
+            frameX,
+            frameY,
+            frameWidth,
+            frameHeight);
+        renderer.DrawRectScreen(frameX, frameY, std::max(6, frameWidth), std::max(4, frameHeight), {255, 255, 255, 220});
         renderer.ResetClipRect();
     }
-    renderer.DrawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
+    renderer.DrawRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, col::BorderStrong);
 
     // Radar alarm: the radar's sides flash red, the band fading inward
     if (m_radarAlert.BlinkOn(SDL_GetTicks()))
     {
-        const RadarAlertConfig &ac = m_radarAlert.config;
-        for (int k = 0; k < ac.edgeWidthPx; ++k)
+        const RadarAlertConfig &alertConfig = m_radarAlert.config;
+        for (int k = 0; k < alertConfig.edgeWidthPx; ++k)
         {
-            SDL_Color ec = ac.color;
-            ec.a = static_cast<Uint8>(ac.edgeAlpha * (ac.edgeWidthPx - k) / ac.edgeWidthPx);
-            renderer.DrawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
+            SDL_Color edgeColor = alertConfig.color;
+            edgeColor.a = static_cast<Uint8>(alertConfig.edgeAlpha * (alertConfig.edgeWidthPx - k) / alertConfig.edgeWidthPx);
+            renderer.DrawRectScreen(
+                radarRect.x + k, radarRect.y + k, radarRect.w - 2 * k, radarRect.h - 2 * k, edgeColor);
         }
     }
 
     // Zoom buttons
-    const UiRect zoomBtns[2] = {RadarZoomOutBtn(rd), RadarZoomInBtn(rd)};
+    const UiRect zoomRects[2] = {RadarZoomOutBtn(radarRect), RadarZoomInBtn(radarRect)};
     for (int k = 0; k < (zoomButtons ? 2 : 0); ++k)
     {
-        const UiRect &b = zoomBtns[k];
+        const UiRect &buttonRect = zoomRects[k];
         const bool enabled = (k == 0) ? m_radarZoom > 1 : m_radarZoom < kRadarMaxZoom;
-        const bool hot = enabled && b.Contains(mx, my);
-        if (hot)
+        const bool hovered = enabled && buttonRect.Contains(mouseX, mouseY);
+        if (hovered)
             SoundRequests::MarkHover();
-        renderer.FillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
-        renderer.DrawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
-        const SDL_Color sc = enabled ? col::Text : col::TextMuted;
-        renderer.FillRectScreen(b.x + 5, b.CenterY() - 1, b.w - 10, 2, sc);
+        renderer.FillRectScreen(
+            buttonRect.x,
+            buttonRect.y,
+            buttonRect.w,
+            buttonRect.h,
+            hovered ? col::Hover : SDL_Color {10, 16, 14, 210});
+        renderer.DrawRectScreen(
+            buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, enabled ? col::BorderStrong : col::Border);
+        const SDL_Color symbolColor = enabled ? col::Text : col::TextMuted;
+        renderer.FillRectScreen(buttonRect.x + 5, buttonRect.CenterY() - 1, buttonRect.w - 10, 2, symbolColor);
         if (k == 1)
-            renderer.FillRectScreen(b.CenterX() - 1, b.y + 5, 2, b.h - 10, sc);
+            renderer.FillRectScreen(buttonRect.CenterX() - 1, buttonRect.y + 5, 2, buttonRect.h - 10, symbolColor);
     }
     if (m_radarZoom > 1)
     {
         fontRenderer.DrawString(
             "x" + std::to_string(m_radarZoom),
-            rd.x + 6,
-            rd.Bottom() - 12,
+            radarRect.x + 6,
+            radarRect.Bottom() - 12,
             ui::FONT_SMALL_BOLD,
             col::TextDim,
             false,
@@ -462,91 +516,105 @@ void HUDController::RenderGameHud(
     const EntityManager &entities,
     const TileMap &map,
     const Camera &camera,
-    int mx,
-    int my,
-    int windowW,
-    int windowH,
+    int mouseX,
+    int mouseY,
+    int windowWidth,
+    int windowHeight,
     const std::vector<int> &selected)
 {
-    SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset, !m_observer && m_speedEnabled);
+    SidebarLayout layout = sidebarLayout(windowWidth, windowHeight, m_topInset, !m_observer && m_speedEnabled);
 
     // Frame
-    ui::FillVerticalGradient(renderer, l.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
-    renderer.FillRectScreen(l.panel.x, 0, 1, windowH, col::BorderStrong);
-    renderer.FillRectScreen(l.panel.x + 1, 0, 1, windowH, {0, 0, 0, 120});
+    ui::FillVerticalGradient(renderer, layout.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
+    renderer.FillRectScreen(layout.panel.x, 0, 1, windowHeight, col::BorderStrong);
+    renderer.FillRectScreen(layout.panel.x + 1, 0, 1, windowHeight, {0, 0, 0, 120});
 
     // --- Header: credits & power ---------------------------------------------------------
     {
-        const UiRect &h = l.header;
+        const UiRect &headerRect = layout.header;
         std::string credits = "$ " + std::to_string(economy.GetCredits());
-        fontRenderer.DrawString(credits, h.x, h.y - 2, ui::FONT_H2, col::Accent, true);
+        fontRenderer.DrawString(credits, headerRect.x, headerRect.y - 2, ui::FONT_H2, col::Accent, true);
 
-        int prod = economy.GetPowerProduced();
-        int cons = economy.GetPowerConsumed();
-        bool deficit = economy.HasPowerDeficit();
-        SDL_Color pCol = deficit ? col::Danger : col::Ok;
-        std::string pwr = std::to_string(cons) + " / " + std::to_string(prod) + _(" kW");
-        fontRenderer.DrawString(pwr, h.Right(), h.y + 2, ui::FONT_SMALL_BOLD, pCol, false, Anchor::RIGHT | Anchor::TOP);
+        int powerProduced = economy.GetPowerProduced();
+        int powerConsumed = economy.GetPowerConsumed();
+        bool hasDeficit = economy.HasPowerDeficit();
+        SDL_Color powerColor = hasDeficit ? col::Danger : col::Ok;
+        std::string powerText = std::to_string(powerConsumed) + " / " + std::to_string(powerProduced) + _(" kW");
+        fontRenderer.DrawString(
+            powerText,
+            headerRect.Right(),
+            headerRect.y + 2,
+            ui::FONT_SMALL_BOLD,
+            powerColor,
+            false,
+            Anchor::RIGHT | Anchor::TOP);
         // The lightning of the game next to the kW figures; it blinks while the power is short
-        if (!deficit || PowerIconBlinkOn())
+        if (!hasDeficit || PowerIconBlinkOn())
         {
-            const int textW = fontRenderer.GetTextWidth(pwr, ui::FONT_SMALL_BOLD);
-            renderer.DrawRawSpriteScreen(PowerIconSprite(), h.Right() - textW - 27, h.y, 1.0f);
+            const int textWidth = fontRenderer.GetTextWidth(powerText, ui::FONT_SMALL_BOLD);
+            renderer.DrawRawSpriteScreen(PowerIconSprite(), headerRect.Right() - textWidth - 27, headerRect.y, 1.0f);
         }
         fontRenderer.DrawString(
-            _("POWER"), h.Right(), h.y + 17, ui::FONT_SMALL, col::TextMuted, false, Anchor::RIGHT | Anchor::TOP);
+            _("POWER"),
+            headerRect.Right(),
+            headerRect.y + 17,
+            ui::FONT_SMALL,
+            col::TextMuted,
+            false,
+            Anchor::RIGHT | Anchor::TOP);
 
-        float ratio = static_cast<float>(cons) / static_cast<float>(std::max(1, prod));
-        ui::DrawProgressBar(renderer, {h.x, h.Bottom() - 6, h.w, 6}, ratio, pCol);
+        float powerRatio = static_cast<float>(powerConsumed) / static_cast<float>(std::max(1, powerProduced));
+        ui::DrawProgressBar(
+            renderer, {headerRect.x, headerRect.Bottom() - 6, headerRect.w, 6}, powerRatio, powerColor);
     }
 
     // --- Radar -----------------------------------------------------------------------------
-    DrawRadar(renderer, fontRenderer, l.radar, entities, map, camera, mx, my);
+    DrawRadar(renderer, fontRenderer, layout.radar, entities, map, camera, mouseX, mouseY);
 
     // --- Menu / objectives -------------------------------------------------------------------
     ui::DrawButton(
         renderer,
         fontRenderer,
-        l.menuBtn,
-        ui::FitText(fontRenderer, _("MENU"), ui::FONT_SMALL, l.menuBtn.w - 8),
+        layout.menuBtn,
+        ui::FitText(fontRenderer, _("MENU"), ui::FONT_SMALL, layout.menuBtn.w - 8),
         ui::ButtonStyle::Secondary,
-        l.menuBtn.Contains(mx, my));
+        layout.menuBtn.Contains(mouseX, mouseY));
     ui::DrawButton(
         renderer,
         fontRenderer,
-        l.objectivesBtn,
-        ui::FitText(fontRenderer, _("OBJECTIVES"), ui::FONT_SMALL, l.objectivesBtn.w - 8),
+        layout.objectivesBtn,
+        ui::FitText(fontRenderer, _("OBJECTIVES"), ui::FONT_SMALL, layout.objectivesBtn.w - 8),
         ui::ButtonStyle::Secondary,
-        l.objectivesBtn.Contains(mx, my));
+        layout.objectivesBtn.Contains(mouseX, mouseY));
     if (!m_observer && m_speedEnabled)
     {
-        char spdBuf[16];
+        char speedBuffer[16];
         if (m_speedMultiplier < 1.0f)
-            std::snprintf(spdBuf, sizeof(spdBuf), "x%.1f", m_speedMultiplier);
+            std::snprintf(speedBuffer, sizeof(speedBuffer), "x%.1f", m_speedMultiplier);
         else
-            std::snprintf(spdBuf, sizeof(spdBuf), "x%d", static_cast<int>(m_speedMultiplier));
+            std::snprintf(speedBuffer, sizeof(speedBuffer), "x%d", static_cast<int>(m_speedMultiplier));
         ui::DrawButton(
             renderer,
             fontRenderer,
-            l.slowerBtn,
+            layout.slowerBtn,
             "-",
             ui::ButtonStyle::Secondary,
-            l.slowerBtn.Contains(mx, my),
+            layout.slowerBtn.Contains(mouseX, mouseY),
             m_speedMultiplier <= 0.5f);
         ui::DrawButton(
             renderer,
             fontRenderer,
-            l.speedBtn,
-            spdBuf,
+            layout.speedBtn,
+            speedBuffer,
             m_speedMultiplier != 1.0f ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
-            l.speedBtn.Contains(mx, my));
+            layout.speedBtn.Contains(mouseX, mouseY));
         ui::DrawButton(
             renderer,
             fontRenderer,
-            l.fasterBtn,
+            layout.fasterBtn,
             "+",
             ui::ButtonStyle::Secondary,
-            l.fasterBtn.Contains(mx, my),
+            layout.fasterBtn.Contains(mouseX, mouseY),
             m_speedMultiplier >= 32.0f);
     }
 
@@ -556,87 +624,99 @@ void HUDController::RenderGameHud(
         ui::DrawButton(
             renderer,
             fontRenderer,
-            l.researchBtn,
-            ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, l.researchBtn.w - 12),
+            layout.researchBtn,
+            ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, layout.researchBtn.w - 12),
             ui::ButtonStyle::Secondary,
-            l.researchBtn.Contains(mx, my));
+            layout.researchBtn.Contains(mouseX, mouseY));
         // --- Tabs ----------------------------------------------------------------------------------
-        for (int t = 0; t < TabCount; ++t)
+        for (int tabIndex = 0; tabIndex < TabCount; ++tabIndex)
         {
-            const UiRect &tr = l.tabs[t];
-            bool active = (t == m_activeTab);
-            bool hovered = tr.Contains(mx, my);
+            const UiRect &tabRect = layout.tabs[tabIndex];
+            bool active = (tabIndex == m_activeTab);
+            bool hovered = tabRect.Contains(mouseX, mouseY);
             if (hovered)
                 SoundRequests::MarkHover();
             renderer.FillRectScreen(
-                tr.x, tr.y, tr.w, tr.h, active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-            renderer.DrawRectScreen(tr.x, tr.y, tr.w, tr.h, active ? col::BorderStrong : col::Border);
+                tabRect.x,
+                tabRect.y,
+                tabRect.w,
+                tabRect.h,
+                active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
+            renderer.DrawRectScreen(
+                tabRect.x, tabRect.y, tabRect.w, tabRect.h, active ? col::BorderStrong : col::Border);
             if (active)
-                renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
+                renderer.FillRectScreen(tabRect.x, tabRect.Bottom() - 3, tabRect.w, 3, col::Accent);
 
-            if (TabIcon(t) >= 0)
+            if (TabIcon(tabIndex) >= 0)
             {
-                renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
-                float s = 0.75f;
-                int iw = static_cast<int>(kCameoW * s);
+                renderer.SetClipRect({tabRect.x + 1, tabRect.y + 1, tabRect.w - 2, tabRect.h - 4});
+                float iconScale = 0.75f;
+                int iconWidth = static_cast<int>(kCameoWidth * iconScale);
                 renderer.SetDrawOwner(Players::Local());
                 renderer.SetStructureFaction(PlayerFaction());
-                renderer.DrawCompositeScreen(TabIcon(t), tr.CenterX() - iw / 2, tr.y + 6, s, PlayerFaction());
+                renderer.DrawCompositeScreen(
+                    TabIcon(tabIndex), tabRect.CenterX() - iconWidth / 2, tabRect.y + 6, iconScale, PlayerFaction());
                 renderer.SetStructureFaction(Faction::Neutral);
                 renderer.SetDrawOwner(kNoPlayer);
                 renderer.ResetClipRect();
                 if (!active)
                     renderer.FillRectScreen(
-                        tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4, {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
+                        tabRect.x + 1,
+                        tabRect.y + 1,
+                        tabRect.w - 2,
+                        tabRect.h - 4,
+                        {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
             }
             else
             {
-                DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
+                DrawCrosshair(
+                    renderer, tabRect.CenterX(), tabRect.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
             }
         }
 
         // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
-        int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
+        int maxScroll = MaxScrollRows(m_activeTab, layout.grid.h);
         int &scroll = m_scrollRow[m_activeTab];
         scroll = std::clamp(scroll, 0, maxScroll);
         {
-            ui::DrawCaption(fontRenderer, renderer, l.strip.x, l.strip.y + 4, _(kTabNames[m_activeTab]));
+            ui::DrawCaption(fontRenderer, renderer, layout.strip.x, layout.strip.y + 4, _(kTabNames[m_activeTab]));
 
             if (m_activeTab == TabInfantry || m_activeTab == TabVehicles)
             {
-                bool inf = (m_activeTab == TabInfantry);
-                int primary = inf ? m_primaryBarracksId : m_primaryFactoryId;
-                auto list = entities.GetBuildingsByType(inf ? UnitType::Barracks : UnitType::Factory, Players::Local());
-                if (!list.empty())
+                bool isInfantry = (m_activeTab == TabInfantry);
+                int primaryId = isInfantry ? m_primaryBarracksId : m_primaryFactoryId;
+                auto buildings
+                    = entities.GetBuildingsByType(isInfantry ? UnitType::Barracks : UnitType::Factory, Players::Local());
+                if (!buildings.empty())
                 {
                     std::string label
-                        = std::string(inf ? _("Barracks") : _("Factory")) + " #" + std::to_string(primary);
-                    if (list.size() > 1)
+                        = std::string(isInfantry ? _("Barracks") : _("Factory")) + " #" + std::to_string(primaryId);
+                    if (buildings.size() > 1)
                         label += "  \xE2\x80\xBA";
-                    bool hot = list.size() > 1 && l.primaryBtn.Contains(mx, my);
+                    bool hovered = buildings.size() > 1 && layout.primaryBtn.Contains(mouseX, mouseY);
                     fontRenderer.DrawString(
-                        ui::FitText(fontRenderer, label, ui::FONT_SMALL, l.primaryBtn.w),
-                        l.primaryBtn.Right(),
-                        l.primaryBtn.CenterY(),
+                        ui::FitText(fontRenderer, label, ui::FONT_SMALL, layout.primaryBtn.w),
+                        layout.primaryBtn.Right(),
+                        layout.primaryBtn.CenterY(),
                         ui::FONT_SMALL,
-                        hot ? col::Accent : col::TextDim,
+                        hovered ? col::Accent : col::TextDim,
                         false,
                         Anchor::RIGHT | Anchor::VCENTER);
                 }
             }
             else if (m_activeTab == TabOrders)
             {
-                int selected = 0;
-                for (const auto &e : entities.GetAllEntities())
+                int selectedCount = 0;
+                for (const auto &entity : entities.GetAllEntities())
                 {
-                    if (e.alive && e.selected && !e.isBuilding)
-                        ++selected;
+                    if (entity.alive && entity.selected && !entity.isBuilding)
+                        ++selectedCount;
                 }
-                std::string label = std::string(_("Selected")) + ": " + std::to_string(selected);
+                std::string label = std::string(_("Selected")) + ": " + std::to_string(selectedCount);
                 fontRenderer.DrawString(
                     label,
-                    l.primaryBtn.Right(),
-                    l.primaryBtn.CenterY(),
+                    layout.primaryBtn.Right(),
+                    layout.primaryBtn.CenterY(),
                     ui::FONT_SMALL,
                     col::TextDim,
                     false,
@@ -645,19 +725,21 @@ void HUDController::RenderGameHud(
 
             if (maxScroll > 0)
             {
-                auto arrow = [&](const UiRect &r, bool up, bool enabled) {
-                    bool hot = enabled && r.Contains(mx, my);
-                    renderer.FillRectScreen(r.x, r.y, r.w, r.h, hot ? col::Hover : col::PanelRaised);
-                    renderer.DrawRectScreen(r.x, r.y, r.w, r.h, hot ? col::BorderStrong : col::Border);
-                    SDL_Color c = enabled ? (hot ? col::Accent : col::Text) : col::TextMuted;
+                auto drawArrow = [&](const UiRect &arrowRect, bool isUp, bool enabled) {
+                    bool hovered = enabled && arrowRect.Contains(mouseX, mouseY);
+                    renderer.FillRectScreen(
+                        arrowRect.x, arrowRect.y, arrowRect.w, arrowRect.h, hovered ? col::Hover : col::PanelRaised);
+                    renderer.DrawRectScreen(
+                        arrowRect.x, arrowRect.y, arrowRect.w, arrowRect.h, hovered ? col::BorderStrong : col::Border);
+                    SDL_Color arrowColor = enabled ? (hovered ? col::Accent : col::Text) : col::TextMuted;
                     for (int i = 0; i < 5; ++i)
                     {
-                        int yy = up ? (r.CenterY() - 2 + i) : (r.CenterY() + 2 - i);
-                        renderer.FillRectScreen(r.CenterX() - i, yy, 2 * i + 1, 1, c);
+                        int rowY = isUp ? (arrowRect.CenterY() - 2 + i) : (arrowRect.CenterY() + 2 - i);
+                        renderer.FillRectScreen(arrowRect.CenterX() - i, rowY, 2 * i + 1, 1, arrowColor);
                     }
                 };
-                arrow(l.scrollUp, true, scroll > 0);
-                arrow(l.scrollDown, false, scroll < maxScroll);
+                drawArrow(layout.scrollUp, true, scroll > 0);
+                drawArrow(layout.scrollDown, false, scroll < maxScroll);
             }
         }
 
@@ -671,23 +753,23 @@ void HUDController::RenderGameHud(
             = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true); // nothing can be built
         // Orders shown on unit cards come from the buildings that would train them
         auto queuedAt = [&](UnitType buildingType) {
-            std::vector<const Building *> out;
+            std::vector<const Building *> targets;
             for (int id : ProductionTargets(buildingType, entities, selected))
-                out.push_back(entities.GetBuilding(id));
-            return out;
+                targets.push_back(entities.GetBuilding(id));
+            return targets;
         };
         const std::vector<const Building *> barracksTargets = queuedAt(UnitType::Barracks);
         const std::vector<const Building *> factoryTargets = queuedAt(UnitType::Factory);
 
-        renderer.SetClipRect({l.grid.x, l.grid.y, l.grid.w, l.grid.h});
-        int count = ItemCountForTab(m_activeTab);
-        for (int i = 0; i < count; ++i)
+        renderer.SetClipRect({layout.grid.x, layout.grid.y, layout.grid.w, layout.grid.h});
+        int itemCount = ItemCountForTab(m_activeTab);
+        for (int i = 0; i < itemCount; ++i)
         {
-            UiRect c = l.Cell(i, scroll);
-            if (c.Bottom() < l.grid.y || c.y > l.grid.Bottom())
+            UiRect cellRect = layout.Cell(i, scroll);
+            if (cellRect.Bottom() < layout.grid.y || cellRect.y > layout.grid.Bottom())
                 continue;
-            const int item = ItemAt(m_activeTab, i); // (the tech level hides what it leaves out)
-            bool hovered = c.Contains(mx, my) && l.grid.Contains(mx, my);
+            const int itemIndex = ItemAt(m_activeTab, i); // (the tech level hides what it leaves out)
+            bool hovered = cellRect.Contains(mouseX, mouseY) && layout.grid.Contains(mouseX, mouseY);
             if (hovered)
                 SoundRequests::MarkHover();
 
@@ -695,30 +777,37 @@ void HUDController::RenderGameHud(
             {
                 case TabBuild:
                 {
-                    const auto &bp = EntityManager::GetBlueprints()[item];
-                    bool selected = (m_buildMode && m_selectedBlueprint == item);
-                    bool canAfford = economy.CanAfford(bp.creditCost);
+                    const auto &blueprint = EntityManager::GetBlueprints()[itemIndex];
+                    bool isSelected = (m_buildMode && m_selectedBlueprint == itemIndex);
+                    bool canAfford = economy.CanAfford(blueprint.creditCost);
                     // Hard limits (data/limits.yaml): greyed out at the limit, "n/max" while one is set
                     // (a mine has its own count in mines.yaml)
-                    const bool isMine = bp.mineKind >= 0;
-                    const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(bp.mineKind)].maxPerPlayer
-                                             : BuildLimits::LimitOf(entities, bp.buildingIndex);
+                    const bool isMine = blueprint.mineKind >= 0;
+                    const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(blueprint.mineKind)].maxPerPlayer
+                                             : BuildLimits::LimitOf(entities, blueprint.buildingIndex);
                     const int owned
                         = limit > 0
-                              ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
-                                        : BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex))
+                              ? (isMine ? entities.CountMines(Players::Local(), blueprint.mineKind)
+                                        : BuildLimits::CountOwned(entities, map, Players::Local(), blueprint.buildingIndex))
                               : 0;
                     const bool atLimit = limit == 0 || (limit > 0 && owned >= limit);
                     const bool radarLocked
-                        = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;
+                        = (blueprint.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;
                     DrawCameo(
-                        renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hovered, selected && !noHq, radarLocked);
+                        renderer,
+                        fontRenderer,
+                        cellRect,
+                        blueprint.iconCompId,
+                        _(blueprint.name),
+                        hovered,
+                        isSelected && !noHq,
+                        radarLocked);
                     if (limit > 0)
                     {
                         fontRenderer.DrawString(
                             std::to_string(owned) + "/" + std::to_string(limit),
-                            c.x + c.w - 6,
-                            c.y + 5,
+                            cellRect.x + cellRect.w - 6,
+                            cellRect.y + 5,
                             ui::FONT_SMALL_BOLD,
                             atLimit ? col::Danger : col::TextMuted,
                             true,
@@ -727,22 +816,23 @@ void HUDController::RenderGameHud(
                     DrawCostTag(
                         renderer,
                         fontRenderer,
-                        c,
-                        "$" + std::to_string(bp.creditCost),
+                        cellRect,
+                        "$" + std::to_string(blueprint.creditCost),
                         canAfford ? col::Accent : col::Danger);
-                    std::string pw = (bp.powerCost >= 0 ? "+" : "") + std::to_string(bp.powerCost);
+                    std::string powerCostText
+                        = (blueprint.powerCost >= 0 ? "+" : "") + std::to_string(blueprint.powerCost);
                     fontRenderer.DrawString(
-                        pw,
-                        c.x + 6,
-                        c.y + 5,
+                        powerCostText,
+                        cellRect.x + 6,
+                        cellRect.y + 5,
                         ui::FONT_SMALL_BOLD,
-                        bp.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255},
+                        blueprint.powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255},
                         true);
                     if (hovered)
                     {
-                        hoverTitle
-                            = std::string(_(bp.name)) + "  $" + std::to_string(bp.creditCost) + ", " + pw + _(" kW");
-                        hoverText = _(bp.desc);
+                        hoverTitle = std::string(_(blueprint.name)) + "  $" + std::to_string(blueprint.creditCost)
+                                     + ", " + powerCostText + _(" kW");
+                        hoverText = _(blueprint.desc);
                         if (limit == 0)
                             hoverText = std::string(_("Not allowed in this game.")) + " " + hoverText;
                         else if (atLimit)
@@ -754,18 +844,18 @@ void HUDController::RenderGameHud(
                 case TabInfantry:
                 case TabVehicles:
                 {
-                    bool inf = (m_activeTab == TabInfantry);
-                    const UnitCameoDef &def = unitCatalog(inf).items[item];
-                    const auto &producers = inf ? barracksTargets : factoryTargets;
-                    const bool unlocked = IsUnitUnlocked(Players::Local(), def.archetype);
-                    bool available = (inf ? hasBarracks : hasFactory) && unlocked;
-                    int cost = UnitCost(def, entities);
-                    std::string name = _(UnitName(def, entities));
+                    bool isInfantry = (m_activeTab == TabInfantry);
+                    const UnitCameoDef &unitDef = unitCatalog(isInfantry).items[itemIndex];
+                    const auto &producers = isInfantry ? barracksTargets : factoryTargets;
+                    const bool unlocked = IsUnitUnlocked(Players::Local(), unitDef.archetype);
+                    bool available = (isInfantry ? hasBarracks : hasFactory) && unlocked;
+                    int cost = UnitCost(unitDef, entities);
+                    std::string name = _(UnitName(unitDef, entities));
                     DrawCameo(
                         renderer,
                         fontRenderer,
-                        c,
-                        SpriteHandle(def.icon, SpriteKind::Part, "unit cameo"),
+                        cellRect,
+                        SpriteHandle(unitDef.icon, SpriteKind::Part, "unit cameo"),
                         name,
                         hovered,
                         false,
@@ -773,54 +863,55 @@ void HUDController::RenderGameHud(
 
                     int queued = 0;
                     float progress = -1.0f; // most advanced order of this unit currently in training
-                    for (const Building *b : producers)
+                    for (const Building *building : producers)
                     {
-                        for (const auto &q : b->productionQueue)
+                        for (const auto &order : building->productionQueue)
                         {
-                            if (q.archetype == def.archetype)
+                            if (order.archetype == unitDef.archetype)
                                 ++queued;
                         }
-                        if (!b->productionQueue.empty() && b->productionQueue.front().archetype == def.archetype)
+                        if (!building->productionQueue.empty()
+                            && building->productionQueue.front().archetype == unitDef.archetype)
                         {
-                            progress = std::max(progress, b->CurrentProductionProgress());
+                            progress = std::max(progress, building->CurrentProductionProgress());
                         }
                     }
                     if (!available)
                     {
-                        DrawLockBadge(renderer, fontRenderer, c);
+                        DrawLockBadge(renderer, fontRenderer, cellRect);
                     }
                     else
                     {
                         DrawCostTag(
                             renderer,
                             fontRenderer,
-                            c,
+                            cellRect,
                             "$" + std::to_string(cost),
                             economy.CanAfford(cost) ? col::Accent : col::Danger);
                         if (progress >= 0.0f)
                         {
-                            DrawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
+                            DrawProgressShutter(renderer, fontRenderer, cellRect, progress, col::Accent);
                         }
                         if (queued > 0)
                         {
                             std::string badge = "\xC3\x97" + std::to_string(queued);
                             renderer.FillRectScreen(
-                                c.x + 3,
-                                c.y + 3,
+                                cellRect.x + 3,
+                                cellRect.y + 3,
                                 fontRenderer.GetTextWidth(badge, ui::FONT_SMALL_BOLD) + 10,
                                 18,
                                 col::Accent);
                             fontRenderer.DrawString(
-                                badge, c.x + 8, c.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
+                                badge, cellRect.x + 8, cellRect.y + 4, ui::FONT_SMALL_BOLD, col::AccentText, false);
                         }
                     }
                     if (available)
                     {
                         bool repeating = false;
-                        for (const Building *pb : producers)
-                            repeating = repeating || pb->repeatArchetype == def.archetype;
-                        const UiRect inf8 = InfinityBtn(c);
-                        DrawInfinity(renderer, inf8, repeating, inf8.Contains(mx, my));
+                        for (const Building *producer : producers)
+                            repeating = repeating || producer->repeatArchetype == unitDef.archetype;
+                        const UiRect infinityRect = InfinityBtn(cellRect);
+                        DrawInfinity(renderer, infinityRect, repeating, infinityRect.Contains(mouseX, mouseY));
                     }
                     if (hovered)
                     {
@@ -829,17 +920,17 @@ void HUDController::RenderGameHud(
                         {
                             hoverText
                                 = std::string(_("[RESEARCH REQUIRED] "))
-                                  + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), def.archetype))
+                                  + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), unitDef.archetype))
                                           .name);
                         }
                         else if (!available)
                         {
-                            hoverText = inf ? _("[BARRACKS REQUIRED] Construct Barracks to recruit ") + name
-                                            : _("[FACTORY REQUIRED] Construct Factory to build ") + name;
+                            hoverText = isInfantry ? _("[BARRACKS REQUIRED] Construct Barracks to recruit ") + name
+                                                   : _("[FACTORY REQUIRED] Construct Factory to build ") + name;
                         }
                         else
                         {
-                            hoverText = _(UnitDesc(def, entities));
+                            hoverText = _(UnitDesc(unitDef, entities));
                             if (queued > 0)
                                 hoverText += std::string("  ") + _("(RMB - cancel one)");
                             hoverText
@@ -850,48 +941,54 @@ void HUDController::RenderGameHud(
                 }
                 case TabOrders:
                 {
-                    const auto &o = kOrders[i];
+                    const auto &orderDef = kOrders[i];
                     bool active = (i == 0 && m_attackMoveMode);
                     if (i >= kFirstStanceOrder)
                     {
                         // Lit when every selected own unit has this stance
-                        const auto wanted = static_cast<UnitStance>(i - kFirstStanceOrder);
-                        bool any = false, all = true;
-                        for (const auto &e : entities.GetAllEntities())
+                        const auto wantedStance = static_cast<UnitStance>(i - kFirstStanceOrder);
+                        bool anySelected = false, allMatch = true;
+                        for (const auto &entity : entities.GetAllEntities())
                         {
-                            const Unit *u = e.AsUnit();
-                            if (!u || !u->alive || !u->selected || u->owner != Players::Local())
+                            const Unit *unit = entity.AsUnit();
+                            if (!unit || !unit->alive || !unit->selected || unit->owner != Players::Local())
                                 continue;
-                            any = true;
-                            all = all && u->stance == wanted;
+                            anySelected = true;
+                            allMatch = allMatch && unit->stance == wantedStance;
                         }
-                        active = any && all;
+                        active = anySelected && allMatch;
                     }
                     renderer.FillRectScreen(
-                        c.x,
-                        c.y,
-                        c.w,
-                        c.h,
+                        cellRect.x,
+                        cellRect.y,
+                        cellRect.w,
+                        cellRect.h,
                         active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
                     renderer.DrawRectScreen(
-                        c.x, c.y, c.w, c.h, active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+                        cellRect.x,
+                        cellRect.y,
+                        cellRect.w,
+                        cellRect.h,
+                        active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
                     fontRenderer.DrawString(
-                        ui::FitText(fontRenderer, _(o.name), ui::FONT_BODY_BOLD, c.w - 16),
-                        c.CenterX(),
-                        c.CenterY() + 6,
+                        ui::FitText(fontRenderer, _(orderDef.name), ui::FONT_BODY_BOLD, cellRect.w - 16),
+                        cellRect.CenterX(),
+                        cellRect.CenterY() + 6,
                         ui::FONT_BODY_BOLD,
                         active ? col::Accent : col::Text,
                         false,
                         Anchor::HCENTER | Anchor::VCENTER);
-                    if (o.key[0] != '\0')
+                    if (orderDef.key[0] != '\0')
                     {
-                        UiRect chip {c.x + 6, c.y + 6, 22, 22};
-                        renderer.FillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelSunken);
-                        renderer.DrawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
+                        UiRect keyChipRect {cellRect.x + 6, cellRect.y + 6, 22, 22};
+                        renderer.FillRectScreen(
+                            keyChipRect.x, keyChipRect.y, keyChipRect.w, keyChipRect.h, col::PanelSunken);
+                        renderer.DrawRectScreen(
+                            keyChipRect.x, keyChipRect.y, keyChipRect.w, keyChipRect.h, col::BorderStrong);
                         fontRenderer.DrawString(
-                            o.key,
-                            chip.CenterX(),
-                            chip.CenterY(),
+                            orderDef.key,
+                            keyChipRect.CenterX(),
+                            keyChipRect.CenterY(),
                             ui::FONT_SMALL_BOLD,
                             col::Accent,
                             false,
@@ -899,10 +996,10 @@ void HUDController::RenderGameHud(
                     }
                     if (hovered)
                     {
-                        hoverTitle = _(o.name);
-                        if (o.key[0] != '\0')
-                            hoverTitle += std::string("  [") + o.key + "]";
-                        hoverText = _(o.desc);
+                        hoverTitle = _(orderDef.name);
+                        if (orderDef.key[0] != '\0')
+                            hoverTitle += std::string("  [") + orderDef.key + "]";
+                        hoverText = _(orderDef.desc);
                     }
                     break;
                 }
@@ -913,37 +1010,43 @@ void HUDController::RenderGameHud(
         // Scroll position hint on the right edge of the grid
         if (maxScroll > 0)
         {
-            int trackX = l.panel.Right() - 5;
-            renderer.FillRectScreen(trackX, l.grid.y, 2, l.grid.h, col::PanelRaised);
-            int rows = maxScroll + l.VisibleRows();
-            int thumbH = std::max(16, l.grid.h * l.VisibleRows() / rows);
-            int thumbY = l.grid.y + (l.grid.h - thumbH) * scroll / maxScroll;
-            renderer.FillRectScreen(trackX, thumbY, 2, thumbH, col::Accent);
+            int trackX = layout.panel.Right() - 5;
+            renderer.FillRectScreen(trackX, layout.grid.y, 2, layout.grid.h, col::PanelRaised);
+            int totalRows = maxScroll + layout.VisibleRows();
+            int thumbHeight = std::max(16, layout.grid.h * layout.VisibleRows() / totalRows);
+            int thumbY = layout.grid.y + (layout.grid.h - thumbHeight) * scroll / maxScroll;
+            renderer.FillRectScreen(trackX, thumbY, 2, thumbHeight, col::Accent);
         }
 
         // --- Info box -------------------------------------------------------------------------------------
         {
-            const UiRect &ib = l.info;
-            ui::DrawPanel(renderer, ib, col::PanelSunken, col::Border);
-            int textW = ib.w - 20;
+            const UiRect &infoRect = layout.info;
+            ui::DrawPanel(renderer, infoRect, col::PanelSunken, col::Border);
+            int textWidth = infoRect.w - 20;
 
             if (!m_hudNotification.empty())
             {
-                renderer.FillRectScreen(ib.x, ib.y, 3, ib.h, col::Accent);
+                renderer.FillRectScreen(infoRect.x, infoRect.y, 3, infoRect.h, col::Accent);
                 fontRenderer.DrawTextWrapped(
-                    m_hudNotification, ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL_BOLD, col::Accent, false);
+                    m_hudNotification,
+                    infoRect.x + 10,
+                    infoRect.y + 8,
+                    textWidth,
+                    ui::FONT_SMALL_BOLD,
+                    col::Accent,
+                    false);
             }
             else if (!hoverTitle.empty())
             {
                 fontRenderer.DrawString(
-                    ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textW),
-                    ib.x + 10,
-                    ib.y + 7,
+                    ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textWidth),
+                    infoRect.x + 10,
+                    infoRect.y + 7,
                     ui::FONT_SMALL_BOLD,
                     col::Text,
                     false);
                 fontRenderer.DrawTextWrapped(
-                    hoverText, ib.x + 10, ib.y + 26, textW, ui::FONT_SMALL, col::TextDim, false);
+                    hoverText, infoRect.x + 10, infoRect.y + 26, textWidth, ui::FONT_SMALL, col::TextDim, false);
             }
             else if (
                 m_buildMode && m_selectedBlueprint >= 0
@@ -951,72 +1054,78 @@ void HUDController::RenderGameHud(
             {
                 fontRenderer.DrawString(
                     _(EntityManager::GetBlueprints()[m_selectedBlueprint].name),
-                    ib.x + 10,
-                    ib.y + 7,
+                    infoRect.x + 10,
+                    infoRect.y + 7,
                     ui::FONT_SMALL_BOLD,
                     col::Accent,
                     false);
                 fontRenderer.DrawTextWrapped(
                     _("LMB - build, RMB / Esc - cancel"),
-                    ib.x + 10,
-                    ib.y + 26,
-                    textW,
+                    infoRect.x + 10,
+                    infoRect.y + 26,
+                    textWidth,
                     ui::FONT_SMALL,
                     col::TextDim,
                     false);
             }
             else if (
-                const Building *busy = [&]() -> const Building * {
-                    const auto &list = (m_activeTab == TabVehicles) ? factoryTargets : barracksTargets;
-                    for (const Building *b : list)
+                const Building *busyBuilding = [&]() -> const Building * {
+                    const auto &targets = (m_activeTab == TabVehicles) ? factoryTargets : barracksTargets;
+                    for (const Building *building : targets)
                     {
-                        if (!b->productionQueue.empty())
-                            return b;
+                        if (!building->productionQueue.empty())
+                            return building;
                     }
                     return nullptr;
                 }();
-                busy && (m_activeTab == TabInfantry || m_activeTab == TabVehicles))
+                busyBuilding && (m_activeTab == TabInfantry || m_activeTab == TabVehicles))
             {
-                const auto &item = busy->productionQueue.front();
-                std::string what = _("Production");
-                if (const auto *cfg = entities.GetUnitConfig(item.archetype))
-                    what = _(cfg->name);
-                float prog = busy->CurrentProductionProgress();
-                std::string line = what + "  " + std::to_string(static_cast<int>(prog * 100.0f)) + "%";
-                if (busy->productionQueue.size() > 1)
+                const auto &frontOrder = busyBuilding->productionQueue.front();
+                std::string unitName = _("Production");
+                if (const auto *unitConfig = entities.GetUnitConfig(frontOrder.archetype))
+                    unitName = _(unitConfig->name);
+                float progress = busyBuilding->CurrentProductionProgress();
+                std::string statusLine = unitName + "  " + std::to_string(static_cast<int>(progress * 100.0f)) + "%";
+                if (busyBuilding->productionQueue.size() > 1)
                 {
-                    line += "   " + std::string(_("queue")) + ": " + std::to_string(busy->productionQueue.size() - 1);
+                    statusLine += "   " + std::string(_("queue")) + ": "
+                                  + std::to_string(busyBuilding->productionQueue.size() - 1);
                 }
                 fontRenderer.DrawString(
-                    ui::FitText(fontRenderer, line, ui::FONT_SMALL_BOLD, textW),
-                    ib.x + 10,
-                    ib.y + 7,
+                    ui::FitText(fontRenderer, statusLine, ui::FONT_SMALL_BOLD, textWidth),
+                    infoRect.x + 10,
+                    infoRect.y + 7,
                     ui::FONT_SMALL_BOLD,
                     col::Text,
                     false);
-                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 30, textW, 8}, prog, col::Accent);
+                ui::DrawProgressBar(renderer, {infoRect.x + 10, infoRect.y + 30, textWidth, 8}, progress, col::Accent);
             }
-            else if (const auto own = OwnSelectedBuildings(entities, selected); !own.empty())
+            else if (const auto ownBuildings = OwnSelectedBuildings(entities, selected); !ownBuildings.empty())
             {
-                const Building *b = own.front();
+                const Building *building = ownBuildings.front();
                 std::string title = _("Structure");
-                if (const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType))
-                    title = _(cfg->name);
-                if (own.size() > 1)
-                    title += "  x" + std::to_string(own.size());
+                if (const BuildingConfig *buildingConfig = entities.GetBuildingConfig(building->rawBuildingType))
+                    title = _(buildingConfig->name);
+                if (ownBuildings.size() > 1)
+                    title += "  x" + std::to_string(ownBuildings.size());
                 fontRenderer.DrawString(
-                    ui::FitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textW),
-                    ib.x + 10,
-                    ib.y + 7,
+                    ui::FitText(fontRenderer, title, ui::FONT_SMALL_BOLD, textWidth),
+                    infoRect.x + 10,
+                    infoRect.y + 7,
                     ui::FONT_SMALL_BOLD,
                     col::Text,
                     false);
-                const float hp = b->maxHp > 0 ? static_cast<float>(b->currentHp) / b->maxHp : 1.0f;
-                ui::DrawProgressBar(renderer, {ib.x + 10, ib.y + 28, textW, 6}, hp, hp > 0.35f ? col::Ok : col::Danger);
+                const float healthRatio
+                    = building->maxHp > 0 ? static_cast<float>(building->currentHp) / building->maxHp : 1.0f;
+                ui::DrawProgressBar(
+                    renderer,
+                    {infoRect.x + 10, infoRect.y + 28, textWidth, 6},
+                    healthRatio,
+                    healthRatio > 0.35f ? col::Ok : col::Danger);
                 fontRenderer.DrawString(
-                    std::to_string(b->currentHp) + " / " + std::to_string(b->maxHp),
-                    ib.x + 10,
-                    ib.y + 40,
+                    std::to_string(building->currentHp) + " / " + std::to_string(building->maxHp),
+                    infoRect.x + 10,
+                    infoRect.y + 40,
                     ui::FONT_SMALL,
                     col::TextDim,
                     false);
@@ -1030,58 +1139,71 @@ void HUDController::RenderGameHud(
                     "Select units and issue a command",
                 };
                 fontRenderer.DrawTextWrapped(
-                    _(kTabHints[m_activeTab]), ib.x + 10, ib.y + 8, textW, ui::FONT_SMALL, col::TextMuted, false);
+                    _(kTabHints[m_activeTab]),
+                    infoRect.x + 10,
+                    infoRect.y + 8,
+                    textWidth,
+                    ui::FONT_SMALL,
+                    col::TextMuted,
+                    false);
             }
 
-            if (const auto ownSel = OwnSelectedBuildings(entities, selected); !ownSel.empty())
+            if (const auto ownBuildings = OwnSelectedBuildings(entities, selected); !ownBuildings.empty())
             {
                 bool anyDamaged = false, allRepairing = true;
-                for (const Building *b : ownSel)
+                for (const Building *building : ownBuildings)
                 {
-                    if (b->CanBeRepaired())
+                    if (building->CanBeRepaired())
                     {
                         anyDamaged = true;
-                        allRepairing = allRepairing && b->repairing;
+                        allRepairing = allRepairing && building->repairing;
                     }
                 }
                 if (anyDamaged)
                 {
-                    const UiRect rb = RepairBtn(ib);
-                    const bool on = allRepairing;
-                    const bool hotR = rb.Contains(mx, my);
+                    const UiRect repairRect = RepairBtn(infoRect);
+                    const bool isRepairing = allRepairing;
+                    const bool repairHovered = repairRect.Contains(mouseX, mouseY);
                     renderer.FillRectScreen(
-                        rb.x,
-                        rb.y,
-                        rb.w,
-                        rb.h,
-                        on ? SDL_Color {60, 44, 20, 255} : (hotR ? col::Hover : col::PanelRaised));
-                    renderer.DrawRectScreen(rb.x, rb.y, rb.w, rb.h, on ? col::Accent : col::BorderStrong);
+                        repairRect.x,
+                        repairRect.y,
+                        repairRect.w,
+                        repairRect.h,
+                        isRepairing ? SDL_Color {60, 44, 20, 255}
+                                    : (repairHovered ? col::Hover : col::PanelRaised));
+                    renderer.DrawRectScreen(
+                        repairRect.x,
+                        repairRect.y,
+                        repairRect.w,
+                        repairRect.h,
+                        isRepairing ? col::Accent : col::BorderStrong);
                     fontRenderer.DrawString(
-                        on ? _("REPAIRING") : _("REPAIR [R]"),
-                        rb.CenterX(),
-                        rb.CenterY(),
+                        isRepairing ? _("REPAIRING") : _("REPAIR [R]"),
+                        repairRect.CenterX(),
+                        repairRect.CenterY(),
                         ui::FONT_SMALL_BOLD,
-                        on ? col::Accent : col::Text,
+                        isRepairing ? col::Accent : col::Text,
                         false,
                         Anchor::HCENTER | Anchor::VCENTER);
                 }
             }
             if (!OwnSelectedBuildings(entities, selected).empty())
             {
-                const UiRect db = DestroyBtn(ib);
+                const UiRect destroyRect = DestroyBtn(infoRect);
                 const bool armed = m_destroyArmed > 0.0f;
-                const bool hot = db.Contains(mx, my);
+                const bool destroyHovered = destroyRect.Contains(mouseX, mouseY);
                 renderer.FillRectScreen(
-                    db.x,
-                    db.y,
-                    db.w,
-                    db.h,
-                    armed ? col::Danger : (hot ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
-                renderer.DrawRectScreen(db.x, db.y, db.w, db.h, col::Danger);
+                    destroyRect.x,
+                    destroyRect.y,
+                    destroyRect.w,
+                    destroyRect.h,
+                    armed ? col::Danger
+                          : (destroyHovered ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
+                renderer.DrawRectScreen(destroyRect.x, destroyRect.y, destroyRect.w, destroyRect.h, col::Danger);
                 fontRenderer.DrawString(
                     armed ? _("CONFIRM?") : _("DESTROY"),
-                    db.CenterX(),
-                    db.CenterY(),
+                    destroyRect.CenterX(),
+                    destroyRect.CenterY(),
                     ui::FONT_SMALL_BOLD,
                     armed ? col::Text : col::Danger,
                     false,

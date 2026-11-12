@@ -184,6 +184,13 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
                             waitBlockedTimer = 0.0f;
                         }
                     }
+                    if (state != ActionState::Move && targetEntityId == 0 && targetWallTileX < 0
+                        && blockedTimer >= 2.5f)
+                    {
+                        waitingForPath = false;
+                        isAttackMoving = false;
+                        ClearMoveTarget();
+                    }
                 }
                 else
                 {

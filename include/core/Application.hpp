@@ -141,6 +141,10 @@ private:
     // left in the accumulator, never going back between two ticks, and 1 once the ticks stop (pause, menus,
     // waiting for the host)
     void UpdateRenderAlpha(double accumulator, double frameTime);
+    // A replica: seconds since the last snapshot was applied (the pictures glide over the time between two snapshots)
+    double m_replicaSince {0.0};
+    // The room owner's wish for a network match: authority mode (setting network.authority_mode, or OAOW_AUTHORITY)
+    bool AuthorityModeWanted() const;
     std::uint32_t m_alphaTick {0};
     double m_alphaSince {0.0}; // seconds since the tick last advanced
     float m_alphaLast {1.0f};

@@ -61,6 +61,11 @@ namespace OpenArtOfWar
 
 // Developer aid (OAOW_NET_BOT=1): the local player sends all of its units at the nearest enemy
 // headquarters every 5 seconds, so two headless peers have real command traffic and fights to agree on
+bool Application::AuthorityModeWanted() const
+{
+    return m_env.Section("network").value("authority_mode", false) || DebugEnv("OAOW_AUTHORITY") != nullptr;
+}
+
 void Application::DriveNetworkBot(std::uint32_t tick)
 {
     static const bool bot = DebugEnv("OAOW_NET_BOT") != nullptr;
@@ -522,6 +527,7 @@ void Application::UpdateNetworkMenu()
             if (m_net)
             {
                 m_networkMenu->PushOptions(*m_net);
+                m_net->SetAuthorityMode(AuthorityModeWanted());
                 m_net->StartFromLobby(SDL_GetTicks());
                 m_netMatchStarted = true;
             }
@@ -677,6 +683,7 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
         if (m_net->ControlsRoom() && m_net->CanStart() && m_net->PlayerCount() >= m_netWantedPlayers)
         {
             m_networkMenu->PushOptions(*m_net);
+            m_net->SetAuthorityMode(AuthorityModeWanted());
             m_net->StartFromLobby(nowMs);
             std::cout << "[Net] Starting the match on " << m_netMapPath << " for " << m_net->PlayerCount() << " players"
                       << std::endl;
@@ -701,6 +708,7 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
         // A fresh simulation now, before the first turn's commands are scheduled into it
         m_gameplayController->ResetForMission(*m_mission, *m_hudController, *m_entities, *m_map);
         m_net->Attach(m_gameplayController->simulation());
+        m_entities->SetCollectReplicaEvents(m_net->AuthorityModeOn() && m_net->IsAuthority());
         m_net->SetReconnectWindow(
             static_cast<std::uint32_t>(m_env.Section("network").value("reconnect_window_s", 60)) * 1000u);
         m_state = AppState::SkirmishPlaying;

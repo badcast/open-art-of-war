@@ -238,6 +238,10 @@ const UnitConfig *EntityManager::GetUnitConfigByUnitType(UnitType type, Faction 
 void EntityManager::Clear()
 {
     m_entities.Clear();
+    m_collectedDeaths.clear();
+    m_eventGroundMarks.clear();
+    m_replicaVisible.clear();
+    m_replicaWorld = false;
     m_seenBuildings.clear();
     m_projectiles.clear();
     m_explosions.clear();

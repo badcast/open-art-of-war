@@ -35,11 +35,11 @@ bool TileMap::LoadMap(const std::string &jsonPath)
         return false;
     }
 
-    nlohmann::json j = nlohmann::json::parse(text);
+    nlohmann::json mapJson = nlohmann::json::parse(text);
 
-    m_width = std::clamp(j["width"].get<int>(), 1, MAX_MAP_SIZE);
-    m_height = std::clamp(j["height"].get<int>(), 1, MAX_MAP_SIZE);
-    m_tilesetId = j["tilesetId"].get<int>();
+    m_width = std::clamp(mapJson["width"].get<int>(), 1, MAX_MAP_SIZE);
+    m_height = std::clamp(mapJson["height"].get<int>(), 1, MAX_MAP_SIZE);
+    m_tilesetId = mapJson["tilesetId"].get<int>();
 
     for (int y = 0; y < MAX_MAP_SIZE; ++y)
     {
@@ -58,83 +58,83 @@ bool TileMap::LoadMap(const std::string &jsonPath)
     }
 
     // Terrain variation ranges by tileset.
-    const int eRanges0[5][2] = {{0, 10}, {10, 18}, {18, 19}, {19, 26}, {26, 34}};
-    const int eRanges1[5][2] = {{0, 10}, {10, 18}, {18, 26}, {26, 33}, {33, 36}};
-    const auto &eRanges = (m_tilesetId == 1) ? eRanges1 : eRanges0;
+    const int variationRanges0[5][2] = {{0, 10}, {10, 18}, {18, 19}, {19, 26}, {26, 34}};
+    const int variationRanges1[5][2] = {{0, 10}, {10, 18}, {18, 26}, {26, 33}, {33, 36}};
+    const auto &variationRanges = (m_tilesetId == 1) ? variationRanges1 : variationRanges0;
 
     // 1. Unpack base terrain tiles from RLE stream
-    int curX = 0;
-    int curY = 0;
-    for (const auto &span : j["terrainRle"])
+    int currentX = 0;
+    int currentY = 0;
+    for (const auto &span : mapJson["terrainRle"])
     {
-        int runLen = span["runLength"].get<int>();
+        int runLength = span["runLength"].get<int>();
         int tileType = span["tileType"].get<int>();
-        for (int i = 0; i < runLen; ++i)
+        for (int i = 0; i < runLength; ++i)
         {
-            if (curY < m_height && curX < m_width)
+            if (currentY < m_height && currentX < m_width)
             {
                 int finalTile = tileType;
-                for (int r = 0; r < 5; ++r)
+                for (int rangeIdx = 0; rangeIdx < 5; ++rangeIdx)
                 {
-                    if (tileType >= eRanges[r][0] && tileType < eRanges[r][1])
+                    if (tileType >= variationRanges[rangeIdx][0] && tileType < variationRanges[rangeIdx][1])
                     {
-                        int spanCount = eRanges[r][1] - eRanges[r][0];
+                        int spanCount = variationRanges[rangeIdx][1] - variationRanges[rangeIdx][0];
                         if (spanCount > 1)
                         {
                             std::uint32_t hash
-                                = (static_cast<std::uint32_t>(curX) * 73856093u
-                                   ^ static_cast<std::uint32_t>(curY) * 19349663u);
-                            int varIdx = static_cast<int>(hash % static_cast<std::uint32_t>(spanCount));
-                            finalTile = eRanges[r][0] + varIdx;
+                                = (static_cast<std::uint32_t>(currentX) * 73856093u
+                                   ^ static_cast<std::uint32_t>(currentY) * 19349663u);
+                            int variantIndex = static_cast<int>(hash % static_cast<std::uint32_t>(spanCount));
+                            finalTile = variationRanges[rangeIdx][0] + variantIndex;
                         }
                         break;
                     }
                 }
-                m_baseTiles[curY][curX] = static_cast<std::uint8_t>(finalTile);
+                m_baseTiles[currentY][currentX] = static_cast<std::uint8_t>(finalTile);
                 if (TileCollision::IsBlocked(m_tilesetId, finalTile))
                 {
-                    m_passable[curY][curX] = false; // The sprite of this tile blocks movement
+                    m_passable[currentY][currentX] = false; // The sprite of this tile blocks movement
                 }
             }
-            curX++;
-            if (curX >= m_width)
+            currentX++;
+            if (currentX >= m_width)
             {
-                curX = 0;
-                curY++;
+                currentX = 0;
+                currentY++;
             }
         }
     }
 
     // 2. Unpack decorations (trees, bridges, cliffs, landmarks)
     m_decorations.clear();
-    for (const auto &d : j["decorations"])
+    for (const auto &decorJson : mapJson["decorations"])
     {
-        MapDecoration dec;
-        dec.type = d["type"].get<int>();
-        dec.x = d["x"].get<int>();
-        dec.y = d["y"].get<int>();
-        m_decorations.push_back(dec);
-        if (dec.y >= 0 && dec.y < m_height && dec.x >= 0 && dec.x < m_width)
+        MapDecoration decoration;
+        decoration.type = decorJson["type"].get<int>();
+        decoration.x = decorJson["x"].get<int>();
+        decoration.y = decorJson["y"].get<int>();
+        m_decorations.push_back(decoration);
+        if (decoration.y >= 0 && decoration.y < m_height && decoration.x >= 0 && decoration.x < m_width)
         {
-            m_decorGrid[dec.y][dec.x] = static_cast<std::uint16_t>(dec.type + 1);
-            m_passable[dec.y][dec.x] = false;
+            m_decorGrid[decoration.y][decoration.x] = static_cast<std::uint16_t>(decoration.type + 1);
+            m_passable[decoration.y][decoration.x] = false;
         }
     }
 
     // 3. Apply passability collision bitmask after decorations.
     // Where bit == 0, tile becomes passable (true); where bit == 1, blocked (false).
     // A tile whose sprite blocks (TileCollision) stays blocked whatever the mask says.
-    const auto &collisionMask = j["collisionMask"];
+    const auto &collisionMask = mapJson["collisionMask"];
     for (int y = 0; y < m_height && y < static_cast<int>(collisionMask.size()); ++y)
     {
         const auto &rowChunks = collisionMask[y];
-        int chunkIdx = 0;
-        for (const auto &chunkVal : rowChunks)
+        int chunkIndex = 0;
+        for (const auto &chunkValue : rowChunks)
         {
-            std::uint32_t mask = chunkVal.get<std::uint32_t>();
+            std::uint32_t mask = chunkValue.get<std::uint32_t>();
             for (int bit = 0; bit < 32; ++bit)
             {
-                int x = chunkIdx * 32 + bit;
+                int x = chunkIndex * 32 + bit;
                 if (x < m_width)
                 {
                     bool blocked
@@ -142,89 +142,90 @@ bool TileMap::LoadMap(const std::string &jsonPath)
                     m_passable[y][x] = !blocked;
                 }
             }
-            chunkIdx++;
+            chunkIndex++;
         }
     }
 
     // 3b. Unpack preplaced defensive walls from map JSON if present
-    if (j.contains("walls"))
+    if (mapJson.contains("walls"))
     {
-        for (const auto &w : j["walls"])
+        for (const auto &wallEntry : mapJson["walls"])
         {
-            if (w.is_object())
+            if (wallEntry.is_object())
             {
-                int wx = w.value("x", 0);
-                int wy = w.value("y", 0);
-                int ww = w.value("w", 1);
-                int wh = w.value("h", 1);
-                int hp = w.value("hp", 100);
-                Faction fac = Faction::Confederation;
-                if (w.contains("faction"))
+                int wallX = wallEntry.value("x", 0);
+                int wallY = wallEntry.value("y", 0);
+                int wallWidth = wallEntry.value("w", 1);
+                int wallHeight = wallEntry.value("h", 1);
+                int hp = wallEntry.value("hp", 100);
+                Faction faction = Faction::Confederation;
+                if (wallEntry.contains("faction"))
                 {
-                    if (w["faction"].is_string())
+                    if (wallEntry["faction"].is_string())
                     {
-                        std::string fstr = w["faction"].get<std::string>();
-                        fac = (fstr == "1") ? Faction::Resistance : Utility::ParseFaction(fstr, Faction::Confederation);
+                        std::string factionStr = wallEntry["faction"].get<std::string>();
+                        faction = (factionStr == "1") ? Faction::Resistance
+                                                      : Utility::ParseFaction(factionStr, Faction::Confederation);
                     }
-                    else if (w["faction"].is_number_integer())
+                    else if (wallEntry["faction"].is_number_integer())
                     {
-                        if (w["faction"].get<int>() != 0)
-                            fac = Faction::Resistance;
+                        if (wallEntry["faction"].get<int>() != 0)
+                            faction = Faction::Resistance;
                     }
                 }
-                for (int ty = wy; ty < wy + wh; ++ty)
+                for (int tileY = wallY; tileY < wallY + wallHeight; ++tileY)
                 {
-                    for (int tx = wx; tx < wx + ww; ++tx)
+                    for (int tileX = wallX; tileX < wallX + wallWidth; ++tileX)
                     {
-                        SetWall(tx, ty, fac, hp);
+                        SetWall(tileX, tileY, faction, hp);
                     }
                 }
             }
-            else if (w.is_array())
+            else if (wallEntry.is_array())
             {
-                if (w.size() >= 4)
+                if (wallEntry.size() >= 4)
                 {
-                    int wx = w[0].get<int>();
-                    int wy = w[1].get<int>();
-                    int ww = w[2].get<int>();
-                    int wh = w[3].get<int>();
-                    Faction fac
-                        = (w.size() >= 5 && w[4].get<int>() != 0) ? Faction::Resistance : Faction::Confederation;
-                    int hp = (w.size() >= 6) ? w[5].get<int>() : 100;
-                    for (int ty = wy; ty < wy + wh; ++ty)
+                    int wallX = wallEntry[0].get<int>();
+                    int wallY = wallEntry[1].get<int>();
+                    int wallWidth = wallEntry[2].get<int>();
+                    int wallHeight = wallEntry[3].get<int>();
+                    Faction faction = (wallEntry.size() >= 5 && wallEntry[4].get<int>() != 0) ? Faction::Resistance
+                                                                                             : Faction::Confederation;
+                    int hp = (wallEntry.size() >= 6) ? wallEntry[5].get<int>() : 100;
+                    for (int tileY = wallY; tileY < wallY + wallHeight; ++tileY)
                     {
-                        for (int tx = wx; tx < wx + ww; ++tx)
+                        for (int tileX = wallX; tileX < wallX + wallWidth; ++tileX)
                         {
-                            SetWall(tx, ty, fac, hp);
+                            SetWall(tileX, tileY, faction, hp);
                         }
                     }
                 }
-                else if (w.size() >= 2)
+                else if (wallEntry.size() >= 2)
                 {
-                    SetWall(w[0].get<int>(), w[1].get<int>(), Faction::Confederation, 100);
+                    SetWall(wallEntry[0].get<int>(), wallEntry[1].get<int>(), Faction::Confederation, 100);
                 }
             }
         }
     }
-    if (j.contains("wallZones"))
+    if (mapJson.contains("wallZones"))
     {
-        for (const auto &wz : j["wallZones"])
+        for (const auto &wallZone : mapJson["wallZones"])
         {
-            if (wz.is_array())
+            if (wallZone.is_array())
             {
-                for (const auto &rect : wz)
+                for (const auto &wallRect : wallZone)
                 {
-                    if (rect.is_array() && rect.size() >= 4)
+                    if (wallRect.is_array() && wallRect.size() >= 4)
                     {
-                        int wx = rect[0].get<int>();
-                        int wy = rect[1].get<int>();
-                        int ww = rect[2].get<int>();
-                        int wh = rect[3].get<int>();
-                        for (int ty = wy; ty < wy + wh; ++ty)
+                        int wallX = wallRect[0].get<int>();
+                        int wallY = wallRect[1].get<int>();
+                        int wallWidth = wallRect[2].get<int>();
+                        int wallHeight = wallRect[3].get<int>();
+                        for (int tileY = wallY; tileY < wallY + wallHeight; ++tileY)
                         {
-                            for (int tx = wx; tx < wx + ww; ++tx)
+                            for (int tileX = wallX; tileX < wallX + wallWidth; ++tileX)
                             {
-                                SetWall(tx, ty, Faction::Confederation, 100);
+                                SetWall(tileX, tileY, Faction::Confederation, 100);
                             }
                         }
                     }
@@ -234,17 +235,17 @@ bool TileMap::LoadMap(const std::string &jsonPath)
     }
 
     // Check if map explicitly enables or disables fog of war
-    if (j.contains("fogOfWar"))
+    if (mapJson.contains("fogOfWar"))
     {
-        m_hasFog = j["fogOfWar"].get<bool>();
+        m_hasFog = mapJson["fogOfWar"].get<bool>();
     }
-    else if (j.contains("hasFog"))
+    else if (mapJson.contains("hasFog"))
     {
-        m_hasFog = j["hasFog"].get<bool>();
+        m_hasFog = mapJson["hasFog"].get<bool>();
     }
-    else if (j.contains("fog"))
+    else if (mapJson.contains("fog"))
     {
-        m_hasFog = j["fog"].get<bool>();
+        m_hasFog = mapJson["fog"].get<bool>();
     }
     else
     {
@@ -379,10 +380,10 @@ Faction TileMap::GetWallFaction(int tileX, int tileY) const
 {
     if (tileX < 0 || tileX >= m_width || tileY < 0 || tileY >= m_height)
         return Faction::Neutral;
-    std::uint16_t w = m_wallGrid[tileY][tileX];
-    if (w >= 1101)
+    std::uint16_t wallTile = m_wallGrid[tileY][tileX];
+    if (wallTile >= 1101)
         return Faction::Resistance;
-    if (w >= 1001)
+    if (wallTile >= 1001)
         return Faction::Confederation;
     return Faction::Neutral;
 }
@@ -508,12 +509,12 @@ bool TileMap::IsVisibleTo(int tileX, int tileY, std::uint8_t team) const
 
 void TileMap::ResetViewerFog()
 {
-    const std::uint8_t bit = TeamBit(m_viewerTeam);
+    const std::uint8_t teamBit = TeamBit(m_viewerTeam);
     for (int y = 0; y < m_height; ++y)
     {
         for (int x = 0; x < m_width; ++x)
         {
-            const bool seen = (m_sight[y][x] & bit) != 0;
+            const bool seen = (m_sight[y][x] & teamBit) != 0;
             m_fog[y][x] = seen ? FogState::Visible : FogState::Hidden;
             if (seen)
                 RememberWall(x, y);
@@ -537,9 +538,9 @@ void TileMap::ResetAllFog(FogState state)
 
 void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, std::uint8_t team)
 {
-    const std::uint8_t bit = TeamBit(team);
-    const bool viewer = (team & 7) == m_viewerTeam;
-    int r2 = radius * radius;
+    const std::uint8_t teamBit = TeamBit(team);
+    const bool isViewer = (team & 7) == m_viewerTeam;
+    int radiusSq = radius * radius;
     int minX = std::max(0, centerTileX - radius);
     int maxX = std::min(m_width - 1, centerTileX + radius);
     int minY = std::max(0, centerTileY - radius);
@@ -547,14 +548,14 @@ void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, std::uint
 
     for (int y = minY; y <= maxY; ++y)
     {
-        int dy = y - centerTileY;
+        int deltaY = y - centerTileY;
         for (int x = minX; x <= maxX; ++x)
         {
-            int dx = x - centerTileX;
-            if (dx * dx + dy * dy <= r2)
+            int deltaX = x - centerTileX;
+            if (deltaX * deltaX + deltaY * deltaY <= radiusSq)
             {
-                m_sight[y][x] |= bit;
-                if (viewer)
+                m_sight[y][x] |= teamBit;
+                if (isViewer)
                     m_fog[y][x] = FogState::Visible;
             }
         }
@@ -563,14 +564,14 @@ void TileMap::RevealArea(int centerTileX, int centerTileY, int radius, std::uint
 
 void TileMap::RevealRect(int tileX, int tileY, int width, int height, std::uint8_t team)
 {
-    const std::uint8_t bit = TeamBit(team);
-    const bool viewer = (team & 7) == m_viewerTeam;
+    const std::uint8_t teamBit = TeamBit(team);
+    const bool isViewer = (team & 7) == m_viewerTeam;
     for (int y = std::max(0, tileY); y < std::min(m_height, tileY + height); ++y)
     {
         for (int x = std::max(0, tileX); x < std::min(m_width, tileX + width); ++x)
         {
-            m_sight[y][x] |= bit;
-            if (viewer)
+            m_sight[y][x] |= teamBit;
+            if (isViewer)
                 m_fog[y][x] = FogState::Visible;
         }
     }
@@ -612,34 +613,35 @@ void TileMap::RenderTerrain(Renderer &renderer, const Camera &camera, bool fogEn
     int startTileY = std::clamp(static_cast<int>(startWorldY / TILE_HEIGHT) - 1, 0, m_height - 1);
     int endTileY = std::clamp(static_cast<int>(endWorldY / TILE_HEIGHT) + 2, 0, m_height);
 
-    for (int ty = startTileY; ty < endTileY; ++ty)
+    for (int tileY = startTileY; tileY < endTileY; ++tileY)
     {
-        for (int tx = startTileX; tx < endTileX; ++tx)
+        for (int tileX = startTileX; tileX < endTileX; ++tileX)
         {
-            FogState fog = m_fog[ty][tx];
+            FogState fog = m_fog[tileY][tileX];
             if (fogEnabled && m_hasFog && fog == FogState::Hidden)
             {
                 // Hidden ground next to seen ground is drawn: the soft fog edge reaches into it
-                bool border = false;
-                for (int dy = -1; dy <= 1 && !border; ++dy)
+                bool hasSeenNeighbor = false;
+                for (int dy = -1; dy <= 1 && !hasSeenNeighbor; ++dy)
                 {
-                    for (int dx = -1; dx <= 1 && !border; ++dx)
+                    for (int dx = -1; dx <= 1 && !hasSeenNeighbor; ++dx)
                     {
-                        const int nx = tx + dx, ny = ty + dy;
-                        border
-                            = nx >= 0 && ny >= 0 && nx < m_width && ny < m_height && m_fog[ny][nx] != FogState::Hidden;
+                        const int neighborX = tileX + dx, neighborY = tileY + dy;
+                        hasSeenNeighbor = neighborX >= 0 && neighborY >= 0 && neighborX < m_width && neighborY < m_height
+                                          && m_fog[neighborY][neighborX] != FogState::Hidden;
                     }
                 }
-                if (!border)
+                if (!hasSeenNeighbor)
                 {
                     renderer.FillRectWorld(
-                        tx * TILE_WIDTH, ty * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, camera, m_fogStyle.color);
+                        tileX * TILE_WIDTH, tileY * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, camera, m_fogStyle.color);
                     continue;
                 }
             }
 
-            int tileIdx = m_baseTiles[ty][tx];
-            renderer.DrawTileWorld(m_tilesetId, tileIdx, tx * TILE_WIDTH, ty * TILE_HEIGHT, camera, globalAnimTick);
+            int tileIndex = m_baseTiles[tileY][tileX];
+            renderer.DrawTileWorld(
+                m_tilesetId, tileIndex, tileX * TILE_WIDTH, tileY * TILE_HEIGHT, camera, globalAnimTick);
         }
     }
 }
@@ -655,21 +657,21 @@ void TileMap::RenderWallRubble(Renderer &renderer, const Camera &camera, bool fo
     int startTileY = std::clamp(static_cast<int>(startWorldY / TILE_HEIGHT) - 1, 0, m_height - 1);
     int endTileY = std::clamp(static_cast<int>(endWorldY / TILE_HEIGHT) + 2, 0, m_height);
 
-    for (int ty = startTileY; ty < endTileY; ++ty)
+    for (int tileY = startTileY; tileY < endTileY; ++tileY)
     {
-        for (int tx = startTileX; tx < endTileX; ++tx)
+        for (int tileX = startTileX; tileX < endTileX; ++tileX)
         {
-            if (fogEnabled && m_hasFog && m_fog[ty][tx] == FogState::Hidden)
+            if (fogEnabled && m_hasFog && m_fog[tileY][tileX] == FogState::Hidden)
                 continue;
             // Under the fog of war the viewer sees the rubble as it was when the tile was last in sight
-            const bool live = !fogEnabled || ViewerSeesLive(tx, ty);
-            std::uint16_t rubble = live ? m_wallRubbleGrid[ty][tx] : m_seenRubble[ty][tx];
+            const bool seesLive = !fogEnabled || ViewerSeesLive(tileX, tileY);
+            std::uint16_t rubble = seesLive ? m_wallRubbleGrid[tileY][tileX] : m_seenRubble[tileY][tileX];
             if (rubble > 0)
             {
                 // The grid only marks the rubble (the simulation compares it); its picture is a sprite
                 static const CachedSprite sprite("fx_wall_rubble.rubble", SpriteKind::Part);
                 renderer.DrawCompositeWorld(
-                    sprite, tx * TILE_WIDTH - 90.0f, ty * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
+                    sprite, tileX * TILE_WIDTH - 90.0f, tileY * TILE_HEIGHT - 60.0f, camera, Faction::Neutral);
             }
         }
     }
@@ -686,47 +688,54 @@ void TileMap::RenderDecorations(Renderer &renderer, const Camera &camera, bool f
     int startTileY = std::clamp(static_cast<int>(startWorldY / TILE_HEIGHT) - 1, 0, m_height - 1);
     int endTileY = std::clamp(static_cast<int>(endWorldY / TILE_HEIGHT) + 2, 0, m_height);
 
-    for (const auto &dec : m_decorations)
+    for (const auto &decoration : m_decorations)
     {
-        if (dec.x < startTileX - 4 || dec.x > endTileX + 4 || dec.y < startTileY - 4 || dec.y > endTileY + 4)
+        if (decoration.x < startTileX - 4 || decoration.x > endTileX + 4 || decoration.y < startTileY - 4
+            || decoration.y > endTileY + 4)
         {
             continue;
         }
 
-        if (fogEnabled && m_hasFog && m_fog[dec.y][dec.x] == FogState::Hidden)
+        if (fogEnabled && m_hasFog && m_fog[decoration.y][decoration.x] == FogState::Hidden)
         {
             continue;
         }
 
         // Trees and rocks: only the ground layer here, their crowns are sorted with the units (EntityManager::render)
-        const int layer = renderer.TallDecorRows(m_tilesetId, dec.type) > 0 ? 0 : -1;
+        const int layer = renderer.TallDecorRows(m_tilesetId, decoration.type) > 0 ? 0 : -1;
         renderer.DrawDecorWorld(
-            m_tilesetId, dec.type, dec.x * TILE_WIDTH, dec.y * TILE_HEIGHT, camera, globalAnimTick, layer);
+            m_tilesetId,
+            decoration.type,
+            decoration.x * TILE_WIDTH,
+            decoration.y * TILE_HEIGHT,
+            camera,
+            globalAnimTick,
+            layer);
     }
 }
 
-void TileMap::LoadEnvironment(const EnvironmentConfig &env)
+void TileMap::LoadEnvironment(const EnvironmentConfig &envConfig)
 {
-    const nlohmann::json &j = env.Root();
-    if (j.contains("construction") && j["construction"].is_object())
+    const nlohmann::json &rootJson = envConfig.Root();
+    if (rootJson.contains("construction") && rootJson["construction"].is_object())
     {
-        const auto &c = j["construction"];
+        const auto &constructionJson = rootJson["construction"];
         m_constructionRules.enemyBlockTiles
-            = std::clamp(c.value("enemy_block_tiles", m_constructionRules.enemyBlockTiles), 0, 64);
+            = std::clamp(constructionJson.value("enemy_block_tiles", m_constructionRules.enemyBlockTiles), 0, 64);
     }
-    if (!j.contains("fog") || !j["fog"].is_object())
+    if (!rootJson.contains("fog") || !rootJson["fog"].is_object())
         return;
-    const auto &f = j["fog"];
-    m_fogStyle.rounding = std::clamp(f.value("rounding", m_fogStyle.rounding), 0.0f, 3.0f);
-    m_fogStyle.texelsPerTile = std::clamp(f.value("texels_per_tile", m_fogStyle.texelsPerTile), 1, 16);
-    m_fogStyle.exploredAlpha = std::clamp(f.value("explored_alpha", m_fogStyle.exploredAlpha), 0, 255);
-    m_fogStyle.hiddenAlpha = std::clamp(f.value("hidden_alpha", m_fogStyle.hiddenAlpha), 0, 255);
-    if (f.contains("color") && f["color"].is_array() && f["color"].size() >= 3)
+    const auto &fogJson = rootJson["fog"];
+    m_fogStyle.rounding = std::clamp(fogJson.value("rounding", m_fogStyle.rounding), 0.0f, 3.0f);
+    m_fogStyle.texelsPerTile = std::clamp(fogJson.value("texels_per_tile", m_fogStyle.texelsPerTile), 1, 16);
+    m_fogStyle.exploredAlpha = std::clamp(fogJson.value("explored_alpha", m_fogStyle.exploredAlpha), 0, 255);
+    m_fogStyle.hiddenAlpha = std::clamp(fogJson.value("hidden_alpha", m_fogStyle.hiddenAlpha), 0, 255);
+    if (fogJson.contains("color") && fogJson["color"].is_array() && fogJson["color"].size() >= 3)
     {
         m_fogStyle.color
-            = {static_cast<Uint8>(f["color"][0].get<int>()),
-               static_cast<Uint8>(f["color"][1].get<int>()),
-               static_cast<Uint8>(f["color"][2].get<int>()),
+            = {static_cast<Uint8>(fogJson["color"][0].get<int>()),
+               static_cast<Uint8>(fogJson["color"][1].get<int>()),
+               static_cast<Uint8>(fogJson["color"][2].get<int>()),
                255};
     }
 }
@@ -735,36 +744,36 @@ namespace
 {
 
 // Separable box blur, run twice (close to a Gaussian): rounds off the staircase of tile edges
-void BlurMask(std::vector<std::uint8_t> &img, std::vector<std::uint8_t> &tmp, int w, int h, int radius)
+void BlurMask(std::vector<std::uint8_t> &mask, std::vector<std::uint8_t> &scratch, int width, int height, int radius)
 {
     if (radius <= 0)
         return;
-    tmp.resize(img.size());
+    scratch.resize(mask.size());
     const int window = 2 * radius + 1;
     for (int pass = 0; pass < 2; ++pass)
     {
-        for (int y = 0; y < h; ++y)
+        for (int y = 0; y < height; ++y)
         {
-            const std::uint8_t *row = &img[static_cast<std::size_t>(y) * w];
+            const std::uint8_t *row = &mask[static_cast<std::size_t>(y) * width];
             int sum = 0;
             for (int k = -radius; k <= radius; ++k)
-                sum += row[std::clamp(k, 0, w - 1)];
-            for (int x = 0; x < w; ++x)
+                sum += row[std::clamp(k, 0, width - 1)];
+            for (int x = 0; x < width; ++x)
             {
-                tmp[static_cast<std::size_t>(y) * w + x] = static_cast<std::uint8_t>(sum / window);
-                sum += row[std::min(x + radius + 1, w - 1)] - row[std::max(x - radius, 0)];
+                scratch[static_cast<std::size_t>(y) * width + x] = static_cast<std::uint8_t>(sum / window);
+                sum += row[std::min(x + radius + 1, width - 1)] - row[std::max(x - radius, 0)];
             }
         }
-        for (int x = 0; x < w; ++x)
+        for (int x = 0; x < width; ++x)
         {
             int sum = 0;
             for (int k = -radius; k <= radius; ++k)
-                sum += tmp[static_cast<std::size_t>(std::clamp(k, 0, h - 1)) * w + x];
-            for (int y = 0; y < h; ++y)
+                sum += scratch[static_cast<std::size_t>(std::clamp(k, 0, height - 1)) * width + x];
+            for (int y = 0; y < height; ++y)
             {
-                img[static_cast<std::size_t>(y) * w + x] = static_cast<std::uint8_t>(sum / window);
-                sum += tmp[static_cast<std::size_t>(std::min(y + radius + 1, h - 1)) * w + x]
-                       - tmp[static_cast<std::size_t>(std::max(y - radius, 0)) * w + x];
+                mask[static_cast<std::size_t>(y) * width + x] = static_cast<std::uint8_t>(sum / window);
+                sum += scratch[static_cast<std::size_t>(std::min(y + radius + 1, height - 1)) * width + x]
+                       - scratch[static_cast<std::size_t>(std::max(y - radius, 0)) * width + x];
             }
         }
     }
@@ -782,49 +791,52 @@ void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) c
     camera.ScreenToWorld(camera.GetViewportWidth(), camera.GetViewportHeight(), endWorldX, endWorldY);
 
     // Visible window plus a margin, so the blur near the screen border sees the real neighbours
-    const int s = smooth ? m_fogStyle.texelsPerTile : 1;
-    const int radius = smooth ? static_cast<int>(std::lround(m_fogStyle.rounding * s * 0.5f)) : 0;
-    const int margin = radius / s + 2;
-    const int x0 = static_cast<int>(std::floor(startWorldX / TILE_WIDTH)) - margin;
-    const int y0 = static_cast<int>(std::floor(startWorldY / TILE_HEIGHT)) - margin;
-    const int x1 = static_cast<int>(std::ceil(endWorldX / TILE_WIDTH)) + margin;
-    const int y1 = static_cast<int>(std::ceil(endWorldY / TILE_HEIGHT)) + margin;
-    const int tilesW = x1 - x0;
-    const int tilesH = y1 - y0;
-    if (tilesW <= 0 || tilesH <= 0)
+    const int texelsPerTile = smooth ? m_fogStyle.texelsPerTile : 1;
+    const int radius = smooth ? static_cast<int>(std::lround(m_fogStyle.rounding * texelsPerTile * 0.5f)) : 0;
+    const int marginTiles = radius / texelsPerTile + 2;
+    const int startTileX = static_cast<int>(std::floor(startWorldX / TILE_WIDTH)) - marginTiles;
+    const int startTileY = static_cast<int>(std::floor(startWorldY / TILE_HEIGHT)) - marginTiles;
+    const int endTileX = static_cast<int>(std::ceil(endWorldX / TILE_WIDTH)) + marginTiles;
+    const int endTileY = static_cast<int>(std::ceil(endWorldY / TILE_HEIGHT)) + marginTiles;
+    const int tilesWidth = endTileX - startTileX;
+    const int tilesHeight = endTileY - startTileY;
+    if (tilesWidth <= 0 || tilesHeight <= 0)
         return;
 
-    const int w = tilesW * s;
-    const int h = tilesH * s;
-    m_fogMask.assign(static_cast<std::size_t>(w) * h, 0);
-    for (int ty = 0; ty < tilesH; ++ty)
+    const int maskWidth = tilesWidth * texelsPerTile;
+    const int maskHeight = tilesHeight * texelsPerTile;
+    m_fogMask.assign(static_cast<std::size_t>(maskWidth) * maskHeight, 0);
+    for (int tileY = 0; tileY < tilesHeight; ++tileY)
     {
-        for (int tx = 0; tx < tilesW; ++tx)
+        for (int tileX = 0; tileX < tilesWidth; ++tileX)
         {
-            const int mx = std::clamp(x0 + tx, 0, m_width - 1); // beyond the map edge: repeat the border
-            const int my = std::clamp(y0 + ty, 0, m_height - 1);
-            const FogState fog = m_fog[my][mx];
-            const std::uint8_t a = fog == FogState::Hidden     ? static_cast<std::uint8_t>(m_fogStyle.hiddenAlpha)
-                                   : fog == FogState::Explored ? static_cast<std::uint8_t>(m_fogStyle.exploredAlpha)
-                                                               : 0;
-            if (a == 0)
+            const int mapX = std::clamp(startTileX + tileX, 0, m_width - 1); // beyond the map edge: repeat the border
+            const int mapY = std::clamp(startTileY + tileY, 0, m_height - 1);
+            const FogState fog = m_fog[mapY][mapX];
+            const std::uint8_t alpha = fog == FogState::Hidden     ? static_cast<std::uint8_t>(m_fogStyle.hiddenAlpha)
+                                       : fog == FogState::Explored ? static_cast<std::uint8_t>(m_fogStyle.exploredAlpha)
+                                                                   : 0;
+            if (alpha == 0)
                 continue;
-            for (int py = 0; py < s; ++py)
+            for (int texelY = 0; texelY < texelsPerTile; ++texelY)
             {
-                std::fill_n(&m_fogMask[static_cast<std::size_t>(ty * s + py) * w + tx * s], s, a);
+                std::fill_n(
+                    &m_fogMask[static_cast<std::size_t>(tileY * texelsPerTile + texelY) * maskWidth + tileX * texelsPerTile],
+                    texelsPerTile,
+                    alpha);
             }
         }
     }
-    BlurMask(m_fogMask, m_fogScratch, w, h, radius);
+    BlurMask(m_fogMask, m_fogScratch, maskWidth, maskHeight, radius);
 
     renderer.DrawAlphaMaskWorld(
         m_fogMask,
-        w,
-        h,
-        static_cast<float>(x0 * TILE_WIDTH),
-        static_cast<float>(y0 * TILE_HEIGHT),
-        static_cast<float>(tilesW * TILE_WIDTH),
-        static_cast<float>(tilesH * TILE_HEIGHT),
+        maskWidth,
+        maskHeight,
+        static_cast<float>(startTileX * TILE_WIDTH),
+        static_cast<float>(startTileY * TILE_HEIGHT),
+        static_cast<float>(tilesWidth * TILE_WIDTH),
+        static_cast<float>(tilesHeight * TILE_HEIGHT),
         camera,
         m_fogStyle.color,
         smooth);
@@ -841,17 +853,22 @@ void TileMap::RenderWalls(Renderer &renderer, const Camera &camera, bool fogEnab
     int startTileY = std::clamp(static_cast<int>(startWorldY / TILE_HEIGHT) - 1, 0, m_height - 1);
     int endTileY = std::clamp(static_cast<int>(endWorldY / TILE_HEIGHT) + 2, 0, m_height);
 
-    for (int ty = startTileY; ty < endTileY; ++ty)
+    for (int tileY = startTileY; tileY < endTileY; ++tileY)
     {
-        RenderWallRow(ty, renderer, camera, fogEnabled, globalAnimTick, startTileX, endTileX);
+        RenderWallRow(tileY, renderer, camera, fogEnabled, globalAnimTick, startTileX, endTileX);
     }
 }
 
 void TileMap::RenderWallRow(
-    int ty, Renderer &renderer, const Camera &camera, bool fogEnabled, int globalAnimTick, int startTileX, int endTileX)
-    const
+    int tileY,
+    Renderer &renderer,
+    const Camera &camera,
+    bool fogEnabled,
+    int globalAnimTick,
+    int startTileX,
+    int endTileX) const
 {
-    if (ty < 0 || ty >= m_height)
+    if (tileY < 0 || tileY >= m_height)
         return;
 
     if (startTileX < 0 || endTileX < 0)
@@ -868,20 +885,20 @@ void TileMap::RenderWallRow(
     // (building 20..24, same damage steps): the research upgrades the walls already standing too.
     int reinforced[kMaxPlayers];
     std::fill(std::begin(reinforced), std::end(reinforced), -1);
-    for (int tx = startTileX; tx < endTileX; ++tx)
+    for (int tileX = startTileX; tileX < endTileX; ++tileX)
     {
-        if (fogEnabled && m_hasFog && m_fog[ty][tx] == FogState::Hidden)
+        if (fogEnabled && m_hasFog && m_fog[tileY][tileX] == FogState::Hidden)
             continue;
 
         // Intact or damaged standing wall (ground ruins/rubble rendered on Layer 1). Under the fog of war (explored,
         // not in sight) the viewer sees the wall as it was when the tile was last in sight: walls built, damaged or
         // destroyed there since stay unknown
-        const bool live = !fogEnabled || ViewerSeesLive(tx, ty);
-        std::uint16_t wval = live ? m_wallGrid[ty][tx] : m_seenWall[ty][tx];
-        if (wval >= 1001 && wval <= 1200)
+        const bool seesLive = !fogEnabled || ViewerSeesLive(tileX, tileY);
+        std::uint16_t wallValue = seesLive ? m_wallGrid[tileY][tileX] : m_seenWall[tileY][tileX];
+        if (wallValue >= 1001 && wallValue <= 1200)
         {
-            int wallBase = (wval >= 1101) ? 25 : 15;
-            const PlayerId owner = live ? m_wallOwner[ty][tx] : m_seenWallOwner[ty][tx];
+            int wallBase = (wallValue >= 1101) ? 25 : 15;
+            const PlayerId owner = seesLive ? m_wallOwner[tileY][tileX] : m_seenWallOwner[tileY][tileX];
             if (wallBase == 15 && owner < kMaxPlayers)
             {
                 if (reinforced[owner] < 0)
@@ -889,14 +906,14 @@ void TileMap::RenderWallRow(
                 if (reinforced[owner] == 1)
                     wallBase = 20;
             }
-            int damageStep = std::clamp(((wval - 1001) % 100) / 20, 0, 4);
+            int damageStep = std::clamp(((wallValue - 1001) % 100) / 20, 0, 4);
             int wallBuildingId = wallBase + damageStep;
-            Faction wallFaction = (wval >= 1101) ? Faction::Resistance : Faction::Confederation;
+            Faction wallFaction = (wallValue >= 1101) ? Faction::Resistance : Faction::Confederation;
             renderer.SetDrawOwner(owner); // the wall wears its owner's army colour
             renderer.DrawBuildingWorld(
-                wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
+                wallBuildingId, tileX * TILE_WIDTH, tileY * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
             renderer.DrawBuildingWorld(
-                wallBuildingId, tx * TILE_WIDTH, ty * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
+                wallBuildingId, tileX * TILE_WIDTH, tileY * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
         }
     }
     renderer.SetDrawOwner(kNoPlayer);
@@ -940,11 +957,11 @@ void TileMap::AddDecoration(int type, int x, int y)
     if (x < 0 || x >= m_width || y < 0 || y >= m_height)
         return;
     RemoveDecorationAt(x, y);
-    MapDecoration dec;
-    dec.type = type;
-    dec.x = x;
-    dec.y = y;
-    m_decorations.push_back(dec);
+    MapDecoration decoration;
+    decoration.type = type;
+    decoration.x = x;
+    decoration.y = y;
+    m_decorations.push_back(decoration);
     m_decorGrid[y][x] = static_cast<std::uint16_t>(type + 1);
     m_passable[y][x] = false;
 }

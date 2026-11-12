@@ -113,6 +113,99 @@ int main()
     back.key.scancode = SDL_SCANCODE_AC_BACK;
     input.ProcessEvent(back, camera);
     Check(input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE), "Android Back must map to Escape");
+
+    // Touch HUD mode (full-screen viewport, always-on box selection except during building placement)
+    Camera touchCam(1280, 720);
+    touchCam.SetPosition(400.0f, 300.0f);
+    input.SetMenuOpen(false);
+    input.SetTouchPan(false); // AndroidHUD default when not placing a building
+    const SDL_Rect radarRect {8, 582, 176, 130};
+    const SDL_Rect buildBtnRect {1072, 652, 96, 60};
+    input.SetTouchUiRects({radarRect, buildBtnRect});
+
+    auto touchFull = [&](Uint32 type, SDL_FingerID id, float px, float py) {
+        SDL_Event event {};
+        event.type = type;
+        event.tfinger.fingerID = id;
+        event.tfinger.x = px / 1280.0f;
+        event.tfinger.y = py / 720.0f;
+        Check(SDL_ConvertEventToRenderCoordinates(renderer, &event), "touch conversion");
+        input.ProcessEvent(event, touchCam);
+        input.Update(0, touchCam);
+    };
+
+    // 1) Dragging on open map always activates box selection without panning camera
+    const float camBeforeX = touchCam.GetX();
+    const float camBeforeY = touchCam.GetY();
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
+    Check(input.GetSelectionBox().active, "single finger down on map starts selection box");
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 360, 320);
+    Check(input.GetSelectionBox().active, "single finger drag on map keeps selection box active");
+    Check(input.GetSelectionBox().HasSignificantArea(), "dragged box has significant area");
+    Check(touchCam.GetX() == camBeforeX && touchCam.GetY() == camBeforeY, "box drag must not pan camera");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 360, 320);
+    Check(!input.GetSelectionBox().active, "finger up ends selection box");
+    Check(!input.WasLeftClickIssued(x, y), "box drag must not issue a tap click");
+
+    // 2) Small diagonal drag (>12px Euclidean, <=12px per axis) must not issue a stray tap click
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 209, 209);
+    touchFull(SDL_EVENT_FINGER_UP, 1, 209, 209);
+    Check(!input.GetSelectionBox().active, "diagonal drag ends cleanly");
+    Check(!input.WasLeftClickIssued(x, y), "diagonal drag past slop must not issue a tap click");
+
+    // 3) Second finger during box drag switches to 2-finger pan/pinch and cancels selection box
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 250, 240);
+    Check(input.GetSelectionBox().active, "box active before second finger");
+    touchFull(SDL_EVENT_FINGER_DOWN, 2, 450, 240);
+    Check(!input.GetSelectionBox().active, "second finger cancels box selection");
+    const float pinchZoomBefore = touchCam.GetZoom();
+    touchFull(SDL_EVENT_FINGER_MOTION, 2, 550, 240);
+    Check(touchCam.GetZoom() > pinchZoomBefore, "2-finger pinch zooms during touch mode");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 250, 240);
+    touchFull(SDL_EVENT_FINGER_UP, 2, 550, 240);
+    Check(!input.WasLeftClickIssued(x, y) && !input.WasRightClickIssued(x, y), "multi-touch must not click");
+
+    // 4) Dragging on minimap/radar or HUD buttons must never trigger box selection
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 50, 640);
+    Check(!input.GetSelectionBox().active, "touch on radar must not start selection box");
+    Check(input.IsLeftMouseDown(), "touch on radar holds left mouse for radar drag");
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 120, 680);
+    Check(!input.GetSelectionBox().active, "dragging on radar must not activate selection box");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 120, 680);
+    Check(!input.IsLeftMouseDown(), "lifting from radar releases left mouse");
+    Check(!input.WasLeftClickIssued(x, y), "dragging on radar must not emit tap click");
+
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 1100, 680);
+    Check(!input.GetSelectionBox().active, "touch on HUD button must not start selection box");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 1100, 680);
+    Check(input.WasLeftClickIssued(x, y), "tapping HUD button inside viewport still clicks on release");
+
+    // 5) Building placement mode (SetTouchPan(true)) disables box selection:
+    //    dragging outside the ghost pans the camera; dragging on the ghost holds pointer without panning
+    input.SetTouchPan(true);
+    const SDL_Rect ghostRect {580, 300, 120, 120};
+    input.SetTouchUiRects({radarRect, buildBtnRect, ghostRect});
+
+    const float placeCamX = touchCam.GetX();
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
+    Check(!input.GetSelectionBox().active, "placing mode must not start selection box on map");
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 260, 200);
+    Check(!input.GetSelectionBox().active, "placing mode must not show selection box while dragging map");
+    Check(touchCam.GetX() < placeCamX, "dragging map outside ghost pans camera during placement");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 260, 200);
+    Check(!input.WasLeftClickIssued(x, y), "panning during placement must not emit tap click");
+
+    const float ghostCamX = touchCam.GetX();
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 640, 360);
+    Check(!input.GetSelectionBox().active, "touch on ghost must not start selection box");
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 700, 360);
+    Check(!input.GetSelectionBox().active, "dragging ghost must not start selection box");
+    Check(touchCam.GetX() == ghostCamX, "dragging ghost must not pan camera");
+    Check(input.IsLeftMouseDown(), "dragging ghost keeps left mouse down for AndroidHUD");
+    touchFull(SDL_EVENT_FINGER_UP, 1, 700, 360);
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

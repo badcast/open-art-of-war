@@ -3,6 +3,7 @@
 #include "openaow/net/Protocol.hpp"
 #include "openaow/net/Transport.hpp"
 
+#include <deque>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -191,6 +192,8 @@ private:
     std::vector<Connection> m_connections;
     std::array<SlotState, kMaxPlayers> m_slots {};
     bool m_running {false};
+    std::uint32_t m_matchId {0};
+    int m_authoritySlot {-1}; // fixed at match start, never transferred implicitly
     std::uint32_t m_startMs {0};
     std::uint32_t m_nextTurn {0};
     std::uint8_t m_inputDelay {2};
@@ -243,6 +246,12 @@ public:
     SessionClient(std::unique_ptr<Transport> transport, ClientConfig config);
 
     void update(std::uint32_t nowMs);
+
+    // Opaque per-player state; only the match authority is allowed to publish it.
+    bool sendAuthorityState(const AuthorityState &state);
+    bool takeAuthorityState(AuthorityState &state);
+    bool sendAuthorityAck(std::uint32_t tick);
+    bool takeAuthorityAck(AuthorityAck &ack);
 
     State state() const
     {
@@ -333,6 +342,12 @@ public:
         return m_inputDelay;
     }
 
+    // The player whose game simulates the world in this match (valid once matchStarted())
+    std::uint8_t authoritySlot() const
+    {
+        return m_authoritySlot;
+    }
+
     void sendWorldHash(std::uint32_t tick, std::uint64_t hash);
 
     // Pause for everybody (a limited number of times) / go on (anybody)
@@ -382,6 +397,12 @@ private:
     std::uint32_t m_desyncTick {0};
     PauseState m_pause;
     std::vector<Chat> m_chat;
+    std::deque<AuthorityState> m_authorityStates; // in arrival order, every one is delivered (one-time events ride on them)
+    std::deque<AuthorityAck> m_authorityAcks;
+    std::uint32_t m_matchId {0};
+    std::uint8_t m_authoritySlot {0};
+    std::uint32_t m_authorityStateTick {0};
+    bool m_hasAuthorityStateTick {false};
     std::vector<FileData> m_files;
     bool m_manifestWaiting {false};
     std::vector<DataEntry> m_manifest;

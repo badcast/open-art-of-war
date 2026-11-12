@@ -30,146 +30,146 @@ namespace OpenArtOfWar
 
 const std::vector<MissionInfo> &MissionController::GetAvailableMissions()
 {
-    static const auto infosOf = [](const std::vector<MissionDef> &defs) {
+    static const auto extractInfos = [](const std::vector<MissionDef> &missionDefs) {
         std::vector<MissionInfo> infos;
-        for (const auto &def : defs)
-            infos.push_back(def.info);
+        for (const auto &missionDef : missionDefs)
+            infos.push_back(missionDef.info);
         return infos;
     };
-    static const std::vector<MissionInfo> s_resistance = infosOf(Missions::resistance());
-    static const std::vector<MissionInfo> s_confederation = infosOf(Missions::confederation());
+    static const std::vector<MissionInfo> s_resistance = extractInfos(Missions::resistance());
+    static const std::vector<MissionInfo> s_confederation = extractInfos(Missions::confederation());
     return PlayerFaction() == Faction::Confederation ? s_confederation : s_resistance;
 }
 
 MissionController::MissionController() {}
 
 void MissionController::SpawnSquadFromCmd27(
-    int group, int x, int y, int val, TileMap &map, EntityManager &entities, Pathfinder *pathfinder)
+    int group, int x, int y, int commandValue, TileMap &map, EntityManager &entities, Pathfinder *pathfinder)
 {
     // Groups 0..2 are the computer's squads, 3 and up the player's - in the Peru campaign as well as in the
     // Confederation one (there the player commands the Confederation)
-    Faction fac = (group < 3) ? AiFaction() : PlayerFaction();
+    Faction faction = (group < 3) ? AiFaction() : PlayerFaction();
     std::vector<int> spawnedIds;
 
-    auto spawnArch = [&](int arch, int idx) {
-        int ox = (idx % 4) - 1;
-        int oy = (idx / 4) - 1;
-        int tx = std::clamp(x + ox, 1, std::max(1, map.GetWidth() - 2));
-        int ty = std::clamp(y + oy, 1, std::max(1, map.GetHeight() - 2));
-        int uid = entities.SpawnUnitByArchetype(arch, tx, ty, fac);
-        if (uid > 0)
+    auto spawnArchetype = [&](int archetypeId, int slotIndex) {
+        int offsetX = (slotIndex % 4) - 1;
+        int offsetY = (slotIndex / 4) - 1;
+        int tileX = std::clamp(x + offsetX, 1, std::max(1, map.GetWidth() - 2));
+        int tileY = std::clamp(y + offsetY, 1, std::max(1, map.GetHeight() - 2));
+        int unitId = entities.SpawnUnitByArchetype(archetypeId, tileX, tileY, faction);
+        if (unitId > 0)
         {
-            spawnedIds.push_back(uid);
+            spawnedIds.push_back(unitId);
         }
     };
 
     // Defense missions send the enemy's squads trimmed to the difficulty (an Easy squad of 10 brings 4)
-    const int squadPercent = (m_defenseMission && fac == AiFaction()) ? m_defenseSquadPercent : 100;
-    auto squadSize = [&](int cnt) {
-        return std::max(1, (cnt * squadPercent + 50) / 100);
+    const int squadPercent = (m_defenseMission && faction == AiFaction()) ? m_defenseSquadPercent : 100;
+    auto squadSize = [&](int baseCount) {
+        return std::max(1, (baseCount * squadPercent + 50) / 100);
     };
 
-    int spawnIdx = 0;
-    if (val >= 72)
+    int spawnIndex = 0;
+    if (commandValue >= 72)
     {
-        int cnt = squadSize((val == 72) ? 1 : (val == 73 ? 3 : 6));
-        int arch = (fac == Faction::Confederation) ? 18 : 8; // Fortress (18) or Armadillo (8)
-        for (int k = 0; k < cnt; ++k)
+        int unitCount = squadSize((commandValue == 72) ? 1 : (commandValue == 73 ? 3 : 6));
+        int archetypeId = (faction == Faction::Confederation) ? 18 : 8; // Fortress (18) or Armadillo (8)
+        for (int k = 0; k < unitCount; ++k)
         {
-            spawnArch(arch, spawnIdx++);
+            spawnArchetype(archetypeId, spawnIndex++);
         }
     }
     else
     {
-        int i2 = val % 3;
-        int i3 = (val % 30) / 3;
-        int i4 = val / 30;
-        int nStart = i4 / 2;
-        int nEnd = 1 - (i4 & 1);
+        int sizeTier = commandValue % 3;
+        int unitVariant = (commandValue % 30) / 3;
+        int branchMode = commandValue / 30;
+        int branchStart = branchMode / 2;
+        int branchEnd = 1 - (branchMode & 1);
 
-        for (int N = nStart; N <= nEnd; ++N)
+        for (int branch = branchStart; branch <= branchEnd; ++branch)
         {
-            if (N == 0)
+            if (branch == 0)
             {
                 // Infantry squad
-                int cnt = squadSize((i2 == 0) ? 3 : (i2 == 1 ? 6 : 10));
-                for (int k = 0; k < cnt; ++k)
+                int unitCount = squadSize((sizeTier == 0) ? 3 : (sizeTier == 1 ? 6 : 10));
+                for (int k = 0; k < unitCount; ++k)
                 {
-                    int arch = 0;
-                    if (i3 == 0)
+                    int archetypeId = 0;
+                    if (unitVariant == 0)
                     {
-                        arch = (fac == Faction::Confederation) ? 1 : 0; // Rifleman
+                        archetypeId = (faction == Faction::Confederation) ? 1 : 0; // Rifleman
                     }
-                    else if (i3 == 1)
+                    else if (unitVariant == 1)
                     {
-                        arch = (fac == Faction::Confederation) ? 3 : 2; // HeavyAssault / Grenadier
+                        archetypeId = (faction == Faction::Confederation) ? 3 : 2; // HeavyAssault / Grenadier
                     }
-                    else if (i3 == 2)
+                    else if (unitVariant == 2)
                     {
-                        arch = (fac == Faction::Confederation) ? 5 : 4; // Flamethrower / Sniper
+                        archetypeId = (faction == Faction::Confederation) ? 5 : 4; // Flamethrower / Sniper
                     }
                     else
                     {
-                        int r = k % 3;
-                        arch = (fac == Faction::Confederation) ? (r * 2 + 1) : (r * 2);
+                        int variantIndex = k % 3;
+                        archetypeId = (faction == Faction::Confederation) ? (variantIndex * 2 + 1) : (variantIndex * 2);
                     }
-                    spawnArch(arch, spawnIdx++);
+                    spawnArchetype(archetypeId, spawnIndex++);
                 }
             }
             else
             {
                 // Vehicle squad
-                int cnt = squadSize((i2 == 0) ? 2 : (i2 == 1 ? 4 : 6));
-                for (int k = 0; k < cnt; ++k)
+                int unitCount = squadSize((sizeTier == 0) ? 2 : (sizeTier == 1 ? 4 : 6));
+                for (int k = 0; k < unitCount; ++k)
                 {
-                    int arch = 6;
-                    if (i3 == 0)
+                    int archetypeId = 6;
+                    if (unitVariant == 0)
                     {
-                        arch = (fac == Faction::Confederation) ? 9 : 6; // Hammer (9) / Coyote (6)
+                        archetypeId = (faction == Faction::Confederation) ? 9 : 6; // Hammer (9) / Coyote (6)
                     }
-                    else if (i3 == 1)
+                    else if (unitVariant == 1)
                     {
-                        if (fac == Faction::Confederation)
+                        if (faction == Faction::Confederation)
                         {
-                            arch = (k % 2 == 0) ? 18 : 17; // Fortress (18) / Zeus (17)
+                            archetypeId = (k % 2 == 0) ? 18 : 17; // Fortress (18) / Zeus (17)
                         }
                         else
                         {
-                            arch = (k % 2 == 0) ? 8 : 10; // Armadillo (8) / Rhino (10)
+                            archetypeId = (k % 2 == 0) ? 8 : 10; // Armadillo (8) / Rhino (10)
                         }
                     }
-                    else if (i3 == 2)
+                    else if (unitVariant == 2)
                     {
-                        if (fac == Faction::Confederation)
+                        if (faction == Faction::Confederation)
                         {
-                            arch = (k % 2 == 0) ? 18 : 13; // Fortress (18) / Grad (13)
+                            archetypeId = (k % 2 == 0) ? 18 : 13; // Fortress (18) / Grad (13)
                         }
                         else
                         {
-                            arch = (k % 2 == 0) ? 10 : 12; // Rhino (10) / Porcupine (12)
+                            archetypeId = (k % 2 == 0) ? 10 : 12; // Rhino (10) / Porcupine (12)
                         }
                     }
                     else
                     {
-                        if (fac == Faction::Confederation)
+                        if (faction == Faction::Confederation)
                         {
-                            const int confVeh[] = {9, 18, 17, 13};
-                            arch = confVeh[k % 4];
+                            const int confederationVehicles[] = {9, 18, 17, 13};
+                            archetypeId = confederationVehicles[k % 4];
                         }
                         else
                         {
-                            const int resVeh[] = {6, 8, 10, 12};
-                            arch = resVeh[k % 4];
+                            const int resistanceVehicles[] = {6, 8, 10, 12};
+                            archetypeId = resistanceVehicles[k % 4];
                         }
                     }
-                    spawnArch(arch, spawnIdx++);
+                    spawnArchetype(archetypeId, spawnIndex++);
                 }
             }
         }
     }
 
     // Reinforcements of the computer's side march on the player's base right away
-    if (pathfinder && fac == AiFaction() && !spawnedIds.empty())
+    if (pathfinder && faction == AiFaction() && !spawnedIds.empty())
     {
         entities.IssueAttackMoveOrder(spawnedIds, m_playerHqTileX, m_playerHqTileY, *pathfinder);
     }
@@ -203,10 +203,10 @@ namespace
 {
 
 // The tech level a map or mission sets for its players: "capabilities": "<level>" in its JSON (none: the default)
-std::string TechPreset(const nlohmann::json &doc)
+std::string TechPreset(const nlohmann::json &mapJson)
 {
-    if (doc.is_object() && doc.contains("capabilities") && doc["capabilities"].is_string())
-        return doc["capabilities"].get<std::string>();
+    if (mapJson.is_object() && mapJson.contains("capabilities") && mapJson["capabilities"].is_string())
+        return mapJson["capabilities"].get<std::string>();
     return {};
 }
 
@@ -221,17 +221,17 @@ bool MissionController::LoadMission(
     ++m_loadSerial;
     ResetResearch();
     m_customMapPath.clear();
-    const auto &mlist = GetAvailableMissions();
-    if (missionId < 0 || missionId >= static_cast<int>(mlist.size()))
+    const auto &missionList = GetAvailableMissions();
+    if (missionId < 0 || missionId >= static_cast<int>(missionList.size()))
     {
         missionId = 0;
     }
     m_currentMissionId = missionId;
-    const auto &minfo = mlist[missionId];
-    m_missionName = minfo.name;
-    m_mapTitle = _(minfo.name.c_str());
-    m_briefingText = minfo.briefing;
-    m_objectiveText = minfo.objective;
+    const auto &missionInfo = missionList[missionId];
+    m_missionName = missionInfo.name;
+    m_mapTitle = _(missionInfo.name.c_str());
+    m_briefingText = missionInfo.briefing;
+    m_objectiveText = missionInfo.objective;
     m_missionTime = 0.0f;
     m_waveTimer = 0.0f;
     m_waveCount = 0;
@@ -251,8 +251,8 @@ bool MissionController::LoadMission(
     economy.Reset(1500);
 
     // 1. Mission definition of the campaign the player's side belongs to (Missions*.cpp)
-    const MissionData &jmi = Missions::Campaign(PlayerFaction())[missionId].data;
-    const int mapIndex = jmi.mapIndex;
+    const MissionData &missionData = Missions::Campaign(PlayerFaction())[missionId].data;
+    const int mapIndex = missionData.mapIndex;
     bool foundPlayerBase = false;
     bool foundPlayerHq = false;
     bool foundEnemyBase = false;
@@ -260,23 +260,23 @@ bool MissionController::LoadMission(
     bool hadMissionScript = false;
 
     // Walls take the side of the nearer base
-    auto setWallZone = [&](const Rect &r) {
-        float distP
-            = DetMath::Hypot(static_cast<float>(r.x - m_playerHqTileX), static_cast<float>(r.y - m_playerHqTileY));
-        float distE
-            = DetMath::Hypot(static_cast<float>(r.x - m_enemyHqTileX), static_cast<float>(r.y - m_enemyHqTileY));
-        Faction wallFac = (distE <= distP) ? Faction::Confederation : Faction::Resistance;
-        for (int ty = r.y; ty < r.y + r.h; ++ty)
+    auto setWallZone = [&](const Rect &zoneRect) {
+        float distToPlayerHq = DetMath::Hypot(
+            static_cast<float>(zoneRect.x - m_playerHqTileX), static_cast<float>(zoneRect.y - m_playerHqTileY));
+        float distToEnemyHq = DetMath::Hypot(
+            static_cast<float>(zoneRect.x - m_enemyHqTileX), static_cast<float>(zoneRect.y - m_enemyHqTileY));
+        Faction wallFaction = (distToEnemyHq <= distToPlayerHq) ? Faction::Confederation : Faction::Resistance;
+        for (int tileY = zoneRect.y; tileY < zoneRect.y + zoneRect.h; ++tileY)
         {
-            for (int tx = r.x; tx < r.x + r.w; ++tx)
+            for (int tileX = zoneRect.x; tileX < zoneRect.x + zoneRect.w; ++tileX)
             {
-                map.SetWall(tx, ty, wallFac, 100);
+                map.SetWall(tileX, tileY, wallFaction, 100);
             }
         }
     };
 
     // 2. Load corresponding map
-    std::string mapPath = LoaderResources::MissionMapPath(jmi.mapFile);
+    std::string mapPath = LoaderResources::MissionMapPath(missionData.mapFile);
     if (!map.LoadMap(mapPath))
     {
         std::cerr << "[MissionController] Failed to load map: " << mapPath << std::endl;
@@ -291,46 +291,48 @@ bool MissionController::LoadMission(
     }
 
     // 3. Spawn preplaced authentic structures and walls from the mission
-    for (const auto &item : jmi.entities)
+    for (const auto &item : missionData.entities)
     {
-        const int etype = item.type, ex = item.x, ey = item.y;
-        if (etype < 15)
+        const int entityType = item.type, entityX = item.x, entityY = item.y;
+        if (entityType < 15)
         {
             // Authentic faction mapping: 0..7 = Confederation (Blue, Enemy), 8..14 = Resistance (Red, Player)
-            Faction faction = (etype >= 8) ? Faction::Resistance : Faction::Confederation;
-            int bid = entities.SpawnBuildingByIndex(etype, ex, ey, faction, 1.0f);
-            if (bid > 0)
+            Faction faction = (entityType >= 8) ? Faction::Resistance : Faction::Confederation;
+            int buildingId = entities.SpawnBuildingByIndex(entityType, entityX, entityY, faction, 1.0f);
+            if (buildingId > 0)
             {
-                const Building *bEnt = entities.GetBuilding(bid);
-                if (bEnt)
+                const Building *building = entities.GetBuilding(buildingId);
+                if (building)
                 {
-                    for (int ty = ey; ty < ey + bEnt->buildHeight && ty < map.GetHeight(); ++ty)
+                    for (int tileY = entityY; tileY < entityY + building->buildHeight && tileY < map.GetHeight();
+                         ++tileY)
                     {
-                        for (int tx = ex; tx < ex + bEnt->buildWidth && tx < map.GetWidth(); ++tx)
+                        for (int tileX = entityX; tileX < entityX + building->buildWidth && tileX < map.GetWidth();
+                             ++tileX)
                         {
-                            map.SetPassable(tx, ty, false);
+                            map.SetPassable(tileX, tileY, false);
                         }
                     }
                 }
                 if (faction == Faction::Resistance)
                 {
-                    if (!foundPlayerBase || (etype == 8 && !foundPlayerHq))
+                    if (!foundPlayerBase || (entityType == 8 && !foundPlayerHq))
                     {
-                        m_playerHqTileX = ex;
-                        m_playerHqTileY = ey;
+                        m_playerHqTileX = entityX;
+                        m_playerHqTileY = entityY;
                         foundPlayerBase = true;
-                        if (etype == 8)
+                        if (entityType == 8)
                             foundPlayerHq = true;
                     }
                 }
                 else
                 {
-                    if (!foundEnemyBase || (etype == 0 && !foundEnemyHq))
+                    if (!foundEnemyBase || (entityType == 0 && !foundEnemyHq))
                     {
-                        m_enemyHqTileX = ex;
-                        m_enemyHqTileY = ey;
+                        m_enemyHqTileX = entityX;
+                        m_enemyHqTileY = entityY;
                         foundEnemyBase = true;
-                        if (etype == 0)
+                        if (entityType == 0)
                             foundEnemyHq = true;
                     }
                 }
@@ -338,79 +340,86 @@ bool MissionController::LoadMission(
         }
         else
         {
-            setWallZone({ex, ey, 1, 1});
+            setWallZone({entityX, entityY, 1, 1});
         }
     }
 
     // 3b. Pre-configured mission wall zones with base proximity faction assignment
-    for (const auto &grp : jmi.wallZones)
+    for (const auto &wallGroup : missionData.wallZones)
     {
-        for (const auto &r : grp)
-            setWallZone(r);
+        for (const auto &zoneRect : wallGroup)
+            setWallZone(zoneRect);
     }
 
     // 4. Process authentic mission scripts (credits, wall zones, initial squads, scheduled waves, objectives)
     int defenseWaves = 0;
-    m_defenseMission = jmi.defense;
+    m_defenseMission = missionData.defense;
     // Each delay counts from the previous command, so a squad's time is the sum of all prior delays.
     float scriptClock = 0.0f;
-    if (!jmi.scripts.empty())
+    if (!missionData.scripts.empty())
     {
         hadMissionScript = true;
-        for (const auto &sc : jmi.scripts)
+        for (const auto &scriptCmd : missionData.scripts)
         {
-            const int cmd = sc.cmd, group = sc.group, delay = sc.delay;
-            const int sx = sc.x, sy = sc.y, val = sc.val;
+            const int command = scriptCmd.cmd, group = scriptCmd.group, delay = scriptCmd.delay;
+            const int scriptX = scriptCmd.x, scriptY = scriptCmd.y, commandVal = scriptCmd.val;
             scriptClock += static_cast<float>(std::max(0, delay));
 
-            if (cmd == 25)
+            if (command == 25)
             {
                 // Starting credits
-                int startCreds = std::max(1000, sy * 10);
-                economy.Reset(startCreds);
+                int startingCredits = std::max(1000, scriptY * 10);
+                economy.Reset(startingCredits);
             }
-            else if (cmd == 33 && val == 1)
+            else if (command == 33 && commandVal == 1)
             {
                 // Activate wall zone
-                if (group >= 0 && group < static_cast<int>(jmi.wallZones.size()))
+                if (group >= 0 && group < static_cast<int>(missionData.wallZones.size()))
                 {
-                    for (const auto &r : jmi.wallZones[group])
-                        setWallZone(r);
+                    for (const auto &zoneRect : missionData.wallZones[group])
+                        setWallZone(zoneRect);
                 }
             }
-            else if (cmd == 40 && group >= 3)
+            else if (command == 40 && group >= 3)
             {
                 // Destination zone objective for player units
                 m_hasDestObjective = true;
-                m_destX = sx;
-                m_destY = sy;
-                m_destSize = std::max(3, val);
+                m_destX = scriptX;
+                m_destY = scriptY;
+                m_destSize = std::max(3, commandVal);
             }
-            else if (cmd == 27)
+            else if (command == 27)
             {
                 // Unit squad spawn
                 // Defense missions: the enemy's starting squads arrive as waves from their spawn points
                 const bool atStart = scriptClock <= 0.0f;
                 if (atStart)
                 {
-                    if (jmi.defense && group < 3)
+                    if (missionData.defense && group < 3)
                     {
                         // Timed by setDefensePacing (difficulty); these defaults hold until it is called
                         const int order = defenseWaves++;
-                        m_scheduledWaves.push_back(
-                            {m_defenseFirstWave + m_defenseWaveGap * order, group, sx, sy, val, false, order, 0.0f});
+                        m_scheduledWaves.push_back({m_defenseFirstWave + m_defenseWaveGap * order,
+                                                    group,
+                                                    scriptX,
+                                                    scriptY,
+                                                    commandVal,
+                                                    false,
+                                                    order,
+                                                    0.0f});
                     }
                     else
                     {
-                        SpawnSquadFromCmd27(group, sx, sy, val, map, entities, nullptr);
+                        SpawnSquadFromCmd27(group, scriptX, scriptY, commandVal, map, entities, nullptr);
                     }
                 }
                 else
                 {
-                    const float at = (jmi.defense && group < 3)
-                                         ? std::max(m_defenseFirstWave, scriptClock * m_defenseTimeScale)
-                                         : scriptClock;
-                    m_scheduledWaves.push_back({at, group, sx, sy, val, false, -1, scriptClock});
+                    const float triggerAt = (missionData.defense && group < 3)
+                                                ? std::max(m_defenseFirstWave, scriptClock * m_defenseTimeScale)
+                                                : scriptClock;
+                    m_scheduledWaves.push_back(
+                        {triggerAt, group, scriptX, scriptY, commandVal, false, -1, scriptClock});
                 }
                 if (delay == 0)
                 {
@@ -419,14 +428,14 @@ bool MissionController::LoadMission(
                     const bool playerSlot = (group >= 3) == (PlayerFaction() == Faction::Resistance);
                     if (playerSlot && !foundPlayerBase)
                     {
-                        m_playerHqTileX = sx;
-                        m_playerHqTileY = sy;
+                        m_playerHqTileX = scriptX;
+                        m_playerHqTileY = scriptY;
                         foundPlayerBase = true;
                     }
                     else if (!playerSlot && !foundEnemyBase)
                     {
-                        m_enemyHqTileX = sx;
-                        m_enemyHqTileY = sy;
+                        m_enemyHqTileX = scriptX;
+                        m_enemyHqTileY = scriptY;
                         foundEnemyBase = true;
                     }
                 }
@@ -457,11 +466,11 @@ bool MissionController::LoadMission(
     // Add initial guard squads around bases if no script units were spawned for that side
     int playerUnitCount = 0;
     int enemyUnitCount = 0;
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        if (!e.alive || e.isBuilding)
+        if (!entity.alive || entity.isBuilding)
             continue;
-        if (e.faction == Faction::Resistance)
+        if (entity.faction == Faction::Resistance)
             playerUnitCount++;
         else
             enemyUnitCount++;
@@ -469,21 +478,21 @@ bool MissionController::LoadMission(
 
     if (playerUnitCount == 0)
     {
-        int px = std::clamp(m_playerHqTileX + 4, 2, map.GetWidth() - 3);
-        int py = std::clamp(m_playerHqTileY + 2, 2, map.GetHeight() - 3);
-        entities.SpawnUnitByArchetype(0, px, py, Faction::Resistance);         // Rifleman
-        entities.SpawnUnitByArchetype(0, px, py + 1, Faction::Resistance);     // Rifleman
-        entities.SpawnUnitByArchetype(2, px - 1, py + 1, Faction::Resistance); // Grenadier
-        entities.SpawnUnitByArchetype(6, px + 1, py + 1, Faction::Resistance); // Coyote
+        int guardX = std::clamp(m_playerHqTileX + 4, 2, map.GetWidth() - 3);
+        int guardY = std::clamp(m_playerHqTileY + 2, 2, map.GetHeight() - 3);
+        entities.SpawnUnitByArchetype(0, guardX, guardY, Faction::Resistance);         // Rifleman
+        entities.SpawnUnitByArchetype(0, guardX, guardY + 1, Faction::Resistance);     // Rifleman
+        entities.SpawnUnitByArchetype(2, guardX - 1, guardY + 1, Faction::Resistance); // Grenadier
+        entities.SpawnUnitByArchetype(6, guardX + 1, guardY + 1, Faction::Resistance); // Coyote
     }
 
-    if (enemyUnitCount == 0 && foundEnemyBase && !jmi.defense)
+    if (enemyUnitCount == 0 && foundEnemyBase && !missionData.defense)
     {
-        int ex = std::clamp(m_enemyHqTileX - 2, 2, map.GetWidth() - 3);
-        int ey = std::clamp(m_enemyHqTileY + 1, 2, map.GetHeight() - 3);
-        entities.SpawnUnitByArchetype(1, ex, ey, Faction::Confederation);          // Rifleman
-        entities.SpawnUnitByArchetype(3, ex, ey + 1, Faction::Confederation);      // Assault trooper
-        entities.SpawnUnitByArchetype(18, ex - 1, ey + 1, Faction::Confederation); // Fortress
+        int enemyGuardX = std::clamp(m_enemyHqTileX - 2, 2, map.GetWidth() - 3);
+        int enemyGuardY = std::clamp(m_enemyHqTileY + 1, 2, map.GetHeight() - 3);
+        entities.SpawnUnitByArchetype(1, enemyGuardX, enemyGuardY, Faction::Confederation);          // Rifleman
+        entities.SpawnUnitByArchetype(3, enemyGuardX, enemyGuardY + 1, Faction::Confederation);      // Assault trooper
+        entities.SpawnUnitByArchetype(18, enemyGuardX - 1, enemyGuardY + 1, Faction::Confederation); // Fortress
     }
 
     // The map describes the Resistance base as "player" and the Confederation base as "enemy";
@@ -540,31 +549,31 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
     {
         // A team is out once it has nothing left; the local player wins when only its team remains
         std::array<bool, kMaxPlayers> teamAlive {};
-        for (const auto &e : entities.GetAllEntities())
+        for (const auto &entity : entities.GetAllEntities())
         {
-            if (!e.alive || e.state == ActionState::Die || e.owner >= kMaxPlayers)
+            if (!entity.alive || entity.state == ActionState::Die || entity.owner >= kMaxPlayers)
                 continue;
-            teamAlive[Players::TeamOf(e.owner) % kMaxPlayers] = true;
+            teamAlive[Players::TeamOf(entity.owner) % kMaxPlayers] = true;
         }
         bool hasHuman = false;
-        for (int p = 0; p < kMaxPlayers; ++p)
-            hasHuman = hasHuman || (m_matchSetup.slots[p].active && m_matchSetup.slots[p].human);
+        for (int playerIndex = 0; playerIndex < kMaxPlayers; ++playerIndex)
+            hasHuman = hasHuman || (m_matchSetup.slots[playerIndex].active && m_matchSetup.slots[playerIndex].human);
         if (!hasHuman)
         {
             int aliveTeams = 0;
-            for (int t = 0; t < kMaxPlayers; ++t)
-                aliveTeams += teamAlive[t] ? 1 : 0;
+            for (int teamIndex = 0; teamIndex < kMaxPlayers; ++teamIndex)
+                aliveTeams += teamAlive[teamIndex] ? 1 : 0;
             if (aliveTeams <= 1)
                 m_isVictory = true;
             return;
         }
-        const std::uint8_t mine = Players::TeamOf(Players::Local()) % kMaxPlayers;
-        int others = 0;
-        for (int t = 0; t < kMaxPlayers; ++t)
-            others += (t != mine && teamAlive[t]) ? 1 : 0;
-        if (!teamAlive[mine])
+        const std::uint8_t localTeam = Players::TeamOf(Players::Local()) % kMaxPlayers;
+        int otherAliveTeams = 0;
+        for (int teamIndex = 0; teamIndex < kMaxPlayers; ++teamIndex)
+            otherAliveTeams += (teamIndex != localTeam && teamAlive[teamIndex]) ? 1 : 0;
+        if (!teamAlive[localTeam])
             m_isDefeat = true;
-        else if (others == 0)
+        else if (otherAliveTeams == 0)
             m_isVictory = true;
         return;
     }
@@ -574,27 +583,27 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
     int enemyUnitCount = 0;
     bool reachedDestZone = false;
 
-    for (const auto &e : entities.GetAllEntities())
+    for (const auto &entity : entities.GetAllEntities())
     {
-        if (!e.alive || e.state == ActionState::Die)
+        if (!entity.alive || entity.state == ActionState::Die)
             continue;
-        if (e.faction == PlayerFaction())
+        if (entity.faction == PlayerFaction())
         {
-            if (e.isBuilding)
+            if (entity.isBuilding)
                 playerBuildingCount++;
             else
             {
                 playerUnitCount++;
-                if (m_hasDestObjective && std::abs(e.tileX - m_destX) <= m_destSize
-                    && std::abs(e.tileY - m_destY) <= m_destSize)
+                if (m_hasDestObjective && std::abs(entity.tileX - m_destX) <= m_destSize
+                    && std::abs(entity.tileY - m_destY) <= m_destSize)
                 {
                     reachedDestZone = true;
                 }
             }
         }
-        else if (e.faction == AiFaction())
+        else if (entity.faction == AiFaction())
         {
-            if (e.isBuilding)
+            if (entity.isBuilding)
                 enemyBuildingCount++;
             else
                 enemyUnitCount++;
@@ -626,39 +635,39 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
 
         int spawnX = m_enemyHqTileX;
         int spawnY = m_enemyHqTileY;
-        for (const auto &e : entities.GetAllEntities())
+        for (const auto &entity : entities.GetAllEntities())
         {
-            if (e.alive && e.state != ActionState::Die && e.faction == AiFaction() && e.isBuilding)
+            if (entity.alive && entity.state != ActionState::Die && entity.faction == AiFaction() && entity.isBuilding)
             {
-                spawnX = std::clamp(e.tileX - 1, 1, map.GetWidth() - 2);
-                spawnY = std::clamp(e.tileY + 1, 1, map.GetHeight() - 2);
+                spawnX = std::clamp(entity.tileX - 1, 1, map.GetWidth() - 2);
+                spawnY = std::clamp(entity.tileY + 1, 1, map.GetHeight() - 2);
                 break;
             }
         }
 
         // Rifleman, rocket infantry, then a medium and a heavy tank of the computer's faction
-        const Faction ai = AiFaction();
-        const bool conf = (ai == Faction::Confederation);
-        const int archRifle = conf ? 1 : 0, archRocket = conf ? 3 : 2, archTank = conf ? 9 : 8,
-                  archHeavy = conf ? 11 : 10;
+        const Faction aiFaction = AiFaction();
+        const bool isConfederation = (aiFaction == Faction::Confederation);
+        const int rifleArchetype = isConfederation ? 1 : 0, rocketArchetype = isConfederation ? 3 : 2,
+                  tankArchetype = isConfederation ? 9 : 8, heavyTankArchetype = isConfederation ? 11 : 10;
         std::vector<int> waveUnitIds;
-        int u1 = entities.SpawnUnitByArchetype(archRifle, spawnX, spawnY, ai);
-        int u2 = entities.SpawnUnitByArchetype(archRocket, spawnX + 1, spawnY, ai);
-        if (u1 > 0)
-            waveUnitIds.push_back(u1);
-        if (u2 > 0)
-            waveUnitIds.push_back(u2);
+        int rifleId = entities.SpawnUnitByArchetype(rifleArchetype, spawnX, spawnY, aiFaction);
+        int rocketId = entities.SpawnUnitByArchetype(rocketArchetype, spawnX + 1, spawnY, aiFaction);
+        if (rifleId > 0)
+            waveUnitIds.push_back(rifleId);
+        if (rocketId > 0)
+            waveUnitIds.push_back(rocketId);
         if (m_waveCount > 1)
         {
-            int u3 = entities.SpawnUnitByArchetype(archTank, spawnX, spawnY + 1, ai);
-            if (u3 > 0)
-                waveUnitIds.push_back(u3);
+            int tankId = entities.SpawnUnitByArchetype(tankArchetype, spawnX, spawnY + 1, aiFaction);
+            if (tankId > 0)
+                waveUnitIds.push_back(tankId);
         }
         if (m_waveCount > 3)
         {
-            int u4 = entities.SpawnUnitByArchetype(archHeavy, spawnX + 1, spawnY + 1, ai);
-            if (u4 > 0)
-                waveUnitIds.push_back(u4);
+            int heavyId = entities.SpawnUnitByArchetype(heavyTankArchetype, spawnX + 1, spawnY + 1, aiFaction);
+            if (heavyId > 0)
+                waveUnitIds.push_back(heavyId);
         }
 
         if (!waveUnitIds.empty())
@@ -679,7 +688,7 @@ bool MissionController::LoadTestPolygon(TileMap &map, EntityManager &entities, E
 
 namespace
 {
-std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &doc, int w, int h);
+std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &mapJson, int mapWidth, int mapHeight);
 }
 
 std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
@@ -690,36 +699,38 @@ std::vector<SkirmishMapInfo> MissionController::ListSkirmishMaps()
         std::string text;
         if (!Assets::ReadText(path, text))
             continue;
-        const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
-        if (!doc.is_object() || !doc.contains("terrainRle") || !doc.contains("width") || !doc.contains("height"))
+        const nlohmann::json mapJson = nlohmann::json::parse(text, nullptr, false);
+        if (!mapJson.is_object() || !mapJson.contains("terrainRle") || !mapJson.contains("width")
+            || !mapJson.contains("height"))
         {
             continue;
         }
         SkirmishMapInfo info;
         info.path = path;
         info.name = std::filesystem::path(path).stem().string();
-        if (doc.contains("title") && doc["title"].is_string())
-            info.title = doc["title"].get<std::string>();
-        info.width = doc["width"].get<int>();
-        info.height = doc["height"].get<int>();
-        info.tilesetId = doc.value("tilesetId", 0);
-        info.players = std::max<int>(2, static_cast<int>(StartPositionsOf(doc, info.width, info.height).size()));
-        info.hasPrebuilt = (doc.contains("buildings") && doc["buildings"].is_array() && !doc["buildings"].empty())
-                           || (doc.contains("units") && doc["units"].is_array() && !doc["units"].empty());
+        if (mapJson.contains("title") && mapJson["title"].is_string())
+            info.title = mapJson["title"].get<std::string>();
+        info.width = mapJson["width"].get<int>();
+        info.height = mapJson["height"].get<int>();
+        info.tilesetId = mapJson.value("tilesetId", 0);
+        info.players = std::max<int>(2, static_cast<int>(StartPositionsOf(mapJson, info.width, info.height).size()));
+        info.hasPrebuilt
+            = (mapJson.contains("buildings") && mapJson["buildings"].is_array() && !mapJson["buildings"].empty())
+              || (mapJson.contains("units") && mapJson["units"].is_array() && !mapJson["units"].empty());
         maps.push_back(std::move(info));
     }
     // (only skirmish maps: the campaign's are in maps.mission_dir) skirmish_* first, then everything else; numbers
     // compare as numbers
-    auto sortKey = [](const SkirmishMapInfo &m) {
-        const std::string &n = m.name;
-        std::size_t digits = n.find_first_of("0123456789");
-        std::string prefix = digits == std::string::npos ? n : n.substr(0, digits);
-        const int number = digits == std::string::npos ? 0 : std::atoi(n.c_str() + digits);
+    auto sortKey = [](const SkirmishMapInfo &mapInfo) {
+        const std::string &name = mapInfo.name;
+        std::size_t digitPos = name.find_first_of("0123456789");
+        std::string prefix = digitPos == std::string::npos ? name : name.substr(0, digitPos);
+        const int number = digitPos == std::string::npos ? 0 : std::atoi(name.c_str() + digitPos);
         const int group = prefix.rfind("skirmish_", 0) == 0 ? 0 : 1;
-        return std::make_tuple(group, prefix, number, n);
+        return std::make_tuple(group, prefix, number, name);
     };
-    std::sort(maps.begin(), maps.end(), [&](const SkirmishMapInfo &a, const SkirmishMapInfo &b) {
-        return sortKey(a) < sortKey(b);
+    std::sort(maps.begin(), maps.end(), [&](const SkirmishMapInfo &lhs, const SkirmishMapInfo &rhs) {
+        return sortKey(lhs) < sortKey(rhs);
     });
     return maps;
 }
@@ -742,69 +753,69 @@ bool FindBaseSite(
     int apartY = 0,
     int minApart = 0)
 {
-    const int w = map.GetWidth(), h = map.GetHeight();
-    long best = -1;
-    for (int y = 0; y + size <= h; ++y)
+    const int mapWidth = map.GetWidth(), mapHeight = map.GetHeight();
+    long bestDistSq = -1;
+    for (int y = 0; y + size <= mapHeight; ++y)
     {
-        for (int x = 0; x + size <= w; ++x)
+        for (int x = 0; x + size <= mapWidth; ++x)
         {
-            bool free = true;
-            for (int dy = 0; dy < size && free; ++dy)
+            bool isFree = true;
+            for (int dy = 0; dy < size && isFree; ++dy)
             {
                 for (int dx = 0; dx < size; ++dx)
                 {
                     if (!map.IsPassable(x + dx, y + dy) || map.IsWall(x + dx, y + dy))
                     {
-                        free = false;
+                        isFree = false;
                         break;
                     }
                 }
             }
-            if (!free)
+            if (!isFree)
                 continue;
-            if (reachable && !(*reachable)[(y + size / 2) * w + x + size / 2])
+            if (reachable && !(*reachable)[(y + size / 2) * mapWidth + x + size / 2])
                 continue;
             if (minApart > 0
                 && DetMath::Hypot(static_cast<float>(x - apartX), static_cast<float>(y - apartY)) < minApart)
                 continue;
-            const long dist
+            const long distSq
                 = static_cast<long>(x - targetX) * (x - targetX) + static_cast<long>(y - targetY) * (y - targetY);
-            if (best < 0 || dist < best)
+            if (bestDistSq < 0 || distSq < bestDistSq)
             {
-                best = dist;
+                bestDistSq = distSq;
                 outX = x;
                 outY = y;
             }
         }
     }
-    return best >= 0;
+    return bestDistSq >= 0;
 }
 
 // Open ground connected to (startX, startY)
 std::vector<char> ReachableFrom(const TileMap &map, int startX, int startY)
 {
-    const int w = map.GetWidth(), h = map.GetHeight();
-    std::vector<char> seen(static_cast<std::size_t>(w) * h, 0);
-    std::queue<std::pair<int, int>> queue;
-    queue.push({startX, startY});
-    seen[startY * w + startX] = 1;
-    while (!queue.empty())
+    const int mapWidth = map.GetWidth(), mapHeight = map.GetHeight();
+    std::vector<char> visited(static_cast<std::size_t>(mapWidth) * mapHeight, 0);
+    std::queue<std::pair<int, int>> frontier;
+    frontier.push({startX, startY});
+    visited[startY * mapWidth + startX] = 1;
+    while (!frontier.empty())
     {
-        const auto [x, y] = queue.front();
-        queue.pop();
-        static const int kStep[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (const auto &s : kStep)
+        const auto [x, y] = frontier.front();
+        frontier.pop();
+        static const int kDirections[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (const auto &dir : kDirections)
         {
-            const int nx = x + s[0], ny = y + s[1];
-            if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[ny * w + nx])
+            const int nextX = x + dir[0], nextY = y + dir[1];
+            if (nextX < 0 || nextY < 0 || nextX >= mapWidth || nextY >= mapHeight || visited[nextY * mapWidth + nextX])
                 continue;
-            if (!map.IsPassable(nx, ny))
+            if (!map.IsPassable(nextX, nextY))
                 continue;
-            seen[ny * w + nx] = 1;
-            queue.push({nx, ny});
+            visited[nextY * mapWidth + nextX] = 1;
+            frontier.push({nextX, nextY});
         }
     }
-    return seen;
+    return visited;
 }
 
 // Sets starting bases on free ground: buildings with a one tile gap around them (the base stays
@@ -815,28 +826,29 @@ public:
     BasePlanner(TileMap &map, EntityManager &entities)
         : m_map(map)
         , m_entities(entities)
-        , m_w(map.GetWidth())
-        , m_h(map.GetHeight())
-        , m_taken(static_cast<std::size_t>(m_w) * m_h, 0)
+        , m_mapWidth(map.GetWidth())
+        , m_mapHeight(map.GetHeight())
+        , m_taken(static_cast<std::size_t>(m_mapWidth) * m_mapHeight, 0)
     {}
 
-    bool Place(int type, int cx, int cy, Faction faction, PlayerId owner, int &outX, int &outY)
+    bool Place(int buildingIndex, int centerX, int centerY, Faction faction, PlayerId owner, int &outX, int &outY)
     {
-        const BuildingConfig *cfg = m_entities.GetBuildingConfig(type);
-        const int bw = cfg ? cfg->width : 3, bh = cfg ? cfg->height : 3;
+        const BuildingConfig *buildingConfig = m_entities.GetBuildingConfig(buildingIndex);
+        const int buildingWidth = buildingConfig ? buildingConfig->width : 3;
+        const int buildingHeight = buildingConfig ? buildingConfig->height : 3;
         int x = 0, y = 0;
-        if (!FindSpot(bw + 1, bh + 1, cx - 1, cy - 1, x, y))
+        if (!FindSpot(buildingWidth + 1, buildingHeight + 1, centerX - 1, centerY - 1, x, y))
             return false;
         x += 1;
         y += 1;
-        if (m_entities.SpawnBuildingByIndex(type, x, y, faction, 1.0f, owner) <= 0)
+        if (m_entities.SpawnBuildingByIndex(buildingIndex, x, y, faction, 1.0f, owner) <= 0)
             return false;
-        for (int ty = y; ty < y + bh && ty < m_h; ++ty)
+        for (int tileY = y; tileY < y + buildingHeight && tileY < m_mapHeight; ++tileY)
         {
-            for (int tx = x; tx < x + bw && tx < m_w; ++tx)
+            for (int tileX = x; tileX < x + buildingWidth && tileX < m_mapWidth; ++tileX)
             {
-                m_map.SetPassable(tx, ty, false);
-                m_taken[ty * m_w + tx] = 1;
+                m_map.SetPassable(tileX, tileY, false);
+                m_taken[tileY * m_mapWidth + tileX] = 1;
             }
         }
         outX = x;
@@ -844,60 +856,61 @@ public:
         return true;
     }
 
-    void PlaceUnits(const int (&archetypes)[4], int cx, int cy, Faction faction, PlayerId owner)
+    void PlaceUnits(const int (&archetypes)[4], int centerX, int centerY, Faction faction, PlayerId owner)
     {
-        for (int arch : archetypes)
+        for (int archetypeId : archetypes)
         {
             int x = 0, y = 0;
-            if (!FindSpot(1, 1, cx, cy, x, y))
+            if (!FindSpot(1, 1, centerX, centerY, x, y))
                 continue;
-            m_taken[y * m_w + x] = 1;
-            m_entities.SpawnUnitByArchetype(arch, x, y, faction, owner);
+            m_taken[y * m_mapWidth + x] = 1;
+            m_entities.SpawnUnitByArchetype(archetypeId, x, y, faction, owner);
         }
     }
 
 private:
     bool TileFree(int x, int y) const
     {
-        return x >= 0 && y >= 0 && x < m_w && y < m_h && m_map.IsPassable(x, y) && !m_map.IsWall(x, y)
-               && !m_taken[y * m_w + x];
+        return x >= 0 && y >= 0 && x < m_mapWidth && y < m_mapHeight && m_map.IsPassable(x, y) && !m_map.IsWall(x, y)
+               && !m_taken[y * m_mapWidth + x];
     }
-    // Nearest spot (by ring distance from cx, cy) where a bw x bh rectangle is free
-    bool FindSpot(int bw, int bh, int cx, int cy, int &outX, int &outY) const
+    // Nearest spot (by ring distance from centerX, centerY) where a width x height rectangle is free
+    bool FindSpot(int width, int height, int centerX, int centerY, int &outX, int &outY) const
     {
-        for (int r = 0; r < 40; ++r)
+        for (int ring = 0; ring < 40; ++ring)
         {
-            long best = -1;
-            for (int y = cy - r; y <= cy + r; ++y)
+            long bestDistSq = -1;
+            for (int y = centerY - ring; y <= centerY + ring; ++y)
             {
-                for (int x = cx - r; x <= cx + r; ++x)
+                for (int x = centerX - ring; x <= centerX + ring; ++x)
                 {
-                    if (std::max(std::abs(x - cx), std::abs(y - cy)) != r)
+                    if (std::max(std::abs(x - centerX), std::abs(y - centerY)) != ring)
                         continue;
-                    bool free = true;
-                    for (int dy = 0; dy < bh && free; ++dy)
+                    bool isFree = true;
+                    for (int dy = 0; dy < height && isFree; ++dy)
                     {
-                        for (int dx = 0; dx < bw; ++dx)
+                        for (int dx = 0; dx < width; ++dx)
                         {
                             if (!TileFree(x + dx, y + dy))
                             {
-                                free = false;
+                                isFree = false;
                                 break;
                             }
                         }
                     }
-                    if (!free)
+                    if (!isFree)
                         continue;
-                    const long dist = static_cast<long>(x - cx) * (x - cx) + static_cast<long>(y - cy) * (y - cy);
-                    if (best < 0 || dist < best)
+                    const long distSq = static_cast<long>(x - centerX) * (x - centerX)
+                                        + static_cast<long>(y - centerY) * (y - centerY);
+                    if (bestDistSq < 0 || distSq < bestDistSq)
                     {
-                        best = dist;
+                        bestDistSq = distSq;
                         outX = x;
                         outY = y;
                     }
                 }
             }
-            if (best >= 0)
+            if (bestDistSq >= 0)
                 return true;
         }
         return false;
@@ -905,7 +918,7 @@ private:
 
     TileMap &m_map;
     EntityManager &m_entities;
-    int m_w, m_h;
+    int m_mapWidth, m_mapHeight;
     std::vector<char> m_taken;
 };
 
@@ -917,91 +930,93 @@ struct StartingBase
 };
 const StartingBase kResistanceBase {8, 9, 10, {0, 0, 2, 6}};
 const StartingBase kConfederationBase {0, 1, 2, {1, 1, 3, 9}};
-const StartingBase &startingBase(Faction f)
+const StartingBase &startingBase(Faction faction)
 {
-    return f == Faction::Confederation ? kConfederationBase : kResistanceBase;
+    return faction == Faction::Confederation ? kConfederationBase : kResistanceBase;
 }
 
-std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &doc, int w, int h)
+std::vector<std::pair<int, int>> StartPositionsOf(const nlohmann::json &mapJson, int mapWidth, int mapHeight)
 {
-    std::vector<std::pair<int, int>> out;
-    auto add = [&](int x, int y) {
-        x = std::clamp(x, 0, std::max(0, w - 1));
-        y = std::clamp(y, 0, std::max(0, h - 1));
-        for (const auto &p : out)
+    std::vector<std::pair<int, int>> positions;
+    auto addPosition = [&](int x, int y) {
+        x = std::clamp(x, 0, std::max(0, mapWidth - 1));
+        y = std::clamp(y, 0, std::max(0, mapHeight - 1));
+        for (const auto &existing : positions)
         {
-            if (std::abs(p.first - x) < 6 && std::abs(p.second - y) < 6)
+            if (std::abs(existing.first - x) < 6 && std::abs(existing.second - y) < 6)
                 return; // the same spot
         }
-        if (out.size() < static_cast<std::size_t>(kMaxPlayers))
-            out.push_back({x, y});
+        if (positions.size() < static_cast<std::size_t>(kMaxPlayers))
+            positions.push_back({x, y});
     };
-    if (doc.is_object() && doc.contains("start_positions") && doc["start_positions"].is_array())
+    if (mapJson.is_object() && mapJson.contains("start_positions") && mapJson["start_positions"].is_array())
     {
-        for (const auto &p : doc["start_positions"])
+        for (const auto &entry : mapJson["start_positions"])
         {
-            if (p.is_object())
-                add(p.value("x", 0), p.value("y", 0));
+            if (entry.is_object())
+                addPosition(entry.value("x", 0), entry.value("y", 0));
         }
     }
     // The map says how many players it has: its own start positions; a map that lists none is a map for two
     // (the classic spots of a custom game: playerPos / enemyPos)
-    int px = 6, py = h - 14, ex = w - 16, ey = 4;
-    if (doc.is_object() && doc.contains("playerPos") && doc["playerPos"].is_object())
+    int playerX = 6, playerY = mapHeight - 14, enemyX = mapWidth - 16, enemyY = 4;
+    if (mapJson.is_object() && mapJson.contains("playerPos") && mapJson["playerPos"].is_object())
     {
-        px = doc["playerPos"].value("x", px);
-        py = doc["playerPos"].value("y", py);
+        playerX = mapJson["playerPos"].value("x", playerX);
+        playerY = mapJson["playerPos"].value("y", playerY);
     }
-    if (doc.is_object() && doc.contains("enemyPos") && doc["enemyPos"].is_object())
+    if (mapJson.is_object() && mapJson.contains("enemyPos") && mapJson["enemyPos"].is_object())
     {
-        ex = doc["enemyPos"].value("x", ex);
-        ey = doc["enemyPos"].value("y", ey);
+        enemyX = mapJson["enemyPos"].value("x", enemyX);
+        enemyY = mapJson["enemyPos"].value("y", enemyY);
     }
-    if (out.empty())
-        add(px, py);
-    if (out.size() < 2)
-        add(ex, ey);
-    return out;
+    if (positions.empty())
+        addPosition(playerX, playerY);
+    if (positions.size() < 2)
+        addPosition(enemyX, enemyY);
+    return positions;
 }
 
 // The buildings and units the map itself carries (the lists the map editor writes). `ownerOf(faction, x, y)` says to
 // whom one belongs (kNoPlayer: left out); `onHq(owner, faction, x, y)` is told about every headquarters.
 void SpawnPrebuilt(
-    const nlohmann::json &doc,
+    const nlohmann::json &mapJson,
     TileMap &map,
     EntityManager &entities,
     const std::function<PlayerId(Faction, int, int)> &ownerOf,
     const std::function<void(PlayerId, Faction, int, int)> &onHq)
 {
-    if (!doc.is_object())
+    if (!mapJson.is_object())
         return;
-    for (const auto &b : doc.value("buildings", nlohmann::json::array()))
+    for (const auto &buildingJson : mapJson.value("buildings", nlohmann::json::array()))
     {
-        const Faction faction = Utility::ParseFaction(b.value("faction", "resistance"));
-        const int x = b.value("x", 0), y = b.value("y", 0), index = b.value("buildingIndex", 0);
+        const Faction faction = Utility::ParseFaction(buildingJson.value("faction", "resistance"));
+        const int x = buildingJson.value("x", 0), y = buildingJson.value("y", 0);
+        const int buildingIndex = buildingJson.value("buildingIndex", 0);
         const PlayerId owner = ownerOf(faction, x, y);
         if (owner == kNoPlayer)
             continue;
-        const int id = entities.SpawnBuildingByIndex(index, x, y, faction, b.value("initialProgress", 1.0f), owner);
-        const Building *spawned = id > 0 ? entities.GetBuilding(id) : nullptr;
-        if (!spawned)
+        const int buildingId
+            = entities.SpawnBuildingByIndex(buildingIndex, x, y, faction, buildingJson.value("initialProgress", 1.0f), owner);
+        const Building *building = buildingId > 0 ? entities.GetBuilding(buildingId) : nullptr;
+        if (!building)
             continue;
-        for (int ty = y; ty < y + spawned->buildHeight && ty < map.GetHeight(); ++ty)
+        for (int tileY = y; tileY < y + building->buildHeight && tileY < map.GetHeight(); ++tileY)
         {
-            for (int tx = x; tx < x + spawned->buildWidth && tx < map.GetWidth(); ++tx)
-                map.SetPassable(tx, ty, false);
+            for (int tileX = x; tileX < x + building->buildWidth && tileX < map.GetWidth(); ++tileX)
+                map.SetPassable(tileX, tileY, false);
         }
-        if (index == 0 || index == 8)
+        if (buildingIndex == 0 || buildingIndex == 8)
             onHq(owner, faction, x, y);
     }
-    for (const auto &u : doc.value("units", nlohmann::json::array()))
+    for (const auto &unitJson : mapJson.value("units", nlohmann::json::array()))
     {
-        const Faction faction = Utility::ParseFaction(u.value("faction", "resistance"));
-        const int x = u.value("x", 0), y = u.value("y", 0);
+        const Faction faction = Utility::ParseFaction(unitJson.value("faction", "resistance"));
+        const int x = unitJson.value("x", 0), y = unitJson.value("y", 0);
         const PlayerId owner = ownerOf(faction, x, y);
         if (owner == kNoPlayer)
             continue;
-        entities.SpawnUnitByArchetype(u.value("archetypeId", 0), x, y, faction, owner);
+        entities.SpawnUnitByArchetype(unitJson.value("archetypeId", 0), x, y, faction, owner);
     }
 }
 
@@ -1024,21 +1039,21 @@ bool MissionController::LoadSkirmish(
         std::cerr << "[MissionController] Failed to load custom game map: " << mapPath << std::endl;
         return false;
     }
-    const nlohmann::json doc = nlohmann::json::parse(mapText, nullptr, false);
+    const nlohmann::json mapJson = nlohmann::json::parse(mapText, nullptr, false);
     if (!usePrebuilt)
         map.ClearWalls(); // from scratch: the map's own walls are not part of it
     m_customPrebuilt = usePrebuilt;
 
     ++m_loadSerial;
     ResetResearch();
-    Capabilities::ApplyLevels(-1, TechPreset(doc), entities); // tech levels: the map's, else the default
+    Capabilities::ApplyLevels(-1, TechPreset(mapJson), entities); // tech levels: the map's, else the default
     m_currentMissionId = kSkirmishMissionId;
     m_customMapPath = mapPath;
     const std::string mapName = std::filesystem::path(mapPath).stem().string();
     std::string title = mapName;
-    if (doc.is_object() && doc.contains("title") && doc["title"].is_string())
+    if (mapJson.is_object() && mapJson.contains("title") && mapJson["title"].is_string())
     {
-        title = _(doc["title"].get<std::string>());
+        title = _(mapJson["title"].get<std::string>());
     }
     m_missionName = "Custom game: " + title;
     m_mapTitle = title;
@@ -1066,48 +1081,48 @@ bool MissionController::LoadSkirmish(
     if (usePrebuilt)
     {
         SpawnPrebuilt(
-            doc,
+            mapJson,
             map,
             entities,
             [](Faction, int, int) { return EntityManager::kAutoOwner; },
-            [&](PlayerId, Faction f, int x, int y) {
-                const int i = f == Faction::Confederation ? 1 : 0;
-                prebuiltHq[i] = true;
-                prebuiltHqX[i] = x;
-                prebuiltHqY[i] = y;
+            [&](PlayerId, Faction faction, int x, int y) {
+                const int factionSlot = faction == Faction::Confederation ? 1 : 0;
+                prebuiltHq[factionSlot] = true;
+                prebuiltHqX[factionSlot] = x;
+                prebuiltHqY[factionSlot] = y;
             });
     }
 
     // Where the bases go: the map's own start positions if it has them, else the bottom-left / top-right corners
-    const int w = map.GetWidth(), h = map.GetHeight();
-    int playerTargetX = 6, playerTargetY = h - 14;
-    int enemyTargetX = w - 16, enemyTargetY = 4;
-    if (doc.is_object())
+    const int mapWidth = map.GetWidth(), mapHeight = map.GetHeight();
+    int playerTargetX = 6, playerTargetY = mapHeight - 14;
+    int enemyTargetX = mapWidth - 16, enemyTargetY = 4;
+    if (mapJson.is_object())
     {
-        if (doc.contains("playerPos") && doc["playerPos"].is_object())
+        if (mapJson.contains("playerPos") && mapJson["playerPos"].is_object())
         {
-            playerTargetX = doc["playerPos"].value("x", playerTargetX);
-            playerTargetY = doc["playerPos"].value("y", playerTargetY);
+            playerTargetX = mapJson["playerPos"].value("x", playerTargetX);
+            playerTargetY = mapJson["playerPos"].value("y", playerTargetY);
         }
-        if (doc.contains("enemyPos") && doc["enemyPos"].is_object())
+        if (mapJson.contains("enemyPos") && mapJson["enemyPos"].is_object())
         {
-            enemyTargetX = doc["enemyPos"].value("x", enemyTargetX);
-            enemyTargetY = doc["enemyPos"].value("y", enemyTargetY);
+            enemyTargetX = mapJson["enemyPos"].value("x", enemyTargetX);
+            enemyTargetY = mapJson["enemyPos"].value("y", enemyTargetY);
         }
     }
     // Original maps are dense: take the largest open square that exists (10, 8, then 6 tiles) and set the
     // buildings and units on the free ground around its center
     constexpr int kSizes[3] = {10, 8, 6};
-    int px = 0, py = 0, psize = 0;
+    int playerBaseX = 0, playerBaseY = 0, playerSiteSize = 0;
     for (int size : kSizes)
     {
-        if (FindBaseSite(map, size, playerTargetX, playerTargetY, nullptr, px, py))
+        if (FindBaseSite(map, size, playerTargetX, playerTargetY, nullptr, playerBaseX, playerBaseY))
         {
-            psize = size;
+            playerSiteSize = size;
             break;
         }
     }
-    if (psize == 0)
+    if (playerSiteSize == 0)
     {
         std::cerr << "[MissionController] No room for a base on " << mapPath << std::endl;
         return false;
@@ -1131,21 +1146,23 @@ bool MissionController::LoadSkirmish(
             m_onLoaded();
         return true;
     }
-    const std::vector<char> connected = ReachableFrom(map, px + psize / 2, py + psize / 2);
+    const std::vector<char> connected
+        = ReachableFrom(map, playerBaseX + playerSiteSize / 2, playerBaseY + playerSiteSize / 2);
 
     // The enemy base is as far from the player as the map allows (at most half of its short side)
-    int ex = 0, ey = 0, esize = 0;
+    int enemyBaseX = 0, enemyBaseY = 0, enemySiteSize = 0;
     for (int size : kSizes)
     {
-        for (int apart = std::min(w, h) / 2; apart >= psize && esize == 0; apart -= 2)
+        for (int apart = std::min(mapWidth, mapHeight) / 2; apart >= playerSiteSize && enemySiteSize == 0; apart -= 2)
         {
-            if (FindBaseSite(map, size, enemyTargetX, enemyTargetY, &connected, ex, ey, px, py, apart))
-                esize = size;
+            if (FindBaseSite(
+                    map, size, enemyTargetX, enemyTargetY, &connected, enemyBaseX, enemyBaseY, playerBaseX, playerBaseY, apart))
+                enemySiteSize = size;
         }
-        if (esize != 0)
+        if (enemySiteSize != 0)
             break;
     }
-    if (esize == 0)
+    if (enemySiteSize == 0)
     {
         std::cerr << "[MissionController] No room for the enemy base on " << mapPath << std::endl;
         return false;
@@ -1154,53 +1171,56 @@ bool MissionController::LoadSkirmish(
     BasePlanner planner(map, entities);
     const PlayerId autoOwner = EntityManager::kAutoOwner;
     // Resistance: headquarters, power generator, barracks; Confederation: the same three of its own
-    const int pcx = px + psize / 2, pcy = py + psize / 2;
-    const int ecx = ex + esize / 2, ecy = ey + esize / 2;
-    int hqX = 0, hqY = 0, ehqX = 0, ehqY = 0, unusedX = 0, unusedY = 0;
+    const int playerCenterX = playerBaseX + playerSiteSize / 2;
+    const int playerCenterY = playerBaseY + playerSiteSize / 2;
+    const int enemyCenterX = enemyBaseX + enemySiteSize / 2;
+    const int enemyCenterY = enemyBaseY + enemySiteSize / 2;
+    int playerHqX = 0, playerHqY = 0, enemyHqX = 0, enemyHqY = 0, unusedX = 0, unusedY = 0;
     // A side whose base the map brought keeps it, the other gets the usual starting base
     if (prebuiltHq[0])
     {
-        hqX = prebuiltHqX[0];
-        hqY = prebuiltHqY[0];
+        playerHqX = prebuiltHqX[0];
+        playerHqY = prebuiltHqY[0];
     }
-    else if (!planner.Place(8, pcx, pcy, Faction::Resistance, autoOwner, hqX, hqY))
+    else if (!planner.Place(8, playerCenterX, playerCenterY, Faction::Resistance, autoOwner, playerHqX, playerHqY))
     {
         std::cerr << "[MissionController] Could not set the headquarters on " << mapPath << std::endl;
         return false;
     }
     if (prebuiltHq[1])
     {
-        ehqX = prebuiltHqX[1];
-        ehqY = prebuiltHqY[1];
+        enemyHqX = prebuiltHqX[1];
+        enemyHqY = prebuiltHqY[1];
     }
-    else if (!planner.Place(0, ecx, ecy, Faction::Confederation, autoOwner, ehqX, ehqY))
+    else if (!planner.Place(0, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner, enemyHqX, enemyHqY))
     {
         std::cerr << "[MissionController] Could not set the headquarters on " << mapPath << std::endl;
         return false;
     }
     if (!prebuiltHq[0])
     {
-        planner.Place(9, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
+        planner.Place(9, playerCenterX, playerCenterY, Faction::Resistance, autoOwner, unusedX, unusedY);
         if (usePrebuilt)
         {
-            planner.Place(10, pcx, pcy, Faction::Resistance, autoOwner, unusedX, unusedY);
-            planner.PlaceUnits(kResistanceBase.units, pcx, pcy, Faction::Resistance, autoOwner);
+            planner.Place(10, playerCenterX, playerCenterY, Faction::Resistance, autoOwner, unusedX, unusedY);
+            planner.PlaceUnits(kResistanceBase.units, playerCenterX, playerCenterY, Faction::Resistance, autoOwner);
         }
     }
     if (!prebuiltHq[1])
     {
-        planner.Place(1, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
+        planner.Place(1, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner, unusedX, unusedY);
         if (usePrebuilt)
         {
-            planner.Place(2, ecx, ecy, Faction::Confederation, autoOwner, unusedX, unusedY);
-            planner.PlaceUnits(kConfederationBase.units, ecx, ecy, Faction::Confederation, autoOwner);
+            planner.Place(2, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner, unusedX, unusedY);
+            planner.PlaceUnits(
+                kConfederationBase.units, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner);
         }
     }
 
-    m_playerHqTileX = hqX;
-    m_playerHqTileY = hqY;
-    m_enemyHqTileX = ehqX;
-    m_enemyHqTileY = ehqY;
+    m_playerHqTileX = playerHqX;
+    m_playerHqTileY = playerHqY;
+    m_enemyHqTileX = enemyHqX;
+    m_enemyHqTileY = enemyHqY;
     if (PlayerFaction() == Faction::Confederation)
     {
         std::swap(m_playerHqTileX, m_enemyHqTileX);
@@ -1209,8 +1229,8 @@ bool MissionController::LoadSkirmish(
 
     map.SetViewerTeam(Players::TeamOf(Players::Local())); // the drawn fog is the local player's from the first frame on
     entities.UpdateFogOfWar(map);
-    std::cout << "[MissionController] Custom game on " << mapPath << " | Player base: (" << px << "," << py
-              << ") | Enemy base: (" << ex << "," << ey << ")" << std::endl;
+    std::cout << "[MissionController] Custom game on " << mapPath << " | Player base: (" << playerBaseX << ","
+              << playerBaseY << ") | Enemy base: (" << enemyBaseX << "," << enemyBaseY << ")" << std::endl;
     if (m_onLoaded)
     {
         m_onLoaded();
@@ -1223,10 +1243,10 @@ std::vector<std::pair<int, int>> MissionController::StartPositions(const std::st
     std::string text;
     if (!Assets::ReadText(mapPath, text))
         return {};
-    const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
-    if (!doc.is_object())
+    const nlohmann::json mapJson = nlohmann::json::parse(text, nullptr, false);
+    if (!mapJson.is_object())
         return {};
-    return StartPositionsOf(doc, doc.value("width", 64), doc.value("height", 64));
+    return StartPositionsOf(mapJson, mapJson.value("width", 64), mapJson.value("height", 64));
 }
 
 bool MissionController::LoadMatch(
@@ -1239,21 +1259,21 @@ bool MissionController::LoadMatch(
         std::cerr << "[MissionController] Failed to load match map: " << setup.mapPath << std::endl;
         return false;
     }
-    const nlohmann::json doc = nlohmann::json::parse(mapText, nullptr, false);
+    const nlohmann::json mapJson = nlohmann::json::parse(mapText, nullptr, false);
     if (!setup.prebuilt)
         map.ClearWalls();
 
     ++m_loadSerial;
     ResetResearch();
     // Tech levels: each slot's own, else the match's, else the map's, else the default
-    Capabilities::ApplyLevels(setup.techLevel, TechPreset(doc), entities);
+    Capabilities::ApplyLevels(setup.techLevel, TechPreset(mapJson), entities);
     m_currentMissionId = kMatchMissionId;
     m_customMapPath.clear();
     m_matchSetup = setup;
     const std::string mapName = std::filesystem::path(setup.mapPath).stem().string();
     std::string title = mapName;
-    if (doc.is_object() && doc.contains("title") && doc["title"].is_string())
-        title = _(doc["title"].get<std::string>());
+    if (mapJson.is_object() && mapJson.contains("title") && mapJson["title"].is_string())
+        title = _(mapJson["title"].get<std::string>());
     m_missionName = (setup.localOnly ? "Custom game: " : "Match: ") + title;
     m_mapTitle = title;
     m_objectiveText = "- Destroy every base and force of the enemy teams.";
@@ -1278,46 +1298,46 @@ bool MissionController::LoadMatch(
     pathfinder.SetMap(&map);
     pathfinder.SetEntityManager(&entities);
 
-    const std::vector<std::pair<int, int>> spots = StartPositionsOf(doc, map.GetWidth(), map.GetHeight());
+    const std::vector<std::pair<int, int>> spots = StartPositionsOf(mapJson, map.GetWidth(), map.GetHeight());
     // The buildings and units of the map go to the player of their faction whose start position is the nearest
     std::array<std::pair<int, int>, kMaxPlayers> prebuiltHq {};
     std::array<bool, kMaxPlayers> hasPrebuiltHq {};
     if (setup.prebuilt)
     {
-        auto nearestOwner = [&](Faction f, int x, int y) {
-            PlayerId best = kNoPlayer;
-            long bestDist = 0;
-            for (PlayerId p = 0; p < kMaxPlayers; ++p)
+        auto nearestOwner = [&](Faction faction, int x, int y) {
+            PlayerId bestOwner = kNoPlayer;
+            long bestDistSq = 0;
+            for (PlayerId playerIndex = 0; playerIndex < kMaxPlayers; ++playerIndex)
             {
-                const PlayerSlot &s = setup.slots[p];
-                const int spot = setup.startPosition[p];
-                if (!s.active || s.faction != f || spot < 0 || spot >= static_cast<int>(spots.size()))
+                const PlayerSlot &slot = setup.slots[playerIndex];
+                const int spot = setup.startPosition[playerIndex];
+                if (!slot.active || slot.faction != faction || spot < 0 || spot >= static_cast<int>(spots.size()))
                     continue;
                 const long dx = spots[spot].first - x, dy = spots[spot].second - y;
-                const long d = dx * dx + dy * dy;
-                if (best == kNoPlayer || d < bestDist)
+                const long distSq = dx * dx + dy * dy;
+                if (bestOwner == kNoPlayer || distSq < bestDistSq)
                 {
-                    best = p;
-                    bestDist = d;
+                    bestOwner = playerIndex;
+                    bestDistSq = distSq;
                 }
             }
-            return best;
+            return bestOwner;
         };
-        SpawnPrebuilt(doc, map, entities, nearestOwner, [&](PlayerId owner, Faction, int x, int y) {
+        SpawnPrebuilt(mapJson, map, entities, nearestOwner, [&](PlayerId owner, Faction, int x, int y) {
             if (owner >= kMaxPlayers)
                 return;
             hasPrebuiltHq[owner] = true;
             prebuiltHq[owner] = {x, y};
         });
-        for (int ty = 0; ty < map.GetHeight(); ++ty)
+        for (int tileY = 0; tileY < map.GetHeight(); ++tileY)
         {
-            for (int tx = 0; tx < map.GetWidth(); ++tx)
+            for (int tileX = 0; tileX < map.GetWidth(); ++tileX)
             {
-                if (!map.IsWall(tx, ty))
+                if (!map.IsWall(tileX, tileY))
                     continue;
-                const PlayerId owner = nearestOwner(map.GetWallFaction(tx, ty), tx, ty);
+                const PlayerId owner = nearestOwner(map.GetWallFaction(tileX, tileY), tileX, tileY);
                 if (owner != kNoPlayer)
-                    map.SetWallOwner(tx, ty, owner);
+                    map.SetWallOwner(tileX, tileY, owner);
             }
         }
     }
@@ -1325,102 +1345,110 @@ bool MissionController::LoadMatch(
     std::vector<char> connected;
     std::vector<std::pair<int, int>> placed; // centers of the bases set so far
     constexpr int kSizes[3] = {10, 8, 6};
-    for (PlayerId p = 0; p < kMaxPlayers; ++p)
+    for (PlayerId playerIndex = 0; playerIndex < kMaxPlayers; ++playerIndex)
     {
-        const PlayerSlot &slot = setup.slots[p];
+        const PlayerSlot &slot = setup.slots[playerIndex];
         if (!slot.active)
             continue;
-        const int spot = setup.startPosition[p];
+        const int spot = setup.startPosition[playerIndex];
         if (spot < 0 || spot >= static_cast<int>(spots.size()))
         {
-            std::cerr << "[MissionController] Player " << int(p) << " has no start position" << std::endl;
+            std::cerr << "[MissionController] Player " << int(playerIndex) << " has no start position" << std::endl;
             return false;
         }
-        if (hasPrebuiltHq[p])
+        if (hasPrebuiltHq[playerIndex])
         { // the map brought this player's base
-            placed.push_back(prebuiltHq[p]);
-            if (p == setup.local)
+            placed.push_back(prebuiltHq[playerIndex]);
+            if (playerIndex == setup.local)
             {
-                m_playerHqTileX = prebuiltHq[p].first;
-                m_playerHqTileY = prebuiltHq[p].second;
+                m_playerHqTileX = prebuiltHq[playerIndex].first;
+                m_playerHqTileY = prebuiltHq[playerIndex].second;
             }
-            else if (Players::Hostile(p, setup.local))
+            else if (Players::Hostile(playerIndex, setup.local))
             {
-                m_enemyHqTileX = prebuiltHq[p].first;
-                m_enemyHqTileY = prebuiltHq[p].second;
+                m_enemyHqTileX = prebuiltHq[playerIndex].first;
+                m_enemyHqTileY = prebuiltHq[playerIndex].second;
             }
             continue;
         }
         // Open ground near the spot, reachable from the first base, away from the bases already set
-        int bx = 0, by = 0, size = 0;
-        for (int s : kSizes)
+        int baseX = 0, baseY = 0, siteSize = 0;
+        for (int candidateSize : kSizes)
         {
-            for (int apart = std::min(map.GetWidth(), map.GetHeight()) / 3; apart >= 0 && size == 0; apart -= 2)
+            for (int apart = std::min(map.GetWidth(), map.GetHeight()) / 3; apart >= 0 && siteSize == 0; apart -= 2)
             {
-                bool ok = FindBaseSite(
-                    map, s, spots[spot].first, spots[spot].second, connected.empty() ? nullptr : &connected, bx, by);
-                for (const auto &c : placed)
+                bool isValidSite = FindBaseSite(
+                    map,
+                    candidateSize,
+                    spots[spot].first,
+                    spots[spot].second,
+                    connected.empty() ? nullptr : &connected,
+                    baseX,
+                    baseY);
+                for (const auto &placedCenter : placed)
                 {
                     if (DetMath::Hypot(
-                            static_cast<float>(bx + s / 2 - c.first), static_cast<float>(by + s / 2 - c.second))
+                            static_cast<float>(baseX + candidateSize / 2 - placedCenter.first),
+                            static_cast<float>(baseY + candidateSize / 2 - placedCenter.second))
                         < apart)
-                        ok = false;
+                        isValidSite = false;
                 }
-                if (ok)
-                    size = s;
+                if (isValidSite)
+                    siteSize = candidateSize;
             }
-            if (size != 0)
+            if (siteSize != 0)
                 break;
         }
-        if (size == 0)
+        if (siteSize == 0)
         {
-            std::cerr << "[MissionController] No room for the base of player " << int(p) << std::endl;
+            std::cerr << "[MissionController] No room for the base of player " << int(playerIndex) << std::endl;
             return false;
         }
-        const int cx = bx + size / 2, cy = by + size / 2;
+        const int centerX = baseX + siteSize / 2, centerY = baseY + siteSize / 2;
         if (connected.empty())
-            connected = ReachableFrom(map, cx, cy);
-        placed.push_back({cx, cy});
+            connected = ReachableFrom(map, centerX, centerY);
+        placed.push_back({centerX, centerY});
         const StartingBase &base = startingBase(slot.faction);
         int hqX = 0, hqY = 0, unusedX = 0, unusedY = 0;
-        if (!planner.Place(base.hq, cx, cy, slot.faction, p, hqX, hqY))
+        if (!planner.Place(base.hq, centerX, centerY, slot.faction, playerIndex, hqX, hqY))
             return false;
         {
             // The power plant behind the headquarters, away from the nearest enemy start (not the first thing an
             // attack meets); next to the HQ when there is no room back there
-            float ex = 0.0f, ey = 0.0f, best = 1e9f;
-            for (PlayerId q = 0; q < kMaxPlayers; ++q)
+            float dirToEnemyX = 0.0f, dirToEnemyY = 0.0f, bestEnemyDist = 1e9f;
+            for (PlayerId otherPlayer = 0; otherPlayer < kMaxPlayers; ++otherPlayer)
             {
-                const int qs = setup.startPosition[q];
-                if (q == p || !setup.slots[q].active || setup.slots[q].team == slot.team || qs < 0
-                    || qs >= static_cast<int>(spots.size()))
+                const int otherSpot = setup.startPosition[otherPlayer];
+                if (otherPlayer == playerIndex || !setup.slots[otherPlayer].active
+                    || setup.slots[otherPlayer].team == slot.team || otherSpot < 0
+                    || otherSpot >= static_cast<int>(spots.size()))
                     continue;
-                const float dx = static_cast<float>(spots[qs].first - cx),
-                            dy = static_cast<float>(spots[qs].second - cy);
-                const float d = DetMath::Hypot(dx, dy);
-                if (d > 0.5f && d < best)
+                const float deltaX = static_cast<float>(spots[otherSpot].first - centerX),
+                            deltaY = static_cast<float>(spots[otherSpot].second - centerY);
+                const float dist = DetMath::Hypot(deltaX, deltaY);
+                if (dist > 0.5f && dist < bestEnemyDist)
                 {
-                    best = d;
-                    ex = dx / d;
-                    ey = dy / d;
+                    bestEnemyDist = dist;
+                    dirToEnemyX = deltaX / dist;
+                    dirToEnemyY = deltaY / dist;
                 }
             }
-            const int px = cx - static_cast<int>(std::lround(ex * 5.0f)),
-                      py = cy - static_cast<int>(std::lround(ey * 5.0f));
-            if (!planner.Place(base.power, px, py, slot.faction, p, unusedX, unusedY))
-                planner.Place(base.power, cx, cy, slot.faction, p, unusedX, unusedY);
+            const int powerX = centerX - static_cast<int>(std::lround(dirToEnemyX * 5.0f)),
+                      powerY = centerY - static_cast<int>(std::lround(dirToEnemyY * 5.0f));
+            if (!planner.Place(base.power, powerX, powerY, slot.faction, playerIndex, unusedX, unusedY))
+                planner.Place(base.power, centerX, centerY, slot.faction, playerIndex, unusedX, unusedY);
         }
         if (setup.prebuilt)
         {
-            planner.Place(base.barracks, cx, cy, slot.faction, p, unusedX, unusedY);
-            planner.PlaceUnits(base.units, cx, cy, slot.faction, p);
+            planner.Place(base.barracks, centerX, centerY, slot.faction, playerIndex, unusedX, unusedY);
+            planner.PlaceUnits(base.units, centerX, centerY, slot.faction, playerIndex);
         }
-        if (p == setup.local)
+        if (playerIndex == setup.local)
         {
             m_playerHqTileX = hqX;
             m_playerHqTileY = hqY;
         }
-        else if (Players::Hostile(p, setup.local))
+        else if (Players::Hostile(playerIndex, setup.local))
         {
             m_enemyHqTileX = hqX;
             m_enemyHqTileY = hqY;
@@ -1500,32 +1528,34 @@ bool MissionController::LoadTestMap(TileMap &map, EntityManager &entities, Econo
     auto parseFaction = [](const nlohmann::json &item) {
         return Utility::ParseFaction(item.value("faction", "resistance"));
     };
-    auto placeBuilding = [&](const nlohmann::json &building) {
-        const int buildingIndex = building.value("buildingIndex", 0);
-        const int bx = building.value("x", 0);
-        const int by = building.value("y", 0);
-        const Faction faction = parseFaction(building);
-        int bid
-            = entities.SpawnBuildingByIndex(buildingIndex, bx, by, faction, building.value("initialProgress", 1.0f));
-        if (bid > 0)
+    auto placeBuilding = [&](const nlohmann::json &buildingJson) {
+        const int buildingIndex = buildingJson.value("buildingIndex", 0);
+        const int buildingX = buildingJson.value("x", 0);
+        const int buildingY = buildingJson.value("y", 0);
+        const Faction faction = parseFaction(buildingJson);
+        int buildingId = entities.SpawnBuildingByIndex(
+            buildingIndex, buildingX, buildingY, faction, buildingJson.value("initialProgress", 1.0f));
+        if (buildingId > 0)
         {
-            const Building *bEnt = entities.GetBuilding(bid);
-            if (bEnt)
+            const Building *building = entities.GetBuilding(buildingId);
+            if (building)
             {
-                for (int ty = by; ty < by + bEnt->buildHeight && ty < map.GetHeight(); ++ty)
+                for (int tileY = buildingY; tileY < buildingY + building->buildHeight && tileY < map.GetHeight();
+                     ++tileY)
                 {
-                    for (int tx = bx; tx < bx + bEnt->buildWidth && tx < map.GetWidth(); ++tx)
+                    for (int tileX = buildingX; tileX < buildingX + building->buildWidth && tileX < map.GetWidth();
+                         ++tileX)
                     {
-                        map.SetPassable(tx, ty, false);
+                        map.SetPassable(tileX, tileY, false);
                     }
                 }
             }
         }
     };
 
-    for (const auto &building : mapData.value("buildings", nlohmann::json::array()))
+    for (const auto &buildingJson : mapData.value("buildings", nlohmann::json::array()))
     {
-        placeBuilding(building);
+        placeBuilding(buildingJson);
     }
     for (const auto &unitData : mapData.value("units", nlohmann::json::array()))
     {

@@ -16,7 +16,16 @@ constexpr float kTwoPi = 6.28318530717958647692f;
 
 inline float Hypot(float x, float y)
 {
-    return std::hypot(x, y);
+    // Scale before squaring to avoid overflowing on large finite inputs. The simulation
+    // uses finite coordinates; square root is specified by IEEE 754, unlike libm hypot.
+    const float ax = std::abs(x);
+    const float ay = std::abs(y);
+    const float hi = ax > ay ? ax : ay;
+    const float lo = ax > ay ? ay : ax;
+    if (hi == 0.0f)
+        return 0.0f;
+    const float ratio = lo / hi;
+    return hi * std::sqrt(1.0f + ratio * ratio);
 }
 
 // sin on [-pi/2, pi/2] (Taylor to x^13, error < 1e-7)

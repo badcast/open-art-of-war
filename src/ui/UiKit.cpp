@@ -405,9 +405,9 @@ ConfirmRects ConfirmLayout(int windowW, int windowH)
         r.no = s.Rect("no");
         return r;
     }
-    r.dialog = CenteredRect(windowW, windowH, 520, 230);
-    r.yes = {r.dialog.x + 24, r.dialog.Bottom() - 64, (r.dialog.w - 60) / 2, 40};
-    r.no = {r.dialog.Right() - 24 - (r.dialog.w - 60) / 2, r.dialog.Bottom() - 64, (r.dialog.w - 60) / 2, 40};
+    r.dialog = CenteredRect(windowW, windowH, 520, 236);
+    r.yes = {r.dialog.x + 24, r.dialog.Bottom() - 70, (r.dialog.w - 60) / 2, 48};
+    r.no = {r.dialog.Right() - 24 - (r.dialog.w - 60) / 2, r.dialog.Bottom() - 70, (r.dialog.w - 60) / 2, 48};
     return r;
 }
 } // namespace

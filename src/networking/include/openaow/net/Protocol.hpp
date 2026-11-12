@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 1;
+constexpr std::uint16_t kProtocolVersion = 3;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;
@@ -63,6 +63,8 @@ enum class MsgType : std::uint8_t
     TurnBundle = 17,   // host -> clients: everybody's commands of a closed turn
     WorldHash = 18,    // client -> host: checksum of the world after a tick
     Desync = 19,       // host -> clients: the checksums of a tick differ
+    AuthorityState = 22, // authority -> relay -> one player: opaque, versioned game state
+    AuthorityAck = 23, // replica -> relay -> authority
     PauseRequest = 20, // client -> host: pause / go on
     PauseState = 21,   // host -> clients: paused or not, by whom
     // Room owner (dedicated server rooms: the first player decides what the host would)
@@ -184,6 +186,8 @@ constexpr std::size_t kMaxMatchSetupBytes = 4096;
 struct StartMatch
 {
     std::uint32_t firstTurnDelayMs {3000}; // countdown before turn 0
+    std::uint8_t authoritySlot {0};        // the player whose game simulates the world (the room owner at start)
+    std::uint32_t matchId {0};             // counts the matches of a room; tells authority state of another match apart
     std::vector<std::uint8_t> setup;
 };
 
@@ -282,6 +286,24 @@ struct OwnerSetMap
 };
 
 constexpr std::size_t kMaxFileBytes = 2 * 1024 * 1024;
+
+// State is addressed to one player because each player's visibility may differ.
+constexpr std::size_t kMaxAuthorityStateBytes = 2 * 1024 * 1024;
+constexpr std::size_t kMaxQueuedAuthorityStates = 64;
+struct AuthorityState
+{
+    std::uint8_t recipient {0};
+    std::uint32_t matchId {0};
+    std::uint32_t tick {0};
+    std::vector<std::uint8_t> bytes;
+};
+
+struct AuthorityAck
+{
+    std::uint8_t sender {0}; // filled by the relay
+    std::uint32_t matchId {0};
+    std::uint32_t tick {0};
+};
 
 struct FileRequest
 {
@@ -474,6 +496,8 @@ void encode(BitWriter &w, const LobbyState &m);
 void encode(BitWriter &w, const OwnerSetMap &m);
 void encode(BitWriter &w, const FileRequest &m);
 void encode(BitWriter &w, const FileData &m);
+void encode(BitWriter &w, const AuthorityState &m);
+void encode(BitWriter &w, const AuthorityAck &m);
 void encode(BitWriter &w, const DataManifest &m);
 void encode(BitWriter &w, const FilePathRequest &m);
 void encode(BitWriter &w, const FilePathData &m);
@@ -516,6 +540,8 @@ bool decode(BitReader &r, LobbyState &m);
 bool decode(BitReader &r, OwnerSetMap &m);
 bool decode(BitReader &r, FileRequest &m);
 bool decode(BitReader &r, FileData &m);
+bool decode(BitReader &r, AuthorityState &m);
+bool decode(BitReader &r, AuthorityAck &m);
 bool decode(BitReader &r, OwnerStart &m);
 bool decode(BitReader &r, OwnerSetAi &m);
 bool decode(BitReader &r, OwnerSetTeam &m);

@@ -71,8 +71,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
         else
         {
             enemyUnitCount++;
-            if (const Unit *u = e.AsUnit();
-                u && IsReserveUnit(*u) && !m_recalled.count(u->id)) // (troops still on the way back do not count)
+            if (const Unit *u = e.AsUnit(); u && IsReserveUnit(*u))
                 ++reserveCount;
         }
     }
@@ -150,7 +149,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     }
     else if (m_infantryQueue.empty() && m_vehicleQueue.empty())
     {
-        const int needed = static_cast<int>(m_currentPlan.archetypes.size()) + HomeGuardCount();
+        const int needed = static_cast<int>(m_currentPlan.archetypes.size());
         for (int i = reserveCount; i < needed; ++i)
             m_infantryQueue.push_back(kRifleman);
     }
@@ -359,31 +358,13 @@ void AIController::UpdateResearch(float deltaTime, EntityManager &entities)
         m_researchTimer = 0.0f;
         ThinkOnce("research", "RESEARCH", std::string("Research completed: ") + def.name);
         ++m_researchIndex;
+        while (m_researchIndex < kResearchCount
+               && (researchDef(faction, m_researchIndex).playerOnly
+                   || !Capabilities::AllowsResearch(m_player, m_researchIndex)))
+        {
+            ++m_researchIndex;
+        }
     }
-}
-
-float AIController::HomeGuardShare() const
-{
-    switch (GetEffectiveDifficulty())
-    {
-        case AIDifficulty::Easy:
-            return 0.40f;
-        case AIDifficulty::Medium:
-            return 0.30f;
-        case AIDifficulty::Hard:
-            return 0.20f;
-        case AIDifficulty::Hardcore:
-            return 0.10f;
-    }
-    return 0.30f;
-}
-
-int AIController::HomeGuardCount() const
-{
-    // Between two plans (a wave just left) the last one counts: the guard is never zero for that second
-    const int wave
-        = m_currentPlan.archetypes.empty() ? m_lastPlanSize : static_cast<int>(m_currentPlan.archetypes.size());
-    return static_cast<int>(std::lround(static_cast<float>(wave) * HomeGuardShare()));
 }
 
 void AIController::UpdateRepairs(float deltaTime, EntityManager &entities)

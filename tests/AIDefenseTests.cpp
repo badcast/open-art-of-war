@@ -8,6 +8,7 @@
 #include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Pathfinder.hpp"
+#include "game/Research.hpp"
 #include "game/TileMap.hpp"
 
 #include <algorithm>
@@ -119,22 +120,21 @@ struct AIDefenseTest
     {
         return ai.m_waveRoster.count(id) != 0;
     }
+    static bool InOffensive(const AIController &ai, int id)
+    {
+        return ai.m_offensive.count(id) != 0;
+    }
     static void UpdateRoster(AIController &ai, EntityManager &entities)
     {
         ai.UpdateWaveRoster(entities);
     }
-    static void SendToRepair(AIController &ai, int id)
+    static void Research(AIController &ai, float dt, EntityManager &entities)
     {
-        ai.m_waveRoster.erase(id);
-        ai.m_repairing.insert(id);
+        ai.UpdateResearch(dt, entities);
     }
-    static bool Repairing(const AIController &ai, int id)
+    static void Stage(AIController &ai, TileMap &map, EntityManager &entities, Pathfinder &pf)
     {
-        return ai.m_repairing.count(id) != 0;
-    }
-    static void Retreat(AIController &ai, EntityManager &entities, Pathfinder &pf)
-    {
-        ai.UpdateValuableRetreat(entities, pf);
+        ai.UpdateStaging(map, entities, pf);
     }
     static void SetPlan(AIController &ai, std::vector<int> archetypes)
     {
@@ -152,12 +152,6 @@ struct AIDefenseTest
     static void Replan(AIController &ai)
     {
         ai.PreparePlan(1, false, false);
-    }
-    static int HomeGuard(AIController &ai, int planned, int lastPlan)
-    {
-        ai.m_currentPlan.archetypes.assign(static_cast<std::size_t>(planned), 1);
-        ai.m_lastPlanSize = lastPlan;
-        return ai.HomeGuardCount();
     }
 };
 } // namespace OpenArtOfWar
@@ -308,24 +302,21 @@ int main()
         AIDefenseTest::Prepare(w.ai, troops, 2, kHqX + 4, kHqY + 4);
         AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
         Check(w.ai.GetWaveCount() == 1 && AIDefenseTest::Squads(w.ai) >= 1, "a wave leaves a quiet base");
-        Check(AIDefenseTest::HomeGuard(w.ai, 0, 10) > 0, "the home guard is not zero between two wave plans");
-        Check(AIDefenseTest::HomeGuard(w.ai, 20, 10) > AIDefenseTest::HomeGuard(w.ai, 0, 10), "the plan counts first");
+        const AISquad *sq = AIDefenseTest::FirstSquad(w.ai);
+        Check(sq && sq->unitIds.size() == 4, "all idle base troops leave with the wave instead of staying in defense");
     }
 
     // Hard/Hardcore do not wait for the whole wave, but a group leaves the staging area only once
-    // dispatch_group_size troops (beyond the home guard) are assembled there: a troop fresh from the barracks never
+    // dispatch_group_size troops are assembled there: a troop fresh from the barracks never
     // marches off alone. Easy/Medium wait for the whole wave
     for (auto level : {AIDifficulty::Easy, AIDifficulty::Medium, AIDifficulty::Hard, AIDifficulty::Hardcore})
     {
         World w(level);
         const int sx = kHqX + 4, sy = kHqY + 4;
-        AIDefenseTest::Prepare(w.ai, {}, 10, sx, sy);
-        AIDefenseTest::SetGroupSize(w.ai, 3);
-        const int guard = AIDefenseTest::HomeGuard(w.ai, 10, 10);
         std::vector<int> troops;
         const int fresh = w.Own(60, 50); // just out of a barracks far away
         troops.push_back(fresh);
-        for (int i = 0; i < guard + 2; ++i)
+        for (int i = 0; i < 2; ++i)
             troops.push_back(w.Own(sx - 2 + i % 5, sy + 1 + i / 5));
         AIDefenseTest::Prepare(w.ai, troops, 10, sx, sy);
         AIDefenseTest::SetGroupSize(w.ai, 3);
@@ -464,7 +455,7 @@ int main()
                            : "a group that storms the enemy base goes on");
     }
 
-    // 4. A chase ends a little outside the base
+    // 4. A chase outside the base switches the unit to the offensive instead of calling it back to the base
     {
         World w;
         const int near = w.Own(14, 15), far = w.Own(15, 15), self = w.Own(16, 15);
@@ -477,7 +468,10 @@ int main()
         AIDefenseTest::Defend(w.ai, w.entities, w.pf);
         Check(w.entities.GetUnit(self)->targetEntityId == foeFar, "a unit's own target is left to its stance");
         const Unit *uf = w.entities.GetUnit(far);
-        Check(uf->orderedTargetId != foeFar && uf->targetEntityId != foeFar, "a chase far from the base is called off");
+        Check(
+            uf->targetEntityId == foeFar && AIDefenseTest::InOffensive(w.ai, far)
+                && !AIDefenseTest::InRoster(w.ai, far),
+            "a chase far from the base switches the unit to the offensive instead of returning it to base");
         Check(w.entities.GetUnit(near)->targetEntityId == foeNear, "an enemy at the base is still fought");
     }
 
@@ -801,7 +795,7 @@ int main()
     }
 
     // Skirmish: no troop of the computer is forgotten - one that no list holds joins the reserve; a mission's
-    // troops stay its script's
+    // troops stay its script's. A troop out in the field switches to the offensive instead of walking back to base.
     for (bool skirmish : {true, false})
     {
         World w(AIDifficulty::Hard);
@@ -810,21 +804,34 @@ int main()
         const int lost = w.Own(60, 50);
         AIDefenseTest::UpdateRoster(w.ai, w.entities);
         Check(AIDefenseTest::InRoster(w.ai, lost) == skirmish, "a forgotten troop joins the reserve in a skirmish");
+        if (skirmish)
+        {
+            AIDefenseTest::Stage(w.ai, w.map, w.entities, w.pf);
+            Check(
+                AIDefenseTest::InOffensive(w.ai, lost) && !AIDefenseTest::InRoster(w.ai, lost),
+                "a troop far outside the base switches to the offensive instead of returning to base");
+        }
     }
 
-    // A damaged vehicle without a factory is never repaired: it does not wait for it for good
+    // AI researches all 24 technologies including COMMUNICATION SYSTEM (index 23) and gains +25% build radius.
     {
         World w(AIDifficulty::Hard);
-        w.ai.SetSkirmish(true);
-        const int tank = w.Own(kHqX + 6, kHqY + 6, 9);
-        AIDefenseTest::Prepare(w.ai, {tank}, 10, kHqX + 4, kHqY + 4);
-        Unit *t = w.entities.GetUnit(tank);
-        t->currentHp = t->maxHp / 4;
-        AIDefenseTest::SendToRepair(w.ai, tank);
-        AIDefenseTest::Retreat(w.ai, w.entities, w.pf);
+        const int lab = w.entities.SpawnBuildingByIndex(4, 30, 30, kOwn, 1.0f, w.ai.Player());
+        w.entities.GetBuilding(lab)->isPowered = true;
+        const int baseRadius = w.entities.BaseBuildRadius(w.ai.Player());
+        Check(w.entities.GetBuildRadius(w.ai.Player()) == baseRadius, "AI starts with base build radius");
+        for (int i = 0; i < kResearchCount; ++i)
+        {
+            AIDefenseTest::SetCredits(w.ai, 10000);
+            AIDefenseTest::Research(w.ai, 1.0f, w.entities);   // starts research i
+            AIDefenseTest::Research(w.ai, 100.0f, w.entities); // completes research i
+        }
+        Check(w.ai.GetResearchIndex() == kResearchCount, "AI advances research index through all 24 technologies");
+        Check(w.ai.IsTechnologyResearched(23), "AI researches COMMUNICATION SYSTEM (index 23)");
         Check(
-            !AIDefenseTest::Repairing(w.ai, tank) && AIDefenseTest::InRoster(w.ai, tank),
-            "a vehicle with no factory to repair it rejoins the reserve");
+            w.entities.GetBuildRadius(w.ai.Player()) == baseRadius * 125 / 100,
+            "AI build radius increases by 25% after researching COMMUNICATION SYSTEM");
+        ResetResearch(w.ai.Player());
     }
 
     // A one-tile exit shared with an ally must drain before more units are spawned.
@@ -924,6 +931,25 @@ int main()
         Check(w.map.ViewerWall(25, 25) == 0, "defeated player's remembered wall removed");
         Check(w.map.GetWall(26, 25) != 0 && w.map.ViewerWall(26, 25) != 0, "surviving player's walls retained");
         Check(w.entities.UpdateElimination(w.map).empty(), "elimination reported only once");
+    }
+
+    // Idle units anywhere in the base (even outside the narrow 7-tile staging radius or with stale attack-move
+    // flags) are always gathered into an attack wave rather than left stranded at the base.
+    {
+        World w(AIDifficulty::Hard);
+        const int sx = kHqX + 4, sy = kHqY + 4;
+        const int u1 = w.Own(sx + 10, sy);     // 10 tiles from staging (previously outside the 7-tile radius)
+        const int u2 = w.Own(kHqX - 1, kHqY);  // right next to the HQ
+        if (Unit *unit1 = w.entities.GetUnit(u1))
+            unit1->isAttackMoving = true; // stale flag while Idle with empty path
+        AIDefenseTest::Prepare(w.ai, {u1, u2}, 6, sx, sy);
+        AIDefenseTest::SetGroupSize(w.ai, 4);
+        AIDefenseTest::Strand(w.ai, 16.0f);
+        AIDefenseTest::Launch(w.ai, w.map, w.entities, w.pf);
+        const AISquad *sq = AIDefenseTest::FirstSquad(w.ai);
+        Check(
+            sq && sq->unitIds.size() == 2,
+            "idle base units outside the 7-tile staging spot launch on a wave instead of staying stuck at the base");
     }
 
     std::printf(failures ? "%d failed\n" : "all passed\n", failures);

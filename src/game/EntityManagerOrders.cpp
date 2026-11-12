@@ -466,7 +466,7 @@ int EntityManager::GetBuildRadius(PlayerId player) const
 
 void EntityManager::SetBuildRadiusPercent(PlayerId player, int percent)
 {
-    if (player >= kMaxPlayers || !Players::Slot(player).human)
+    if (player >= kMaxPlayers)
         return;
     const int base = BaseBuildRadius(player);
     m_buildRadiusExtra[player] = base * (100 + percent) / 100 - base;

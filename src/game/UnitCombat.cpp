@@ -19,55 +19,58 @@ namespace
 // Queue at a gap in a hostile wall: the gap ahead (toward the goal) is shut by an ally that stands there (fighting,
 // or queueing itself). Returns the hostile wall segment beside that gap which the unit can shoot from where it
 // stands (the nearest one), so the ones held up widen the gap instead of waiting for it to clear.
-bool FindJammedGapWall(const Unit &u, const TileMap &map, const UnitDelegates &delegates, int &outX, int &outY)
+bool FindJammedGapWall(const Unit &unit, const TileMap &map, const UnitDelegates &delegates, int &outX, int &outY)
 {
     outX = outY = -1;
-    if (!delegates.getUnitAtTile || !delegates.getEntity || !u.HasMoveTarget())
+    if (!delegates.getUnitAtTile || !delegates.getEntity || !unit.HasMoveTarget())
         return false;
-    const int w = map.GetWidth(), h = map.GetHeight();
+    const int mapWidth = map.GetWidth(), mapHeight = map.GetHeight();
     auto inside = [&](int x, int y) {
-        return x >= 0 && y >= 0 && x < w && y < h;
+        return x >= 0 && y >= 0 && x < mapWidth && y < mapHeight;
     };
     auto closed = [&](int x, int y) {
         return !inside(x, y) || !map.IsPassable(x, y) || map.GetWall(x, y) > 0;
     };
-    const float range = u.attackRange * TILE_WIDTH;
-    const float ux = u.GetUnitCenterPixelX(), uy = u.GetUnitCenterPixelY();
-    const int ownGoalDist = std::max(std::abs(u.tileX - u.targetTileX), std::abs(u.tileY - u.targetTileY));
-    const int reach = std::clamp(static_cast<int>(std::ceil(u.attackRange)) + 1, 2, 8);
-    float best = 1e9f;
-    for (int gy = u.tileY - reach; gy <= u.tileY + reach; ++gy)
+    const float range = unit.attackRange * TILE_WIDTH;
+    const float unitCenterX = unit.GetUnitCenterPixelX(), unitCenterY = unit.GetUnitCenterPixelY();
+    const int ownGoalDist = std::max(std::abs(unit.tileX - unit.targetTileX), std::abs(unit.tileY - unit.targetTileY));
+    const int reach = std::clamp(static_cast<int>(std::ceil(unit.attackRange)) + 1, 2, 8);
+    float bestDist = 1e9f;
+    for (int gapY = unit.tileY - reach; gapY <= unit.tileY + reach; ++gapY)
     {
-        for (int gx = u.tileX - reach; gx <= u.tileX + reach; ++gx)
+        for (int gapX = unit.tileX - reach; gapX <= unit.tileX + reach; ++gapX)
         {
-            if ((gx == u.tileX && gy == u.tileY) || closed(gx, gy))
+            if ((gapX == unit.tileX && gapY == unit.tileY) || closed(gapX, gapY))
                 continue;
             // a gap: shut on both sides across it
-            if (!((closed(gx - 1, gy) && closed(gx + 1, gy)) || (closed(gx, gy - 1) && closed(gx, gy + 1))))
+            if (!((closed(gapX - 1, gapY) && closed(gapX + 1, gapY))
+                  || (closed(gapX, gapY - 1) && closed(gapX, gapY + 1))))
                 continue;
             // ahead of the unit, on its way to the goal
-            if (std::max(std::abs(gx - u.targetTileX), std::abs(gy - u.targetTileY)) >= ownGoalDist)
+            if (std::max(std::abs(gapX - unit.targetTileX), std::abs(gapY - unit.targetTileY)) >= ownGoalDist)
                 continue;
-            const int blockerId = delegates.getUnitAtTile(gx, gy, u.id);
-            const Entity *e = blockerId > 0 ? delegates.getEntity(blockerId) : nullptr;
-            const Unit *b = e ? e->AsUnit() : nullptr;
-            if (!b || !b->alive || b->state == ActionState::Die || Players::Hostile(b->owner, u.owner)
-                || b->HasReservation() || (b->state == ActionState::Move && !b->groupHold))
+            const int blockerId = delegates.getUnitAtTile(gapX, gapY, unit.id);
+            const Entity *blockerEntity = blockerId > 0 ? delegates.getEntity(blockerId) : nullptr;
+            const Unit *blocker = blockerEntity ? blockerEntity->AsUnit() : nullptr;
+            if (!blocker || !blocker->alive || blocker->state == ActionState::Die
+                || Players::Hostile(blocker->owner, unit.owner) || blocker->HasReservation()
+                || (blocker->state == ActionState::Move && !blocker->groupHold))
                 continue; // free, or the ally there is walking on
-            for (int wy = gy - 1; wy <= gy + 1; ++wy)
+            for (int wallY = gapY - 1; wallY <= gapY + 1; ++wallY)
             {
-                for (int wx = gx - 1; wx <= gx + 1; ++wx)
+                for (int wallX = gapX - 1; wallX <= gapX + 1; ++wallX)
                 {
-                    if (!inside(wx, wy) || map.GetWall(wx, wy) <= 0
-                        || !Players::Hostile(map.GetWallOwner(wx, wy), u.owner))
+                    if (!inside(wallX, wallY) || map.GetWall(wallX, wallY) <= 0
+                        || !Players::Hostile(map.GetWallOwner(wallX, wallY), unit.owner))
                         continue;
-                    const float d = DetMath::Hypot(
-                        wx * TILE_WIDTH + TILE_WIDTH * 0.5f - ux, wy * TILE_HEIGHT + TILE_HEIGHT * 0.5f - uy);
-                    if (d <= range && d < best)
+                    const float dist = DetMath::Hypot(
+                        wallX * TILE_WIDTH + TILE_WIDTH * 0.5f - unitCenterX,
+                        wallY * TILE_HEIGHT + TILE_HEIGHT * 0.5f - unitCenterY);
+                    if (dist <= range && dist < bestDist)
                     {
-                        best = d;
-                        outX = wx;
-                        outY = wy;
+                        bestDist = dist;
+                        outX = wallX;
+                        outY = wallY;
                     }
                 }
             }
@@ -79,12 +82,12 @@ bool FindJammedGapWall(const Unit &u, const TileMap &map, const UnitDelegates &d
 
 bool Unit::FindPathToAttack(const Entity &target, Pathfinder &pathfinder, bool *outPartial)
 {
-    int gx = target.tileX, gy = target.tileY;
+    int goalX = target.tileX, goalY = target.tileY;
     if (const TileMap *map = pathfinder.GetMap())
-        ApproachTile(target, *map, gx, gy);
-    if (pathfinder.FindPath(tileX, tileY, gx, gy, path, id, outPartial))
+        ApproachTile(target, *map, goalX, goalY);
+    if (pathfinder.FindPath(tileX, tileY, goalX, goalY, path, id, outPartial))
         return true;
-    return (gx != target.tileX || gy != target.tileY)
+    return (goalX != target.tileX || goalY != target.tileY)
            && pathfinder.FindPath(tileX, tileY, target.tileX, target.tileY, path, id, outPartial);
 }
 
@@ -103,12 +106,12 @@ bool Unit::ShouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const
     int routeLen = 0;
     if (!HasOpenRouteTo(goalX, goalY, pathfinder, &routeLen))
         return true;
-    const int straight = std::max(std::abs(goalX - tileX), std::abs(goalY - tileY));
-    if (routeLen > straight * kDetourFactor + kDetourSlack)
+    const int straightDist = std::max(std::abs(goalX - tileX), std::abs(goalY - tileY));
+    if (routeLen > straightDist * kDetourFactor + kDetourSlack)
         return true;
     // (not right at the goal: there the unit only waits for allies to make room; and only a unit standing
     // at the wall itself - one queueing further back is held up by its allies, not by the wall)
-    if (blockedTimer < kQueueSeconds || straight <= 3)
+    if (blockedTimer < kQueueSeconds || straightDist <= 3)
         return false;
     const TileMap *map = pathfinder.GetMap();
     if (!map)
@@ -127,14 +130,14 @@ bool Unit::ShouldBreachWalls(int goalX, int goalY, Pathfinder &pathfinder) const
 
 bool Unit::HasOpenRouteToEntity(const Entity &target, Pathfinder &pathfinder) const
 {
-    int x0 = target.tileX, y0 = target.tileY, x1 = target.tileX, y1 = target.tileY;
-    if (const Building *b = target.AsBuilding())
+    int minX = target.tileX, minY = target.tileY, maxX = target.tileX, maxY = target.tileY;
+    if (const Building *building = target.AsBuilding())
     {
-        x1 = b->tileX + b->buildWidth - 1;
-        y1 = b->tileY + b->buildHeight - 1;
+        maxX = building->tileX + building->buildWidth - 1;
+        maxY = building->tileY + building->buildHeight - 1;
     }
     auto touches = [&](int x, int y) {
-        return x >= x0 - 1 && x <= x1 + 1 && y >= y0 - 1 && y <= y1 + 1;
+        return x >= minX - 1 && x <= maxX + 1 && y >= minY - 1 && y <= maxY + 1;
     };
     if (touches(tileX, tileY))
         return true;
@@ -151,9 +154,10 @@ bool Unit::StanceAllowsTarget(const Entity &candidate) const
 {
     if (stance != UnitStance::PursueAndReturn || isAttackMoving || stanceHomeX < 0)
         return true;
-    const int cx = static_cast<int>(candidate.GetUnitCenterPixelX() / TILE_WIDTH);
-    const int cy = static_cast<int>(candidate.GetUnitCenterPixelY() / TILE_HEIGHT);
-    return std::max(std::abs(cx - stanceHomeX), std::abs(cy - stanceHomeY)) <= StanceLeashTiles();
+    const int candidateTileX = static_cast<int>(candidate.GetUnitCenterPixelX() / TILE_WIDTH);
+    const int candidateTileY = static_cast<int>(candidate.GetUnitCenterPixelY() / TILE_HEIGHT);
+    return std::max(std::abs(candidateTileX - stanceHomeX), std::abs(candidateTileY - stanceHomeY))
+           <= StanceLeashTiles();
 }
 
 void Unit::UpdateStanceHome(Pathfinder &pathfinder)
@@ -184,7 +188,7 @@ void Unit::UpdateStanceHome(Pathfinder &pathfinder)
         }
         return;
     }
-    const int away = std::max(std::abs(tileX - stanceHomeX), std::abs(tileY - stanceHomeY));
+    const int distFromHome = std::max(std::abs(tileX - stanceHomeX), std::abs(tileY - stanceHomeY));
     if (stanceReturning)
     {
         if (state != ActionState::Move || path.empty())
@@ -196,8 +200,8 @@ void Unit::UpdateStanceHome(Pathfinder &pathfinder)
         }
         return;
     }
-    const bool tooFar = targetEntityId != 0 && away > StanceLeashTiles();
-    const bool chaseOver = settled && away > 1;
+    const bool tooFar = targetEntityId != 0 && distFromHome > StanceLeashTiles();
+    const bool chaseOver = settled && distFromHome > 1;
     if (!tooFar && !chaseOver)
         return;
     targetEntityId = 0;
@@ -436,9 +440,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
             if (IsFortress())
             {
-                int tdx = std::abs(targetWallTileX - tileX);
-                int tdy = std::abs(targetWallTileY - tileY);
-                bool isClose = (tdx <= 1 && tdy <= 1);
+                int tileDeltaX = std::abs(targetWallTileX - tileX);
+                int tileDeltaY = std::abs(targetWallTileY - tileY);
+                bool isClose = (tileDeltaX <= 1 && tileDeltaY <= 1);
                 bool hasUpgrade
                     = delegates.isFortressFlamethrowerUnlocked && delegates.isFortressFlamethrowerUnlocked(owner);
                 if (isClose && hasUpgrade)
@@ -446,12 +450,12 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                     projectile = ProjectileType::Flame;
                     if (delegates.spawnProjectile)
                     {
-                        float mSrcX, mSrcY;
-                        GetMuzzlePoint(mSrcX, mSrcY);
-                        ProjectileType origProj = projectile;
+                        float muzzleX, muzzleY;
+                        GetMuzzlePoint(muzzleX, muzzleY);
+                        ProjectileType originalProjectile = projectile;
                         projectile = ProjectileType::Bullet;
-                        delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
-                        projectile = origProj;
+                        delegates.spawnProjectile(*this, muzzleX, muzzleY, dstX, dstY, 0, map);
+                        projectile = originalProjectile;
                     }
                 }
                 else
@@ -467,11 +471,11 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             animTimer = 0.0f;
             state = ActionState::Attack;
 
-            float mSrcX, mSrcY;
-            GetMuzzlePoint(mSrcX, mSrcY);
+            float muzzleX, muzzleY;
+            GetMuzzlePoint(muzzleX, muzzleY);
             if (delegates.spawnProjectile)
             {
-                delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, 0, map);
+                delegates.spawnProjectile(*this, muzzleX, muzzleY, dstX, dstY, 0, map);
             }
             if (burstCount > 1)
             {
@@ -506,15 +510,15 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
                     continue;
-                const std::uint32_t h = static_cast<std::uint32_t>(id) * 73856093u
-                                        ^ static_cast<std::uint32_t>(x) * 19349663u
-                                        ^ static_cast<std::uint32_t>(y) * 83492791u;
-                if (((h >> 7) & 1u) == 0u)
+                const std::uint32_t wallHash = static_cast<std::uint32_t>(id) * 73856093u
+                                               ^ static_cast<std::uint32_t>(x) * 19349663u
+                                               ^ static_cast<std::uint32_t>(y) * 83492791u;
+                if (((wallHash >> 7) & 1u) == 0u)
                     continue; // this one is left alone
-                const int d = std::abs(x - tileX) + std::abs(y - tileY);
-                if (d < bestDist)
+                const int tileDist = std::abs(x - tileX) + std::abs(y - tileY);
+                if (tileDist < bestDist)
                 {
-                    bestDist = d;
+                    bestDist = tileDist;
                     bestX = x;
                     bestY = y;
                 }
@@ -543,21 +547,21 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         && CanBreachWalls() && wallCheckCooldown <= 0.0f)
     {
         wallCheckCooldown = 1.0f;
-        int wx = -1, wy = -1;
+        int wallX = -1, wallY = -1;
         // (no search left this tick: look again soon)
         const bool searchAllowed = pathfinder.TakeBackgroundSearch();
         if (!searchAllowed)
             wallCheckCooldown = 0.1f;
         if (searchAllowed && stuckWithGoal && delegates.findWallTarget
             && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
-            delegates.findWallTarget(*this, wx, wy);
+            delegates.findWallTarget(*this, wallX, wallY);
         // The way through is open, only jammed: shoot the wall beside the gap, so it widens
-        if (wx < 0 && jammedAtGap)
-            FindJammedGapWall(*this, map, delegates, wx, wy);
-        if (wx >= 0)
+        if (wallX < 0 && jammedAtGap)
+            FindJammedGapWall(*this, map, delegates, wallX, wallY);
+        if (wallX >= 0)
         {
-            targetWallTileX = wx;
-            targetWallTileY = wy;
+            targetWallTileX = wallX;
+            targetWallTileY = wallY;
             if (state == ActionState::Move)
             {
                 // Keep the move goal: the route is planned again once the wall is down
@@ -593,9 +597,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             bool busyInRange = false;
             if (targetEntityId != 0)
             {
-                const Entity *current = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
-                busyInRange = current && current->alive && current->state != ActionState::Die
-                              && ComputeDistanceToEntityPixels(*this, *current) <= attackRange * TILE_WIDTH;
+                const Entity *currentTarget = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
+                busyInRange = currentTarget && currentTarget->alive && currentTarget->state != ActionState::Die
+                              && ComputeDistanceToEntityPixels(*this, *currentTarget) <= attackRange * TILE_WIDTH;
             }
             if (!busyInRange)
             {
@@ -626,21 +630,21 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             int bestTargetId = delegates.findTarget(*this);
             if (bestTargetId != 0)
             {
-                Entity *cand = delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
-                bool validForUnit = (cand != nullptr);
+                Entity *candidate = delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                bool validForUnit = (candidate != nullptr);
                 if (validForUnit && (isSiegeMode || moveSpeed <= 0.0f || HoldsGround()))
                 {
                     // Siege mode and holding units ONLY acquire targets strictly within attackRange
-                    float d = ComputeDistanceToEntityPixels(*this, *cand);
-                    validForUnit = (d <= attackRange * TILE_WIDTH);
+                    float targetDist = ComputeDistanceToEntityPixels(*this, *candidate);
+                    validForUnit = (targetDist <= attackRange * TILE_WIDTH);
                     if (!validForUnit && HoldsGround() && delegates.findEnemyInAttackRange)
                     {
                         bestTargetId = delegates.findEnemyInAttackRange(*this);
-                        cand = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
-                        validForUnit = cand != nullptr;
+                        candidate = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                        validForUnit = candidate != nullptr;
                     }
                 }
-                if (validForUnit && !StanceAllowsTarget(*cand))
+                if (validForUnit && !StanceAllowsTarget(*candidate))
                     validForUnit = false;
                 if (validForUnit && !isManualWallTarget)
                 {
@@ -727,10 +731,10 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 int nextTargetId = delegates.findTarget(*this);
                 if (nextTargetId != 0)
                 {
-                    Entity *cand = delegates.getEntity ? delegates.getEntity(nextTargetId) : nullptr;
-                    if (cand && StanceAllowsTarget(*cand)
+                    Entity *candidate = delegates.getEntity ? delegates.getEntity(nextTargetId) : nullptr;
+                    if (candidate && StanceAllowsTarget(*candidate)
                         && (!(isSiegeMode || HoldsGround())
-                            || ComputeDistanceToEntityPixels(*this, *cand) <= attackRange * TILE_WIDTH))
+                            || ComputeDistanceToEntityPixels(*this, *candidate) <= attackRange * TILE_WIDTH))
                     {
                         targetEntityId = nextTargetId;
                         return;
@@ -778,11 +782,13 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             && delegates.findEnemyInAttackRange)
         {
             retargetCooldown = 0.5f;
-            const int betterId = delegates.findEnemyInAttackRange(*this);
-            const Entity *better = betterId != 0 && delegates.getEntity ? delegates.getEntity(betterId) : nullptr;
-            if (better && betterId != targetEntityId && TargetPriorityTier(*better) < TargetPriorityTier(*target))
+            const int betterTargetId = delegates.findEnemyInAttackRange(*this);
+            const Entity *betterTarget
+                = betterTargetId != 0 && delegates.getEntity ? delegates.getEntity(betterTargetId) : nullptr;
+            if (betterTarget && betterTargetId != targetEntityId
+                && TargetPriorityTier(*betterTarget) < TargetPriorityTier(*target))
             {
-                targetEntityId = betterId;
+                targetEntityId = betterTargetId;
                 isSupportAssisting = false;
                 return;
             }
@@ -822,9 +828,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             if (state != ActionState::Move && !waitingForPath)
             {
                 bool isPartial = false;
-                const int gx = target->isBuilding ? target->tileX : lastSeenTargetX;
-                const int gy = target->isBuilding ? target->tileY : lastSeenTargetY;
-                if (pathfinder.FindPath(tileX, tileY, gx, gy, path, id, &isPartial))
+                const int goalX = target->isBuilding ? target->tileX : lastSeenTargetX;
+                const int goalY = target->isBuilding ? target->tileY : lastSeenTargetY;
+                if (pathfinder.FindPath(tileX, tileY, goalX, goalY, path, id, &isPartial))
                 {
                     pathIndex = 0;
                     state = ActionState::Move;
@@ -860,10 +866,10 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             projectile = secondaryProjectile;
             muzzleOffsetX = secondaryMuzzleX;
             muzzleOffsetY = secondaryMuzzleY;
-            float mSrcX, mSrcY;
-            GetMuzzlePoint(mSrcX, mSrcY);
+            float muzzleX, muzzleY;
+            GetMuzzlePoint(muzzleX, muzzleY);
             firingSecondary = true;
-            delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+            delegates.spawnProjectile(*this, muzzleX, muzzleY, dstX, dstY, target->id, map);
             firingSecondary = false;
             attackDamage = mainDamage;
             splashPercent = mainSplash;
@@ -912,14 +918,14 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 wallCheckCooldown = 1.0f;
                 if (!HasOpenRouteToEntity(*target, pathfinder))
                 {
-                    int wx = -1, wy = -1;
-                    delegates.findWallTarget(*this, wx, wy);
-                    if (wx >= 0)
+                    int wallX = -1, wallY = -1;
+                    delegates.findWallTarget(*this, wallX, wallY);
+                    if (wallX >= 0)
                     {
                         targetEntityId = 0;
                         isSupportAssisting = false;
-                        targetWallTileX = wx;
-                        targetWallTileY = wy;
+                        targetWallTileX = wallX;
+                        targetWallTileY = wallY;
                         waitingForPath = false;
                         return;
                     }
@@ -1019,9 +1025,9 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
             if (IsFortress())
             {
-                int tdx = std::abs(target->tileX - tileX);
-                int tdy = std::abs(target->tileY - tileY);
-                bool isClose = (tdx <= 1 && tdy <= 1);
+                int tileDeltaX = std::abs(target->tileX - tileX);
+                int tileDeltaY = std::abs(target->tileY - tileY);
+                bool isClose = (tileDeltaX <= 1 && tileDeltaY <= 1);
                 bool hasUpgrade
                     = delegates.isFortressFlamethrowerUnlocked && delegates.isFortressFlamethrowerUnlocked(owner);
                 if (isClose && hasUpgrade)
@@ -1029,12 +1035,12 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                     projectile = ProjectileType::Flame;
                     if (delegates.spawnProjectile)
                     {
-                        float mSrcX, mSrcY;
-                        GetMuzzlePoint(mSrcX, mSrcY);
-                        ProjectileType origProj = projectile;
+                        float muzzleX, muzzleY;
+                        GetMuzzlePoint(muzzleX, muzzleY);
+                        ProjectileType originalProjectile = projectile;
                         projectile = ProjectileType::Bullet;
-                        delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
-                        projectile = origProj;
+                        delegates.spawnProjectile(*this, muzzleX, muzzleY, dstX, dstY, target->id, map);
+                        projectile = originalProjectile;
                     }
                 }
                 else
@@ -1050,11 +1056,11 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             animTimer = 0.0f;
             state = ActionState::Attack;
 
-            float mSrcX, mSrcY;
-            GetMuzzlePoint(mSrcX, mSrcY);
+            float muzzleX, muzzleY;
+            GetMuzzlePoint(muzzleX, muzzleY);
             if (delegates.spawnProjectile)
             {
-                delegates.spawnProjectile(*this, mSrcX, mSrcY, dstX, dstY, target->id, map);
+                delegates.spawnProjectile(*this, muzzleX, muzzleY, dstX, dstY, target->id, map);
             }
             if (burstCount > 1)
             {

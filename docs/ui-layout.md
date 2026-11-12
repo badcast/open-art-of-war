@@ -28,9 +28,9 @@ screens:
 - **action**: what a button does (the game knows the names).
 
 ## HUD, profile `touch`
-Conditions: `placing`, `panel_open`, `panel_build`, `panel_units`, `units_inf`, `units_veh`, `box_select`,
+Conditions: `placing`, `panel_open`, `panel_build`, `panel_units`, `units_inf`, `units_veh`,
 `attack_mode`, `sell_armed`, `has_combat`, `has_building`, `has_selection`.
-Actions: `menu goals tech dock_build dock_units dock_box attack_move stop hold siege clear select_all repair sell
+Actions: `menu goals tech dock_build dock_units attack_move stop hold siege clear select_all repair sell
 confirm cancel units_infantry units_vehicles scroll_left scroll_right`.
 
 ## Examples

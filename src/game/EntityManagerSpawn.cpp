@@ -164,6 +164,8 @@ static void CopyUnitConfig(Unit &u, const UnitConfig &cfg)
 // order, so the first slots took every freed place and the production of the last ones stood still for good.
 int EntityManager::FreeEntitySlots(PlayerId owner) const
 {
+    if (m_replicaApplying)
+        return MAX_UNITS;
     int live = 0;
     int own = 0;
     for (const Entity &e : m_entities)

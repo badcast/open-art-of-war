@@ -169,9 +169,19 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                     m_leftClickWorldX,
                     m_leftClickWorldY);
 
-                // Immediate click dispatch for the UI sidebar (right of the map viewport) and the top debug bar
-                if (static_cast<int>(event.button.x) >= camera.GetViewportWidth()
-                    || static_cast<int>(event.button.y) <= 40)
+                // Immediate click dispatch for the UI sidebar (right of the map viewport), touch HUD panels, and debug bar
+                const int px = static_cast<int>(event.button.x);
+                const int py = static_cast<int>(event.button.y);
+                bool inTouchPanel = false;
+                for (const SDL_Rect &r : m_touchUiRects)
+                {
+                    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h)
+                    {
+                        inTouchPanel = true;
+                        break;
+                    }
+                }
+                if (px >= camera.GetViewportWidth() || py <= 40 || inTouchPanel)
                 {
                     m_leftClickIssued = true;
                     m_selectionBox.active = false;
@@ -303,6 +313,9 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             mouse(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_LEFT);
             // Touch UI clicks fire on release, allowing a hold to cancel a production order.
             m_leftClickIssued = false;
+            // Never start a selection box on a HUD/radar panel, menu, or when single-finger camera pan is active
+            if (!m_touchMap || m_touchPan)
+                m_selectionBox.active = false;
         }
         else
         {
@@ -388,6 +401,11 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             m_leftClickScreenX = static_cast<int>(point.x);
             m_leftClickScreenY = static_cast<int>(point.y);
             camera.ScreenToWorld(point.x, point.y, m_leftClickWorldX, m_leftClickWorldY);
+        }
+        else
+        {
+            // A finger that dragged past the tap slop must never turn into a stray tap click on release
+            m_selectionBox.active = false;
         }
         mouse(SDL_EVENT_MOUSE_BUTTON_UP, SDL_BUTTON_LEFT);
     }

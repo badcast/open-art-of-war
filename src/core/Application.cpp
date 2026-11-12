@@ -22,6 +22,7 @@
 #include "graphics/ShaderEffects.hpp"
 #include "graphics/NightLighting.hpp"
 #include "net/NetMatch.hpp"
+#include "net/WorldSnapshot.hpp"
 #include "ui/NetworkMenu.hpp"
 #include "openaow/net/Discovery.hpp"
 #include "openaow/net/MasterClient.hpp"
@@ -54,6 +55,32 @@
 #include <cmath>
 namespace OpenArtOfWar
 {
+
+namespace
+{
+// OAOW_NET_TRACE=1: every 20th tick the hash of a snapshot, to compare the authority with a replica by eye or script
+void SnapshotTrace(const char *who, const WorldSnapshot &snap)
+{
+    static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
+    if (!trace || snap.tick % 20 != 0)
+        return;
+    std::uint64_t h = 1469598103934665603ull;
+    // Entities and economies only: the replica's own capture carries no shots or events
+    WorldSnapshot plain = snap;
+    plain.hasWalls = false;
+    plain.walls.clear();
+    plain.projectiles.clear();
+    plain.cues.clear();
+    plain.blasts.clear();
+    plain.explosions.clear();
+    const std::vector<std::uint8_t> bytes = plain.Encode();
+    for (std::uint8_t b : bytes)
+        h = (h ^ b) * 1099511628211ull;
+    std::printf("[Snap] %s tick %u entities %zu bytes %zu hash %016llx\n", who, snap.tick, snap.entities.size(), bytes.size(),
+        static_cast<unsigned long long>(h));
+    std::fflush(stdout);
+}
+} // namespace
 
 Application::Application() {}
 
@@ -484,6 +511,13 @@ void Application::UpdateRenderAlpha(double accumulator, double frameTime)
         m_alphaLast = 1.0f;
         return;
     }
+    if (InNetworkMatch() && m_net->IsReplica())
+    {
+        // Snapshots come every second tick: glide from the last picture to the new one over that time
+        m_alphaLast = static_cast<float>(std::clamp(m_replicaSince / (2.0 * SIMULATION_TIMESTEP), 0.0, 1.0));
+        m_entities->SetRenderAlpha(m_alphaLast);
+        return;
+    }
     const std::uint32_t tick = m_gameplayController->simulation().Tick();
     const bool ticked = tick != m_alphaTick;
     if (ticked)
@@ -628,6 +662,27 @@ void Application::Run()
                                 zoom);
                         }
                         m_net->AfterTick(tick, checksum);
+                        if (m_net->AuthorityModeOn() && m_net->IsAuthority() && tick % 2 == 0)
+                        {
+                            SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
+                            WorldSnapshot snap = WorldSnapshot::CaptureEntities(*m_entities, tick);
+                            snap.CaptureEffects(*m_entities);
+                            {
+                                // Walls: when the set changed, and once a second in case a snapshot was lost
+                                static std::vector<WallSnap> sentWalls;
+                                WorldSnapshot walls;
+                                walls.CaptureWalls(*m_map);
+                                if (walls.walls != sentWalls || tick % 20 == 0)
+                                {
+                                    snap.hasWalls = true;
+                                    snap.walls = walls.walls;
+                                    sentWalls = std::move(walls.walls);
+                                }
+                            }
+                            sim.FillEconomies(ctx, snap);
+                            sim.FillResearch(snap);
+                            m_net->PublishSnapshot(snap, *m_entities, *m_map);
+                        }
                         m_net->NoteTickRan(nowMs);
                         // Tests (OAOW_NET_DROP_AT=<tick>): the connection drops once at that tick
                         static const long dropAt
@@ -642,7 +697,7 @@ void Application::Run()
                     }
                     return true;
                 };
-                if (net && m_net->TurnsAhead(sim.Tick()) > 10)
+                if (net && !m_net->IsReplica() && m_net->TurnsAhead(sim.Tick()) > 10)
                 {
                     // Far behind (back after a reconnect): play the turns through as fast as a frame allows
                     const auto deadline = clock::now() + std::chrono::milliseconds(25);
@@ -650,6 +705,64 @@ void Application::Run()
                     {
                     }
                     accumulator = 0.0;
+                }
+                else if (net && m_net->IsReplica())
+                {
+                    // A replica never advances the world (state comes from the authority): commands go out, the UI lives
+                    static std::uint32_t lastReplicaTick = 0;
+                    m_net->PumpReplica(nowMs);
+                    m_replicaSince += frameTime;
+                    m_entities->UpdateVisualEffects(static_cast<float>(frameTime));
+                    WorldSnapshot snap;
+                    while (m_net->TakeSnapshot(snap))
+                    {
+                        SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
+                        if (!m_entities->ApplySnapshot(snap))
+                            continue;
+                        m_net->AckSnapshot(snap);
+                        snap.ApplyWalls(*m_map);
+                        // The authority decides how the match ends for this player
+                        if (m_state == AppState::SkirmishPlaying && snap.result == 1)
+                            m_state = AppState::Victory;
+                        else if (m_state == AppState::SkirmishPlaying && snap.result == 2)
+                            m_state = AppState::Defeat;
+                        m_entities->UpdateFogOfWar(*m_map); // nobody simulates here: the fog follows the replicated entities
+                        sim.ApplyEconomies(snap, ctx);
+                        sim.ApplyResearch(snap, ctx);
+                        if (DebugEnv("OAOW_NET_TRACE"))
+                        {
+                            // The replica's own capture of the world it just built: must equal what was sent
+                            WorldSnapshot mine = WorldSnapshot::CaptureEntities(*m_entities, snap.tick);
+                            sim.FillEconomies(ctx, mine);
+                            sim.FillResearch(mine);
+                            mine.research.erase(std::remove_if(mine.research.begin(), mine.research.end(), [&](const ResearchSnap &r) {
+                                return std::none_of(snap.research.begin(), snap.research.end(), [&](const ResearchSnap &o) { return o.player == r.player; });
+                            }), mine.research.end());
+                            // Only what the authority sent: the replica also remembers things it can no longer see
+                            mine.entities.erase(
+                                std::remove_if(
+                                    mine.entities.begin(), mine.entities.end(),
+                                    [&](const EntitySnap &e) {
+                                        return std::none_of(snap.entities.begin(), snap.entities.end(), [&](const EntitySnap &o) { return o.id == e.id; });
+                                    }),
+                                mine.entities.end());
+                            mine.economies.erase(
+                                std::remove_if(
+                                    mine.economies.begin(), mine.economies.end(),
+                                    [&](const EconomySnap &e) {
+                                        return std::none_of(snap.economies.begin(), snap.economies.end(), [&](const EconomySnap &o) { return o.player == e.player; });
+                                    }),
+                                mine.economies.end());
+                            SnapshotTrace("repl", mine);
+                        }
+                        lastReplicaTick = snap.tick;
+                        m_replicaSince = 0.0;
+                    }
+                    DriveNetworkBot(lastReplicaTick);
+                    accumulator = 0.0;
+                    m_gameplayController->SetSimulationHold(true);
+                    Update(static_cast<float>(frameTime));
+                    m_gameplayController->SetSimulationHold(false);
                 }
                 else if (net)
                 {

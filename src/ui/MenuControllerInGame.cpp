@@ -51,15 +51,16 @@ PauseLayout pauseLayout(int windowW, int windowH)
 {
     PauseLayout l;
     // ui/layout.yaml (screen pause); the numbers below stand in when the file has no such screen
-    if (uilayout::Current().Has("pause", "pc"))
+    const uilayout::Layout &layoutFile = uilayout::Current();
+    if (layoutFile.Has("pause", "pc"))
     {
-        const uilayout::Solved s = uilayout::Current().Solve("pause", "pc", windowW, windowH, {});
+        const uilayout::Solved s = layoutFile.Solve("pause", uilayout::MenuProfile(layoutFile, "pause"), windowW, windowH, {});
         l.dialog = s.Rect("dialog");
         for (int i = 0; i < kPauseItems; ++i)
             l.items[i] = s.Rect("item" + std::to_string(i));
         return l;
     }
-    const int itemH = 46;
+    const int itemH = 50;
     const int gap = 8;
     int h = 52 + 20 + kPauseItems * itemH + (kPauseItems - 1) * gap + 24;
     l.dialog = ui::CenteredRect(windowW, windowH, 380, h);
@@ -263,7 +264,7 @@ bool MenuController::UpdateMissionDialog(
         return false;
     m_mouseX = mx;
     m_mouseY = my;
-    const UiRect btn = DialogFooterButton(MissionDialogRect(windowW, windowH), 200);
+    const UiRect btn = DialogFooterButton(MissionDialogRect(windowW, windowH), 220);
     if ((leftClicked && btn.Contains(mx, my)) || input.IsConfirmJustPressed()
         || input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
     {
@@ -303,7 +304,7 @@ void MenuController::RenderBriefing(
         col::Text,
         ui::FONT_BODY);
 
-    UiRect start = DialogFooterButton(d, 220);
+    UiRect start = DialogFooterButton(d, 240);
     fontRenderer.DrawString(
         _("Click or press Enter to begin"),
         d.x + 20,
@@ -351,7 +352,7 @@ void MenuController::RenderMissionDialog(Renderer &renderer, BitmapFontRenderer 
         return;
     const UiRect d = MissionDialogRect(windowW, windowH);
     const UiRect content = ui::DrawDialog(renderer, fontRenderer, windowW, windowH, d, m_missionDialog.title);
-    const UiRect btn = DialogFooterButton(d, 200);
+    const UiRect btn = DialogFooterButton(d, 220);
     const int bottom = btn.y - 12;
     // Speaker in the accent colour, the line below it; body text gets smaller when the dialogue is long
     int scale = ui::FONT_BODY;

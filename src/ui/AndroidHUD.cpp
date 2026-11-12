@@ -15,16 +15,16 @@ namespace OpenArtOfWar
 namespace
 {
 
-constexpr int kCardW = 136;
-constexpr int kCardH = 88;
+constexpr int kCardWidth = 136;
+constexpr int kCardHeight = 88;
 constexpr int kCardGap = 8;
 
 bool HasCombatUnits(const EntityManager &entities, const std::vector<int> &selected)
 {
-    for (int id : selected)
+    for (int entityId : selected)
     {
-        const Entity *e = entities.GetEntity(id);
-        if (e && e->alive && !e->isBuilding)
+        const Entity *entity = entities.GetEntity(entityId);
+        if (entity && entity->alive && !entity->isBuilding)
             return true;
     }
     return false;
@@ -33,10 +33,10 @@ bool HasCombatUnits(const EntityManager &entities, const std::vector<int> &selec
 } // namespace
 
 AndroidHUD::Layout AndroidHUD::MakeLayout(
-    int windowW, int windowH, bool hasCombat, bool hasBuilding, int selectedCount) const
+    int windowWidth, int windowHeight, bool hasCombat, bool hasBuilding, int selectedCount) const
 {
     // Where things stand is ui/layout.yaml (screen hud, profile touch); this only answers its conditions
-    const uilayout::Conditions cond = [&](const std::string &name) {
+    const uilayout::Conditions conditions = [&](const std::string &name) {
         if (name == "placing")
             return m_placing;
         if (name == "panel_open")
@@ -49,8 +49,6 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
             return m_unitTab == TabInfantry;
         if (name == "units_veh")
             return m_unitTab == TabVehicles;
-        if (name == "box_select")
-            return m_boxSelect;
         if (name == "attack_mode")
             return m_attackMoveMode;
         if (name == "sell_armed")
@@ -67,13 +65,12 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
             return selectedCount > 0;
         return false;
     };
-    static const std::map<std::string, Act> kActs
+    static const std::map<std::string, Act> kActions
         = {{"menu", Act::Menu},
            {"goals", Act::Goals},
            {"tech", Act::Tech},
            {"dock_build", Act::DockBuild},
            {"dock_units", Act::DockUnits},
-           {"dock_box", Act::DockBox},
            {"attack_move", Act::AttackMove},
            {"stop", Act::Stop},
            {"hold", Act::Hold},
@@ -91,82 +88,99 @@ AndroidHUD::Layout AndroidHUD::MakeLayout(
            {"radar_zoom_in", Act::RadarZoomIn},
            {"radar_zoom_out", Act::RadarZoomOut}};
 
-    const uilayout::Solved solved = uilayout::Current().Solve("hud", "touch", windowW, windowH, cond);
+    const uilayout::Solved solved
+        = uilayout::Current().Solve("hud", "touch", windowWidth, windowHeight, conditions);
     Layout layout;
     layout.u = solved.u;
     layout.resources = solved.Rect("resources");
     layout.radar = solved.Rect("radar");
     layout.cards = solved.Rect("cards");
     layout.notice = solved.Rect("notice");
-    for (const uilayout::Node &n : solved.nodes)
+    for (const uilayout::Node &node : solved.nodes)
     {
-        if (!n.visible || n.type != "button")
+        if (!node.visible || node.type != "button")
             continue;
-        const auto it = kActs.find(n.action);
-        if (it == kActs.end())
+        const auto actionIt = kActions.find(node.action);
+        if (actionIt == kActions.end())
             continue;
-        Button b;
-        b.r = n.rect;
-        b.act = it->second;
-        b.label = _(n.label.c_str());
-        b.active = n.active;
-        b.disabled = n.disabled;
-        b.fontScale = n.fontScale;
-        b.style = n.style == "danger"    ? ui::ButtonStyle::Danger
-                  : n.style == "primary" ? ui::ButtonStyle::Primary
-                                         : ui::ButtonStyle::Secondary;
-        layout.buttons.push_back(std::move(b));
+        Button button;
+        button.r = node.rect;
+        button.act = actionIt->second;
+        button.label = _(node.label.c_str());
+        button.active = node.active;
+        button.disabled = node.disabled;
+        button.fontScale = node.fontScale;
+        button.style = node.style == "danger"    ? ui::ButtonStyle::Danger
+                       : node.style == "primary" ? ui::ButtonStyle::Primary
+                                                 : ui::ButtonStyle::Secondary;
+        layout.buttons.push_back(std::move(button));
     }
+    const auto scalePx = [&](int value) {
+        return static_cast<int>(std::lround(value * layout.u));
+    };
     if (layout.cards.w > 0)
     {
-        const int arrow = static_cast<int>(std::lround(48 * layout.u));
-        const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * layout.u)) + 4 : 0;
-        layout.cardsFit = std::max(1, (layout.cards.w - 2 * arrow - offset) / (kCardW + kCardGap));
+        const int arrowWidth = scalePx(48);
+        const int tabOffset = m_panel == Panel::Units ? scalePx(70) + scalePx(4) : 0;
+        const int cardWidth = std::max(1, scalePx(kCardWidth));
+        const int cardGap = scalePx(kCardGap);
+        const int availableWidth = std::max(0, layout.cards.w - 2 * arrowWidth - tabOffset);
+        layout.cardsFit = std::max(1, (availableWidth - cardGap) / (cardWidth + cardGap));
     }
     return layout;
 }
 
 UiRect AndroidHUD::CardRect(const Layout &layout, int slot) const
 {
-    const int arrow = static_cast<int>(std::lround(48 * layout.u));
-    const int offset = m_panel == Panel::Units ? static_cast<int>(std::lround(70 * layout.u)) + 4 : 0;
-    return {layout.cards.x + arrow + offset + slot * (kCardW + kCardGap), layout.cards.y, kCardW, kCardH};
+    const auto scalePx = [&](int value) {
+        return static_cast<int>(std::lround(value * layout.u));
+    };
+    const int arrowWidth = scalePx(48);
+    const int tabOffset = m_panel == Panel::Units ? scalePx(70) + scalePx(4) : 0;
+    const int cardWidth = scalePx(kCardWidth);
+    const int cardHeight = scalePx(kCardHeight);
+    const int cardGap = scalePx(kCardGap);
+    return {
+        layout.cards.x + arrowWidth + tabOffset + slot * (cardWidth + cardGap), layout.cards.y, cardWidth, cardHeight};
 }
 
-bool AndroidHUD::OverPanels(const Layout &layout, int mx, int my) const
+bool AndroidHUD::OverPanels(const Layout &layout, int mouseX, int mouseY) const
 {
-    if (layout.resources.Contains(mx, my) || layout.radar.Contains(mx, my))
+    if (layout.resources.Contains(mouseX, mouseY) || layout.radar.Contains(mouseX, mouseY))
         return true;
-    for (const Button &b : layout.buttons)
-        if (b.r.Contains(mx, my))
+    for (const Button &button : layout.buttons)
+        if (button.r.Contains(mouseX, mouseY))
             return true;
-    if (m_panel != Panel::None && !m_placing && layout.cards.Contains(mx, my))
+    if (m_panel != Panel::None && !m_placing && layout.cards.Contains(mouseX, mouseY))
         return true;
     return false;
 }
 
-bool AndroidHUD::IsOverHud(int mx, int my, int windowW, int windowH) const
+bool AndroidHUD::IsOverHud(int mouseX, int mouseY, int windowWidth, int windowHeight) const
 {
-    const Layout layout = MakeLayout(windowW, windowH, false, false, 0);
-    return OverPanels(layout, mx, my);
+    const Layout layout
+        = MakeLayout(windowWidth, windowHeight, m_lastHasCombat, m_lastHasBuilding, m_lastSelectedCount);
+    return OverPanels(layout, mouseX, mouseY);
 }
 
-std::vector<SDL_Rect> AndroidHUD::TouchPanels(int windowW, int windowH) const
+std::vector<SDL_Rect> AndroidHUD::TouchPanels(int windowWidth, int windowHeight) const
 {
-    const Layout layout = MakeLayout(windowW, windowH, true, true, 1);
-    std::vector<SDL_Rect> out;
-    auto push = [&](const UiRect &r) {
-        out.push_back({r.x, r.y, r.w, r.h});
+    const Layout layout
+        = MakeLayout(windowWidth, windowHeight, m_lastHasCombat, m_lastHasBuilding, m_lastSelectedCount);
+    std::vector<SDL_Rect> panelRects;
+    auto pushRect = [&](const UiRect &rect) {
+        if (rect.w > 0 && rect.h > 0)
+            panelRects.push_back({rect.x, rect.y, rect.w, rect.h});
     };
-    push(layout.resources);
-    push(layout.radar);
-    for (const Button &b : layout.buttons)
-        push(b.r);
+    pushRect(layout.resources);
+    pushRect(layout.radar);
+    for (const Button &button : layout.buttons)
+        pushRect(button.r);
     if (m_panel != Panel::None && !m_placing)
-        push(layout.cards);
+        pushRect(layout.cards);
     if (m_placing && m_ghostRect.w > 0)
-        out.push_back(m_ghostRect);
-    return out;
+        panelRects.push_back(m_ghostRect);
+    return panelRects;
 }
 
 void AndroidHUD::UpdateGhostRect(const Camera &camera)
@@ -177,20 +191,21 @@ void AndroidHUD::UpdateGhostRect(const Camera &camera)
         m_ghostRect = {0, 0, 0, 0};
         return;
     }
-    const BuildingBlueprint &bp = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
-    float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
-    camera.WorldToScreen(static_cast<float>(m_ghostX * TILE_WIDTH), static_cast<float>(m_ghostY * TILE_HEIGHT), x0, y0);
+    const BuildingBlueprint &blueprint = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
+    float startX = 0.0f, startY = 0.0f, endX = 0.0f, endY = 0.0f;
     camera.WorldToScreen(
-        static_cast<float>((m_ghostX + bp.width) * TILE_WIDTH),
-        static_cast<float>((m_ghostY + bp.height) * TILE_HEIGHT),
-        x1,
-        y1);
-    const int pad = 24; // a finger is not a pixel
+        static_cast<float>(m_ghostX * TILE_WIDTH), static_cast<float>(m_ghostY * TILE_HEIGHT), startX, startY);
+    camera.WorldToScreen(
+        static_cast<float>((m_ghostX + blueprint.width) * TILE_WIDTH),
+        static_cast<float>((m_ghostY + blueprint.height) * TILE_HEIGHT),
+        endX,
+        endY);
+    const int touchPadding = 24; // a finger is not a pixel
     m_ghostRect
-        = {static_cast<int>(x0) - pad,
-           static_cast<int>(y0) - pad,
-           static_cast<int>(x1 - x0) + 2 * pad,
-           static_cast<int>(y1 - y0) + 2 * pad};
+        = {static_cast<int>(startX) - touchPadding,
+           static_cast<int>(startY) - touchPadding,
+           static_cast<int>(endX - startX) + 2 * touchPadding,
+           static_cast<int>(endY - startY) + 2 * touchPadding};
 }
 
 void AndroidHUD::StartPlacing(const Camera &camera)
@@ -201,10 +216,11 @@ void AndroidHUD::StartPlacing(const Camera &camera)
     m_panel = Panel::None;
     m_attackMoveMode = false;
     m_grab = m_fingerWas = false;
-    float wx = 0.0f, wy = 0.0f;
-    camera.ScreenToWorld(camera.GetViewportWidth() * 0.5f, camera.GetViewportHeight() * 0.5f - 40.0f, wx, wy);
-    m_ghostX = static_cast<int>(std::floor(wx / TILE_WIDTH));
-    m_ghostY = static_cast<int>(std::floor(wy / TILE_HEIGHT));
+    float worldX = 0.0f, worldY = 0.0f;
+    camera.ScreenToWorld(
+        camera.GetViewportWidth() * 0.5f, camera.GetViewportHeight() * 0.5f - 40.0f, worldX, worldY);
+    m_ghostX = static_cast<int>(std::floor(worldX / TILE_WIDTH));
+    m_ghostY = static_cast<int>(std::floor(worldY / TILE_HEIGHT));
 }
 
 bool AndroidHUD::ConfirmPlacing(Economy &economy, const EntityManager &entities, const TileMap &map)
@@ -212,20 +228,21 @@ bool AndroidHUD::ConfirmPlacing(Economy &economy, const EntityManager &entities,
     const auto &blueprints = EntityManager::GetBlueprints();
     if (m_selectedBlueprint < 0 || m_selectedBlueprint >= static_cast<int>(blueprints.size()))
         return false;
-    const BuildingBlueprint &bp = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
-    const bool isMine = bp.mineKind >= 0;
+    const BuildingBlueprint &blueprint = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
+    const bool isMine = blueprint.mineKind >= 0;
     const bool canPlace
-        = isMine ? entities.CanPlaceMine(bp.mineKind, m_ghostX, m_ghostY, map, Players::Local())
-                 : entities.CanPlaceBuilding(m_ghostX, m_ghostY, bp.width, bp.height, map, Players::Local());
-    if (!isMine && !BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex))
+        = isMine ? entities.CanPlaceMine(blueprint.mineKind, m_ghostX, m_ghostY, map, Players::Local())
+                 : entities.CanPlaceBuilding(
+                     m_ghostX, m_ghostY, blueprint.width, blueprint.height, map, Players::Local());
+    if (!isMine && !BuildLimits::CanBuildMore(entities, map, Players::Local(), blueprint.buildingIndex))
     {
         SoundRequests::Play("ui_error");
         SetNotification(
-            BuildLimits::LimitOf(entities, bp.buildingIndex) == 0 ? _("THIS BUILDING IS NOT ALLOWED!")
-                                                                  : _("BUILDING LIMIT REACHED!"));
+            BuildLimits::LimitOf(entities, blueprint.buildingIndex) == 0 ? _("THIS BUILDING IS NOT ALLOWED!")
+                                                                         : _("BUILDING LIMIT REACHED!"));
         return false;
     }
-    if (!economy.CanAfford(bp.creditCost))
+    if (!economy.CanAfford(blueprint.creditCost))
     {
         SoundRequests::Announce("ann_insufficient_funds");
         return false;
@@ -235,14 +252,14 @@ bool AndroidHUD::ConfirmPlacing(Economy &economy, const EntityManager &entities,
         SoundRequests::Announce("ann_cannot_build");
         return false;
     }
-    SimCommand c;
-    c.type = CommandType::PlaceBuilding;
-    c.a = bp.blueprintId;
-    c.x = m_ghostX;
-    c.y = m_ghostY;
-    Issue(std::move(c));
+    SimCommand command;
+    command.type = CommandType::PlaceBuilding;
+    command.a = blueprint.blueprintId;
+    command.x = m_ghostX;
+    command.y = m_ghostY;
+    Issue(std::move(command));
     SoundRequests::Play("build_place");
-    if (!bp.isWall && !isMine)
+    if (!blueprint.isWall && !isMine)
     {
         SoundRequests::Announce("ann_building");
         m_placing = false; // a building ends the placement; walls and mines are laid one after the other
@@ -301,9 +318,6 @@ void AndroidHUD::Press(
             m_activeTab = m_unitTab;
             m_attackMoveMode = false;
             break;
-        case Act::DockBox:
-            m_boxSelect = !m_boxSelect;
-            break;
         case Act::AttackMove:
             ActivateCell(TabOrders, 0, false, economy, entities, map, selectedUnits);
             break;
@@ -318,36 +332,37 @@ void AndroidHUD::Press(
             break;
         case Act::ClearSel:
             selectedUnits.clear();
-            for (auto &e : entities.GetAllEntities())
-                e.selected = false;
+            for (auto &entity : entities.GetAllEntities())
+                entity.selected = false;
             m_attackMoveMode = false;
             break;
         case Act::SelectAll:
             selectedUnits.clear();
-            for (auto &e : entities.GetAllEntities())
+            for (auto &entity : entities.GetAllEntities())
             {
-                const Unit *u = e.AsUnit();
-                e.selected = u && u->alive && u->state != ActionState::Die && u->owner == Players::Local();
-                if (e.selected)
-                    selectedUnits.push_back(e.id);
+                const Unit *unit = entity.AsUnit();
+                entity.selected = unit && unit->alive && unit->state != ActionState::Die
+                                  && unit->owner == Players::Local();
+                if (entity.selected)
+                    selectedUnits.push_back(entity.id);
             }
             break;
         case Act::Repair:
         {
-            const auto own = OwnSelectedBuildings(entities, selectedUnits);
-            if (own.empty())
+            const auto ownedBuildings = OwnSelectedBuildings(entities, selectedUnits);
+            if (ownedBuildings.empty())
                 break;
-            SimCommand c;
-            c.type = CommandType::ToggleRepair;
-            for (const Building *b : own)
-                c.ids.push_back(static_cast<std::uint32_t>(b->id));
-            Issue(std::move(c));
+            SimCommand command;
+            command.type = CommandType::ToggleRepair;
+            for (const Building *building : ownedBuildings)
+                command.ids.push_back(static_cast<std::uint32_t>(building->id));
+            Issue(std::move(command));
             break;
         }
         case Act::Sell:
         {
-            const auto own = OwnSelectedBuildings(entities, selectedUnits);
-            if (own.empty())
+            const auto ownedBuildings = OwnSelectedBuildings(entities, selectedUnits);
+            if (ownedBuildings.empty())
                 break;
             if (m_destroyArmed <= 0.0f)
             {
@@ -355,19 +370,21 @@ void AndroidHUD::Press(
                 break;
             }
             m_destroyArmed = 0.0f;
-            SimCommand c;
-            c.type = CommandType::Demolish;
-            for (const Building *b : own)
-                c.ids.push_back(static_cast<std::uint32_t>(b->id));
+            SimCommand command;
+            command.type = CommandType::Demolish;
+            for (const Building *building : ownedBuildings)
+                command.ids.push_back(static_cast<std::uint32_t>(building->id));
             selectedUnits.erase(
                 std::remove_if(
                     selectedUnits.begin(),
                     selectedUnits.end(),
-                    [&](int id) {
-                        return std::find(c.ids.begin(), c.ids.end(), static_cast<std::uint32_t>(id)) != c.ids.end();
+                    [&](int selectedId) {
+                        return std::find(
+                                   command.ids.begin(), command.ids.end(), static_cast<std::uint32_t>(selectedId))
+                               != command.ids.end();
                     }),
                 selectedUnits.end());
-            Issue(std::move(c));
+            Issue(std::move(command));
             break;
         }
         case Act::Confirm:
@@ -387,10 +404,11 @@ void AndroidHUD::Press(
         case Act::ScrollLeft:
         case Act::ScrollRight:
         {
-            const int slot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
+            const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
             const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
             const int maxStart = std::max(0, ItemCountForTab(tab) - layout.cardsFit);
-            m_scroll[slot] = std::clamp(m_scroll[slot] + (act == Act::ScrollLeft ? -1 : 1), 0, maxStart);
+            m_scroll[scrollSlot]
+                = std::clamp(m_scroll[scrollSlot] + (act == Act::ScrollLeft ? -1 : 1), 0, maxStart);
             break;
         }
         case Act::RadarZoomIn:
@@ -406,14 +424,14 @@ void AndroidHUD::Press(
 }
 
 bool AndroidHUD::HandleHudClick(
-    int mx,
-    int my,
+    int mouseX,
+    int mouseY,
     bool leftClicked,
     bool rightClicked,
     bool leftMouseDown,
     int wheelSteps,
-    int windowW,
-    int windowH,
+    int windowWidth,
+    int windowHeight,
     Economy &economy,
     EntityManager &entities,
     TileMap &map,
@@ -426,38 +444,51 @@ bool AndroidHUD::HandleHudClick(
     SyncPanelWithTab();
     if (m_destroyArmed > 0.0f && OwnSelectedBuildings(entities, selectedUnits).empty())
         m_destroyArmed = 0.0f;
-    const bool combat = HasCombatUnits(entities, selectedUnits);
-    const bool building = !OwnSelectedBuildings(entities, selectedUnits).empty();
-    const Layout layout = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selectedUnits.size()));
-    m_panels.clear();
+    const bool hasCombat = HasCombatUnits(entities, selectedUnits);
+    const bool hasBuilding = !OwnSelectedBuildings(entities, selectedUnits).empty();
+    m_lastHasCombat = hasCombat;
+    m_lastHasBuilding = hasBuilding;
+    m_lastSelectedCount = static_cast<int>(selectedUnits.size());
+    const Layout layout = MakeLayout(windowWidth, windowHeight, hasCombat, hasBuilding, m_lastSelectedCount);
+    if (m_panel != Panel::None)
+    {
+        const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
+        const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
+        const int maxStart = std::max(0, ItemCountForTab(tab) - layout.cardsFit);
+        m_scroll[scrollSlot] = std::clamp(m_scroll[scrollSlot], 0, maxStart);
+    }
 
     if (!leftMouseDown)
         m_radarHeld = false;
 
     // The radar: a tap or a drag on it puts the camera there (the zoom buttons on it are buttons)
     bool onButton = false;
-    for (const Button &b : layout.buttons)
-        onButton = onButton || b.r.Contains(mx, my);
-    if (layout.radar.Contains(mx, my) && !onButton && (leftMouseDown || leftClicked))
+    for (const Button &button : layout.buttons)
+        onButton = onButton || button.r.Contains(mouseX, mouseY);
+    if (layout.radar.Contains(mouseX, mouseY) && !onButton && (leftMouseDown || leftClicked))
         m_radarHeld = true;
     m_radarDragging = m_radarHeld && leftMouseDown; // a zoomed radar holds still while the camera follows the finger
     if (m_radarHeld)
     {
-        const RadarView v
+        const RadarView view
             = radarView(layout.radar, map.GetWidth(), map.GetHeight(), m_radarZoom, m_radarCenterX, m_radarCenterY);
-        if (v.w > 0 && v.h > 0)
+        if (view.w > 0 && view.h > 0)
         {
-            const float tx = std::clamp(
-                v.viewX + static_cast<float>(mx - v.ox) / v.scale, 0.0f, static_cast<float>(map.GetWidth()));
-            const float ty = std::clamp(
-                v.viewY + static_cast<float>(my - v.oy) / v.scale, 0.0f, static_cast<float>(map.GetHeight()));
-            camera.CenterOn(tx * TILE_WIDTH, ty * TILE_HEIGHT);
+            const float tileX = std::clamp(
+                view.viewX + static_cast<float>(mouseX - view.ox) / view.scale,
+                0.0f,
+                static_cast<float>(map.GetWidth()));
+            const float tileY = std::clamp(
+                view.viewY + static_cast<float>(mouseY - view.oy) / view.scale,
+                0.0f,
+                static_cast<float>(map.GetHeight()));
+            camera.CenterOn(tileX * TILE_WIDTH, tileY * TILE_HEIGHT);
         }
         return true;
     }
 
     const bool onPanel
-        = OverPanels(layout, mx, my) || (m_panel != Panel::None && !m_placing && layout.cards.Contains(mx, my));
+        = OverPanels(layout, mouseX, mouseY) || (m_panel != Panel::None && !m_placing && layout.cards.Contains(mouseX, mouseY));
     UpdateGhostRect(camera);
     if (!leftMouseDown)
     {
@@ -473,15 +504,16 @@ bool AndroidHUD::HandleHudClick(
         {
             // A tap on the building itself builds it (when the place is fit); a tap anywhere else leaves the placement
             const auto &blueprints = EntityManager::GetBlueprints();
-            float wx = 0.0f, wy = 0.0f;
-            camera.ScreenToWorld(static_cast<float>(mx), static_cast<float>(my), wx, wy);
-            const int tx = static_cast<int>(std::floor(wx / TILE_WIDTH)),
-                      ty = static_cast<int>(std::floor(wy / TILE_HEIGHT));
+            float worldX = 0.0f, worldY = 0.0f;
+            camera.ScreenToWorld(static_cast<float>(mouseX), static_cast<float>(mouseY), worldX, worldY);
+            const int tileX = static_cast<int>(std::floor(worldX / TILE_WIDTH)),
+                      tileY = static_cast<int>(std::floor(worldY / TILE_HEIGHT));
             bool onGhost = false;
             if (m_selectedBlueprint >= 0 && m_selectedBlueprint < static_cast<int>(blueprints.size()))
             {
-                const BuildingBlueprint &bp = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
-                onGhost = tx >= m_ghostX && tx < m_ghostX + bp.width && ty >= m_ghostY && ty < m_ghostY + bp.height;
+                const BuildingBlueprint &blueprint = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
+                onGhost = tileX >= m_ghostX && tileX < m_ghostX + blueprint.width && tileY >= m_ghostY
+                          && tileY < m_ghostY + blueprint.height;
             }
             if (onGhost)
                 ConfirmPlacing(economy, entities, map);
@@ -490,29 +522,33 @@ bool AndroidHUD::HandleHudClick(
         }
         else if (leftMouseDown)
         {
-            float fx = 0.0f, fy = 0.0f;
-            camera.ScreenToWorld(static_cast<float>(mx), static_cast<float>(my), fx, fy);
+            float fingerWorldX = 0.0f, fingerWorldY = 0.0f;
+            camera.ScreenToWorld(
+                static_cast<float>(mouseX), static_cast<float>(mouseY), fingerWorldX, fingerWorldY);
             if (!m_fingerWas)
             {
                 // The finger just came down: on the ghost it takes it where it touched (the ghost does not jump
                 // under the finger); elsewhere the drag is the camera's (InputManager)
                 m_fingerWas = true;
-                const SDL_Rect &r = m_ghostRect;
-                m_grab = mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h;
-                m_grabOffX = static_cast<float>(m_ghostX * TILE_WIDTH) - fx;
-                m_grabOffY = static_cast<float>(m_ghostY * TILE_HEIGHT) - fy;
+                const SDL_Rect &ghostRect = m_ghostRect;
+                m_grab = mouseX >= ghostRect.x && mouseX < ghostRect.x + ghostRect.w && mouseY >= ghostRect.y
+                         && mouseY < ghostRect.y + ghostRect.h;
+                m_grabOffX = static_cast<float>(m_ghostX * TILE_WIDTH) - fingerWorldX;
+                m_grabOffY = static_cast<float>(m_ghostY * TILE_HEIGHT) - fingerWorldY;
             }
             if (m_grab)
             {
-                m_ghostX = static_cast<int>(std::lround((fx + m_grabOffX) / TILE_WIDTH));
-                m_ghostY = static_cast<int>(std::lround((fy + m_grabOffY) / TILE_HEIGHT));
+                m_ghostX = static_cast<int>(std::lround((fingerWorldX + m_grabOffX) / TILE_WIDTH));
+                m_ghostY = static_cast<int>(std::lround((fingerWorldY + m_grabOffY) / TILE_HEIGHT));
                 // Near the edge of the screen the camera follows, so the building can be taken far
-                const int margin = 56;
-                const float step = 9.0f;
-                const float dx = mx < margin ? -step : (mx > camera.GetViewportWidth() - margin ? step : 0.0f);
-                const float dy = my < margin ? -step : (my > camera.GetViewportHeight() - margin ? step : 0.0f);
-                if (dx != 0.0f || dy != 0.0f)
-                    camera.Pan(dx, dy);
+                const int edgeMargin = 56;
+                const float panStep = 9.0f;
+                const float panDeltaX
+                    = mouseX < edgeMargin ? -panStep : (mouseX > camera.GetViewportWidth() - edgeMargin ? panStep : 0.0f);
+                const float panDeltaY
+                    = mouseY < edgeMargin ? -panStep : (mouseY > camera.GetViewportHeight() - edgeMargin ? panStep : 0.0f);
+                if (panDeltaX != 0.0f || panDeltaY != 0.0f)
+                    camera.Pan(panDeltaX, panDeltaY);
             }
         }
         return true;
@@ -528,42 +564,42 @@ bool AndroidHUD::HandleHudClick(
         return false;
     }
 
-    if (rightClicked && m_panel == Panel::Units && layout.cards.Contains(mx, my))
+    if (rightClicked && m_panel == Panel::Units && layout.cards.Contains(mouseX, mouseY))
     {
         // Holding a unit card takes one order back
-        for (int s = 0; s < layout.cardsFit; ++s)
+        for (int cardSlot = 0; cardSlot < layout.cardsFit; ++cardSlot)
         {
-            if (!CardRect(layout, s).Contains(mx, my))
+            if (!CardRect(layout, cardSlot).Contains(mouseX, mouseY))
                 continue;
-            const int idx = ItemAt(m_unitTab, m_scroll[m_unitTab == TabInfantry ? 1 : 2] + s);
-            if (idx >= 0)
-                ActivateCell(m_unitTab, idx, true, economy, entities, map, selectedUnits);
+            const int itemIndex = ItemAt(m_unitTab, m_scroll[m_unitTab == TabInfantry ? 1 : 2] + cardSlot);
+            if (itemIndex >= 0)
+                ActivateCell(m_unitTab, itemIndex, true, economy, entities, map, selectedUnits);
         }
         return true;
     }
     if (!leftClicked)
         return true;
 
-    for (const Button &b : layout.buttons)
+    for (const Button &button : layout.buttons)
     {
-        if (b.r.Contains(mx, my) && !b.disabled)
+        if (button.r.Contains(mouseX, mouseY) && !button.disabled)
         {
-            Press(b.act, layout, economy, entities, map, camera, outOpenMenu, outOpenObjectives, selectedUnits);
+            Press(button.act, layout, economy, entities, map, camera, outOpenMenu, outOpenObjectives, selectedUnits);
             return true;
         }
     }
-    if (m_panel != Panel::None && layout.cards.Contains(mx, my))
+    if (m_panel != Panel::None && layout.cards.Contains(mouseX, mouseY))
     {
         const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-        const int first = m_scroll[m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2)];
-        for (int s = 0; s < layout.cardsFit; ++s)
+        const int firstIndex = m_scroll[m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2)];
+        for (int cardSlot = 0; cardSlot < layout.cardsFit; ++cardSlot)
         {
-            if (!CardRect(layout, s).Contains(mx, my))
+            if (!CardRect(layout, cardSlot).Contains(mouseX, mouseY))
                 continue;
-            const int idx = ItemAt(tab, first + s);
-            if (idx < 0)
+            const int itemIndex = ItemAt(tab, firstIndex + cardSlot);
+            if (itemIndex < 0)
                 break;
-            ActivateCell(tab, idx, false, economy, entities, map, selectedUnits);
+            ActivateCell(tab, itemIndex, false, economy, entities, map, selectedUnits);
             if (m_buildMode)
                 StartPlacing(camera);
             break;
@@ -579,17 +615,20 @@ void AndroidHUD::RenderGameHud(
     const EntityManager &entities,
     const TileMap &map,
     const Camera &camera,
-    int mx,
-    int my,
-    int windowW,
-    int windowH,
+    int mouseX,
+    int mouseY,
+    int windowWidth,
+    int windowHeight,
     const std::vector<int> &selected)
 {
-    const bool combat = HasCombatUnits(entities, selected);
-    const bool building = !OwnSelectedBuildings(entities, selected).empty();
-    const Layout layout = MakeLayout(windowW, windowH, combat, building, static_cast<int>(selected.size()));
-    const auto S = [&](int v) {
-        return static_cast<int>(std::lround(v * layout.u));
+    const bool hasCombat = HasCombatUnits(entities, selected);
+    const bool hasBuilding = !OwnSelectedBuildings(entities, selected).empty();
+    m_lastHasCombat = hasCombat;
+    m_lastHasBuilding = hasBuilding;
+    m_lastSelectedCount = static_cast<int>(selected.size());
+    const Layout layout = MakeLayout(windowWidth, windowHeight, hasCombat, hasBuilding, m_lastSelectedCount);
+    const auto scalePx = [&](int value) {
+        return static_cast<int>(std::lround(value * layout.u));
     };
 
     if (m_placing)
@@ -600,35 +639,49 @@ void AndroidHUD::RenderGameHud(
 
     // Credits and power
     {
-        const UiRect &h = layout.resources;
-        renderer.FillRectScreen(h.x, h.y, h.w, h.h, {10, 13, 18, 210});
-        renderer.DrawRectScreen(h.x, h.y, h.w, h.h, col::BorderStrong);
+        const UiRect &resourcesRect = layout.resources;
+        const int padding = scalePx(8);
+        const int barHeight = std::max(3, scalePx(5));
+        renderer.FillRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, {10, 13, 18, 210});
+        renderer.DrawRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, col::BorderStrong);
         fontRenderer.DrawString(
-            "$ " + std::to_string(economy.GetCredits()), h.x + 8, h.y + 3, ui::FONT_H2, col::Accent, true);
-        const int prod = economy.GetPowerProduced();
-        const int cons = economy.GetPowerConsumed();
-        const bool deficit = economy.HasPowerDeficit();
-        const SDL_Color pCol = deficit ? col::Danger : col::Ok;
-        const std::string pwrText = std::to_string(cons) + "/" + std::to_string(prod) + _(" kW");
+            "$ " + std::to_string(economy.GetCredits()),
+            resourcesRect.x + padding,
+            resourcesRect.y + scalePx(3),
+            ui::FONT_H2,
+            col::Accent,
+            true);
+        const int powerProduced = economy.GetPowerProduced();
+        const int powerConsumed = economy.GetPowerConsumed();
+        const bool hasDeficit = economy.HasPowerDeficit();
+        const SDL_Color powerColor = hasDeficit ? col::Danger : col::Ok;
+        const std::string powerText = std::to_string(powerConsumed) + "/" + std::to_string(powerProduced) + _(" kW");
         // The lightning of the game next to the figures; it blinks while the power is short
-        if (!deficit || PowerIconBlinkOn())
+        if (!hasDeficit || PowerIconBlinkOn())
         {
-            const int textW = fontRenderer.GetTextWidth(pwrText, ui::FONT_SMALL_BOLD);
-            renderer.DrawRawSpriteScreen(PowerIconSprite(), h.Right() - 8 - textW - 26, h.y + 2, 1.0f);
+            const int textWidth = fontRenderer.GetTextWidth(powerText, ui::FONT_SMALL_BOLD);
+            renderer.DrawRawSpriteScreen(
+                PowerIconSprite(),
+                resourcesRect.Right() - padding - textWidth - scalePx(26),
+                resourcesRect.y + scalePx(2),
+                layout.u);
         }
         fontRenderer.DrawString(
-            std::to_string(cons) + "/" + std::to_string(prod) + _(" kW"),
-            h.Right() - 8,
-            h.y + 5,
+            powerText,
+            resourcesRect.Right() - padding,
+            resourcesRect.y + scalePx(5),
             ui::FONT_SMALL_BOLD,
-            pCol,
+            powerColor,
             false,
             Anchor::RIGHT | Anchor::TOP);
         ui::DrawProgressBar(
             renderer,
-            {h.x + 6, h.Bottom() - 9, h.w - 12, 5},
-            static_cast<float>(cons) / static_cast<float>(std::max(1, prod)),
-            pCol);
+            {resourcesRect.x + scalePx(6),
+             resourcesRect.Bottom() - scalePx(4) - barHeight,
+             resourcesRect.w - scalePx(12),
+             barHeight},
+            static_cast<float>(powerConsumed) / static_cast<float>(std::max(1, powerProduced)),
+            powerColor);
     }
 
     // The radar (no zoom buttons: a tap puts the camera there)
@@ -637,87 +690,103 @@ void AndroidHUD::RenderGameHud(
     // Cards
     if (m_panel != Panel::None && !m_placing)
     {
+        const int paddingY = scalePx(4);
         renderer.FillRectScreen(
-            layout.cards.x, layout.cards.y - 4, layout.cards.w, layout.cards.h + 8, {10, 13, 18, 215});
+            layout.cards.x,
+            layout.cards.y - paddingY,
+            layout.cards.w,
+            layout.cards.h + 2 * paddingY,
+            {10, 13, 18, 215});
         const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-        const int first = m_scroll[m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2)];
-        const bool noHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true);
+        const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
+        const int maxStart = std::max(0, ItemCountForTab(tab) - layout.cardsFit);
+        m_scroll[scrollSlot] = std::clamp(m_scroll[scrollSlot], 0, maxStart);
+        const int firstIndex = m_scroll[scrollSlot];
+        const bool missingHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true);
         const bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
         const bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
-        for (int s = 0; s < layout.cardsFit; ++s)
+        for (int cardSlot = 0; cardSlot < layout.cardsFit; ++cardSlot)
         {
-            const int idx = ItemAt(tab, first + s);
-            if (idx < 0)
+            const int itemIndex = ItemAt(tab, firstIndex + cardSlot);
+            if (itemIndex < 0)
                 break;
-            const UiRect c = CardRect(layout, s);
-            const bool hot = c.Contains(mx, my);
+            const UiRect cardRect = CardRect(layout, cardSlot);
+            const bool hovered = cardRect.Contains(mouseX, mouseY);
             if (tab == TabBuild)
             {
-                const auto &bp = EntityManager::GetBlueprints()[static_cast<std::size_t>(idx)];
-                const bool isMine = bp.mineKind >= 0;
-                const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(bp.mineKind)].maxPerPlayer
-                                         : BuildLimits::LimitOf(entities, bp.buildingIndex);
+                const auto &blueprint = EntityManager::GetBlueprints()[static_cast<std::size_t>(itemIndex)];
+                const bool isMine = blueprint.mineKind >= 0;
+                const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(blueprint.mineKind)].maxPerPlayer
+                                         : BuildLimits::LimitOf(entities, blueprint.buildingIndex);
                 const int owned
-                    = limit > 0 ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
-                                          : BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex))
-                                : 0;
-                const bool locked = noHq || limit == 0 || (limit > 0 && owned >= limit)
-                                    || (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local()));
-                DrawCameo(renderer, fontRenderer, c, bp.iconCompId, _(bp.name), hot, false, locked);
+                    = limit > 0
+                          ? (isMine
+                                 ? entities.CountMines(Players::Local(), blueprint.mineKind)
+                                 : BuildLimits::CountOwned(entities, map, Players::Local(), blueprint.buildingIndex))
+                          : 0;
+                const bool locked = missingHq || limit == 0 || (limit > 0 && owned >= limit)
+                                    || (blueprint.buildingIndex == 6 && !IsRadarUnlocked(Players::Local()));
+                DrawCameo(renderer, fontRenderer, cardRect, blueprint.iconCompId, _(blueprint.name), hovered, false, locked);
                 DrawCostTag(
                     renderer,
                     fontRenderer,
-                    c,
-                    "$" + std::to_string(bp.creditCost),
-                    economy.CanAfford(bp.creditCost) ? col::Accent : col::Danger);
+                    cardRect,
+                    "$" + std::to_string(blueprint.creditCost),
+                    economy.CanAfford(blueprint.creditCost) ? col::Accent : col::Danger);
                 if (limit > 0)
                     fontRenderer.DrawString(
                         std::to_string(owned) + "/" + std::to_string(limit),
-                        c.x + 6,
-                        c.y + 5,
+                        cardRect.x + 6,
+                        cardRect.y + 5,
                         ui::FONT_SMALL_BOLD,
                         owned >= limit ? col::Danger : col::TextMuted);
             }
             else
             {
-                const bool inf = tab == TabInfantry;
-                const UnitCameoDef &def = unitCatalog(inf).items[idx];
+                const bool isInfantry = tab == TabInfantry;
+                const UnitCameoDef &unitDef = unitCatalog(isInfantry).items[itemIndex];
                 const bool available
-                    = (inf ? hasBarracks : hasFactory) && IsUnitUnlocked(Players::Local(), def.archetype);
+                    = (isInfantry ? hasBarracks : hasFactory) && IsUnitUnlocked(Players::Local(), unitDef.archetype);
                 DrawCameo(
                     renderer,
                     fontRenderer,
-                    c,
-                    SpriteHandle(def.icon, SpriteKind::Part, "unit cameo"),
-                    _(def.name),
-                    hot,
+                    cardRect,
+                    SpriteHandle(unitDef.icon, SpriteKind::Part, "unit cameo"),
+                    _(unitDef.name),
+                    hovered,
                     false,
                     !available);
-                const auto *cfg = entities.GetUnitConfig(def.archetype);
-                const int cost = cfg ? cfg->creditCost : def.cost;
+                const auto *unitConfig = entities.GetUnitConfig(unitDef.archetype);
+                const int cost = unitConfig ? unitConfig->creditCost : unitDef.cost;
                 DrawCostTag(
                     renderer,
                     fontRenderer,
-                    c,
+                    cardRect,
                     "$" + std::to_string(cost),
                     economy.CanAfford(cost) ? col::Accent : col::Danger);
                 int queued = 0;
                 float progress = -1.0f;
-                for (int id : ProductionTargets(inf ? UnitType::Barracks : UnitType::Factory, entities, selected))
+                for (int buildingId : ProductionTargets(isInfantry ? UnitType::Barracks : UnitType::Factory, entities, selected))
                 {
-                    const Building *b = entities.GetBuilding(id);
-                    if (!b)
+                    const Building *building = entities.GetBuilding(buildingId);
+                    if (!building)
                         continue;
-                    for (const auto &q : b->productionQueue)
-                        queued += q.archetype == def.archetype ? 1 : 0;
-                    if (!b->productionQueue.empty() && b->productionQueue.front().archetype == def.archetype)
-                        progress = std::max(progress, b->CurrentProductionProgress());
+                    for (const auto &queueItem : building->productionQueue)
+                        queued += queueItem.archetype == unitDef.archetype ? 1 : 0;
+                    if (!building->productionQueue.empty()
+                        && building->productionQueue.front().archetype == unitDef.archetype)
+                        progress = std::max(progress, building->CurrentProductionProgress());
                 }
                 if (available && progress >= 0.0f)
-                    DrawProgressShutter(renderer, fontRenderer, c, progress, col::Accent);
+                    DrawProgressShutter(renderer, fontRenderer, cardRect, progress, col::Accent);
                 if (queued > 0)
                     fontRenderer.DrawString(
-                        "\xC3\x97" + std::to_string(queued), c.x + 6, c.y + 5, ui::FONT_BODY_BOLD, col::Accent, true);
+                        "\xC3\x97" + std::to_string(queued),
+                        cardRect.x + 6,
+                        cardRect.y + 5,
+                        ui::FONT_BODY_BOLD,
+                        col::Accent,
+                        true);
             }
         }
         const int count = ItemCountForTab(tab);
@@ -733,25 +802,25 @@ void AndroidHUD::RenderGameHud(
     }
 
     // Buttons
-    for (const Button &b : layout.buttons)
+    for (const Button &button : layout.buttons)
     {
         ui::DrawButton(
             renderer,
             fontRenderer,
-            b.r,
-            b.label,
-            b.active ? ui::ButtonStyle::Primary : b.style,
-            b.r.Contains(mx, my),
-            !b.disabled,
-            ui::ButtonFontForScale(b.fontScale));
+            button.r,
+            button.label,
+            button.active ? ui::ButtonStyle::Primary : button.style,
+            button.r.Contains(mouseX, mouseY),
+            !button.disabled,
+            ui::ButtonFontForScale(button.fontScale));
     }
 
-    // What is selected, over the orders
+    // What is selected, over the orders (or above the open cards drawer so it never overlaps)
     if (!selected.empty() && !m_placing)
     {
         const std::string info = std::to_string(selected.size()) + " " + _("SELECTED");
-        fontRenderer.DrawString(
-            info, layout.radar.Right() + S(8), windowH - S(8) - S(60) - 18, ui::FONT_SMALL_BOLD, col::Text, true);
+        const int labelY = (m_panel != Panel::None ? layout.cards.y : windowHeight - scalePx(68)) - scalePx(22);
+        fontRenderer.DrawString(info, layout.radar.Right() + scalePx(8), labelY, ui::FONT_SMALL_BOLD, col::Text, true);
     }
 
     // The line of text at the top: a notice, or what a mode wants from the next tap
@@ -760,24 +829,24 @@ void AndroidHUD::RenderGameHud(
         notice = _("TAP THE TARGET: ATTACK-MOVE");
     if (notice.empty() && m_placing)
         notice = _("DRAG THE GHOST, THEN BUILD HERE");
-    if (notice.empty() && m_boxSelect)
-        notice = _("BOX SELECT: DRAG OVER THE UNITS");
     if (!notice.empty())
     {
-        const int tw = fontRenderer.GetTextWidth(notice, ui::FONT_BODY_BOLD) + 24;
-        const UiRect n {windowW / 2 - tw / 2, layout.notice.y, tw, layout.notice.h};
-        renderer.FillRectScreen(n.x, n.y, n.w, n.h, {10, 13, 18, 220});
-        renderer.DrawRectScreen(n.x, n.y, n.w, n.h, col::Accent);
+        const int maxWidth = std::max(120, windowWidth - scalePx(16));
+        const int noticeWidth
+            = std::min(maxWidth, fontRenderer.GetTextWidth(notice, ui::FONT_BODY_BOLD) + scalePx(24));
+        const UiRect noticeRect {windowWidth / 2 - noticeWidth / 2, layout.notice.y, noticeWidth, layout.notice.h};
+        renderer.FillRectScreen(noticeRect.x, noticeRect.y, noticeRect.w, noticeRect.h, {10, 13, 18, 220});
+        renderer.DrawRectScreen(noticeRect.x, noticeRect.y, noticeRect.w, noticeRect.h, col::Accent);
         fontRenderer.DrawString(
-            notice,
-            n.CenterX(),
-            n.CenterY(),
+            ui::FitText(fontRenderer, notice, ui::FONT_BODY_BOLD, std::max(40, noticeWidth - scalePx(16))),
+            noticeRect.CenterX(),
+            noticeRect.CenterY(),
             ui::FONT_BODY_BOLD,
             col::Accent,
             false,
             Anchor::HCENTER | Anchor::VCENTER);
     }
-    (void) my;
+    (void) mouseY;
 }
 
 } // namespace OpenArtOfWar

@@ -59,12 +59,11 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     const AIDifficulty difficulty = GetEffectiveDifficulty();
     if (difficulty == AIDifficulty::Hardcore || m_noFoesLeft || (m_playerHqX <= 0 && m_playerHqY <= 0))
     {
-        // No more scouting: a scout still out comes back to the reserve instead of standing there for good
+        // No more scouting: a scout still out joins the offensive and never returns to base
         if (Unit *scout = m_scoutId ? entities.GetUnit(m_scoutId) : nullptr; scout && scout->alive)
         {
-            entities.IssueMoveOrder({scout->id}, m_stagingX, m_stagingY, pathfinder, false);
-            m_waveRoster.insert(scout->id);
-            m_recalled.insert(scout->id);
+            m_waveRoster.erase(scout->id);
+            m_offensive.insert(scout->id);
         }
         m_scoutId = 0;
         return;
@@ -79,7 +78,7 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     }
     if (scout)
     {
-        // Back to the reserve once it got there, or when it stands without orders for a while
+        // Once it got there, or when it stands without orders for a while, it joins the offensive instead of returning
         const bool there = std::max(std::abs(scout->tileX - m_scoutX), std::abs(scout->tileY - m_scoutY)) <= 3;
         const bool idle = scout->state == ActionState::Idle && !scout->HasMoveTarget() && !scout->waitingForPath;
         m_scoutIdleTimer = idle ? m_scoutIdleTimer + deltaTime : 0.0f;
@@ -89,9 +88,8 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
             msg << "Scouting trip " << m_scoutTrips << " over: " << m_knownBuildings.size() << " enemy structures and "
                 << m_seenEnemyUnits.size() << " units known";
             Think("SCOUT", msg.str());
-            entities.IssueMoveOrder({scout->id}, m_stagingX, m_stagingY, pathfinder, false);
-            m_waveRoster.insert(scout->id);
-            m_recalled.insert(scout->id);
+            m_waveRoster.erase(scout->id);
+            m_offensive.insert(scout->id);
             m_scoutId = 0;
         }
         return;
@@ -103,8 +101,7 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     for (const auto &e : entities.GetAllEntities())
     {
         const Unit *u = e.AsUnit();
-        if (!u || !IsReserveUnit(*u) || IsPostGuard(u->id) || m_repairing.count(u->id) || u->targetEntityId != 0
-            || m_defenders.count(u->id))
+        if (!u || !IsReserveUnit(*u) || u->targetEntityId != 0 || m_defenders.count(u->id))
             continue;
         const UnitConfig *cfg = entities.GetUnitConfig(u->archetypeId);
         const int cost = cfg ? cfg->creditCost : 1000;
@@ -143,59 +140,6 @@ void AIController::UpdateScouting(float deltaTime, TileMap &map, EntityManager &
     Think("SCOUT", msg.str());
 }
 
-void AIController::UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder)
-{
-    // Where vehicles get repaired: next to an own Factory; otherwise (and for infantry) the staging area
-    int factoryX = -1, factoryY = -1;
-    for (const auto &e : entities.GetAllEntities())
-    {
-        const Building *b = e.AsBuilding();
-        if (b && b->alive && b->owner == m_player && b->type == UnitType::Factory && b->buildProgress >= 1.0f)
-        {
-            factoryX = b->tileX + b->buildWidth / 2;
-            factoryY = b->tileY + b->buildHeight + 1;
-            break;
-        }
-    }
-    // Healed (or dead): back to the reserve
-    for (auto it = m_repairing.begin(); it != m_repairing.end();)
-    {
-        Unit *u = entities.GetUnit(*it);
-        if (!u || !u->alive || u->state == ActionState::Die)
-        {
-            m_repairProgress.erase(*it);
-            it = m_repairing.erase(it);
-            continue;
-        }
-        const bool vehicle = !Utility::IsInfantryArchetype(u->archetypeId);
-        // A vehicle without a factory is never repaired, and a unit whose HP has not risen for a while (it cannot
-        // get close enough) waits for nothing: both rejoin the reserve as they are
-        auto &progress = m_repairProgress[u->id];
-        if (u->currentHp > progress.first || progress.second <= 0.0f)
-            progress = {u->currentHp, m_gameTime};
-        constexpr float kRepairStallSeconds = 20.0f;
-        const bool stalled = m_gameTime - progress.second > kRepairStallSeconds;
-        if (u->currentHp * 10 >= u->maxHp * 9 || (vehicle && factoryX < 0) || stalled)
-        {
-            m_waveRoster.insert(u->id);
-            Think(
-                "RETREAT",
-                u->currentHp * 10 >= u->maxHp * 9 ? "A repaired unit rejoins the reserve"
-                                                  : "No repair for a damaged unit: it rejoins the reserve");
-            m_repairProgress.erase(u->id);
-            it = m_repairing.erase(it);
-            continue;
-        }
-        const int rx = vehicle && factoryX >= 0 ? factoryX : m_stagingX;
-        const int ry = vehicle && factoryX >= 0 ? factoryY : m_stagingY;
-        if (u->state == ActionState::Idle && !u->HasMoveTarget()
-            && std::max(std::abs(u->tileX - rx), std::abs(u->tileY - ry)) > 3)
-            entities.IssueMoveOrder({u->id}, rx, ry, pathfinder, false);
-        ++it;
-    }
-    // A unit that went on the attack is never pulled out of its group for repairs: the squads fight to the end
-}
-
 void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder)
 {
     const std::vector<const Building *> ownStructures = OwnStructures(entities);
@@ -204,16 +148,18 @@ void AIController::UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfind
         Unit *u = e.AsUnit();
         if (!u || !u->alive || u->state == ActionState::Die || u->owner != m_player)
             continue;
-        // A squad's members take orders from their squad only (a held member waits for its group); the scout
-        // and units on their way to repairs do not pick fights either
-        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_repairing.count(u->id)
-            || m_offensive.count(u->id))
-            continue;
-        // An attack-move with nowhere left to go is over: such a unit counts as busy for the staging area, the
-        // waves and this very check, and would stand where it is for good
-        if (u->isAttackMoving && !u->HasMoveTarget() && u->targetEntityId == 0 && !u->waitingForPath
-            && u->state == ActionState::Idle)
+        // An attack-move or ground target with no active path is over: clear it before role checks so neither
+        // offensive troops nor reserve troops stay marked as busy forever
+        if (u->state == ActionState::Idle && u->path.empty() && !u->waitingForPath && u->targetEntityId == 0
+            && u->targetWallTileX < 0 && !u->isSiegeMode)
+        {
             u->isAttackMoving = false;
+            u->ClearMoveTarget();
+        }
+        // A squad's members take orders from their squad only (a held member waits for its group); the scout
+        // and offensive troops do not pick base fights either
+        if (m_squadController.IsSquadMember(u->id) || u->id == m_scoutId || m_offensive.count(u->id))
+            continue;
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->waitingForPath && !u->isAttackMoving)
         {
             float closestDist = u->sightRadius * TILE_WIDTH;

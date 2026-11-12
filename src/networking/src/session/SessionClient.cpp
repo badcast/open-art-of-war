@@ -111,12 +111,49 @@ void SessionClient::handle(const TransportEvent &e)
                 break;
             // A match from the start (also after a reconnect: every turn so far follows)
             m_started = true;
+            // Authority state of an older match goes; one of this match that overtook the start stays. The tick
+            // filter starts again from what is left (a new match counts its ticks from zero)
+            m_authorityStates.erase(
+                std::remove_if(
+                    m_authorityStates.begin(), m_authorityStates.end(),
+                    [&](const AuthorityState &a) { return a.matchId != m.matchId; }),
+                m_authorityStates.end());
+            m_hasAuthorityStateTick = !m_authorityStates.empty();
+            if (m_hasAuthorityStateTick)
+                m_authorityStateTick = m_authorityStates.back().tick;
+            else if (m_matchId != m.matchId)
+                m_authorityStateTick = 0;
+            m_matchId = m.matchId;
+            m_authorityAcks.clear();
+            m_authoritySlot = m.authoritySlot;
             ++m_starts;
             m_setup = std::move(m.setup);
             m_turns.clear();
             m_turnsReceived = 0;
             m_desynced = false;
             m_pause = PauseState {};
+            break;
+        }
+        case MsgType::AuthorityState:
+        {
+            AuthorityState state;
+            if (e.data.size() <= kMaxAuthorityStateBytes + 32 && decode(r, state) && state.recipient == slot()
+                && (!m_started || state.matchId == m_matchId) && (!m_hasAuthorityStateTick || state.tick > m_authorityStateTick))
+            {
+                m_authorityStateTick = state.tick;
+                m_hasAuthorityStateTick = true;
+                if (m_authorityStates.size() >= kMaxQueuedAuthorityStates)
+                    m_authorityStates.pop_front(); // a client that never takes them: the oldest go first
+                m_authorityStates.push_back(std::move(state));
+            }
+            break;
+        }
+        case MsgType::AuthorityAck:
+        {
+            AuthorityAck ack;
+            if (m_started && slot() == m_authoritySlot && decode(r, ack) && ack.matchId == m_matchId
+                && ack.sender != slot())
+                m_authorityAcks.push_back(ack);
             break;
         }
         case MsgType::TurnBundle:
@@ -164,6 +201,50 @@ void SessionClient::handle(const TransportEvent &e)
         default:
             break;
     }
+}
+
+bool SessionClient::sendAuthorityState(const AuthorityState &state)
+{
+    if (m_state != State::Joined || !m_started || state.recipient >= kMaxPlayers || state.recipient == slot() || state.bytes.size() > kMaxAuthorityStateBytes)
+        return false;
+    std::vector<std::uint8_t> packet(state.bytes.size() + 32);
+    BitWriter w(packet.data(), packet.size());
+    AuthorityState out = state;
+    out.matchId = m_matchId;
+    encode(w, out);
+    const std::size_t size = w.finish();
+    if (w.overflowed())
+        return false;
+    send(Channel::Bulk, packet.data(), size);
+    return true;
+}
+
+bool SessionClient::takeAuthorityState(AuthorityState &state)
+{
+    if (m_authorityStates.empty())
+        return false;
+    state = std::move(m_authorityStates.front());
+    m_authorityStates.pop_front();
+    return true;
+}
+
+bool SessionClient::sendAuthorityAck(std::uint32_t tick)
+{
+    if (m_state != State::Joined || !m_started || slot() == m_authoritySlot)
+        return false;
+    BitWriter w(m_buffer.data(), m_buffer.size());
+    encode(w, AuthorityAck {slot(), m_matchId, tick});
+    send(Channel::Control, m_buffer.data(), w.finish());
+    return !w.overflowed();
+}
+
+bool SessionClient::takeAuthorityAck(AuthorityAck &ack)
+{
+    if (m_authorityAcks.empty())
+        return false;
+    ack = m_authorityAcks.front();
+    m_authorityAcks.pop_front();
+    return true;
 }
 
 void SessionClient::sendCommands(std::uint32_t turn, const std::vector<std::uint8_t> &bytes)

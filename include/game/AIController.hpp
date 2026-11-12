@@ -409,12 +409,6 @@ private:
     void UpdateIntel(EntityManager &entities);
     // A cheap unit looks for the enemy at the start and again every while (not on Hardcore: it sees all)
     void UpdateScouting(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
-    // Units sent to repairs (m_repairing) walk to the factory / staging area and rejoin the reserve when healed;
-    // nobody is pulled out of a squad that went on the attack
-    void UpdateValuableRetreat(EntityManager &entities, Pathfinder &pathfinder);
-    // Share of the reserve that stays home when a wave leaves (Easy 40% ... Hardcore 10%)
-    float HomeGuardShare() const;
-    int HomeGuardCount() const;
     bool AiSees(const Entity &e, const EntityManager &entities) const;
     void FindAttackObjective(const EntityManager &entities, const TileMap &map, int &outX, int &outY) const;
     void UpdateIdleUnits(EntityManager &entities, Pathfinder &pathfinder);
@@ -445,7 +439,7 @@ private:
         bool *unitBlocked = nullptr,
         bool needsExit = false) const;
     // Units a squad let go (stragglers, stuck in a passage, a foe out of the game) went on the attack: they stay on
-    // the offensive (m_offensive). Only when no foe is left at all do they walk back and rejoin the reserve
+    // the offensive (m_offensive) and never return to the base
     void RecallReleasedUnits(EntityManager &entities);
     // Troops on the offensive with nothing to do attack-move to the current objective; they are never called home
     void UpdateOffensive(const TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
@@ -500,7 +494,6 @@ private:
     // Units placed by the mission (base garrison) never join the waves
     std::unordered_set<int> m_garrison;
     bool m_garrisonRecorded {false};
-    std::set<int> m_recalled;  // released squad members on their way back to the reserve (no foe left)
     std::set<int> m_offensive; // went on the attack and left their squad: they go on to the objective, never home
     // The computer's own list of the troops for its next wave: a unit joins only explicitly (the computer trained it,
     // a squad released it, or it stood at the home base when the game began), never because it happens to stand
@@ -541,31 +534,20 @@ private:
     int m_gateX[2] {-1, -1}; // the two openings in the wall the attack groups march out of
     int m_gateY[2] {-1, -1};
     // Threat memory (fades, half-life kThreatHalfLife): how much came at the base from each of the 8 sectors around
-    // the home, and how much each foe sent; the defense, the guard posts, the towers and the choice of target use it
+    // the home, and how much each foe sent; the defense, the towers and the choice of target use it
     float m_sectorThreat[8] {};
     float m_foeHostility[kMaxPlayers] {};
     int SectorOf(int x, int y) const; // 0..7 around the home (0: east, counter-clockwise by 45 degrees)
-    // Guard posts: on every road to an enemy, just inside the line of defense (PlanBaseDefenses); the home guard
-    // (HomeGuardCount) is spread over them, at least one each, the rest by the threat of the post's sector
-    std::vector<std::pair<int, int>> m_guardPosts;
-    std::map<int, int> m_guardOf; // unit id -> post index (ordered: the same iteration on every peer)
-    float m_guardTimer {0.0f};
-    void UpdateGuardPosts(EntityManager &entities, Pathfinder &pathfinder);
-    bool IsPostGuard(int unitId) const
-    {
-        return m_guardOf.count(unitId) != 0;
-    }
     int UnitThreatValue(const Unit &u, const EntityManager &entities) const; // its credit cost
     // The base: the headquarters and every structure of this player. An entity is near it when it stands within
     // the base zone widened by extraTiles
     std::vector<const Building *> OwnStructures(const EntityManager &entities) const;
     bool IsNearBase(const Entity &e, const std::vector<const Building *> &ownStructures, float extraTiles) const;
     // Troops sent against an attack on the base -> the tile they were sent to (ordered: the same iteration on
-    // every peer). Emptied when the base is quiet again: the reserve and the guard posts take them back
+    // every peer). Emptied when the base is quiet again: the reserve takes them back
     std::map<int, std::pair<int, int>> m_defenders;
     float m_baseAttackedTimer {0.0f};   // > 0: the base was attacked within the last seconds
     float m_baseAttackedSeconds {0.0f}; // how long the current attack has lasted (waves wait only so long)
-    int m_lastPlanSize {0};             // size of the last wave plan (the home guard between two plans)
     int m_lastThreatX {-1};             // where the strongest attack on the base last was (debug view)
     int m_lastThreatY {-1};
     int m_lastThreatId {0};
@@ -585,10 +567,6 @@ private:
     float m_scoutTimer {0.0f};
     float m_scoutIdleTimer {0.0f};
     int m_scoutTrips {0};
-    // Expensive units on their way to repairs (out of the waves until healed)
-    std::set<int> m_repairing;
-    std::map<int, std::pair<int, float>> m_repairProgress; // unit -> (HP, game time it last rose): no repair, no wait
-    float m_retreatTimer {0.0f};
     bool m_firstRaidDone {false};
     // Waves that broke nothing: Hard / Hardcore send more groups and more troops after them (as far as the treasury
     // allows), one that destroys a structure resets it

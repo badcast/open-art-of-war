@@ -26,6 +26,7 @@ namespace OpenArtOfWar
 
 class TileMap;
 class TextureManager;
+struct WorldSnapshot;
 
 /**
  * @brief Container adapter for polymorphic game entities, providing
@@ -479,6 +480,12 @@ public:
     // health keeps its share, orders go on
     bool UpgradeUnitForm(int unitId, int newArchetype);
     int SpawnBuilding(UnitType type, int tileX, int tileY, Faction faction);
+    // Replica worlds (TASKNEW.md step 3): makes the entities match the authority's snapshot without running any
+    // behaviour: new ids are spawned under their own id, known ones get the sent state, a full snapshot kills the ones
+    // it does not list. Returns false when the snapshot is not usable (an entity could not be created).
+    bool ApplySnapshot(const WorldSnapshot &snapshot);
+    // The visual-only part of Update (muzzle flashes, flame jets, explosions): also run by replicas
+    void UpdateVisualEffects(float deltaTime);
     int SpawnBuildingByIndex(
         int buildingIdx,
         int tileX,
@@ -533,8 +540,7 @@ public:
     {
         m_buildRadiusExtra[Players::Local() % kMaxPlayers] += delta;
     }
-    // Technologies widen the base building radius by a percentage of the mission's own radius (people only:
-    // the computer's bases are laid out by the AI)
+    // Technologies widen the base building radius by a percentage of the mission's own radius
     void SetBuildRadiusPercent(PlayerId player, int percent);
     // Build menu of the local player's faction
     static const std::vector<BuildingBlueprint> &GetBlueprints();
@@ -811,6 +817,37 @@ public:
         out.swap(m_buildingBlasts);
         return out;
     }
+    // What a replica needs besides the entities (TASKNEW.md step 5): the sounds, building blasts and explosions of the
+    // ticks since the last call, collected on the authority only while a network match runs in authority mode
+    struct ReplicaExplosion
+    {
+        float x {0.0f};
+        float y {0.0f};
+        int anim {0};
+        float delay {0.0f};
+    };
+    std::unordered_set<int> &CollectedDeaths() { return m_collectedDeaths; }
+    struct ReplicaGroundMark { float x, y; int composite; float seconds; };
+    struct ReplicaEvents
+    {
+        std::vector<SoundCueEvent> cues;
+        std::vector<BuildingBlast> blasts;
+        std::vector<ReplicaExplosion> explosions;
+        std::vector<ReplicaGroundMark> groundMarks;
+    };
+    void SetCollectReplicaEvents(bool on)
+    {
+        m_collectEvents = on;
+    }
+    ReplicaEvents TakeReplicaEvents()
+    {
+        ReplicaEvents out;
+        out.cues.swap(m_eventCues);
+        out.blasts.swap(m_eventBlasts);
+        out.explosions.swap(m_eventExplosions);
+        out.groundMarks.swap(m_eventGroundMarks);
+        return out;
+    }
     std::vector<SoundCueEvent> TakeSoundCues()
     {
         std::vector<SoundCueEvent> out;
@@ -932,11 +969,22 @@ private:
     int m_nextMineId {1};
     std::vector<SoundCueEvent> m_soundCues;
     std::vector<BuildingBlast> m_buildingBlasts;
+    bool m_collectEvents {false};
+    std::unordered_set<int> m_collectedDeaths;
+    std::unordered_set<int> m_replicaVisible;
+    bool m_replicaWorld {false};
+    bool m_replicaApplying {false}; // ApplySnapshot is spawning: no entity limit
+    std::vector<SoundCueEvent> m_eventCues;
+    std::vector<BuildingBlast> m_eventBlasts;
+    std::vector<ReplicaExplosion> m_eventExplosions;
+    std::vector<ReplicaGroundMark> m_eventGroundMarks;
     std::uint32_t m_generation {0};
     void Cue(SoundCue c, float x, float y, PlayerId owner, std::uint16_t sound = 0, float gain = 1.0f)
     {
         if (m_soundCues.size() < 256) // nobody takes them (headless, editor): they stop piling up
             m_soundCues.push_back({c, x, y, owner, sound, gain});
+        if (m_collectEvents && m_eventCues.size() < 512)
+            m_eventCues.push_back({c, x, y, owner, sound, gain});
     }
     std::vector<std::string> m_soundNames; // only grows: projectiles in flight keep their ids over a reload
     std::uint16_t InternSound(const std::string &name);
