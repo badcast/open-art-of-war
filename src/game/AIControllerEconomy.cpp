@@ -25,6 +25,9 @@ namespace OpenArtOfWar
 
 void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map, EntityManager &entities)
 {
+    // Like a person the computer orders units into the queue of a building (and pays for them then): it keeps up to
+    // this many orders in each Barracks / Factory, so a building never stands idle between two of its decisions
+    constexpr std::size_t kQueueDepth = 2;
     bool hasHq = false;
     bool hasBarracks = false;
     bool hasFactory = false;
@@ -53,13 +56,15 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             else if (b->type == UnitType::Barracks)
             {
                 hasBarracks = true;
-                if (b->buildProgress >= 1.0f && b->isPowered && !b->isProducing && b->productionTimer <= 0.0f)
+                enemyUnitCount += static_cast<int>(b->productionQueue.size()); // (ordered troops count to the army cap)
+                if (b->buildProgress >= 1.0f && b->isPowered && b->productionQueue.size() < kQueueDepth)
                     availableBarracks.push_back(b);
             }
             else if (b->type == UnitType::Factory)
             {
                 hasFactory = true;
-                if (b->buildProgress >= 1.0f && b->isPowered && !b->isProducing && b->productionTimer <= 0.0f)
+                enemyUnitCount += static_cast<int>(b->productionQueue.size());
+                if (b->buildProgress >= 1.0f && b->isPowered && b->productionQueue.size() < kQueueDepth)
                     availableFactories.push_back(b);
             }
         }
@@ -247,26 +252,24 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
             return;
         }
         ThinkOnce("economy", "ECONOMY", "Training troops for the next wave");
-        int sx = building->tileX;
-        int sy = building->tileY;
-        if (!entities.GetBuildingSpawnPoint(building->id, map, sx, sy) || crowdedExit(sx, sy))
-            return;
-        int id = entities.SpawnUnitByArchetype(
-            ProductionForm(m_player, SideArchetype(arch, side())), sx, sy, side(), m_player);
-        if (id == 0)
-            return; // no charge or cooldown when the global entity limit prevents spawning
+        // The exit must be free to take the unit when it is done: not an exit a crowd of stalled troops already shuts
+        if (building->productionQueue.empty())
+        {
+            int sx = building->tileX;
+            int sy = building->tileY;
+            if (!entities.GetBuildingSpawnPoint(building->id, map, sx, sy) || crowdedExit(sx, sy))
+                return;
+        }
+        ProductionItem item;
+        item.archetype = SideArchetype(arch, side());
+        item.cost = cost;
+        item.totalTime = std::max(0.01f, buildTime);
+        item.progressTime = 0.0f;
+        building->productionQueue.push_back(item);
+        building->isProducing = true;
         m_credits -= cost;
         queue.erase(queue.begin());
         ++enemyUnitCount;
-        // New troops get every technology the AI has already researched, and join the list of the next wave
-        if (Unit *u = entities.GetUnit(id))
-        {
-            ApplyCompletedResearch(*u);
-            m_waveRoster.insert(id);
-            ++m_trainedUnits;
-        }
-        building->isProducing = true;
-        building->productionTimer = buildTime;
     };
 
     // Factories spend first so cheap infantry cannot consume the tank budget.
@@ -285,7 +288,7 @@ void AIController::UpdateEconomyAndProduction(float /*deltaTime*/, TileMap &map,
     bool vehicleWaits = false, exitAvailable = false;
     for (Building *factory : availableFactories)
     {
-        if (factory->isProducing || m_vehicleQueue.empty())
+        if (m_vehicleQueue.empty())
             continue;
         vehicleWaits = true;
         int sx = factory->tileX, sy = factory->tileY;

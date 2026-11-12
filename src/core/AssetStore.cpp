@@ -74,6 +74,77 @@ std::vector<fs::path> CandidateRoots()
     return roots;
 }
 
+#if ANDROID
+// The CI can put game data into the APK (android-setup/app/src/main/assets/: *.blob and *.mod listed in
+// bundled_files.txt). libarchive opens files by path and cannot read inside an APK, so the first start copies them to
+// the app's storage: *.blob next to where the blobs are looked for, *.mod into mods/. A file already there with the
+// same size is left alone (an update of the APK with other data has another size).
+void InstallBundledData()
+{
+    SDL_IOStream *list = SDL_IOFromFile("bundled_files.txt", "r");
+    if (!list)
+        return; // an APK without bundled data: assets.blob is pushed by hand (android-setup/README.md)
+    std::size_t listSize = 0;
+    void *listData = SDL_LoadFile_IO(list, &listSize, true);
+    if (!listData)
+        return;
+    const std::string names(static_cast<const char *>(listData), listSize);
+    SDL_free(listData);
+    char *pref = SDL_GetPrefPath("badcast", "openaow");
+    if (!pref)
+        return;
+    const fs::path base(pref);
+    SDL_free(pref);
+
+    std::istringstream lines(names);
+    std::string name;
+    while (std::getline(lines, name))
+    {
+        while (!name.empty() && (name.back() == '\r' || name.back() == ' '))
+            name.pop_back();
+        const fs::path file(name);
+        const std::string ext = file.extension().string();
+        if (name.empty() || file.filename() != file || (ext != ".blob" && ext != ".mod"))
+            continue; // only plain file names of the two kinds
+        SDL_IOStream *in = SDL_IOFromFile(name.c_str(), "rb");
+        if (!in)
+        {
+            std::cerr << "[Assets] bundled " << name << " is listed but not in the APK" << std::endl;
+            continue;
+        }
+        const Sint64 size = SDL_GetIOSize(in);
+        const fs::path dir = ext == ".mod" ? base / "mods" : base;
+        const fs::path dest = dir / file;
+        std::error_code ec;
+        fs::create_directories(dir, ec);
+        if (size >= 0 && fs::is_regular_file(dest, ec) && static_cast<Sint64>(fs::file_size(dest, ec)) == size)
+        {
+            SDL_CloseIO(in);
+            continue;
+        }
+        const fs::path temp = dest.string() + ".part";
+        {
+            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::vector<char> buffer(1 << 20);
+            std::size_t got = 0;
+            while (out && (got = SDL_ReadIO(in, buffer.data(), buffer.size())) > 0)
+                out.write(buffer.data(), static_cast<std::streamsize>(got));
+            out.flush();
+            if (!out)
+            {
+                std::cerr << "[Assets] cannot copy bundled " << name << " to " << dest << std::endl;
+                SDL_CloseIO(in);
+                fs::remove(temp, ec);
+                continue;
+            }
+        }
+        SDL_CloseIO(in);
+        fs::rename(temp, dest, ec);
+        std::cout << "[Assets] installed bundled " << name << " (" << size << " bytes) into " << dir << std::endl;
+    }
+}
+#endif
+
 // "assets/maps/m0.json", "./assets/x", "../assets/x" -> "maps/m0.json"; false for non-asset paths
 bool AssetKey(const std::string &path, std::string &key)
 {
@@ -205,6 +276,9 @@ bool Init()
     if (s.mode != Mode::None)
         return true;
 
+#if ANDROID
+    InstallBundledData();
+#endif
     std::error_code ec;
     const std::vector<fs::path> roots = CandidateRoots();
 

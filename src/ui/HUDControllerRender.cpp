@@ -13,6 +13,7 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include "game/TileMap.hpp"
 #include "game/EntityManager.hpp"
+#include "game/Mines.hpp"
 #include "game/Economy.hpp"
 #include "game/Research.hpp"
 #include "graphics/RenderUtility.hpp"
@@ -136,6 +137,8 @@ void DrawInfinity(Renderer &r, const UiRect &b, bool on, bool hovered)
     r.DrawRingScreen(static_cast<float>(b.x + 17), static_cast<float>(b.CenterY()), 4.0f, 3.5f, 1.6f, c, 24);
 }
 
+} // namespace
+
 void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color)
 {
     int tw = font.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
@@ -207,6 +210,9 @@ void DrawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &ce
         Anchor::HCENTER | Anchor::VCENTER);
 }
 
+namespace
+{
+
 void DrawLockBadge(Renderer &r, BitmapFontRenderer &font, const UiRect &cell)
 {
     font.DrawString(
@@ -229,6 +235,225 @@ void DrawCrosshair(Renderer &r, int cx, int cy, int size, SDL_Color c)
 }
 
 } // namespace
+
+void HUDController::DrawRadar(
+    Renderer &renderer,
+    BitmapFontRenderer &fontRenderer,
+    const UiRect &rd,
+    const EntityManager &entities,
+    const TileMap &map,
+    const Camera &camera,
+    int mx,
+    int my,
+    bool zoomButtons)
+{
+    renderer.FillRectScreen(rd.x, rd.y, rd.w, rd.h, {6, 12, 10, 255});
+    const int mapW = map.GetWidth();
+    const int mapH = map.GetHeight();
+    // A zoomed radar follows the camera, except while the player drags on it (that moves the camera)
+    const float camCenterX = (camera.GetX() + camera.GetViewportWidth() * 0.5f / camera.GetZoom()) / TILE_WIDTH;
+    const float camCenterY = (camera.GetY() + camera.GetViewportHeight() * 0.5f / camera.GetZoom()) / TILE_HEIGHT;
+    if (!m_radarDragging || m_radarCenterX < 0.0f)
+    {
+        m_radarCenterX = camCenterX;
+        m_radarCenterY = camCenterY;
+    }
+    RadarView v = radarView(rd, mapW, mapH, m_radarZoom, m_radarCenterX, m_radarCenterY);
+    if (v.w > 0 && v.h > 0)
+    {
+        renderer.SetClipRect({v.ox, v.oy, v.w, v.h});
+        renderer.FillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
+        const bool fog = m_radarFog && map.IsFogEnabled() && !m_showAll;
+        const int tx0 = std::max(0, static_cast<int>(v.viewX));
+        const int ty0 = std::max(0, static_cast<int>(v.viewY));
+        const int tx1 = std::min(mapW, static_cast<int>(std::ceil(v.viewX + v.w / v.scale)) + 1);
+        const int ty1 = std::min(mapH, static_cast<int>(std::ceil(v.viewY + v.h / v.scale)) + 1);
+        // Cells from rounded edges: neighbours meet exactly, nothing shimmers as the view moves
+        auto cellRect = [&](float x, float y, float w, float h, int &px, int &py, int &pw, int &ph) {
+            px = static_cast<int>(std::lround(v.ToScreenX(x)));
+            py = static_cast<int>(std::lround(v.ToScreenY(y)));
+            pw = std::max(1, static_cast<int>(std::lround(v.ToScreenX(x + w))) - px);
+            ph = std::max(1, static_cast<int>(std::lround(v.ToScreenY(y + h))) - py);
+        };
+        const SDL_Color hiddenCol {4, 6, 8, 255};
+        for (int ty = ty0; ty < ty1; ++ty)
+        {
+            for (int tx = tx0; tx < tx1; ++tx)
+            {
+                int px, py, pw, ph;
+                cellRect(static_cast<float>(tx), static_cast<float>(ty), 1.0f, 1.0f, px, py, pw, ph);
+                const FogState fs = fog ? map.GetFogState(tx, ty) : FogState::Visible;
+                if (fs == FogState::Hidden)
+                {
+                    renderer.FillRectScreen(px, py, pw, ph, hiddenCol);
+                    continue;
+                }
+                // Walls as the local player knows them: under the fog of war the ones seen there last
+                const std::uint16_t wall = fog ? map.ViewerWall(tx, ty) : map.GetWall(tx, ty);
+                if (wall > 0)
+                {
+                    const PlayerId owner = fog ? map.ViewerWallOwner(tx, ty) : map.GetWallOwner(tx, ty);
+                    renderer.FillRectScreen(
+                        px,
+                        py,
+                        pw,
+                        ph,
+                        RadarOwnerColor(owner, wall >= 1101 ? Faction::Resistance : Faction::Confederation, false));
+                }
+                else if (map.GetWall(tx, ty) == 0 && !map.IsPassable(tx, ty)) // an unseen wall is no terrain
+                {
+                    renderer.FillRectScreen(px, py, pw, ph, {30, 54, 40, 255});
+                }
+            }
+        }
+
+        // First enemy drawn on the radar this frame: the radar alarm's contact point
+        bool enemyOnRadar = false;
+        float contactX = 0.0f, contactY = 0.0f;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            if (!e.alive || e.state == ActionState::Die)
+                continue;
+            const bool own = (e.owner == Players::Local());
+            const Building *b = e.AsBuilding();
+            if (fog && !own)
+            {
+                if (b)
+                {
+                    // Enemy structures appear once they have been seen (never while they are being built out of
+                    // sight)
+                    if (!entities.IsHostileBuildingShown(*b, map))
+                        continue;
+                }
+                else if (!entities.IsEntityVisibleToPlayer(e, Players::Local(), map))
+                {
+                    continue; // units only while in sight
+                }
+            }
+            int px, py, pw, ph;
+            if (b)
+            {
+                cellRect(
+                    static_cast<float>(b->tileX),
+                    static_cast<float>(b->tileY),
+                    static_cast<float>(b->buildWidth),
+                    static_cast<float>(b->buildHeight),
+                    px,
+                    py,
+                    pw,
+                    ph);
+                renderer.FillRectScreen(
+                    px, py, std::max(3, pw), std::max(3, ph), RadarOwnerColor(e.owner, e.faction, false));
+            }
+            else
+            {
+                cellRect(
+                    e.GetUnitCenterPixelX() / TILE_WIDTH - 0.5f,
+                    e.GetUnitCenterPixelY() / TILE_HEIGHT - 0.5f,
+                    1.0f,
+                    1.0f,
+                    px,
+                    py,
+                    pw,
+                    ph);
+                const int s = std::max(2, std::min(pw, ph));
+                renderer.FillRectScreen(
+                    px + (pw - s) / 2, py + (ph - s) / 2, s, s, RadarOwnerColor(e.owner, e.faction, true));
+            }
+            if (!enemyOnRadar && !own && e.faction != Faction::Neutral
+                && Players::Hostile(e.owner, Players::Local()) && (!b || m_radarAlert.config.includeBuildings))
+            {
+                enemyOnRadar = true;
+                contactX = e.GetUnitCenterPixelX() / TILE_WIDTH;
+                contactY = e.GetUnitCenterPixelY() / TILE_HEIGHT;
+                if (b)
+                {
+                    contactX = b->tileX + b->buildWidth * 0.5f;
+                    contactY = b->tileY + b->buildHeight * 0.5f;
+                }
+            }
+        }
+
+        // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
+        const std::uint64_t nowMs = SDL_GetTicks();
+        m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
+        if (m_radarAlert.Active())
+        {
+            const RadarAlertConfig &ac = m_radarAlert.config;
+            const float cx = v.ToScreenX(m_radarAlert.TileX());
+            const float cy = v.ToScreenY(m_radarAlert.TileY());
+            for (int i = 0; i < ac.waveCount; ++i)
+            {
+                float radius = 0.0f, opacity = 0.0f;
+                if (!m_radarAlert.Wave(i, nowMs, radius, opacity))
+                    continue;
+                SDL_Color wc = ac.color;
+                wc.a = static_cast<Uint8>(ac.color.a * opacity);
+                for (int k = 0; k < ac.waveThicknessPx; ++k)
+                    DrawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
+            }
+            if (m_radarAlert.BlinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
+                FillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
+        }
+
+        // Camera frame from rounded edges (truncating position and size separately made it wobble)
+        const float camWorldW = camera.GetViewportWidth() / camera.GetZoom();
+        const float camWorldH = camera.GetViewportHeight() / camera.GetZoom();
+        int fx, fy, fw, fh;
+        cellRect(
+            camera.GetX() / TILE_WIDTH,
+            camera.GetY() / TILE_HEIGHT,
+            camWorldW / TILE_WIDTH,
+            camWorldH / TILE_HEIGHT,
+            fx,
+            fy,
+            fw,
+            fh);
+        renderer.DrawRectScreen(fx, fy, std::max(6, fw), std::max(4, fh), {255, 255, 255, 220});
+        renderer.ResetClipRect();
+    }
+    renderer.DrawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
+
+    // Radar alarm: the radar's sides flash red, the band fading inward
+    if (m_radarAlert.BlinkOn(SDL_GetTicks()))
+    {
+        const RadarAlertConfig &ac = m_radarAlert.config;
+        for (int k = 0; k < ac.edgeWidthPx; ++k)
+        {
+            SDL_Color ec = ac.color;
+            ec.a = static_cast<Uint8>(ac.edgeAlpha * (ac.edgeWidthPx - k) / ac.edgeWidthPx);
+            renderer.DrawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
+        }
+    }
+
+    // Zoom buttons
+    const UiRect zoomBtns[2] = {RadarZoomOutBtn(rd), RadarZoomInBtn(rd)};
+    for (int k = 0; k < (zoomButtons ? 2 : 0); ++k)
+    {
+        const UiRect &b = zoomBtns[k];
+        const bool enabled = (k == 0) ? m_radarZoom > 1 : m_radarZoom < kRadarMaxZoom;
+        const bool hot = enabled && b.Contains(mx, my);
+        if (hot)
+            SoundRequests::MarkHover();
+        renderer.FillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
+        renderer.DrawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
+        const SDL_Color sc = enabled ? col::Text : col::TextMuted;
+        renderer.FillRectScreen(b.x + 5, b.CenterY() - 1, b.w - 10, 2, sc);
+        if (k == 1)
+            renderer.FillRectScreen(b.CenterX() - 1, b.y + 5, 2, b.h - 10, sc);
+    }
+    if (m_radarZoom > 1)
+    {
+        fontRenderer.DrawString(
+            "x" + std::to_string(m_radarZoom),
+            rd.x + 6,
+            rd.Bottom() - 12,
+            ui::FONT_SMALL_BOLD,
+            col::TextDim,
+            false,
+            Anchor::LEFT | Anchor::VCENTER);
+    }
+}
 
 void HUDController::RenderGameHud(
     Renderer &renderer,
@@ -276,215 +501,7 @@ void HUDController::RenderGameHud(
     }
 
     // --- Radar -----------------------------------------------------------------------------
-    {
-        const UiRect &rd = l.radar;
-        renderer.FillRectScreen(rd.x, rd.y, rd.w, rd.h, {6, 12, 10, 255});
-        const int mapW = map.GetWidth();
-        const int mapH = map.GetHeight();
-        // A zoomed radar follows the camera, except while the player drags on it (that moves the camera)
-        const float camCenterX = (camera.GetX() + camera.GetViewportWidth() * 0.5f / camera.GetZoom()) / TILE_WIDTH;
-        const float camCenterY = (camera.GetY() + camera.GetViewportHeight() * 0.5f / camera.GetZoom()) / TILE_HEIGHT;
-        if (!m_radarDragging || m_radarCenterX < 0.0f)
-        {
-            m_radarCenterX = camCenterX;
-            m_radarCenterY = camCenterY;
-        }
-        RadarView v = radarView(rd, mapW, mapH, m_radarZoom, m_radarCenterX, m_radarCenterY);
-        if (v.w > 0 && v.h > 0)
-        {
-            renderer.SetClipRect({v.ox, v.oy, v.w, v.h});
-            renderer.FillRectScreen(v.ox, v.oy, v.w, v.h, {14, 30, 22, 255});
-            const bool fog = m_radarFog && map.IsFogEnabled() && !m_showAll;
-            const int tx0 = std::max(0, static_cast<int>(v.viewX));
-            const int ty0 = std::max(0, static_cast<int>(v.viewY));
-            const int tx1 = std::min(mapW, static_cast<int>(std::ceil(v.viewX + v.w / v.scale)) + 1);
-            const int ty1 = std::min(mapH, static_cast<int>(std::ceil(v.viewY + v.h / v.scale)) + 1);
-            // Cells from rounded edges: neighbours meet exactly, nothing shimmers as the view moves
-            auto cellRect = [&](float x, float y, float w, float h, int &px, int &py, int &pw, int &ph) {
-                px = static_cast<int>(std::lround(v.ToScreenX(x)));
-                py = static_cast<int>(std::lround(v.ToScreenY(y)));
-                pw = std::max(1, static_cast<int>(std::lround(v.ToScreenX(x + w))) - px);
-                ph = std::max(1, static_cast<int>(std::lround(v.ToScreenY(y + h))) - py);
-            };
-            const SDL_Color hiddenCol {4, 6, 8, 255};
-            for (int ty = ty0; ty < ty1; ++ty)
-            {
-                for (int tx = tx0; tx < tx1; ++tx)
-                {
-                    int px, py, pw, ph;
-                    cellRect(static_cast<float>(tx), static_cast<float>(ty), 1.0f, 1.0f, px, py, pw, ph);
-                    const FogState fs = fog ? map.GetFogState(tx, ty) : FogState::Visible;
-                    if (fs == FogState::Hidden)
-                    {
-                        renderer.FillRectScreen(px, py, pw, ph, hiddenCol);
-                        continue;
-                    }
-                    // Walls as the local player knows them: under the fog of war the ones seen there last
-                    const std::uint16_t wall = fog ? map.ViewerWall(tx, ty) : map.GetWall(tx, ty);
-                    if (wall > 0)
-                    {
-                        const PlayerId owner = fog ? map.ViewerWallOwner(tx, ty) : map.GetWallOwner(tx, ty);
-                        renderer.FillRectScreen(
-                            px,
-                            py,
-                            pw,
-                            ph,
-                            RadarOwnerColor(owner, wall >= 1101 ? Faction::Resistance : Faction::Confederation, false));
-                    }
-                    else if (map.GetWall(tx, ty) == 0 && !map.IsPassable(tx, ty)) // an unseen wall is no terrain
-                    {
-                        renderer.FillRectScreen(px, py, pw, ph, {30, 54, 40, 255});
-                    }
-                }
-            }
-
-            // First enemy drawn on the radar this frame: the radar alarm's contact point
-            bool enemyOnRadar = false;
-            float contactX = 0.0f, contactY = 0.0f;
-            for (const auto &e : entities.GetAllEntities())
-            {
-                if (!e.alive || e.state == ActionState::Die)
-                    continue;
-                const bool own = (e.owner == Players::Local());
-                const Building *b = e.AsBuilding();
-                if (fog && !own)
-                {
-                    if (b)
-                    {
-                        // Enemy structures appear once they have been seen (never while they are being built out of
-                        // sight)
-                        if (!entities.IsHostileBuildingShown(*b, map))
-                            continue;
-                    }
-                    else if (!entities.IsEntityVisibleToPlayer(e, Players::Local(), map))
-                    {
-                        continue; // units only while in sight
-                    }
-                }
-                int px, py, pw, ph;
-                if (b)
-                {
-                    cellRect(
-                        static_cast<float>(b->tileX),
-                        static_cast<float>(b->tileY),
-                        static_cast<float>(b->buildWidth),
-                        static_cast<float>(b->buildHeight),
-                        px,
-                        py,
-                        pw,
-                        ph);
-                    renderer.FillRectScreen(
-                        px, py, std::max(3, pw), std::max(3, ph), RadarOwnerColor(e.owner, e.faction, false));
-                }
-                else
-                {
-                    cellRect(
-                        e.GetUnitCenterPixelX() / TILE_WIDTH - 0.5f,
-                        e.GetUnitCenterPixelY() / TILE_HEIGHT - 0.5f,
-                        1.0f,
-                        1.0f,
-                        px,
-                        py,
-                        pw,
-                        ph);
-                    const int s = std::max(2, std::min(pw, ph));
-                    renderer.FillRectScreen(
-                        px + (pw - s) / 2, py + (ph - s) / 2, s, s, RadarOwnerColor(e.owner, e.faction, true));
-                }
-                if (!enemyOnRadar && !own && e.faction != Faction::Neutral
-                    && Players::Hostile(e.owner, Players::Local()) && (!b || m_radarAlert.config.includeBuildings))
-                {
-                    enemyOnRadar = true;
-                    contactX = e.GetUnitCenterPixelX() / TILE_WIDTH;
-                    contactY = e.GetUnitCenterPixelY() / TILE_HEIGHT;
-                    if (b)
-                    {
-                        contactX = b->tileX + b->buildWidth * 0.5f;
-                        contactY = b->tileY + b->buildHeight * 0.5f;
-                    }
-                }
-            }
-
-            // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
-            const std::uint64_t nowMs = SDL_GetTicks();
-            m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
-            if (m_radarAlert.Active())
-            {
-                const RadarAlertConfig &ac = m_radarAlert.config;
-                const float cx = v.ToScreenX(m_radarAlert.TileX());
-                const float cy = v.ToScreenY(m_radarAlert.TileY());
-                for (int i = 0; i < ac.waveCount; ++i)
-                {
-                    float radius = 0.0f, opacity = 0.0f;
-                    if (!m_radarAlert.Wave(i, nowMs, radius, opacity))
-                        continue;
-                    SDL_Color wc = ac.color;
-                    wc.a = static_cast<Uint8>(ac.color.a * opacity);
-                    for (int k = 0; k < ac.waveThicknessPx; ++k)
-                        DrawCircleScreen(renderer, cx, cy, radius + static_cast<float>(k), wc);
-                }
-                if (m_radarAlert.BlinkOn(nowMs) && ac.dotRadiusPx > 0.0f)
-                    FillCircleScreen(renderer, cx, cy, ac.dotRadiusPx, ac.color);
-            }
-
-            // Camera frame from rounded edges (truncating position and size separately made it wobble)
-            const float camWorldW = camera.GetViewportWidth() / camera.GetZoom();
-            const float camWorldH = camera.GetViewportHeight() / camera.GetZoom();
-            int fx, fy, fw, fh;
-            cellRect(
-                camera.GetX() / TILE_WIDTH,
-                camera.GetY() / TILE_HEIGHT,
-                camWorldW / TILE_WIDTH,
-                camWorldH / TILE_HEIGHT,
-                fx,
-                fy,
-                fw,
-                fh);
-            renderer.DrawRectScreen(fx, fy, std::max(6, fw), std::max(4, fh), {255, 255, 255, 220});
-            renderer.ResetClipRect();
-        }
-        renderer.DrawRectScreen(rd.x, rd.y, rd.w, rd.h, col::BorderStrong);
-
-        // Radar alarm: the radar's sides flash red, the band fading inward
-        if (m_radarAlert.BlinkOn(SDL_GetTicks()))
-        {
-            const RadarAlertConfig &ac = m_radarAlert.config;
-            for (int k = 0; k < ac.edgeWidthPx; ++k)
-            {
-                SDL_Color ec = ac.color;
-                ec.a = static_cast<Uint8>(ac.edgeAlpha * (ac.edgeWidthPx - k) / ac.edgeWidthPx);
-                renderer.DrawRectScreen(rd.x + k, rd.y + k, rd.w - 2 * k, rd.h - 2 * k, ec);
-            }
-        }
-
-        // Zoom buttons
-        const UiRect zoomBtns[2] = {RadarZoomOutBtn(rd), RadarZoomInBtn(rd)};
-        for (int k = 0; k < 2; ++k)
-        {
-            const UiRect &b = zoomBtns[k];
-            const bool enabled = (k == 0) ? m_radarZoom > 1 : m_radarZoom < kRadarMaxZoom;
-            const bool hot = enabled && b.Contains(mx, my);
-            if (hot)
-                SoundRequests::MarkHover();
-            renderer.FillRectScreen(b.x, b.y, b.w, b.h, hot ? col::Hover : SDL_Color {10, 16, 14, 210});
-            renderer.DrawRectScreen(b.x, b.y, b.w, b.h, enabled ? col::BorderStrong : col::Border);
-            const SDL_Color sc = enabled ? col::Text : col::TextMuted;
-            renderer.FillRectScreen(b.x + 5, b.CenterY() - 1, b.w - 10, 2, sc);
-            if (k == 1)
-                renderer.FillRectScreen(b.CenterX() - 1, b.y + 5, 2, b.h - 10, sc);
-        }
-        if (m_radarZoom > 1)
-        {
-            fontRenderer.DrawString(
-                "x" + std::to_string(m_radarZoom),
-                rd.x + 6,
-                rd.Bottom() - 12,
-                ui::FONT_SMALL_BOLD,
-                col::TextDim,
-                false,
-                Anchor::LEFT | Anchor::VCENTER);
-        }
-    }
+    DrawRadar(renderer, fontRenderer, l.radar, entities, map, camera, mx, my);
 
     // --- Menu / objectives -------------------------------------------------------------------
     ui::DrawButton(
@@ -557,15 +574,6 @@ void HUDController::RenderGameHud(
             if (active)
                 renderer.FillRectScreen(tr.x, tr.Bottom() - 3, tr.w, 3, col::Accent);
 
-#if ANDROID
-            ui::DrawButton(
-                renderer,
-                fontRenderer,
-                tr,
-                _(kTabNames[t]),
-                active ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
-                hovered);
-#else
             if (TabIcon(t) >= 0)
             {
                 renderer.SetClipRect({tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 4});
@@ -585,7 +593,6 @@ void HUDController::RenderGameHud(
             {
                 DrawCrosshair(renderer, tr.CenterX(), tr.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
             }
-#endif
         }
 
         // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
@@ -692,9 +699,14 @@ void HUDController::RenderGameHud(
                     bool selected = (m_buildMode && m_selectedBlueprint == item);
                     bool canAfford = economy.CanAfford(bp.creditCost);
                     // Hard limits (data/limits.yaml): greyed out at the limit, "n/max" while one is set
-                    const int limit = BuildLimits::LimitOf(entities, bp.buildingIndex);
-                    const int owned
-                        = limit > 0 ? BuildLimits::CountOwned(entities, map, Players::Local(), bp.buildingIndex) : 0;
+                    // (a mine has its own count in mines.yaml)
+                    const bool isMine = bp.mineKind >= 0;
+                    const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(bp.mineKind)].maxPerPlayer
+                                             : BuildLimits::LimitOf(entities, bp.buildingIndex);
+                    const int owned = limit > 0 ? (isMine ? entities.CountMines(Players::Local(), bp.mineKind)
+                                                          : BuildLimits::CountOwned(
+                                                              entities, map, Players::Local(), bp.buildingIndex))
+                                                : 0;
                     const bool atLimit = limit == 0 || (limit > 0 && owned >= limit);
                     const bool radarLocked
                         = (bp.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;

@@ -7,6 +7,7 @@
 #include "game/Players.hpp"
 #include "game/BuildLimits.hpp"
 #include "ui/UiKit.hpp"
+#include "ui/UiLayout.hpp"
 #include "core/Localization.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
@@ -27,6 +28,19 @@ namespace OpenArtOfWar
 
 using ui::UiRect;
 namespace col = ui::color;
+
+// Cameo drawing shared by the PC sidebar and the touch interface (HUDControllerRender.cpp)
+void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color);
+void DrawCameo(
+    Renderer &r,
+    BitmapFontRenderer &font,
+    const UiRect &cell,
+    int compId,
+    const std::string &name,
+    bool hovered,
+    bool selected,
+    bool locked);
+void DrawProgressShutter(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, float progress, SDL_Color tint);
 
 namespace menu_detail
 {
@@ -150,7 +164,7 @@ struct SidebarLayout
     }
 };
 
-inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showSpeed = false)
+inline SidebarLayout sidebarLayoutBuiltIn(int windowW, int windowH, int top, bool showSpeed)
 {
     SidebarLayout l;
     const int w = HUDController::kSidebarWidth;
@@ -190,27 +204,37 @@ inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showS
 
     l.info = {x + pad, windowH - 82, innerW, 72};
     l.grid = {x + pad, top + 366, innerW, std::max(SidebarLayout::kCellH, l.info.y - 8 - (top + 366))};
-#if ANDROID
-    l.radar.h = 104;
-    l.menuBtn = {x + pad, top + 166, (innerW - 8) / 2, 44};
-    l.objectivesBtn = {l.menuBtn.Right() + 8, l.menuBtn.y, innerW - l.menuBtn.w - 8, 44};
-    l.researchBtn = {x + pad, top + 216, innerW, 44};
-    int tabsY = top + 266;
-    if (showSpeed)
-    {
-        l.slowerBtn = {x + pad, tabsY, 60, 44};
-        l.speedBtn = {l.slowerBtn.Right() + 8, tabsY, innerW - 136, 44};
-        l.fasterBtn = {l.speedBtn.Right() + 8, tabsY, 60, 44};
-        tabsY += 50;
-    }
+    return l;
+}
+
+// The sidebar of the desktop interface: ui/layout.yaml (screen hud, profile pc); the built-in numbers above stand in when
+// the file has no such profile
+inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showSpeed = false)
+{
+    const uilayout::Layout &file = uilayout::Current();
+    if (!file.Has("hud", "pc"))
+        return sidebarLayoutBuiltIn(windowW, windowH, top, showSpeed);
+    const std::map<std::string, float> extra {{"T", static_cast<float>(top)}};
+    const uilayout::Solved s = file.Solve(
+        "hud", "pc", windowW, windowH, [showSpeed](const std::string &n) { return n == "speed" && showSpeed; }, &extra);
+    SidebarLayout l;
+    l.panel = s.Rect("panel");
+    l.header = s.Rect("header");
+    l.radar = s.Rect("radar");
+    l.menuBtn = showSpeed ? s.Rect("menu_s") : s.Rect("menu");
+    l.objectivesBtn = showSpeed ? s.Rect("objectives_s") : s.Rect("objectives");
+    l.slowerBtn = s.Rect("slower");
+    l.speedBtn = s.Rect("speed");
+    l.fasterBtn = s.Rect("faster");
+    l.researchBtn = s.Rect("research");
     for (int t = 0; t < HUDController::TabCount; ++t)
-        l.tabs[t] = {x + pad + (t % 2) * ((innerW - 8) / 2 + 8), tabsY + (t / 2) * 52, (innerW - 8) / 2, 46};
-    l.strip = {x + pad, tabsY + 104, innerW, 44};
-    l.scrollDown = {l.strip.Right() - 44, l.strip.y, 44, 44};
-    l.scrollUp = {l.scrollDown.x - 48, l.strip.y, 44, 44};
-    l.primaryBtn = {l.strip.x + 90, l.strip.y, innerW - 186, 44};
-    l.grid = {x + pad, l.strip.Bottom() + 6, innerW, l.info.y - 8 - (l.strip.Bottom() + 6)};
-#endif
+        l.tabs[t] = s.Rect("tab" + std::to_string(t));
+    l.strip = s.Rect("strip");
+    l.scrollUp = s.Rect("scroll_up");
+    l.scrollDown = s.Rect("scroll_down");
+    l.primaryBtn = s.Rect("primary");
+    l.grid = s.Rect("grid");
+    l.info = s.Rect("info");
     return l;
 }
 
@@ -291,20 +315,12 @@ inline std::vector<const Building *> OwnSelectedBuildings(
 // Zoom buttons in the radar's bottom-right corner
 inline UiRect RadarZoomInBtn(const UiRect &radar)
 {
-#if ANDROID
-    return {radar.Right() - 44, radar.Bottom() - 44, 40, 40};
-#else
     return {radar.Right() - 22, radar.Bottom() - 22, 20, 20};
-#endif
 }
 
 inline UiRect RadarZoomOutBtn(const UiRect &radar)
 {
-#if ANDROID
-    return {radar.Right() - 88, radar.Bottom() - 44, 40, 40};
-#else
     return {radar.Right() - 44, radar.Bottom() - 22, 20, 20};
-#endif
 }
 
 // The infinity button in the bottom right corner of a unit cameo

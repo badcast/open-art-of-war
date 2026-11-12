@@ -5,6 +5,7 @@
 #include "game/Simulation.hpp"
 #include "ui/RadarAlert.hpp"
 #include "ui/UiKit.hpp"
+#include <SDL3/SDL_rect.h>
 #include <functional>
 #include <string>
 #include <vector>
@@ -46,6 +47,38 @@ public:
     };
 
     HUDController() = default;
+    virtual ~HUDController() = default;
+
+    // ---- What differs between the desktop sidebar and the touch interface (AndroidHUD) ----
+    // Width on the right the interface takes from the map viewport
+    virtual int ReservedWidth() const
+    {
+        return kSidebarWidth;
+    }
+    // The point is on the interface, not on the map (a placement ghost or an order line is not drawn there)
+    virtual bool IsOverHud(int mx, int my, int windowW, int windowH) const
+    {
+        (void) my;
+        (void) windowH;
+        return IsOverSidebar(mx, windowW);
+    }
+    // One finger dragging over the map moves the camera (touch)
+    virtual bool TouchPansCamera() const
+    {
+        return false;
+    }
+    // A mode of the interface owns the finger on the map (placing a building): no selection box is drawn then
+    virtual bool OwnsMapInput() const
+    {
+        return false;
+    }
+    // Panels of the interface over the map, in screen pixels (a touch that starts on one never pans the map)
+    virtual std::vector<SDL_Rect> TouchPanels(int windowW, int windowH) const
+    {
+        (void) windowW;
+        (void) windowH;
+        return {};
+    }
 
     // Window of the technology tree: search, filter, the tree, the selected technology and its start button
     bool IsResearchWindowOpen() const
@@ -95,7 +128,7 @@ public:
     }
 
     // Returns true when the mouse is over the sidebar (map input must be ignored)
-    bool HandleHudClick(
+    virtual bool HandleHudClick(
         int mx,
         int my,
         bool leftClicked,
@@ -145,7 +178,7 @@ public:
     static int PowerIconSprite(); // the lightning of the power readout (sprite ui_power_icon.icon)
     static bool PowerIconBlinkOn();
 
-    void RenderGameHud(
+    virtual void RenderGameHud(
         Renderer &renderer,
         BitmapFontRenderer &fontRenderer,
         const Economy &economy,
@@ -233,6 +266,9 @@ public:
     {
         return m_radarZoom;
     }
+    // Build grid (option "Show grid when building"; colors and thickness: section build_grid of game_environment.yaml)
+    static void SetShowBuildGrid(bool on);
+    static void SetBuildGridConfig(const nlohmann::json &section);
     // Radar alarm settings (section "radar_alert" of game_environment.json)
     void SetRadarAlertConfig(const nlohmann::json &section)
     {
@@ -293,7 +329,18 @@ public:
         m_hudNotificationTimer = time;
     }
 
-private:
+protected:
+    // The radar (map, units, alarm, camera frame, zoom buttons) in `rd`
+    void DrawRadar(
+        Renderer &renderer,
+        BitmapFontRenderer &fontRenderer,
+        const ui::UiRect &rd,
+        const EntityManager &entities,
+        const TileMap &map,
+        const Camera &camera,
+        int mx,
+        int my,
+        bool zoomButtons = true);
     // Cells of a tab: what the local player's tech level (data/capabilities.yaml) allows, in catalog order
     int ItemCountForTab(int tab) const;
     // The catalog index (blueprint / unit cameo / order) shown in the tab's cell `slot`, -1 past the end

@@ -162,7 +162,6 @@ void CharacterEditor::DrawPreviewControls()
         {EditorMode::Explosions, "Explosions"},
         {EditorMode::Wrecks, "Wrecks"},
         {EditorMode::Projectiles, "Projectiles"},
-        {EditorMode::GameUi, "Game UI"},
         {EditorMode::Environment, "Environment"},
         {EditorMode::AiDifficulty, "AI Difficulty"},
         {EditorMode::Animator, "Animator"},
@@ -183,7 +182,7 @@ void CharacterEditor::DrawPreviewControls()
     }
     ImGui::Separator();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
-        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::GameUi
+        || editorMode == EditorMode::SpriteMerge
         || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
         return;
     // Background of the canvas (black by default)

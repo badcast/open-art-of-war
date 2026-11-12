@@ -50,10 +50,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    sourceSets {
-        getByName("main") {
-            // Do not put assets.blob here: libarchive opens it by file path, which cannot read inside an APK
-        }
+    // Game data bundled by the CI lives in src/main/assets (*.blob, *.mod and bundled_files.txt, see
+    // tools/fetch_game_data.sh). The game copies it to its storage on the first start (libarchive opens files by
+    // path and cannot read inside an APK). The archives are compressed already: keep them stored.
+    androidResources {
+        noCompress += listOf("blob", "mod", "txt")
     }
 }
 

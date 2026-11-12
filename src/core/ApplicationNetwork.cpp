@@ -39,6 +39,7 @@
 #include "game/WeaponBalance.hpp"
 #include "game/BuildLimits.hpp"
 #include "game/Capabilities.hpp"
+#include "game/Mines.hpp"
 #include "game/Research.hpp"
 #include "storage/SaveManager.hpp"
 #include "debug/DebugOverlay.hpp"
@@ -199,6 +200,7 @@ void Application::ReloadGameData()
 {
     if (!m_entities || !m_map)
         return;
+    Mines::Reload(); // before the characters: the Resistance's build menu lists the mines
     m_entities->LoadCharacterConfigs();
     ReloadResearchCatalogs();
     Projectiles::reload();
@@ -397,6 +399,20 @@ void Application::UpdateNetworkMenu()
             SDL_StopTextInput(m_window);
         m_textInput = wantText;
     }
+    if (wantText)
+    {
+        // Tell SDL where the field is: the soft keyboard of a phone then keeps it in view
+        SDL_Rect field {};
+        if (m_networkMenu->FocusedFieldRect(m_windowW, m_windowH, m_net && m_net->connected(), field))
+        {
+            static SDL_Rect last {};
+            if (field.x != last.x || field.y != last.y || field.w != last.w || field.h != last.h)
+            {
+                SDL_SetTextInputArea(m_window, &field, 0);
+                last = field;
+            }
+        }
+    }
     const std::uint16_t port = static_cast<std::uint16_t>(m_env.Section("network").value("udp_port", 38100));
     // Games on the local network while browsing (games of another version are left out)
     if (!m_net)
@@ -474,6 +490,10 @@ void Application::UpdateNetworkMenu()
         }
         case NetworkAction::Leave:
             LeaveNetworkGame();
+            break;
+        case NetworkAction::LanRefresh:
+            m_lanBrowser.reset(); // a new search starts with the next frame
+            m_lanGames.clear();
             break;
         case NetworkAction::ServerRefresh:
             m_serverListMs = 0; // updateServer asks again

@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
 #include "core/JsonFile.hpp"
@@ -59,6 +60,11 @@ int MainMenuTitleY(int windowH)
 
 UiRect MainMenuItemRect(int i, int windowW, int windowH)
 {
+    // ui/layout.yaml (screen main_menu); the numbers below stand in when the file has no such screen
+    const uilayout::Layout &file = uilayout::Current();
+    if (file.Has("main_menu", "pc"))
+        return file.Solve("main_menu", uilayout::MenuProfile(file, "main_menu"), windowW, windowH, {})
+            .Rect("item" + std::to_string(i));
     const int itemH = 44;
     const int gap = 6;
     int startY = MainMenuTitleY(windowH) + 128;
@@ -346,6 +352,15 @@ void MenuController::RenderMainMenu(
     // Title block
     int x = MainMenuColumnX(windowW);
     int titleY = MainMenuTitleY(windowH);
+    const uilayout::Layout &layoutFile = uilayout::Current();
+    const std::string &profile = uilayout::MenuProfile(layoutFile, "main_menu");
+    const bool touchMenu = profile == "touch";
+    if (layoutFile.Has("main_menu", profile))
+    {
+        const UiRect t = layoutFile.Solve("main_menu", profile, windowW, windowH, {}).Rect("title");
+        x = t.x;
+        titleY = t.y;
+    }
     fontRenderer.DrawString("OPEN ART OF WAR", x, titleY, ui::FONT_HERO, col::Accent, true);
     fontRenderer.DrawString(_("FREEDOM FOR LIBERTY"), x + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
     renderer.FillRectScreen(x + 2, titleY + 86, 72, 3, col::Accent);
@@ -366,11 +381,16 @@ void MenuController::RenderMainMenu(
         //     renderer.FillRectScreen(r.x, r.y, 4, r.h, isExit ? col::Danger : col::Accent);
         // }
         SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
+        if (touchMenu)
+        {
+            // Touch: the same text lines as on the desktop (no button plate), only bigger and always lit
+            textCol = isExit ? SDL_Color {255, 190, 180, 255} : col::Text;
+        }
         fontRenderer.DrawString(
             label,
-            r.x + 20 + (selected ? 5 : 0),
+            r.x + 20 + (selected && !touchMenu ? 5 : 0),
             r.CenterY(),
-            ui::FONT_H2,
+            touchMenu ? ui::FONT_H1 : ui::FONT_H2,
             textCol,
             selected,
             Anchor::LEFT | Anchor::VCENTER);

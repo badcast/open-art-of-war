@@ -1,6 +1,7 @@
 #include "game/EntityManager.hpp"
 #include "EntityManagerInternal.hpp"
 #include "graphics/SpriteRegistry.hpp"
+#include "game/Mines.hpp"
 #include "game/Projectiles.hpp"
 #include "game/WeaponBalance.hpp"
 #include "core/DetMath.hpp"
@@ -113,14 +114,14 @@ EntityManager::EntityManager()
 
 void EntityManager::RebuildBlueprints()
 {
-    // Blueprints of the player's faction in canonical order: HQ, power, barracks, factory, lab, bunker, tower, wall
+    // Blueprints of the player's faction in canonical order: HQ, power, barracks, factory, lab, bunker, (Confederation: radar locator), tower, wall
     // Both factions: commands of other players are looked up in their own faction's list
     for (int side = 0; side < 2; ++side)
     {
         std::vector<BuildingBlueprint> &list = s_factionBlueprints[side];
         list.clear();
         const std::vector<int> bpOrder
-            = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
+            = side == 0 ? std::vector<int> {0, 1, 2, 3, 4, 5, 6, 7, 15} : std::vector<int> {8, 9, 10, 11, 12, 13, 14, 25};
         for (std::size_t slot = 0; slot < bpOrder.size(); ++slot)
         {
             const int bIdx = bpOrder[slot];
@@ -142,6 +143,26 @@ void EntityManager::RebuildBlueprints()
                 bp.desc = cfg.description;
                 list.push_back(bp);
             }
+        }
+    }
+    // The Resistance's mines come after its walls: one blueprint per kind, laid like a wall segment
+    {
+        std::vector<BuildingBlueprint> &list = s_factionBlueprints[1];
+        const std::vector<MineSpec> &mines = Mines::Specs();
+        const int firstSlot = 8; // after the eight buildings and walls of its list
+        for (std::size_t k = 0; k < mines.size(); ++k)
+        {
+            BuildingBlueprint bp;
+            bp.blueprintId = firstSlot + static_cast<int>(k);
+            bp.buildingIndex = 40 + static_cast<int>(k); // no building has it
+            bp.iconCompId = mines[k].iconComp;
+            bp.unitType = UnitType::Headquarters;
+            bp.name = mines[k].name;
+            bp.width = bp.height = 1;
+            bp.creditCost = mines[k].cost;
+            bp.desc = mines[k].desc;
+            bp.mineKind = static_cast<int>(k);
+            list.push_back(bp);
         }
     }
     s_blueprints = s_factionBlueprints[PlayerFaction() == Faction::Confederation ? 0 : 1];
@@ -224,6 +245,8 @@ void EntityManager::Clear()
     m_flameBursts.clear();
     m_muzzleFlashes.clear();
     m_groundMarks.clear();
+    m_mines.clear();
+    m_nextMineId = 1;
     m_soundCues.clear();
     m_eliminated = {};
     // Muzzle-flash reveals name entity ids: the next game reuses them from 1, so old pings would show its units

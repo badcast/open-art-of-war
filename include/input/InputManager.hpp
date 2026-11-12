@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <string>
 #if ANDROID
 #include <map>
@@ -46,6 +47,30 @@ public:
         m_touchRenderer = renderer;
     }
 #endif
+
+    // Touch screen: one finger dragging over the map moves the camera (instead of drawing a selection box) while this
+    // is on; the touch interface turns it off for a box-select mode and while it drags a building ghost
+    void SetTouchPan(bool on)
+    {
+        m_touchPan = on;
+    }
+    // A finger drag in a menu or window scrolls it by wheel steps; a window that scrolls by itself (the technology
+    // tree: two directions) turns that off and takes the raw travel with ConsumeTouchDrag instead
+    void SetTouchWheelScroll(bool on)
+    {
+        m_touchWheelScroll = on;
+    }
+    void ConsumeTouchDrag(float &dx, float &dy)
+    {
+        dx = m_touchDragX;
+        dy = m_touchDragY;
+        m_touchDragX = m_touchDragY = 0.0f;
+    }
+    // Touch interface panels over the map (screen pixels): a finger that starts on one never pans the map
+    void SetTouchUiRects(std::vector<SDL_Rect> rects)
+    {
+        m_touchUiRects = std::move(rects);
+    }
 
     void Update(float deltaTime, Camera &camera);
     void UpdateCamera(
@@ -181,6 +206,12 @@ public:
     void ResetFrameEvents();
 
 private:
+    bool m_touchPan {false};
+    float m_touchDragX {0.0f};
+    float m_touchDragY {0.0f};
+    bool m_touchWheelScroll {true};
+    float m_touchScroll {0.0f}; // finger travel not yet turned into wheel steps (menus scroll by swiping)
+    std::vector<SDL_Rect> m_touchUiRects;
 #if ANDROID
     bool ProcessTouch(const SDL_Event &event, Camera &camera);
     SDL_Renderer *m_touchRenderer {nullptr};

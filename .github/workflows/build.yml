@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      data_urls:
+        description: "Game data to put into the packages (one URL per line, *.blob and *.mod); empty: the repository variable GAME_DATA_URLS"
+        required: false
+        default: ""
 
 concurrency:
   group: build-${{ github.ref }}
@@ -15,6 +20,9 @@ concurrency:
 env:
   SDL_VIDEODRIVER: dummy
   SDL_AUDIODRIVER: dummy
+  # Game data of the packages (assets.blob, *.mod): Settings -> Secrets and variables -> Actions (docs/ci-game-data.md)
+  GAME_DATA_URLS: ${{ inputs.data_urls || vars.GAME_DATA_URLS || secrets.GAME_DATA_URLS }}
+  GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
 
 jobs:
   linux:
@@ -43,10 +51,15 @@ jobs:
           path: determinism-linux.txt
       - name: Network tests
         run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
+      - name: Fetch the game data (assets.blob, mods)
+        shell: bash
+        run: tools/fetch_game_data.sh game-data
       - name: Package
         # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |
           mkdir dist
+          cp game-data/*.blob dist/ 2>/dev/null || true
+          mkdir -p dist/mods && cp game-data/*.mod dist/mods/ 2>/dev/null || true
           cp -a build/openaow build/openaow-server build/openaow-charactereditor build/openaow-mapeditor build/libopenaow.so* dist/
           tar -czf openaow-linux-x64.tar.gz -C dist .
       - uses: actions/upload-artifact@v4
@@ -88,10 +101,15 @@ jobs:
           path: determinism-windows-msvc.txt
       - name: Network tests
         run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
+      - name: Fetch the game data (assets.blob, mods)
+        shell: bash
+        run: tools/fetch_game_data.sh game-data
       - name: Package
         shell: bash
         run: |
           mkdir dist
+          cp game-data/*.blob dist/ 2>/dev/null || true
+          mkdir -p dist/mods && cp game-data/*.mod dist/mods/ 2>/dev/null || true
           cp build/*.exe build/*.dll dist/
       - uses: actions/upload-artifact@v4
         with:
@@ -140,9 +158,14 @@ jobs:
           path: determinism-windows-mingw.txt
       - name: Network tests
         run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
+      - name: Fetch the game data (assets.blob, mods)
+        shell: bash
+        run: tools/fetch_game_data.sh game-data
       - name: Package
         run: |
           mkdir dist
+          cp game-data/*.blob dist/ 2>/dev/null || true
+          mkdir -p dist/mods && cp game-data/*.mod dist/mods/ 2>/dev/null || true
           cp build/*.exe build/*.dll dist/
           # runtime DLLs (SDL3, yaml-cpp, libintl ...) so the folder runs outside MSYS2
           for exe in dist/*.exe; do
@@ -180,10 +203,15 @@ jobs:
           path: determinism-macos.txt
       - name: Network tests
         run: ctest --test-dir build --output-on-failure --no-tests=error -R "^openaow-net-tests$"
+      - name: Fetch the game data (assets.blob, mods)
+        shell: bash
+        run: tools/fetch_game_data.sh game-data
       - name: Package
         # (a tarball keeps the executable bits; an artifact folder would lose them)
         run: |
           mkdir dist
+          cp game-data/*.blob dist/ 2>/dev/null || true
+          mkdir -p dist/mods && cp game-data/*.mod dist/mods/ 2>/dev/null || true
           cp -a build/openaow build/openaow-charactereditor build/openaow-mapeditor build/libopenaow*.dylib dist/
           tar -czf openaow-macos-arm64.tar.gz -C dist .
       - uses: actions/upload-artifact@v4

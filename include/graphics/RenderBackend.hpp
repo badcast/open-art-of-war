@@ -32,10 +32,11 @@ struct RenderApiOption
 // what this system found out: settings.json, key "environment"):
 //   api           the API to start with
 //   fallback      the next one known to work
-//   probed        { name: true/false } what was tried on this system
-//   probe_key     SDL version + video driver the probes belong to (a change starts over)
 //   init_pending  set while an API is being brought up, cleared after its first frame: still set on
 //                 the next start means that attempt took the whole process down, so the API is skipped
+//                 once (nothing is remembered against it)
+// What was found out about an API (works / fails) is only kept in memory for the run: a stored failure
+// once hid SDL GPU for good.
 namespace RenderBackend
 {
 
@@ -45,7 +46,7 @@ std::string Label(const std::string &name);
 
 // Creates the renderer for `window`: `forced` (command line, not stored) or the configured API first,
 // then the fallback and the rest in order of preference, software last. Failed attempts are logged,
-// marked in `env` and skipped; `env` gets the API that came up and the next working one. Saves `env`.
+// skipped for the rest of the run; `env` gets the API that came up and the next working one. Saves `env`.
 SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced = "");
 
 // The first frame of the new renderer is on the screen: the API is safe, clear init_pending
@@ -55,7 +56,7 @@ void ConfirmFirstFrame(EnvironmentConfig &env);
 bool Probe(const std::string &name);
 
 // The options for the settings screen: every candidate with what is known about it.
-// `probeUnknown` tries the not yet probed ones now (and stores the results in `env`).
+// `probeUnknown` tries the not yet probed ones now (results are kept for this run only).
 std::vector<RenderApiOption> Options(EnvironmentConfig &env, bool probeUnknown);
 inline std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUnknown)
 {

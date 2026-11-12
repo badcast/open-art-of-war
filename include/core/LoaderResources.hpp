@@ -79,6 +79,10 @@ public:
     {
         return Projectiles();
     }
+    // Layout of the interface (ui/layout.yaml), visual only
+    static std::string UiLayout();
+    // The mines of the Resistance (characters/mines.yaml)
+    static std::string Mines();
     // Hard per-player building limits (data/limits.yaml)
     static std::string Limits();
     // Tech levels: buildings, units and researches allowed per level (data/capabilities.yaml)

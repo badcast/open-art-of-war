@@ -489,6 +489,18 @@ int ReduceDamageByArmor(int damage, const Entity &target)
 {
     if (damage <= 0)
         return damage;
+bool IsMineResearched(PlayerId player, int mineValue)
+{
+    const Faction faction = Players::FactionOf(player);
+    for (int i = 0; i < kResearchCount; ++i)
+    {
+        const ResearchDef &def = researchDef(faction, i);
+        if (def.effect == ResearchEffect::Mine && def.value == mineValue && IsResearched(player, i))
+            return true;
+    }
+    return false;
+}
+
     int percent = 0;
     if (target.isBuilding)
     {

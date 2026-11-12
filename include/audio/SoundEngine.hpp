@@ -32,7 +32,7 @@ public:
     void PlayMenuMusic();
     void PlayRandomGameTrack();
     void StopMusic();
-    void NextTrack(); // player: mainmenu -> tracks... -> mainmenu
+    void NextTrack(); // player: mainmenu tracks -> the other tracks -> the main menu tracks again (once touched)
     void PrevTrack();
     void SetMusicVolume(int volume); // 0..128
     // 0..128: the general volume, over every other one (music, surroundings, effects, interface, voices)
@@ -110,6 +110,8 @@ private:
     bool LoadTrack(const Track &track, bool loop);
     void AdvanceGameTrack();
     void PlayPlayerTrack(int index);
+    void PlayMenuPlaylist(std::size_t position); // main menu playlist: the menu tracks, then all the others
+    void StepTrack(int direction);               // next (+1) / previous (-1) of the playlist of the current area
 
     bool m_initialized {false};
     bool m_muted {false};

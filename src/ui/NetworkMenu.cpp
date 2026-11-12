@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include "ui/NetworkMenu.hpp"
 #include "audio/SoundRequests.hpp"
 #include "core/Localization.hpp"
@@ -238,38 +239,66 @@ void NetworkMenu::Reset()
     m_wasInLobby = false;
 }
 
-NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int w, int h)
+NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int w, int h) const
 {
+    // Where things stand is ui/layout.yaml (screen network)
     BrowserLayout l;
-    l.dialog = ui::CenteredRect(w, h, 760, 560);
-    const int x = l.dialog.x + 24, inner = l.dialog.w - 48;
-    l.nameField = {x + 140, l.dialog.y + 70, 220, 36};
-    l.passwordField = {x + 540, l.dialog.y + 70, inner - 540, 36};
-    l.tabLan = {x, l.dialog.y + 126, inner / 2 - 3, 36};
-    l.tabInternet = {x + inner / 2 + 3, l.dialog.y + 126, inner / 2 - 3, 36};
-    l.list = {x, l.dialog.y + 172, inner, l.dialog.h - 172 - 80};
-    // Internet tab: direct address, then the server's rooms, then a room code
-    l.addressField = {x, l.list.y + 22, inner - 180, 36};
-    l.directBtn = {l.addressField.Right() + 10, l.addressField.y, 170, 36};
-    l.refreshBtn = {l.list.Right() - 140, l.addressField.Bottom() + 14, 140, 28};
-    l.serverList = {x, l.refreshBtn.Bottom() + 6, inner, 4 * 34 + 8};
-    l.codeField = {x + 150, l.serverList.Bottom() + 10, 130, 34};
-    l.codeBtn = {l.codeField.Right() + 10, l.codeField.y, 170, 34};
-    // Bottom row: Back on the left, the three actions share the rest; a narrow window shrinks them all, so they
-    // never overlap
-    constexpr int kGap = 12;
-    const int backW = std::min(120, inner / 6);
-    const int actionW = std::min(210, (inner - backW - 3 * kGap) / 3);
-    l.joinBtn = {l.dialog.Right() - 24 - actionW, l.dialog.Bottom() - 60, actionW, 40};
-    l.hostBtn = {l.joinBtn.x - kGap - actionW, l.joinBtn.y, actionW, 40};
-    l.serverBtn = {l.hostBtn.x - kGap - actionW, l.joinBtn.y, actionW, 40};
-    l.backBtn = {x, l.joinBtn.y, backW, 40};
+    const bool lan = m_tab == Tab::Lan;
+    const uilayout::Solved s = uilayout::Current().Solve(
+        "network", "pc", w, h, [lan](const std::string &n) { return n == (lan ? "tab_lan" : "tab_internet"); });
+    l.dialog = s.Rect("dialog");
+    l.nameField = s.Rect("name");
+    l.passwordField = s.Rect("password");
+    l.addressField = s.Rect("address");
+    l.directBtn = s.Rect("connect");
+    l.tabLan = s.Rect("tab_lan");
+    l.tabInternet = s.Rect("tab_internet");
+    l.lanRefreshBtn = l.refreshBtn = s.Rect("refresh");
+    l.list = s.Rect("lan_list");
+    l.serverList = s.Rect("server_list");
+    l.codeField = s.Rect("code");
+    l.codeBtn = s.Rect("code_join");
+    l.backBtn = s.Rect("back");
+    l.joinBtn = s.Rect("join");
+    l.hostBtn = s.Rect("host");
+    l.serverBtn = s.Rect("server_create");
     return l;
 }
 
 NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int w, int h)
 {
     LobbyLayout l;
+    // ui/layout.yaml (screen map_select, shared with the campaign and the custom game); the numbers below stand in
+    // without it
+    if (uilayout::Current().Has("map_select", "pc"))
+    {
+        const uilayout::Solved s = uilayout::Current().Solve("map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), w, h, {});
+        l.dialog = s.Rect("dialog");
+        l.mapSearch = s.Rect("room_search");
+        l.mapList = s.Rect("room_list");
+        l.chatField = s.Rect("room_chat_field");
+        l.chatSend = s.Rect("room_chat_send");
+        l.chatLog = s.Rect("room_chat_log");
+        l.details = s.Rect("details");
+        const ui::UiRect &d = l.details;
+        const int rowH = std::clamp((d.h - 74 - 24 - 150 - 30) / 8, 30, 40);
+        l.rowH = rowH;
+        l.players = {d.x + 20, d.y + 74, d.w - 40, 24 + 8 * rowH};
+        const int below = d.Bottom() - 16 - (l.players.Bottom() + 12);
+        const int size = std::clamp(std::min(below, static_cast<int>(d.w * 0.45f)), 120, 460);
+        l.map = {d.x + 20, l.players.Bottom() + 12, size, size};
+        const int optX = l.map.Right() + 20;
+        const int optW = d.Right() - 20 - optX;
+        l.creditsBtn = s.Rect("credits");
+        l.timeBtn = s.Rect("time");
+        l.techBtn = s.Rect("tech");
+        l.fogCheckbox = {optX, l.map.y, optW, 28};
+        l.prebuiltBtn = {optX, l.map.y + 32, optW, 28};
+        l.leaveBtn = s.Rect("room_leave");
+        l.startBtn = s.Rect("room_start");
+        l.readyBtn = s.Rect("room_ready");
+        return l;
+    }
     l.dialog = ui::CenteredRect(w, h, w, h); // the whole window
     const int x = l.dialog.x + 20;
     const int contentY = l.dialog.y + 52 + 16;
@@ -347,6 +376,35 @@ bool NetworkMenu::ParseAddress(const std::string &text)
     }
     m_joinAddress = a;
     return !a.empty();
+}
+
+bool NetworkMenu::FocusedFieldRect(int windowW, int windowH, bool inRoom, SDL_Rect &out) const
+{
+    ui::UiRect r;
+    if (inRoom)
+    {
+        const LobbyLayout l = lobbyLayout(windowW, windowH);
+        if (m_focus == Field::Chat)
+            r = l.chatField;
+        else if (m_focus == Field::Search)
+            r = l.mapSearch;
+    }
+    else
+    {
+        const BrowserLayout l = browserLayout(windowW, windowH);
+        if (m_focus == Field::Name)
+            r = l.nameField;
+        else if (m_focus == Field::Password)
+            r = l.passwordField;
+        else if (m_focus == Field::Address)
+            r = l.addressField;
+        else if (m_focus == Field::Code)
+            r = l.codeField;
+    }
+    if (r.w <= 0)
+        return false;
+    out = {r.x, r.y, r.w, r.h};
+    return true;
 }
 
 NetworkAction NetworkMenu::Update(
@@ -432,20 +490,13 @@ NetworkAction NetworkMenu::UpdateBrowser(
             m_joinPort = server[m_serverSelected].port;
             return NetworkAction::ServerJoin;
         }
-        if (m_tab == Tab::Lan)
+        if (m_tab == Tab::Lan && m_lanSelected >= 0 && m_lanSelected < static_cast<int>(lan.size()))
         {
-            if (m_lanSelected < 0 || m_lanSelected >= static_cast<int>(lan.size()))
-                return NetworkAction::None;
             m_joinAddress = lan[m_lanSelected].address;
             m_joinPort = lan[m_lanSelected].port;
             return NetworkAction::Join;
         }
-        if (!ParseAddress(settings.lastAddress))
-        {
-            m_notice = _("Enter an address: host or host:port");
-            return NetworkAction::None;
-        }
-        return NetworkAction::Join;
+        return joinDirect();
     };
 
     if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
@@ -475,43 +526,48 @@ NetworkAction NetworkMenu::UpdateBrowser(
         m_tab = Tab::Lan;
     if (l.tabInternet.Contains(mx, my))
         m_tab = Tab::Internet;
-    if (m_tab == Tab::Internet)
+    if (l.addressField.Contains(mx, my))
+        m_focus = Field::Address;
+    if (l.codeField.Contains(mx, my))
+        m_focus = Field::Code;
+    if (l.directBtn.Contains(mx, my) && !settings.lastAddress.empty())
     {
-        if (l.addressField.Contains(mx, my))
-            m_focus = Field::Address;
-        if (l.codeField.Contains(mx, my))
-            m_focus = Field::Code;
-        if (l.directBtn.Contains(mx, my) && !settings.lastAddress.empty())
-        {
-            m_notice.clear();
-            return joinDirect();
-        }
-        if (l.codeBtn.Contains(mx, my))
-            return joinCode();
-        if (l.refreshBtn.Contains(mx, my))
-            return NetworkAction::ServerRefresh;
-        for (int i = 0; i < static_cast<int>(server.size()) && i < 4; ++i)
-        {
-            if (!l.ServerRow(i).Contains(mx, my))
-                continue;
-            if (i == m_serverSelected)
-                return join(); // a second click joins
-            m_serverSelected = i;
-        }
+        m_notice.clear();
+        return joinDirect();
     }
-    if (m_tab == Tab::Internet && l.serverBtn.Contains(mx, my))
+    if (l.codeBtn.Contains(mx, my))
+        return joinCode();
+    if (l.refreshBtn.Contains(mx, my))
+    {
+        if (m_tab == Tab::Internet)
+            return NetworkAction::ServerRefresh;
+        m_lanSelected = -1;
+        return NetworkAction::LanRefresh;
+    }
+    const int serverRows = std::max(1, (l.serverList.h - 8) / 34);
+    for (int i = 0; m_tab == Tab::Internet && i < static_cast<int>(server.size()) && i < serverRows; ++i)
+    {
+        if (!l.ServerRow(i).Contains(mx, my))
+            continue;
+        if (i == m_serverSelected)
+            return join(); // a second click joins
+        m_serverSelected = i;
+        m_lanSelected = -1;
+    }
+    if (l.serverBtn.Contains(mx, my))
     {
         m_notice.clear();
         return NetworkAction::ServerCreate;
     }
-    if (m_tab == Tab::Lan && l.list.Contains(mx, my))
+    if (l.list.Contains(mx, my))
     {
         const int row = (my - l.list.y - 4) / 40;
-        if (row >= 0 && row < static_cast<int>(lan.size()))
+        if (row >= 0 && row < static_cast<int>(lan.size()) && row < std::max(1, (l.list.h - 8) / 40))
         {
             if (row == m_lanSelected)
                 return join(); // a second click joins
             m_lanSelected = row;
+            m_serverSelected = -1;
         }
     }
     if (l.backBtn.Contains(mx, my))
@@ -1611,6 +1667,23 @@ void NetworkMenu::Render(
         false,
         Anchor::LEFT | Anchor::VCENTER);
     DrawField(r, font, l.passwordField, std::string(m_password.size(), '*'), _("Optional"), m_focus == Field::Password);
+    font.DrawString(
+        _("Connect by address (the host forwards UDP port 38100)"),
+        l.addressField.x,
+        l.addressField.y - 18,
+        ui::FONT_SMALL,
+        col::TextDim,
+        false);
+    DrawField(
+        r, font, l.addressField, settings.lastAddress, _("IP address or hostname"), m_focus == Field::Address);
+    ui::DrawButton(
+        r,
+        font,
+        l.directBtn,
+        _("CONNECT"),
+        ui::ButtonStyle::Secondary,
+        l.directBtn.Contains(m_mouseX, m_mouseY),
+        !settings.lastAddress.empty());
     ui::DrawButton(
         r,
         font,
@@ -1627,6 +1700,9 @@ void NetworkMenu::Render(
         l.tabInternet.Contains(m_mouseX, m_mouseY));
     if (m_tab == Tab::Lan)
     {
+        ui::DrawCaption(font, r, l.list.x, l.refreshBtn.y + 6, _("LOCAL NETWORK"));
+        ui::DrawButton(
+            r, font, l.refreshBtn, _("REFRESH"), ui::ButtonStyle::Ghost, l.refreshBtn.Contains(m_mouseX, m_mouseY));
         ui::DrawPanel(r, l.list, col::PanelSunken, col::Border);
         if (lan.empty())
         {
@@ -1639,14 +1715,14 @@ void NetworkMenu::Render(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
-        for (std::size_t i = 0; i < lan.size() && i < 8; ++i)
+        for (std::size_t i = 0; i < lan.size() && static_cast<int>(i) < std::max(1, (l.list.h - 8) / 40); ++i)
         {
             const UiRect row {l.list.x + 4, l.list.y + 4 + static_cast<int>(i) * 40, l.list.w - 8, 36};
             const bool sel = static_cast<int>(i) == m_lanSelected;
             ui::DrawPanel(r, row, sel ? col::Hover : col::PanelRaised, sel ? col::Accent : col::Border);
             const LanGame &g = lan[i];
             font.DrawString(
-                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, 220),
+                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, row.w * 26 / 100),
                 row.x + 10,
                 row.CenterY(),
                 ui::FONT_BODY_BOLD,
@@ -1654,8 +1730,8 @@ void NetworkMenu::Render(
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, g.map, ui::FONT_SMALL, 160),
-                row.x + 250,
+                ui::FitText(font, g.map, ui::FONT_SMALL, row.w * 30 / 100),
+                row.x + row.w * 28 / 100,
                 row.CenterY(),
                 ui::FONT_SMALL,
                 col::TextDim,
@@ -1663,7 +1739,7 @@ void NetworkMenu::Render(
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
                 std::to_string(g.players) + "/" + std::to_string(g.maxPlayers),
-                row.x + 440,
+                row.x + row.w * 62 / 100,
                 row.CenterY(),
                 ui::FONT_SMALL,
                 col::Text,
@@ -1678,28 +1754,11 @@ void NetworkMenu::Render(
                 false,
                 Anchor::RIGHT | Anchor::VCENTER);
             if (g.locked)
-                DrawLock(r, row.x + 412, row.CenterY() - 7, col::Accent);
+                DrawLock(r, row.x + row.w * 62 / 100 - 28, row.CenterY() - 7, col::Accent);
         }
     }
     else
     {
-        font.DrawString(
-            _("Direct connection (the host forwards UDP port 38100)"),
-            l.addressField.x,
-            l.addressField.y - 18,
-            ui::FONT_SMALL,
-            col::TextDim,
-            false);
-        DrawField(
-            r, font, l.addressField, settings.lastAddress, _("IP address or hostname"), m_focus == Field::Address);
-        ui::DrawButton(
-            r,
-            font,
-            l.directBtn,
-            _("CONNECT"),
-            ui::ButtonStyle::Secondary,
-            l.directBtn.Contains(m_mouseX, m_mouseY),
-            !settings.lastAddress.empty());
         ui::DrawCaption(font, r, l.serverList.x, l.refreshBtn.y + 6, std::string(_("SERVER")) + "  " + serverStatus);
         ui::DrawButton(
             r, font, l.refreshBtn, _("REFRESH"), ui::ButtonStyle::Ghost, l.refreshBtn.Contains(m_mouseX, m_mouseY));
@@ -1715,7 +1774,7 @@ void NetworkMenu::Render(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
-        for (int i = 0; i < static_cast<int>(server.size()) && i < 4; ++i)
+        for (int i = 0; i < static_cast<int>(server.size()) && i < std::max(1, (l.serverList.h - 8) / 34); ++i)
         {
             const UiRect row = l.ServerRow(i);
             const bool sel = i == m_serverSelected;
@@ -1730,16 +1789,16 @@ void NetworkMenu::Render(
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, 200),
-                row.x + 90,
+                ui::FitText(font, g.name, ui::FONT_BODY_BOLD, row.w * 30 / 100 ),
+                row.x + 110,
                 row.CenterY(),
                 ui::FONT_BODY_BOLD,
                 col::Text,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, g.map, ui::FONT_SMALL, 160),
-                row.x + 310,
+                ui::FitText(font, g.map, ui::FONT_SMALL, row.w * 30 / 100),
+                row.x + row.w * 45 / 100,
                 row.CenterY(),
                 ui::FONT_SMALL,
                 col::TextDim,
@@ -1789,10 +1848,8 @@ void NetworkMenu::Render(
     ui::DrawButton(
         r, font, l.hostBtn, _("CREATE GAME"), ui::ButtonStyle::Secondary, l.hostBtn.Contains(m_mouseX, m_mouseY));
     if (m_tab == Tab::Internet)
-    {
         ui::DrawButton(
-            r, font, l.serverBtn, _("CREATE"), ui::ButtonStyle::Secondary, l.serverBtn.Contains(m_mouseX, m_mouseY));
-    }
+            r, font, l.serverBtn, _("CREATE ROOM"), ui::ButtonStyle::Secondary, l.serverBtn.Contains(m_mouseX, m_mouseY));
     const bool canJoin = m_tab == Tab::Internet
                              ? (m_serverSelected >= 0 && m_serverSelected < static_cast<int>(server.size()))
                              : (m_lanSelected >= 0 && m_lanSelected < static_cast<int>(lan.size()));

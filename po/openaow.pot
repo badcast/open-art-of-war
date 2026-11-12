@@ -2697,3 +2697,69 @@ msgstr "Ambient volume"
 
 msgid "Volume of the surroundings in a match: the forest by day or by night"
 msgstr "Volume of the surroundings in a match: the forest by day or by night"
+
+msgid "GOALS"
+msgstr "GOALS"
+
+msgid "UNITS"
+msgstr "UNITS"
+
+msgid "BOX"
+msgstr "BOX"
+
+msgid "ATTACK"
+msgstr "ATTACK"
+
+msgid "HOLD"
+msgstr "HOLD"
+
+msgid "REPAIR"
+msgstr "REPAIR"
+
+msgid "SELL"
+msgstr "SELL"
+
+msgid "SURE?"
+msgstr "SURE?"
+
+msgid "CLEAR"
+msgstr "CLEAR"
+
+msgid "ALL"
+msgstr "ALL"
+
+msgid "BUILD HERE"
+msgstr "BUILD HERE"
+
+msgid "INF"
+msgstr "INF"
+
+msgid "VEH"
+msgstr "VEH"
+
+msgid "SELECTED"
+msgstr "SELECTED"
+
+msgid "NOTHING AVAILABLE"
+msgstr "NOTHING AVAILABLE"
+
+msgid "TAP THE TARGET: ATTACK-MOVE"
+msgstr "TAP THE TARGET: ATTACK-MOVE"
+
+msgid "DRAG THE GHOST, THEN BUILD HERE"
+msgstr "DRAG THE GHOST, THEN BUILD HERE"
+
+msgid "BOX SELECT: DRAG OVER THE UNITS"
+msgstr "BOX SELECT: DRAG OVER THE UNITS"
+
+msgid "Show grid when building"
+msgstr "Show grid when building"
+
+msgid "White tiles where a building may stand, red where it may not"
+msgstr "White tiles where a building may stand, red where it may not"
+
+msgid "Connect by address (the host forwards UDP port 38100)"
+msgstr "Connect by address (the host forwards UDP port 38100)"
+
+msgid "CREATE ROOM"
+msgstr "CREATE ROOM"

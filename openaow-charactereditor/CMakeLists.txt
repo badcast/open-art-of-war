@@ -5,7 +5,6 @@ set(CHARACTER_EDITOR_SOURCES
     src/EditorEffects.cpp
     src/EditorProjectiles.cpp
     src/EditorSettings.cpp
-    src/EditorGameUi.cpp
     src/EditorEnvironment.cpp
     src/EditorAi.cpp
     src/EditorAnimator.cpp

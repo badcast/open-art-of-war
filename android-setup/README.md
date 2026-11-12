@@ -67,7 +67,12 @@ adb install -r android-setup/app/build/outputs/apk/debug/app-debug.apk
 
 ## Game assets
 
-The game reads `assets.blob` by filesystem path, so the archive is **not bundled inside the APK**.
+The game reads `assets.blob` by filesystem path (libarchive cannot read inside an APK). Two ways to get it onto the device:
+
+- **CI / your own build:** list the files in the repository variable `GAME_DATA_URLS`; they are bundled into the APK and
+  copied to the app's storage on the first start ([instructions](../docs/ci-game-data.md)). Locally: run
+  `GAME_DATA_URLS=... tools/fetch_game_data.sh game-data`, copy `game-data/*` into `android-setup/app/src/main/assets/`.
+- **By hand:** push the archive as below.
 
 After installing and launching the app once, copy your prepared archive into the app's storage directory. Run this command from the repository root:
 

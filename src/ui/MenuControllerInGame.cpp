@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
 #include "ui/MapFilter.hpp"
@@ -49,6 +50,15 @@ struct PauseLayout
 PauseLayout pauseLayout(int windowW, int windowH)
 {
     PauseLayout l;
+    // ui/layout.yaml (screen pause); the numbers below stand in when the file has no such screen
+    if (uilayout::Current().Has("pause", "pc"))
+    {
+        const uilayout::Solved s = uilayout::Current().Solve("pause", "pc", windowW, windowH, {});
+        l.dialog = s.Rect("dialog");
+        for (int i = 0; i < kPauseItems; ++i)
+            l.items[i] = s.Rect("item" + std::to_string(i));
+        return l;
+    }
     const int itemH = 46;
     const int gap = 8;
     int h = 52 + 20 + kPauseItems * itemH + (kPauseItems - 1) * gap + 24;

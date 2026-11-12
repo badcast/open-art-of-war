@@ -746,6 +746,18 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     if (m_researchActive)
         SetResearchAnimation(m_player, true, entities);
     m_waveAssemblyTimer += deltaTime;
+    // The orders in the queues of its Barracks / Factories go on every tick (the decisions below come once a second)
+    {
+        int refunded = 0;
+        const std::vector<int> trained
+            = Economy::AdvanceQueues(m_player, deltaTime, entities, map, pathfinder, false, true, refunded);
+        m_credits += refunded;
+        for (int id : trained)
+        {
+            m_waveRoster.insert(id); // joins the list of the next wave
+            ++m_trainedUnits;
+        }
+    }
     UpdateUnitStances(entities);
     m_squadController.SetSeesAll(GetEffectiveDifficulty() == AIDifficulty::Hardcore);
     UpdateRepairs(deltaTime, entities);

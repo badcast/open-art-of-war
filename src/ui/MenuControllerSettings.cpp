@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
 #include "ui/MapFilter.hpp"
@@ -66,6 +67,21 @@ struct SettingsLayout
 SettingsLayout settingsLayout(int windowW, int windowH)
 {
     SettingsLayout l;
+    // ui/layout.yaml (screen settings); the numbers below stand in when the file has no such screen
+    if (uilayout::Current().Has("settings", "pc"))
+    {
+        const uilayout::Solved s = uilayout::Current().Solve("settings", "pc", windowW, windowH, {});
+        l.dialog = s.Rect("dialog");
+        for (int i = 0; i < kSettingsTabs; ++i)
+            l.tabs[i] = s.Rect("tab" + std::to_string(i));
+        l.backBtn = s.Rect("back");
+        l.defaultsBtn = s.Rect("defaults");
+        const UiRect area = s.Rect("list");
+        l.visible = std::max(1, (area.h + SettingsLayout::kGap) / (SettingsLayout::kRowH + SettingsLayout::kGap));
+        l.list = {area.x, area.y, area.w, l.visible * (SettingsLayout::kRowH + SettingsLayout::kGap) - SettingsLayout::kGap};
+        l.track = {l.list.Right() + 8, l.list.y, 4, l.list.h};
+        return l;
+    }
     l.dialog = ui::CenteredRect(windowW, windowH, 780, std::min(640, std::max(420, windowH - 40)));
     const int tabW = (l.dialog.w - 40 - (kSettingsTabs - 1) * 6) / kSettingsTabs;
     for (int i = 0; i < kSettingsTabs; ++i)
@@ -493,6 +509,14 @@ std::vector<SettingsRow> BuildSettingsRows(
                 s.language = i == 1 ? "ru" : "en";
                 notify(SettingsArea::Game);
             });
+        toggle(
+            _("Show grid when building"),
+            _("White tiles where a building may stand, red where it may not"),
+            s.showBuildGrid,
+            [&s, notify](bool on) {
+                s.showBuildGrid = on;
+                notify(SettingsArea::Game);
+            });
         rows.push_back(SliderRow(
             _("Default zoom"),
             _("Map zoom when a mission starts"),
@@ -587,6 +611,7 @@ void ResetSettingsTab(int tab, Settings &s)
         s.zoomMin = d.zoomMin;
         s.zoomMax = d.zoomMax;
         s.edgePanMargin = d.edgePanMargin;
+        s.showBuildGrid = d.showBuildGrid;
     }
 }
 

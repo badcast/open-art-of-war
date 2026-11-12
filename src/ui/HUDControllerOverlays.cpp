@@ -13,6 +13,7 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include "game/TileMap.hpp"
 #include "game/EntityManager.hpp"
+#include "game/Mines.hpp"
 #include "game/Economy.hpp"
 #include "game/Research.hpp"
 #include "graphics/RenderUtility.hpp"
@@ -171,6 +172,40 @@ void HUDController::RenderProductionOverlay(
     }
 }
 
+namespace
+{
+bool s_showBuildGrid = true;
+struct BuildGridStyle
+{
+    bool enabled {true};
+    float width {1.0f}; // world pixels: the lines lie on the ground and grow and shrink with the zoom
+    int radius {14};    // tiles around the ghost (what the screen shows of them)
+    SDL_Color allowed {255, 255, 255, 255};
+    SDL_Color forbidden {255, 32, 32, 255};
+    Uint8 fillAlpha {128};
+    Uint8 lineAlpha {128};
+} s_grid;
+} // namespace
+
+void HUDController::SetShowBuildGrid(bool on)
+{
+    s_showBuildGrid = on;
+}
+
+void HUDController::SetBuildGridConfig(const nlohmann::json &o)
+{
+    s_grid = BuildGridStyle {};
+    if (!o.is_object())
+        return;
+    s_grid.enabled = o.value("enabled", s_grid.enabled);
+    s_grid.width = std::clamp(o.value("line_width", s_grid.width), 0.5f, 12.0f);
+    s_grid.radius = std::clamp(o.value("radius_tiles", s_grid.radius), 1, 40);
+    s_grid.allowed = RenderUtility::ParseHexColor(o.value("allowed_color", std::string()), s_grid.allowed);
+    s_grid.forbidden = RenderUtility::ParseHexColor(o.value("forbidden_color", std::string()), s_grid.forbidden);
+    s_grid.fillAlpha = static_cast<Uint8>(255 * std::clamp(o.value("fill_opacity", 0.5f), 0.0f, 1.0f));
+    s_grid.lineAlpha = static_cast<Uint8>(255 * std::clamp(o.value("line_opacity", 0.5f), 0.0f, 1.0f));
+}
+
 void HUDController::RenderBuildGhost(
     Renderer &renderer,
     const TileMap &map,
@@ -186,7 +221,9 @@ void HUDController::RenderBuildGhost(
 
     const auto &bp = blueprints[m_selectedBlueprint];
 
-    bool canPlace = entities.CanPlaceBuilding(mouseTileX, mouseTileY, bp.width, bp.height, map, Players::Local());
+    bool canPlace = bp.mineKind >= 0
+                        ? entities.CanPlaceMine(bp.mineKind, mouseTileX, mouseTileY, map, Players::Local())
+                        : entities.CanPlaceBuilding(mouseTileX, mouseTileY, bp.width, bp.height, map, Players::Local());
     bool canAfford = economy.CanAfford(bp.creditCost);
 
     // While a building is picked, the line of the build zone of every finished headquarters shows where it may stand
@@ -206,6 +243,41 @@ void HUDController::RenderBuildGhost(
             2.0f);
     }
 
+    // The grid of the tiles around the ghost, drawn on the ground like the map itself (world units: it scales with
+    // the zoom): every tile filled, white where a building may stand, red where it may not; only what the screen shows
+    if (s_showBuildGrid && s_grid.enabled)
+    {
+        const float zoom = camera.GetZoom();
+        const int viewX0 = static_cast<int>(std::floor(camera.GetX() / TILE_WIDTH));
+        const int viewY0 = static_cast<int>(std::floor(camera.GetY() / TILE_HEIGHT));
+        const int viewX1 = static_cast<int>(std::ceil((camera.GetX() + camera.GetViewportWidth() / zoom) / TILE_WIDTH));
+        const int viewY1 = static_cast<int>(std::ceil((camera.GetY() + camera.GetViewportHeight() / zoom) / TILE_HEIGHT));
+        const int r = s_grid.radius;
+        const int x0 = std::max({mouseTileX - r, viewX0, 0}), x1 = std::min({mouseTileX + r, viewX1, map.GetWidth() - 1});
+        const int y0 = std::max({mouseTileY - r, viewY0, 0}), y1 = std::min({mouseTileY + r, viewY1, map.GetHeight() - 1});
+        const float t = s_grid.width;
+        const float w = static_cast<float>(TILE_WIDTH), h = static_cast<float>(TILE_HEIGHT);
+        for (int ty = y0; ty <= y1; ++ty)
+        {
+            for (int tx = x0; tx <= x1; ++tx)
+            {
+                const bool ok = bp.mineKind >= 0
+                                    ? entities.CanPlaceMine(bp.mineKind, tx, ty, map, Players::Local())
+                                    : entities.CanPlaceBuilding(tx, ty, 1, 1, map, Players::Local(), nullptr, false);
+                SDL_Color fill = ok ? s_grid.allowed : s_grid.forbidden;
+                SDL_Color line = fill;
+                fill.a = s_grid.fillAlpha;
+                line.a = s_grid.lineAlpha;
+                const float wx = static_cast<float>(tx * TILE_WIDTH), wy = static_cast<float>(ty * TILE_HEIGHT);
+                renderer.FillRectWorld(wx, wy, w, h, camera, fill);
+                renderer.FillRectWorld(wx, wy, w, t, camera, line);
+                renderer.FillRectWorld(wx, wy + h - t, w, t, camera, line);
+                renderer.FillRectWorld(wx, wy + t, t, h - 2 * t, camera, line);
+                renderer.FillRectWorld(wx + w - t, wy + t, t, h - 2 * t, camera, line);
+            }
+        }
+    }
+
     SDL_Color boxColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 80} : SDL_Color {255, 0, 0, 80};
     SDL_Color borderColor = (canPlace && canAfford) ? SDL_Color {0, 255, 0, 220} : SDL_Color {255, 0, 0, 220};
 
@@ -221,6 +293,22 @@ void HUDController::RenderBuildGhost(
             renderer.DrawRectWorld(
                 wx, wy, static_cast<float>(TILE_WIDTH), static_cast<float>(TILE_HEIGHT), camera, borderColor);
         }
+    }
+
+    if (bp.mineKind >= 0)
+    {
+        // A mine shows how far its blast reaches; there is no building to draw
+        const auto &mines = Mines::Specs();
+        if (bp.mineKind < static_cast<int>(mines.size()))
+            RenderUtility::DrawTileRadius(
+                renderer,
+                camera,
+                (mouseTileX + 0.5f) * TILE_WIDTH,
+                (mouseTileY + 0.5f) * TILE_HEIGHT,
+                mines[static_cast<std::size_t>(bp.mineKind)].blastRadius,
+                {240, 150, 60, 200},
+                2.0f);
+        return;
     }
 
     // A tower / bunker shows where it will reach from this spot

@@ -5,6 +5,7 @@
 #include "core/Utility.hpp"
 #include "game/AIController.hpp"
 #include "game/BuildLimits.hpp"
+#include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/TileMap.hpp"
@@ -775,7 +776,13 @@ int main()
             Building *f = w.entities.GetBuilding(factory);
             f->isProducing = false;
             f->productionTimer = 0.0f;
+            f->productionQueue.clear();
             AIDefenseTest::Produce(w.ai, w.map, w.entities);
+            // (the order sits in the factory's queue, paid, and no unit stands yet: let it finish, as the computer's
+            // own ticks do)
+            Check(f->productionQueue.size() == 1, "the computer orders a vehicle into the factory's queue");
+            int refunded = 0;
+            Economy::AdvanceQueues(w.ai.Player(), 60.0f, w.entities, w.map, w.pf, false, true, refunded);
             for (const auto &e : w.entities.GetAllEntities())
             {
                 Unit *u = const_cast<Entity &>(e).AsUnit();

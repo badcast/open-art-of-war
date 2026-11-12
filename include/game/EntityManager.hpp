@@ -314,6 +314,7 @@ struct BuildingBlueprint
     int powerCost {0}; // >0 produces, <0 consumes
     std::string desc;
     bool isWall {false}; // placed as a 1x1 wall segment instead of a building
+    int mineKind {-1};   // >= 0: a mine (index into Mines::Specs()), laid on one tile like a wall segment
 };
 
 struct WeaponConfig
@@ -501,9 +502,17 @@ public:
     const UnitConfig *GetUnitConfigByUnitType(UnitType type, Faction faction) const;
 
     // `player` builds there: within the radius of one of its headquarters, on ground it sees (people)
+    // `checkBaseOpen` false: the (costly, whole-map) KeepsBaseOpen test of computer players is left to the caller, which
+    // then asks KeepsBaseOpen itself for the few spots it really considers
     bool CanPlaceBuilding(
-        int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player, const char **reason = nullptr)
-        const;
+        int tileX,
+        int tileY,
+        int width,
+        int height,
+        const TileMap &map,
+        PlayerId player,
+        const char **reason = nullptr,
+        bool checkBaseOpen = true) const;
     // The footprint would not shut the player's base in: from the headquarters and from the exits of the unit
     // producers the rest of the map stays reachable, and the new building keeps a free side of its own.
     // Checked for computer players (a human may wall himself in).
@@ -822,6 +831,29 @@ public:
     // still queued in it, for a refund
     int DemolishBuilding(int buildingId, TileMap &map);
 
+    // ---- Mines (assets/characters/mines.yaml): laid on one tile, invisible to the other side, fired by hostile units
+    struct Mine
+    {
+        int id {0};
+        PlayerId owner {kNoPlayer};
+        int tileX {0};
+        int tileY {0};
+        int kind {0};          // index into Mines::Specs()
+        float armLeft {0.0f};  // seconds until it can fire
+    };
+    const std::vector<Mine> &GetMines() const
+    {
+        return m_mines;
+    }
+    int CountMines(PlayerId owner, int kind) const;
+    // `player` may lay a mine of that kind there (the rules of a wall segment, a free tile, the kind's own limit)
+    bool CanPlaceMine(int kind, int tileX, int tileY, const TileMap &map, PlayerId player) const;
+    // Lays it (the credits are the caller's); false when it may not be laid there
+    bool PlaceMine(int kind, int tileX, int tileY, const TileMap &map, PlayerId player);
+    void UpdateMines(float deltaTime, TileMap &map);
+    // The mines the local player's side sees (its own and its allies')
+    void RenderMines(Renderer &renderer, const Camera &camera, const TileMap &map, PlayerId viewer) const;
+
     void SpawnExplosion(float worldX, float worldY, int animId = 12, float delay = 0.0f);
     // Destruction of a building or vehicle: the main blast plus secondary ones (over a building's whole footprint)
     void SpawnDeathExplosions(const Entity &e);
@@ -883,6 +915,8 @@ private:
         float timeLeft {0.0f};
     };
     std::vector<GroundMark> m_groundMarks;
+    std::vector<Mine> m_mines; // part of the simulation state (Simulation::VisitState)
+    int m_nextMineId {1};
     std::vector<SoundCueEvent> m_soundCues;
     std::uint32_t m_generation {0};
     void Cue(SoundCue c, float x, float y, PlayerId owner, std::uint16_t sound = 0, float gain = 1.0f)

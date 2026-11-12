@@ -101,6 +101,8 @@ float ResearchedAttackRange(PlayerId player, int archetypeId, float range);
 int ResearchTotal(PlayerId player, ResearchEffect effect);
 // A completed technology with that effect exists
 bool IsEffectResearched(PlayerId player, ResearchEffect effect);
+// The mine technology whose `value` is `mineValue` (research effect `mine`) is done
+bool IsMineResearched(PlayerId player, int mineValue);
 // Units that need a technology (flamethrower, sniper, Grad, Porcupine) can only be trained once it is done; none the
 // player's tech level (Capabilities) leaves out
 bool IsUnitUnlocked(PlayerId player, int archetype);

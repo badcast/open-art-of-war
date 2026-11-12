@@ -38,7 +38,7 @@ constexpr float kDetailsIconScale = 1.3f; // the icon of the selected technology
 constexpr int kGapX0 = 34;
 constexpr int kGapY0 = 10;
 constexpr int kDetailsW0 = 270;
-constexpr float kScaleMin = 0.75f, kScaleMax = 2.0f, kScaleStep = 0.125f;
+constexpr float kScaleMin = 0.75f, kScaleMax = 4.0f, kScaleStep = 0.125f;
 int sz(int v, float scale)
 {
     return static_cast<int>(std::lround(v * scale));
@@ -405,6 +405,16 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             m_researchScrollX -= wheel * 60.0f;
         else
             m_researchScrollY -= wheel * 60.0f;
+    }
+    // A finger dragging over the tree moves it in both directions
+    {
+        float dragX = 0.0f, dragY = 0.0f;
+        input.ConsumeTouchDrag(dragX, dragY);
+        if (l.tree.Contains(mx, my))
+        {
+            m_researchScrollX -= dragX;
+            m_researchScrollY -= dragY;
+        }
     }
     if (m_researchPanning)
     {

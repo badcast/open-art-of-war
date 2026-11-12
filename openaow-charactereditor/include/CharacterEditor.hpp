@@ -273,7 +273,7 @@ private:
     void DrawSpriteMerge();
     void DrawSpriteMergeProperties();
 
-    // --- Settings tabs: Explosions, Wrecks, Game UI, Environment, AI Difficulty ---
+    // --- Settings tabs: Explosions, Wrecks, Environment, AI Difficulty ---
     // Settings files are edited in the text, so their comments stay (CommentedYaml)
     bool LoadYamlFile(CommentedYaml &y, const char *name);
     bool SaveYamlFile(CommentedYaml &y);
@@ -307,8 +307,6 @@ private:
     SDL_Texture *ZoomedThumbnail(int composite, float scale); // a composite magnified around its centre (96x64)
     std::map<std::pair<int, int>, SDL_Texture *> zoomThumbs;
 
-    void DrawGameUi();
-    void DrawGameUiProperties();
     void EnsureUi();
 
     void EnsureEnvironment();
@@ -441,7 +439,7 @@ private:
     bool researchDirty[2] {false, false};
     int researchFaction {0};
     int researchSelected {0};
-    CommentedYaml effectsYaml, uiYaml, aiYaml, projectilesYaml;
+    CommentedYaml effectsYaml, aiYaml, projectilesYaml;
     bool projectilesTried {false};
     int projKind {0}; // 0 bullet, 1 sniper, 2 shell, 3 rocket, 4 flame
     float projDistance {260.0f};
@@ -500,7 +498,6 @@ private:
     float wreckPlaySeconds {12.0f}; // preview: the whole burial takes this long
     float wreckClock {0.0f};
     int wreckFaction {1};
-    int uiTheme {0}; // 0 neutral, 1 resistance, 2 confederation
     nlohmann::ordered_json envJson;
     nlohmann::ordered_json envBase;
     fs::path envPath;

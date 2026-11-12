@@ -2,6 +2,7 @@
 
 #include "core/Config.hpp"
 #include "game/Players.hpp"
+#include <vector>
 
 namespace OpenArtOfWar
 {
@@ -39,6 +40,20 @@ public:
         return Player();
     }
     void Update(float deltaTime, EntityManager &entities, const TileMap &map, Pathfinder &pathfinder);
+
+    // Advances the production queues of the player's Barracks / Factories by one tick and creates the units that are
+    // done (at the exit, sent to the rally point, with the player's technologies). Returns their ids; `refunded` gets
+    // the price of the orders of buildings that were destroyed. `setPower`: the building's power switch is set from
+    // `powerOk` (a person's economy); otherwise each building's own switch decides (a computer player).
+    static std::vector<int> AdvanceQueues(
+        PlayerId player,
+        float deltaTime,
+        EntityManager &entities,
+        const TileMap &map,
+        Pathfinder &pathfinder,
+        bool setPower,
+        bool powerOk,
+        int &refunded);
 
     bool CanAfford(int cost) const
     {

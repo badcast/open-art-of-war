@@ -4,6 +4,7 @@
 #include "game/BuildLimits.hpp"
 #include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
+#include "game/Mines.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/Research.hpp"
 #include "game/SimCommandCodec.hpp"
@@ -548,6 +549,18 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             if (!found)
                 return;
             const auto &bp = *found;
+            if (bp.mineKind >= 0)
+            {
+                // A mine: one tile like a wall segment, once its technology is done
+                const std::vector<MineSpec> &mines = Mines::Specs();
+                if (bp.mineKind >= static_cast<int>(mines.size())
+                    || !IsMineResearched(cmd.player, mines[static_cast<std::size_t>(bp.mineKind)].researchValue)
+                    || !economy.CanAfford(bp.creditCost))
+                    return;
+                if (entities.PlaceMine(bp.mineKind, cmd.x, cmd.y, map, cmd.player))
+                    economy.SpendCredits(bp.creditCost);
+                break;
+            }
             // The Radar Locator is built only once its technology is researched (the interface says so too)
             if (!IsBuildingUnlocked(cmd.player, bp.buildingIndex))
                 return;
@@ -840,6 +853,16 @@ void Simulation::VisitState(const SimContext &ctx, Sink &s) const
                 s.I32("owner", map.GetWallOwner(x, y));
             }
         }
+    }
+    for (const EntityManager::Mine &m : ctx.entities.GetMines())
+    {
+        s.Record("mine");
+        s.I32("id", m.id);
+        s.I32("x", m.tileX);
+        s.I32("y", m.tileY);
+        s.I32("kind", m.kind);
+        s.I32("owner", m.owner);
+        s.F32("arm", m.armLeft);
     }
     s.EndSection(2);
 

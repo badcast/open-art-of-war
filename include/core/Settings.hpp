@@ -39,7 +39,7 @@ struct Settings
 
     // Graphics
     int graphicsQuality {2};  // 0 = low (sprites at 1/3 resolution), 1 = medium (1/2), 2 = high (original resolution)
-    bool smoothing {true};    // smooth scaling of the sprites (and of the reduced picture of low / medium quality)
+    bool smoothing {false};   // smooth scaling of the sprites (and of the reduced picture of low / medium quality)
     float zoomDefault {2.0f}; // camera zoom when a mission starts
     float zoomMin {0.5f};
     float zoomMax {4.0f};
@@ -65,6 +65,7 @@ struct Settings
     // Game
     std::string language {"en"};
     int difficulty {1};    // 0 = easy .. 3 = hardcore
+    bool showBuildGrid {true}; // grid of allowed / forbidden tiles while a building is placed
     int edgePanMargin {5}; // 5..30 pixels (screen border thickness for mouse scrolling)
 
     static constexpr int kArmyColors = 8;

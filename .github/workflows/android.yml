@@ -6,6 +6,7 @@ on:
     tags: ["v*"]
     paths:
       - 'android-setup/**'
+      - 'tools/fetch_game_data.sh'
       - 'src/**'
       - 'include/**'
       - '3rdParty/**'
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'android-setup/**'
+      - 'tools/fetch_game_data.sh'
       - 'src/**'
       - 'include/**'
       - '3rdParty/**'
@@ -22,6 +24,11 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+    inputs:
+      data_urls:
+        description: "Game data to bundle into the APK (one URL per line, *.blob and *.mod); empty: the repository variable GAME_DATA_URLS"
+        required: false
+        default: ""
 
 concurrency:
   group: android-${{ github.ref }}
@@ -61,6 +68,23 @@ jobs:
         with:
           path: android-setup/app/.cxx
           key: android-cxx-${{ hashFiles('cmake/AndroidDeps.cmake') }}
+
+      # assets.blob and mods listed in the repository variable GAME_DATA_URLS (docs/ci-game-data.md) go into the APK:
+      # the game copies them to its storage on the first start
+      - name: Fetch the game data (assets.blob, mods)
+        env:
+          GAME_DATA_URLS: ${{ inputs.data_urls || vars.GAME_DATA_URLS || secrets.GAME_DATA_URLS }}
+          GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
+        run: |
+          tools/fetch_game_data.sh game-data
+          ASSETS=android-setup/app/src/main/assets
+          rm -rf "$ASSETS"; mkdir -p "$ASSETS"
+          if [ -s game-data/bundled_files.txt ]; then
+            cp game-data/* "$ASSETS"/
+            echo "bundled into the APK:"; cat game-data/bundled_files.txt
+          else
+            echo "no game data listed: the APK has none (adb push assets.blob, see android-setup/README.md)"
+          fi
 
       - name: Build the debug APK
         working-directory: android-setup

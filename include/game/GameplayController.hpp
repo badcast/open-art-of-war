@@ -67,6 +67,12 @@ public:
         const TileMap &map,
         BitmapFontRenderer &fontRenderer);
 
+    // Touch interface: with units selected a tap on the ground (or on an enemy) orders them (move; a second tap on the
+    // same spot: attack-move) instead of selecting; a tap on an own unit selects it
+    void SetTouchMode(bool on)
+    {
+        m_touchMode = on;
+    }
     void SetDebugMode(bool enabled);
     bool IsDebugMode() const
     {
@@ -205,6 +211,10 @@ private:
     int m_lastGroupKey {-1};
     std::uint64_t m_lastGroupTicks {0};
     int m_lastClickId {0};
+    bool m_touchMode {false};
+    std::uint64_t m_touchOrderTicks {0}; // the last tap that ordered (a second one close by is an attack-move)
+    int m_touchOrderX {-1000};
+    int m_touchOrderY {-1000};
     std::uint64_t m_lastClickTicks {0};
     int m_lastClickX {-100}; // screen position of the last click (a double click on empty ground)
     int m_lastClickY {-100};

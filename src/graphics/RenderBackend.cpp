@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <map>
 #include <iostream>
 
 namespace OpenArtOfWar::RenderBackend
@@ -44,30 +45,33 @@ std::string ProbeKey()
            + std::to_string(SDL_VERSIONNUM_MICRO(v)) + "|" + (video ? video : "none");
 }
 
-// The "render" section, reset when it was probed with another SDL / video driver
+// The "render" section of the environment: only the choice (api, fallback) and the init_pending marker are stored.
+// What was found out about an API (works / fails) is never written down: a failure kept on disk once hid a working
+// API (SDL GPU) for good after an SDL update. Old stored results are dropped.
 nlohmann::json &RenderSection(EnvironmentConfig &env)
 {
     nlohmann::json &r = env.Edit("render");
-    const std::string key = ProbeKey();
-    if (r.value("probe_key", std::string()) != key)
-    {
-        r["probe_key"] = key;
-        r["probed"] = nlohmann::json::object();
-    }
-    if (!r.contains("probed") || !r["probed"].is_object())
-        r["probed"] = nlohmann::json::object();
+    r.erase("probed");
+    r.erase("probe_key");
     return r;
 }
 
-void MarkProbed(nlohmann::json &r, const std::string &name, bool works)
+// What this run found out (in memory only)
+std::map<std::string, bool> &Probed()
 {
-    r["probed"][name] = works;
+    static std::map<std::string, bool> probed;
+    return probed;
 }
 
-bool KnownToFail(const nlohmann::json &r, const std::string &name)
+void MarkProbed(const std::string &name, bool works)
 {
-    auto it = r["probed"].find(name);
-    return it != r["probed"].end() && it->is_boolean() && !it->get<bool>();
+    Probed()[name] = works;
+}
+
+bool KnownToFail(const std::string &name)
+{
+    auto it = Probed().find(name);
+    return it != Probed().end() && !it->second;
 }
 
 // Checks what the game needs from a renderer; logs the reason when it falls short
@@ -161,7 +165,7 @@ void Select(EnvironmentConfig &env, const std::string &name)
         return;
     r["api"] = name;
     // The one that ran so far is a good fallback for the new choice
-    if (!previous.empty() && !KnownToFail(r, previous))
+    if (!previous.empty() && !KnownToFail(previous))
         r["fallback"] = previous;
     env.Save();
 }
@@ -183,12 +187,13 @@ SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::stri
     nlohmann::json &r = RenderSection(env);
 
     // A start that died while bringing an API up leaves it in init_pending
+    std::string skipOnce;
     const std::string crashed = r.value("init_pending", std::string());
     if (!crashed.empty())
     {
         std::cerr << "[Render] WARNING: the last start did not survive the " << Label(crashed)
-                  << " initialization, it is skipped from now on" << std::endl;
-        MarkProbed(r, crashed, false);
+                  << " initialization, it is skipped this time" << std::endl;
+        skipOnce = crashed; // for this start only: nothing is remembered against the API
         r["init_pending"] = "";
     }
 
@@ -216,12 +221,12 @@ SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::stri
     for (const std::string &name : order)
     {
         // A forced API is tried even when it failed before (that is what forcing is for)
-        if (name != forced && KnownToFail(r, name))
+        if (name != forced && (name == skipOnce || KnownToFail(name)))
             continue;
         r["init_pending"] = name;
         env.Save(); // on disk before the driver gets a chance to take the process down
         renderer = TryCreate(window, name);
-        MarkProbed(r, name, renderer != nullptr);
+        MarkProbed(name, renderer != nullptr);
         if (renderer)
         {
             chosen = name;
@@ -257,7 +262,7 @@ SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::stri
         std::string fallback;
         for (auto it = std::find(order.begin(), order.end(), chosen); it != order.end(); ++it)
         {
-            if (*it != chosen && !KnownToFail(r, *it))
+            if (*it != chosen && !KnownToFail(*it))
             {
                 fallback = *it;
                 break;
@@ -294,30 +299,22 @@ bool Probe(const std::string &name)
 
 std::vector<RenderApiOption> Options(EnvironmentConfig &env, bool probeUnknown)
 {
-    nlohmann::json &r = RenderSection(env);
-    const std::string current = r.value("api", std::string());
+    const std::string current = RenderSection(env).value("api", std::string());
     std::vector<RenderApiOption> out;
-    bool probedNow = false;
     for (const std::string &name : Candidates())
     {
         RenderApiOption o;
         o.name = name;
         o.label = Label(name);
-        auto it = r["probed"].find(name);
-        if (it == r["probed"].end() && probeUnknown && name != current)
-        {
-            MarkProbed(r, name, Probe(name));
-            it = r["probed"].find(name);
-            probedNow = true;
-        }
-        if (it != r["probed"].end() && it->is_boolean())
-        {
-            o.status = it->get<bool>() ? RenderApiOption::Status::Works : RenderApiOption::Status::Fails;
-        }
+        if (probeUnknown && name != current && Probed().find(name) == Probed().end())
+            MarkProbed(name, Probe(name));
+        auto it = Probed().find(name);
+        if (name == current && it == Probed().end())
+            o.status = RenderApiOption::Status::Works; // it is the one that runs
+        else if (it != Probed().end())
+            o.status = it->second ? RenderApiOption::Status::Works : RenderApiOption::Status::Fails;
         out.push_back(std::move(o));
     }
-    if (probedNow)
-        env.Save();
     return out;
 }
 

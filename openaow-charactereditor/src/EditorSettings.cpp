@@ -352,10 +352,6 @@ void CharacterEditor::SaveActiveSettings()
                 ApplySaved(false);
             }
             break;
-        case EditorMode::GameUi:
-            if (SaveYamlFile(uiYaml))
-                ApplySaved(false);
-            break;
         case EditorMode::AiDifficulty:
             if (SaveYamlFile(aiYaml))
                 ApplySaved(false);

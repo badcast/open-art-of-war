@@ -6,6 +6,8 @@
 #include "core/Mods.hpp"
 #include "core/DebugEnv.hpp"
 #include "ui/MenuController.hpp"
+#include "ui/AndroidHUD.hpp"
+#include "ui/UiLayout.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/UiKit.hpp"
 #include "ui/ImGuiBridge.hpp"
@@ -232,7 +234,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     }
     m_renderer->SetEffects(m_effects.get());
     // The map viewport ends where the command sidebar begins
-    m_camera = std::make_unique<Camera>(m_windowW - HUDController::kSidebarWidth, m_windowH);
+    m_camera = std::make_unique<Camera>(m_windowW - HudReservedWidth(), m_windowH);
     m_input = std::make_unique<InputManager>();
 #if ANDROID
     m_input->SetRenderer(m_sdlRenderer);
@@ -281,9 +283,16 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_networkMenu = std::make_unique<NetworkMenu>();
     m_replayMenu = std::make_unique<ReplayMenu>();
     m_modsMenu = std::make_unique<ModsMenu>();
-    m_hudController = std::make_unique<HUDController>();
+    if (m_touchUi)
+        m_hudController = std::make_unique<AndroidHUD>();
+    else
+        m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
+    HUDController::SetBuildGridConfig(m_env.Section("build_grid"));
+    HUDController::SetShowBuildGrid(m_settings.showBuildGrid);
     m_gameplayController = std::make_unique<GameplayController>();
+    m_gameplayController->SetTouchMode(m_touchUi);
+    uilayout::SetMenuProfile(m_touchUi ? "touch" : "pc");
     m_gameplayController->LoadOverlayStyle(m_env);
     m_hudController->SetResearchProbe([this](PlayerId p) { return m_gameplayController->ResearchOf(p); });
     m_menuController->BindLoading(
@@ -757,10 +766,23 @@ void Application::StepGameSpeed(int delta)
     }
 }
 
+int Application::HudReservedWidth() const
+{
+    return m_touchUi ? 0 : HUDController::kSidebarWidth;
+}
+
 void Application::HandleEvents()
 {
     SyncWindowSize();
+    uilayout::Poll(SDL_GetTicks()); // the layout file was edited: the interface follows
+    if (m_hudController)
+        m_input->SetTouchWheelScroll(!m_hudController->IsResearchWindowOpen()); // the tree takes the raw drag
     m_input->ResetFrameEvents();
+    if (m_hudController && m_touchUi)
+    {
+        m_input->SetTouchPan(m_hudController->TouchPansCamera());
+        m_input->SetTouchUiRects(m_hudController->TouchPanels(m_windowW, m_windowH));
+    }
 #if ANDROID
     const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
     m_input->SetMenuOpen(
@@ -1314,6 +1336,7 @@ void Application::Render()
         // Layer 1: Ground Remnants (Strictly 1 layer above ground, underneath decorations, walls, buildings & units)
         m_map->RenderWallRubble(*m_renderer, worldCam, !disableFog);
         m_entities->RenderGroundRemnants(*m_renderer, worldCam, *m_map, !disableFog);
+        m_entities->RenderMines(*m_renderer, worldCam, *m_map, ReplayShowsAll() ? kNoPlayer : Players::Local());
 
         // Layer 2: Map Decorations (trees, bridges, cliffs, landmarks)
         m_map->RenderDecorations(*m_renderer, worldCam, !disableFog, globalAnimTick);
@@ -1429,13 +1452,13 @@ void Application::Render()
         m_hudController->RenderPowerAlerts(*m_renderer, *m_entities, *m_economy, *m_camera);
 
         // Render Selection Box
-        if (!m_hudController->IsBuildMode())
+        if (!m_hudController->IsBuildMode() && !m_hudController->OwnsMapInput())
         {
             m_gameplayController->RenderSelectionBox(*m_renderer, *m_camera, *m_input);
         }
 
         // Render Build Ghost in Placement Mode (only while the cursor is over the map)
-        if (m_hudController->IsBuildMode() && !HUDController::IsOverSidebar(m_input->GetMouseScreenX(), m_windowW))
+        if (m_hudController->IsBuildMode() && !m_hudController->IsOverHud(m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
         {
             int mouseTileX = static_cast<int>(m_input->GetMouseWorldX() / TILE_WIDTH);
             int mouseTileY = static_cast<int>(m_input->GetMouseWorldY() / TILE_HEIGHT);
@@ -1450,7 +1473,7 @@ void Application::Render()
         }
 
         // Render Attack-Move Reticle in Attack-Move Mode ('Q' key)
-        if (m_hudController->IsAttackMoveMode() && !HUDController::IsOverSidebar(m_input->GetMouseScreenX(), m_windowW))
+        if (m_hudController->IsAttackMoveMode() && !m_hudController->IsOverHud(m_input->GetMouseScreenX(), m_input->GetMouseScreenY(), m_windowW, m_windowH))
         {
             int mx = m_input->GetMouseScreenX();
             int my = m_input->GetMouseScreenY();

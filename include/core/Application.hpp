@@ -83,6 +83,11 @@ public:
     // cannot be played
     bool OpenReplay(const std::string &path);
     void LaunchTestMap();
+    // The touch interface (AndroidHUD) instead of the desktop sidebar: the default on Android, --touch-ui elsewhere
+    void SetTouchUi(bool on)
+    {
+        m_touchUi = on;
+    }
     // Single-player game on a map straight from the command line (--map=<name|path>, --from-scratch):
     // the same start as a custom game picked in the menu. False when the map is unknown or fails to load.
     bool LaunchMap(const std::string &nameOrPath, bool fromScratch);
@@ -397,6 +402,12 @@ private:
     // Subsystem Controllers
     std::unique_ptr<MenuController> m_menuController;
     std::unique_ptr<HUDController> m_hudController;
+#if ANDROID
+    bool m_touchUi {true};
+#else
+    bool m_touchUi {false};
+#endif
+    int HudReservedWidth() const;
     std::unique_ptr<GameplayController> m_gameplayController;
 };
 

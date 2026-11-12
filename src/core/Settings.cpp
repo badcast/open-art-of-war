@@ -93,6 +93,7 @@ bool Settings::Save(const std::string &path) const
         j["lastAddress"] = lastAddress;
         j["difficulty"] = difficulty;
         j["edgePanMargin"] = edgePanMargin;
+        j["showBuildGrid"] = showBuildGrid;
 
         return JsonFile::WriteAtomic(path, j);
     }
@@ -120,6 +121,9 @@ bool Settings::Load(const std::string &path)
         fullscreenW = j.value("fullscreenWidth", fullscreenW);
         fullscreenH = j.value("fullscreenHeight", fullscreenH);
         vsync = j.value("vsync", vsync);
+#if ANDROID
+        vsync = true; // without it the mobile builds glitch: not up to a stored choice of an older build
+#endif
         fpsLimit = j.value("fpsLimit", fpsLimit);
         enabledMods.clear();
         if (j.contains("enabledMods") && j["enabledMods"].is_array())
@@ -149,6 +153,7 @@ bool Settings::Load(const std::string &path)
         lastAddress = j.value("lastAddress", lastAddress);
         difficulty = j.value("difficulty", difficulty);
         edgePanMargin = j.value("edgePanMargin", edgePanMargin);
+        showBuildGrid = j.value("showBuildGrid", showBuildGrid);
         Clamp();
         return true;
     }

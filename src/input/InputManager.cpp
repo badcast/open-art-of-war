@@ -291,8 +291,14 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             m_touchGesture = false;
             m_touchMoved = false;
             m_touchMap = !m_menuOpen && point.x < camera.GetViewportWidth();
+            for (const SDL_Rect &r : m_touchUiRects)
+            {
+                if (point.x >= r.x && point.x < r.x + r.w && point.y >= r.y && point.y < r.y + r.h)
+                    m_touchMap = false; // a panel of the touch interface: a drag there is not a map drag
+            }
             m_touchOrigin = point;
             m_touchStart = SDL_GetTicks();
+            m_touchScroll = 0.0f;
             SetMouseScreenPosition(static_cast<int>(point.x), static_cast<int>(point.y));
             mouse(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_LEFT);
             // Touch UI clicks fire on release, allowing a hold to cancel a production order.
@@ -331,11 +337,41 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             if (before > 16.0f && after > 16.0f)
                 camera.SetZoom(camera.GetZoom() * after / before, (point.x + b.x) * 0.5f, (point.y + b.y) * 0.5f);
         }
+        const SDL_FPoint previous = it->second;
         it->second = point;
         if (!m_touchGesture)
         {
             SetMouseScreenPosition(static_cast<int>(point.x), static_cast<int>(point.y));
             m_touchMoved = m_touchMoved || std::hypot(point.x - m_touchOrigin.x, point.y - m_touchOrigin.y) > 12.0f;
+            if (m_menuOpen && m_touchMoved)
+            {
+                // A menu, a list, a window: the finger scrolls it. Every 32 px of travel is a wheel step (content
+                // follows the finger: dragging up goes to the later rows), so every list that takes the wheel works.
+                constexpr float kStepPx = 32.0f;
+                m_touchDragX += point.x - previous.x;
+                m_touchDragY += point.y - previous.y;
+                if (m_touchWheelScroll)
+                    m_touchScroll += point.y - previous.y;
+                while (m_touchWheelScroll && std::fabs(m_touchScroll) >= kStepPx)
+                {
+                    SDL_Event wheel {};
+                    wheel.type = SDL_EVENT_MOUSE_WHEEL;
+                    wheel.wheel.y = m_touchScroll < 0.0f ? -1.0f : 1.0f;
+                    wheel.wheel.mouse_x = point.x;
+                    wheel.wheel.mouse_y = point.y;
+                    ProcessEvent(wheel, camera);
+                    m_touchScroll += m_touchScroll < 0.0f ? kStepPx : -kStepPx;
+                }
+                // what the touch began (a pressed button, a selection box) is dropped: it was a scroll
+                m_selectionBox.active = false;
+            }
+            if (m_touchPan && m_touchMap && m_touchMoved)
+            {
+                // The map follows the finger; what the touch began (a selection box) is dropped
+                m_selectionBox.active = false;
+                m_leftMouseDown = false;
+                camera.Pan(previous.x - point.x, previous.y - point.y);
+            }
         }
         return true;
     }

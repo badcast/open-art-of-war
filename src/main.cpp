@@ -23,6 +23,7 @@ Open Art Of War: Freedom for Liberty. Run it from the folder that holds ./assets
 Single player:
   --map=<name|path>             start a custom game on this map (a name from assets/maps or a .json path)
   --from-scratch                start from scratch (only HQ and power plant, no units)
+  --touch-ui                    the touch interface (bottom panels, tap to move, double tap to attack-move)
   --testmap, --test-map, -tm    open the test polygon (assets/maps/testmap.json)
   --replay=<file.awr>           watch a recorded network game (a bare .awr path works too; replays are saved in
                                 the user's folder replays/ after every network game)
@@ -69,6 +70,7 @@ int main(int argc, char *argv[])
 #endif
     bool debugMode = false;
     bool testMapMode = false;
+    bool touchUi = false; // --touch-ui: the touch interface (the default on Android) with the mouse
     bool fromScratch = false; // --map without a network game: a custom game, --from-scratch ignores the map's own bases
     std::string rendererOverride;
     // Network game from the command line: --host[=port] --players=N --map=<name> | --join=<address>[:port],
@@ -143,6 +145,8 @@ int main(int argc, char *argv[])
             std::cerr << "[Main] " << arg << " needs a debug build (cmake -DAOW_DEBUG=ON); ignored" << std::endl;
 #endif
         }
+        if (arg == "--touch-ui")
+            touchUi = true;
         if (arg == "--testmap" || arg == "--test-map" || arg == "-tm")
         {
             testMapMode = true;
@@ -170,6 +174,8 @@ int main(int argc, char *argv[])
     {
         OpenArtOfWar::Application app;
         app.SetRendererOverride(restart ? std::string() : rendererOverride);
+        if (touchUi)
+            app.SetTouchUi(true);
         if (!app.Init(1280, 720))
         {
             std::cerr << "Engine initialization failed." << std::endl;

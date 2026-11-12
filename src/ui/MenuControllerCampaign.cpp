@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
 #include "ui/MapFilter.hpp"
@@ -137,6 +138,30 @@ struct CampaignLayout
 CampaignLayout campaignLayout(int windowW, int windowH, int missionCount)
 {
     CampaignLayout l;
+    // ui/layout.yaml (screen map_select, shared with the network room); the numbers below stand in without it
+    if (uilayout::Current().Has("map_select", "pc"))
+    {
+        const uilayout::Solved s = uilayout::Current().Solve("map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowW, windowH, {});
+        l.dialog = s.Rect("dialog");
+        l.list = s.Rect("list");
+        const int n = std::max(1, missionCount);
+        l.itemH = std::clamp((l.list.h - (n - 1) * l.itemGap) / n, 26, 44);
+        l.details = s.Rect("details");
+        l.backBtn = s.Rect("back");
+        l.startBtn = s.Rect("start");
+        l.sideBtn[0] = s.Rect("side");
+        l.editorBtn = s.Rect("editor");
+        l.difficultyBtn = s.Rect("difficulty");
+        l.creditsBtn = s.Rect("credits");
+        l.timeBtn = s.Rect("time");
+        l.techBtn = s.Rect("tech");
+        const UiRect pv = CustomPreviewArea(l.details);
+        const int optX = pv.Right() + 20;
+        l.fogCheckbox = {optX, pv.y, l.details.Right() - 20 - optX, 28};
+        l.baseCheckbox = {optX, pv.y + 32, l.details.Right() - 20 - optX, 28};
+        l.speedCheckbox = {optX, pv.y + 64, l.details.Right() - 20 - optX, 28};
+        return l;
+    }
     l.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole screen
     int contentY = l.dialog.y + 52 + 16;
     int footerY = l.dialog.Bottom() - 64;
@@ -1150,7 +1175,7 @@ std::vector<std::string> MenuController::CampaignComboOptions(int id) const
         return out;
     }
     if (id == kComboSide)
-        return {_("RESISTANCE"), _("CONFEDERACY"), _("RANDOM")};
+        return {_("Resistance"), _("Confederation"), _("Random")};
     if (id == kComboDifficulty)
     {
         return {

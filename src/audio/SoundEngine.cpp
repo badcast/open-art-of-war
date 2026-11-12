@@ -538,20 +538,44 @@ void SoundEngine::PlayPlayerTrack(int index)
     }
 }
 
-// In the game the playlist is the game tracks only; the main menu theme belongs to the menu
-void SoundEngine::NextTrack()
+// The main menu plays its own tracks (everything listed under `mainmenu`) round and round until the user touches the
+// player (next / previous / a seek); from then on its playlist is those tracks followed by all the others, and goes on
+// through them. In the game the playlist is the game tracks only; the main menu theme belongs to the menu.
+void SoundEngine::PlayMenuPlaylist(std::size_t position)
 {
-    if (m_lastArea == 1 && m_menuTracks.size() > 1)
+    const std::size_t menuCount = m_menuTracks.size();
+    const std::size_t total = menuCount + m_gameTracks.size();
+    if (!m_initialized || total == 0)
+        return;
+    position %= total;
+    const bool menuTrack = position < menuCount;
+    const Track &track = menuTrack ? m_menuTracks[position] : m_gameTracks[position - menuCount];
+    if (menuTrack)
     {
-        m_currentMenuTrack = (m_currentMenuTrack + 1) % m_menuTracks.size();
-        const Track &track = m_menuTracks[m_currentMenuTrack];
+        m_currentMenuTrack = position;
         m_menuTrack = track;
-        if (LoadTrack(track, false))
-        {
-            m_musicContext = 1;
-            m_currentTrack = 0;
-            m_manualPlayback = true;
-        }
+    }
+    if (LoadTrack(track, false))
+    {
+        m_musicContext = menuTrack ? 1 : 2;
+        m_currentTrack = menuTrack ? 0 : static_cast<int>(position - menuCount + 1);
+        m_manualPlayback = true;
+    }
+    else
+    {
+        StopMusic();
+    }
+}
+
+void SoundEngine::StepTrack(int direction)
+{
+    if (m_lastArea == 1 && !m_menuTracks.empty())
+    {
+        const std::size_t menuCount = m_menuTracks.size();
+        const std::size_t total = menuCount + m_gameTracks.size();
+        std::size_t at = m_musicContext == 2 && m_currentTrack > 0 ? menuCount + static_cast<std::size_t>(m_currentTrack - 1)
+                                                                    : m_currentMenuTrack % menuCount;
+        PlayMenuPlaylist((at + (direction > 0 ? 1 : total - 1)) % total);
         return;
     }
     const int count = GetTrackCount();
@@ -561,32 +585,20 @@ void SoundEngine::NextTrack()
         return;
     const int cur = m_currentTrack < 0 ? -1 : (m_hasMenuTrack ? m_currentTrack : m_currentTrack - 1);
     const int rel = cur - first;
-    PlayPlayerTrack(first + (rel < 0 ? 0 : (rel + 1) % n));
+    if (direction > 0)
+        PlayPlayerTrack(first + (rel < 0 ? 0 : (rel + 1) % n));
+    else
+        PlayPlayerTrack(first + (rel <= 0 ? n - 1 : rel - 1));
+}
+
+void SoundEngine::NextTrack()
+{
+    StepTrack(1);
 }
 
 void SoundEngine::PrevTrack()
 {
-    if (m_lastArea == 1 && m_menuTracks.size() > 1)
-    {
-        m_currentMenuTrack = (m_currentMenuTrack + m_menuTracks.size() - 1) % m_menuTracks.size();
-        const Track &track = m_menuTracks[m_currentMenuTrack];
-        m_menuTrack = track;
-        if (LoadTrack(track, false))
-        {
-            m_musicContext = 1;
-            m_currentTrack = 0;
-            m_manualPlayback = true;
-        }
-        return;
-    }
-    const int count = GetTrackCount();
-    const int first = (m_lastArea == 2 && m_hasMenuTrack && !m_gameTracks.empty()) ? 1 : 0;
-    const int n = count - first;
-    if (!m_initialized || n <= 0)
-        return;
-    const int cur = m_currentTrack < 0 ? -1 : (m_hasMenuTrack ? m_currentTrack : m_currentTrack - 1);
-    const int rel = cur - first;
-    PlayPlayerTrack(first + (rel <= 0 ? n - 1 : rel - 1));
+    StepTrack(-1);
 }
 
 double SoundEngine::GetTrackPosition() const
@@ -631,7 +643,12 @@ void SoundEngine::SeekTrack(double ratio)
     }
     SDL_UnlockMutex(m_lock);
     if (sought)
+    {
         SDL_ClearAudioStream(m_stream);
+        // Seeking in the main menu is touching the player: the menu theme stops looping, the other tracks follow
+        if (m_lastArea == 1)
+            m_manualPlayback = true;
+    }
 }
 
 std::string SoundEngine::GetCurrentTrackName() const

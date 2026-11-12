@@ -157,9 +157,39 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
     m_powerProduced = powerProd;
     m_powerConsumed = powerCons;
 
-    // 3. Every Barracks / Factory trains its own queue; units appear only at that building's exit
-    const bool powerOk = !HasPowerDeficit();
-    const float speedMultiplier = powerOk ? 1.0f : 0.0f; // training stands still without power
+    // 3. Every Barracks / Factory trains its own queue; units appear only at that building's exit.
+    //    (A computer player's queues are advanced by its AIController, which pays and orders the units the same way.)
+    if (!Players::Slot(player).human)
+        return;
+    // Infinite production: the next unit is ordered as soon as the queue runs low and the credits are there
+    for (auto &e : entities.GetAllEntities())
+    {
+        Building *b = e.AsBuilding();
+        if (!b || b->owner != player || !b->alive || b->state == ActionState::Die || !b->IsUnitProducer())
+            continue;
+        if (b->repeatArchetype >= 0 && b->buildProgress >= 1.0f && b->productionQueue.size() < 2
+            && IsUnitUnlocked(player, b->repeatArchetype))
+        {
+            const auto *cfg = entities.GetUnitConfig(b->repeatArchetype);
+            QueueUnit(b->repeatArchetype, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, b->id, entities);
+        }
+    }
+    int refunded = 0;
+    AdvanceQueues(player, deltaTime, entities, map, pathfinder, true, !HasPowerDeficit(), refunded);
+    m_credits += refunded;
+}
+
+std::vector<int> Economy::AdvanceQueues(
+    PlayerId player,
+    float deltaTime,
+    EntityManager &entities,
+    const TileMap &map,
+    Pathfinder &pathfinder,
+    bool setPower,
+    bool powerOk,
+    int &refunded)
+{
+    const Faction faction = Players::FactionOf(player);
     struct Spawn
     {
         int archetype;
@@ -190,27 +220,23 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
         {
             // Destroyed with orders pending: refund what was paid
             for (const auto &item : b->productionQueue)
-                m_credits += item.cost;
+                refunded += item.cost;
             b->productionQueue.clear();
             continue;
         }
-        b->isPowered = powerOk;
+        if (setPower)
+            b->isPowered = powerOk;
         if (!b->IsUnitProducer())
             continue;
-        // Infinite production: the next unit is ordered as soon as the queue runs low and the credits are there
-        if (b->repeatArchetype >= 0 && b->buildProgress >= 1.0f && b->productionQueue.size() < 2
-            && IsUnitUnlocked(player, b->repeatArchetype))
-        {
-            const auto *cfg = entities.GetUnitConfig(b->repeatArchetype);
-            QueueUnit(b->repeatArchetype, cfg ? cfg->creditCost : 100, cfg ? cfg->buildTime : 4.0f, b->id, entities);
-        }
-        // (a computer player trains by its timer, not through the queue: Building::UpdateProduction)
         b->isProducing = !b->productionQueue.empty() || b->productionTimer > 0.0f;
         if (b->productionQueue.empty() || b->buildProgress < 1.0f)
             continue;
 
+        // Training stands still without power (the player's: the balance of the whole base; a computer player's: the
+        // building's own switch)
+        const bool powered = setPower ? powerOk : b->isPowered;
         ProductionItem &item = b->productionQueue.front();
-        item.progressTime = std::min(item.totalTime, item.progressTime + deltaTime * speedMultiplier);
+        item.progressTime = std::min(item.totalTime, item.progressTime + deltaTime * (powered ? 1.0f : 0.0f));
         if (item.progressTime < item.totalTime)
             continue;
 
@@ -227,16 +253,20 @@ void Economy::Update(float deltaTime, EntityManager &entities, const TileMap &ma
         b->productionQueue.pop_front();
     }
 
+    std::vector<int> created;
     for (const Spawn &sp : spawns)
     {
         int unitId = entities.SpawnUnitByArchetype(ProductionForm(player, sp.archetype), sp.x, sp.y, faction, player);
         if (Unit *u = entities.GetUnit(unitId))
             ApplyCompletedResearch(*u);
+        if (unitId > 0)
+            created.push_back(unitId);
         if (unitId > 0 && (sp.rallyX != sp.x || sp.rallyY != sp.y))
         {
             entities.IssueAttackMoveOrder({unitId}, sp.rallyX, sp.rallyY, pathfinder); // answers fire on the way
         }
     }
+    return created;
 }
 
 } // namespace OpenArtOfWar

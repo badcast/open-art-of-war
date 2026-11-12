@@ -165,6 +165,8 @@ set(ENGINE_SOURCES
     src/game/AISquadController.cpp
     src/game/Research.cpp
     src/game/Effects.cpp
+    src/game/Mines.cpp
+    src/game/EntityManagerMines.cpp
     src/game/Projectiles.cpp
     src/game/WeaponBalance.cpp
     src/game/BuildLimits.cpp
@@ -194,6 +196,8 @@ set(ENGINE_SOURCES
     src/ui/MenuControllerSettings.cpp
     src/ui/MenuControllerCampaign.cpp
     src/ui/MenuControllerCustom.cpp
+    src/ui/UiLayout.cpp
+    src/ui/AndroidHUD.cpp
     src/ui/HUDController.cpp
     src/ui/HUDControllerRender.cpp
     src/ui/HUDControllerInput.cpp
@@ -504,6 +508,13 @@ set_target_properties(openaow-flowfield-tests PROPERTIES
 # (it reads the unit definitions: run where ./assets is)
 add_test(NAME openaow-flowfield-tests COMMAND openaow-flowfield-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
+add_executable(openaow-mines-tests tests/MinesTests.cpp)
+target_link_libraries(openaow-mines-tests PRIVATE openaow-core)
+set_target_properties(openaow-mines-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+# (it reads the unit definitions: run where ./assets is)
+add_test(NAME openaow-mines-tests COMMAND openaow-mines-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 add_executable(openaow-build-limits-tests tests/BuildLimitsTests.cpp)
 target_link_libraries(openaow-build-limits-tests PRIVATE openaow-core)
 set_target_properties(openaow-build-limits-tests PROPERTIES
@@ -512,6 +523,14 @@ set_target_properties(openaow-build-limits-tests PROPERTIES
 add_test(NAME openaow-build-limits-tests COMMAND openaow-build-limits-tests)
 
 add_executable(openaow-capabilities-tests tests/CapabilitiesTests.cpp)
+
+add_executable(openaow-ui-layout-tests tests/UiLayoutTests.cpp)
+target_link_libraries(openaow-ui-layout-tests PRIVATE openaow-core)
+set_target_properties(openaow-ui-layout-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-ui-layout-tests COMMAND openaow-ui-layout-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
 target_link_libraries(openaow-capabilities-tests PRIVATE openaow-core OpenAOWNetworking)
 set_target_properties(openaow-capabilities-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"

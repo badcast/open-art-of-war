@@ -54,9 +54,6 @@ const Hint kHints[] = {
     {"Wrecks",
      "Edits the remains left by destroyed vehicles and buildings: wreck pictures, burial stages and time "
      "(assets/characters/effects.yaml)."},
-    {"Game UI",
-     "Edits the colors of the game interface per theme (assets/characters/game_ui.yaml) with a mock-up of the "
-     "screens."},
     {"Environment", "Edits assets/data/game_environment.json: font, fog, construction, network, order lines."},
     {"AI Difficulty",
      "Edits the AI levels Easy..Hardcore (assets/characters/difficulty.yaml): income, waves, tactics. Charts compare "

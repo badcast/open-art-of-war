@@ -357,8 +357,22 @@ private:
     bool IsOwnGround(int x, int y) const;
     // Preserve connected free space for one- and two-tile units and existing production exits.
     // `needsExit`: the structure placed there trains troops or is a headquarters: its own sides must lead out too
+    // What KeepsWayOut works out about the map that does not depend on the spot; one search of sites keeps one cache
+    struct WayOutCache
+    {
+        bool ready {false};
+        std::vector<unsigned char> blocked, important;
+        std::vector<int> before[2]; // components before a placement, at clearance 1 and 2
+    };
     bool KeepsWayOut(
-        int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit = false) const;
+        int x,
+        int y,
+        int w,
+        int h,
+        const TileMap &map,
+        const EntityManager &entities,
+        bool needsExit = false,
+        WayOutCache *cache = nullptr) const;
     // A free place for a structure of the core build order: ring by ring outward from the HQ, the best of a ring by
     // the preferred direction (dx, dy); `rearOnly`: never on the side of the enemy (power plants). False: none
     bool FindCoreSite(

@@ -161,7 +161,7 @@ int CharacterEditor::run()
                 }
                 else if (
                     editorMode == EditorMode::Explosions || editorMode == EditorMode::Wrecks
-                    || editorMode == EditorMode::Projectiles || editorMode == EditorMode::GameUi
+                    || editorMode == EditorMode::Projectiles
                     || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
                     SaveActiveSettings();
                 else
@@ -294,7 +294,7 @@ void CharacterEditor::LoadCatalog()
             continue;
         if (entry.path().filename() == "difficulty.yaml" || entry.path().filename() == "ai_difficulty.yaml"
             || entry.path().filename() == "effects.yaml" || entry.path().filename() == "projectiles.yaml"
-            || entry.path().filename() == "game_ui.yaml")
+            || entry.path().filename() == "game_ui.yaml" || entry.path().filename() == "mines.yaml")
             continue;
         if (entry.path().filename().string().rfind("research_", 0) == 0)
             continue; // edited in the Research tab

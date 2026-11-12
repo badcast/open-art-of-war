@@ -149,6 +149,9 @@ void EntityManager::DestroyPlayer(PlayerId player, TileMap &map)
         }
     }
     map.ForgetPlayerWalls(player);
+    m_mines.erase(
+        std::remove_if(m_mines.begin(), m_mines.end(), [player](const Mine &m) { return m.owner == player; }),
+        m_mines.end());
 }
 
 std::vector<PlayerId> EntityManager::UpdateElimination(TileMap &map)

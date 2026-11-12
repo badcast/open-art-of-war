@@ -327,8 +327,6 @@ void CharacterEditor::DrawEditor()
         DrawWreckTabProperties();
     else if (editorMode == EditorMode::Projectiles)
         DrawProjectileProperties();
-    else if (editorMode == EditorMode::GameUi)
-        DrawGameUiProperties();
     else if (editorMode == EditorMode::Environment)
         DrawEnvironmentProperties();
     else if (editorMode == EditorMode::AiDifficulty)
@@ -392,14 +390,12 @@ void CharacterEditor::DrawEditor()
             | ImGuiWindowFlags_NoBringToFrontOnFocus);
     DrawPreviewControls();
     if (editorMode == EditorMode::Research || editorMode == EditorMode::SpriteTools
-        || editorMode == EditorMode::SpriteMerge || editorMode == EditorMode::GameUi
+        || editorMode == EditorMode::SpriteMerge
         || editorMode == EditorMode::Environment || editorMode == EditorMode::AiDifficulty)
     {
         previewRect = {0, 0, 0, 0};
         if (editorMode == EditorMode::Research)
             DrawResearchTree();
-        else if (editorMode == EditorMode::GameUi)
-            DrawGameUi();
         else if (editorMode == EditorMode::Environment)
             DrawEnvironment();
         else if (editorMode == EditorMode::AiDifficulty)

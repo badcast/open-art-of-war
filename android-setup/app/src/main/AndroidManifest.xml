@@ -17,6 +17,7 @@
             android:name="org.libsdl.app.SDLActivity"
             android:exported="true"
             android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

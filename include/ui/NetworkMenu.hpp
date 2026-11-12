@@ -42,6 +42,7 @@ enum class NetworkAction
     Join,
     Leave,
     Start,
+    LanRefresh,    // search the local network again
     ServerRefresh, // the room list of the dedicated server
     ServerCreate,  // a room on the dedicated server
     ServerJoin,    // a listed room of the server (joinPort) or one by code (joinCode)
@@ -139,6 +140,8 @@ public:
     {
         return m_focus != Field::None;
     }
+    // Where the focused text field is on the screen (the soft keyboard of a phone must not cover it); false when none
+    bool FocusedFieldRect(int windowW, int windowH, bool inRoom, SDL_Rect &out) const;
     // A message for the browser (a failed connection, a rejection)
     void SetNotice(std::string text)
     {
@@ -165,7 +168,7 @@ private:
 
     struct BrowserLayout
     {
-        ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, serverList,
+        ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, lanRefreshBtn, serverList,
             refreshBtn, codeField, codeBtn, joinBtn, hostBtn, serverBtn, backBtn;
         ui::UiRect ServerRow(int i) const
         {
@@ -244,7 +247,7 @@ private:
             return Col(i, 6);
         }
     };
-    static BrowserLayout browserLayout(int w, int h);
+    BrowserLayout browserLayout(int w, int h) const;
     static LobbyLayout lobbyLayout(int w, int h);
 
     NetworkAction UpdateBrowser(

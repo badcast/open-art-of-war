@@ -621,7 +621,14 @@ int EntityManager::SpawnBuildingByIndex(
 }
 
 bool EntityManager::CanPlaceBuilding(
-    int tileX, int tileY, int width, int height, const TileMap &map, PlayerId player, const char **reason) const
+    int tileX,
+    int tileY,
+    int width,
+    int height,
+    const TileMap &map,
+    PlayerId player,
+    const char **reason,
+    bool checkBaseOpen) const
 {
     auto reject = [&](const char *why) {
         if (reason)
@@ -734,7 +741,7 @@ bool EntityManager::CanPlaceBuilding(
             }
         }
     }
-    if (!Players::Slot(player).human)
+    if (checkBaseOpen && !Players::Slot(player).human)
         return KeepsBaseOpen(tileX, tileY, width, height, map, player);
     return true;
 }

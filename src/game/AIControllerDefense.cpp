@@ -451,6 +451,7 @@ bool AIController::FindSiteNear(
 {
     if (unitBlocked)
         *unitBlocked = false;
+    WayOutCache wayOutCache; // (the buildings do not change during one search)
     auto clearOfGates = [&](int px, int py) {
         for (int g = 0; g < 2; ++g)
         {
@@ -496,7 +497,7 @@ bool AIController::FindSiteNear(
                         *unitBlocked = true;
                     continue;
                 }
-                if (!KeepsWayOut(px, py, w, h, map, entities, needsExit))
+                if (!KeepsWayOut(px, py, w, h, map, entities, needsExit, &wayOutCache))
                     continue; // it would close the base in (or itself)
                 x = px;
                 y = py;

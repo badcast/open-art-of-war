@@ -66,6 +66,7 @@ void HUDController::ActivateCell(
             }
             else if (
                 index < static_cast<int>(blueprints.size())
+                && blueprints[index].mineKind < 0
                 && !BuildLimits::CanBuildMore(entities, map, Players::Local(), blueprints[index].buildingIndex))
             {
                 SoundRequests::Play("ui_error");

@@ -18,6 +18,7 @@
 #include "game/TileMap.hpp"
 #include "game/Pathfinder.hpp"
 #include "game/EntityManager.hpp"
+#include "game/Mines.hpp"
 #include "game/Economy.hpp"
 #include "game/AIController.hpp"
 #include "game/MissionController.hpp"
@@ -908,12 +909,14 @@ void GameplayController::Update(const FrameContext &ctx)
 
                 if (leftClicked && mx < mapViewW)
                 {
-                    bool canPlace
-                        = entities.CanPlaceBuilding(curTileX, curTileY, bp.width, bp.height, map, Players::Local());
+                    const bool isMine = bp.mineKind >= 0;
+                    bool canPlace = isMine ? entities.CanPlaceMine(bp.mineKind, curTileX, curTileY, map, Players::Local())
+                                           : entities.CanPlaceBuilding(
+                                               curTileX, curTileY, bp.width, bp.height, map, Players::Local());
                     bool canAfford = economy.CanAfford(bp.creditCost);
                     // Hard limits (data/limits.yaml): checked again by the simulation
                     const bool withinLimit
-                        = BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex);
+                        = isMine || BuildLimits::CanBuildMore(entities, map, Players::Local(), bp.buildingIndex);
                     if (!withinLimit)
                     {
                         SoundRequests::Play("ui_error");
@@ -941,10 +944,10 @@ void GameplayController::Update(const FrameContext &ctx)
                         c.y = curTileY;
                         m_sim.Issue(std::move(c));
                         SoundRequests::Play("build_place");
-                        if (!bp.isWall)
+                        if (!bp.isWall && !isMine)
                             SoundRequests::Announce("ann_building");
-                        // Walls are laid one after the other; a building ends the placement
-                        if (!bp.isWall)
+                        // Walls and mines are laid one after the other; a building ends the placement
+                        if (!bp.isWall && !isMine)
                             hud.SetBuildMode(false);
                     }
                 }
@@ -1107,8 +1110,33 @@ void GameplayController::Update(const FrameContext &ctx)
             }
         }
 
+        // Touch: a tap on the ground or an enemy orders the selected units (move; twice on a spot: attack-move)
+        bool touchOrdered = false;
+        if (m_touchMode && !hud.IsAttackMoveMode() && leftClicked && mx < mapViewW && (!m_debugMode || my > 30))
+        {
+            std::vector<int> combatUnits;
+            for (int uid : m_selectedUnits)
+            {
+                const Entity *e = entities.GetEntity(uid);
+                if (e && e->alive && !e->isBuilding)
+                    combatUnits.push_back(uid);
+            }
+            const Entity *tapped = entities.GetEntity(entities.GetUnitAt(lx, ly));
+            if (!combatUnits.empty() && !(tapped && IsLiveOwnUnit(tapped)))
+            {
+                const std::uint64_t now = SDL_GetTicks();
+                const bool again = now - m_touchOrderTicks < 450 && std::abs(mx - m_touchOrderX) <= 40
+                                   && std::abs(my - m_touchOrderY) <= 40;
+                OrderAt(combatUnits, lx, ly, again ? OrderKind::AttackMove : OrderKind::Move, false);
+                m_touchOrderTicks = again ? 0 : now;
+                m_touchOrderX = mx;
+                m_touchOrderY = my;
+                touchOrdered = true;
+            }
+        }
+
         // Left-Click single unit selection on map
-        if (!hud.IsAttackMoveMode() && leftClicked && mx < mapViewW && (!m_debugMode || my > 30))
+        if (!touchOrdered && !hud.IsAttackMoveMode() && leftClicked && mx < mapViewW && (!m_debugMode || my > 30))
         {
             int clickedId = entities.GetUnitAt(lx, ly);
             const Building *clickedBuilding = entities.GetBuilding(clickedId);

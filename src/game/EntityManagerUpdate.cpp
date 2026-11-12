@@ -67,6 +67,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
         powered[p] = m_unlimitedPower || cons[p] <= prod[p];
     }
     UpdateRegeneration(deltaTime);
+    UpdateMines(deltaTime, map);
 
     // Build Delegates for Units
     UnitDelegates uDelegates;

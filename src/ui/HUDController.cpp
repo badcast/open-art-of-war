@@ -14,6 +14,7 @@
 #include "graphics/BitmapFontRenderer.hpp"
 #include "game/TileMap.hpp"
 #include "game/EntityManager.hpp"
+#include "game/Mines.hpp"
 #include "game/Economy.hpp"
 #include "game/Research.hpp"
 #include "graphics/RenderUtility.hpp"
@@ -312,7 +313,7 @@ int CatalogCount(int tab)
     switch (tab)
     {
         case HUDController::TabBuild:
-            return std::min(8, static_cast<int>(EntityManager::GetBlueprints().size()));
+            return static_cast<int>(EntityManager::GetBlueprints().size());
         case HUDController::TabInfantry:
             return unitCatalog(true).count;
         case HUDController::TabVehicles:
@@ -329,8 +330,16 @@ bool Shown(int tab, int index)
     switch (tab)
     {
         case HUDController::TabBuild:
-            return Capabilities::AllowsBuilding(
-                Players::Local(), EntityManager::GetBlueprints()[static_cast<std::size_t>(index)].buildingIndex);
+        {
+            const BuildingBlueprint &bp = EntityManager::GetBlueprints()[static_cast<std::size_t>(index)];
+            if (bp.mineKind >= 0) // a mine shows up once its technology is done
+            {
+                const auto &mines = Mines::Specs();
+                return bp.mineKind < static_cast<int>(mines.size())
+                       && IsMineResearched(Players::Local(), mines[static_cast<std::size_t>(bp.mineKind)].researchValue);
+            }
+            return Capabilities::AllowsBuilding(Players::Local(), bp.buildingIndex);
+        }
         case HUDController::TabInfantry:
         case HUDController::TabVehicles:
             return Capabilities::AllowsUnit(

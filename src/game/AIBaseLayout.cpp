@@ -240,41 +240,59 @@ void AIController::PlanTerritory(const TileMap &map, const EntityManager &entiti
 }
 
 bool AIController::KeepsWayOut(
-    int x, int y, int w, int h, const TileMap &map, const EntityManager &entities, bool needsExit) const
+    int x,
+    int y,
+    int w,
+    int h,
+    const TileMap &map,
+    const EntityManager &entities,
+    bool needsExit,
+    WayOutCache *cache) const
 {
     const int mw = map.GetWidth(), mh = map.GetHeight();
     // Compare connected components before/after placement, at infantry and vehicle clearance.
     // This also works when the whole map lies inside the HQ's construction radius.
-    std::vector<unsigned char> blocked(mw * mh, 0);
-    for (const auto &e : entities.GetAllEntities())
+    // What does not depend on the spot (the occupied tiles, the tiles a passage must keep together, the components
+    // before the placement) is worked out once per search of sites when the caller hands a cache over: a search
+    // tries dozens of spots and each of them used to flood the whole map again.
+    WayOutCache local;
+    WayOutCache &c = cache ? *cache : local;
+    if (!c.ready)
     {
-        const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die)
-            continue;
-        for (int ty = std::max(0, b->tileY); ty < std::min(mh, b->tileY + b->buildHeight); ++ty)
-            for (int tx = std::max(0, b->tileX); tx < std::min(mw, b->tileX + b->buildWidth); ++tx)
-                blocked[ty * mw + tx] = 1;
+        c.blocked.assign(static_cast<std::size_t>(mw) * mh, 0);
+        c.important.assign(static_cast<std::size_t>(mw) * mh, 0);
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Building *b = e.AsBuilding();
+            if (!b || !b->alive || b->state == ActionState::Die)
+                continue;
+            for (int ty = std::max(0, b->tileY); ty < std::min(mh, b->tileY + b->buildHeight); ++ty)
+                for (int tx = std::max(0, b->tileX); tx < std::min(mw, b->tileX + b->buildWidth); ++tx)
+                    c.blocked[ty * mw + tx] = 1;
+        }
+        // Tiles a passage must keep together: roads, the ground around every exit building of this player and around
+        // every headquarters
+        for (int ty = 0; ty < mh; ++ty)
+            for (int tx = 0; tx < mw; ++tx)
+                if (IsRoadCore(tx, ty))
+                    c.important[ty * mw + tx] = 1;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            const Building *b = e.AsBuilding();
+            if (!b || !b->alive || b->state == ActionState::Die)
+                continue;
+            const bool hq = b->type == UnitType::Headquarters;
+            if (!hq && !(b->owner == m_player && IsExitBuilding(b->type)))
+                continue;
+            for (int ty = b->tileY - 2; ty <= b->tileY + b->buildHeight + 1; ++ty)
+                for (int tx = b->tileX - 2; tx <= b->tileX + b->buildWidth + 1; ++tx)
+                    if (tx >= 0 && ty >= 0 && tx < mw && ty < mh)
+                        c.important[ty * mw + tx] = 1;
+        }
+        c.ready = true;
     }
-    // Tiles a passage must keep together: roads, the ground around every exit building of this player and around
-    // every headquarters
-    std::vector<unsigned char> important(mw * mh, 0);
-    for (int ty = 0; ty < mh; ++ty)
-        for (int tx = 0; tx < mw; ++tx)
-            if (IsRoadCore(tx, ty))
-                important[ty * mw + tx] = 1;
-    for (const auto &e : entities.GetAllEntities())
-    {
-        const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die)
-            continue;
-        const bool hq = b->type == UnitType::Headquarters;
-        if (!hq && !(b->owner == m_player && IsExitBuilding(b->type)))
-            continue;
-        for (int ty = b->tileY - 2; ty <= b->tileY + b->buildHeight + 1; ++ty)
-            for (int tx = b->tileX - 2; tx <= b->tileX + b->buildWidth + 1; ++tx)
-                if (tx >= 0 && ty >= 0 && tx < mw && ty < mh)
-                    important[ty * mw + tx] = 1;
-    }
+    const std::vector<unsigned char> &blocked = c.blocked;
+    const std::vector<unsigned char> &important = c.important;
     for (int clearance : {1, 2})
     {
         auto free = [&](int bx, int by, bool after) {
@@ -321,7 +339,11 @@ bool AIController::KeepsWayOut(
                 }
             return labels;
         };
-        const auto before = components(false), after = components(true);
+        std::vector<int> &beforeCached = c.before[clearance - 1];
+        if (beforeCached.empty())
+            beforeCached = components(false);
+        const std::vector<int> &before = beforeCached;
+        const auto after = components(true);
         // A passage that falls apart is refused, unless the parts cut off are only small dead ends (a niche by a
         // cliff, a corner behind the building): on narrow maps nearly every spot closes one, and refusing them all
         // left the computer without a place to build. A part that holds a road, the door of a building or a
@@ -418,6 +440,7 @@ bool AIController::FindCoreSite(
     const int maxRing = entities.GetBuildRadius(m_player) + 2;
     const int mapW = map.GetWidth(), mapH = map.GetHeight();
     std::vector<std::uint8_t> builtOn(static_cast<std::size_t>(mapW) * mapH, 0);
+    WayOutCache wayOutCache; // (the buildings do not change during one search)
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();
@@ -499,7 +522,7 @@ bool AIController::FindCoreSite(
                 if (crowding < 3 && nearGate(px, py))
                     continue;
                 const char *reason = nullptr;
-                if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player, &reason))
+                if (!entities.CanPlaceBuilding(px, py, w, h, map, m_player, &reason, false))
                 {
                     if (failure && reason && failure->find(reason) == std::string::npos)
                         *failure += std::string(reason) + "; ";
@@ -541,9 +564,13 @@ bool AIController::FindCoreSite(
         {
             if (crowding < 3 && c.side < -0.2f && m_style.layout != AIBaseStyle::Compact)
                 continue; // (sorted by the score with the contact bonus: the spots after it may face the right way)
+            // (the base-open test is a flood of the whole map: only the spots tried here get it, in the same order as
+            // before, so the choice is the same)
+            if (!Players::Slot(m_player).human && !entities.KeepsBaseOpen(c.x, c.y, w, h, map, m_player))
+                continue;
             if (++tried > 24 && crowding < 3)
                 break; // the way-out check floods the map: a ring gets a limited number of tries
-            if (KeepsWayOut(c.x, c.y, w, h, map, entities, needsExit))
+            if (KeepsWayOut(c.x, c.y, w, h, map, entities, needsExit, &wayOutCache))
             {
                 outX = c.x;
                 outY = c.y;

@@ -1,3 +1,4 @@
+#include "ui/UiLayout.hpp"
 #include <cmath>
 #include "ui/UiKit.hpp"
 #include "ui/ImGuiBridge.hpp"
@@ -361,17 +362,28 @@ bool OnScrollTrack(const UiRect &track, int mx, int my)
 
 namespace
 {
-UiRect ConfirmDialogRect(int windowW, int windowH)
+// ui/layout.yaml (screen confirm: a bigger dialog with big buttons with the touch interface); the numbers stand in
+// without it
+struct ConfirmRects
 {
-    return CenteredRect(windowW, windowH, 520, 230);
-}
-UiRect ConfirmYes(const UiRect &d)
+    UiRect dialog, yes, no;
+};
+ConfirmRects ConfirmLayout(int windowW, int windowH)
 {
-    return {d.x + 24, d.Bottom() - 64, (d.w - 60) / 2, 40};
-}
-UiRect ConfirmNo(const UiRect &d)
-{
-    return {d.Right() - 24 - (d.w - 60) / 2, d.Bottom() - 64, (d.w - 60) / 2, 40};
+    ConfirmRects r;
+    const uilayout::Layout &file = uilayout::Current();
+    if (file.Has("confirm", "pc"))
+    {
+        const uilayout::Solved s = file.Solve("confirm", uilayout::MenuProfile(file, "confirm"), windowW, windowH, {});
+        r.dialog = s.Rect("dialog");
+        r.yes = s.Rect("yes");
+        r.no = s.Rect("no");
+        return r;
+    }
+    r.dialog = CenteredRect(windowW, windowH, 520, 230);
+    r.yes = {r.dialog.x + 24, r.dialog.Bottom() - 64, (r.dialog.w - 60) / 2, 40};
+    r.no = {r.dialog.Right() - 24 - (r.dialog.w - 60) / 2, r.dialog.Bottom() - 64, (r.dialog.w - 60) / 2, 40};
+    return r;
 }
 } // namespace
 
@@ -397,13 +409,13 @@ int ConfirmUpdate(
         return ans;
     }
     const bool useNativeHitTest = !ImGuiBridge::IsInitialized();
-    const UiRect d = ConfirmDialogRect(windowW, windowH);
-    if (enterPressed || (useNativeHitTest && clicked && ConfirmYes(d).Contains(mx, my)))
+    const ConfirmRects c = ConfirmLayout(windowW, windowH);
+    if (enterPressed || (useNativeHitTest && clicked && c.yes.Contains(mx, my)))
     {
         state.modalResult = -1;
         return 1;
     }
-    if (escPressed || (useNativeHitTest && clicked && ConfirmNo(d).Contains(mx, my)))
+    if (escPressed || (useNativeHitTest && clicked && c.no.Contains(mx, my)))
     {
         state.modalResult = -1;
         return 0;
@@ -421,11 +433,11 @@ void DrawConfirm(
         ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
         return;
     }
-    const UiRect d = ConfirmDialogRect(windowW, windowH);
-    const UiRect content = DrawDialog(r, font, windowW, windowH, d, state.title);
+    const ConfirmRects c = ConfirmLayout(windowW, windowH);
+    const UiRect content = DrawDialog(r, font, windowW, windowH, c.dialog, state.title);
     font.DrawTextWrapped(state.text, content.x + 24, content.y + 18, content.w - 48, FONT_BODY, color::Text, false);
-    DrawButton(r, font, ConfirmYes(d), _("YES"), ButtonStyle::Danger, ConfirmYes(d).Contains(mx, my));
-    DrawButton(r, font, ConfirmNo(d), _("NO"), ButtonStyle::Secondary, ConfirmNo(d).Contains(mx, my));
+    DrawButton(r, font, c.yes, _("YES"), ButtonStyle::Danger, c.yes.Contains(mx, my));
+    DrawButton(r, font, c.no, _("NO"), ButtonStyle::Secondary, c.no.Contains(mx, my));
 }
 
 void DrawComboField(

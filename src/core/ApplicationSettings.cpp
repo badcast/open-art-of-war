@@ -145,6 +145,7 @@ void Application::ApplySettings(SettingsArea area)
                 m_aiController->SetDifficulty(static_cast<AIDifficulty>(m_settings.difficulty));
             if (m_input)
                 m_input->SetEdgePanMargin(m_settings.edgePanMargin);
+            HUDController::SetShowBuildGrid(m_settings.showBuildGrid);
             break;
     }
     SaveSettings();
@@ -198,7 +199,7 @@ void Application::SyncWindowSize(int w, int h)
     m_windowH = ph;
     if (m_camera)
     {
-        m_camera->SetViewport(m_windowW - HUDController::kSidebarWidth, m_windowH);
+        m_camera->SetViewport(m_windowW - HudReservedWidth(), m_windowH);
         if (m_map)
             m_camera->ClampToBounds(m_map->GetWidth(), m_map->GetHeight());
     }

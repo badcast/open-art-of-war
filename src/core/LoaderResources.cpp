@@ -61,11 +61,28 @@ bool LoadInto(State &s, const std::string &path)
             }
         }
         else
+        {
             std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest object: no resources"
                       << std::endl;
+        }
+        if (doc.is_object() && doc.contains("version") && doc["version"].is_number_integer())
+        {
+            s.version = doc["version"].get<int>();
+            if (s.version < LoaderResources::kMinimalVersionManifest)
+            {
+                doc.clear();
+            }
+        }
+
+        if (doc.empty())
+        {
+            std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest version" << std::endl;
+        }
     }
     else
+    {
         std::cerr << "[LoaderResources] " << path << " not found: no resources" << std::endl;
+    }
     std::lock_guard<std::mutex> guard(s.lock);
     s.doc = std::move(doc);
     s.text = ok ? text : std::string();
@@ -342,6 +359,16 @@ std::string LoaderResources::Projectiles()
     return join(Str(nullptr, "projectiles"));
 }
 
+std::string LoaderResources::UiLayout()
+{
+    return join(Str(nullptr, "ui_layout"));
+}
+
+std::string LoaderResources::Mines()
+{
+    return join(Str(nullptr, "mines"));
+}
+
 std::string LoaderResources::WeaponBalance()
 {
     return join(Str(nullptr, "weapon_balance"));
@@ -503,6 +530,7 @@ std::string LoaderResources::NetManifestText()
            "ai_difficulty",
            "effects",
            "projectiles",
+           "mines",
            "weapon_balance",
            "limits",
            "research",

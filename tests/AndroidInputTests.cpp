@@ -71,6 +71,31 @@ int main()
     touch(SDL_EVENT_FINGER_UP, 2, 600, 200);
     Check(!input.WasLeftClickIssued(x, y) && !input.IsLeftMouseDown(), "cancel must not leave a stuck pointer");
 
+    // A menu scrolls with the finger: 32 px of travel = one wheel step (dragging up = later rows), and it is no tap
+    input.ConsumeWheel();
+    touch(SDL_EVENT_FINGER_DOWN, 1, 600, 500);
+    touch(SDL_EVENT_FINGER_MOTION, 1, 600, 400);
+    touch(SDL_EVENT_FINGER_MOTION, 1, 600, 300);
+    touch(SDL_EVENT_FINGER_UP, 1, 600, 300);
+    Check(input.ConsumeWheel() == -6, "swiping up 200 px must scroll a menu by six steps");
+    Check(!input.WasLeftClickIssued(x, y), "a scroll must not click");
+    touch(SDL_EVENT_FINGER_DOWN, 1, 600, 300);
+    touch(SDL_EVENT_FINGER_MOTION, 1, 600, 380);
+    touch(SDL_EVENT_FINGER_UP, 1, 600, 380);
+    Check(input.ConsumeWheel() == 2, "swiping down must scroll back");
+
+    // A window that scrolls both ways (the technology tree) takes the raw drag instead of wheel steps
+    input.SetTouchWheelScroll(false);
+    input.ConsumeWheel();
+    touch(SDL_EVENT_FINGER_DOWN, 1, 600, 500);
+    touch(SDL_EVENT_FINGER_MOTION, 1, 500, 420);
+    touch(SDL_EVENT_FINGER_UP, 1, 500, 420);
+    float dragX = 0.0f, dragY = 0.0f;
+    input.ConsumeTouchDrag(dragX, dragY);
+    Check(dragX < -90.0f && dragY < -70.0f, "the raw drag must reach the window");
+    Check(input.ConsumeWheel() == 0, "and no wheel steps are made of it");
+    input.SetTouchWheelScroll(true);
+
     touch(SDL_EVENT_FINGER_DOWN, 1, 1100, 300);
     SDL_Event focus {};
     focus.type = SDL_EVENT_WINDOW_FOCUS_LOST;
