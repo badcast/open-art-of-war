@@ -196,6 +196,10 @@ public:
     float blockRetryTimer {0.0f};
     static constexpr int kBlockRetries = 3;
     static constexpr float kBlockRetryPause = 0.25f;
+    // Re-planning a route around a blockage is a whole-map search (two of them when allies are in the way): a unit
+    // that keeps meeting blockages may do it only this often, else a crowd of stuck units stalls the game
+    float replanCooldown {0.0f};
+    static constexpr float kReplanPause = 0.4f;
     int yieldHomeX {-1}; // where a unit without orders stood before it stepped aside (it walks back)
     int yieldHomeY {-1};
     float yieldHomeTimer {0.0f};

@@ -544,7 +544,11 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
     {
         wallCheckCooldown = 1.0f;
         int wx = -1, wy = -1;
-        if (stuckWithGoal && delegates.findWallTarget && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
+        // (no search left this tick: look again soon)
+        const bool searchAllowed = pathfinder.TakeBackgroundSearch();
+        if (!searchAllowed)
+            wallCheckCooldown = 0.1f;
+        if (searchAllowed && stuckWithGoal && delegates.findWallTarget && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
             delegates.findWallTarget(*this, wx, wy);
         // The way through is open, only jammed: shoot the wall beside the gap, so it widens
         if (wx < 0 && jammedAtGap)

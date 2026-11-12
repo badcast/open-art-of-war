@@ -93,6 +93,23 @@ public:
         m_ignoreUnitsOnce = true;
     }
 
+    // Searches nobody ordered (a unit stuck in a crowd planning a way around, retrying a path that was shut, checking
+    // a wall) share a budget per simulation tick: with hundreds of units jammed at a passage each of them would
+    // otherwise search the whole map several times a second. A refused search is simply tried again on a later tick.
+    // Player orders and the computer's group plans do not use it.
+    static constexpr int kBackgroundSearchesPerTick = 8;
+    void BeginTick()
+    {
+        m_backgroundBudget = kBackgroundSearchesPerTick;
+    }
+    bool TakeBackgroundSearch()
+    {
+        if (m_backgroundBudget <= 0)
+            return false;
+        --m_backgroundBudget;
+        return true;
+    }
+
     // Group orders: one flow field (a Dijkstra map from the goal over terrain, water, walls and buildings) gives every
     // unit of the group its way to that goal without a search of its own. False when the goal is blocked or outside.
     bool BuildFlowField(int goalX, int goalY);
@@ -121,6 +138,7 @@ private:
     int m_lastHeight {0};
     std::vector<PathNode> m_avoidTiles;
     bool m_ignoreUnitsOnce {false};
+    int m_backgroundBudget {kBackgroundSearchesPerTick};
 };
 
 } // namespace OpenArtOfWar

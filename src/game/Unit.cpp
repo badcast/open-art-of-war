@@ -146,6 +146,8 @@ void Unit::UpdateImpl(float deltaTime, TileMap &map, Pathfinder &pathfinder, con
         blockRetries = 0; // it moved on: the next blockage gets its tries again
     if (blockRetryTimer > 0.0f)
         blockRetryTimer -= deltaTime;
+    if (replanCooldown > 0.0f)
+        replanCooldown -= deltaTime;
     blockedTileX = tileX;
     blockedTileY = tileY;
     if (secondaryCooldownTimer > 0.0f)

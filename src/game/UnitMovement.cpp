@@ -132,7 +132,7 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
         if (waitingForPath && state == ActionState::Idle)
         {
             pathRetryTimer += deltaTime;
-            if (pathRetryTimer >= 0.45f)
+            if (pathRetryTimer >= 0.45f && pathfinder.TakeBackgroundSearch())
             {
                 pathRetryTimer = 0.0f;
 
@@ -281,6 +281,11 @@ void Unit::UpdateMovement(float deltaTime, TileMap &map, Pathfinder &pathfinder,
         }
         if (goalX < 0 || goalY < 0)
             return false;
+
+        // Too soon after the last search: the caller parks the unit, which tries again by its own timer
+        if (replanCooldown > 0.0f || !pathfinder.TakeBackgroundSearch())
+            return false;
+        replanCooldown = kReplanPause;
 
         // Moving allies are not locked by syncMap, so explicitly route around the one we bumped into
         if (avoidX == goalX && avoidY == goalY)

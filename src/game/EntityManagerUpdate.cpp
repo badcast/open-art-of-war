@@ -42,6 +42,7 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
             m_revealPings.begin(), m_revealPings.end(), [](const RevealPing &p) { return p.timeLeft <= 0.0f; }),
         m_revealPings.end());
     pathfinder.SetEntityManager(this);
+    pathfinder.BeginTick();
 
     // Initial fog update for this tick
     UpdateFogOfWar(map);

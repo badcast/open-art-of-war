@@ -122,7 +122,7 @@ void AIController::InitDifficultyDefaults()
     hard.tactics.researchSeconds = 70.0f;
     hard.tactics.vanguardWave = 2;
     hard.tactics.assaultWave = 3;
-    hard.tactics.siegeWave = 5;
+    hard.tactics.siegeWave = 4;
     hard.tactics.vehicleWaitSeconds = 45.0f;
     hard.tactics.stragglerTimeoutSeconds = 8.0f;
     hard.tactics.marchStrideTiles = 4;
@@ -145,7 +145,7 @@ void AIController::InitDifficultyDefaults()
     hardcore.tactics.researchSeconds = 65.0f;
     hardcore.tactics.vanguardWave = 2;
     hardcore.tactics.assaultWave = 3;
-    hardcore.tactics.siegeWave = 5;
+    hardcore.tactics.siegeWave = 4;
     hardcore.tactics.vehicleWaitSeconds = 40.0f;
     hardcore.tactics.maxAttackGroups = 5;
     hardcore.tactics.creditsPerExtraGroup = 500;
