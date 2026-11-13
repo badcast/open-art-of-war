@@ -284,14 +284,21 @@ void CharacterEditor::DrawPreviewControls()
     ImGui::Separator();
     YAML::Node cNode = document["combat"];
     const bool hasRotTurret = YamlBool(cNode, "has_rotating_turret", false);
+    float tmpAx = 0.0f, tmpAy = 0.0f;
+    const int previewArch = YamlInt(document, "archetype_id", -1);
+    const bool hasSpriteTurret
+        = !hasRotTurret && YamlString(document, "type") != "building" && textures
+          && textures->GetTurretAnchor(previewArch, facing, tmpAx, tmpAy);
+    const bool showTurretSlider = hasRotTurret || hasSpriteTurret;
 
     ImGui::SetNextItemWidth(105.0f);
     if (Hinted(
-            ImGui::SliderInt("##facing", &facing, 0, 7, hasRotTurret ? _("Hull %d/7") : _("Facing %d/7")), "##facing"))
+            ImGui::SliderInt("##facing", &facing, 0, 7, showTurretSlider ? _("Hull %d/7") : _("Facing %d/7")),
+            "##facing"))
     {
         desiredHullFacingDir = facing;
         previewHullTurnTimer = 0.0f;
-        if (!hasRotTurret || linkTurretToHull)
+        if (!showTurretSlider || linkTurretToHull)
         {
             turretFacingDir = facing;
             desiredTurretFacingDir = facing;
@@ -302,7 +309,7 @@ void CharacterEditor::DrawPreviewControls()
             targetWorldY = std::sin(ang) * dist;
         }
     }
-    if (hasRotTurret)
+    if (showTurretSlider)
     {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(115.0f);

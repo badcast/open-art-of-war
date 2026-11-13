@@ -952,12 +952,10 @@ void Application::HandleEvents()
         m_input->SetTouchScrollPanel(m_hudController->TouchScrollPanel(m_windowW, m_windowH));
         m_input->SetTouchUiRects(m_hudController->TouchPanels(m_windowW, m_windowH));
     }
-#if OAOW_TOUCH
     const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
     m_input->SetMenuOpen(
         !playing || (m_menuController && m_menuController->IsAnyMenuOpen())
         || (m_hudController && m_hudController->IsResearchWindowOpen()));
-#endif
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {

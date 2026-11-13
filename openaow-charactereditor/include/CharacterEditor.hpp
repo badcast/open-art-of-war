@@ -582,6 +582,13 @@ private:
     int spriteSplitPadding {2};
     int spritePreviewKind {0}; // 0: buildings, 1: bodies, 2: parts, 3: anims
     int spritePreviewItem {0};
+    int spritePreviewLayer {-1};
+    int spritePreviewTurretDir {-1}; // -1: natural dir, 0..7: override rot_*[slot] in bodies
+    int spritePreviewTool {0};       // 0: drag selected layer at, 1: pick/drag pivot [0,0] center
+    bool spritePreviewSyncParts {true};
+    bool spritePreviewSyncRot {true};
+    float spritePreviewDragAnchor[2] {0.0f, 0.0f};
+    bool spritePreviewDragging {false};
     float spritePreviewZoom {1.0f};
     bool spritePreviewShowOverlays {false};
     bool spritePreviewAnimate {true};

@@ -133,13 +133,16 @@ std::string UnitDesc(const UnitCameoDef &unitDef, const EntityManager &entities)
 
 void DrawInfinity(Renderer &renderer, const UiRect &buttonRect, bool active, bool hovered)
 {
-    const SDL_Color topFill = active ? ui::Mix(col::Accent, col::PanelRaised, 0.35f)
-                                     : (hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.42f) : col::PanelRaised);
-    const SDL_Color botFill = active ? ui::color::AccentDeep : col::PanelSunken;
-    const SDL_Color border = active ? col::Accent : (hovered ? col::BorderStrong : col::Border);
+    const SDL_Color topFill = active
+                                  ? ui::Mix(col::Accent, col::White, 0.14f)
+                                  : (hovered ? ui::Mix(ui::color::AccentDeep, col::Accent, 0.40f)
+                                             : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.52f));
+    const SDL_Color botFill = active ? col::Accent : ui::color::AccentDeep;
+    const SDL_Color border = active ? ui::Mix(col::Accent, col::White, 0.45f)
+                                    : (hovered ? col::Accent : col::BorderStrong);
     ui::DrawButtonChrome(renderer, buttonRect, topFill, botFill, border, {0, 0, 0, 0}, {0, 0, 0, 0}, 235);
-    // two rings side by side: the infinity sign
-    const SDL_Color ringColor = active ? col::Accent : col::TextDim;
+    // two rings side by side: the infinity sign (kept crisp white at opacity 200)
+    const SDL_Color ringColor {255, 255, 255, 200};
     renderer.DrawRingScreen(
         static_cast<float>(buttonRect.x + 7),
         static_cast<float>(buttonRect.CenterY()),
@@ -175,6 +178,33 @@ void DrawCostTag(
         color,
         false,
         Anchor::HCENTER | Anchor::VCENTER);
+}
+
+void DrawPowerTag(Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell, int powerCost, int iconSpriteId)
+{
+    const std::string text = (powerCost > 0 ? "+" : "") + std::to_string(powerCost);
+    const SDL_Color color = powerCost >= 0 ? col::Ok : SDL_Color {255, 170, 80, 255};
+    const int tagHeight = std::clamp(cell.h * 18 / 84, 15, 28);
+    const float iconScale = static_cast<float>(std::max(11, tagHeight - 5)) / 19.0f;
+    const int iconW = iconSpriteId >= 0 ? static_cast<int>(std::lround(23.0f * iconScale)) : 0;
+    const int iconH = iconSpriteId >= 0 ? static_cast<int>(std::lround(19.0f * iconScale)) : 0;
+    const int gap = iconSpriteId >= 0 ? 3 : 0;
+    const int padX = 5;
+    const int textW = fontRenderer.GetTextWidth(text, ui::FONT_SMALL_BOLD);
+    const int tagWidth = padX + iconW + gap + textW + padX;
+    const UiRect tagRect {cell.x + 3, cell.y + 3, tagWidth, tagHeight};
+    renderer.FillRectScreen(tagRect.x, tagRect.y, tagRect.w, tagRect.h, {6, 8, 12, 215});
+    if (iconSpriteId >= 0)
+        renderer.DrawRawSpriteScreen(
+            iconSpriteId, tagRect.x + padX, tagRect.y + (tagRect.h - iconH) / 2, iconScale);
+    fontRenderer.DrawString(
+        text,
+        tagRect.x + padX + iconW + gap,
+        tagRect.CenterY(),
+        ui::FONT_SMALL_BOLD,
+        color,
+        false,
+        Anchor::LEFT | Anchor::VCENTER);
 }
 
 // Common cameo frame: icon, bottom name band, hover/selection border
@@ -549,12 +579,13 @@ void HUDController::DrawRadar(
         const bool hovered = enabled && buttonRect.Contains(mouseX, mouseY);
         if (hovered)
             SoundRequests::MarkHover();
-        const SDL_Color topFill = hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.45f)
-                                          : ui::Mix(col::PanelRaised, col::Panel, 0.35f);
-        const SDL_Color border = hovered ? col::Accent : (enabled ? col::BorderStrong : col::Border);
+        const SDL_Color topFill = hovered ? ui::Mix(ui::color::AccentDeep, col::Accent, 0.38f)
+                                          : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.52f);
+        const SDL_Color botFill = enabled ? ui::color::AccentDeep : col::PanelSunken;
+        const SDL_Color border = hovered ? col::Accent : (enabled ? ui::Mix(col::BorderStrong, col::Accent, 0.35f) : col::Border);
         ui::DrawButtonChrome(
-            renderer, buttonRect, topFill, col::PanelSunken, border, {0, 0, 0, 0}, {0, 0, 0, 0}, enabled ? 235 : 170);
-        const SDL_Color symbolColor = enabled ? col::Text : col::TextMuted;
+            renderer, buttonRect, topFill, botFill, border, {0, 0, 0, 0}, {0, 0, 0, 0}, enabled ? 235 : 170);
+        const SDL_Color symbolColor {255, 255, 255, enabled ? Uint8(200) : Uint8(110)};
         renderer.FillRectScreen(buttonRect.x + 5, buttonRect.CenterY() - 1, buttonRect.w - 10, 2, symbolColor);
         if (k == 1)
             renderer.FillRectScreen(buttonRect.CenterX() - 1, buttonRect.y + 5, 2, buttonRect.h - 10, symbolColor);
@@ -721,7 +752,7 @@ void HUDController::RenderGameHud(
             else
             {
                 DrawCrosshair(
-                    renderer, tabRect.CenterX(), tabRect.CenterY() - 1, 16, active ? col::Accent : col::TextDim);
+                    renderer, tabRect.CenterX(), tabRect.CenterY() - 1, 16, SDL_Color {255, 255, 255, 200});
             }
         }
 
@@ -786,9 +817,10 @@ void HUDController::RenderGameHud(
                     ui::DrawPanel(
                         renderer,
                         arrowRect,
-                        hovered ? col::Hover : col::PanelRaised,
-                        hovered ? col::BorderStrong : col::Border);
-                    SDL_Color arrowColor = enabled ? (hovered ? col::Accent : col::Text) : col::TextMuted;
+                        hovered ? ui::Mix(ui::color::AccentDeep, col::Accent, 0.35f)
+                                : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.50f),
+                        hovered ? col::Accent : ui::Mix(col::BorderStrong, col::Accent, 0.35f));
+                    SDL_Color arrowColor {255, 255, 255, enabled ? Uint8(200) : Uint8(110)};
                     for (int i = 0; i < 5; ++i)
                     {
                         int rowY = isUp ? (arrowRect.CenterY() - 2 + i) : (arrowRect.CenterY() + 2 - i);

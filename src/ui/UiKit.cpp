@@ -674,6 +674,33 @@ void DrawTab(
     }
 }
 
+CompositeFit FitCompositeInRect(const UiRect &box, int pad, float minX, float minY, float maxX, float maxY)
+{
+    const float compW = std::max(1.0f, maxX - minX);
+    const float compH = std::max(1.0f, maxY - minY);
+    const float innerW = static_cast<float>(std::max(1, box.w - pad * 2));
+    const float innerH = static_cast<float>(std::max(1, box.h - pad * 2));
+    const float scale = std::min(innerW / compW, innerH / compH);
+    const float scaledW = compW * scale;
+    const float scaledH = compH * scale;
+    const int drawX = static_cast<int>(
+        std::lround(static_cast<float>(box.x) + (static_cast<float>(box.w) - scaledW) * 0.5f - minX * scale));
+    const int drawY = static_cast<int>(
+        std::lround(static_cast<float>(box.y) + (static_cast<float>(box.h) - scaledH) * 0.5f - minY * scale));
+    return {drawX, drawY, scale};
+}
+
+void DrawCompositeFitted(Renderer &r, int compId, const UiRect &box, int pad, Faction faction)
+{
+    if (compId < 0 || box.w <= 0 || box.h <= 0)
+        return;
+    float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
+    if (!r.GetCompositeBounds(compId, minX, minY, maxX, maxY))
+        return;
+    const CompositeFit fit = FitCompositeInRect(box, pad, minX, minY, maxX, maxY);
+    r.DrawCompositeScreen(compId, fit.x, fit.y, fit.scale, faction);
+}
+
 UiRect DrawDialog(
     Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, std::string_view title)
 {
@@ -862,13 +889,13 @@ void DrawButton(
             break;
         case ButtonStyle::Secondary:
             topFill
-                = hovered ? Mix(color::Hover, color::Accent, 0.22f) : Mix(color::PanelRaised, color::AccentDeep, 0.22f);
-            botFill = hovered ? Mix(color::PanelRaised, color::AccentDeep, 0.28f)
-                              : Mix(color::Panel, color::PanelSunken, 0.45f);
-            border = hovered ? Mix(color::Accent, color::White, 0.20f) : Mix(color::BorderStrong, color::Accent, 0.30f);
+                = hovered ? Mix(color::AccentDeep, color::Accent, 0.36f) : Mix(color::PanelRaised, color::AccentDeep, 0.52f);
+            botFill = hovered ? Mix(color::PanelRaised, color::AccentDeep, 0.62f)
+                              : Mix(color::PanelSunken, color::AccentDeep, 0.30f);
+            border = hovered ? Mix(color::Accent, color::White, 0.25f) : Mix(color::BorderStrong, color::Accent, 0.38f);
             corners
-                = hovered ? Mix(color::Accent, color::White, 0.34f) : Mix(color::Accent, color::BorderStrong, 0.50f);
-            text = hovered ? color::White : color::Text;
+                = hovered ? Mix(color::Accent, color::White, 0.40f) : Mix(color::Accent, color::BorderStrong, 0.45f);
+            text = hovered ? color::White : Mix(color::Text, color::White, 0.25f);
             break;
         case ButtonStyle::Danger:
             topFill = hovered ? SDL_Color {148, 46, 38, 255} : SDL_Color {104, 34, 28, 255};
@@ -1021,16 +1048,17 @@ bool OnScrollTrack(const UiRect &track, int mx, int my)
 
 namespace
 {
-// Shared kinetic vertical drag + flick glide + smooth wheel easing solver
 void StepVerticalKineticScroll(
     float &offset,
     float &target,
     float &velocity,
     bool &dragging,
     bool &dragMoved,
-    int &dragStartY,
-    int &dragLastY,
-    Uint32 &lastTickMs,
+    bool &hasVelocity,
+    float &dragStartY,
+    float &dragLastY,
+    float &dragIdleS,
+    Uint64 &lastTickNs,
     const UiRect &area,
     float maxScroll,
     int stepPx,
@@ -1040,83 +1068,240 @@ void StepVerticalKineticScroll(
     bool pressed,
     int pressX,
     int pressY,
-    int wheel,
+    float wheel,
     bool allowWheelOutside = false,
     const UiRect *extraWheelRect = nullptr)
+{
+    KineticScroll2D k;
+    k.offsetY = offset;
+    k.targetY = target;
+    k.velY = velocity;
+    k.dragging = dragging;
+    k.dragMoved = dragMoved;
+    k.hasVelocity = hasVelocity;
+    k.dragStartY = dragStartY;
+    k.dragLastY = dragLastY;
+    k.dragIdleS = dragIdleS;
+    k.lastTickNs = lastTickNs;
+
+    StepKineticScroll2D(
+        k,
+        area,
+        0.0f,
+        maxScroll,
+        0.0f,
+        static_cast<float>(stepPx),
+        mx,
+        my,
+        down,
+        pressed,
+        pressX,
+        pressY,
+        0.0f,
+        wheel,
+        true,
+        allowWheelOutside,
+        extraWheelRect);
+
+    offset = k.offsetY;
+    target = k.targetY;
+    velocity = k.velY;
+    dragging = k.dragging;
+    dragMoved = k.dragMoved;
+    hasVelocity = k.hasVelocity;
+    dragStartY = k.dragStartY;
+    dragLastY = k.dragLastY;
+    dragIdleS = k.dragIdleS;
+    lastTickNs = k.lastTickNs;
+}
+} // namespace
+
+void StepKineticScroll2D(
+    KineticScroll2D &scroll,
+    const UiRect &area,
+    float maxScrollX,
+    float maxScrollY,
+    float stepPxX,
+    float stepPxY,
+    int mx,
+    int my,
+    bool down,
+    bool pressed,
+    int pressX,
+    int pressY,
+    float wheelX,
+    float wheelY,
+    bool allowStart,
+    bool allowWheelOutside,
+    const UiRect *extraWheelRect)
 {
     constexpr float kSlop = 12.0f;
     constexpr float kGlideMax = 6000.0f;
     constexpr float kGlideStop = 30.0f;
     constexpr float kGlideFriction = 3.5f;
     constexpr float kWheelEase = 18.0f;
+    constexpr float kVelBlendTau = 0.045f;
+    constexpr float kHoldGraceS = 0.035f;
+    constexpr float kHoldDecayTau = 0.018f;
 
-    const Uint32 nowMs = SDL_GetTicks();
-    const float dtS = lastTickMs == 0 ? 0.0f : std::clamp(static_cast<float>(nowMs - lastTickMs) * 0.001f, 0.0f, 0.1f);
-    lastTickMs = nowMs;
+    const Uint64 nowNs = SDL_GetTicksNS();
+    const float dtS
+        = scroll.lastTickNs == 0
+              ? 0.0f
+              : std::clamp(static_cast<float>(nowNs - scroll.lastTickNs) * 1e-9f, 0.0f, 0.1f);
+    scroll.lastTickNs = nowNs;
 
-    if (!dragging && wheel != 0 && maxScroll > 0.0f
-        && (allowWheelOutside || area.Contains(mx, my) || (extraWheelRect && extraWheelRect->Contains(mx, my))))
+    const bool canScroll = maxScrollX > 0.0f || maxScrollY > 0.0f;
+    const bool wheelHit
+        = allowWheelOutside || area.Contains(mx, my) || (extraWheelRect && extraWheelRect->Contains(mx, my));
+    if (!scroll.dragging && wheelHit)
     {
-        velocity = 0.0f;
-        target = std::clamp(target - static_cast<float>(wheel * stepPx), 0.0f, maxScroll);
-    }
-
-    if (pressed && down && maxScroll > 0.0f && area.Contains(pressX, pressY))
-    {
-        velocity = 0.0f;
-        dragging = true;
-        dragMoved = false;
-        dragStartY = pressY;
-        dragLastY = pressY;
-    }
-
-    if (dragging)
-    {
-        bool justMoved = false;
-        if (!dragMoved && std::abs(my - dragStartY) > kSlop)
+        if (wheelX != 0.0f && maxScrollX > 0.0f)
         {
-            dragMoved = true;
-            justMoved = true;
+            scroll.velX = 0.0f;
+            scroll.hasVelocity = scroll.velY != 0.0f;
+            scroll.targetX = std::clamp(scroll.targetX - wheelX * stepPxX, 0.0f, maxScrollX);
         }
-        if (dragMoved)
+        if (wheelY != 0.0f && maxScrollY > 0.0f)
         {
-            const float dy = static_cast<float>(my - dragLastY);
-            offset -= dy;
-            target = offset;
-            dragLastY = my;
-            if (dtS > 0.0f && !justMoved)
+            scroll.velY = 0.0f;
+            scroll.hasVelocity = scroll.velX != 0.0f;
+            scroll.targetY = std::clamp(scroll.targetY - wheelY * stepPxY, 0.0f, maxScrollY);
+        }
+    }
+
+    if (pressed && down && allowStart && canScroll && area.Contains(pressX, pressY))
+    {
+        scroll.velX = scroll.velY = 0.0f;
+        scroll.hasVelocity = false;
+        scroll.dragging = true;
+        scroll.dragMoved = false;
+        scroll.dragStartX = scroll.dragLastX = static_cast<float>(pressX);
+        scroll.dragStartY = scroll.dragLastY = static_cast<float>(pressY);
+        scroll.dragIdleS = 0.0f;
+    }
+
+    bool movedThisStep = false;
+    if (scroll.dragging)
+    {
+        if (!scroll.dragMoved)
+        {
+            const float distX = maxScrollX > 0.0f ? (static_cast<float>(mx) - scroll.dragStartX) : 0.0f;
+            const float distY = maxScrollY > 0.0f ? (static_cast<float>(my) - scroll.dragStartY) : 0.0f;
+            const float dist = std::hypot(distX, distY);
+            if (dist > kSlop)
             {
-                const float k = std::min(1.0f, dtS / 0.08f);
-                velocity += (std::clamp(-dy / dtS, -kGlideMax, kGlideMax) - velocity) * k;
+                scroll.dragMoved = true;
+                scroll.dragIdleS = 0.0f;
+                const float scale = kSlop / dist;
+                scroll.dragLastX = scroll.dragStartX + distX * scale;
+                scroll.dragLastY = scroll.dragStartY + distY * scale;
+            }
+        }
+        if (scroll.dragMoved)
+        {
+            const float dx = maxScrollX > 0.0f ? (static_cast<float>(mx) - scroll.dragLastX) : 0.0f;
+            const float dy = maxScrollY > 0.0f ? (static_cast<float>(my) - scroll.dragLastY) : 0.0f;
+            scroll.dragLastX = static_cast<float>(mx);
+            scroll.dragLastY = static_cast<float>(my);
+            movedThisStep = (dx != 0.0f || dy != 0.0f);
+            if (movedThisStep)
+            {
+                scroll.offsetX -= dx;
+                scroll.offsetY -= dy;
+                scroll.targetX = scroll.offsetX;
+                scroll.targetY = scroll.offsetY;
+                const float moveDt = std::clamp(dtS + scroll.dragIdleS, 0.0f, 0.1f);
+                scroll.dragIdleS = 0.0f;
+                if (moveDt > 0.0f)
+                {
+                    const float instVx = std::clamp(-dx / moveDt, -kGlideMax, kGlideMax);
+                    const float instVy = std::clamp(-dy / moveDt, -kGlideMax, kGlideMax);
+                    if (!scroll.hasVelocity)
+                    {
+                        scroll.velX = instVx;
+                        scroll.velY = instVy;
+                        scroll.hasVelocity = true;
+                    }
+                    else
+                    {
+                        const float k = std::min(1.0f, moveDt / kVelBlendTau);
+                        scroll.velX += (instVx - scroll.velX) * k;
+                        scroll.velY += (instVy - scroll.velY) * k;
+                    }
+                }
+            }
+            else if (down && dtS > 0.0f && scroll.hasVelocity)
+            {
+                scroll.dragIdleS += dtS;
+                if (scroll.dragIdleS >= kHoldGraceS)
+                {
+                    const float decay = std::exp(-dtS / kHoldDecayTau);
+                    scroll.velX *= decay;
+                    scroll.velY *= decay;
+                }
             }
         }
         if (!down)
-            dragging = false;
-    }
-    else if (std::abs(velocity) >= kGlideStop && maxScroll > 0.0f)
-    {
-        offset += velocity * dtS;
-        target = offset;
-        velocity *= std::exp(-dtS * kGlideFriction);
-    }
-    else
-    {
-        velocity = 0.0f;
-        if (dtS > 0.0f && std::abs(target - offset) > 0.35f)
-            offset += (target - offset) * (1.0f - std::exp(-dtS * kWheelEase));
-        else
-            offset = target;
+        {
+            scroll.dragging = false;
+            scroll.dragIdleS = 0.0f;
+        }
     }
 
-    const float clamped = std::clamp(offset, 0.0f, maxScroll);
-    if (clamped != offset)
+    if (!scroll.dragging)
     {
-        offset = clamped;
-        velocity = 0.0f;
+        const float speed = std::hypot(scroll.velX, scroll.velY);
+        if (speed >= kGlideStop && canScroll)
+        {
+            if (!movedThisStep && dtS > 0.0f)
+            {
+                scroll.offsetX += scroll.velX * dtS;
+                scroll.offsetY += scroll.velY * dtS;
+                scroll.targetX = scroll.offsetX;
+                scroll.targetY = scroll.offsetY;
+                const float keep = std::exp(-dtS * kGlideFriction);
+                scroll.velX *= keep;
+                scroll.velY *= keep;
+            }
+        }
+        else
+        {
+            scroll.velX = scroll.velY = 0.0f;
+            scroll.hasVelocity = false;
+            auto easeAxis = [&](float &offset, float target) {
+                if (std::abs(target - offset) > 0.35f)
+                {
+                    if (dtS > 0.0f)
+                        offset += (target - offset) * (1.0f - std::exp(-dtS * kWheelEase));
+                }
+                else
+                {
+                    offset = target;
+                }
+            };
+            easeAxis(scroll.offsetX, scroll.targetX);
+            easeAxis(scroll.offsetY, scroll.targetY);
+        }
     }
-    target = std::clamp(target, 0.0f, maxScroll);
+
+    const float clampedX = std::clamp(scroll.offsetX, 0.0f, maxScrollX);
+    if (clampedX != scroll.offsetX)
+    {
+        scroll.offsetX = clampedX;
+        scroll.velX = 0.0f;
+    }
+    const float clampedY = std::clamp(scroll.offsetY, 0.0f, maxScrollY);
+    if (clampedY != scroll.offsetY)
+    {
+        scroll.offsetY = clampedY;
+        scroll.velY = 0.0f;
+    }
+    if (scroll.velX == 0.0f && scroll.velY == 0.0f)
+        scroll.hasVelocity = false;
+    scroll.targetX = std::clamp(scroll.targetX, 0.0f, maxScrollX);
+    scroll.targetY = std::clamp(scroll.targetY, 0.0f, maxScrollY);
 }
-} // namespace
 
 void SmoothListScroll::EnsureVisible(int row, int stepH, int viewH, int totalRows)
 {
@@ -1148,7 +1333,7 @@ void UpdateSmoothList(
     bool pressed,
     int pressX,
     int pressY,
-    int wheel,
+    float wheel,
     bool &clicked,
     bool allowBarDrag)
 {
@@ -1162,20 +1347,20 @@ void UpdateSmoothList(
     if (allowBarDrag && !touchProfile && pressed && down && OnScrollTrack(trackRect, pressX, pressY))
     {
         scroll.barDrag = true;
-        scroll.velocity = 0.0f;
+        scroll.StopGlide();
         scroll.dragging = false;
         scroll.dragMoved = false;
+        scroll.dragIdleS = 0.0f;
     }
     if (scroll.barDrag)
     {
         const float pos
             = ScrollPosFromMouse(trackRect, my, static_cast<float>(contentH), static_cast<float>(listRect.h));
         scroll.offset = scroll.target = std::clamp(pos, 0.0f, maxScroll);
+        scroll.lastTickNs = SDL_GetTicksNS();
+        clicked = false;
         if (!down)
-        {
             scroll.barDrag = false;
-            clicked = false;
-        }
         return;
     }
 
@@ -1186,9 +1371,11 @@ void UpdateSmoothList(
         scroll.velocity,
         scroll.dragging,
         scroll.dragMoved,
+        scroll.hasVelocity,
         scroll.dragStartY,
         scroll.dragLastY,
-        scroll.lastTickMs,
+        scroll.dragIdleS,
+        scroll.lastTickNs,
         listRect,
         maxScroll,
         stepPx,
@@ -1199,11 +1386,10 @@ void UpdateSmoothList(
         pressX,
         pressY,
         wheel);
-    if (wasDragging && !scroll.dragging && scroll.dragMoved)
-    {
-        scroll.dragMoved = false;
+    if (scroll.dragMoved)
         clicked = false;
-    }
+    if (wasDragging && !scroll.dragging && scroll.dragMoved)
+        scroll.dragMoved = false;
 }
 
 namespace
@@ -1464,7 +1650,7 @@ bool ComboUpdate(
     int mx,
     int my,
     bool clicked,
-    int wheel,
+    float wheel,
     int &picked,
     bool down,
     bool pressed,
@@ -1485,8 +1671,9 @@ bool ComboUpdate(
         state.lastOpen = state.open;
         state.scrollPx = state.targetPx = std::clamp(static_cast<float>(state.scroll * kComboItemH), 0.0f, maxPx);
         state.velPx = 0.0f;
-        state.dragging = state.dragMoved = false;
-        state.lastTickMs = SDL_GetTicks();
+        state.dragging = state.dragMoved = state.hasVelocity = false;
+        state.dragIdleS = 0.0f;
+        state.lastTickNs = SDL_GetTicksNS();
     }
     const bool wasDragging = state.dragging;
     StepVerticalKineticScroll(
@@ -1495,9 +1682,11 @@ bool ComboUpdate(
         state.velPx,
         state.dragging,
         state.dragMoved,
+        state.hasVelocity,
         state.dragStartY,
         state.dragLastY,
-        state.lastTickMs,
+        state.dragIdleS,
+        state.lastTickNs,
         list,
         maxPx,
         kComboItemH * 2,
@@ -1512,13 +1701,15 @@ bool ComboUpdate(
         &field);
     state.scroll = static_cast<int>(state.scrollPx) / kComboItemH;
 
-    if (wheel != 0 && (list.Contains(mx, my) || field.Contains(mx, my)))
+    if (wheel != 0.0f && (list.Contains(mx, my) || field.Contains(mx, my)))
         return true;
     if (wasDragging && !state.dragging && state.dragMoved)
     {
         state.dragMoved = false;
         return true;
     }
+    if (state.dragMoved)
+        return true;
     if (!clicked)
         return false;
     if (list.Contains(mx, my))
@@ -1532,6 +1723,7 @@ bool ComboUpdate(
     state.lastOpen = -1;
     state.scroll = 0;
     state.scrollPx = state.targetPx = state.velPx = 0.0f;
+    state.hasVelocity = false;
     return true;
 }
 

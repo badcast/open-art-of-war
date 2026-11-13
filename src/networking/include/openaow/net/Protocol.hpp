@@ -16,7 +16,7 @@ namespace OpenArtOfWar::Net
 
 constexpr std::uint16_t kDefaultPort = 38100;
 constexpr std::uint32_t kProtocolMagic = 0x574F414Fu; // "OAOW"
-constexpr std::uint16_t kProtocolVersion = 3;
+constexpr std::uint16_t kProtocolVersion = 1;
 
 constexpr int kMaxPlayers = 8;
 constexpr std::size_t kMaxNameLength = 24;

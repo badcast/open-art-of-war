@@ -73,6 +73,20 @@ public:
         int windowH,
         const std::vector<int> &selected) override;
 
+    struct ButtonColors
+    {
+        SDL_Color fill;
+        SDL_Color border;
+        SDL_Color activeBar;
+        SDL_Color iconTint;
+        Uint8 iconAlpha {200};
+        SDL_Color text;
+    };
+    static constexpr Uint8 kHudIconAlpha = 200;
+    // Adapts button chrome to the local faction/army color while keeping HUD icons crisp white at opacity 200.
+    static ButtonColors ResolveButtonColors(
+        ui::ButtonStyle style, bool active, bool hovered, bool disabled, bool armed, SDL_Color factionColor);
+
 private:
     enum class Panel
     {

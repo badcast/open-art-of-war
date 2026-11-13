@@ -460,7 +460,7 @@ NetworkAction NetworkMenu::UpdateBrowser(
     const BrowserLayout layout = browserLayout(windowW, windowH);
     float clickX, clickY;
     bool clicked = input.WasLeftClickIssued(clickX, clickY);
-    const int wheel = input.ConsumeWheel();
+    const float wheel = input.ConsumeWheelF();
     int pressX = 0, pressY = 0;
     const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
     const bool down = input.IsLeftMouseDown();
@@ -667,7 +667,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
     const Net::LobbyState *lobby = net.Lobby();
     float clickX, clickY;
     bool clicked = input.WasLeftClickIssued(clickX, clickY);
-    const int wheel = input.ConsumeWheel();
+    const float wheel = input.ConsumeWheelF();
     int pressX = 0, pressY = 0;
     const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
     const bool down = input.IsLeftMouseDown();

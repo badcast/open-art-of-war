@@ -31,6 +31,7 @@ namespace col = ui::color;
 
 // Cameo drawing shared by the PC sidebar and the touch interface (HUDControllerRender.cpp)
 void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, std::string_view text, SDL_Color color);
+void DrawPowerTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, int powerCost, int iconSpriteId);
 void DrawCameo(
     Renderer &r,
     BitmapFontRenderer &font,

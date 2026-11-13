@@ -633,7 +633,7 @@ void GameplayController::Update(const FrameContext &context)
     // Wheel steps of this frame: over the map they zoom (below, only when no window covers the map); steps that
     // arrive while a window is open are dropped so nothing jumps when it closes
     const int mapWheel = input.ConsumeMapWheel();
-    const bool windowOpen = menu.IsAnyMenuOpen();
+    const bool windowOpen = menu.IsAnyMenuOpen() || hud.IsResearchWindowOpen();
     input.SetMenuOpen(windowOpen);
     if (windowOpen)
         input.ConsumeUiWheel();

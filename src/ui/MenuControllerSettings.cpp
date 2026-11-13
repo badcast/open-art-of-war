@@ -764,7 +764,7 @@ void MenuController::UpdateSettingsScreen(
             current[row].step(dir);
     };
     // An open list takes the mouse first: a pick sets the value, a click anywhere else only closes it
-    const int wheel = input.ConsumeWheel();
+    const float wheel = input.ConsumeWheelF();
     if (m_combo.open >= kComboSide)
         m_combo.open = -1; // one of the custom game dialog's
     if (m_combo.open >= 0)

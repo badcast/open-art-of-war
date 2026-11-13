@@ -467,7 +467,11 @@ void CharacterEditor::DrawEditor()
             desiredHullFacingDir = (dir % 8 + 8) % 8;
 
             const bool hasRotTurret = YamlBool(document["combat"], "has_rotating_turret", false);
-            if (!hasRotTurret || linkTurretToHull)
+            float tmpAx = 0.0f, tmpAy = 0.0f;
+            const bool hasSpriteTurret = !hasRotTurret && YamlString(document, "type") != "building" && textures
+                                         && textures->GetTurretAnchor(
+                                             YamlInt(document, "archetype_id", -1), desiredHullFacingDir, tmpAx, tmpAy);
+            if (!(hasRotTurret || hasSpriteTurret) || linkTurretToHull)
             {
                 desiredTurretFacingDir = desiredHullFacingDir;
                 targetWorldX = mWorldX;
@@ -486,13 +490,17 @@ void CharacterEditor::DrawEditor()
             targetCustomized = true;
 
             const bool hasRotTurret = YamlBool(document["combat"], "has_rotating_turret", false);
+            float tmpAx = 0.0f, tmpAy = 0.0f;
+            const bool hasSpriteTurret = !hasRotTurret && YamlString(document, "type") != "building" && textures
+                                         && textures->GetTurretAnchor(
+                                             YamlInt(document, "archetype_id", -1), desiredHullFacingDir, tmpAx, tmpAy);
             float tPivotX = hasRotTurret ? turretOffsetX : 0.0f;
             float tPivotY = hasRotTurret ? turretOffsetY : 0.0f;
             float dx = targetWorldX - tPivotX;
             float dy = targetWorldY - tPivotY;
             int dir = OpenArtOfWar::Utility::Dir8FromVector(dx, dy);
             desiredTurretFacingDir = (dir % 8 + 8) % 8;
-            if (!hasRotTurret)
+            if (!hasRotTurret && !hasSpriteTurret)
             {
                 desiredHullFacingDir = desiredTurretFacingDir;
             }

@@ -246,7 +246,7 @@ void MenuController::UpdateInfoScreen(InputManager &input, AppState &state)
     m_mouseY = input.GetMouseScreenY();
     float lx, ly;
     bool clicked = input.WasLeftClickIssued(lx, ly);
-    const int wheel = input.ConsumeWheel();
+    const float wheel = input.ConsumeWheelF();
     int px = 0, py = 0;
     const bool down = input.IsLeftMouseDown();
     const bool pressed = input.ConsumeLeftPress(px, py) && down;
@@ -272,7 +272,7 @@ void MenuController::UpdateInfoScreen(InputManager &input, AppState &state)
 
     const float maxScroll = std::max(0.0f, static_cast<float>(contentH - m_infoListRect.h));
     auto nudgeInfo = [&](float deltaPx) {
-        m_infoScroll.velocity = 0.0f;
+        m_infoScroll.StopGlide();
         m_infoScroll.target = std::clamp(m_infoScroll.target + deltaPx, 0.0f, maxScroll);
     };
     if (input.IsKeyJustPressed(SDL_SCANCODE_UP))
@@ -283,10 +283,15 @@ void MenuController::UpdateInfoScreen(InputManager &input, AppState &state)
         nudgeInfo(-static_cast<float>(kInfoLineH * 10));
     if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
         nudgeInfo(static_cast<float>(kInfoLineH * 10));
+    // Clicking inside a scrollable info viewport starts pointer drag-scrolling rather than dismissing the screen
+    if (clicked && maxScroll > 0.0f && m_infoListRect.Contains(static_cast<int>(lx), static_cast<int>(ly)))
+        clicked = false;
     if (clicked || input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || input.IsConfirmJustPressed())
     {
         state = AppState::MainMenu;
         m_infoScroll.Reset();
+        m_infoTotal = 0;
+        m_infoListRect = {};
     }
 }
 

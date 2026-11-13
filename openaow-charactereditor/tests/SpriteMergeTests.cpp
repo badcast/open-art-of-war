@@ -1,6 +1,8 @@
 // Merging sprite objects: names, the merged meta and the references in other files
 #include "SpriteMerge.hpp"
+#include "SpriteMetaEdit.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -316,6 +318,44 @@ buildings:
         CHECK(hit.relocated);
         CHECK(hit.rects[0][1] == 32 && hit.rects[0][2] == 40 && hit.rects[0][3] == 40);
         CHECK(hit.canvasH == 72);
+    }
+
+    // SpriteMetaEdit: turret pivot recentering & paired firing/rot layer sync
+    {
+        std::string meta =
+            "# keep comment\n"
+            "parts:\n"
+            "  c731:\n"
+            "  - {frame: s393, at: [55, 36]}\n"
+            "  c739:\n"
+            "  - {frame: s393, at: [55, 36]}\n"
+            "  - {frame: flash, at: [44, 34]}\n"
+            "  other:\n"
+            "  - {frame: s393, at: [10, 10]}\n"
+            "bodies:\n"
+            "  b16:\n"
+            "  - {part: c691, at: [-29, -20], flag: 1}\n"
+            "  - {anim: 'rot_a125[0]', at: [-50, -37], flag: 4}\n"
+            "  - {part: 'rot_c731[0]', at: [-50, -37]}\n"
+            "families:\n"
+            "  rot_c731: {parts: [c731]}\n";
+
+        // Shift c731 so local (61.5, 43) becomes [0, 0]; paired c739 shifts by (-61.5, -43), unrelated 'other' stays
+        CHECK(CharEditor::ShiftPartPivot(meta, "c731", 61.5f, 43.0f, true));
+        const auto c731 = CharEditor::ReadMetaItemLayers(meta, "parts", "c731");
+        const auto c739 = CharEditor::ReadMetaItemLayers(meta, "parts", "c739");
+        const auto other = CharEditor::ReadMetaItemLayers(meta, "parts", "other");
+        CHECK(c731.size() == 1 && std::abs(c731[0].x - (-6.5f)) < 0.01f && std::abs(c731[0].y - (-7.0f)) < 0.01f);
+        CHECK(c739.size() == 2 && std::abs(c739[0].x - (-6.5f)) < 0.01f && std::abs(c739[1].x - (-17.5f)) < 0.01f);
+        CHECK(other.size() == 1 && std::abs(other[0].x - 10.0f) < 0.01f);
+        CHECK(meta.find("# keep comment") != std::string::npos);
+
+        // Shifting rot_c731[0] on body b16 syncs sibling rot_a125[0]
+        CHECK(CharEditor::ShiftBodyLayer(meta, "b16", 2, 61.5f, 43.0f, true));
+        const auto b16 = CharEditor::ReadMetaItemLayers(meta, "bodies", "b16");
+        CHECK(b16.size() == 3 && std::abs(b16[1].x - 11.5f) < 0.01f && std::abs(b16[2].x - 11.5f) < 0.01f);
+        CHECK(std::abs(b16[2].y - 6.0f) < 0.01f);
+        CHECK(CharEditor::ReadMetaFamilyMembers(meta, "rot_c731", "parts").size() == 1);
     }
 
     if (fails)

@@ -2,7 +2,9 @@
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
 #include "graphics/Renderer.hpp"
+#include "graphics/ShaderEffects.hpp"
 #include "ui/TouchHUD.hpp"
+#include "ui/UiKit.hpp"
 #include "ui/UiLayout.hpp"
 #include "../src/ui/MenuControllerInternal.hpp"
 #include "../src/ui/TouchMenuGeometry.hpp"
@@ -438,6 +440,190 @@ int main()
                 tapItem(9, AppState::MainMenu, false);
             }
             uilayout::SetMenuProfile("pc");
+        }
+        // Kinetic smooth scrolling, flick inertia, 2D research physics, combo flicks, and About scroll-drag.
+        {
+            const ui::UiRect listRect {100, 100, 300, 300};
+            const ui::UiRect trackRect {394, 100, 6, 300};
+            const int contentH = 2000;
+
+            // 1) Smooth mouse wheel easing (including fractional trackpad deltas) without sub-ms snapping
+            ui::SmoothListScroll scroll;
+            bool clicked = false;
+            ui::UpdateSmoothList(scroll, listRect, trackRect, contentH, 60, 200, 200, false, false, 0, 0, 0.0f, clicked);
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 200, false, false, 0, 0, -0.5f, clicked);
+            Check(std::fabs(scroll.target - 30.0f) < 1e-4f, "fractional -0.5 wheel targets 30 px");
+            Check(scroll.offset < scroll.target, "wheel scroll must ease smoothly rather than snap to target");
+            for (int i = 0; i < 6; ++i)
+            {
+                SDL_Delay(16);
+                ui::UpdateSmoothList(
+                    scroll, listRect, trackRect, contentH, 60, 200, 200, false, false, 0, 0, 0.0f, clicked);
+            }
+            Check(scroll.offset > 15.0f && scroll.offset <= 30.5f, "wheel easing advances smoothly over frames");
+
+            // 2) Fast 1-motion-frame flick past 12 px slop: no slop snap, strong velocity, glides immediately on !down
+            scroll.Reset();
+            clicked = true;
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 320, true, true, 200, 320, 0.0f, clicked);
+            SDL_Delay(16);
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 260, true, false, 200, 320, 0.0f, clicked);
+            Check(
+                std::fabs(scroll.offset - 48.0f) < 1e-3f,
+                "crossing 12 px slop subtracts slop so drag starts smoothly without a jump (60 - 12 = 48 px)");
+            Check(scroll.velocity > 1500.0f, "single fast motion frame past slop establishes strong flick velocity");
+            Check(!clicked, "drag past slop cancels click");
+            SDL_Delay(16);
+            // Release frame with zero additional motion (same my = 260, down = false)
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 260, false, false, 200, 320, 0.0f, clicked);
+            const float afterRelease = scroll.offset;
+            Check(afterRelease > 55.0f && scroll.velocity > 1000.0f, "release frame preserves velocity and starts gliding");
+            for (int i = 0; i < 5; ++i)
+            {
+                SDL_Delay(16);
+                ui::UpdateSmoothList(
+                    scroll, listRect, trackRect, contentH, 60, 200, 260, false, false, 200, 320, 0.0f, clicked);
+            }
+            Check(scroll.offset > afterRelease + 40.0f, "kinetic glide carries list forward smoothly across frames");
+
+            // 3) Drag, pause/hold stationary, then release must damp velocity and not flick
+            scroll.Reset();
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 320, true, true, 200, 320, 0.0f, clicked);
+            SDL_Delay(16);
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 250, true, false, 200, 320, 0.0f, clicked);
+            for (int i = 0; i < 8; ++i)
+            {
+                SDL_Delay(16);
+                ui::UpdateSmoothList(
+                    scroll, listRect, trackRect, contentH, 60, 200, 250, true, false, 200, 320, 0.0f, clicked);
+            }
+            ui::UpdateSmoothList(
+                scroll, listRect, trackRect, contentH, 60, 200, 250, false, false, 200, 320, 0.0f, clicked);
+            Check(std::fabs(scroll.velocity) < 60.0f, "holding stationary before release bleeds flick velocity");
+
+            // 4) 2D kinetic scroll (used by ResearchWindow) glides along both axes without slop jump
+            ui::KineticScroll2D k2;
+            ui::StepKineticScroll2D(k2, listRect, 800.0f, 800.0f, 60.0f, 60.0f, 260, 260, true, true, 260, 260, 0, 0);
+            SDL_Delay(16);
+            ui::StepKineticScroll2D(
+                k2, listRect, 800.0f, 800.0f, 60.0f, 60.0f, 200, 200, true, false, 260, 260, 0, 0);
+            Check(k2.offsetX > 45.0f && k2.offsetX < 55.0f && k2.offsetY > 45.0f && k2.offsetY < 55.0f,
+                  "2D kinetic drag subtracts 12 px radial slop smoothly");
+            SDL_Delay(16);
+            ui::StepKineticScroll2D(
+                k2, listRect, 800.0f, 800.0f, 60.0f, 60.0f, 200, 200, false, false, 260, 260, 0, 0);
+            Check(k2.velX > 1000.0f && k2.velY > 1000.0f && k2.offsetX > 55.0f,
+                  "2D kinetic flick glides smoothly on release");
+
+            // 5) ComboState flick glide works without snapping or picking on release
+            ui::ComboState combo;
+            combo.open = 0;
+            const ui::UiRect field {100, 40, 200, 34};
+            int picked = -1;
+            ui::ComboUpdate(combo, field, 24, 720, 150, 150, false, 0.0f, picked, true, true, 150, 150);
+            SDL_Delay(16);
+            ui::ComboUpdate(combo, field, 24, 720, 150, 95, false, 0.0f, picked, true, false, 150, 150);
+            SDL_Delay(16);
+            const bool consumedRelease
+                = ui::ComboUpdate(combo, field, 24, 720, 150, 95, true, 0.0f, picked, false, false, 150, 150);
+            Check(consumedRelease && picked == -1 && combo.open == 0 && combo.velPx > 1000.0f,
+                  "combo drag flick glides smoothly and does not pick/close on release");
+
+            // 6) Clicking/dragging inside scrollable MenuAbout viewport keeps MenuAbout open and scrolls text
+            MenuController menu;
+            BitmapFontRenderer font(sdlRenderer);
+            Renderer aboutRenderer(sdlRenderer, nullptr);
+            AppState aboutState = AppState::MenuAbout;
+            menu.RenderMenuAbout(aboutRenderer, font, 1280, 720);
+            InputManager aboutInput;
+            Camera aboutCam(1280, 720);
+            aboutInput.SetMenuOpen(true);
+            SDL_Event aboutDown {};
+            aboutDown.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            aboutDown.button.button = SDL_BUTTON_LEFT;
+            aboutDown.button.x = 640.0f;
+            aboutDown.button.y = 320.0f;
+            aboutInput.ProcessEvent(aboutDown, aboutCam);
+            aboutInput.Update(0.016f, aboutCam);
+            menu.UpdateInfoScreen(aboutInput, aboutState);
+            Check(
+                aboutState == AppState::MenuAbout,
+                "pressing inside scrollable MenuAbout list must not immediately close About");
+            SDL_Delay(16);
+            SDL_Event aboutMove {};
+            aboutMove.type = SDL_EVENT_MOUSE_MOTION;
+            aboutMove.motion.x = 640.0f;
+            aboutMove.motion.y = 240.0f;
+            aboutInput.ProcessEvent(aboutMove, aboutCam);
+            aboutInput.Update(0.016f, aboutCam);
+            menu.UpdateInfoScreen(aboutInput, aboutState);
+            Check(aboutState == AppState::MenuAbout, "dragging inside MenuAbout keeps About open");
+            SDL_Event aboutUp {};
+            aboutUp.type = SDL_EVENT_MOUSE_BUTTON_UP;
+            aboutUp.button.button = SDL_BUTTON_LEFT;
+            aboutUp.button.x = 640.0f;
+            aboutUp.button.y = 240.0f;
+            aboutInput.ProcessEvent(aboutUp, aboutCam);
+            aboutInput.Update(0.016f, aboutCam);
+            menu.UpdateInfoScreen(aboutInput, aboutState);
+            Check(aboutState == AppState::MenuAbout, "releasing a drag inside MenuAbout keeps About open");
+            SDL_Event aboutEsc {};
+            aboutEsc.type = SDL_EVENT_KEY_DOWN;
+            aboutEsc.key.scancode = SDL_SCANCODE_ESCAPE;
+            aboutInput.ProcessEvent(aboutEsc, aboutCam);
+            menu.UpdateInfoScreen(aboutInput, aboutState);
+            Check(aboutState == AppState::MainMenu, "pressing Escape in MenuAbout returns to MainMenu");
+
+            // 7) ResearchWindow composite icon fitting scales proportionally and centers offset/non-64x64 sprites
+            {
+                const ui::UiRect frame62 {100, 200, 62, 62};
+                const ui::CompositeFit smallOff = ui::FitCompositeInRect(frame62, 4, 4.0f, 3.0f, 38.0f, 28.0f);
+                const float renderedW = 34.0f * smallOff.scale;
+                const float renderedH = 25.0f * smallOff.scale;
+                const float left = smallOff.x + 4.0f * smallOff.scale;
+                const float right = smallOff.x + 38.0f * smallOff.scale;
+                const float top = smallOff.y + 3.0f * smallOff.scale;
+                const float bottom = smallOff.y + 28.0f * smallOff.scale;
+                Check(
+                    std::fabs(renderedW - 54.0f) < 0.5f && renderedH <= 54.5f,
+                    "FitCompositeInRect scales proportionally to fill padded frame");
+                Check(
+                    std::fabs((left - frame62.x) - (frame62.Right() - right)) <= 1.5f
+                        && std::fabs((top - frame62.y) - (frame62.Bottom() - bottom)) <= 1.5f,
+                    "FitCompositeInRect centers offset sprites horizontally and vertically");
+
+                const ui::UiRect zoomedFrame {100, 200, 124, 124};
+                const ui::CompositeFit zoomed = ui::FitCompositeInRect(zoomedFrame, 8, 4.0f, 3.0f, 38.0f, 28.0f);
+                Check(
+                    zoomed.scale > smallOff.scale * 1.9f,
+                    "FitCompositeInRect scales up proportionally when icon frame grows");
+            }
+
+            // 8) TouchHUD button colors adapt to faction while keeping HUD icons white at opacity 200
+            {
+                const auto confIdle = TouchHUD::ResolveButtonColors(
+                    ui::ButtonStyle::Secondary, false, false, false, false, ArmyColor(1));
+                const auto resIdle = TouchHUD::ResolveButtonColors(
+                    ui::ButtonStyle::Secondary, false, false, false, false, ArmyColor(2));
+                Check(
+                    confIdle.fill.b > confIdle.fill.r + 40 && resIdle.fill.r > resIdle.fill.b + 40,
+                    "HUD button plates adapt vividly to Confederation blue vs Resistance red");
+                Check(
+                    confIdle.iconTint.r == 255 && confIdle.iconTint.g == 255 && confIdle.iconTint.b == 255
+                        && confIdle.iconAlpha == 200 && resIdle.iconTint.r == 255 && resIdle.iconAlpha == 200,
+                    "HUD button icons remain white with opacity 200");
+                const auto confActive = TouchHUD::ResolveButtonColors(
+                    ui::ButtonStyle::Secondary, true, false, false, false, ArmyColor(1));
+                Check(
+                    confActive.fill.a > confIdle.fill.a && confActive.iconAlpha == 200,
+                    "active HUD button highlights fill while keeping white icon at opacity 200");
+            }
         }
         SDL_DestroyRenderer(sdlRenderer);
     }

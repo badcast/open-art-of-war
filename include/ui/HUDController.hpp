@@ -394,16 +394,9 @@ protected:
     bool m_researchSearchFocus {false};
     int m_researchFilter {0}; // 0 all, 1 available, 2 researched, 3 locked, 4 in progress
     ui::ComboState m_researchCombo;
-    float m_researchScrollX {0.0f}, m_researchScrollY {0.0f};
+    ui::KineticScroll2D m_researchScroll;
     float m_researchScale {1.0f}; // size of the tree cards and icons (wheel, + / - / reset buttons)
     int m_researchScrollDrag {0}; // 1: the vertical scroll bar is held, 2: the horizontal one
-    // The tree follows the pointer (a finger, or the mouse held on it): a press on it starts a drag, past the tap slop
-    // it pans, and the speed it had at the release carries on and fades (the glide of a flick)
-    bool m_researchDrag {false};                  // the pointer went down on the tree and is still down
-    bool m_researchDragMoved {false};             // ... and travelled past the slop: a pan, not a tap
-    int m_researchDragX {0}, m_researchDragY {0}; // where the last step of the drag ended (the press until it moved)
-    float m_researchGlideX {0.0f}, m_researchGlideY {0.0f}; // scroll speed, px/s
-    std::uint32_t m_researchTickMs {0}; // the last time the window was updated (speed of the drag, the glide)
     std::uint32_t m_researchClickMs {0};
     int m_researchClickNode {-1};
     // Starts the technology (messages as the cameo click gave them); false when it was not started

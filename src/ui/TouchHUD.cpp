@@ -424,12 +424,14 @@ void TouchHUD::Press(
             m_placing = false;
             break;
         case Act::UnitsInfantry:
+            if (m_unitTab != TabInfantry)
+                m_cardScroll[1].Reset();
             m_unitTab = m_activeTab = TabInfantry;
-            m_cardScroll[1].Reset();
             break;
         case Act::UnitsVehicles:
+            if (m_unitTab != TabVehicles)
+                m_cardScroll[2].Reset();
             m_unitTab = m_activeTab = TabVehicles;
-            m_cardScroll[2].Reset();
             break;
         case Act::ScrollLeft:
         case Act::ScrollRight:
@@ -437,7 +439,7 @@ void TouchHUD::Press(
             const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
             const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
             const float maxStart = MaxCardScroll(layout, tab);
-            m_cardScroll[scrollSlot].velocity = 0.0f;
+            m_cardScroll[scrollSlot].StopGlide();
             m_cardScroll[scrollSlot].target = std::clamp(
                 m_cardScroll[scrollSlot].target + (act == Act::ScrollLeft ? -72.0f : 72.0f) * layout.u, 0.0f, maxStart);
             break;
@@ -706,6 +708,44 @@ int TouchHUD::IconSpriteForAction(Act act)
     return -1;
 }
 
+TouchHUD::ButtonColors TouchHUD::ResolveButtonColors(
+    ui::ButtonStyle style, bool active, bool hovered, bool disabled, bool armed, SDL_Color factionColor)
+{
+    const float luma = 0.299f * factionColor.r + 0.587f * factionColor.g + 0.114f * factionColor.b;
+    const SDL_Color rich = (luma > 165.0f) ? ui::Mix(factionColor, col::PanelSunken, 0.32f) : factionColor;
+    const ui::ButtonStyle effectiveStyle = active ? ui::ButtonStyle::Primary : style;
+
+    ButtonColors c;
+    c.activeBar = ui::WithAlpha(ui::Mix(factionColor, col::White, 0.65f), 245);
+    c.iconTint = col::White;
+    c.iconAlpha = disabled ? Uint8(115) : kHudIconAlpha;
+    c.text = disabled ? ui::WithAlpha(col::White, 130) : ui::WithAlpha(col::White, 240);
+
+    if (disabled)
+    {
+        c.fill = ui::WithAlpha(ui::Mix(rich, col::PanelSunken, 0.72f), 140);
+        c.border = ui::WithAlpha(ui::Mix(rich, col::Border, 0.50f), 140);
+    }
+    else if (effectiveStyle == ui::ButtonStyle::Danger)
+    {
+        c.fill = (armed || hovered) ? SDL_Color {186, 42, 34, 224} : SDL_Color {142, 34, 28, 200};
+        c.border = (armed || hovered) ? SDL_Color {255, 118, 106, 242} : SDL_Color {226, 86, 76, 215};
+    }
+    else if (effectiveStyle == ui::ButtonStyle::Primary)
+    {
+        c.fill = ui::WithAlpha(hovered ? ui::Mix(rich, col::White, 0.14f) : ui::Mix(rich, col::PanelSunken, 0.10f), 224);
+        c.border = ui::WithAlpha(ui::Mix(factionColor, col::White, hovered ? 0.72f : 0.50f), 245);
+    }
+    else
+    {
+        c.fill = ui::WithAlpha(
+            ui::Mix(rich, col::PanelSunken, hovered ? 0.24f : 0.42f), hovered ? Uint8(215) : Uint8(195));
+        c.border = ui::WithAlpha(
+            ui::Mix(factionColor, col::White, hovered ? 0.55f : 0.35f), hovered ? Uint8(240) : Uint8(215));
+    }
+    return c;
+}
+
 void TouchHUD::RenderGameHud(
     Renderer &renderer,
     BitmapFontRenderer &fontRenderer,
@@ -790,7 +830,7 @@ void TouchHUD::RenderGameHud(
             contentLeft,
             resourcesRect.CenterY(),
             ui::FONT_H2,
-            {242, 196, 86, 255},
+            col::White,
             true,
             Anchor::LEFT | Anchor::VCENTER);
         fontRenderer.DrawString(
@@ -798,7 +838,7 @@ void TouchHUD::RenderGameHud(
             contentLeft + dollarW + dollarGap,
             resourcesRect.CenterY(),
             amountFont,
-            {248, 244, 232, 255},
+            col::White,
             true,
             Anchor::LEFT | Anchor::VCENTER);
 
@@ -884,14 +924,21 @@ void TouchHUD::RenderGameHud(
                     fontRenderer,
                     cardRect,
                     "$" + std::to_string(blueprint.creditCost),
-                    economy.CanAfford(blueprint.creditCost) ? col::Accent : col::Danger);
+                    economy.CanAfford(blueprint.creditCost) ? col::White : col::Danger);
+                if (blueprint.powerCost != 0)
+                    DrawPowerTag(renderer, fontRenderer, cardRect, blueprint.powerCost, PowerIconSprite());
                 if (limit > 0)
+                {
+                    const int tagHeight = std::clamp(cardRect.h * 18 / 84, 15, 28);
                     fontRenderer.DrawString(
                         std::to_string(owned) + "/" + std::to_string(limit),
-                        cardRect.x + 6,
-                        cardRect.y + 5,
+                        cardRect.Right() - 6,
+                        cardRect.y + tagHeight + 5,
                         ui::FONT_SMALL_BOLD,
-                        owned >= limit ? col::Danger : col::TextMuted);
+                        owned >= limit ? col::Danger : col::TextMuted,
+                        true,
+                        Anchor::RIGHT | Anchor::TOP);
+                }
             }
             else
             {
@@ -915,7 +962,7 @@ void TouchHUD::RenderGameHud(
                     fontRenderer,
                     cardRect,
                     "$" + std::to_string(cost),
-                    economy.CanAfford(cost) ? col::Accent : col::Danger);
+                    economy.CanAfford(cost) ? col::White : col::Danger);
                 int queued = 0;
                 float progress = -1.0f;
                 for (int buildingId :
@@ -959,46 +1006,24 @@ void TouchHUD::RenderGameHud(
                 Anchor::HCENTER | Anchor::VCENTER);
     }
 
-    // Buttons
-    // Buttons: solid semi-transparent plates with centered opaque icons tinted in the local army's color
+    // Buttons: faction-adapted plates with crisp white icons at opacity 200 (building/unit cameos stay untouched above)
     for (const Button &button : layout.buttons)
     {
-        const ui::ButtonStyle style = button.active ? ui::ButtonStyle::Primary : button.style;
         const bool hovered = button.r.Contains(mouseX, mouseY);
         if (hovered && !button.disabled)
             SoundRequests::MarkHover();
 
-        SDL_Color fill {12, 16, 22, 155};
-        SDL_Color border {160, 172, 190, 145};
-        if (button.disabled)
-        {
-            fill = {10, 13, 18, 105};
-            border = {84, 92, 104, 115};
-        }
-        else if (style == ui::ButtonStyle::Danger)
-        {
-            const bool armed = (button.act == Act::Sell && m_destroyArmed > 0.0f);
-            fill = (armed || hovered) ? SDL_Color {104, 24, 24, 190} : SDL_Color {62, 16, 16, 165};
-            border = (armed || hovered) ? SDL_Color {245, 96, 84, 235} : SDL_Color {210, 72, 62, 200};
-        }
-        else if (style == ui::ButtonStyle::Primary)
-        {
-            fill = ui::WithAlpha(ui::Mix(armyColor, SDL_Color {12, 16, 22, 255}, hovered ? 0.62f : 0.72f), 190);
-            border = ui::WithAlpha(ui::Mix(armyColor, col::White, hovered ? 0.25f : 0.0f), 235);
-        }
-        else if (hovered)
-        {
-            fill = {24, 30, 40, 180};
-            border = ui::WithAlpha(armyColor, 210);
-        }
+        const bool armed = (button.act == Act::Sell && m_destroyArmed > 0.0f);
+        const ButtonColors colors
+            = ResolveButtonColors(button.style, button.active, hovered, button.disabled, armed, armyColor);
 
-        renderer.FillRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, fill);
-        renderer.DrawRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, border);
+        renderer.FillRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, colors.fill);
+        renderer.DrawRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, colors.border);
         if (!button.disabled && button.active && button.r.h > 4)
             renderer.FillRectScreen(
-                button.r.x + 1, button.r.Bottom() - 3, std::max(0, button.r.w - 2), 2, ui::WithAlpha(armyColor, 245));
+                button.r.x + 1, button.r.Bottom() - 3, std::max(0, button.r.w - 2), 2, colors.activeBar);
 
-        const Act iconAct = (button.act == Act::Sell && m_destroyArmed > 0.0f) ? Act::Confirm : button.act;
+        const Act iconAct = armed ? Act::Confirm : button.act;
         const int iconId = IconSpriteForAction(iconAct);
         if (iconId < 0)
         {
@@ -1012,14 +1037,12 @@ void TouchHUD::RenderGameHud(
                 button.r.CenterX(),
                 button.r.CenterY(),
                 ui::ButtonFontForScale(button.fontScale),
-                button.disabled ? col::TextMuted : ui::WithAlpha(armyColor, 255),
+                colors.text,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
             continue;
         }
 
-        SDL_Color iconTint = button.disabled ? ui::Mix(armyColor, SDL_Color {50, 54, 64, 255}, 0.58f) : armyColor;
-        iconTint.a = 255;
         const int iconSz = std::max(16, static_cast<int>(std::lround(std::min(button.r.w, button.r.h) * 0.60f)));
         renderer.DrawSpritePartScreen(
             iconId,
@@ -1033,8 +1056,8 @@ void TouchHUD::RenderGameHud(
             0.0f,
             SDL_FLIP_NONE,
             Faction::Resistance,
-            255,
-            iconTint);
+            colors.iconAlpha,
+            colors.iconTint);
     }
 
     // What is selected, over the orders (or above the open cards drawer so it never overlaps)

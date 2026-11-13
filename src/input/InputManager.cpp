@@ -371,8 +371,8 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
             else if (event.button.button == SDL_BUTTON_MIDDLE)
             {
                 m_middleMouseDown = true;
-                m_lastMouseX = static_cast<int>(event.button.x);
-                m_lastMouseY = static_cast<int>(event.button.y);
+                m_lastMouseX = event.button.x;
+                m_lastMouseY = event.button.y;
             }
             break;
         }
@@ -464,11 +464,11 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
         {
             if (m_middleMouseDown && !m_menuOpen)
             {
-                float dx = static_cast<float>(m_lastMouseX - static_cast<int>(event.motion.x));
-                float dy = static_cast<float>(m_lastMouseY - static_cast<int>(event.motion.y));
+                const float dx = m_lastMouseX - event.motion.x;
+                const float dy = m_lastMouseY - event.motion.y;
                 camera.Pan(dx, dy);
-                m_lastMouseX = static_cast<int>(event.motion.x);
-                m_lastMouseY = static_cast<int>(event.motion.y);
+                m_lastMouseX = event.motion.x;
+                m_lastMouseY = event.motion.y;
             }
             else if (
                 m_touchMode && m_touchMouseDrag.active && !m_menuOpen && IsDirectPointerMouseEvent(event.motion.which))
@@ -482,8 +482,10 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
         {
             // Only counted here: the game decides who gets the steps (a list, the sidebar, or the camera zoom when
             // the cursor is on the open map and no window is in the way - GameplayController)
-            const int step = (event.wheel.y > 0.0f) ? 1 : ((event.wheel.y < 0.0f) ? -1 : 0);
-            m_wheel += step;
+            const float stepX = event.wheel.x;
+            const float stepY = event.wheel.y;
+            m_wheelX += stepX;
+            m_wheel += stepY;
             bool overTouchPanel = false;
             if (m_touchMode)
             {
@@ -498,9 +500,9 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                 }
             }
             if (overTouchPanel || event.wheel.mouse_x >= static_cast<float>(camera.GetViewportWidth()))
-                m_uiWheel += step;
+                m_uiWheel += stepY;
             else
-                m_mapWheel += step;
+                m_mapWheel += stepY;
             break;
         }
     }

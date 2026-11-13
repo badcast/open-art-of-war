@@ -383,7 +383,7 @@ void Application::UpdateReplayInput(double frameTime)
             mx,
             my,
             clicked,
-            m_input->ConsumeWheel(),
+            m_input->ConsumeWheelF(),
             picked,
             down,
             pressed,

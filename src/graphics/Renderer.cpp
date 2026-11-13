@@ -289,6 +289,22 @@ bool CompositeBox(const TextureManager &tex, int compId, float ox, float oy, int
 }
 } // namespace
 
+bool Renderer::GetCompositeBounds(int compId, float &minX, float &minY, float &maxX, float &maxY) const
+{
+    minX = minY = maxX = maxY = 0.0f;
+    if (!m_texManager || compId < 0)
+        return false;
+    float box[4] {0, 0, 0, 0};
+    bool any = false;
+    if (!CompositeBox(*m_texManager, compId, 0.0f, 0.0f, 0, box, any))
+        return false;
+    minX = box[0];
+    minY = box[1];
+    maxX = box[2];
+    maxY = box[3];
+    return true;
+}
+
 void Renderer::CompositeCenterOffset(int compId, float &outDx, float &outDy)
 {
     outDx = outDy = 0.0f;

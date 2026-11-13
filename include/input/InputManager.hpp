@@ -187,21 +187,40 @@ public:
     // Mouse wheel steps anywhere in the window since the last call (positive = up), for menus and lists
     int ConsumeWheel()
     {
-        int v = m_wheel;
-        m_wheel = 0;
-        return v;
+        return TakeWholeWheelSteps(m_wheel);
     }
     int ConsumeUiWheel()
     {
-        int v = m_uiWheel;
-        m_uiWheel = 0;
-        return v;
+        return TakeWholeWheelSteps(m_uiWheel);
     }
     // Mouse wheel steps scrolled over the map viewport (left of the sidebar) since the last call: camera zoom
     int ConsumeMapWheel()
     {
-        int v = m_mapWheel;
-        m_mapWheel = 0;
+        return TakeWholeWheelSteps(m_mapWheel);
+    }
+    // Fractional wheel travel (for smooth list/trackpad scrolling without losing small deltas)
+    float ConsumeWheelF()
+    {
+        const float v = m_wheel;
+        m_wheel = 0.0f;
+        return v;
+    }
+    float ConsumeWheelXF()
+    {
+        const float v = m_wheelX;
+        m_wheelX = 0.0f;
+        return v;
+    }
+    float ConsumeUiWheelF()
+    {
+        const float v = m_uiWheel;
+        m_uiWheel = 0.0f;
+        return v;
+    }
+    float ConsumeMapWheelF()
+    {
+        const float v = m_mapWheel;
+        m_mapWheel = 0.0f;
         return v;
     }
 
@@ -295,12 +314,20 @@ private:
     int m_rightClickScreenY {0};
 
     bool m_middleMouseDown {false};
-    int m_lastMouseX {0};
-    int m_lastMouseY {0};
+    float m_lastMouseX {0.0f};
+    float m_lastMouseY {0.0f};
 
-    int m_uiWheel {0};
-    int m_mapWheel {0};
-    int m_wheel {0};
+    static int TakeWholeWheelSteps(float &accum)
+    {
+        const int whole = static_cast<int>(accum);
+        accum -= static_cast<float>(whole);
+        return whole;
+    }
+
+    float m_uiWheel {0.0f};
+    float m_mapWheel {0.0f};
+    float m_wheel {0.0f};
+    float m_wheelX {0.0f};
     std::string m_typed;
     int m_backspaces {0};
     int m_edgePanMargin {5};

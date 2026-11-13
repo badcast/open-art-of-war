@@ -122,6 +122,18 @@ void DrawTab(
     BitmapFontRenderer *font = nullptr,
     std::string_view label = {});
 
+// Screen origin and proportional scale placing a [minX..maxX, minY..maxY] composite dead center inside `box`.
+struct CompositeFit
+{
+    int x {0};
+    int y {0};
+    float scale {1.0f};
+};
+CompositeFit FitCompositeInRect(const UiRect &box, int pad, float minX, float minY, float maxX, float maxY);
+
+// Draws a composite proportionally scaled to fit inside `box` (with `pad` margin) and centered within it.
+void DrawCompositeFitted(Renderer &r, int compId, const UiRect &box, int pad, Faction faction = Faction::Resistance);
+
 // Full-screen dimmer + framed dialog with a title bar; returns the content area below the title
 UiRect DrawDialog(
     Renderer &r, BitmapFontRenderer &font, int windowW, int windowH, const UiRect &rect, std::string_view title);
@@ -178,6 +190,54 @@ float ScrollPosFromMouse(const UiRect &track, int mouse, float total, float visi
 // Scroll bars are thin: they are grabbed from a wider strip
 bool OnScrollTrack(const UiRect &track, int mx, int my);
 
+// Shared 1D/2D kinetic scroll solver (wheel easing, pointer drag past 12 px slop, and flick glide)
+struct KineticScroll2D
+{
+    float offsetX {0.0f}, offsetY {0.0f};
+    float targetX {0.0f}, targetY {0.0f};
+    float velX {0.0f}, velY {0.0f};
+    bool dragging {false};
+    bool dragMoved {false};
+    bool hasVelocity {false};
+    float dragStartX {0.0f}, dragStartY {0.0f};
+    float dragLastX {0.0f}, dragLastY {0.0f};
+    float dragIdleS {0.0f};
+    Uint64 lastTickNs {0};
+
+    void Reset()
+    {
+        offsetX = offsetY = targetX = targetY = velX = velY = 0.0f;
+        dragging = dragMoved = hasVelocity = false;
+        dragStartX = dragStartY = dragLastX = dragLastY = 0.0f;
+        dragIdleS = 0.0f;
+        lastTickNs = 0;
+    }
+    void StopGlide()
+    {
+        velX = velY = 0.0f;
+        hasVelocity = false;
+    }
+};
+
+void StepKineticScroll2D(
+    KineticScroll2D &scroll,
+    const UiRect &area,
+    float maxScrollX,
+    float maxScrollY,
+    float stepPxX,
+    float stepPxY,
+    int mx,
+    int my,
+    bool down,
+    bool pressed,
+    int pressX,
+    int pressY,
+    float wheelX,
+    float wheelY,
+    bool allowStart = true,
+    bool allowWheelOutside = false,
+    const UiRect *extraWheelRect = nullptr);
+
 // Smooth kinetic list scrolling: smooth mouse-wheel easing, pointer drag past 12 px slop, and flick glide
 struct SmoothListScroll
 {
@@ -186,16 +246,24 @@ struct SmoothListScroll
     float velocity {0.0f};
     bool dragging {false};
     bool dragMoved {false};
-    int dragStartY {0};
-    int dragLastY {0};
+    bool hasVelocity {false};
+    float dragStartY {0.0f};
+    float dragLastY {0.0f};
+    float dragIdleS {0.0f};
     bool barDrag {false};
-    Uint32 lastTickMs {0};
+    Uint64 lastTickNs {0};
 
     void Reset()
     {
         offset = target = velocity = 0.0f;
-        dragging = dragMoved = barDrag = false;
-        lastTickMs = 0;
+        dragging = dragMoved = hasVelocity = barDrag = false;
+        dragStartY = dragLastY = dragIdleS = 0.0f;
+        lastTickNs = 0;
+    }
+    void StopGlide()
+    {
+        velocity = 0.0f;
+        hasVelocity = false;
     }
     void EnsureVisible(int row, int stepH, int viewH, int totalRows);
     int FirstVisibleRow(int stepH) const
@@ -219,7 +287,7 @@ void UpdateSmoothList(
     bool pressed,
     int pressX,
     int pressY,
-    int wheel,
+    float wheel,
     bool &clicked,
     bool allowBarDrag = true);
 
@@ -257,9 +325,11 @@ struct ComboState
     float velPx {0.0f};
     bool dragging {false};
     bool dragMoved {false};
-    int dragStartY {0};
-    int dragLastY {0};
-    Uint32 lastTickMs {0};
+    bool hasVelocity {false};
+    float dragStartY {0.0f};
+    float dragLastY {0.0f};
+    float dragIdleS {0.0f};
+    Uint64 lastTickNs {0};
 };
 constexpr int kComboItemH = 34;
 constexpr int kComboMaxVisible = 9;
@@ -301,7 +371,7 @@ bool ComboUpdate(
     int mx,
     int my,
     bool clicked,
-    int wheel,
+    float wheel,
     int &picked,
     bool down = false,
     bool pressed = false,

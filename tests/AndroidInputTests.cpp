@@ -1,4 +1,5 @@
 #include "input/InputManager.hpp"
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -384,11 +385,72 @@ int main()
     mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 380.0f, 250.0f);
 
     input.SetTouchPan(false);
+    const float menuCamX = touchCam.GetX(), menuCamY = touchCam.GetY();
     input.SetMenuOpen(true);
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    mouseMoveEvt(200.0f, 150.0f);
+    Check(
+        input.IsLeftMouseDown() && touchCam.GetX() == menuCamX && touchCam.GetY() == menuCamY,
+        "menu drag in touch-ui must never lose drag state or pan the map behind the menu");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 200.0f, 150.0f);
     mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
     mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 300.0f, 250.0f);
     Check(input.WasLeftClickIssued(x, y), "menu open click in touch-ui must still dispatch");
     input.SetMenuOpen(false);
+
+    // 8b) Fractional trackpad / smooth mouse wheel accumulation & multi-step wheel preservation:
+    input.ConsumeWheelF();
+    input.ConsumeWheelXF();
+    input.ConsumeUiWheelF();
+    input.ConsumeMapWheelF();
+    SDL_Event fwheel {};
+    fwheel.type = SDL_EVENT_MOUSE_WHEEL;
+    fwheel.wheel.mouse_x = 400.0f;
+    fwheel.wheel.mouse_y = 400.0f;
+    for (int i = 0; i < 3; ++i)
+    {
+        fwheel.wheel.y = 0.25f;
+        fwheel.wheel.x = -0.25f;
+        input.ProcessEvent(fwheel, touchCam);
+    }
+    Check(input.ConsumeMapWheel() == 0, "fractional 0.75 wheel sum must not jump a full step early");
+    fwheel.wheel.y = 0.25f;
+    fwheel.wheel.x = 0.0f;
+    input.ProcessEvent(fwheel, touchCam);
+    Check(input.ConsumeMapWheel() == 1, "four 0.25 wheel events accumulate cleanly to one whole step");
+    Check(std::fabs(input.ConsumeWheelXF() + 0.75f) < 1e-4f, "horizontal wheel deltas preserve fractional precision");
+    fwheel.wheel.y = 0.35f;
+    input.ProcessEvent(fwheel, touchCam);
+    Check(std::fabs(input.ConsumeWheelF() - 1.35f) < 1e-4f, "ConsumeWheelF returns unquantized accumulated delta");
+    fwheel.wheel.y = 3.0f;
+    input.ProcessEvent(fwheel, touchCam);
+    Check(input.ConsumeWheel() == 3, "fast 3.0 wheel event is not clamped down to 1");
+
+    // Middle-mouse sub-pixel pan does not truncate motion deltas to int.
+    touchCam.SetPosition(500.0f, 500.0f);
+    SDL_Event midDown {};
+    midDown.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+    midDown.button.button = SDL_BUTTON_MIDDLE;
+    midDown.button.x = 300.0f;
+    midDown.button.y = 300.0f;
+    input.ProcessEvent(midDown, touchCam);
+    for (int i = 1; i <= 4; ++i)
+    {
+        SDL_Event midMove {};
+        midMove.type = SDL_EVENT_MOUSE_MOTION;
+        midMove.motion.x = 300.0f + 0.4f * static_cast<float>(i);
+        midMove.motion.y = 300.0f;
+        input.ProcessEvent(midMove, touchCam);
+    }
+    SDL_Event midUp {};
+    midUp.type = SDL_EVENT_MOUSE_BUTTON_UP;
+    midUp.button.button = SDL_BUTTON_MIDDLE;
+    midUp.button.x = 301.6f;
+    midUp.button.y = 300.0f;
+    input.ProcessEvent(midUp, touchCam);
+    Check(
+        std::fabs(touchCam.GetX() - (500.0f - 1.6f / touchCam.GetZoom())) < 0.05f,
+        "middle-mouse pan preserves sub-pixel precision");
 
     // 9) Render-scale coordinate conversion (ApplicationSettings OAOW_TOUCH): logical tap screen coordinates survive a
     // zoomed/panned Camera when menu is open.

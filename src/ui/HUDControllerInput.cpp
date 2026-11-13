@@ -409,7 +409,7 @@ bool HUDController::HandleHudClick(
     }
     if (maxScrollPx > 0.0f && l.scrollUp.Contains(mx, my))
     {
-        m_gridScroll[m_activeTab].velocity = 0.0f;
+        m_gridScroll[m_activeTab].StopGlide();
         m_gridScroll[m_activeTab].target = std::clamp(
             m_gridScroll[m_activeTab].target - static_cast<float>(SidebarLayout::kCellH + SidebarLayout::kGap),
             0.0f,
@@ -418,7 +418,7 @@ bool HUDController::HandleHudClick(
     }
     if (maxScrollPx > 0.0f && l.scrollDown.Contains(mx, my))
     {
-        m_gridScroll[m_activeTab].velocity = 0.0f;
+        m_gridScroll[m_activeTab].StopGlide();
         m_gridScroll[m_activeTab].target = std::clamp(
             m_gridScroll[m_activeTab].target + static_cast<float>(SidebarLayout::kCellH + SidebarLayout::kGap),
             0.0f,

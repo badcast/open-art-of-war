@@ -197,6 +197,8 @@ public:
         SDL_Color tint = {255, 255, 255, 255});
     void DrawCompositeScreen(
         int compId, int screenX, int screenY, float scale = 1.0f, Faction faction = Faction::Resistance, int depth = 0);
+    // Computes the bounding box of all sprites in a composite (false when empty/missing).
+    bool GetCompositeBounds(int compId, float &minX, float &minY, float &maxX, float &maxY) const;
 
     // Clipping
     void SetClipRect(const SDL_Rect &rect);

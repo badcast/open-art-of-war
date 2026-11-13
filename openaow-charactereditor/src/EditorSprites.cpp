@@ -4,6 +4,7 @@
 // from a PNG. Parts, animations and families are written in the meta by hand; the tab lists them.
 #include "CharacterEditor.hpp"
 #include "SpriteMerge.hpp"
+#include "SpriteMetaEdit.hpp"
 
 #include "game/Effects.hpp"
 #include "game/Projectiles.hpp"
@@ -2571,7 +2572,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
         }
     }
 
-    // --- Live Assembled Preview (how composites render at game offsets and drawn sizes) ---
+    // --- Live Assembled Preview & Turret Pivot Editor ---
     if (ImGui::CollapsingHeader(_("Assembled preview"), ImGuiTreeNodeFlags_DefaultOpen))
     {
         struct CachedMeta
@@ -2603,6 +2604,12 @@ void CharacterEditor::DrawSpritePropertiesBody()
             }
         }
         const YAML::Node &meta = cache.node;
+        auto ensureMetaDraft = [&]() -> std::string & {
+            if (spriteMetaBase.empty())
+                spriteMetaBase = ReadFile(mpath);
+            return spriteMetaBase;
+        };
+        const std::string &metaTextRef = spriteMetaBase.empty() ? ReadFile(mpath) : spriteMetaBase;
 
         static const char *const kSectionKeys[] = {"buildings", "bodies", "parts", "anims"};
         static const char *const kSectionLabels[] = {"Building", "Body", "Part", "Anim"};
@@ -2621,6 +2628,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 {
                     spritePreviewKind = k;
                     spritePreviewItem = 0;
+                    spritePreviewLayer = -1;
                     break;
                 }
         }
@@ -2643,6 +2651,9 @@ void CharacterEditor::DrawSpritePropertiesBody()
                     {
                         spritePreviewKind = k;
                         spritePreviewItem = 0;
+                        spritePreviewLayer = -1;
+                        if (k != 2 && spritePreviewTool == 1)
+                            spritePreviewTool = 0;
                     }
                 }
                 ImGui::EndCombo();
@@ -2653,14 +2664,119 @@ void CharacterEditor::DrawSpritePropertiesBody()
             {
                 for (int idx = 0; idx < static_cast<int>(curItems.size()); ++idx)
                     if (ImGui::Selectable(curItems[idx].c_str(), idx == spritePreviewItem))
+                    {
                         spritePreviewItem = idx;
+                        spritePreviewLayer = -1;
+                    }
                 ImGui::EndCombo();
             }
+            const std::string &itemName = curItems[spritePreviewItem];
+            const std::vector<MetaLayerRef> itemLayers
+                = ReadMetaItemLayers(metaTextRef, kSectionKeys[spritePreviewKind], itemName);
+            bool hasRotLayer = false;
+            for (const MetaLayerRef &l : itemLayers)
+                if (l.target.rfind("rot_", 0) == 0)
+                    hasRotLayer = true;
+            if (!itemLayers.empty()
+                && (spritePreviewLayer < 0 || spritePreviewLayer >= static_cast<int>(itemLayers.size())))
+            {
+                int pick = 0;
+                for (int i = 0; i < static_cast<int>(itemLayers.size()); ++i)
+                    if (itemLayers[i].target.rfind("rot_", 0) == 0 && itemLayers[i].kind == "part")
+                    {
+                        pick = i;
+                        break;
+                    }
+                spritePreviewLayer = pick;
+            }
+
             ImGui::Checkbox(_("Overlays (state>0 / flag>1)"), &spritePreviewShowOverlays);
             ImGui::SameLine();
             ImGui::Checkbox(_("Animate"), &spritePreviewAnimate);
+            if (hasRotLayer && (spritePreviewKind == 0 || spritePreviewKind == 1))
+            {
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderInt(
+                    _("##preview-tdir"),
+                    &spritePreviewTurretDir,
+                    -1,
+                    7,
+                    spritePreviewTurretDir < 0 ? _("Test Turret Dir: natural") : _("Test Turret Dir: %d/7"));
+                ImGui::SetItemTooltip(
+                    "%s", _("Rotate any rot_* turret layer independently (0..7) to check pivot stability on this hull."));
+            }
+            else
+            {
+                spritePreviewTurretDir = -1;
+            }
             ImGui::SetNextItemWidth(-1.0f);
             ImGui::SliderFloat(_("Zoom##preview"), &spritePreviewZoom, 0.25f, 4.0f, "%.2fx");
+
+            if (!itemLayers.empty())
+            {
+                if (spritePreviewKind == 2)
+                {
+                    ImGui::RadioButton(_("Move layer"), &spritePreviewTool, 0);
+                    ImGui::SameLine();
+                    ImGui::RadioButton(_("Pick Pivot [0,0]"), &spritePreviewTool, 1);
+                    ImGui::SetItemTooltip(
+                        "%s", _("Click the turret ring center on the preview to set it as [0, 0] pivot."));
+                    ImGui::SameLine();
+                    ImGui::Checkbox(_("Sync firing parts"), &spritePreviewSyncParts);
+                }
+                else if (spritePreviewKind == 1 && hasRotLayer)
+                {
+                    ImGui::Checkbox(_("Sync sibling rot_* (firing) layers"), &spritePreviewSyncRot);
+                }
+
+                const float listH = std::clamp(24.0f * static_cast<float>(itemLayers.size()) + 8.0f, 36.0f, 96.0f);
+                ImGui::BeginChild("##preview-layers", ImVec2(0.0f, listH), true);
+                for (int i = 0; i < static_cast<int>(itemLayers.size()); ++i)
+                {
+                    const MetaLayerRef &l = itemLayers[i];
+                    char buf[160];
+                    std::snprintf(
+                        buf,
+                        sizeof(buf),
+                        "#%d  %s: %s  at [%.2g, %.2g]##pl%d",
+                        i,
+                        l.kind.c_str(),
+                        l.target.c_str(),
+                        l.x,
+                        l.y,
+                        i);
+                    if (ImGui::Selectable(buf, i == spritePreviewLayer))
+                        spritePreviewLayer = i;
+                }
+                ImGui::EndChild();
+
+                if (spritePreviewLayer >= 0 && spritePreviewLayer < static_cast<int>(itemLayers.size()))
+                {
+                    const MetaLayerRef &curL = itemLayers[spritePreviewLayer];
+                    float xy[2] = {curL.x, curL.y};
+                    if (ImGui::DragFloat2(_("Layer at [X, Y]"), xy, 0.25f, -512.0f, 512.0f, "%.2f"))
+                    {
+                        std::string &draft = ensureMetaDraft();
+                        bool ok = false;
+                        if (spritePreviewKind == 1)
+                            ok = ShiftBodyLayer(
+                                draft,
+                                itemName,
+                                spritePreviewLayer,
+                                xy[0] - curL.x,
+                                xy[1] - curL.y,
+                                spritePreviewSyncRot);
+                        else
+                            ok = SetMetaLayerAt(
+                                draft, kSectionKeys[spritePreviewKind], itemName, spritePreviewLayer, xy[0], xy[1]);
+                        if (ok)
+                        {
+                            spriteDirty = true;
+                            cache.valid = false;
+                        }
+                    }
+                }
+            }
 
             struct PreviewPiece
             {
@@ -2669,6 +2785,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 int src[4] {0, 0, 1, 1};
                 float wx {0.0f}, wy {0.0f}, ww {1.0f}, wh {1.0f};
                 int layer {0};
+                int entryIdx {-1};
                 std::size_t order {0};
             };
             std::vector<PreviewPiece> pieces;
@@ -2691,6 +2808,10 @@ void CharacterEditor::DrawSpritePropertiesBody()
                     outIdx = std::atoi(s.c_str() + open + 1);
                     s = s.substr(0, open);
                 }
+                if (spritePreviewTurretDir >= 0 && outObj == spriteObject && s.rfind("rot_", 0) == 0)
+                {
+                    outIdx = spritePreviewTurretDir;
+                }
                 outName = s;
             };
             auto resolveFamily = [&](const std::string &name, const char *sec, int idx) -> std::string {
@@ -2704,8 +2825,8 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 return f[sec][idx].as<std::string>("");
             };
             const auto &tables = Sprites().Tables();
-            std::function<void(OpenArtOfWar::SpriteRef, float, float, int, int)> walkExternal;
-            walkExternal = [&](OpenArtOfWar::SpriteRef sr, float ox, float oy, int layer, int depth) {
+            std::function<void(OpenArtOfWar::SpriteRef, float, float, int, int, int)> walkExternal;
+            walkExternal = [&](OpenArtOfWar::SpriteRef sr, float ox, float oy, int layer, int depth, int rootIdx) {
                 if (!sr.Valid() || depth > 8)
                     return;
                 if (sr.kind == SpriteKind::Frame && sr.handle < static_cast<int>(tables.frames.size()))
@@ -2728,6 +2849,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
                         pp.ww = sf.width;
                         pp.wh = sf.height;
                         pp.layer = layer;
+                        pp.entryIdx = rootIdx;
                         pp.order = pieces.size();
                         pieces.push_back(pp);
                     }
@@ -2739,7 +2861,12 @@ void CharacterEditor::DrawSpritePropertiesBody()
                     {
                         const auto &cp = tables.compositeParts[i];
                         walkExternal(
-                            {static_cast<SpriteKind>(cp.isComp), cp.child}, ox + cp.ox, oy + cp.oy, layer, depth + 1);
+                            {static_cast<SpriteKind>(cp.isComp), cp.child},
+                            ox + cp.ox,
+                            oy + cp.oy,
+                            layer,
+                            depth + 1,
+                            rootIdx);
                     }
                 }
                 else if (sr.kind == SpriteKind::Anim && sr.handle < static_cast<int>(tables.animRanges.size()))
@@ -2757,7 +2884,8 @@ void CharacterEditor::DrawSpritePropertiesBody()
                                 ox + af.ox,
                                 oy + af.oy,
                                 layer,
-                                depth + 1);
+                                depth + 1,
+                                rootIdx);
                         }
                     }
                 }
@@ -2765,12 +2893,14 @@ void CharacterEditor::DrawSpritePropertiesBody()
 
             // Walks local composite lists recursively using live `spriteFrames` + `SpriteCanvasTexture()` and external
             // sprites via `Sprites()`.
-            std::function<void(const YAML::Node &, float, float, int, int)> walkSub;
-            walkSub = [&](const YAML::Node &list, float ox, float oy, int layer, int depth) {
+            std::function<void(const YAML::Node &, float, float, int, int, int)> walkSub;
+            walkSub = [&](const YAML::Node &list, float ox, float oy, int layer, int depth, int rootIdx) {
                 if (!list || !list.IsSequence() || depth > 8)
                     return;
-                for (const auto &e : list)
+                for (int li = 0; li < static_cast<int>(list.size()); ++li)
                 {
+                    const YAML::Node &e = list[li];
+                    const int assignedIdx = (rootIdx >= 0) ? rootIdx : li;
                     try
                     {
                         if (!e.IsMap())
@@ -2809,7 +2939,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
                         parseRef(raw, obj, name, idx);
                         if (obj != spriteObject)
                         {
-                            walkExternal(Sprites().Resolve(raw, want), ax, ay, eLayer, depth + 1);
+                            walkExternal(Sprites().Resolve(raw, want), ax, ay, eLayer, depth + 1, assignedIdx);
                             continue;
                         }
                         if (want == SpriteKind::Frame)
@@ -2836,6 +2966,7 @@ void CharacterEditor::DrawSpritePropertiesBody()
                                 pp.ww = fe->size[0];
                                 pp.wh = fe->size[1];
                                 pp.layer = eLayer;
+                                pp.entryIdx = assignedIdx;
                                 pp.order = pieces.size();
                                 pieces.push_back(pp);
                             }
@@ -2851,13 +2982,13 @@ void CharacterEditor::DrawSpritePropertiesBody()
                         }
                         if (want == SpriteKind::Part)
                         {
-                            walkSub(tgt, ax, ay, eLayer, depth + 1);
+                            walkSub(tgt, ax, ay, eLayer, depth + 1, assignedIdx);
                         }
                         else if (want == SpriteKind::Anim && tgt && tgt.IsSequence() && tgt.size() > 0)
                         {
                             YAML::Node single(YAML::NodeType::Sequence);
                             single.push_back(tgt[animTick % tgt.size()]);
-                            walkSub(single, ax, ay, eLayer, depth + 1);
+                            walkSub(single, ax, ay, eLayer, depth + 1, assignedIdx);
                         }
                     }
                     catch (const std::exception &)
@@ -2865,52 +2996,61 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 }
             };
 
-            const std::string &itemName = curItems[spritePreviewItem];
             const YAML::Node node = meta[kSectionKeys[spritePreviewKind]][itemName];
             if (spritePreviewKind == 0 && node && node.IsMap())
             {
                 if (const YAML::Node bparts = node["parts"]; bparts && bparts.IsSequence())
-                    for (const auto &e : bparts)
+                    for (int i = 0; i < static_cast<int>(bparts.size()); ++i)
                     {
+                        const YAML::Node &e = bparts[i];
                         if (!spritePreviewShowOverlays && e.IsMap() && e["state"] && e["state"].IsScalar()
                             && e["state"].as<int>(0) > 0)
                             continue;
                         YAML::Node one(YAML::NodeType::Sequence);
                         one.push_back(e);
-                        walkSub(one, 0.0f, 0.0f, 0, 0);
+                        walkSub(one, 0.0f, 0.0f, 0, 0, i);
                     }
             }
             else if (spritePreviewKind == 1 && node && node.IsSequence())
             {
-                for (const auto &e : node)
+                for (int i = 0; i < static_cast<int>(node.size()); ++i)
                 {
+                    const YAML::Node &e = node[i];
                     if (!spritePreviewShowOverlays && e.IsMap() && e["flag"] && e["flag"].IsScalar()
                         && e["flag"].as<int>(0) > 1)
                         continue;
                     YAML::Node one(YAML::NodeType::Sequence);
                     one.push_back(e);
-                    walkSub(one, 0.0f, 0.0f, 0, 0);
+                    walkSub(one, 0.0f, 0.0f, 0, 0, i);
                 }
             }
             else if (spritePreviewKind == 2 && node && node.IsSequence())
             {
-                walkSub(node, 0.0f, 0.0f, 0, 0);
+                walkSub(node, 0.0f, 0.0f, 0, 0, -1);
             }
             else if (spritePreviewKind == 3 && node && node.IsSequence() && node.size() > 0)
             {
                 YAML::Node single(YAML::NodeType::Sequence);
                 single.push_back(node[animTick % node.size()]);
-                walkSub(single, 0.0f, 0.0f, 0, 0);
+                walkSub(single, 0.0f, 0.0f, 0, 0, -1);
             }
 
             std::stable_sort(pieces.begin(), pieces.end(), [](const PreviewPiece &a, const PreviewPiece &b) {
                 return a.layer != b.layer ? (a.layer < b.layer) : (a.order < b.order);
             });
 
+            if (spritePreviewLayer >= static_cast<int>(itemLayers.size()))
+                spritePreviewLayer = itemLayers.empty() ? -1 : 0;
+
             const float boxW = std::max(120.0f, ImGui::GetContentRegionAvail().x);
             const float boxH = 220.0f;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            ImGui::InvisibleButton("##assembled-preview-canvas", ImVec2(boxW, boxH));
+            ImGui::InvisibleButton(
+                "##assembled-preview-canvas",
+                ImVec2(boxW, boxH),
+                ImGuiButtonFlags_MouseButtonLeft);
+            const bool canvasHovered = ImGui::IsItemHovered();
+            const bool canvasActive = ImGui::IsItemActive();
             ImDrawList *dl = ImGui::GetWindowDrawList();
             const ImVec2 p1(p0.x + boxW, p0.y + boxH);
             dl->AddRectFilled(p0, p1, IM_COL32(28, 30, 34, 255));
@@ -2923,9 +3063,12 @@ void CharacterEditor::DrawSpritePropertiesBody()
                             ImVec2(p0.x + (cx + 1) * 16, p0.y + (cy + 1) * 16),
                             IM_COL32(36, 39, 44, 255));
 
+            float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
+            float fit = spritePreviewZoom;
+            float cx = p0.x + boxW * 0.5f;
+            float cy = p0.y + boxH * 0.5f;
             if (!pieces.empty())
             {
-                float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
                 bool first = true;
                 for (const PreviewPiece &pp : pieces)
                 {
@@ -2947,9 +3090,9 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 }
                 const float spanW = std::max(1.0f, maxX - minX);
                 const float spanH = std::max(1.0f, maxY - minY);
-                const float fit = std::min((boxW - 20.0f) / spanW, (boxH - 20.0f) / spanH) * spritePreviewZoom;
-                const float cx = p0.x + boxW * 0.5f - (minX + spanW * 0.5f) * fit;
-                const float cy = p0.y + boxH * 0.5f - (minY + spanH * 0.5f) * fit;
+                fit = std::min((boxW - 20.0f) / spanW, (boxH - 20.0f) / spanH) * spritePreviewZoom;
+                cx = p0.x + boxW * 0.5f - (minX + spanW * 0.5f) * fit;
+                cy = p0.y + boxH * 0.5f - (minY + spanH * 0.5f) * fit;
 
                 for (const PreviewPiece &pp : pieces)
                 {
@@ -2962,14 +3105,101 @@ void CharacterEditor::DrawSpritePropertiesBody()
                         static_cast<float>(pp.src[0] + pp.src[2]) / pp.imgW,
                         static_cast<float>(pp.src[1] + pp.src[3]) / pp.imgH);
                     dl->AddImage(reinterpret_cast<ImTextureID>(pp.tex), a, b, uv0, uv1);
+                    if (spritePreviewLayer >= 0 && pp.entryIdx == spritePreviewLayer)
+                        dl->AddRect(a, b, IM_COL32(255, 200, 70, 200), 0.0f, 0, 1.5f);
                 }
-                // Subtle origin [0, 0] crosshair
-                dl->AddLine(ImVec2(cx - 6.0f, cy), ImVec2(cx + 6.0f, cy), IM_COL32(255, 220, 80, 140));
-                dl->AddLine(ImVec2(cx, cy - 6.0f), ImVec2(cx, cy + 6.0f), IM_COL32(255, 220, 80, 140));
+            }
+            // Pivot [0, 0] crosshair (bright cyan when Part pivot mode is active)
+            const ImU32 pivotCol
+                = (spritePreviewKind == 2 && spritePreviewTool == 1) ? IM_COL32(80, 235, 255, 255) : IM_COL32(255, 220, 80, 180);
+            dl->AddCircle(ImVec2(cx, cy), 5.0f, pivotCol, 16, 1.5f);
+            dl->AddLine(ImVec2(cx - 8.0f, cy), ImVec2(cx + 8.0f, cy), pivotCol, 1.5f);
+            dl->AddLine(ImVec2(cx, cy - 8.0f), ImVec2(cx, cy + 8.0f), pivotCol, 1.5f);
+            // Selected layer anchor crosshair (shows the deck pivot point of a Body's rot_* layer)
+            if (spritePreviewLayer >= 0 && spritePreviewLayer < static_cast<int>(itemLayers.size()))
+            {
+                const MetaLayerRef &selL = itemLayers[spritePreviewLayer];
+                const ImVec2 lx(cx + selL.x * fit, cy + selL.y * fit);
+                dl->AddCircle(lx, 4.0f, IM_COL32(80, 235, 255, 240), 14, 1.5f);
+                dl->AddLine(ImVec2(lx.x - 6.0f, lx.y), ImVec2(lx.x + 6.0f, lx.y), IM_COL32(80, 235, 255, 240), 1.5f);
+                dl->AddLine(ImVec2(lx.x, lx.y - 6.0f), ImVec2(lx.x, lx.y + 6.0f), IM_COL32(80, 235, 255, 240), 1.5f);
+            }
+            // Mouse interaction: drag selected layer OR click to set Part pivot [0, 0]
+            if (canvasHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && fit > 1e-4f)
+            {
+                const ImVec2 mp = ImGui::GetMousePos();
+                const float wx = (mp.x - cx) / fit;
+                const float wy = (mp.y - cy) / fit;
+                if (spritePreviewKind == 2 && spritePreviewTool == 1)
+                {
+                    std::string &draft = ensureMetaDraft();
+                    if (ShiftPartPivot(draft, itemName, wx, wy, spritePreviewSyncParts))
+                    {
+                        spriteDirty = true;
+                        cache.valid = false;
+                    }
+                }
+                else if (spritePreviewLayer >= 0 && spritePreviewLayer < static_cast<int>(itemLayers.size()))
+                {
+                    spritePreviewDragAnchor[0] = itemLayers[spritePreviewLayer].x;
+                    spritePreviewDragAnchor[1] = itemLayers[spritePreviewLayer].y;
+                    spritePreviewDragging = true;
+                }
+            }
+            if (spritePreviewDragging)
+            {
+                if (canvasActive && ImGui::IsMouseDown(ImGuiMouseButton_Left) && fit > 1e-4f
+                    && spritePreviewLayer >= 0 && spritePreviewLayer < static_cast<int>(itemLayers.size()))
+                {
+                    const ImVec2 d = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left, 0.0f);
+                    const float nx = spritePreviewDragAnchor[0] + d.x / fit;
+                    const float ny = spritePreviewDragAnchor[1] + d.y / fit;
+                    const MetaLayerRef &curL = itemLayers[spritePreviewLayer];
+                    const float stepX = nx - curL.x;
+                    const float stepY = ny - curL.y;
+                    if (std::fabs(stepX) > 1e-3f || std::fabs(stepY) > 1e-3f)
+                    {
+                        std::string &draft = ensureMetaDraft();
+                        bool ok = false;
+                        if (spritePreviewKind == 1)
+                            ok = ShiftBodyLayer(draft, itemName, spritePreviewLayer, stepX, stepY, spritePreviewSyncRot);
+                        else
+                            ok = SetMetaLayerAt(draft, kSectionKeys[spritePreviewKind], itemName, spritePreviewLayer, nx, ny);
+                        if (ok)
+                        {
+                            spriteDirty = true;
+                            cache.valid = false;
+                        }
+                    }
+                }
+                else
+                {
+                    spritePreviewDragging = false;
+                }
             }
             dl->PopClipRect();
             dl->AddRect(p0, p1, IM_COL32(90, 96, 110, 200));
             ImGui::TextDisabled(_("%zu piece(s) rendered"), pieces.size());
+
+            if (spritePreviewKind == 2 && !pieces.empty())
+            {
+                const float bw = maxX - minX, bh = maxY - minY;
+                auto applyPartPivot = [&](float px, float py) {
+                    std::string &draft = ensureMetaDraft();
+                    if (ShiftPartPivot(draft, itemName, px, py, spritePreviewSyncParts))
+                    {
+                        spriteDirty = true;
+                        cache.valid = false;
+                    }
+                };
+                if (ImGui::Button(_("Center Pivot")))
+                    applyPartPivot(minX + bw * 0.5f, minY + bh * 0.5f);
+                ImGui::SameLine();
+                if (ImGui::Button(_("Turret Base (75% Y)")))
+                    applyPartPivot(minX + bw * 0.5f, minY + bh * 0.75f);
+                ImGui::SetItemTooltip(
+                    "%s", _("Places [0, 0] at the lower-center turret pedestal ring (50% X, 75% Y)."));
+            }
         }
     }
 

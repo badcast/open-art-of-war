@@ -144,7 +144,7 @@ ReplayMenu::Result ReplayMenu::Update(InputManager &input, int windowW, int wind
     m_mouseY = input.GetMouseScreenY();
     float lx, ly;
     bool clicked = input.WasLeftClickIssued(lx, ly);
-    const int wheel = input.ConsumeWheel();
+    const float wheel = input.ConsumeWheelF();
     int pressX = 0, pressY = 0;
     const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
     const bool down = input.IsLeftMouseDown();

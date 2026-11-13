@@ -44,9 +44,6 @@ constexpr int kPadX0 = 14;
 constexpr int kPadY0 = 12;
 constexpr int kDetailsW0 = 290;
 constexpr float kScaleMin = 0.75f, kScaleMax = 4.0f, kScaleStep = 0.125f;
-// The glide of a flick on the tree after the finger lifts: px/s limit, the speed below which it stops, how fast it
-// slows
-constexpr float kGlideMax = 6000.0f, kGlideStop = 30.0f, kGlideFriction = 3.5f;
 int sz(int v, float scale)
 {
     return static_cast<int>(std::lround(v * scale));
@@ -313,9 +310,9 @@ UiRect nodeRect(const TreeLayout &tree, const TreeMetrics &m, int i, const UiRec
     const int div = std::clamp(tree.division[i], 0, 2);
     const int indent = std::min(tree.depth[i], 3) * m.indentX;
     return {
-        view.x + m.originX + m.colX[div] + indent - static_cast<int>(scrollX),
+        view.x + m.originX + m.colX[div] + indent - static_cast<int>(std::lround(scrollX)),
         view.y + m.padY + m.headerH + m.headerGapY + static_cast<int>(tree.row[i] * (m.nodeH + m.gapY))
-            - static_cast<int>(scrollY),
+            - static_cast<int>(std::lround(scrollY)),
         m.nodeW,
         m.nodeH};
 }
@@ -425,9 +422,10 @@ void HUDController::OpenResearchWindow()
     m_researchOpen = true;
     m_researchSearchFocus = false;
     m_researchCombo.open = -1;
-    m_researchDrag = m_researchDragMoved = false;
-    m_researchGlideX = m_researchGlideY = 0.0f;
-    m_researchTickMs = SDL_GetTicks();
+    m_researchScroll.dragging = m_researchScroll.dragMoved = false;
+    m_researchScroll.StopGlide();
+    m_researchScroll.lastTickNs = SDL_GetTicksNS();
+    m_researchScrollDrag = 0;
     m_researchClickNode = -1;
     m_buildMode = false;
     m_attackMoveMode = false;
@@ -439,8 +437,9 @@ void HUDController::CloseResearchWindow()
     m_researchOpen = false;
     m_researchSearchFocus = false;
     m_researchCombo.open = -1;
-    m_researchDrag = m_researchDragMoved = false;
-    m_researchGlideX = m_researchGlideY = 0.0f;
+    m_researchScroll.dragging = m_researchScroll.dragMoved = false;
+    m_researchScroll.StopGlide();
+    m_researchScrollDrag = 0;
 }
 
 ResearchProgress HUDController::ResearchShown() const
@@ -527,8 +526,9 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         m_researchSel = tree.first;
 
     // The window covers the map as well: every wheel step and left press belongs to it cleanly once per frame
-    const int wheel = input.ConsumeWheel();
-    input.ConsumeUiWheel();
+    const float wheel = input.ConsumeWheelF();
+    const float wheelX = input.ConsumeWheelXF();
+    input.ConsumeUiWheelF();
     const bool down = input.IsLeftMouseDown();
     int pressX = 0, pressY = 0;
     const bool pressed = input.ConsumeLeftPress(pressX, pressY) && down;
@@ -593,109 +593,92 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         const float before = m_researchScale;
         m_researchScale = std::clamp(std::round(nextScale / kScaleStep) * kScaleStep, kScaleMin, kScaleMax);
         const float k = m_researchScale / before;
-        m_researchScrollX *= k;
-        m_researchScrollY *= k;
+        m_researchScroll.offsetX *= k;
+        m_researchScroll.offsetY *= k;
+        m_researchScroll.targetX *= k;
+        m_researchScroll.targetY *= k;
+        m_researchScroll.StopGlide();
         metrics = measureTree(tree, l, m_researchScale * l.u);
         treeW = metrics.contentW;
         treeH = metrics.contentH;
         maxX = std::max(0.0f, treeW - l.tree.w);
         maxY = std::max(0.0f, treeH - l.tree.h);
     };
-    if (wheel != 0 && l.tree.Contains(mx, my))
-    {
-        const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
-        const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
-        if (ctrl)
-            applyZoom(m_researchScale + wheel * kScaleStep);
-        else if (shift || (maxY <= 0.0f && maxX > 0.0f))
-            m_researchScrollX -= wheel * 60.0f;
-        else
-            m_researchScrollY -= wheel * 60.0f;
-    }
 
     const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
     const UiRect zoomReset = zoomResetRect(l);
     const bool onZoomWidget = l.zoomIn.Contains(pressX, pressY) || l.zoomOut.Contains(pressX, pressY)
                               || (zoomReset.w > 0 && zoomReset.Contains(pressX, pressY));
-    const std::uint32_t nowMs = SDL_GetTicks();
-    const float dtS = std::clamp(static_cast<float>(nowMs - m_researchTickMs) * 0.001f, 0.0f, 0.1f);
-    m_researchTickMs = nowMs;
     if (pressed)
     {
-        m_researchGlideX = m_researchGlideY = 0.0f;
-        m_researchDragMoved = false;
         if (!l.touch && maxY > 0.0f && ui::OnScrollTrack(vTrack, pressX, pressY))
             m_researchScrollDrag = 1;
         else if (!l.touch && maxX > 0.0f && ui::OnScrollTrack(hTrack, pressX, pressY))
             m_researchScrollDrag = 2;
-        m_researchDrag = m_researchScrollDrag == 0 && !onZoomWidget && l.tree.Contains(pressX, pressY);
-        m_researchDragX = pressX;
-        m_researchDragY = pressY;
-    }
-    const bool wasDragging = m_researchDrag;
-    if (m_researchDrag)
-    {
-        constexpr float kSlop = 12.0f;
-        bool justMoved = false;
-        if (!m_researchDragMoved
-            && std::hypot(static_cast<float>(mx - m_researchDragX), static_cast<float>(my - m_researchDragY)) > kSlop)
+        if (m_researchScrollDrag != 0)
         {
-            m_researchDragMoved = true;
-            justMoved = true;
-        }
-        if (m_researchDragMoved)
-        {
-            const float dx = static_cast<float>(mx - m_researchDragX), dy = static_cast<float>(my - m_researchDragY);
-            m_researchScrollX -= dx;
-            m_researchScrollY -= dy;
-            m_researchDragX = mx;
-            m_researchDragY = my;
-            if (dtS > 0.0f && !justMoved)
-            {
-                const float k = std::min(1.0f, dtS / 0.08f);
-                m_researchGlideX += (std::clamp(-dx / dtS, -kGlideMax, kGlideMax) - m_researchGlideX) * k;
-                m_researchGlideY += (std::clamp(-dy / dtS, -kGlideMax, kGlideMax) - m_researchGlideY) * k;
-            }
-        }
-        if (!down)
-            m_researchDrag = false;
-    }
-    else if (m_researchGlideX != 0.0f || m_researchGlideY != 0.0f)
-    {
-        if (std::hypot(m_researchGlideX, m_researchGlideY) < kGlideStop)
-        {
-            m_researchGlideX = m_researchGlideY = 0.0f;
-        }
-        else
-        {
-            m_researchScrollX += m_researchGlideX * dtS;
-            m_researchScrollY += m_researchGlideY * dtS;
-            const float keep = std::exp(-dtS * kGlideFriction);
-            m_researchGlideX *= keep;
-            m_researchGlideY *= keep;
+            m_researchScroll.StopGlide();
+            m_researchScroll.dragging = false;
+            m_researchScroll.dragMoved = false;
         }
     }
-
     const bool scrollDragFrame = m_researchScrollDrag != 0;
-    if (m_researchScrollDrag == 1)
-        m_researchScrollY = ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h));
-    else if (m_researchScrollDrag == 2)
-        m_researchScrollX = ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w));
-    if (!down)
-        m_researchScrollDrag = 0;
-
-    const float scrollX = std::clamp(m_researchScrollX, 0.0f, maxX),
-                scrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
-    if (scrollX != m_researchScrollX)
-        m_researchGlideX = 0.0f;
-    if (scrollY != m_researchScrollY)
-        m_researchGlideY = 0.0f;
-    m_researchScrollX = scrollX;
-    m_researchScrollY = scrollY;
     if (scrollDragFrame)
+    {
+        if (m_researchScrollDrag == 1)
+        {
+            m_researchScroll.offsetY = m_researchScroll.targetY
+                = std::clamp(ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h)), 0.0f, maxY);
+        }
+        else if (m_researchScrollDrag == 2)
+        {
+            m_researchScroll.offsetX = m_researchScroll.targetX
+                = std::clamp(ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w)), 0.0f, maxX);
+        }
+        m_researchScroll.lastTickNs = SDL_GetTicksNS();
+        if (!down)
+            m_researchScrollDrag = 0;
         return true;
-    if (wasDragging && !m_researchDrag && m_researchDragMoved)
+    }
+
+    const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
+    const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
+    float scrollWheelX = wheelX;
+    float scrollWheelY = wheel;
+    if (ctrl && l.tree.Contains(mx, my))
+    {
+        if (wheel != 0.0f)
+            applyZoom(m_researchScale + wheel * kScaleStep);
+        scrollWheelX = 0.0f;
+        scrollWheelY = 0.0f;
+    }
+    else if (shift || (maxY <= 0.0f && maxX > 0.0f))
+    {
+        scrollWheelX += wheel;
+        scrollWheelY = 0.0f;
+    }
+
+    const bool wasDragging = m_researchScroll.dragging;
+    ui::StepKineticScroll2D(
+        m_researchScroll,
+        l.tree,
+        maxX,
+        maxY,
+        60.0f,
+        60.0f,
+        mx,
+        my,
+        down,
+        pressed,
+        pressX,
+        pressY,
+        scrollWheelX,
+        scrollWheelY,
+        !onZoomWidget);
+    if (m_researchScroll.dragMoved)
         leftClicked = false;
+    if (wasDragging && !m_researchScroll.dragging && m_researchScroll.dragMoved)
+        m_researchScroll.dragMoved = false;
 
     if (leftClicked)
     {
@@ -717,16 +700,16 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         if (l.zoomIn.Contains(mx, my) || l.zoomOut.Contains(mx, my))
         {
             applyZoom(m_researchScale + (l.zoomIn.Contains(mx, my) ? kScaleStep : -kScaleStep));
-            m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
-            m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
+            m_researchScroll.offsetX = m_researchScroll.targetX = std::clamp(m_researchScroll.offsetX, 0.0f, maxX);
+            m_researchScroll.offsetY = m_researchScroll.targetY = std::clamp(m_researchScroll.offsetY, 0.0f, maxY);
             SoundRequests::Play("ui_click");
             return true;
         }
         if (zoomReset.w > 0 && zoomReset.Contains(mx, my))
         {
             applyZoom(1.0f);
-            m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
-            m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
+            m_researchScroll.offsetX = m_researchScroll.targetX = std::clamp(m_researchScroll.offsetX, 0.0f, maxX);
+            m_researchScroll.offsetY = m_researchScroll.targetY = std::clamp(m_researchScroll.offsetY, 0.0f, maxY);
             SoundRequests::Play("ui_click");
             return true;
         }
@@ -748,9 +731,11 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             {
                 m_researchSel = need;
                 const UiRect n0 = nodeRect(tree, metrics, need, l.tree, 0.0f, 0.0f);
-                m_researchScrollX = std::clamp(static_cast<float>(n0.CenterX() - l.tree.CenterX()), 0.0f, maxX);
-                m_researchScrollY = std::clamp(static_cast<float>(n0.CenterY() - l.tree.CenterY()), 0.0f, maxY);
-                m_researchGlideX = m_researchGlideY = 0.0f;
+                m_researchScroll.offsetX = m_researchScroll.targetX
+                    = std::clamp(static_cast<float>(n0.CenterX() - l.tree.CenterX()), 0.0f, maxX);
+                m_researchScroll.offsetY = m_researchScroll.targetY
+                    = std::clamp(static_cast<float>(n0.CenterY() - l.tree.CenterY()), 0.0f, maxY);
+                m_researchScroll.StopGlide();
                 m_researchClickNode = -1;
                 SoundRequests::Play("ui_click");
                 return true;
@@ -762,7 +747,7 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             {
                 if (!tree.shown[i])
                     continue;
-                const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
+                const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScroll.offsetX, m_researchScroll.offsetY);
                 if (!n.Contains(mx, my))
                     continue;
                 const std::uint32_t now = SDL_GetTicks();
@@ -1101,7 +1086,11 @@ void HUDController::RenderResearchWindow(
         renderer.SetClipRect(innerTree);
 
     drawBlueprintBackdrop(
-        renderer, {innerTree.x, innerTree.y, innerTree.w, innerTree.h}, m_researchScrollX, m_researchScrollY, sc);
+        renderer,
+        {innerTree.x, innerTree.y, innerTree.w, innerTree.h},
+        m_researchScroll.offsetX,
+        m_researchScroll.offsetY,
+        sc);
 
     // Division headers & completion progress
     int colDone[3] {0, 0, 0};
@@ -1110,13 +1099,15 @@ void HUDController::RenderResearchWindow(
         if (tree.shown[i] && IsResearched(Players::Local(), i))
             colDone[std::clamp(tree.division[i], 0, 2)] += 1;
     }
+    const int scrollOffX = static_cast<int>(std::lround(m_researchScroll.offsetX));
+    const int scrollOffY = static_cast<int>(std::lround(m_researchScroll.offsetY));
     for (int c = 0; c < 3; ++c)
     {
         if (!metrics.colShown[c])
             continue;
         const UiRect hdr {
-            l.tree.x + metrics.originX + metrics.colX[c] - static_cast<int>(m_researchScrollX),
-            l.tree.y + metrics.padY - static_cast<int>(m_researchScrollY),
+            l.tree.x + metrics.originX + metrics.colX[c] - scrollOffX,
+            l.tree.y + metrics.padY - scrollOffY,
             metrics.colW[c],
             metrics.headerH};
         if (hdr.Right() < l.tree.x || hdr.x > l.tree.Right() || hdr.Bottom() < l.tree.y || hdr.y > l.tree.Bottom())
@@ -1148,8 +1139,8 @@ void HUDController::RenderResearchWindow(
     {
         if (!tree.shown[i] || tree.parent[i] < 0)
             continue;
-        const UiRect a = nodeRect(tree, metrics, tree.parent[i], l.tree, m_researchScrollX, m_researchScrollY);
-        const UiRect b = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
+        const UiRect a = nodeRect(tree, metrics, tree.parent[i], l.tree, m_researchScroll.offsetX, m_researchScroll.offsetY);
+        const UiRect b = nodeRect(tree, metrics, i, l.tree, m_researchScroll.offsetX, m_researchScroll.offsetY);
         const int busX = a.x + std::min(metrics.indentX / 2, std::max(7, sz(9, sc)));
         const bool hot = i == m_researchSel || tree.parent[i] == m_researchSel;
         const bool done = IsResearched(Players::Local(), tree.parent[i]);
@@ -1180,7 +1171,7 @@ void HUDController::RenderResearchWindow(
     {
         if (!tree.shown[i])
             continue;
-        const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
+        const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScroll.offsetX, m_researchScroll.offsetY);
         if (n.Right() < l.tree.x || n.x > l.tree.Right() || n.Bottom() < l.tree.y || n.y > l.tree.Bottom())
             continue;
         const auto &r = researchDef(faction, i);
@@ -1211,10 +1202,10 @@ void HUDController::RenderResearchWindow(
         const UiRect iconFrame {n.x + iconPad + 4, n.y + iconPad, iconSize, iconSize};
         renderer.FillRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, {12, 10, 8, 255});
         renderer.DrawRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, col::Border);
-        const float iconScale = static_cast<float>(std::max(16, iconSize - 6)) / 64.0f;
+        const int innerPad = std::clamp(sz(4, sc), 3, std::max(3, iconSize / 8));
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, iconFrame.x + 3, iconFrame.y + 3, iconScale, faction);
+        ui::DrawCompositeFitted(renderer, r.compId, iconFrame, innerPad, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
 
@@ -1296,14 +1287,14 @@ void HUDController::RenderResearchWindow(
         ui::DrawScrollBar(
             renderer,
             vTrack,
-            m_researchScrollY,
+            m_researchScroll.offsetY,
             metrics.contentH,
             static_cast<float>(l.tree.h),
             m_researchScrollDrag == 1 || ui::OnScrollTrack(vTrack, mx, my));
         ui::DrawScrollBar(
             renderer,
             hTrack,
-            m_researchScrollX,
+            m_researchScroll.offsetX,
             metrics.contentW,
             static_cast<float>(l.tree.w),
             m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
@@ -1356,8 +1347,7 @@ void HUDController::RenderResearchWindow(
         renderer.DrawRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, pal.border);
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(
-            r.compId, iconFrame.x + 4, iconFrame.y + 4, static_cast<float>(iconSize - 8) / 64.0f, faction);
+        ui::DrawCompositeFitted(renderer, r.compId, iconFrame, 5, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
 

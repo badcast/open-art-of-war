@@ -17,6 +17,7 @@ set(CHARACTER_EDITOR_SOURCES
     src/EditorResearch.cpp
     src/EditorSprites.cpp
     src/EditorSpriteMerge.cpp
+    src/SpriteMetaEdit.cpp
     src/SpriteMerge.cpp
     src/EditorProperties.cpp
     src/EditorUtils.cpp
@@ -35,8 +36,8 @@ set_target_properties(openaow-charactereditor-tests PROPERTIES RUNTIME_OUTPUT_DI
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-charactereditor-tests COMMAND openaow-charactereditor-tests)
 
-# Merging sprite objects (SpriteMerge)
-add_executable(openaow-spritemerge-tests tests/SpriteMergeTests.cpp src/SpriteMerge.cpp)
+# Merging sprite objects (SpriteMerge) and editing sprite meta pivots (SpriteMetaEdit)
+add_executable(openaow-spritemerge-tests tests/SpriteMergeTests.cpp src/SpriteMerge.cpp src/SpriteMetaEdit.cpp)
 target_include_directories(openaow-spritemerge-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(openaow-spritemerge-tests PRIVATE openaow-core)
 set_target_properties(openaow-spritemerge-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
