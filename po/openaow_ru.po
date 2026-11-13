@@ -2790,3 +2790,12 @@ msgstr "НЕДОСТАТОЧНО СРЕДСТВ!"
 
 msgid "CANNOT BUILD HERE!"
 msgstr "ЗДЕСЬ НЕЛЬЗЯ СТРОИТЬ!"
+
+msgid "Snapshot"
+msgstr "Снимок"
+
+msgid "B"
+msgstr "Б"
+
+msgid "age"
+msgstr "возраст"

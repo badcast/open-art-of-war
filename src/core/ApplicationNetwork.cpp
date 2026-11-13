@@ -72,10 +72,9 @@ void Application::DriveNetworkBot(std::uint32_t tick)
     if (!bot)
         return;
     // A replica sees the same tick for many frames: act once per tick
-    static std::uint32_t lastTick = UINT32_MAX;
-    if (tick == lastTick)
+    if (tick == m_netBotLastTick)
         return;
-    lastTick = tick;
+    m_netBotLastTick = tick;
     const PlayerId me = Players::Local();
     const Faction myFaction = Players::FactionOf(me);
     // Economy traffic too (the commands that broke the other side's faction and unit ids): riflemen from
@@ -242,6 +241,9 @@ void Application::LeaveNetworkGame()
     m_net.reset();
     m_netMatchStarted = false;
     m_netMatchLoaded = false;
+    m_sentWalls.clear();
+    m_lastReplicaTick = 0;
+    m_netBotLastTick = 0xFFFFFFFFu;
     m_netPlayers = {};
     m_notices.clear();
     m_netMapPath.clear();
@@ -568,6 +570,23 @@ bool Application::InNetworkMatch() const
     return m_net && m_netMatchStarted && m_mission && m_mission->IsMatch();
 }
 
+bool Application::AuthorityMatchContinues() const
+{
+    if (!m_net || !m_net->AuthorityModeOn() || !m_net->IsAuthority() || !m_netMatchLoaded || !m_entities)
+        return false;
+    std::array<bool, kMaxPlayers> teamAlive {};
+    for (int p = 0; p < kMaxPlayers; ++p)
+    {
+        const PlayerId id = static_cast<PlayerId>(p);
+        if (Players::IsActive(id) && !m_entities->IsEliminated(id))
+            teamAlive[Players::TeamOf(id) % kMaxPlayers] = true;
+    }
+    int aliveTeams = 0;
+    for (bool alive : teamAlive)
+        aliveTeams += alive ? 1 : 0;
+    return aliveTeams >= 2;
+}
+
 void Application::HostNetworkGame(
     std::uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
 {
@@ -710,6 +729,9 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
         }
         m_netMatchStarted = true;
         m_netMatchLoaded = true;
+        m_sentWalls.clear();
+        m_lastReplicaTick = 0;
+        m_netBotLastTick = 0xFFFFFFFFu;
         m_netPlayers = {};
         m_notices.clear();
         // A fresh simulation now, before the first turn's commands are scheduled into it

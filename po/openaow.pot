@@ -2778,3 +2778,12 @@ msgstr "INSUFFICIENT FUNDS!"
 
 msgid "CANNOT BUILD HERE!"
 msgstr "CANNOT BUILD HERE!"
+
+msgid "Snapshot"
+msgstr "Snapshot"
+
+msgid "B"
+msgstr "B"
+
+msgid "age"
+msgstr "age"

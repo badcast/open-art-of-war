@@ -544,6 +544,40 @@ void Application::RenderNetStats()
         lines.push_back({buf, col::Text});
         std::snprintf(buf, sizeof buf, "%s %d", _("Turns buffered"), st.turnsBuffered);
         lines.push_back({buf, st.turnsBuffered > 2 ? col::Accent : col::Text});
+        if (st.authorityMode)
+        {
+            if (st.snapshotBytes >= 1024)
+            {
+                std::snprintf(
+                    buf,
+                    sizeof buf,
+                    "%s %.1f %s  %.1f/%s  %s %u %s",
+                    _("Snapshot"),
+                    static_cast<float>(st.snapshotBytes) / 1024.0f,
+                    _("KB"),
+                    st.snapshotRate,
+                    _("s"),
+                    _("age"),
+                    st.snapshotAgeMs,
+                    _("ms"));
+            }
+            else
+            {
+                std::snprintf(
+                    buf,
+                    sizeof buf,
+                    "%s %zu %s  %.1f/%s  %s %u %s",
+                    _("Snapshot"),
+                    st.snapshotBytes,
+                    _("B"),
+                    st.snapshotRate,
+                    _("s"),
+                    _("age"),
+                    st.snapshotAgeMs,
+                    _("ms"));
+            }
+            lines.push_back({buf, st.snapshotAgeMs > 400 ? col::Accent : col::Text});
+        }
         if (st.stalledSeconds > 0.3f)
         {
             std::snprintf(buf, sizeof buf, "%s %.1f %s", _("Waiting for the next turn"), st.stalledSeconds, _("s"));

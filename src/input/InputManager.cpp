@@ -113,6 +113,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
     {
         m_fingers.clear();
         m_touchGesture = false;
+        m_mouseScrollPanelPressed = m_mouseGhostPressed = false;
         m_leftMouseDown = m_leftPressed = m_leftClickIssued = m_rightClickIssued = m_middleMouseDown = false;
         m_selectionBox.active = false;
     }
@@ -174,6 +175,13 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                                             && event.button.x < m_touchScrollPanel.x + m_touchScrollPanel.w
                                             && event.button.y >= m_touchScrollPanel.y
                                             && event.button.y < m_touchScrollPanel.y + m_touchScrollPanel.h;
+                m_mouseGhostPressed = m_touchMode && !m_menuOpen && event.button.which != SDL_TOUCH_MOUSEID
+                                      && m_touchPlacementGhost.w > 0 && event.button.x >= m_touchPlacementGhost.x
+                                      && event.button.x < m_touchPlacementGhost.x + m_touchPlacementGhost.w
+                                      && event.button.y >= m_touchPlacementGhost.y
+                                      && event.button.y < m_touchPlacementGhost.y + m_touchPlacementGhost.h;
+                if (m_mouseGhostPressed)
+                    m_touchGhostAtPress = m_touchPlacementGhost;
                 // Immediate click dispatch for the UI sidebar (right of the map viewport), touch HUD panels, and debug
                 // bar
                 const int px = static_cast<int>(event.button.x);
@@ -189,7 +197,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                 }
                 if (px >= camera.GetViewportWidth() || py <= 40 || inTouchPanel)
                 {
-                    m_leftClickIssued = !m_mouseScrollPanelPressed;
+                    m_leftClickIssued = !m_mouseScrollPanelPressed && !m_mouseGhostPressed;
                     m_selectionBox.active = false;
                 }
                 else
@@ -231,6 +239,25 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
             if (event.button.button == SDL_BUTTON_LEFT)
             {
                 m_leftMouseDown = false;
+                if (m_mouseGhostPressed)
+                {
+                    const bool sameGhost = m_touchGhostAtPress.x == m_touchPlacementGhost.x
+                                           && m_touchGhostAtPress.y == m_touchPlacementGhost.y
+                                           && m_touchGhostAtPress.w == m_touchPlacementGhost.w
+                                           && m_touchGhostAtPress.h == m_touchPlacementGhost.h;
+                    const bool insideGhost = event.button.x >= m_touchPlacementGhost.x
+                                             && event.button.x < m_touchPlacementGhost.x + m_touchPlacementGhost.w
+                                             && event.button.y >= m_touchPlacementGhost.y
+                                             && event.button.y < m_touchPlacementGhost.y + m_touchPlacementGhost.h;
+                    if (sameGhost && insideGhost)
+                    {
+                        m_leftClickIssued = true;
+                        m_leftClickScreenX = static_cast<int>(event.button.x);
+                        m_leftClickScreenY = static_cast<int>(event.button.y);
+                        camera.ScreenToWorld(event.button.x, event.button.y, m_leftClickWorldX, m_leftClickWorldY);
+                    }
+                    m_mouseGhostPressed = false;
+                }
                 if (m_mouseScrollPanelPressed)
                 {
                     const float dx = event.button.x - m_leftPressX;
@@ -475,7 +502,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             mouse(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_RIGHT);
         }
         else if (
-            !m_touchMoved
+            (!m_touchMoved && !m_touchOnGhost)
             || (m_touchOnGhost && m_touchGhostAtPress.x == m_touchPlacementGhost.x
                 && m_touchGhostAtPress.y == m_touchPlacementGhost.y && m_touchGhostAtPress.w == m_touchPlacementGhost.w
                 && m_touchGhostAtPress.h == m_touchPlacementGhost.h && point.x >= m_touchPlacementGhost.x

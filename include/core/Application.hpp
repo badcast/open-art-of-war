@@ -10,6 +10,7 @@
 #include "core/VideoModes.hpp"
 #include "graphics/CameraShake.hpp"
 #include "graphics/RenderBackend.hpp"
+#include "net/WorldSnapshot.hpp"
 #include <array>
 #include <deque>
 #include <map>
@@ -146,6 +147,8 @@ private:
     double m_replicaSince {0.0};
     // The room owner's wish for a network match: authority mode (setting network.authority_mode, or OAOW_AUTHORITY)
     bool AuthorityModeWanted() const;
+    // In a 3+ team authority match, keeps ticking and streaming snapshots even after the local host loses
+    bool AuthorityMatchContinues() const;
     std::uint32_t m_alphaTick {0};
     double m_alphaSince {0.0}; // seconds since the tick last advanced
     float m_alphaLast {1.0f};
@@ -358,6 +361,9 @@ private:
     std::string m_netMapPath;
     bool m_netMatchStarted {false};
     bool m_netMatchLoaded {false}; // the match world is set up and playing (or was)
+    std::vector<WallSnap> m_sentWalls;
+    std::uint32_t m_lastReplicaTick {0};
+    std::uint32_t m_netBotLastTick {0xFFFFFFFFu};
     // Desync analysis: the world as text at the last checksummed ticks (the host names the tick that differed a
     // little later), and the file the one of that tick went to once the game went out of sync
     void NoteNetState(std::uint32_t tick);

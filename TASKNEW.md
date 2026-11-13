@@ -52,10 +52,10 @@ High:
 
 Medium:
 - [~] Finished projectiles are removed after their update (live-shot order is preserved); `FreeEntitySlots` remains linear per spawn (quadratic for 500 entities).
-- [ ] Replica commands are timed by the last received bundle; `m_replicaSentTurn` is written but unused. Host moves late commands to the next open turn, so nothing is lost, only delay varies.
+- [x] (`m_replicaSentTurn` paces replica sends at most once per computed target turn so rapid commands coalesce; `m_replicaSentTurn`/`m_lastTickMs` and `Application` per-match caches reset across matches, and `NoteTickRan` updates on replica snapshot apply) Replica commands are timed by the last received bundle; `m_replicaSentTurn` is written but unused. Host moves late commands to the next open turn, so nothing is lost, only delay varies.
 - [x] (class / archetype mismatch replaces the entity) Match entities by id only: check class / archetype too, replace on mismatch; a failed spawn leaves a half-applied snapshot; `id + 1` overflow.
 - [x] Snapshot entities are filtered by the recipient team’s current visibility; enemy economies are omitted.
-- [~] A forged `AuthorityState` from a normal client is refused by the host (slot + matchId checked). The decoder rejects non-finite float fields and unsafe entity IDs; validation of the remaining fields is still needed.
+- [x] A forged `AuthorityState` from a normal client is refused by the host (slot + matchId checked). The decoder validates snapshot field ranges, finite visual/research floats, and sorted unique entity/delta/hidden IDs.
 
 ## Helpers
 
@@ -76,8 +76,8 @@ Medium:
 - [x] Host sets `Authority`, clients set `Replica` at match start (`NetMatch::Attach`; opt-in setting `network.authority_mode`, default off until step 5; `StartMatch.authoritySlot` tells every peer who simulates)
 - [x] Clients send their commands to the host and do not schedule them locally (`NetMatch::PumpReplica`, replica branch in `Application.cpp`)
 - [~] Host applies received commands on its next tick (still via `TurnBundle` consumed by the authority only; dropping input-delay turns is a later cleanup)
-- [ ] AI players, missions, victory/defeat run only on the host; result is sent to clients
-- [ ] Test: two loopback peers, host simulates, client world stays untouched without snapshots
+- [x] AI players, missions, victory/defeat run only on the host; team-based `result` is filtered and sent to clients (`AuthorityMatchContinues` keeps 3+ team authority hosts ticking after own defeat)
+- [x] Test: loopback peers (`ReplicaLoopbackTests.cpp`), host simulates, client world stays untouched without snapshots, full + delta, 3-team elimination, `PlayerLeft`, and reconnect recovery
 
 ## Step 2 — snapshot format (`src/net/WorldSnapshot.cpp`, header in `include/net/`)
 
@@ -116,12 +116,12 @@ Medium:
 - [~] Host filters entities by recipient visibility and hides enemy economies; verification pending. Walls and visual events retain their existing behavior.
 - [~] Entering vision sends the entity; leaving vision retains known hidden entities on the replica, including remembered buildings. Verification pending.
 - [~] Measured (live skirmish, uncompressed full snapshots): ~29 bytes per entity, 35 entities = 1013 B per snapshot = ~10 KB/s per player. Extrapolated to 500 entities ~14 KB per snapshot = ~140 KB/s per player: too much, so deltas (send only changed entities) and zstd are needed. Then tune rate and quantisation (target 20–50 KB/s)
-- [ ] Stats overlay (`ApplicationOverlays.cpp`) shows snapshot size, rate and age
+- [x] Stats overlay (`ApplicationOverlays.cpp`, `NetMatch::Stats`) shows snapshot size, rate and age in authority mode
 
 ## Step 7 — leave, reconnect, pause, replays
 
-- [ ] Player leaves: host applies `PlayerLeft` locally, clients get the result in the next snapshot
-- [ ] Reconnect = full snapshot, no replay of past turns
+- [x] Player leaves: host applies `PlayerLeft` locally, clients get the result in the next snapshot (loopback test in `ReplicaLoopbackTests.cpp`)
+- [x] Reconnect = full snapshot, no replay of past turns (loopback test in `ReplicaLoopbackTests.cpp`)
 - [~] `PauseState` blocks already-buffered authority turns and freezes replica interpolation; targeted tests and live verification remain
 - [ ] Replays: the host records input commands as now and plays them in `Authority` mode; update `docs/replay-format.md`
 
@@ -174,9 +174,9 @@ Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen
 
 - [~] Snapshot v6 carries allied research and progress, with delta filtering and periodic refresh; replica applies completed effects and progress. Snapshot tests extended; full build, all 17 tests and the live two-instance check (51 of 51 hashes, ~1.9 KB/s) pass. Exact restoration when completed research is removed has not been implemented or verified (a research can only grow in a match, low priority).
 - [x] Mines: own and allied mines ride on the snapshot (v7); hostile mines are never sent (by design the other side never sees them; Codex had made them visible on lit tiles, reverted).
-- [x] Match result: the authority computes victory / defeat per recipient (`WorldSnapshot::result`, snapshot v8), the replica switches to Victory / Defeat. Not yet exercised in a live match (bots do not finish a game in 1000 ticks).
+- [x] Match result: the authority computes team-based victory / defeat per recipient (`WorldSnapshot::result`, snapshot v8), the replica switches to Victory / Defeat. Verified in `WorldSnapshotTests` and 3-team `ReplicaLoopbackTests`.
 - [x] Pause: nothing to do: the host stops sending turns while paused, so the authority cannot tick (a Codex attempt that refused ticks on every client was reverted after review: it froze the UI in the catch-up branch and could stall).
-- [~] Player leave: `ScheduleBundle` applies `PlayerLeft` on the authority (checked by reading); reconnect: a connected -> disconnected roster change resets the peer, so a returning replica gets a full snapshot and `LoadMatch` clears its world (by reading, no live test yet).
+- [x] Player leave & reconnect: `ScheduleBundle` applies `PlayerLeft` on the authority; a connected -> disconnected roster change resets the peer so a returning replica gets a full snapshot without replaying past turns (verified in `ReplicaLoopbackTests`).
 
 ## Replica death visuals (snapshot v9)
 
@@ -200,4 +200,4 @@ Release build completed; all 18 CTest tests pass when the ENet test is run with 
 
 ## Match-end follow-up
 
-The authority now publishes a final snapshot even when victory or defeat occurs on an odd tick. A live match-end test is still needed. In matches with three or more teams, the authority owner's own elimination can still stop the simulation while other teams are alive; that needs separate handling before authority mode can be considered complete.
+- [x] The authority publishes a final snapshot immediately when victory or defeat occurs (including odd ticks), evaluates `FilterForPlayer` per team, and continues simulating/streaming snapshots via `AuthorityMatchContinues` in 3+ team matches even if the host player is eliminated first. Covered by `WorldSnapshotTests` and `ReplicaLoopbackTests`.

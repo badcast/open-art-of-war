@@ -83,6 +83,17 @@ public:
     {
         m_simHold = hold;
     }
+    // One tick of the world (after the input): commands, research, entities, economies, AI, mission
+    void SimulationStep(
+        float deltaTime,
+        TileMap &map,
+        Pathfinder &pathfinder,
+        EntityManager &entities,
+        Economy &economy,
+        AIController &aiController,
+        MissionController &mission,
+        HUDController &hud,
+        AppState &appState);
     bool IsRevealFog() const
     {
         return m_debugMode && m_revealFog;
@@ -194,17 +205,6 @@ private:
     // The computer players of a match, in slot order (every peer runs them alike)
     std::vector<std::unique_ptr<AIController>> m_matchAis;
     void CreateMatchAis(const MissionController &mission, EntityManager &entities, TileMap &map);
-    // One tick of the world (after the input): commands, research, entities, economies, AI, mission
-    void SimulationStep(
-        float deltaTime,
-        TileMap &map,
-        Pathfinder &pathfinder,
-        EntityManager &entities,
-        Economy &economy,
-        AIController &aiController,
-        MissionController &mission,
-        HUDController &hud,
-        AppState &appState);
     int m_missionSerial {-1};
     int m_pendingDialogId {0}; // campaign dialogue still to open (MissionDialogs id), 0 = none
     float m_dialogTimer {0.0f};

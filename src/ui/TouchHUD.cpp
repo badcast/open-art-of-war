@@ -16,8 +16,8 @@ namespace
 {
 
 constexpr int kCardGap = 8;
-constexpr int kCardColumns = 4;
-constexpr int kCardRows = 4;
+constexpr int kCardColumns = 3;
+constexpr int kCardRows = 3;
 
 bool HasCombatUnits(const EntityManager &entities, const std::vector<int> &selected)
 {
@@ -232,7 +232,7 @@ void TouchHUD::StartPlacing(const Camera &camera)
     m_placing = true;
     m_panel = Panel::None;
     m_attackMoveMode = false;
-    m_grab = m_fingerWas = false;
+    m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
     float worldX = 0.0f, worldY = 0.0f;
     camera.ScreenToWorld(camera.GetViewportWidth() * 0.5f, camera.GetViewportHeight() * 0.5f, worldX, worldY);
     const auto &blueprints = EntityManager::GetBlueprints();
@@ -514,13 +514,13 @@ bool TouchHUD::HandleHudClick(
               && (m_cardsTracking
                   || (m_panel != Panel::None && !m_placing && layout.cards.Contains(m_pressX, m_pressY))));
     UpdateGhostRect(camera);
-    if (!leftMouseDown)
-        m_grab = m_fingerWas = false;
-    const bool pressOnGhost = m_pressX >= m_ghostRect.x && m_pressX < m_ghostRect.x + m_ghostRect.w
+    if (!m_placing)
+        m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
+    const bool pressOnGhost = !onPanel && m_pressX >= m_ghostRect.x && m_pressX < m_ghostRect.x + m_ghostRect.w
                               && m_pressY >= m_ghostRect.y && m_pressY < m_ghostRect.y + m_ghostRect.h;
     if (m_placing && (!onPanel || m_grab || (leftMouseDown && pressOnGhost)))
     {
-        if (leftClicked)
+        if (!leftMouseDown && leftClicked)
         {
             const auto &blueprints = EntityManager::GetBlueprints();
             float worldX = 0.0f, worldY = 0.0f;
@@ -532,23 +532,35 @@ bool TouchHUD::HandleHudClick(
                 const auto &blueprint = blueprints[static_cast<std::size_t>(m_selectedBlueprint)];
                 const bool onGhost = tileX >= m_ghostX && tileX < m_ghostX + blueprint.width && tileY >= m_ghostY
                                      && tileY < m_ghostY + blueprint.height;
-                if (onGhost)
+                const bool samePlace = m_fingerWas ? (m_grabPressedOnGhost && !m_grabMoved && m_ghostX == m_grabStartX
+                                                      && m_ghostY == m_grabStartY)
+                                                   : pressOnGhost;
+                if (onGhost && samePlace)
                     ConfirmPlacing(economy, entities, map);
-                else
+                else if (!m_grabMoved)
                 {
                     m_ghostX = tileX - blueprint.width / 2;
                     m_ghostY = tileY - blueprint.height / 2;
                 }
             }
+            m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
         }
-        else if (leftMouseDown)
+        else if (!leftMouseDown)
+        {
+            m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
+        }
+        else
         {
             float worldX = 0.0f, worldY = 0.0f;
             camera.ScreenToWorld(static_cast<float>(mouseX), static_cast<float>(mouseY), worldX, worldY);
             if (!m_fingerWas)
             {
                 m_fingerWas = true;
+                m_grabPressedOnGhost = pressOnGhost;
                 m_grab = pressOnGhost;
+                m_grabStartX = m_ghostX;
+                m_grabStartY = m_ghostY;
+                m_grabMoved = false;
                 float pressWorldX = 0.0f, pressWorldY = 0.0f;
                 camera.ScreenToWorld(
                     static_cast<float>(m_pressX), static_cast<float>(m_pressY), pressWorldX, pressWorldY);
@@ -559,6 +571,8 @@ bool TouchHUD::HandleHudClick(
             {
                 m_ghostX = static_cast<int>(std::lround((worldX + m_grabOffX) / TILE_WIDTH));
                 m_ghostY = static_cast<int>(std::lround((worldY + m_grabOffY) / TILE_HEIGHT));
+                if (m_ghostX != m_grabStartX || m_ghostY != m_grabStartY)
+                    m_grabMoved = true;
                 constexpr int edgeMargin = 56;
                 constexpr float panStep = 9.0f;
                 const float dx = mouseX < edgeMargin                               ? -panStep
@@ -568,11 +582,16 @@ bool TouchHUD::HandleHudClick(
                                  : mouseY > camera.GetViewportHeight() - edgeMargin ? panStep
                                                                                     : 0.0f;
                 if (dx != 0.0f || dy != 0.0f)
+                {
                     camera.Pan(dx, dy);
+                    m_grabMoved = true;
+                }
             }
         }
         return true;
     }
+    if (!leftMouseDown)
+        m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
     if (!onPanel)
     {
         // A tap on the map closes the open cards (and does nothing else: one mode at a time)
@@ -835,7 +854,7 @@ void TouchHUD::RenderGameHud(
             }
         }
         if (softClip)
-            renderer.EndClipTarget(128);
+            renderer.EndClipTarget(200);
         else
             renderer.ResetClipRect();
         const int count = ItemCountForTab(tab);
@@ -862,7 +881,7 @@ void TouchHUD::RenderGameHud(
             button.r.Contains(mouseX, mouseY),
             !button.disabled,
             ui::ButtonFontForScale(button.fontScale),
-            128);
+            200);
     }
 
     // What is selected, over the orders (or above the open cards drawer so it never overlaps)

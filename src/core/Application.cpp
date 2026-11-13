@@ -584,15 +584,17 @@ void Application::Run()
         UpdateGameChat(static_cast<std::uint32_t>(SDL_GetTicks()));
 
         // Simulation / Menu Update
-        if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
+        const bool activeGame = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
+        const bool authorityContinues = (m_state == AppState::Defeat) && AuthorityMatchContinues();
+        if (activeGame || authorityContinues)
         {
             const bool menuOpen
                 = (m_menuController && m_menuController->IsAnyMenuOpen()) || m_state == AppState::Paused;
             if (m_input)
             {
-                m_input->SetMenuOpen(menuOpen);
+                m_input->SetMenuOpen(menuOpen || !activeGame);
             }
-            if (m_map && !menuOpen)
+            if (activeGame && m_map && !menuOpen)
             {
                 m_input->UpdateCamera(
                     static_cast<float>(frameTime), *m_camera, m_map->GetWidth(), m_map->GetHeight(), menuOpen);
@@ -623,7 +625,8 @@ void Application::Run()
                 const bool net = InNetworkMatch();
                 Simulation &sim = m_gameplayController->simulation();
                 // P / Pause: everybody stops (a few times per player), anybody goes on
-                if (net && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)))
+                if (net && activeGame
+                    && (m_input->IsKeyJustPressed(SDL_SCANCODE_P) || m_input->IsKeyJustPressed(SDL_SCANCODE_PAUSE)))
                 {
                     m_net->TogglePause();
                 }
@@ -636,8 +639,25 @@ void Application::Run()
                     const std::uint32_t tick = sim.Tick();
                     if (!m_net->CanRunTick(tick))
                         return false;
-                    DriveNetworkBot(tick);
-                    Update(static_cast<float>(SIMULATION_TIMESTEP));
+                    if (playing())
+                    {
+                        DriveNetworkBot(tick);
+                        Update(static_cast<float>(SIMULATION_TIMESTEP));
+                    }
+                    else
+                    {
+                        AppState simState = m_state;
+                        m_gameplayController->SimulationStep(
+                            static_cast<float>(SIMULATION_TIMESTEP),
+                            *m_map,
+                            *m_pathfinder,
+                            *m_entities,
+                            *m_economy,
+                            *m_aiController,
+                            *m_mission,
+                            *m_hudController,
+                            simState);
+                    }
                     if (sim.Tick() != tick)
                     {
                         std::uint64_t checksum = 0;
@@ -671,21 +691,21 @@ void Application::Run()
                         }
                         m_net->AfterTick(tick, checksum);
                         // Send the terminal result even when it falls between the normal snapshot ticks.
-                        if (m_net->AuthorityModeOn() && m_net->IsAuthority() && (tick % 2 == 0 || !playing()))
+                        const bool matchEnded = !playing() && !AuthorityMatchContinues();
+                        if (m_net->AuthorityModeOn() && m_net->IsAuthority() && (tick % 2 == 0 || matchEnded))
                         {
                             SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
                             WorldSnapshot snap = WorldSnapshot::CaptureEntities(*m_entities, tick);
                             snap.CaptureEffects(*m_entities);
                             {
                                 // Walls: when the set changed, and once a second in case a snapshot was lost
-                                static std::vector<WallSnap> sentWalls;
                                 WorldSnapshot walls;
                                 walls.CaptureWalls(*m_map);
-                                if (walls.walls != sentWalls || tick % 20 == 0)
+                                if (walls.walls != m_sentWalls || tick % 20 == 0)
                                 {
                                     snap.hasWalls = true;
                                     snap.walls = walls.walls;
-                                    sentWalls = std::move(walls.walls);
+                                    m_sentWalls = std::move(walls.walls);
                                 }
                             }
                             sim.FillEconomies(ctx, snap);
@@ -710,7 +730,8 @@ void Application::Run()
                 {
                     // Far behind (back after a reconnect): play the turns through as fast as a frame allows
                     const auto deadline = clock::now() + std::chrono::milliseconds(25);
-                    while (clock::now() < deadline && playing() && m_net->TurnsAhead(sim.Tick()) > 2 && netTick())
+                    while (clock::now() < deadline && (playing() || AuthorityMatchContinues())
+                           && m_net->TurnsAhead(sim.Tick()) > 2 && netTick())
                     {
                     }
                     accumulator = 0.0;
@@ -719,7 +740,6 @@ void Application::Run()
                 {
                     // A replica never advances the world (state comes from the authority): commands go out, the UI
                     // lives
-                    static std::uint32_t lastReplicaTick = 0;
                     m_net->PumpReplica(nowMs);
                     m_replicaSince += frameTime;
                     m_entities->UpdateVisualEffects(static_cast<float>(frameTime));
@@ -782,10 +802,11 @@ void Application::Run()
                                 mine.economies.end());
                             SnapshotTrace("repl", mine);
                         }
-                        lastReplicaTick = snap.tick;
+                        m_lastReplicaTick = snap.tick;
                         m_replicaSince = 0.0;
+                        m_net->NoteTickRan(nowMs);
                     }
-                    DriveNetworkBot(lastReplicaTick);
+                    DriveNetworkBot(m_lastReplicaTick);
                     accumulator = 0.0;
                     m_gameplayController->SetSimulationHold(true);
                     Update(static_cast<float>(frameTime));
@@ -797,7 +818,7 @@ void Application::Run()
                     if (m_net->TurnsAhead(sim.Tick()) > 2)
                         accumulator += SIMULATION_TIMESTEP;
                     int ran = 0;
-                    while (accumulator >= SIMULATION_TIMESTEP && playing())
+                    while (accumulator >= SIMULATION_TIMESTEP && (playing() || AuthorityMatchContinues()))
                     {
                         if (!netTick())
                         {
@@ -808,9 +829,9 @@ void Application::Run()
                         accumulator -= SIMULATION_TIMESTEP;
                         ++ran;
                     }
-                    if (ran == 0 && playing())
+                    if (!playing() || ran == 0)
                     {
-                        // No network turn ran this frame (paused or waiting): keep UI & pause menu responsive
+                        // No network turn ran this frame (or defeated host keeps ticking): keep UI responsive
                         m_gameplayController->SetSimulationHold(true);
                         Update(static_cast<float>(frameTime));
                         m_gameplayController->SetSimulationHold(false);
@@ -1227,7 +1248,7 @@ void Application::Update(float deltaTime)
     {
         // Clicks and Enter from the last seconds of the battle must not skip the result screen: input is read
         // (and so consumed) from the first frame, but acted on only after kEndScreenInputDelay
-        if (m_endScreenTimer <= 0.0f && m_net)
+        if (m_net && !AuthorityMatchContinues())
             m_net->FinishReplay(m_state == AppState::Victory ? "victory" : "defeat"); // the match is saved
         if (m_endScreenTimer <= 0.0f)
             FinishLocalReplay(m_state == AppState::Victory ? "victory" : "defeat");

@@ -248,6 +248,11 @@ public:
         float stalledSeconds {0.0f}; // waiting for the next turn
         bool reconnecting {false};
         bool desynced {false};
+        bool authorityMode {false};
+        bool replica {false};
+        std::size_t snapshotBytes {0};
+        float snapshotRate {0.0f}; // snapshots sent/received per second
+        std::uint32_t snapshotAgeMs {0};
         struct Peer
         {
             std::uint8_t slot {0};
@@ -382,6 +387,11 @@ private:
     std::uint64_t m_rateSent {0}, m_rateRecv {0};
     std::uint32_t m_rateMs {0};
     float m_sendKBps {0.0f}, m_recvKBps {0.0f};
+    bool m_hasSnapshotStat {false};
+    std::size_t m_snapshotBytes {0};
+    std::uint32_t m_snapshotCount {0};
+    float m_snapshotRate {0.0f};
+    std::uint32_t m_lastSnapshotMs {0};
     bool m_hasPendingChoice {false};
     std::array<std::uint8_t, 5> m_pendingChoice {}; // faction, team, color, spawn, ready (Net::LobbyChoice)
     std::uint32_t m_pendingChoiceMs {0};

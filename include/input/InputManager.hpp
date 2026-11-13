@@ -221,8 +221,10 @@ public:
 
 private:
     SDL_Rect m_touchPlacementGhost {0, 0, 0, 0};
+    SDL_Rect m_touchGhostAtPress {0, 0, 0, 0};
     SDL_Rect m_touchScrollPanel {0, 0, 0, 0};
     bool m_mouseScrollPanelPressed {false};
+    bool m_mouseGhostPressed {false};
     bool m_touchMode {false};
     bool m_touchPan {false};
     bool m_touchWheelScroll {true};
@@ -238,7 +240,6 @@ private:
     bool m_touchMoved {false};
     bool m_touchOnGhost {false};
     bool m_touchOnScrollPanel {false};
-    SDL_Rect m_touchGhostAtPress {0, 0, 0, 0};
     bool m_touchSelecting {false};
     bool m_touchPanning {false};
     Uint64 m_touchStart {0};

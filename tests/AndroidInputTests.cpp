@@ -262,6 +262,35 @@ int main()
     touchFull(SDL_EVENT_FINGER_UP, 1, 700, 360);
     Check(!input.WasLeftClickIssued(x, y), "releasing a dragged ghost must not build");
 
+    // 6) Small touch motion (<= 12px) that still moved the ghost must not confirm on release
+    input.SetTouchPlacementGhost(ghostRect);
+    touchFull(SDL_EVENT_FINGER_DOWN, 1, 640, 360);
+    input.SetTouchPlacementGhost(SDL_Rect {604, 300, 120, 120});
+    touchFull(SDL_EVENT_FINGER_MOTION, 1, 646, 360);
+    touchFull(SDL_EVENT_FINGER_UP, 1, 646, 360);
+    Check(!input.WasLeftClickIssued(x, y), "small touch move that shifts ghost must not build on release");
+
+    // 7) Desktop --touch-ui mouse on placement ghost waits for release and cancels if ghost moved
+    input.SetTouchPlacementGhost(ghostRect);
+    auto mouseEvt = [&](Uint32 type, float mx, float my) {
+        SDL_Event event {};
+        event.type = type;
+        event.button.button = SDL_BUTTON_LEFT;
+        event.button.x = mx;
+        event.button.y = my;
+        input.ProcessEvent(event, touchCam);
+        input.Update(0, touchCam);
+    };
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 640.0f, 360.0f);
+    Check(!input.WasLeftClickIssued(x, y), "mouse press on ghost must not build before release");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 640.0f, 360.0f);
+    Check(input.WasLeftClickIssued(x, y), "mouse release on stationary ghost confirms placement");
+
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 640.0f, 360.0f);
+    input.SetTouchPlacementGhost(SDL_Rect {604, 300, 120, 120});
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 646.0f, 360.0f);
+    Check(!input.WasLeftClickIssued(x, y), "mouse release after moving ghost must not build");
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

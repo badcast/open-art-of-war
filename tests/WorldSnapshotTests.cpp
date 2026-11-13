@@ -138,6 +138,33 @@ int main()
         invalid.entities[0].id = static_cast<std::uint32_t>(std::numeric_limits<int>::max());
         const auto badId = invalid.Encode();
         Check(!WorldSnapshot::Decode(badId.data(), badId.size(), untouched), "overflowing entity id is refused");
+
+        auto expectRefused = [&](const char *label, auto mutate) {
+            WorldSnapshot badSnap = Sample();
+            mutate(badSnap);
+            const auto encoded = badSnap.Encode();
+            WorldSnapshot dest = Sample();
+            Check(!WorldSnapshot::Decode(encoded.data(), encoded.size(), dest) && dest == Sample(), label);
+        };
+        expectRefused("unsorted entity ids are refused", [](WorldSnapshot &w) { std::swap(w.entities[0], w.entities[1]); });
+        expectRefused("invalid entity faction is refused", [](WorldSnapshot &w) { w.entities[0].faction = 3; });
+        expectRefused("invalid entity owner is refused", [](WorldSnapshot &w) { w.entities[0].owner = 8; });
+        expectRefused("invalid entity archetype is refused", [](WorldSnapshot &w) { w.entities[0].archetype = 99; });
+        expectRefused("invalid building index is refused", [](WorldSnapshot &w) { w.entities[1].rawBuilding = 15; });
+        expectRefused("invalid production permille is refused", [](WorldSnapshot &w) { w.entities[1].queue[0].progressPermille = 1001; });
+        expectRefused("unsorted removed ids are refused", [](WorldSnapshot &w) { w.removed = {3, 2}; });
+        expectRefused("duplicate hiddenAlive ids are refused", [](WorldSnapshot &w) { w.hiddenAlive = {12, 12}; });
+        expectRefused("duplicate economy player is refused", [](WorldSnapshot &w) { w.economies.push_back(w.economies[0]); });
+        expectRefused("invalid research index is refused", [](WorldSnapshot &w) { w.research[0].active = 24; });
+        expectRefused("zero research duration is refused", [](WorldSnapshot &w) { w.research[0].duration = 0.0f; });
+        expectRefused("negative mine arm time is refused", [](WorldSnapshot &w) { w.mines[0].armLeft = -0.1f; });
+        expectRefused("zero wall hpPercent is refused", [](WorldSnapshot &w) { w.walls[0].hpPercent = 0; });
+        expectRefused("invalid projectile type is refused", [](WorldSnapshot &w) { w.projectiles[0].type = 9; });
+        expectRefused("negative sound gain is refused", [](WorldSnapshot &w) { w.cues[0].gain = -1.0f; });
+        expectRefused("non-positive blast size is refused", [](WorldSnapshot &w) { w.blasts[0].size = 0.0f; });
+        expectRefused("negative explosion delay is refused", [](WorldSnapshot &w) { w.explosions[0].delay = -0.5f; });
+        expectRefused("negative death timer is refused", [](WorldSnapshot &w) { w.deaths[0].timer = -1.0f; });
+        expectRefused("non-positive groundMark duration is refused", [](WorldSnapshot &w) { w.groundMarks[0].seconds = 0.0f; });
     }
 
     // Completed projectiles must not accumulate on the authority between snapshots.
@@ -285,6 +312,51 @@ int main()
         WorldSnapshot clear = WorldSnapshot::CaptureEntities(world, 3);
         clear.FilterForPlayer(world, map, 0);
         Check(clear.entities.size() == 3 && clear.hiddenAlive.empty() && world.GetEntity(own), "fog disabled sends all entities");
+    }
+
+    // Team-based match result in FilterForPlayer (allies + 3+ teams)
+    {
+        std::array<PlayerSlot, kMaxPlayers> slots {};
+        slots[0] = {true, Faction::Resistance, 0, 0, true};
+        slots[1] = {true, Faction::Resistance, 0, 0, true};    // ally of 0
+        slots[2] = {true, Faction::Confederation, 1, 0, true}; // team 1
+        slots[3] = {true, Faction::Confederation, 2, 0, true}; // team 2
+        Players::Setup(slots, 0);
+        TileMap map;
+        map.InitBlankArena(32, 32);
+        map.SetFogEnabled(false);
+        EntityManager world;
+        world.LoadCharacterConfigs();
+        const int b1 = world.SpawnBuilding(UnitType::Headquarters, 6, 6, Faction::Resistance);
+        const int b2 = world.SpawnBuilding(UnitType::Headquarters, 14, 14, Faction::Confederation);
+        const int b3 = world.SpawnBuilding(UnitType::Headquarters, 22, 22, Faction::Confederation);
+        world.GetEntity(b1)->owner = 1;
+        world.GetEntity(b2)->owner = 2;
+        world.GetEntity(b3)->owner = 3;
+        // Player 0 has no buildings -> eliminated individually, but teammate 1 keeps team 0 alive.
+        Check(world.UpdateElimination(map).size() == 1 && world.IsEliminated(0), "player 0 eliminated individually");
+        WorldSnapshot s0 = WorldSnapshot::CaptureEntities(world, 1);
+        WorldSnapshot s2 = s0;
+        s0.FilterForPlayer(world, map, 0);
+        s2.FilterForPlayer(world, map, 2);
+        Check(s0.result == 0, "eliminated player stays in match while ally lives");
+        Check(s2.result == 0, "hostile team 1 stays in match");
+        world.GetEntity(b1)->alive = false;
+        world.UpdateElimination(map);
+        WorldSnapshot afterTeam0Out = WorldSnapshot::CaptureEntities(world, 2);
+        WorldSnapshot a0 = afterTeam0Out, a2 = afterTeam0Out, a3 = afterTeam0Out;
+        a0.FilterForPlayer(world, map, 0);
+        a2.FilterForPlayer(world, map, 2);
+        a3.FilterForPlayer(world, map, 3);
+        Check(a0.result == 2, "defeated team gets defeat result");
+        Check(a2.result == 0 && a3.result == 0, "remaining two enemy teams continue after team 0 falls");
+        world.GetEntity(b2)->alive = false;
+        world.UpdateElimination(map);
+        WorldSnapshot end2 = WorldSnapshot::CaptureEntities(world, 3);
+        WorldSnapshot end3 = end2;
+        end2.FilterForPlayer(world, map, 2);
+        end3.FilterForPlayer(world, map, 3);
+        Check(end2.result == 2 && end3.result == 1, "last standing team receives victory");
     }
 
     if (failures == 0)

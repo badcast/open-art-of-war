@@ -152,6 +152,10 @@ private:
     bool m_placing {false};
     int m_ghostX {0};
     int m_ghostY {0};
+    int m_grabStartX {0};
+    int m_grabStartY {0};
+    bool m_grabMoved {false};
+    bool m_grabPressedOnGhost {false};
     int m_pressX {0}, m_pressY {0};
     bool m_grab {false};
     bool m_fingerWas {false};

@@ -330,6 +330,13 @@ void NetMatch::leave()
     m_synced = false;
     m_syncText.clear();
     m_scheduledTurn = 0;
+    m_replicaSentTurn = 0;
+    m_lastTickMs = 0;
+    m_hasSnapshotStat = false;
+    m_snapshotBytes = 0;
+    m_snapshotCount = 0;
+    m_snapshotRate = 0.0f;
+    m_lastSnapshotMs = 0;
     m_reconnect = Reconnect {};
     m_hostedMaster.clear();
     m_hostedMasterPort = 0;
@@ -939,6 +946,13 @@ bool NetMatch::TakeStartedMatch(MatchSetup &out)
     m_authorityMode = out.authorityMode;
     m_takenStarts = m_client->matchStarts();
     m_scheduledTurn = 0;
+    m_replicaSentTurn = 0;
+    m_lastTickMs = 0;
+    m_hasSnapshotStat = false;
+    m_snapshotBytes = 0;
+    m_snapshotCount = 0;
+    m_snapshotRate = 0.0f;
+    m_lastSnapshotMs = 0;
     m_outgoing.clear();
     return true;
 }
@@ -966,6 +980,8 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
             peer.hasAck = true;
         }
     }
+    bool published = false;
+    std::size_t publishedBytes = 0;
     for (const Net::RosterEntry &p : m_client->roster().players)
     {
         if (p.slot >= kMaxPlayers || p.slot == m_client->slot())
@@ -1011,6 +1027,8 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         state.bytes = outgoing.Encode();
         if (state.bytes.empty() || !m_client->sendAuthorityState(state))
             continue;
+        published = true;
+        publishedBytes = state.bytes.size();
         peer.bytes += state.bytes.size();
         const std::uint32_t now = SDL_GetTicks();
         if (!peer.traceStart)
@@ -1054,6 +1072,13 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         if (peer.history.size() > 64)
             peer.history.pop_front();
     }
+    if (published)
+    {
+        m_hasSnapshotStat = true;
+        m_snapshotBytes = publishedBytes;
+        ++m_snapshotCount;
+        m_lastSnapshotMs = m_nowMs;
+    }
 }
 
 bool NetMatch::TakeSnapshot(WorldSnapshot &out)
@@ -1072,6 +1097,10 @@ bool NetMatch::TakeSnapshot(WorldSnapshot &out)
             if (base == m_replicaSnapshots.end() || !out.ExpandFrom(*base))
                 continue;
         }
+        m_hasSnapshotStat = true;
+        m_snapshotBytes = state.bytes.size();
+        ++m_snapshotCount;
+        m_lastSnapshotMs = m_nowMs;
         return true;
     }
     return false;
@@ -1112,6 +1141,8 @@ void NetMatch::PumpReplica(std::uint32_t nowMs)
         return;
     // The host's newest turn is the clock here: what the player did goes out for a turn a little ahead of it
     const std::uint32_t turn = m_client->turnsReceived() + m_client->inputDelay();
+    if (turn < m_replicaSentTurn)
+        return;
     CoalesceTurn(m_outgoing);
     for (const std::vector<std::uint8_t> &bytes : EncodeBatches(m_outgoing))
         m_client->sendCommands(turn, bytes);
@@ -1123,6 +1154,13 @@ void NetMatch::Attach(Simulation &sim)
 {
     m_snapshotPeers = {};
     m_replicaSnapshots.clear();
+    m_replicaSentTurn = 0;
+    m_lastTickMs = 0;
+    m_hasSnapshotStat = false;
+    m_snapshotBytes = 0;
+    m_snapshotCount = 0;
+    m_snapshotRate = 0.0f;
+    m_lastSnapshotMs = 0;
     m_sim = &sim;
     sim.SetExecutionMode(
         !m_authorityMode ? Simulation::ExecutionMode::Standalone
@@ -1241,15 +1279,18 @@ NetMatch::Stats NetMatch::stats(std::uint32_t nowMs, std::uint32_t tick)
         m_rateMs = nowMs;
         m_rateSent = link.bytesSent;
         m_rateRecv = link.bytesReceived;
+        m_snapshotCount = 0;
     }
     else if (nowMs - m_rateMs >= 1000)
     {
         const float secs = (nowMs - m_rateMs) / 1000.0f;
         m_sendKBps = (link.bytesSent - m_rateSent) / 1024.0f / secs;
         m_recvKBps = (link.bytesReceived - m_rateRecv) / 1024.0f / secs;
+        m_snapshotRate = m_snapshotCount / secs;
         m_rateMs = nowMs;
         m_rateSent = link.bytesSent;
         m_rateRecv = link.bytesReceived;
+        m_snapshotCount = 0;
     }
     s.sendKBps = m_sendKBps;
     s.recvKBps = m_recvKBps;
@@ -1259,6 +1300,11 @@ NetMatch::Stats NetMatch::stats(std::uint32_t nowMs, std::uint32_t tick)
     s.stalledSeconds = m_sim ? StalledSeconds(nowMs) : 0.0f;
     s.reconnecting = m_reconnect.active;
     s.desynced = Desynced();
+    s.authorityMode = m_authorityMode;
+    s.replica = IsReplica();
+    s.snapshotBytes = m_snapshotBytes;
+    s.snapshotRate = m_snapshotRate;
+    s.snapshotAgeMs = (m_hasSnapshotStat && nowMs >= m_lastSnapshotMs) ? (nowMs - m_lastSnapshotMs) : 0;
     if (m_host)
     {
         for (const Net::SessionHost::Player &p : m_host->players())

@@ -1,5 +1,8 @@
 #include "net/WorldSnapshot.hpp"
+#include "core/Utility.hpp"
 #include "game/Players.hpp"
+#include "game/Projectiles.hpp"
+#include "game/Research.hpp"
 
 #include "game/Building.hpp"
 #include "game/EntityManager.hpp"
@@ -31,6 +34,25 @@ float Dequantise(std::int64_t q)
 bool SameSub(float a, float b)
 {
     return Quantise(a) == Quantise(b);
+}
+bool ValidOwner(std::uint8_t owner)
+{
+    return owner < kMaxPlayers || owner == kNoPlayer;
+}
+bool ValidTile(std::int32_t x, std::int32_t y)
+{
+    return x >= 0 && y >= 0 && x < MAX_MAP_SIZE && y < MAX_MAP_SIZE;
+}
+bool StrictlySortedIds(const std::vector<std::uint32_t> &ids)
+{
+    for (std::size_t i = 0; i < ids.size(); ++i)
+    {
+        if (ids[i] == 0 || ids[i] >= static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+            return false;
+        if (i > 0 && ids[i] <= ids[i - 1])
+            return false;
+    }
+    return true;
 }
 } // namespace
 
@@ -119,16 +141,23 @@ bool WorldSnapshot::ExpandFrom(const WorldSnapshot &base)
 
 void WorldSnapshot::FilterForPlayer(const EntityManager &manager, const TileMap &map, std::uint8_t player)
 {
-    // Victory / defeat of this recipient: out of the match, or every hostile player is
+    // Victory / defeat of this recipient matches MissionController's team rule: defeat only once the
+    // recipient's whole team is out, victory once no hostile team remains.
     if (player < kMaxPlayers && Players::IsActive(player))
     {
+        bool teamAlive = false;
         bool enemyLeft = false;
         for (int p = 0; p < kMaxPlayers; ++p)
-            if (p != player && Players::IsActive(static_cast<PlayerId>(p))
-                && Players::Hostile(static_cast<PlayerId>(p), player)
-                && !manager.IsEliminated(static_cast<PlayerId>(p)))
+        {
+            const PlayerId pid = static_cast<PlayerId>(p);
+            if (!Players::IsActive(pid) || manager.IsEliminated(pid))
+                continue;
+            if (Players::Hostile(pid, player))
                 enemyLeft = true;
-        result = manager.IsEliminated(player) ? 2 : (enemyLeft ? 0 : 1);
+            else
+                teamAlive = true;
+        }
+        result = !teamAlive ? 2 : (enemyLeft ? 0 : 1);
     }
     economies.erase(
         std::remove_if(
@@ -498,6 +527,8 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         if (entityId == 0 || entityId >= static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
             return false;
         e.id = static_cast<std::uint32_t>(entityId);
+        if (!s.entities.empty() && e.id <= s.entities.back().id)
+            return false;
         e.isBuilding = r.readBool();
         e.type = static_cast<std::int32_t>(r.readVarInt());
         e.archetype = static_cast<std::int32_t>(r.readVarInt());
@@ -537,16 +568,37 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
                 ProductionSnap p;
                 p.archetype = static_cast<std::int32_t>(r.readVarInt());
                 p.progressPermille = r.readU16();
+                if (p.archetype < 0 || p.archetype >= Utility::kArchetypeCount || p.progressPermille > 1000)
+                    return false;
                 e.queue.push_back(p);
             }
+            if (e.rawBuilding < 0 || e.rawBuilding > 14 || e.buildPermille > 1000)
+                return false;
+        }
+        else if (e.rawBuilding != -1 || e.archetype < 0 || e.archetype >= Utility::kArchetypeCount)
+        {
+            return false;
+        }
+        if (e.faction > static_cast<std::uint8_t>(Faction::Neutral) || !ValidOwner(e.owner)
+            || !ValidTile(e.tileX, e.tileY) || !std::isfinite(e.subX) || !std::isfinite(e.subY)
+            || std::abs(e.subX) > 1024.0f || std::abs(e.subY) > 1024.0f || e.hp < 0 || e.maxHp <= 0
+            || e.state > static_cast<std::uint8_t>(ActionState::Transform) || e.facing < 0 || e.facing >= 8
+            || e.turret < 0 || e.turret >= 8
+            || ((e.type < 0 || e.type > static_cast<std::int32_t>(UnitType::Radar))
+                && e.type != static_cast<std::int32_t>(UnitType::Unknown)))
+        {
+            return false;
         }
         s.entities.push_back(std::move(e));
     }
     if (!r.readIdList(s.removed, kMaxEntities) || !r.readIdList(s.hiddenAlive, kMaxEntities))
         return false;
+    if (!StrictlySortedIds(s.removed) || !StrictlySortedIds(s.hiddenAlive))
+        return false;
     const std::uint64_t econ = r.readVarUint();
     if (r.failed() || econ > 64)
         return false;
+    std::uint8_t seenEcon = 0;
     for (std::uint64_t i = 0; i < econ && !r.failed(); ++i)
     {
         EconomySnap e;
@@ -554,11 +606,15 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         e.credits = static_cast<std::int32_t>(r.readVarInt());
         e.powerOut = static_cast<std::int32_t>(r.readVarInt());
         e.powerUse = static_cast<std::int32_t>(r.readVarInt());
+        if (e.player >= kMaxPlayers || ((seenEcon >> e.player) & 1u) != 0 || e.powerOut < 0 || e.powerUse < 0)
+            return false;
+        seenEcon |= static_cast<std::uint8_t>(1u << e.player);
         s.economies.push_back(e);
     }
     const std::uint64_t researchCount = r.readVarUint();
     if (r.failed() || researchCount > 64)
         return false;
+    std::uint8_t seenResearch = 0;
     for (std::uint64_t i = 0; i < researchCount && !r.failed(); ++i)
     {
         ResearchSnap item;
@@ -567,6 +623,10 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         item.active = static_cast<std::int32_t>(r.readVarInt());
         item.timer = r.readFloat();
         item.duration = r.readFloat();
+        if (item.player >= kMaxPlayers || ((seenResearch >> item.player) & 1u) != 0 || item.active < -1
+            || item.active >= kResearchCount)
+            return false;
+        seenResearch |= static_cast<std::uint8_t>(1u << item.player);
         s.research.push_back(item);
     }
     const std::uint64_t mineCount = r.readVarUint();
@@ -581,6 +641,8 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         m.kind = static_cast<std::int32_t>(r.readVarInt());
         m.owner = r.readU8();
         m.armLeft = r.readFloat();
+        if (m.id <= 0 || !ValidTile(m.tileX, m.tileY) || m.kind < 0 || m.kind >= 64 || m.owner >= kMaxPlayers)
+            return false;
         s.mines.push_back(m);
     }
     s.result = r.readU8();
@@ -600,6 +662,9 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
             t.faction = r.readU8();
             t.hpPercent = r.readU8();
             t.owner = r.readU8();
+            if (!ValidTile(t.x, t.y) || t.faction > static_cast<std::uint8_t>(Faction::Neutral) || t.hpPercent < 1
+                || t.hpPercent > 100 || !ValidOwner(t.owner))
+                return false;
             s.walls.push_back(t);
         }
     }
@@ -616,6 +681,9 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         p.dir32 = r.readU8();
         p.faction = r.readU8();
         p.owner = r.readU8();
+        if (p.type >= Projectiles::kCount || p.direction >= 16 || p.dir32 >= 32
+            || p.faction > static_cast<std::uint8_t>(Faction::Neutral) || !ValidOwner(p.owner))
+            return false;
         s.projectiles.push_back(p);
     }
     const std::uint64_t cueCount = r.readVarUint();
@@ -630,6 +698,8 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         c.owner = r.readU8();
         c.sound = r.readString(64);
         c.gain = r.readFloat();
+        if (c.cue > static_cast<std::uint8_t>(EntityManager::SoundCue::WallDestroyed) || !ValidOwner(c.owner))
+            return false;
         s.cues.push_back(std::move(c));
     }
     const std::uint64_t blastCount = r.readVarUint();
@@ -674,6 +744,8 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         d.wreckComposite = static_cast<std::int32_t>(r.readVarInt());
         d.wreckStages = static_cast<std::int32_t>(r.readVarInt());
         d.flame = r.readBool();
+        if (!ValidTile(d.tileX, d.tileY) || d.wreckStages < 0)
+            return false;
         s.deaths.push_back(d);
     }
     const std::uint64_t markCount = r.readVarUint();
@@ -690,38 +762,51 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
     }
     if (r.failed() || !r.atEnd())
         return false;
-    const auto validId = [](std::uint32_t id) {
-        return id > 0 && id < static_cast<std::uint32_t>(std::numeric_limits<int>::max());
-    };
-    if (!std::all_of(s.removed.begin(), s.removed.end(), validId)
-        || !std::all_of(s.hiddenAlive.begin(), s.hiddenAlive.end(), validId))
-        return false;
     for (const auto &v : s.research)
-        if (!std::isfinite(v.timer) || !std::isfinite(v.duration))
+        if (!std::isfinite(v.timer) || v.timer < 0.0f || !std::isfinite(v.duration) || v.duration <= 0.0f)
             return false;
     for (const auto &v : s.mines)
-        if (!std::isfinite(v.armLeft))
+        if (!std::isfinite(v.armLeft) || v.armLeft < 0.0f)
             return false;
     for (const auto &v : s.projectiles)
         if (!std::isfinite(v.x) || !std::isfinite(v.y))
             return false;
     for (const auto &v : s.cues)
-        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.gain))
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.gain) || v.gain < 0.0f)
             return false;
     for (const auto &v : s.blasts)
-        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.size))
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.size) || v.size <= 0.0f)
             return false;
     for (const auto &v : s.explosions)
-        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.delay))
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.delay) || v.delay < 0.0f)
             return false;
     for (const auto &v : s.deaths)
-        if (!std::isfinite(v.subX) || !std::isfinite(v.subY) || !std::isfinite(v.timer))
+        if (!std::isfinite(v.subX) || !std::isfinite(v.subY) || !std::isfinite(v.timer) || v.timer < 0.0f)
             return false;
     for (const auto &v : s.groundMarks)
-        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.seconds))
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.seconds) || v.seconds <= 0.0f)
             return false;
     out = std::move(s);
     return true;
 }
 
+bool ValidOwner(std::uint8_t owner)
+{
+    return owner < kMaxPlayers || owner == kNoPlayer;
+}
+bool ValidTile(std::int32_t x, std::int32_t y)
+{
+    return x >= 0 && y >= 0 && x < MAX_MAP_SIZE && y < MAX_MAP_SIZE;
+}
+bool StrictlySortedIds(const std::vector<std::uint32_t> &ids)
+{
+    for (std::size_t i = 0; i < ids.size(); ++i)
+    {
+        if (ids[i] == 0 || ids[i] >= static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+            return false;
+        if (i > 0 && ids[i] <= ids[i - 1])
+            return false;
+    }
+    return true;
+}
 } // namespace OpenArtOfWar
