@@ -22,7 +22,7 @@ cmake --build build-debug -j16
 Run the game from the repository root (it looks for `./assets`). Without a screen, use
 `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`.
 
-CMake options: `OAOW_BUILD_NET_TESTS` (default ON, network unit tests), `OAOW_BUILD_SERVER` (default ON).
+CMake options: `AOW_DEBUG` (default OFF), `BUILD_ASSETS_BLOB` (default OFF), `OAOW_BUILD_NET_TESTS` (default ON, network unit tests), `OAOW_BUILD_SERVER` (default ON).
 
 ## 2. Unit tests (`ctest`)
 
@@ -32,14 +32,29 @@ CMake options: `OAOW_BUILD_NET_TESTS` (default ON, network unit tests), `OAOW_BU
 
 | Test | Source | Covers |
 | --- | --- | --- |
-| `openaow-net-tests` | `src/networking/tests/NetTests.cpp` | CRC32, bit stream, protocol codec round trips, fuzzing the decoder, ENet over localhost, the lockstep session (turn order, late commands, desync detection, reconnect with the token, takeover of a slot the host still holds), lobby rules, password and leaving, ENet session, LAN discovery, room server, player-hosted games through the server. Prints `N checks, 0 failed`. |
-| `openaow-ai-defense-tests` | `tests/AIDefenseTests.cpp` | Computer player: attackers known by the damage they do, who defends, waves that wait, marching groups that turn back, the limit of a chase, the share of riflemen in late waves, the fortification (bunkers behind the wall, towers behind them, build order, no duplicates, shared limits, further headquarters). Needs `./assets` (ctest runs it from the source directory). |
-| `openaow-charactereditor-tests` | `openaow-charactereditor/tests/ConfigMergeTests.cpp` | Saving YAML configs keeps what the editor does not know: unknown fields, comments, removed keys stay removed. |
+| `openaow-net-tests` | `src/networking/tests/NetTests.cpp` | CRC32, bit stream, protocol codec round trips, fuzzing the decoder, ENet over localhost, lockstep session, lobby rules, LAN discovery, room server, player-hosted games through the server |
+| `openaow-determinism-tests` | `tests/DeterminismTests.cpp` | Replays two-AI skirmish twice and compares the world checksum on every tick |
+| `openaow-worldsnapshot-tests` | `tests/WorldSnapshotTests.cpp` | World snapshot serialization and restoration |
+| `openaow-replica-tests` | `tests/ReplicaLoopbackTests.cpp` | Network replica loopback synchronization |
+| `openaow-ai-defense-tests` | `tests/AIDefenseTests.cpp` | Computer player defense, wave coordination, fortification and build order |
+| `openaow-ai-layout-tests` | `tests/AIBaseLayoutTests.cpp` | AI base placement and layout checks |
+| `openaow-flowfield-tests` | `tests/FlowFieldTests.cpp` | Flow-field group pathfinding |
+| `openaow-fortress-flame-tests` | `tests/FortressFlameTests.cpp` | Fortress flame behaviour |
+| `openaow-mines-tests` | `tests/MinesTests.cpp` | Mine placement and detonation |
+| `openaow-build-limits-tests` | `tests/BuildLimitsTests.cpp` | Unit and building limits |
+| `openaow-capabilities-tests` | `tests/CapabilitiesTests.cpp` | Tech levels (`data/capabilities.yaml`) |
+| `openaow-mods-tests` | `tests/ModsTests.cpp` | Mod loading, priority, conflicts and manifest merging |
+| `openaow-about-tests` | `tests/AboutSimulationTests.cpp` | In-game About battle showcase simulation |
+| `openaow-sprite-tests` | `tests/SpriteRegistryTests.cpp` | Sprite sheet and graphics registry consistency |
+| `openaow-ui-layout-tests` | `tests/UiLayoutTests.cpp` | `assets/ui/layout.yaml` expression parsing and profile geometry |
+| `openaow-android-input-tests` | `tests/AndroidInputTests.cpp` | Touch HUD input, gestures, card scrolling and geometry |
+| `openaow-charactereditor-tests` | `openaow-charactereditor/tests/ConfigMergeTests.cpp` | Preserving unknown fields and comments when saving YAML configs |
+| `openaow-spritemerge-tests` | `openaow-charactereditor/tests/SpriteMergeTests.cpp` | Sprite merging and sprite meta pivot editing |
+| `openaow-preview-tests` | `openaow-charactereditor/tests/PreviewStatsTests.cpp` | Character editor stat preview calculations |
 
 Run one binary directly to see its whole output: `./build/tests/openaow-net-tests` (the test programs are built into `build/tests/`).
 
-Not covered: packet loss, latency or reordering (the loopback transport has no loss model); the game side of a
-network match (`NetMatch`) and the world checksum. Use the bot matches below for those (there is no automated game-level test).
+Not covered: packet loss, latency or reordering in the loopback transport (use `tc netem` below for real-network testing).
 
 ## 3. Debug mode in the game (`--debug`, debug build)
 
@@ -131,11 +146,8 @@ At start the log reports what was loaded: `[SfxMixer] N sound clips for M events
 
 ## 6. Game data guarantee
 
-Run `python3 tools/test_pack_assets.py` to check that manifest references must be present in the archive inventory,
-including rejection of existing but excluded files and paths outside the assets directory.
-
 - `assets/main.yaml` names every file the game loads by its full path; the game does not start without it.
-  `tools/pack_assets.py` refuses to pack when main.yaml names a file that does not exist.
+  `tools/pack_assets.py` refuses to pack when `main.yaml` names a file that does not exist.
 - `tools/pack_assets.py <assets> <out.blob>` packs the data and writes the integrity certificate into the blob
   itself: the entry `certificate.sha256` (`<path>  <sha256>` per packed file). There is no separate certificate
   file. With `-DBUILD_ASSETS_BLOB=ON` CMake runs it.
@@ -157,12 +169,12 @@ including rejection of existing but excluded files and paths outside the assets 
 
 ## 8. Other checks
 
-- **Translations**: every project has its own catalogs under `po/`:
-  `po/openaow_{en,ru}.po`, `po/openaow_character_editor_{en,ru}.po`, `po/openaow_map_editor_{en,ru}.po`.
-  Check with `tools/localegen.sh --check` or `msgfmt -c po/<file>.po`. CMake compiles them into
-  `assets/locale/*/LC_MESSAGES/*.mo`.
-- **Network assets check**: everything under `assets/data/*.json` and `assets/characters/*.yaml` (except the
-  sound settings) is hashed (`NetMatch::AssetsHash`). Peers with different files are refused at join time.
+- **Translations**: `po/openaow.pot` and `po/openaow_ru.po`.
+  Check with `tools/localegen.sh --check` or `msgfmt -c po/<file>.po`. On desktop builds, the CMake `translations`
+  target runs `tools/po2yaml.py` to generate `assets/locale/<lang>/openaow.yaml`.
+- **Network assets check**: the files listed under `net_hash` in `assets/main.yaml` (`assets/characters/*.yaml`,
+  simulation YAML tables, etc.) are hashed (`NetMatch::AssetsHash`). Joining peers whose hash differs automatically
+  receive the host's `net_hash` data into a temporary session overlay (`NetMatch` DataSync).
   Protocol changes need `kProtocolVersion` bumped (`src/networking`).
 - **Screenshots**: there is no built-in facility. Temporarily add `SDL_RenderReadPixels` + `SDL_SaveBMP` before
   `m_renderer->Present()` in `Application::Render()` (works with the dummy video driver), then remove it.

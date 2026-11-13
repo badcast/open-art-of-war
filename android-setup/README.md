@@ -84,7 +84,7 @@ Restart the app after copying the archive. See the [main asset instructions](../
 
 ## Android interface and controls
 
-CMake defines the numeric flag `ANDROID=1` for Android and `ANDROID=0` for other platforms. Platform-specific code uses `#if ANDROID`.
+CMake defines `OAOW_TOUCH=1` for mobile builds (Android and iOS) and `OAOW_TOUCH=0` for desktop builds. Android-specific calls are isolated in [`platform/TouchPlatform.cpp`](../platform/TouchPlatform.cpp).
 
 - Fullscreen landscape mode supports both landscape orientations.
 - The interface uses a shared coordinate system with a height of 720, preserving the screen's aspect ratio.

@@ -4,10 +4,10 @@
 
 <img src="docs/app-game-icon.png" alt="Open Art Of War: Logo" width="100" />
 
-A native, open-source, **cross-platform real-time strategy game** recreating **Art of War 2: Liberation of Peru** for **Linux, Windows, macOS and Android**. Build your base, command the Resistance or Confederation, and play campaigns or skirmishes against the AI. **LAN and online multiplayer support up to eight players**, with teams, direct connections and dedicated server rooms.
+A native, open-source, **cross-platform real-time strategy game** recreating **Art of War 2: Liberation of Peru** for **Linux, Windows, macOS, Android and iOS**. Build your base, command the Resistance or Confederation, and play campaigns or skirmishes against the AI. **LAN and online multiplayer support up to eight players**, with teams, direct connections and dedicated server rooms.
 
 [![Build](https://img.shields.io/github/actions/workflow/status/badcast/open-art-of-war/build.yml?branch=main&style=flat-square&label=build)](https://github.com/badcast/open-art-of-war/actions)
-[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android-informational?style=flat-square)](#platforms)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android%20%7C%20iOS-informational?style=flat-square)](#platforms)
 [![License](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](LICENSE)
 
 [Website](https://openaow.imister.tech) · [Downloads](https://github.com/badcast/open-art-of-war/releases) · [Report an issue](https://github.com/badcast/open-art-of-war/issues) · [Telegram](https://t.me/+EkC17x8nKy05NDdi)
@@ -32,11 +32,11 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 <details>
 <summary>In Russian</summary>
 
-**Open Art Of War: Freedom for Liberty** - открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS и Android. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков и редакторы.
+**Open Art Of War: Freedom for Liberty** - открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS, Android и iOS. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков и редакторы.
 
 > **Статус:** проект находится в разработке и тестировании. Графика и звук оригинальной игры не входят в лицензию движка. Перед запуском необходимо подготовить игровые ресурсы.
 
-**Android:** добавлены альбомная ориентация, масштабирование интерфейса, крупные вкладки HUD и сенсорное управление. Инструкции по сборке, установке ресурсов и жестам находятся в [Android README](android-setup/README.md).
+**Android и iOS:** добавлены альбомная ориентация, масштабирование интерфейса, крупные вкладки HUD и сенсорное управление. Инструкции по сборке и установке ресурсов находятся в [Android README](android-setup/README.md) и [iOS README](ios-setup/README.md).
 
 **Как помочь:** кодом, тестированием, переводами, графикой и звуком. Задачи обсуждаем в Issues и чате Telegram - ссылки в начале страницы.
 </details>
@@ -46,7 +46,7 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 - **Two factions and campaigns:** Resistance - *Liberation of Peru*; Confederation - *Global Confederation*.
 - **Skirmishes and multiplayer:** custom maps, computer opponents, teams and up to eight players; LAN discovery, direct connections and server rooms.
 - **Classic RTS gameplay:** base building, power, economy, research, fog of war, attack-move and control groups.
-- **Desktop and touch controls:** mouse and keyboard on desktop; touch selection, contextual commands, camera gestures and a landscape HUD on Android.
+- **Desktop and touch controls:** mouse and keyboard on desktop; touch selection, contextual commands, camera gestures and a landscape HUD on Android and iOS.
 - **Configurable graphics:** zoom, quality settings, renderer fallback and shader effects where supported.
 - **Creation tools:** map and character editors, configurable game data, mods and replay support.
 
@@ -68,8 +68,9 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 | Windows | Native desktop build with MSVC or MinGW |
 | macOS | Native desktop build |
 | Android | Android 7.0+; ARM64 and x86_64; fullscreen landscape with touch controls |
+| iOS | iOS 15.0+; ARM64 (device and simulator); Xcode / CMake static build with Metal shaders and touch controls |
 
-The Android project is in [`android-setup/`](android-setup/README.md). Common touch-device code uses `OAOW_TOUCH`, set by CMake for supported mobile builds; platform-specific SDL calls are isolated in `platform/TouchPlatform.cpp`.
+The Android project is in [`android-setup/`](android-setup/README.md), and the iOS setup is in [`ios-setup/`](ios-setup/README.md). Common touch-device code uses `OAOW_TOUCH`, set by CMake for supported mobile builds; platform-specific calls are isolated in `platform/TouchPlatform.cpp`.
 
 ## Build & run
 
@@ -79,7 +80,7 @@ The engine needs game data, artwork and audio. Original Art of War 2 assets belo
 
 On desktop, place the prepared `assets/` directory in the repository root, or put `assets.blob` beside the executable. The default archive name is **`assets.blob`**.
 
-To pack an existing `assets/` directory during a desktop build, add `-DBUILD_ASSETS_BLOB=ON` to the configure command. Android reads this archive from the application's storage directory; see the [Android asset instructions](android-setup/README.md#game-assets).
+To pack an existing `assets/` directory during a desktop build, add `-DBUILD_ASSETS_BLOB=ON` to the configure command. Android and iOS install bundled blobs from the package on first launch or read `assets.blob` from their application storage directory; see the [Android asset instructions](android-setup/README.md#game-assets) and [iOS asset instructions](ios-setup/README.md#game-assets-game_data_urls).
 
 ### Desktop dependencies
 
@@ -121,6 +122,17 @@ The APK is written to `android-setup/app/build/outputs/apk/debug/` relative to t
 
 See the [Android setup guide](android-setup/README.md) for prerequisites and asset installation. The [Android build workflow](.github/workflows/android.yml) contains the CI setup, including SDL Java sources.
 
+### Build for iOS
+
+On macOS with Xcode 15+, CMake 3.22+, Git and `spirv-cross` installed (`brew install cmake ninja spirv-cross`), run the helper script from the repository root:
+
+```bash
+./ios-setup/build-ios.sh device --ipa   # Unsigned device .app + OpenArtOfWar-ios.ipa
+./ios-setup/build-ios.sh simulator       # iOS Simulator build
+```
+
+All iOS dependencies (`SDL3`, `SDL3_ttf`, `yaml-cpp`, `nlohmann_json`, `zstd`, `libarchive`) are fetched and built statically via [`cmake/IosDeps.cmake`](cmake/IosDeps.cmake), and `GAME_DATA_URLS` assets are downloaded into `ios-setup/assets/` when set. See the [iOS setup guide](ios-setup/README.md) and [iOS build workflow](.github/workflows/ios.yml) for signing, simulator usage and Finder/Files asset sideloading.
+
 ### Useful launch options
 
 ```bash
@@ -152,7 +164,7 @@ See the [Android setup guide](android-setup/README.md) for prerequisites and ass
 | Toggle fullscreen | `F11` or `Alt+Enter` |
 | Pause a network match | `P` or `Pause` |
 
-### Android
+### Touch devices (Android & iOS)
 
 | Action | Gesture |
 | --- | --- |
@@ -162,7 +174,7 @@ See the [Android setup guide](android-setup/README.md) for prerequisites and ass
 | Cancel a production order | Hold its production card, then release |
 | Move and zoom the camera | Drag or pinch with two fingers |
 | Switch HUD tabs | Tap the labelled sidebar buttons |
-| Back / game menu | System Back button |
+| Back / game menu | On-screen `MENU` button (or system Back button on Android) |
 
 The interface scales with the screen and stays in landscape orientation. Camera gestures are disabled while menus are open.
 
@@ -200,13 +212,13 @@ Opening the game menu does not pause a network match. The game supports reconnec
 
 The server needs no graphics or game assets. Default ports are UDP `38100` for discovery and room access, UDP `38110–38199` for rooms, and TCP `38100` for the HTTP status endpoint. See the [systemd service example](openaow-server/openaow-server.service) for Linux hosting.
 
-The simulation uses deterministic lockstep: players exchange commands and each peer simulates the world. Network defaults are configured in `assets/data/game_environment.json`.
+The simulation uses deterministic lockstep: players exchange commands and each peer simulates the world. Network defaults are configured in `assets/data/game_environment.yaml`.
 
 </details>
 
 ## Settings & saved data
 
-Open **Settings** from the main menu or game menu to adjust graphics, audio, language and zoom. Desktop builds also offer window modes and display resolutions; Android uses the fullscreen device surface.
+Open **Settings** from the main menu or game menu to adjust graphics, audio, language and zoom. Desktop builds also offer window modes and display resolutions; Android and iOS use the fullscreen device surface.
 
 The game stores preferences and progress in its per-user application directory, separate from the factory data in `assets/`:
 
@@ -221,14 +233,15 @@ The game stores preferences and progress in its per-user application directory, 
 
 | Guide | Contents |
 | --- | --- |
-| [Android](android-setup/README.md) | Build setup, assets, touch controls and device checks |
+| [Android](android-setup/README.md) | Android build setup, assets, touch controls and device checks |
+| [iOS](ios-setup/README.md) | macOS/Xcode build setup, Metal shaders, `GAME_DATA_URLS` and sideloading |
 | [Tests & debugging](TESTS.md) | Test suites, debug builds and diagnostic tools |
-| [Architecture](docs/architecture.md) | Engine structure and simulation |
+| [UI layout](docs/ui-layout.md) | `assets/ui/layout.yaml` profiles (`pc`, `touch`) and live reload |
 | [Map editor](openaow-mapeditor/README.md) | Map creation and editing |
 | [Character editor](openaow-charactereditor/README.md) | Unit and building configuration |
-| [Modding](docs/modding.md) | Custom game content |
-| [Replay format](docs/replay-format.md) | Replay file structure |
-| [Binary formats](docs/binary_formats.md) | Resource formats |
+| [Modding](docs/modding.md) | Custom game content and tech levels |
+| [Replay format](docs/replay-format.md) | Replay file structure (`.awr`) |
+| [CI game data](docs/ci-game-data.md) | `GAME_DATA_URLS` bundling for desktop, Android and iOS CI builds |
 
 Run tests after building:
 
@@ -246,7 +259,7 @@ cmake --build build-debug --parallel
 
 ## Contributing
 
-Contributions are welcome in gameplay, networking, Android support, UI, testing, translations, original artwork and audio.
+Contributions are welcome in gameplay, networking, mobile (Android & iOS) support, UI, testing, translations, original artwork and audio.
 
 Start with an issue describing the problem or proposal, then submit a focused pull request with verification steps. For bugs, include your platform, build version, reproduction steps and relevant logs. Use the community links at the top of this page to discuss work with other contributors.
 
