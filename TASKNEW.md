@@ -183,3 +183,15 @@ Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen
 ## Replica death visuals (snapshot v9)
 
 - [~] Death events carry the authority's death animation and wreck state, and replicas age visible remains without simulation. Explosions and blasts use the existing event stream. Snapshot round-trip and replica behavior tests pass in the targeted Release build; the test reports no loaded sprite or character configs, and live visual verification is pending. Projectile craters are carried as visual events.
+
+## Codex audit of the replica path (2026-11-13)
+
+- [x] `NetMatch::CanRunTick/ScheduleBundle/AfterTick` refuse on a replica, `Detach` restores Standalone, replica research comes from the snapshot.
+- [ ] Match loading builds the world and AI controllers on every client before `Attach` sets the role: set the role first.
+- [ ] `OAOW_NET_BOT` runs every frame on a replica (`Application.cpp` `DriveNetworkBot`): once per new snapshot tick only.
+- [ ] `Simulation::Schedule` / `EndTick` still work in Replica mode when called directly.
+- [ ] `tests/ReplicaLoopbackTests.cpp` (two peers, host ticks, replica stands still without snapshots): agy was not started (command refused / wrong flag order).
+
+## Touch build (2026-11-13)
+
+Clip rects broke behind SDL's logical presentation on devices (empty radar, cut dialogs): now a plain render scale, ImGui in those units, touch confirm drawn by the game. Needs a check on a phone.
