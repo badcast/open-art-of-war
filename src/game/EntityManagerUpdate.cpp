@@ -584,6 +584,11 @@ void EntityManager::Update(float deltaTime, TileMap &map, Pathfinder &pathfinder
         }
     }
 
+    // Finished shots are not part of simulation state or snapshots. Keep live shots in their existing order.
+    m_projectiles.erase(
+        std::remove_if(m_projectiles.begin(), m_projectiles.end(), [](const Projectile &p) { return !p.active; }),
+        m_projectiles.end());
+
     // Craters fade away after their time
     for (GroundMark &m : m_groundMarks)
         m.timeLeft -= deltaTime;
@@ -647,8 +652,10 @@ void EntityManager::UpdateVisualEffects(float deltaTime)
         const EffectsConfig &fx = EffectsConfig::Get();
         for (GroundMark &m : m_groundMarks)
             m.timeLeft -= deltaTime;
-        m_groundMarks.erase(std::remove_if(m_groundMarks.begin(), m_groundMarks.end(),
-            [](const GroundMark &m) { return m.timeLeft <= 0.0f; }), m_groundMarks.end());
+        m_groundMarks.erase(
+            std::remove_if(
+                m_groundMarks.begin(), m_groundMarks.end(), [](const GroundMark &m) { return m.timeLeft <= 0.0f; }),
+            m_groundMarks.end());
         for (Entity &e : m_entities)
         {
             if (e.state != ActionState::Die)
@@ -673,10 +680,14 @@ void EntityManager::UpdateVisualEffects(float deltaTime)
                 }
             }
         }
-        m_entities.Raw().erase(std::remove_if(m_entities.Raw().begin(), m_entities.Raw().end(),
-            [&](const std::unique_ptr<Entity> &e) {
-                return e->state == ActionState::Die && e->deathTimer <= -fx.fadeSeconds;
-            }), m_entities.Raw().end());
+        m_entities.Raw().erase(
+            std::remove_if(
+                m_entities.Raw().begin(),
+                m_entities.Raw().end(),
+                [&](const std::unique_ptr<Entity> &e) {
+                    return e->state == ActionState::Die && e->deathTimer <= -fx.fadeSeconds;
+                }),
+            m_entities.Raw().end());
     }
     // 3b. Flamethrower jets and muzzle flashes (visual only)
     for (auto &flash : m_muzzleFlashes)

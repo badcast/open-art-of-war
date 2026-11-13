@@ -69,7 +69,7 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 | macOS | Native desktop build |
 | Android | Android 7.0+; ARM64 and x86_64; fullscreen landscape with touch controls |
 
-The Android project is in [`android-setup/`](android-setup/README.md). Its platform-specific code uses `#if ANDROID`; CMake defines `ANDROID=1` for Android and `ANDROID=0` for desktop builds.
+The Android project is in [`android-setup/`](android-setup/README.md). Common touch-device code uses `OAOW_TOUCH`, set by CMake for supported mobile builds; platform-specific SDL calls are isolated in `platform/TouchPlatform.cpp`.
 
 ## Build & run
 

@@ -3,6 +3,7 @@
 #include "core/Config.hpp"
 #include "game/Players.hpp"
 
+#include <array>
 #include <string>
 
 namespace OpenArtOfWar
@@ -85,6 +86,10 @@ void SetResearchAnimation(PlayerId player, bool researching, EntityManager &enti
 // of the player's faction (researchDef(Players::factionOf(player), i)).
 void ResetResearch();
 void ResetResearch(PlayerId player);
+// Save/restore completed flags for a separate temporary world; existing unit effects are not modified.
+using ResearchState = std::array<std::uint32_t, kMaxPlayers>;
+ResearchState CaptureResearchState();
+void RestoreResearchState(const ResearchState &state);
 bool IsResearched(PlayerId player, int index);
 // The technology's own requirement is done and the player's tech level (Capabilities) has it
 bool IsResearchAvailable(PlayerId player, int index);

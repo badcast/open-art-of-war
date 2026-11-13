@@ -1000,6 +1000,12 @@ msgstr "Спрайты в 1/2 разрешения"
 msgid "Smoothing"
 msgstr "Сглаживание"
 
+msgid "Show shadows"
+msgstr "Показывать тени"
+
+msgid "Draw shadows under units and buildings"
+msgstr "Отображать тени юнитов и зданий"
+
 msgid "Smooth scaling of the sprites instead of hard pixels"
 msgstr "Плавное масштабирование спрайтов вместо резких пикселей"
 
@@ -2775,3 +2781,12 @@ msgstr "Подключение по адресу (хост открывает UD
 
 msgid "CREATE ROOM"
 msgstr "СОЗДАТЬ КОМНАТУ"
+
+msgid "TAP A LOCATION, THEN TAP THE BUILDING"
+msgstr "КОСНИТЕСЬ МЕСТА, ЗАТЕМ ЗДАНИЯ"
+
+msgid "INSUFFICIENT FUNDS!"
+msgstr "НЕДОСТАТОЧНО СРЕДСТВ!"
+
+msgid "CANNOT BUILD HERE!"
+msgstr "ЗДЕСЬ НЕЛЬЗЯ СТРОИТЬ!"

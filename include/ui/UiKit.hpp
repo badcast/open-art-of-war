@@ -121,7 +121,8 @@ void DrawButton(
     ButtonStyle style,
     bool hovered,
     bool enabled = true,
-    int fontId = FONT_BODY_BOLD);
+    int fontId = FONT_BODY_BOLD,
+    Uint8 opacity = 255);
 
 // The bold font nearest to `scale` times the body size (16px): 1 = body, 2 = ~30px title, 3 = hero (48px)
 int ButtonFontForScale(float scale);

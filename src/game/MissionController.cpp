@@ -399,14 +399,15 @@ bool MissionController::LoadMission(
                     {
                         // Timed by setDefensePacing (difficulty); these defaults hold until it is called
                         const int order = defenseWaves++;
-                        m_scheduledWaves.push_back({m_defenseFirstWave + m_defenseWaveGap * order,
-                                                    group,
-                                                    scriptX,
-                                                    scriptY,
-                                                    commandVal,
-                                                    false,
-                                                    order,
-                                                    0.0f});
+                        m_scheduledWaves.push_back(
+                            {m_defenseFirstWave + m_defenseWaveGap * order,
+                             group,
+                             scriptX,
+                             scriptY,
+                             commandVal,
+                             false,
+                             order,
+                             0.0f});
                     }
                     else
                     {
@@ -996,8 +997,8 @@ void SpawnPrebuilt(
         const PlayerId owner = ownerOf(faction, x, y);
         if (owner == kNoPlayer)
             continue;
-        const int buildingId
-            = entities.SpawnBuildingByIndex(buildingIndex, x, y, faction, buildingJson.value("initialProgress", 1.0f), owner);
+        const int buildingId = entities.SpawnBuildingByIndex(
+            buildingIndex, x, y, faction, buildingJson.value("initialProgress", 1.0f), owner);
         const Building *building = buildingId > 0 ? entities.GetBuilding(buildingId) : nullptr;
         if (!building)
             continue;
@@ -1156,7 +1157,16 @@ bool MissionController::LoadSkirmish(
         for (int apart = std::min(mapWidth, mapHeight) / 2; apart >= playerSiteSize && enemySiteSize == 0; apart -= 2)
         {
             if (FindBaseSite(
-                    map, size, enemyTargetX, enemyTargetY, &connected, enemyBaseX, enemyBaseY, playerBaseX, playerBaseY, apart))
+                    map,
+                    size,
+                    enemyTargetX,
+                    enemyTargetY,
+                    &connected,
+                    enemyBaseX,
+                    enemyBaseY,
+                    playerBaseX,
+                    playerBaseY,
+                    apart))
                 enemySiteSize = size;
         }
         if (enemySiteSize != 0)
@@ -1212,8 +1222,7 @@ bool MissionController::LoadSkirmish(
         if (usePrebuilt)
         {
             planner.Place(2, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner, unusedX, unusedY);
-            planner.PlaceUnits(
-                kConfederationBase.units, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner);
+            planner.PlaceUnits(kConfederationBase.units, enemyCenterX, enemyCenterY, Faction::Confederation, autoOwner);
         }
     }
 

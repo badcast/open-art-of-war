@@ -19,6 +19,10 @@ class ShaderEffects;
 class Renderer
 {
 public:
+    void SetShowShadows(bool show)
+    {
+        m_showShadows = show;
+    }
     Renderer(SDL_Renderer *sdlRenderer, TextureManager *textureManager);
 
     void Clear(SDL_Color clearColor = {0, 0, 0, 255});
@@ -185,6 +189,11 @@ public:
     // Clipping
     void SetClipRect(const SDL_Rect &rect);
     void ResetClipRect();
+    // A clip that needs no scissor: what is drawn between Begin and End goes into an offscreen picture of `rect`,
+    // filled with the opaque `background` first, and the requested region is blitted back without a hardware scissor.
+    // False when it cannot (the caller falls back to SetClipRect).
+    bool BeginClipTarget(const SDL_Rect &rect, SDL_Color background);
+    void EndClipTarget(Uint8 opacity = 255);
 
     SDL_Renderer *GetSdlRenderer() const
     {
@@ -269,13 +278,22 @@ private:
     float m_drawAlpha {1.0f};
     SDL_Color m_glowColor {255, 255, 255, 255};
     float m_glowStrength {0.0f};
-    int m_structureTeam {0};                                             // see setStructureFaction
+    int m_structureTeam {0}; // see setStructureFaction
+    bool m_showShadows {true};
     std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
     std::vector<bool> m_tintedSheet; // images whose colour mod carries an army colour right now
 
     SDL_Renderer *m_renderer {nullptr};
     TextureManager *m_texManager {nullptr};
     SDL_Texture *m_maskTexture {nullptr};
+    SDL_Texture *m_clipTex {nullptr}; // BeginClipTarget's picture
+    int m_clipTexW {0}, m_clipTexH {0};
+    SDL_Texture *m_clipPrevTarget {nullptr};
+    SDL_Rect m_clipTargetRect {0, 0, 0, 0};
+    SDL_Rect m_clipPrevViewport {0, 0, 0, 0};
+    bool m_clipPrevViewportSet {false};
+    bool m_clipTargetActive {false};
+    float m_clipScale {1.0f};
     SDL_Texture *m_glowTexture {nullptr}; // white radial falloff with a soft rim (selection bubble)
     int m_maskW {0};
     int m_maskH {0};

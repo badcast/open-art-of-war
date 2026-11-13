@@ -137,7 +137,7 @@ void ImGuiBridge::ProcessEvent(const SDL_Event &event)
 {
     if (s_initialized)
     {
-        // With a logical presentation (Android) pointer events must land in the logical space the UI is laid out in
+        // With a logical presentation (touch) pointer events must land in the logical space the UI is laid out in
         SDL_Event converted = event;
         SDL_ConvertEventToRenderCoordinates(s_renderer, &converted);
         ImGui_ImplSDL3_ProcessEvent(&converted);
@@ -152,7 +152,7 @@ void ImGuiBridge::BeginFrame()
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     {
-        // Android draws through a render scale: ImGui must lay out in those units, not in window pixels
+        // Touch devices draw through a render scale: ImGui must lay out in those units, not in window pixels
         float sx = 1.0f, sy = 1.0f;
         int ow = 0, oh = 0;
         SDL_GetRenderScale(s_renderer, &sx, &sy);

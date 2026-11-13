@@ -115,14 +115,12 @@ void SessionClient::handle(const TransportEvent &e)
             // filter starts again from what is left (a new match counts its ticks from zero)
             m_authorityStates.erase(
                 std::remove_if(
-                    m_authorityStates.begin(), m_authorityStates.end(),
+                    m_authorityStates.begin(),
+                    m_authorityStates.end(),
                     [&](const AuthorityState &a) { return a.matchId != m.matchId; }),
                 m_authorityStates.end());
-            m_hasAuthorityStateTick = !m_authorityStates.empty();
-            if (m_hasAuthorityStateTick)
-                m_authorityStateTick = m_authorityStates.back().tick;
-            else if (m_matchId != m.matchId)
-                m_authorityStateTick = 0;
+            m_hasAuthorityStateTick = false;
+            m_authorityStateTick = 0;
             m_matchId = m.matchId;
             m_authorityAcks.clear();
             m_authoritySlot = m.authoritySlot;
@@ -138,10 +136,9 @@ void SessionClient::handle(const TransportEvent &e)
         {
             AuthorityState state;
             if (e.data.size() <= kMaxAuthorityStateBytes + 32 && decode(r, state) && state.recipient == slot()
-                && (!m_started || state.matchId == m_matchId) && (!m_hasAuthorityStateTick || state.tick > m_authorityStateTick))
+                && (!m_started || state.matchId == m_matchId)
+                && (!m_hasAuthorityStateTick || state.tick > m_authorityStateTick))
             {
-                m_authorityStateTick = state.tick;
-                m_hasAuthorityStateTick = true;
                 if (m_authorityStates.size() >= kMaxQueuedAuthorityStates)
                     m_authorityStates.pop_front(); // a client that never takes them: the oldest go first
                 m_authorityStates.push_back(std::move(state));
@@ -205,8 +202,14 @@ void SessionClient::handle(const TransportEvent &e)
 
 bool SessionClient::sendAuthorityState(const AuthorityState &state)
 {
-    if (m_state != State::Joined || !m_started || state.recipient >= kMaxPlayers || state.recipient == slot() || state.bytes.size() > kMaxAuthorityStateBytes)
+    if (m_state != State::Joined || !m_started || state.recipient >= kMaxPlayers || state.recipient == slot()
+        || state.bytes.size() > kMaxAuthorityStateBytes)
         return false;
+    const auto recipient = std::find_if(m_roster.players.begin(), m_roster.players.end(), [&](const RosterEntry &p) {
+        return p.slot == state.recipient && p.connected;
+    });
+    if (recipient == m_roster.players.end())
+        return false; // this is a local roster check, not a delivery acknowledgement
     std::vector<std::uint8_t> packet(state.bytes.size() + 32);
     BitWriter w(packet.data(), packet.size());
     AuthorityState out = state;
@@ -221,17 +224,26 @@ bool SessionClient::sendAuthorityState(const AuthorityState &state)
 
 bool SessionClient::takeAuthorityState(AuthorityState &state)
 {
-    if (m_authorityStates.empty())
-        return false;
-    state = std::move(m_authorityStates.front());
-    m_authorityStates.pop_front();
-    return true;
+    while (!m_authorityStates.empty())
+    {
+        state = std::move(m_authorityStates.front());
+        m_authorityStates.pop_front();
+        if (!m_hasAuthorityStateTick || state.tick > m_authorityStateTick)
+            return true;
+    }
+    return false;
 }
 
 bool SessionClient::sendAuthorityAck(std::uint32_t tick)
 {
     if (m_state != State::Joined || !m_started || slot() == m_authoritySlot)
         return false;
+    // The caller acknowledges only after decoding and applying the snapshot.
+    if (!m_hasAuthorityStateTick || tick > m_authorityStateTick)
+    {
+        m_authorityStateTick = tick;
+        m_hasAuthorityStateTick = true;
+    }
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, AuthorityAck {slot(), m_matchId, tick});
     send(Channel::Control, m_buffer.data(), w.finish());

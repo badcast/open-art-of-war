@@ -250,6 +250,7 @@ public:
     // Opaque per-player state; only the match authority is allowed to publish it.
     bool sendAuthorityState(const AuthorityState &state);
     bool takeAuthorityState(AuthorityState &state);
+    // Confirm a successfully decoded and applied snapshot; older states are then ignored.
     bool sendAuthorityAck(std::uint32_t tick);
     bool takeAuthorityAck(AuthorityAck &ack);
 
@@ -397,7 +398,8 @@ private:
     std::uint32_t m_desyncTick {0};
     PauseState m_pause;
     std::vector<Chat> m_chat;
-    std::deque<AuthorityState> m_authorityStates; // in arrival order, every one is delivered (one-time events ride on them)
+    std::deque<AuthorityState>
+        m_authorityStates; // in arrival order, every one is delivered (one-time events ride on them)
     std::deque<AuthorityAck> m_authorityAcks;
     std::uint32_t m_matchId {0};
     std::uint8_t m_authoritySlot {0};

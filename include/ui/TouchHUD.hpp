@@ -10,14 +10,11 @@ namespace OpenArtOfWar
 /**
  * @brief The touch interface: no sidebar, the whole screen is the map and the controls float over it.
  *
- * Bottom left the radar, bottom right the dock (BUILD, UNITS), between them the orders of what is selected;
- * the cards of what can be built or trained open above the dock. A building is placed with a ghost: pick the card,
- * drag the ghost with a finger, confirm with the green button (walls and mines keep the placement going). Taps on the
- * map are handled by GameplayController (tap = move, second tap = attack-move, tap on an own unit = select), and
- * dragging on the map always draws a selection box unless building placement is active.
- * Used instead of HUDController on Android (and with --touch-ui).
+ * The right-hand grid contains construction and production cards. Map taps choose and confirm a building position;
+ * map drags pan the camera and a hold followed by a drag selects units.
+ * Used instead of HUDController on touch devices (and with --touch-ui).
  */
-class AndroidHUD : public HUDController
+class TouchHUD : public HUDController
 {
 public:
     int ReservedWidth() const override
@@ -25,13 +22,22 @@ public:
         return 0;
     }
     bool IsOverHud(int mx, int my, int windowW, int windowH) const override;
-    // Box selection is always active for single-finger map drags except while placing a building: then a drag that
-    // starts on the ghost moves it (the ghost is a panel of TouchPanels), and one that starts elsewhere pans the camera
+    // While placing, map drags pan without starting selection.
     bool TouchPansCamera() const override
     {
         return m_placing || m_buildMode;
     }
     std::vector<SDL_Rect> TouchPanels(int windowW, int windowH) const override;
+    SDL_Rect TouchScrollPanel(int windowW, int windowH) const override;
+    SDL_Rect TouchPlacementGhost() const override
+    {
+        return m_placing ? m_ghostRect : SDL_Rect {0, 0, 0, 0};
+    }
+    void SetPointerPressOrigin(int x, int y) override
+    {
+        m_pressX = x;
+        m_pressY = y;
+    }
     bool OwnsMapInput() const override
     {
         return m_placing || m_buildMode;
@@ -114,11 +120,13 @@ private:
         float u {1.0f};
         ui::UiRect resources, radar, cards, notice;
         std::vector<Button> buttons;
-        int cardsFit {1}; // cards that fit side by side
+        int cardsFit {1}; // visible cards
     };
     // `hasCombat` / `hasBuilding`: what is selected (own units that fight / own structures)
     Layout MakeLayout(int windowW, int windowH, bool hasCombat, bool hasBuilding, int selectedCount) const;
     ui::UiRect CardRect(const Layout &l, int slot) const;
+    int FirstCard(const Layout &l, int scrollSlot) const;
+    float MaxCardScroll(const Layout &l, int tab) const;
     bool OverPanels(const Layout &l, int mx, int my) const;
     void Press(
         Act act,
@@ -137,14 +145,18 @@ private:
 
     Panel m_panel {Panel::None};
     int m_unitTab {TabInfantry};
-    int m_scroll[3] {0, 0, 0}; // first card shown: build, infantry, vehicles
+    float m_scroll[3] {0, 0, 0}; // vertical offset in pixels: build, infantry, vehicles
+    bool m_cardsTracking {false};
+    bool m_cardsDragging {false};
+    float m_cardsStartScroll {0.0f};
     bool m_placing {false};
     int m_ghostX {0};
     int m_ghostY {0};
-    bool m_grab {false};                        // the finger holds the ghost
-    bool m_fingerWas {false};                   // the finger was down on the last call
-    float m_grabOffX {0.0f}, m_grabOffY {0.0f}; // ghost corner minus finger, world pixels, from where it was taken
-    mutable SDL_Rect m_ghostRect {0, 0, 0, 0};  // the ghost on the screen (with room for a finger)
+    int m_pressX {0}, m_pressY {0};
+    bool m_grab {false};
+    bool m_fingerWas {false};
+    float m_grabOffX {0.0f}, m_grabOffY {0.0f};
+    mutable SDL_Rect m_ghostRect {0, 0, 0, 0};
     bool m_radarHeld {false};
     int m_seenTab {TabBuild};
     mutable bool m_lastHasCombat {false};

@@ -41,6 +41,7 @@ struct Settings
     // Graphics
     int graphicsQuality {2};  // 0 = low (sprites at 1/3 resolution), 1 = medium (1/2), 2 = high (original resolution)
     bool smoothing {false};   // smooth scaling of the sprites (and of the reduced picture of low / medium quality)
+    bool showShadows {true};  // shadows from unit and building sprites
     float zoomDefault {2.0f}; // camera zoom when a mission starts
     float zoomMin {0.5f};
     float zoomMax {4.0f};

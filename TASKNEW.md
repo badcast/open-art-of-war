@@ -33,10 +33,8 @@ Legend: `[x]` done, `[ ]` to do, `[~]` in progress.
 
 - [x] `AuthorityState` rides `Bulk`, `StartMatch` rides `Lockstep`: no ordering; an early snapshot is wiped by the start
       handler (`SessionClient.cpp:111`). Add a match id / start counter to the snapshot and drop foreign ones.
-- [~] (done: only after match start, no self-send, host drops foreign matchId; todo: boundary/truncation tests) `sendAuthorityState` is allowed before the match and returns true after only packing; tell the sender when the
-      recipient is missing, refuse self-addressed state, add boundary/truncation tests (2 MiB limit, ENet fragmentation).
-- [~] (done: host ends the match when the authority is given up; todo: announce authority slot to clients) Authority leaving does not end the match (`SessionHost.cpp:505`): decide the rule (end match) and announce the
-      authority slot to clients.
+- [x] `sendAuthorityState` refuses pre-match, self-addressed, oversized, and locally known missing/disconnected recipients. Boundary, truncation, and real ENet fragmentation of a 2 MiB snapshot pass. A successful send is not an end-to-end delivery acknowledgement.
+- [x] The authority slot is announced in `StartMatch`; the match ends when the authority is given up. Covered by network tests.
 - [x] Replica guard now also in `Simulation` (ApplyCommands, UpdateEconomies, UpdateOrderQueues, UpdateResearch, UpdateSquads).
 - [x] (now 2, `matchId` added to `StartMatch`/`AuthorityState`) `kProtocolVersion` is still 1: bump with the first network-visible change, not at step 8.
 - Desync suspects: `Hypot` normalisation in movement (`Unit.cpp:442`), float bits hashed in `Simulation.cpp:63,776`;
@@ -49,15 +47,15 @@ High:
 - [x] (`MatchSetup::authorityMode`, the room owner decides; verified live with the joiner lacking the switch) Authority mode is read locally (`ApplicationNetwork.cpp`, setting / `OAOW_AUTHORITY`) and never agreed at match start: mixed settings = lockstep client next to a replica. Put the mode into the match setup so everybody follows the room owner.
 - [x] (dead and dying entities are not sent, the replica erases what is gone, spawns without the slot limit; a failed spawn is still only `false`) `ApplySnapshot` spawns before it kills the missing ones (`FreeEntitySlots` can refuse), ignores a `false` result, and dead entities stay forever (no `Update` on a replica): erase the entities a snapshot drops, spawn without the slot limit, handle failure.
 - [x] (a queue of 64, every snapshot is delivered in order) `SessionClient` keeps one pending snapshot: a second one overwrites the first and its one-time events (explosions, sounds, shake) are lost. Queue them, or put the events in a separate stream that is never dropped.
-- [x] (the filter restarts per match; decode-before-trust is still open) `m_hasAuthorityStateTick` is not reset after `takeAuthorityState`, so a new match / reconnect with lower ticks is refused; the tick is also stored before the content is decoded.
+- [x] The snapshot tick filter resets per match and advances only after the application decodes, applies, and acknowledges a snapshot; invalid high-tick payloads cannot suppress later valid snapshots.
 - [x] (`EntityManager::UpdateVisualEffects` runs on replicas) Replica explosions are never animated or removed (the update that does it does not run on a replica): run the visual-only update (explosions, craters, wrecks) on replicas.
 
 Medium:
-- [ ] Inactive projectiles pile up in `m_projectiles` on the authority; `FreeEntitySlots` is linear per spawn (quadratic for 500 entities).
+- [~] Finished projectiles are removed after their update (live-shot order is preserved); `FreeEntitySlots` remains linear per spawn (quadratic for 500 entities).
 - [ ] Replica commands are timed by the last received bundle; `m_replicaSentTurn` is written but unused. Host moves late commands to the next open turn, so nothing is lost, only delay varies.
 - [x] (class / archetype mismatch replaces the entity) Match entities by id only: check class / archetype too, replace on mismatch; a failed spawn leaves a half-applied snapshot; `id + 1` overflow.
 - [x] Snapshot entities are filtered by the recipient team’s current visibility; enemy economies are omitted.
-- [ ] A forged `AuthorityState` from a normal client is refused by the host (slot + matchId checked); the authority itself is trusted, but its snapshot should be validated field by field.
+- [~] A forged `AuthorityState` from a normal client is refused by the host (slot + matchId checked). The decoder rejects non-finite float fields and unsafe entity IDs; validation of the remaining fields is still needed.
 
 ## Helpers
 
@@ -71,7 +69,7 @@ Medium:
 - [x] Protocol: `MsgType::AuthorityState`, `AuthorityState {recipient, tick, bytes}`, `kMaxAuthorityStateBytes`
 - [x] `SessionHost` relays `AuthorityState` only from `m_authoritySlot`; `SessionClient::sendAuthorityState/takeAuthorityState`
 - [x] Net tests for the relay (`src/networking/tests/NetTests.cpp`)
-- [ ] Review and commit this groundwork (user's own changes, do not reformat)
+- [x] Groundwork committed in `5d4d1de`; subsequent changes and test coverage are tracked separately.
 
 ## Step 1 — roles in `NetMatch`
 
@@ -101,7 +99,7 @@ Medium:
 
 - [~] Per-recipient acknowledged snapshot history and deltas implemented; build and runtime verification pending.
 - [~] Replica acknowledges successfully applied snapshots; authority sends periodic full snapshots and falls back when the base is missing or too old. Reconnect needs live verification.
-- [ ] Split snapshots larger than one packet or raise the limit consciously (`kMaxAuthorityStateBytes` = 2 MB)
+- [x] Reliable ENet fragmentation reassembles a maximum 2 MiB authority snapshot over local UDP; larger snapshots are rejected by the existing limit.
 - [ ] Unreliable/sequenced channel for deltas, drop outdated ones (client already ignores `tick <= last`)
 - [ ] Tests in `NetTests.cpp`: loss, reorder, late joiner, reconnect
 
@@ -129,7 +127,7 @@ Medium:
 
 ## Step 8 — clean up
 
-- [ ] Remove `WorldHash`, `Desync`, `TurnBundle` world checksums and the `DESYNC/` dumps for network games
+- [~] Authority/replica matches no longer send `WorldHash`; lockstep still uses hashes and desync dumps until its future is decided.
 - [ ] Simplify `SimBuildId` / `DataSync` for clients (only the snapshot version must match; visual data check stays)
 - [ ] Bump `kProtocolVersion`
 - [ ] Update `CLAUDE.md` (network section) and `docs/`
@@ -187,11 +185,19 @@ Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen
 ## Codex audit of the replica path (2026-11-13)
 
 - [x] `NetMatch::CanRunTick/ScheduleBundle/AfterTick` refuse on a replica, `Detach` restores Standalone, replica research comes from the snapshot.
-- [ ] Match loading builds the world and AI controllers on every client before `Attach` sets the role: set the role first.
-- [ ] `OAOW_NET_BOT` runs every frame on a replica (`Application.cpp` `DriveNetworkBot`): once per new snapshot tick only.
-- [ ] `Simulation::Schedule` / `EndTick` still work in Replica mode when called directly.
+- [~] `Attach` sets the role before match loading and replicas skip AI initialization. The initial map and starting world are still built on replicas before the first snapshot.
+- [x] `OAOW_NET_BOT` acts once per tick (`DriveNetworkBot`).
+- [x] `Simulation::Schedule` and `EndTick` refuse direct calls in Replica mode; player commands still reach the network sink. Covered by the replica loopback test.
 - [x] `tests/ReplicaLoopbackTests.cpp` (agy): host ticks, replica stands still without snapshots, full + delta snapshots match (ctest openaow-replica-tests).
 
 ## Touch build (2026-11-13)
 
 Clip rects broke behind SDL's logical presentation on devices (empty radar, cut dialogs): now a plain render scale, ImGui in those units, touch confirm drawn by the game. Needs a check on a phone.
+
+## Verification update
+
+Release build completed; all 18 CTest tests pass when the ENet test is run with local socket access (the sandboxed ENet run cannot open its sockets). Snapshot validation now rejects non-finite visual/research values and unsafe entity IDs; other fields still require validation. A separate `AOW_DEBUG` determinism build passes. Two headless local instances (authority and replica with network bots) produced matching re-captured snapshot hashes at 61 of 61 sampled ticks through tick 1200. This does not replace a real visual multiplayer check.
+
+## Match-end follow-up
+
+The authority now publishes a final snapshot even when victory or defeat occurs on an odd tick. A live match-end test is still needed. In matches with three or more teams, the authority owner's own elimination can still stop the simulation while other teams are alive; that needs separate handling before authority mode can be considered complete.

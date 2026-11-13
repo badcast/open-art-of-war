@@ -61,10 +61,24 @@ public:
     Simulation() = default;
 
     // Replica worlds are populated by authoritative state, never advanced locally.
-    enum class ExecutionMode : std::uint8_t { Standalone, Authority, Replica };
-    void SetExecutionMode(ExecutionMode mode) { m_executionMode = mode; }
-    ExecutionMode GetExecutionMode() const { return m_executionMode; }
-    bool AdvancesWorld() const { return m_executionMode != ExecutionMode::Replica; }
+    enum class ExecutionMode : std::uint8_t
+    {
+        Standalone,
+        Authority,
+        Replica
+    };
+    void SetExecutionMode(ExecutionMode mode)
+    {
+        m_executionMode = mode;
+    }
+    ExecutionMode GetExecutionMode() const
+    {
+        return m_executionMode;
+    }
+    bool AdvancesWorld() const
+    {
+        return m_executionMode != ExecutionMode::Replica;
+    }
 
     // Economies of a snapshot (TASKNEW.md): the authority fills them in, a replica takes them over
     void FillEconomies(const SimContext &ctx, WorldSnapshot &out) const;
@@ -115,7 +129,8 @@ public:
     static constexpr std::size_t kMaxQueuedOrders = 16;
     void EndTick()
     {
-        ++m_tick;
+        if (AdvancesWorld())
+            ++m_tick;
     }
 
     std::uint32_t Tick() const

@@ -1,12 +1,14 @@
 // WorldSnapshot: encode / decode round trip, version and damage checks (TASKNEW.md step 2)
 #include "game/EntityManager.hpp"
 #include "game/Players.hpp"
+#include "game/Pathfinder.hpp"
 #include "game/TileMap.hpp"
 #include "game/Unit.hpp"
 #include "game/Building.hpp"
 #include "net/WorldSnapshot.hpp"
 
 #include <cstdio>
+#include <limits>
 
 using namespace OpenArtOfWar;
 
@@ -120,6 +122,38 @@ int main()
     longer.push_back(0);
     WorldSnapshot t2;
     Check(!WorldSnapshot::Decode(longer.data(), longer.size(), t2), "trailing bytes are refused");
+
+    {
+        WorldSnapshot invalid = Sample();
+        invalid.research[0].timer = std::numeric_limits<float>::quiet_NaN();
+        const auto bad = invalid.Encode();
+        WorldSnapshot untouched = Sample();
+        Check(!WorldSnapshot::Decode(bad.data(), bad.size(), untouched) && untouched == Sample(),
+              "non-finite research data is refused without changing output");
+        invalid = Sample();
+        invalid.projectiles[0].x = std::numeric_limits<float>::infinity();
+        const auto badShot = invalid.Encode();
+        Check(!WorldSnapshot::Decode(badShot.data(), badShot.size(), untouched), "non-finite projectile is refused");
+        invalid = Sample();
+        invalid.entities[0].id = static_cast<std::uint32_t>(std::numeric_limits<int>::max());
+        const auto badId = invalid.Encode();
+        Check(!WorldSnapshot::Decode(badId.data(), badId.size(), untouched), "overflowing entity id is refused");
+    }
+
+    // Completed projectiles must not accumulate on the authority between snapshots.
+    {
+        EntityManager shots;
+        WorldSnapshot snapshot;
+        snapshot.projectiles = {{0, 120.0f, 80.0f, 0, 0, 0, 0}, {0, 180.0f, 80.0f, 0, 0, 0, 0}};
+        Check(shots.ApplySnapshot(snapshot) && shots.GetProjectiles().size() == 2, "projectile test starts with shots");
+        TileMap map;
+        map.InitBlankArena(30, 30);
+        Pathfinder pathfinder;
+        pathfinder.SetMap(&map);
+        pathfinder.SetEntityManager(&shots);
+        shots.Update(0.05f, map, pathfinder);
+        Check(shots.GetProjectiles().empty(), "completed projectiles are removed after update");
+    }
 
     // A real world (needs ./assets): capture, round trip, the same world captures the same bytes
     {

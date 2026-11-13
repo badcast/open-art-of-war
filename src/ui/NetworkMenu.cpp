@@ -245,10 +245,10 @@ NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int windowW, int windowH) 
     // Where things stand is ui/layout.yaml (screen network)
     BrowserLayout layout;
     const bool isLan = m_tab == Tab::Lan;
-    const uilayout::Solved solved = uilayout::Current().Solve(
-        "network", "pc", windowW, windowH, [isLan](const std::string &name) {
-            return name == (isLan ? "tab_lan" : "tab_internet");
-        });
+    const uilayout::Solved solved
+        = uilayout::Current().Solve("network", "pc", windowW, windowH, [isLan](const std::string &name) {
+              return name == (isLan ? "tab_lan" : "tab_internet");
+          });
     layout.dialog = solved.Rect("dialog");
     layout.nameField = solved.Rect("name");
     layout.passwordField = solved.Rect("password");
@@ -315,9 +315,11 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int windowW, int windowH)
     layout.mapList = {contentX, contentY + 72, leftWidth, columnH - 72 - chatHeight - 10};
     layout.chatField = {contentX, contentY + columnH - 36, leftWidth - 52, 36};
     layout.chatSend = {layout.chatField.Right() + 8, layout.chatField.y, 44, 36};
-    layout.chatLog = {contentX, layout.mapList.Bottom() + 10, leftWidth, layout.chatField.y - 6 - (layout.mapList.Bottom() + 10)};
+    layout.chatLog
+        = {contentX, layout.mapList.Bottom() + 10, leftWidth, layout.chatField.y - 6 - (layout.mapList.Bottom() + 10)};
     // Right: the details
-    layout.details = {contentX + leftWidth + 16, contentY, layout.dialog.Right() - 20 - (contentX + leftWidth + 16), columnH};
+    layout.details
+        = {contentX + leftWidth + 16, contentY, layout.dialog.Right() - 20 - (contentX + leftWidth + 16), columnH};
     const ui::UiRect &detailsRect = layout.details;
     // The seat table takes the whole width of the details (its cells share it); the map picture sits under it on the
     // left, the options and the hint on its right
@@ -964,8 +966,9 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
     if (!clicked)
         return NetworkAction::None;
 
-    m_focus = layout.chatField.Contains(mouseX, mouseY) ? Field::Chat
-              : (layout.mapSearch.Contains(mouseX, mouseY) ? Field::Search : Field::None);
+    m_focus = layout.chatField.Contains(mouseX, mouseY)
+                  ? Field::Chat
+                  : (layout.mapSearch.Contains(mouseX, mouseY) ? Field::Search : Field::None);
     if (m_focus == Field::Search)
         return NetworkAction::None;
     if (layout.chatSend.Contains(mouseX, mouseY))
@@ -1224,8 +1227,7 @@ void NetworkMenu::Render(
                     const UiRect swatchRect {colorCell.x + 6, colorCell.y + 6, colorCell.w - 28, colorCell.h - 12};
                     renderer.FillRectScreen(
                         swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, SlotColor(choice.color));
-                    renderer.DrawRectScreen(
-                        swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, col::BorderStrong);
+                    renderer.DrawRectScreen(swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, col::BorderStrong);
                 }
                 else
                 {
@@ -1234,8 +1236,7 @@ void NetworkMenu::Render(
                     const UiRect swatchRect {colorCell.x + 6, colorCell.y + 6, colorCell.w - 12, colorCell.h - 12};
                     renderer.FillRectScreen(
                         swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, SlotColor(choice.color));
-                    renderer.DrawRectScreen(
-                        swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, col::BorderStrong);
+                    renderer.DrawRectScreen(swatchRect.x, swatchRect.y, swatchRect.w, swatchRect.h, col::BorderStrong);
                 }
                 const std::string handicapText = ComboChoices(7)[std::min<int>(choice.handicap, 5)];
                 const std::string armyCapText = ui::ArmyCapChoices()[std::min<int>(choice.armyCap, kArmyCapCount - 1)];
@@ -1364,13 +1365,14 @@ void NetworkMenu::Render(
         {
             int previewW = 0, previewH = 0;
             const std::string &file = net->LobbyMapFile();
-            SDL_Texture *texture = m_preview.Get(renderer.GetSdlRenderer(), textures, file, file, {}, previewW, previewH);
+            SDL_Texture *texture
+                = m_preview.Get(renderer.GetSdlRenderer(), textures, file, file, {}, previewW, previewH);
             if (texture)
             {
                 m_mapW = previewW;
                 m_mapH = previewH;
-                const float scale
-                    = std::min(static_cast<float>(layout.map.w) / previewW, static_cast<float>(layout.map.h) / previewH);
+                const float scale = std::min(
+                    static_cast<float>(layout.map.w) / previewW, static_cast<float>(layout.map.h) / previewH);
                 const SDL_FRect destRect {
                     layout.map.x + (layout.map.w - previewW * scale) / 2.0f,
                     layout.map.y + (layout.map.h - previewH * scale) / 2.0f,
@@ -1398,11 +1400,7 @@ void NetworkMenu::Render(
                 renderer.FillRectScreen(
                     spotX - 10, spotY - 10, 20, 20, blockedSpot ? SDL_Color {40, 20, 20, 255} : spotColor);
                 renderer.DrawRectScreen(
-                    spotX - 12,
-                    spotY - 12,
-                    24,
-                    24,
-                    hot ? col::Accent : (blockedSpot ? col::Danger : col::Text));
+                    spotX - 12, spotY - 12, 24, 24, hot ? col::Accent : (blockedSpot ? col::Danger : col::Text));
                 if (blockedSpot)
                 {
                     renderer.DrawLineScreen(spotX - 9, spotY - 9, spotX + 9, spotY + 9, col::Danger);
@@ -1572,11 +1570,10 @@ void NetworkMenu::Render(
             {
                 const std::vector<int> counts = ui::MapFilter::PlayerCounts(m_maps);
                 const auto currentIt = std::find(counts.begin(), counts.end(), m_mapFilter.players);
-                const int current
-                    = comboId == kFilterPlayers
-                          ? (currentIt == counts.end() ? 0 : static_cast<int>(currentIt - counts.begin()))
-                      : comboId == kFilterSize ? m_mapFilter.size
-                                               : m_mapFilter.sort;
+                const int current = comboId == kFilterPlayers
+                                        ? (currentIt == counts.end() ? 0 : static_cast<int>(currentIt - counts.begin()))
+                                    : comboId == kFilterSize ? m_mapFilter.size
+                                                             : m_mapFilter.sort;
                 ui::DrawComboList(
                     renderer,
                     font,
@@ -1700,7 +1697,14 @@ void NetworkMenu::Render(
     {
         // Connecting: the loading screen with what the connection is doing, and a way out
         ui::DrawLoadingScreen(
-            renderer, font, windowW, windowH, _("NETWORK GAME"), net->ConnectingText(SDL_GetTicks()), -1.0f, SDL_GetTicks());
+            renderer,
+            font,
+            windowW,
+            windowH,
+            _("NETWORK GAME"),
+            net->ConnectingText(SDL_GetTicks()),
+            -1.0f,
+            SDL_GetTicks());
         ui::DrawButton(
             renderer,
             font,
@@ -1798,7 +1802,8 @@ void NetworkMenu::Render(
         {
             const UiRect row {layout.list.x + 4, layout.list.y + 4 + static_cast<int>(i) * 40, layout.list.w - 8, 36};
             const bool isSelected = static_cast<int>(i) == m_lanSelected;
-            ui::DrawPanel(renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
+            ui::DrawPanel(
+                renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
             const LanGame &game = lan[i];
             font.DrawString(
                 ui::FitText(font, game.name, ui::FONT_BODY_BOLD, row.w * 26 / 100),
@@ -1839,7 +1844,11 @@ void NetworkMenu::Render(
     else
     {
         ui::DrawCaption(
-            font, renderer, layout.serverList.x, layout.refreshBtn.y + 6, std::string(_("SERVER")) + "  " + serverStatus);
+            font,
+            renderer,
+            layout.serverList.x,
+            layout.refreshBtn.y + 6,
+            std::string(_("SERVER")) + "  " + serverStatus);
         ui::DrawButton(
             renderer,
             font,
@@ -1864,7 +1873,8 @@ void NetworkMenu::Render(
             const UiRect row = layout.ServerRow(i);
             const bool isSelected = i == m_serverSelected;
             const LanGame &game = server[i];
-            ui::DrawPanel(renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
+            ui::DrawPanel(
+                renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
             font.DrawString(
                 game.code,
                 row.x + 10,

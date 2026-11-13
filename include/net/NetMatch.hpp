@@ -307,7 +307,8 @@ public:
     static constexpr std::uint32_t kHashIntervalTicks = 20;
 
 private:
-    struct SnapshotPeer {
+    struct SnapshotPeer
+    {
         std::deque<WorldSnapshot> history;
         std::unordered_set<std::uint32_t> knownEntities;
         std::uint32_t ack {0};
@@ -333,7 +334,7 @@ private:
     std::uint32_t m_scheduledTurn {0}; // turns below this have their commands scheduled
     bool m_authorityMode {false};
     std::uint32_t m_replicaSentTurn {0}; // replica: the last turn its commands went out for (+1, 0 = none)
-    std::uint32_t m_takenStarts {0};   // StartMatch messages turned into a match so far
+    std::uint32_t m_takenStarts {0};     // StartMatch messages turned into a match so far
     void UpdateMapFile();
     // Data sync (see TakeDataChanged)
     void UpdateDataSync();

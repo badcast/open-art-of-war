@@ -640,7 +640,8 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                     if (!validForUnit && HoldsGround() && delegates.findEnemyInAttackRange)
                     {
                         bestTargetId = delegates.findEnemyInAttackRange(*this);
-                        candidate = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
+                        candidate
+                            = bestTargetId != 0 && delegates.getEntity ? delegates.getEntity(bestTargetId) : nullptr;
                         validForUnit = candidate != nullptr;
                     }
                 }

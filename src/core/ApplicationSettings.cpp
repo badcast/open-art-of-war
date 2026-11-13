@@ -84,6 +84,8 @@ int Application::RenderDivisor() const
 
 void Application::ApplyGraphics()
 {
+    if (m_renderer)
+        m_renderer->SetShowShadows(m_settings.showShadows);
     if (m_camera)
         m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
     const bool effects = m_effects && m_effects->Available();
@@ -106,14 +108,14 @@ void Application::ApplySettings(SettingsArea area)
     {
         case SettingsArea::Video:
         {
-#if ANDROID
+#if OAOW_TOUCH
             m_settings.windowMode = WindowMode::Borderless;
 #else
             const Settings before = m_confirmedVideo;
 #endif
             VideoModes::Apply(m_window, m_sdlRenderer, m_settings);
             SyncWindowSize();
-#if ANDROID
+#if OAOW_TOUCH
             m_confirmedVideo = m_settings;
 #else
             const bool windowChanged = before.windowMode != m_settings.windowMode
@@ -154,8 +156,8 @@ void Application::ApplySettings(SettingsArea area)
 // F11 / Alt+Enter: windowed <-> borderless fullscreen
 void Application::ToggleFullscreen()
 {
-#if ANDROID
-    return; // Android owns the fullscreen surface.
+#if OAOW_TOUCH
+    return; // The platform owns the fullscreen surface.
 #endif
     if (m_videoConfirmActive)
         return;
@@ -185,7 +187,7 @@ void Application::SyncWindowSize(int w, int h)
     if (pw <= 0 || ph <= 0)
         return;
 
-#if ANDROID
+#if OAOW_TOUCH
     // One shared coordinate space for menus, HUD, camera and touch hit testing: the display scaled uniformly so that
     // it is at least 960x720 units (every dialog fits). A plain render scale, not SDL's logical presentation: clip
     // rects (radar, dialogs, the map edge) misbehaved behind the latter on devices.

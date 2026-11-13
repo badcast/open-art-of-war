@@ -1,8 +1,10 @@
 // The layout file of the interface: expressions, references between nodes, flows, conditions, profiles, bad files.
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
-#include "ui/AndroidHUD.hpp"
+#include "graphics/Renderer.hpp"
+#include "ui/TouchHUD.hpp"
 #include "ui/UiLayout.hpp"
+#include "../src/ui/TouchMenuGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -205,15 +207,15 @@ int main()
                 Check(inBounds(mmTouch.Rect("item" + std::to_string(i)), w, h), "touch main menu items fit in viewport");
         }
 
-        // AndroidHUD runtime behavior: box selection always on except when placing/building; responsive TouchPanels
+        // TouchHUD runtime behavior: box selection always on except when placing/building; responsive TouchPanels
         Check(Assets::Init() && LoaderResources::Init() && uilayout::Reload(), "load shipped layout into UiLayout");
-        AndroidHUD androidHud;
-        Check(androidHud.ReservedWidth() == 0, "AndroidHUD reserves zero sidebar width");
-        Check(!androidHud.TouchPansCamera(), "AndroidHUD defaults to always-on box selection (no single-finger pan)");
-        Check(!androidHud.OwnsMapInput(), "AndroidHUD does not own map input when not placing");
-        const auto panels1280 = androidHud.TouchPanels(1280, 720);
-        const auto panels1600 = androidHud.TouchPanels(1600, 720);
-        const auto panels1920 = androidHud.TouchPanels(1920, 1080);
+        TouchHUD touchHud;
+        Check(touchHud.ReservedWidth() == 0, "TouchHUD reserves zero sidebar width");
+        Check(!touchHud.TouchPansCamera(), "TouchHUD defaults to always-on box selection (no single-finger pan)");
+        Check(!touchHud.OwnsMapInput(), "TouchHUD does not own map input when not placing");
+        const auto panels1280 = touchHud.TouchPanels(1280, 720);
+        const auto panels1600 = touchHud.TouchPanels(1600, 720);
+        const auto panels1920 = touchHud.TouchPanels(1920, 1080);
         auto maxRight = [](const std::vector<SDL_Rect> &rects) {
             int mr = 0;
             for (const SDL_Rect &r : rects)
@@ -225,15 +227,80 @@ int main()
               "TouchPanels shifts right-anchored HUD panels right on wider aspect ratio");
         Check(panels1920[0].w > panels1280[0].w, "TouchPanels scales panels up on higher resolution");
 
-        androidHud.SetBuildMode(true);
-        Check(androidHud.TouchPansCamera(), "AndroidHUD disables box selection (enables pan) during building mode");
-        Check(androidHud.OwnsMapInput(), "AndroidHUD owns map input during building mode");
-        androidHud.SetBuildMode(false);
-        Check(!androidHud.TouchPansCamera() && !androidHud.OwnsMapInput(),
-              "AndroidHUD restores always-on box selection when leaving building mode");
+        touchHud.SetBuildMode(true);
+        Check(touchHud.TouchPansCamera(), "TouchHUD disables box selection (enables pan) during building mode");
+        Check(touchHud.OwnsMapInput(), "TouchHUD owns map input during building mode");
+        touchHud.SetBuildMode(false);
+        Check(!touchHud.TouchPansCamera() && !touchHud.OwnsMapInput(),
+              "TouchHUD restores always-on box selection when leaving building mode");
     }
 
     if (g_failures == 0)
         std::printf("all passed\n");
+    for (const auto size : {std::pair<int, int> {960, 720}, {1280, 720}, {1440, 720}})
+    {
+        for (int i = 0; i < 10; ++i)
+        {
+            const auto item = menu_detail::TouchMainMenuItemRect(i, size.first, size.second);
+            Check(item.x >= 364 && item.Right() <= size.first && item.y >= 0 && item.Bottom() <= size.second - 30,
+                  "touch main menu item stays on screen and clear of the music player");
+        }
+    }
+
+    // The touch panels share an offscreen crop: contents must survive at normal and scaled output sizes.
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+    Check(SDL_Init(SDL_INIT_VIDEO), "clip test SDL init");
+    SDL_Window *window = SDL_CreateWindow("clip test", 800, 600, SDL_WINDOW_HIDDEN);
+    SDL_Renderer *sdlRenderer = window ? SDL_CreateRenderer(window, "software") : nullptr;
+    Check(sdlRenderer != nullptr, "clip test renderer");
+    if (sdlRenderer)
+    {
+        {
+            Renderer renderer(sdlRenderer, nullptr);
+            for (float scale : {1.0f, 1.5f})
+            {
+                SDL_SetRenderScale(sdlRenderer, scale, scale);
+                SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
+                SDL_RenderClear(sdlRenderer);
+                Check(renderer.BeginClipTarget({300, 200, 200, 150}, {0, 0, 0, 255}), "begin touch clip");
+                renderer.FillRectScreen(310, 210, 20, 20, {255, 0, 0, 255});
+                renderer.EndClipTarget();
+                SDL_SetRenderScale(sdlRenderer, 1.0f, 1.0f);
+                SDL_Rect sample {static_cast<int>(315 * scale), static_cast<int>(215 * scale), 1, 1};
+                SDL_Surface *pixel = SDL_RenderReadPixels(sdlRenderer, &sample);
+                Check(pixel != nullptr, "read touch clip pixel");
+                if (pixel)
+                {
+                    Uint8 r, g, b, a;
+                    SDL_GetRGBA(*static_cast<Uint32 *>(pixel->pixels), SDL_GetPixelFormatDetails(pixel->format),
+                                nullptr, &r, &g, &b, &a);
+                    Check(r > 200 && g < 20 && b < 20, "touch clip displays content at scale");
+                    SDL_DestroySurface(pixel);
+                }
+            }
+            SDL_SetRenderScale(sdlRenderer, 1.0f, 1.0f);
+            SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
+            SDL_RenderClear(sdlRenderer);
+            Check(renderer.BeginClipTarget({300, 200, 200, 150}, {0, 0, 0, 255}), "begin translucent touch clip");
+            renderer.FillRectScreen(310, 210, 20, 20, {255, 0, 0, 255});
+            renderer.EndClipTarget(128);
+            SDL_Rect sample {315, 215, 1, 1};
+            SDL_Surface *pixel = SDL_RenderReadPixels(sdlRenderer, &sample);
+            Check(pixel != nullptr, "read translucent touch clip");
+            if (pixel)
+            {
+                Uint8 r, g, b, a;
+                SDL_GetRGBA(*static_cast<Uint32 *>(pixel->pixels), SDL_GetPixelFormatDetails(pixel->format),
+                            nullptr, &r, &g, &b, &a);
+                Check(r >= 120 && r <= 136 && g < 20 && b < 20, "touch clip uses half opacity");
+                SDL_DestroySurface(pixel);
+            }
+        }
+        SDL_DestroyRenderer(sdlRenderer);
+    }
+    if (window)
+        SDL_DestroyWindow(window);
+    SDL_Quit();
+
     return g_failures == 0 ? 0 : 1;
 }

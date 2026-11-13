@@ -173,6 +173,25 @@ int main()
     moveCmd.a = static_cast<std::int32_t>(OrderKind::Move);
     hostSim.Schedule(0, moveCmd);
 
+    // Direct calls cannot advance a replica or leave commands to execute after a role change.
+    Simulation guardSim;
+    guardSim.Reset(12345u);
+    guardSim.SetRecording(true);
+    guardSim.SetExecutionMode(Simulation::ExecutionMode::Replica);
+    guardSim.Schedule(0, moveCmd);
+    guardSim.EndTick();
+    Check(guardSim.Tick() == 0, "direct EndTick does not advance a replica");
+    bool sentToAuthority = false;
+    guardSim.SetCommandSink([&](SimCommand) { sentToAuthority = true; });
+    guardSim.Issue(moveCmd);
+    Check(sentToAuthority, "replica still sends player commands to its network sink");
+    guardSim.SetCommandSink({});
+    guardSim.SetExecutionMode(Simulation::ExecutionMode::Authority);
+    guardSim.ApplyCommands(replicaCtx);
+    Check(guardSim.log().empty(), "commands scheduled on a replica are not retained");
+    guardSim.EndTick();
+    Check(guardSim.Tick() == 1, "authority still advances after role change");
+
     // Also schedule a command on the replica to verify Replica mode ignores it without snapshots.
     replicaSim.Schedule(0, moveCmd);
 

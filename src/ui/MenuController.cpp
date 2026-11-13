@@ -1,6 +1,7 @@
 #include "ui/UiLayout.hpp"
 #include "ui/MenuController.hpp"
 #include "MenuControllerInternal.hpp"
+#include "TouchMenuGeometry.hpp"
 #include "core/JsonFile.hpp"
 #include "ui/MapFilter.hpp"
 #include "ui/MatchOptions.hpp"
@@ -62,6 +63,8 @@ UiRect MainMenuItemRect(int i, int windowW, int windowH)
 {
     // ui/layout.yaml (screen main_menu); the numbers below stand in when the file has no such screen
     const uilayout::Layout &file = uilayout::Current();
+    if (uilayout::MenuProfile(file, "main_menu") == "touch")
+        return menu_detail::TouchMainMenuItemRect(i, windowW, windowH);
     if (file.Has("main_menu", "pc"))
         return file.Solve("main_menu", uilayout::MenuProfile(file, "main_menu"), windowW, windowH, {})
             .Rect("item" + std::to_string(i));
@@ -313,42 +316,46 @@ void MenuController::RenderMainMenu(
     BitmapFontRenderer &fontRenderer,
     const SoundEngine &sound,
     int windowW,
-    int windowH)
+    int windowH,
+    bool drawBackdrop)
 {
-    renderer.FillRectScreen(0, 0, windowW, windowH, col::Backdrop);
-
-    // Key art anchored to the right edge, blended into the dark backdrop
-    SDL_Texture *titleTex = texManager.GetUiTexture("title");
-    if (titleTex)
+    if (drawBackdrop)
     {
-        int th = windowH;
-        int tw = th * 240 / 323; // the original art's proportions, until the texture tells its own
-        float texW = 0.0f, texH = 0.0f;
-        if (SDL_GetTextureSize(titleTex, &texW, &texH) && texW > 0.0f && texH > 0.0f)
-            tw = static_cast<int>(th * texW / texH); // whatever size the key art has, it is not stretched
-        int tx = windowW - tw;
-        renderer.DrawTextureScreen(titleTex, tx, 0, tw, th);
-        renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 70});
-        int fadeW = std::min(tw, 320);
-        ui::FillHorizontalGradient(renderer, {tx, 0, fadeW, windowH}, col::Backdrop, ui::WithAlpha(col::Backdrop, 0));
-        if (tx > 0)
-            renderer.FillRectScreen(0, 0, tx, windowH, col::Backdrop);
-        m_backdropFx.render(renderer, texManager, tx, windowW, windowH, SDL_GetTicks());
-        // The blasts melt into the key art instead of ending at a hard edge
-        if (tx > 0)
+        renderer.FillRectScreen(0, 0, windowW, windowH, col::Backdrop);
+
+        // Key art anchored to the right edge, blended into the dark backdrop
+        SDL_Texture *titleTex = texManager.GetUiTexture("title");
+        if (titleTex)
+        {
+            int th = windowH;
+            int tw = th * 240 / 323; // the original art's proportions, until the texture tells its own
+            float texW = 0.0f, texH = 0.0f;
+            if (SDL_GetTextureSize(titleTex, &texW, &texH) && texW > 0.0f && texH > 0.0f)
+                tw = static_cast<int>(th * texW / texH); // whatever size the key art has, it is not stretched
+            int tx = windowW - tw;
+            renderer.DrawTextureScreen(titleTex, tx, 0, tw, th);
+            renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 70});
+            int fadeW = std::min(tw, 320);
             ui::FillHorizontalGradient(
-                renderer,
-                {std::max(0, tx - 200), 0, std::min(tx, 200), windowH},
-                ui::WithAlpha(col::Backdrop, 0),
-                col::Backdrop);
+                renderer, {tx, 0, fadeW, windowH}, col::Backdrop, ui::WithAlpha(col::Backdrop, 0));
+            if (tx > 0)
+                renderer.FillRectScreen(0, 0, tx, windowH, col::Backdrop);
+            m_backdropFx.render(renderer, texManager, tx, windowW, windowH, SDL_GetTicks());
+            // The blasts melt into the key art instead of ending at a hard edge
+            if (tx > 0)
+                ui::FillHorizontalGradient(
+                    renderer,
+                    {std::max(0, tx - 200), 0, std::min(tx, 200), windowH},
+                    ui::WithAlpha(col::Backdrop, 0),
+                    col::Backdrop);
+        }
+        else
+        {
+            m_backdropFx.render(renderer, texManager, windowW * 55 / 100, windowW, windowH, SDL_GetTicks());
+        }
+        ui::FillVerticalGradient(
+            renderer, {0, windowH - 160, windowW, 160}, ui::WithAlpha(col::Backdrop, 0), col::Backdrop);
     }
-    else
-    {
-        m_backdropFx.render(renderer, texManager, windowW * 55 / 100, windowW, windowH, SDL_GetTicks());
-    }
-    ui::FillVerticalGradient(
-        renderer, {0, windowH - 160, windowW, 160}, ui::WithAlpha(col::Backdrop, 0), col::Backdrop);
-
     // Title block
     int x = MainMenuColumnX(windowW);
     int titleY = MainMenuTitleY(windowH);
@@ -360,6 +367,20 @@ void MenuController::RenderMainMenu(
         const UiRect t = layoutFile.Solve("main_menu", profile, windowW, windowH, {}).Rect("title");
         x = t.x;
         titleY = t.y;
+    }
+    if (!drawBackdrop)
+    {
+        int backdropWidth = std::max(
+            x + fontRenderer.GetTextWidth("OPEN ART OF WAR", ui::FONT_HERO),
+            x + 2 + fontRenderer.GetTextWidth(_("FREEDOM FOR LIBERTY"), ui::FONT_BODY_BOLD));
+        for (int i = 0; i < kMainMenuItems; ++i)
+        {
+            const UiRect item = MainMenuItemRect(i, windowW, windowH);
+            backdropWidth = std::max(
+                backdropWidth,
+                item.x + 25 + fontRenderer.GetTextWidth(_(kMainMenuLabels[i]), touchMenu ? ui::FONT_H1 : ui::FONT_H2));
+        }
+        renderer.FillRectScreen(0, 0, std::min(windowW, backdropWidth + 24), windowH, {0, 0, 0, 150});
     }
     fontRenderer.DrawString("OPEN ART OF WAR", x, titleY, ui::FONT_HERO, col::Accent, true);
     fontRenderer.DrawString(_("FREEDOM FOR LIBERTY"), x + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
@@ -575,7 +596,7 @@ std::vector<std::string> MusicCredits()
     return credits;
 }
 
-void MenuController::RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH)
+std::vector<std::string> MenuController::AboutLines() const
 {
     std::vector<std::string> lines = {
         "Open Art Of War: Freedom for Liberty",
@@ -587,6 +608,24 @@ void MenuController::RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fon
         _("The Resistance stands ready to strike for freedom!"),
         "",
     };
+    std::string buildInfo;
+    if (Assets::ReadText("assets/data/buildinfo.yaml", buildInfo))
+    {
+        const auto info = JsonFile::ReadYamlFromString(buildInfo);
+        if (info.contains("libraries") && info["libraries"].is_array())
+        {
+            lines.push_back("LIBRARIES");
+            lines.push_back("");
+            for (const auto &library : info["libraries"])
+            {
+                if (!library.is_object() || !library.contains("name") || !library["name"].is_string()
+                    || !library.contains("description") || !library["description"].is_string())
+                    continue;
+                lines.push_back(library["name"].get<std::string>() + " - " + library["description"].get<std::string>());
+                lines.push_back("");
+            }
+        }
+    }
     // The licence texts shipped with the music; the tracklist authors only when the file is missing
     std::string licence;
     if (Assets::ReadText(LoaderResources::AudioLicense(), licence))
@@ -607,7 +646,12 @@ void MenuController::RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fon
         for (const std::string &credit : MusicCredits())
             lines.push_back(credit);
     }
-    RenderInfoDialog(renderer, fontRenderer, windowW, windowH, _("ABOUT GAME"), lines);
+    return lines;
+}
+
+void MenuController::RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH)
+{
+    RenderInfoDialog(renderer, fontRenderer, windowW, windowH, _("ABOUT GAME"), AboutLines());
 }
 
 } // namespace OpenArtOfWar

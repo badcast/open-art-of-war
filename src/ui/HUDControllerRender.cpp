@@ -76,7 +76,8 @@ void FillCircleScreen(Renderer &renderer, float centerX, float centerY, float ra
         const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(offsetY * offsetY)));
         const int leftX = static_cast<int>(std::lround(centerX - span));
         const int rightX = static_cast<int>(std::lround(centerX + span));
-        renderer.FillRectScreen(leftX, static_cast<int>(std::lround(centerY)) + offsetY, std::max(1, rightX - leftX), 1, color);
+        renderer.FillRectScreen(
+            leftX, static_cast<int>(std::lround(centerY)) + offsetY, std::max(1, rightX - leftX), 1, color);
     }
 }
 
@@ -147,9 +148,21 @@ void DrawInfinity(Renderer &renderer, const UiRect &buttonRect, bool active, boo
     // two rings side by side: the infinity sign
     const SDL_Color ringColor = active ? col::Accent : col::TextDim;
     renderer.DrawRingScreen(
-        static_cast<float>(buttonRect.x + 7), static_cast<float>(buttonRect.CenterY()), 4.0f, 3.5f, 1.6f, ringColor, 24);
+        static_cast<float>(buttonRect.x + 7),
+        static_cast<float>(buttonRect.CenterY()),
+        4.0f,
+        3.5f,
+        1.6f,
+        ringColor,
+        24);
     renderer.DrawRingScreen(
-        static_cast<float>(buttonRect.x + 17), static_cast<float>(buttonRect.CenterY()), 4.0f, 3.5f, 1.6f, ringColor, 24);
+        static_cast<float>(buttonRect.x + 17),
+        static_cast<float>(buttonRect.CenterY()),
+        4.0f,
+        3.5f,
+        1.6f,
+        ringColor,
+        24);
 }
 
 } // namespace
@@ -162,7 +175,13 @@ void DrawCostTag(
     UiRect tagRect {cell.Right() - tagWidth - 3, cell.y + 3, tagWidth, tagHeight};
     renderer.FillRectScreen(tagRect.x, tagRect.y, tagRect.w, tagRect.h, {6, 8, 12, 215});
     fontRenderer.DrawString(
-        text, tagRect.CenterX(), tagRect.CenterY(), ui::FONT_SMALL_BOLD, color, false, Anchor::HCENTER | Anchor::VCENTER);
+        text,
+        tagRect.CenterX(),
+        tagRect.CenterY(),
+        ui::FONT_SMALL_BOLD,
+        color,
+        false,
+        Anchor::HCENTER | Anchor::VCENTER);
 }
 
 // Common cameo frame: icon, bottom name band, hover/selection border
@@ -220,8 +239,10 @@ void DrawProgressShutter(
     const int bandHeight = std::clamp(cell.h * 20 / 84, 16, 36);
     int coverHeight = static_cast<int>((cell.h - bandHeight) * (1.0f - std::clamp(progress, 0.0f, 1.0f)));
     if (coverHeight > 0)
-        renderer.FillRectScreen(cell.x + 1, cell.Bottom() - bandHeight - coverHeight, cell.w - 2, coverHeight, {6, 8, 12, 160});
-    renderer.FillRectScreen(cell.x + 1, cell.Bottom() - bandHeight - 2, static_cast<int>((cell.w - 2) * progress), 2, tint);
+        renderer.FillRectScreen(
+            cell.x + 1, cell.Bottom() - bandHeight - coverHeight, cell.w - 2, coverHeight, {6, 8, 12, 160});
+    renderer.FillRectScreen(
+        cell.x + 1, cell.Bottom() - bandHeight - 2, static_cast<int>((cell.w - 2) * progress), 2, tint);
     std::string percentText = std::to_string(static_cast<int>(progress * 100.0f)) + "%";
     fontRenderer.DrawString(
         percentText,
@@ -330,7 +351,8 @@ void HUDController::DrawRadar(
                 const std::uint16_t wall = fogEnabled ? map.ViewerWall(tileX, tileY) : map.GetWall(tileX, tileY);
                 if (wall > 0)
                 {
-                    const PlayerId owner = fogEnabled ? map.ViewerWallOwner(tileX, tileY) : map.GetWallOwner(tileX, tileY);
+                    const PlayerId owner
+                        = fogEnabled ? map.ViewerWallOwner(tileX, tileY) : map.GetWallOwner(tileX, tileY);
                     renderer.FillRectScreen(
                         pixelX,
                         pixelY,
@@ -338,7 +360,8 @@ void HUDController::DrawRadar(
                         pixelHeight,
                         RadarOwnerColor(owner, wall >= 1101 ? Faction::Resistance : Faction::Confederation, false));
                 }
-                else if (map.GetWall(tileX, tileY) == 0 && !map.IsPassable(tileX, tileY)) // an unseen wall is no terrain
+                else if (map.GetWall(tileX, tileY) == 0 && !map.IsPassable(tileX, tileY)) // an unseen wall is no
+                                                                                          // terrain
                 {
                     renderer.FillRectScreen(pixelX, pixelY, pixelWidth, pixelHeight, {30, 54, 40, 255});
                 }
@@ -495,7 +518,8 @@ void HUDController::DrawRadar(
         for (int k = 0; k < alertConfig.edgeWidthPx; ++k)
         {
             SDL_Color edgeColor = alertConfig.color;
-            edgeColor.a = static_cast<Uint8>(alertConfig.edgeAlpha * (alertConfig.edgeWidthPx - k) / alertConfig.edgeWidthPx);
+            edgeColor.a
+                = static_cast<Uint8>(alertConfig.edgeAlpha * (alertConfig.edgeWidthPx - k) / alertConfig.edgeWidthPx);
             renderer.DrawRectScreen(
                 radarRect.x + k, radarRect.y + k, radarRect.w - 2 * k, radarRect.h - 2 * k, edgeColor);
         }
@@ -511,11 +535,7 @@ void HUDController::DrawRadar(
         if (hovered)
             SoundRequests::MarkHover();
         renderer.FillRectScreen(
-            buttonRect.x,
-            buttonRect.y,
-            buttonRect.w,
-            buttonRect.h,
-            hovered ? col::Hover : SDL_Color {10, 16, 14, 210});
+            buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, hovered ? col::Hover : SDL_Color {10, 16, 14, 210});
         renderer.DrawRectScreen(
             buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, enabled ? col::BorderStrong : col::Border);
         const SDL_Color symbolColor = enabled ? col::Text : col::TextMuted;
@@ -591,8 +611,7 @@ void HUDController::RenderGameHud(
             Anchor::RIGHT | Anchor::TOP);
 
         float powerRatio = static_cast<float>(powerConsumed) / static_cast<float>(std::max(1, powerProduced));
-        ui::DrawProgressBar(
-            renderer, {headerRect.x, headerRect.Bottom() - 6, headerRect.w, 6}, powerRatio, powerColor);
+        ui::DrawProgressBar(renderer, {headerRect.x, headerRect.Bottom() - 6, headerRect.w, 6}, powerRatio, powerColor);
     }
 
     // --- Radar -----------------------------------------------------------------------------
@@ -712,8 +731,8 @@ void HUDController::RenderGameHud(
             {
                 bool isInfantry = (m_activeTab == TabInfantry);
                 int primaryId = isInfantry ? m_primaryBarracksId : m_primaryFactoryId;
-                auto buildings
-                    = entities.GetBuildingsByType(isInfantry ? UnitType::Barracks : UnitType::Factory, Players::Local());
+                auto buildings = entities.GetBuildingsByType(
+                    isInfantry ? UnitType::Barracks : UnitType::Factory, Players::Local());
                 if (!buildings.empty())
                 {
                     std::string label
@@ -812,11 +831,11 @@ void HUDController::RenderGameHud(
                     const bool isMine = blueprint.mineKind >= 0;
                     const int limit = isMine ? Mines::Specs()[static_cast<std::size_t>(blueprint.mineKind)].maxPerPlayer
                                              : BuildLimits::LimitOf(entities, blueprint.buildingIndex);
-                    const int owned
-                        = limit > 0
-                              ? (isMine ? entities.CountMines(Players::Local(), blueprint.mineKind)
-                                        : BuildLimits::CountOwned(entities, map, Players::Local(), blueprint.buildingIndex))
-                              : 0;
+                    const int owned = limit > 0
+                                          ? (isMine ? entities.CountMines(Players::Local(), blueprint.mineKind)
+                                                    : BuildLimits::CountOwned(
+                                                          entities, map, Players::Local(), blueprint.buildingIndex))
+                                          : 0;
                     const bool atLimit = limit == 0 || (limit > 0 && owned >= limit);
                     const bool radarLocked
                         = (blueprint.buildingIndex == 6 && !IsRadarUnlocked(Players::Local())) || noHq || atLimit;
@@ -945,10 +964,10 @@ void HUDController::RenderGameHud(
                         hoverTitle = name + "  $" + std::to_string(cost);
                         if (!unlocked)
                         {
-                            hoverText
-                                = std::string(_("[RESEARCH REQUIRED] "))
-                                  + _(researchDef(PlayerFaction(), UnitUnlockResearch(PlayerFaction(), unitDef.archetype))
-                                          .name);
+                            hoverText = std::string(_("[RESEARCH REQUIRED] "))
+                                        + _(researchDef(
+                                                PlayerFaction(), UnitUnlockResearch(PlayerFaction(), unitDef.archetype))
+                                                .name);
                         }
                         else if (!available)
                         {
@@ -1196,8 +1215,7 @@ void HUDController::RenderGameHud(
                         repairRect.y,
                         repairRect.w,
                         repairRect.h,
-                        isRepairing ? SDL_Color {60, 44, 20, 255}
-                                    : (repairHovered ? col::Hover : col::PanelRaised));
+                        isRepairing ? SDL_Color {60, 44, 20, 255} : (repairHovered ? col::Hover : col::PanelRaised));
                     renderer.DrawRectScreen(
                         repairRect.x,
                         repairRect.y,

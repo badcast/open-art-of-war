@@ -117,8 +117,8 @@ struct DeathSnap
     bool operator==(const DeathSnap &o) const
     {
         return id == o.id && tileX == o.tileX && tileY == o.tileY && subX == o.subX && subY == o.subY
-            && timer == o.timer && sequence == o.sequence && wreckComposite == o.wreckComposite
-            && wreckStages == o.wreckStages && flame == o.flame;
+               && timer == o.timer && sequence == o.sequence && wreckComposite == o.wreckComposite
+               && wreckStages == o.wreckStages && flame == o.flame;
     }
 };
 // A shot in flight, as it is drawn
@@ -184,8 +184,8 @@ struct MineSnap
     float armLeft {0.0f};
     bool operator==(const MineSnap &o) const
     {
-        return id == o.id && tileX == o.tileX && tileY == o.tileY && kind == o.kind
-               && owner == o.owner && armLeft == o.armLeft;
+        return id == o.id && tileX == o.tileX && tileY == o.tileY && kind == o.kind && owner == o.owner
+               && armLeft == o.armLeft;
     }
 };
 
@@ -195,16 +195,16 @@ struct WorldSnapshot
 
     std::uint32_t tick {0};
     std::uint32_t baseTick {0};
-    bool full {true};                  // false: only what changed since the tick the client acknowledged
-    std::vector<EntitySnap> entities;  // sorted by id
-    std::vector<std::uint32_t> removed; // sorted ids absent from the delta base
+    bool full {true};                       // false: only what changed since the tick the client acknowledged
+    std::vector<EntitySnap> entities;       // sorted by id
+    std::vector<std::uint32_t> removed;     // sorted ids absent from the delta base
     std::vector<std::uint32_t> hiddenAlive; // alive outside the viewer's sight
     std::vector<EconomySnap> economies;
     std::vector<ResearchSnap> research;
     std::vector<MineSnap> mines; // complete visible list in every snapshot
     std::uint8_t result {0}; // the match for this recipient: 0 goes on, 1 victory, 2 defeat (decided by the authority)
-    bool hasWalls {false};            // the wall list below is valid (sent when it changed and once a second)
-    std::vector<WallSnap> walls;      // every wall tile, row by row
+    bool hasWalls {false};   // the wall list below is valid (sent when it changed and once a second)
+    std::vector<WallSnap> walls;             // every wall tile, row by row
     std::vector<ProjectileSnap> projectiles; // the whole list every time
     std::vector<CueSnap> cues;
     std::vector<BlastSnap> blasts;

@@ -74,6 +74,7 @@ bool Settings::Save(const std::string &path) const
         j["showNetStats"] = showNetStats;
         j["graphicsQuality"] = graphicsQuality;
         j["smoothing"] = smoothing;
+        j["showShadows"] = showShadows;
         j["zoomDefault"] = zoomDefault;
         j["zoomMin"] = zoomMin;
         j["zoomMax"] = zoomMax;
@@ -147,7 +148,7 @@ void Settings::ApplyJson(const nlohmann::json &j)
     fullscreenW = j.value("fullscreenWidth", fullscreenW);
     fullscreenH = j.value("fullscreenHeight", fullscreenH);
     vsync = j.value("vsync", vsync);
-#if ANDROID
+#if OAOW_TOUCH
     vsync = true; // without it the mobile builds glitch: not up to a stored choice of an older build
 #endif
     fpsLimit = j.value("fpsLimit", fpsLimit);
@@ -160,6 +161,7 @@ void Settings::ApplyJson(const nlohmann::json &j)
     showNetStats = j.value("showNetStats", showNetStats);
     graphicsQuality = j.value("graphicsQuality", graphicsQuality);
     smoothing = j.value("smoothing", smoothing);
+    showShadows = j.value("showShadows", showShadows);
     zoomDefault = j.value("zoomDefault", zoomDefault);
     zoomMin = j.value("zoomMin", zoomMin);
     zoomMax = j.value("zoomMax", zoomMax);

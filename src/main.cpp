@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#if ANDROID
+#if OAOW_TOUCH
 // Renames main() to SDL_main(): SDLActivity starts the game through it
 #include <SDL3/SDL_main.h>
 #endif
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 #endif
     bool debugMode = false;
     bool testMapMode = false;
-    bool touchUi = false;     // --touch-ui: the touch interface (the default on Android) with the mouse
+    bool touchUi = false;     // --touch-ui: the touch interface (the default on touch devices) with the mouse
     bool fromScratch = false; // --map without a network game: a custom game, --from-scratch ignores the map's own bases
     std::string rendererOverride;
     // Network game from the command line: --host[=port] --players=N --map=<name> | --join=<address>[:port],

@@ -1,5 +1,6 @@
 #include "core/AssetStore.hpp"
 #include "core/Sha256.hpp"
+#include "core/TouchPlatform.hpp"
 
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -61,29 +62,29 @@ std::vector<fs::path> CandidateRoots()
         roots.push_back(fs::path(base) / "..");
         roots.push_back(fs::path(base) / ".." / "share" / "openaow");
     }
-#if ANDROID
+#if OAOW_TOUCH
     if (char *pref = SDL_GetPrefPath("badcast", "openaow"))
     {
         roots.push_back(fs::path(pref));
         SDL_free(pref);
     }
-    // /sdcard/Android/data/<package>/files: assets.blob can be put here with a plain "adb push"
-    if (const char *external = SDL_GetAndroidExternalStoragePath())
+    // Include platform-specific external storage when available.
+    if (const char *external = TouchPlatform::ExternalStoragePath())
         roots.push_back(fs::path(external));
 #endif
     return roots;
 }
 
-#if ANDROID
-// The CI can put game data into the APK (android-setup/app/src/main/assets/: *.blob and *.mod listed in
-// bundled_files.txt). libarchive opens files by path and cannot read inside an APK, so the first start copies them to
+#if OAOW_TOUCH
+// The build can bundle game data (*.blob and *.mod listed in
+// bundled_files.txt). libarchive opens files by path, so the first start copies bundled files to
 // the app's storage: *.blob next to where the blobs are looked for, *.mod into mods/. A file already there with the
 // same size is left alone (an update of the APK with other data has another size).
 void InstallBundledData()
 {
     SDL_IOStream *list = SDL_IOFromFile("bundled_files.txt", "r");
     if (!list)
-        return; // an APK without bundled data: assets.blob is pushed by hand (android-setup/README.md)
+        return; // no bundled data
     std::size_t listSize = 0;
     void *listData = SDL_LoadFile_IO(list, &listSize, true);
     if (!listData)
@@ -276,7 +277,7 @@ bool Init()
     if (s.mode != Mode::None)
         return true;
 
-#if ANDROID
+#if OAOW_TOUCH
     InstallBundledData();
 #endif
     std::error_code ec;

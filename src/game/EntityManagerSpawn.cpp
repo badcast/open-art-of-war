@@ -165,7 +165,7 @@ static void CopyUnitConfig(Unit &u, const UnitConfig &cfg)
 int EntityManager::FreeEntitySlots(PlayerId owner) const
 {
     if (m_replicaApplying)
-        return MAX_UNITS;
+        return m_entityLimit;
     int live = 0;
     int own = 0;
     for (const Entity &e : m_entities)
@@ -176,7 +176,7 @@ int EntityManager::FreeEntitySlots(PlayerId owner) const
         if (e.owner == owner)
             ++own;
     }
-    int room = MAX_UNITS - live;
+    int room = m_entityLimit - live;
     if (owner < kMaxPlayers && Players::IsActive(owner))
     {
         int players = 0;
@@ -184,7 +184,7 @@ int EntityManager::FreeEntitySlots(PlayerId owner) const
             if (Players::IsActive(static_cast<PlayerId>(p)) && !m_eliminated[p])
                 ++players;
         if (players > 2)
-            room = std::min(room, MAX_UNITS / players - own);
+            room = std::min(room, m_entityLimit / players - own);
     }
     return std::max(room, 0);
 }

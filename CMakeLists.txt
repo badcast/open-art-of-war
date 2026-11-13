@@ -199,7 +199,9 @@ set(ENGINE_SOURCES
     src/ui/MenuControllerCampaign.cpp
     src/ui/MenuControllerCustom.cpp
     src/ui/UiLayout.cpp
-    src/ui/AndroidHUD.cpp
+    src/ui/TouchHUD.cpp
+    src/ui/AboutSimulation.cpp
+    platform/TouchPlatform.cpp
     src/ui/HUDController.cpp
     src/ui/HUDControllerRender.cpp
     src/ui/HUDControllerInput.cpp
@@ -344,7 +346,7 @@ target_link_libraries(openaow-core PRIVATE OpenAOWNetworking ${OAOW_ZSTD})
 target_sources(openaow-core PRIVATE ${OAOW_SHADER_OUT}/OaowShaders.inc ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
 target_include_directories(openaow-core PRIVATE ${OAOW_SHADER_OUT} ${OAOW_SIM_OUT})
 target_compile_definitions(openaow-core PUBLIC
-            ANDROID=$<BOOL:${ANDROID}>
+            OAOW_TOUCH=$<OR:$<BOOL:${ANDROID}>,$<BOOL:${IOS}>>
             $<$<BOOL:${AOW_DEBUG}>:AOW_DEBUG>
             MAIN_ASSET_BLOB_NAME="${MAIN_ASSET_BLOB_NAME}"
             OAOW_VERSION="${OAOW_VERSION_FULL}"
@@ -466,7 +468,7 @@ add_subdirectory(openaow-mapeditor mapeditor_build)
 add_executable(openaow-android-input-tests
     tests/AndroidInputTests.cpp src/input/InputManager.cpp src/graphics/Camera.cpp)
 target_include_directories(openaow-android-input-tests PRIVATE include)
-target_compile_definitions(openaow-android-input-tests PRIVATE ANDROID=1)
+target_compile_definitions(openaow-android-input-tests PRIVATE OAOW_TOUCH=1)
 target_link_libraries(openaow-android-input-tests PRIVATE SDL3::SDL3)
 set_target_properties(openaow-android-input-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}")
 add_test(NAME openaow-android-input-tests COMMAND openaow-android-input-tests)
@@ -507,6 +509,11 @@ set_target_properties(openaow-replica-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-replica-tests COMMAND openaow-replica-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+add_executable(openaow-about-tests tests/AboutSimulationTests.cpp)
+target_link_libraries(openaow-about-tests PRIVATE openaow-core)
+set_target_properties(openaow-about-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}")
+add_test(NAME openaow-about-tests COMMAND openaow-about-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_executable(openaow-determinism-tests tests/DeterminismTests.cpp)
 target_link_libraries(openaow-determinism-tests PRIVATE openaow-core)

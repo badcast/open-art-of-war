@@ -240,7 +240,8 @@ void DrawButton(
     ButtonStyle style,
     bool hovered,
     bool enabled,
-    int fontId)
+    int fontId,
+    Uint8 opacity)
 {
     if (hovered && enabled)
         SoundRequests::MarkHover();
@@ -277,6 +278,9 @@ void DrawButton(
         text = color::TextMuted;
     }
 
+    fill.a = static_cast<Uint8>(static_cast<unsigned>(fill.a) * opacity / 255);
+    border.a = static_cast<Uint8>(static_cast<unsigned>(border.a) * opacity / 255);
+    text.a = static_cast<Uint8>(static_cast<unsigned>(text.a) * opacity / 255);
     r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
     if (border.a > 0)
         r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);

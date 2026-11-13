@@ -26,6 +26,8 @@ class GameSounds
 public:
     // A new world (entity ids start again): forget what was seen
     void Reset();
+    // Only weapon and impact cues: no announcer, unit voices or UI alerts.
+    static void PlayBattleCues(SoundEngine &sound, EntityManager &entities, const Camera &camera, float volume);
     // Once per frame while a match is shown
     void Update(
         SoundEngine &sound,

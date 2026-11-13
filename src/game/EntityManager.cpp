@@ -548,11 +548,26 @@ void EntityManager::ResolveUnitStacking(TileMap &map)
         }
     }
 
+    // Index units by tile, keeping their original entity order for deterministic resolution.
+    auto tileKey = [](int x, int y) {
+        return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(x)) << 32) | static_cast<std::uint32_t>(y);
+    };
+    std::unordered_map<std::uint64_t, std::vector<std::size_t>> byTile;
+    byTile.reserve(livingUnits.size());
+    for (std::size_t i = 0; i < livingUnits.size(); ++i)
+        byTile[tileKey(livingUnits[i]->tileX, livingUnits[i]->tileY)].push_back(i);
+
     for (std::size_t i = 0; i < livingUnits.size(); ++i)
     {
         Unit *u1 = livingUnits[i];
-        for (std::size_t j = i + 1; j < livingUnits.size(); ++j)
+        const auto found = byTile.find(tileKey(u1->tileX, u1->tileY));
+        if (found == byTile.end() || found->second.size() < 2)
+            continue;
+        const auto candidates = found->second;
+        for (std::size_t j : candidates)
         {
+            if (j <= i)
+                continue;
             Unit *u2 = livingUnits[j];
             if (u1->tileX == u2->tileX && u1->tileY == u2->tileY)
             {
@@ -567,6 +582,10 @@ void EntityManager::ResolveUnitStacking(TileMap &map)
                     {
                         if (map.IsPassable(nx, ny) && map.GetWall(nx, ny) == 0 && !IsTileOccupiedByUnit(nx, ny, u2->id))
                         {
+                            auto &oldTile = byTile[tileKey(u2->tileX, u2->tileY)];
+                            oldTile.erase(std::lower_bound(oldTile.begin(), oldTile.end(), j));
+                            auto &newTile = byTile[tileKey(nx, ny)];
+                            newTile.insert(std::lower_bound(newTile.begin(), newTile.end(), j), j);
                             u2->tileX = nx;
                             u2->tileY = ny;
                             u2->subX = 0.0f;

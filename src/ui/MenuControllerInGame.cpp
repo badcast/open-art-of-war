@@ -54,7 +54,8 @@ PauseLayout pauseLayout(int windowW, int windowH)
     const uilayout::Layout &layoutFile = uilayout::Current();
     if (layoutFile.Has("pause", "pc"))
     {
-        const uilayout::Solved s = layoutFile.Solve("pause", uilayout::MenuProfile(layoutFile, "pause"), windowW, windowH, {});
+        const uilayout::Solved s
+            = layoutFile.Solve("pause", uilayout::MenuProfile(layoutFile, "pause"), windowW, windowH, {});
         l.dialog = s.Rect("dialog");
         for (int i = 0; i < kPauseItems; ++i)
             l.items[i] = s.Rect("item" + std::to_string(i));

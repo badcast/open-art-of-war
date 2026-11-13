@@ -401,8 +401,7 @@ void AISquadController::CapDetours(const AISquad &squad, EntityManager &entities
         // Allowed: the straight way, some slack for small obstacles, plus the group's leash
         const float detourLimit = std::max(6.0f, straightDist * 1.8f + leash * 1.5f);
         // Only units already with the group: a straggler far away must still be allowed to come back
-        const float distToLeader
-            = DistTo(*unit, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
+        const float distToLeader = DistTo(*unit, static_cast<float>(leader->tileX), static_cast<float>(leader->tileY));
         // A map-wide detour is never worth it, wherever the leader is
         const bool isMapWideDetour = pathLength > straightDist * 3.0f + 20.0f;
         if (pathLength > detourLimit && (distToLeader <= leash * 2.0f || isMapWideDetour))
@@ -436,8 +435,7 @@ void AISquadController::SetState(AISquad &squad, AISquadState state)
     squad.quietTimer = 0.0f;
 }
 
-void AISquadController::UpdateFocusTarget(
-    AISquad &squad, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
+void AISquadController::UpdateFocusTarget(AISquad &squad, TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
 {
     const Unit *leader = entities.GetUnit(squad.leaderId);
     if (!leader || !leader->alive)
@@ -592,16 +590,14 @@ bool AISquadController::PlanRoute(
                 for (int dx = -2; dx <= 2; ++dx)
                 {
                     const int nextX = x + dx, nextY = y + dy;
-                    const bool blocked
-                        = nextX < 0 || nextY < 0 || nextX >= mapWidth || nextY >= mapHeight
-                          || tileKind[tileIndex(nextX, nextY)] != 0;
+                    const bool blocked = nextX < 0 || nextY < 0 || nextX >= mapWidth || nextY >= mapHeight
+                                         || tileKind[tileIndex(nextX, nextY)] != 0;
                     if (!blocked)
                         continue;
                     (std::max(std::abs(dx), std::abs(dy)) == 1 ? nearOneTile : nearTwoTiles) += 1;
                 }
             }
-            tilePenalty[tileIndex(x, y)]
-                = nearOneTile > 0 ? kNextToObstacle : (nearTwoTiles > 0 ? kNearObstacle : 0);
+            tilePenalty[tileIndex(x, y)] = nearOneTile > 0 ? kNextToObstacle : (nearTwoTiles > 0 ? kNearObstacle : 0);
         }
     }
     for (const auto &entity : entities.GetAllEntities())
@@ -673,8 +669,7 @@ bool AISquadController::PlanRoute(
                 if (neighborKind == 1)
                     continue;
                 // No cutting corners past cliffs or buildings
-                if (dx != 0 && dy != 0
-                    && (tileKind[tileIndex(x + dx, y)] == 1 || tileKind[tileIndex(x, y + dy)] == 1))
+                if (dx != 0 && dy != 0 && (tileKind[tileIndex(x + dx, y)] == 1 || tileKind[tileIndex(x, y + dy)] == 1))
                     continue;
                 const int stepCost = (dx != 0 && dy != 0 ? kDiagonal : kStraight) + tilePenalty[tileIndex(nextX, nextY)]
                                      + (neighborKind == 2 ? kHostileWall : 0);
@@ -1429,8 +1424,7 @@ void AISquadController::Tick(
                 SetState(squad, AISquadState::Marching);
                 break;
             }
-            squad.quietTimer
-                = trackStragglers(leash, centroidX, centroidY) ? 0.0f : squad.quietTimer + deltaTime;
+            squad.quietTimer = trackStragglers(leash, centroidX, centroidY) ? 0.0f : squad.quietTimer + deltaTime;
             break;
         }
 
@@ -1461,8 +1455,7 @@ void AISquadController::Tick(
             {
                 const Unit *unit = entities.GetUnit(unitId);
                 if (chokes.IsChoke(unit->tileX, unit->tileY)
-                    || DistTo(*unit, static_cast<float>(deployNode.x), static_cast<float>(deployNode.y))
-                           > leash + 1.5f)
+                    || DistTo(*unit, static_cast<float>(deployNode.x), static_cast<float>(deployNode.y)) > leash + 1.5f)
                 {
                     allOut = false;
                 }
@@ -1529,8 +1522,7 @@ void AISquadController::Tick(
             const bool leaderAtFormUp
                 = DistTo(*leader, static_cast<float>(formUpNode.x), static_cast<float>(formUpNode.y))
                   <= std::max(2.5f, leash);
-            squad.quietTimer
-                = (leaderAtFormUp && maxSpread <= leash * 1.5f) ? squad.quietTimer + deltaTime : 0.0f;
+            squad.quietTimer = (leaderAtFormUp && maxSpread <= leash * 1.5f) ? squad.quietTimer + deltaTime : 0.0f;
             if (squad.quietTimer >= 1.0f || squad.stateTimer > 12.0f)
             {
                 squad.progress = squad.marchIndex;
@@ -1699,9 +1691,17 @@ void AISquadController::RenderDebug(
         std::string label = "G" + std::to_string(squad.id);
         int labelWidth = font.GetTextWidth(label, 6) + 10;
         renderer.FillRectScreen(
-            static_cast<int>(screenX) - labelWidth / 2, static_cast<int>(screenY) - 10, labelWidth, 20, {12, 14, 20, 210});
+            static_cast<int>(screenX) - labelWidth / 2,
+            static_cast<int>(screenY) - 10,
+            labelWidth,
+            20,
+            {12, 14, 20, 210});
         renderer.DrawRectScreen(
-            static_cast<int>(screenX) - labelWidth / 2, static_cast<int>(screenY) - 10, labelWidth, 20, {232, 176, 74, 255});
+            static_cast<int>(screenX) - labelWidth / 2,
+            static_cast<int>(screenY) - 10,
+            labelWidth,
+            20,
+            {232, 176, 74, 255});
         font.DrawString(
             label,
             static_cast<int>(screenX),

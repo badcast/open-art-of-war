@@ -100,15 +100,7 @@ bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
     m_doc.SetTextureManager(m_texManager.get());
     m_renderer = std::make_unique<Renderer>(m_sdlRenderer, m_texManager.get());
 
-    if (!m_texManager->LoadAllAssets())
-    {
-        LoaderResources::SetAssetRoot("../assets");
-        if (!m_texManager->LoadAllAssets())
-        {
-            LoaderResources::SetAssetRoot("../../assets");
-            m_texManager->LoadAllAssets();
-        }
-    }
+    m_texManager->LoadAllAssets();
 
     // Load initial map or create default
     if (!initialMap.empty())

@@ -3,6 +3,7 @@
 #include "MapGenerator.hpp"
 #include "TileCorners.hpp"
 #include "core/AssetStore.hpp"
+#include "core/LoaderResources.hpp"
 #include "game/TileCollision.hpp"
 #include "game/TileMap.hpp"
 #include <fstream>
@@ -628,7 +629,16 @@ int main(int argc, char *argv[])
         }
     }
 #endif
-    OpenArtOfWar::Assets::Init();
+    if (!OpenArtOfWar::Assets::Init())
+    {
+        std::cerr << "[MapEditor] Game assets were not found." << std::endl;
+        return 1;
+    }
+    if (!OpenArtOfWar::LoaderResources::Init())
+    {
+        std::cerr << "[MapEditor] The game asset manifest is missing or invalid." << std::endl;
+        return 1;
+    }
     std::cout << "========================================================\n"
               << "Open Art Of War Map Editor — openaow-mapeditor\n"
               << "Native Map & Campaign Editor for Open Art Of War\n"

@@ -575,6 +575,56 @@ void testEnetLoopback()
     CHECK(connected);
     CHECK(received);
     CHECK(got.turn == 77 && got.players.size() == 1 && got.players[0].bytes == std::vector<std::uint8_t>({4, 2}));
+    // A maximum-size snapshot spans many ENet datagrams and must be reassembled byte-for-byte.
+    AuthorityState large {1, 7, 81, {}};
+    large.bytes.resize(kMaxAuthorityStateBytes);
+    std::uint32_t random = 0x12345678u;
+    for (auto &byte : large.bytes)
+    {
+        random ^= random << 13;
+        random ^= random >> 17;
+        random ^= random << 5;
+        byte = static_cast<std::uint8_t>(random);
+    }
+    std::vector<std::uint8_t> packet(kMaxAuthorityStateBytes + 64);
+    BitWriter writer(packet.data(), packet.size());
+    encode(writer, large);
+    const std::size_t packetSize = writer.finish();
+    CHECK(!writer.overflowed());
+    bool largeReceived = false;
+    if (connected && !writer.overflowed())
+    {
+        ENetPacket *p = enet_packet_create(packet.data(), packetSize, ENET_PACKET_FLAG_RELIABLE);
+        CHECK(p != nullptr);
+        if (p)
+        {
+            const int sent = enet_peer_send(peer, static_cast<enet_uint8>(Channel::Bulk), p);
+            CHECK(sent == 0);
+            if (sent != 0)
+                enet_packet_destroy(p);
+        }
+        const auto largeDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+        while (std::chrono::steady_clock::now() < largeDeadline && !largeReceived)
+        {
+            ENetEvent ev;
+            while (enet_host_service(client, &ev, 1) > 0)
+                if (ev.type == ENET_EVENT_TYPE_RECEIVE)
+                    enet_packet_destroy(ev.packet);
+            while (enet_host_service(server, &ev, 1) > 0)
+            {
+                if (ev.type != ENET_EVENT_TYPE_RECEIVE)
+                    continue;
+                BitReader r(ev.packet->data, ev.packet->dataLength);
+                AuthorityState decoded;
+                largeReceived = ev.channelID == static_cast<enet_uint8>(Channel::Bulk)
+                                && readType(r) == MsgType::AuthorityState && decode(r, decoded)
+                                && decoded.tick == large.tick && decoded.matchId == large.matchId
+                                && decoded.recipient == large.recipient && decoded.bytes == large.bytes;
+                enet_packet_destroy(ev.packet);
+            }
+        }
+    }
+    CHECK(largeReceived);
     enet_peer_disconnect_now(peer, 0);
     enet_host_destroy(client);
     enet_host_destroy(server);
@@ -826,9 +876,28 @@ void testLockstepSession()
     CHECK(clients[0]->takeAuthorityAck(ack) && ack.sender == clients[1]->slot() && ack.tick == 10);
     CHECK(!clients[1]->takeAuthorityAck(ack));
     CHECK(!clients[2]->takeAuthorityAck(ack));
+    AuthorityState missing {7, 0, 11, {1}};
+    CHECK(!clients[0]->sendAuthorityState(missing)); // no connected recipient in the roster
     AuthorityState self {0, 0, 11, {1}};
     CHECK(!clients[0]->sendAuthorityState(self)); // not to itself
     state.tick = 9;
+    CHECK(clients[0]->sendAuthorityState(state));
+    step(10);
+    CHECK(!clients[1]->takeAuthorityState(received));
+
+    // An opaque, invalid high-tick payload must not suppress a later usable snapshot.
+    state.tick = 100;
+    state.bytes = {0xff};
+    CHECK(clients[0]->sendAuthorityState(state));
+    state.tick = 11;
+    state.bytes = {7, 8};
+    CHECK(clients[0]->sendAuthorityState(state));
+    step(10);
+    CHECK(clients[1]->takeAuthorityState(received) && received.tick == 100);
+    // The application rejects the first payload without acknowledging it.
+    CHECK(clients[1]->takeAuthorityState(received) && received.tick == 11 && received.bytes == state.bytes);
+    CHECK(clients[1]->sendAuthorityAck(11));
+    state.tick = 10;
     CHECK(clients[0]->sendAuthorityState(state));
     step(10);
     CHECK(!clients[1]->takeAuthorityState(received));

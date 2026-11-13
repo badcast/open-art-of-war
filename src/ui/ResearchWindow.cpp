@@ -715,7 +715,12 @@ void HUDController::RenderResearchWindow(
 
     // The tree
     ui::DrawPanel(renderer, l.tree, col::PanelSunken, col::Border);
-    renderer.SetClipRect({l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2});
+    // Touch: the scissor of some devices lands in the wrong place, so the tree is drawn into its own picture
+    const bool softClip
+        = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch"
+          && renderer.BeginClipTarget({l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2}, col::PanelSunken);
+    if (!softClip)
+        renderer.SetClipRect({l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2});
     auto nodeRect = [&](int i) {
         return UiRect {
             l.tree.x + 8 + tree.depth[i] * (kNodeW + kGapX) - static_cast<int>(m_researchScrollX),
@@ -800,7 +805,10 @@ void HUDController::RenderResearchWindow(
         if (!lit)
             renderer.FillRectScreen(n.x, n.y, n.w, n.h, {8, 10, 14, 170}); // not what the search / filter asks for
     }
-    renderer.ResetClipRect();
+    if (softClip)
+        renderer.EndClipTarget();
+    else
+        renderer.ResetClipRect();
     {
         const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
         const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);

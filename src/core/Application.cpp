@@ -7,7 +7,9 @@
 #include "core/Mods.hpp"
 #include "core/DebugEnv.hpp"
 #include "ui/MenuController.hpp"
-#include "ui/AndroidHUD.hpp"
+#include "ui/AboutSimulation.hpp"
+#include "ui/TouchHUD.hpp"
+#include "core/TouchPlatform.hpp"
 #include "ui/UiLayout.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/UiKit.hpp"
@@ -76,7 +78,12 @@ void SnapshotTrace(const char *who, const WorldSnapshot &snap)
     const std::vector<std::uint8_t> bytes = plain.Encode();
     for (std::uint8_t b : bytes)
         h = (h ^ b) * 1099511628211ull;
-    std::printf("[Snap] %s tick %u entities %zu bytes %zu hash %016llx\n", who, snap.tick, snap.entities.size(), bytes.size(),
+    std::printf(
+        "[Snap] %s tick %u entities %zu bytes %zu hash %016llx\n",
+        who,
+        snap.tick,
+        snap.entities.size(),
+        bytes.size(),
         static_cast<unsigned long long>(h));
     std::fflush(stdout);
 }
@@ -174,11 +181,11 @@ bool Application::Init(int windowWidth, int windowHeight)
         LoaderResources::Reload();
     }
 
-#if ANDROID
+#if OAOW_TOUCH
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+    TouchPlatform::ConfigureBackButton();
     m_settings.windowMode = WindowMode::Borderless;
     m_confirmedVideo = m_settings;
 #endif
@@ -220,7 +227,7 @@ bool Application::Init(int windowWidth, int windowHeight)
             m_windowH = size.h;
         }
     }
-#if ANDROID
+#if OAOW_TOUCH
     SyncWindowSize();
 #endif
     m_resolutions = VideoModes::AvailableResolutions(m_window);
@@ -266,7 +273,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     // The map viewport ends where the command sidebar begins
     m_camera = std::make_unique<Camera>(m_windowW - HudReservedWidth(), m_windowH);
     m_input = std::make_unique<InputManager>();
-#if ANDROID
+#if OAOW_TOUCH
     m_input->SetRenderer(m_sdlRenderer);
 #endif
     m_input->SetEdgePanMargin(m_settings.edgePanMargin);
@@ -289,7 +296,8 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_mission->SetOnLoaded([this] {
         m_pathfinder->SetMap(m_map.get());
         m_pathfinder->SetEntityManager(m_entities.get());
-        if (m_aiController && m_mission)
+        if (m_aiController && m_mission
+            && (!m_gameplayController || m_gameplayController->simulation().AdvancesWorld()))
         {
             m_aiController->Init(
                 m_mission->GetEnemyHqX(),
@@ -314,7 +322,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_replayMenu = std::make_unique<ReplayMenu>();
     m_modsMenu = std::make_unique<ModsMenu>();
     if (m_touchUi)
-        m_hudController = std::make_unique<AndroidHUD>();
+        m_hudController = std::make_unique<TouchHUD>();
     else
         m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
@@ -662,7 +670,8 @@ void Application::Run()
                                 zoom);
                         }
                         m_net->AfterTick(tick, checksum);
-                        if (m_net->AuthorityModeOn() && m_net->IsAuthority() && tick % 2 == 0)
+                        // Send the terminal result even when it falls between the normal snapshot ticks.
+                        if (m_net->AuthorityModeOn() && m_net->IsAuthority() && (tick % 2 == 0 || !playing()))
                         {
                             SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
                             WorldSnapshot snap = WorldSnapshot::CaptureEntities(*m_entities, tick);
@@ -708,7 +717,8 @@ void Application::Run()
                 }
                 else if (net && m_net->IsReplica())
                 {
-                    // A replica never advances the world (state comes from the authority): commands go out, the UI lives
+                    // A replica never advances the world (state comes from the authority): commands go out, the UI
+                    // lives
                     static std::uint32_t lastReplicaTick = 0;
                     m_net->PumpReplica(nowMs);
                     m_replicaSince += frameTime;
@@ -726,7 +736,8 @@ void Application::Run()
                             m_state = AppState::Victory;
                         else if (m_state == AppState::SkirmishPlaying && snap.result == 2)
                             m_state = AppState::Defeat;
-                        m_entities->UpdateFogOfWar(*m_map); // nobody simulates here: the fog follows the replicated entities
+                        m_entities->UpdateFogOfWar(
+                            *m_map); // nobody simulates here: the fog follows the replicated entities
                         sim.ApplyEconomies(snap, ctx);
                         sim.ApplyResearch(snap, ctx);
                         if (DebugEnv("OAOW_NET_TRACE"))
@@ -735,22 +746,38 @@ void Application::Run()
                             WorldSnapshot mine = WorldSnapshot::CaptureEntities(*m_entities, snap.tick);
                             sim.FillEconomies(ctx, mine);
                             sim.FillResearch(mine);
-                            mine.research.erase(std::remove_if(mine.research.begin(), mine.research.end(), [&](const ResearchSnap &r) {
-                                return std::none_of(snap.research.begin(), snap.research.end(), [&](const ResearchSnap &o) { return o.player == r.player; });
-                            }), mine.research.end());
+                            mine.research.erase(
+                                std::remove_if(
+                                    mine.research.begin(),
+                                    mine.research.end(),
+                                    [&](const ResearchSnap &r) {
+                                        return std::none_of(
+                                            snap.research.begin(), snap.research.end(), [&](const ResearchSnap &o) {
+                                                return o.player == r.player;
+                                            });
+                                    }),
+                                mine.research.end());
                             // Only what the authority sent: the replica also remembers things it can no longer see
                             mine.entities.erase(
                                 std::remove_if(
-                                    mine.entities.begin(), mine.entities.end(),
+                                    mine.entities.begin(),
+                                    mine.entities.end(),
                                     [&](const EntitySnap &e) {
-                                        return std::none_of(snap.entities.begin(), snap.entities.end(), [&](const EntitySnap &o) { return o.id == e.id; });
+                                        return std::none_of(
+                                            snap.entities.begin(), snap.entities.end(), [&](const EntitySnap &o) {
+                                                return o.id == e.id;
+                                            });
                                     }),
                                 mine.entities.end());
                             mine.economies.erase(
                                 std::remove_if(
-                                    mine.economies.begin(), mine.economies.end(),
+                                    mine.economies.begin(),
+                                    mine.economies.end(),
                                     [&](const EconomySnap &e) {
-                                        return std::none_of(snap.economies.begin(), snap.economies.end(), [&](const EconomySnap &o) { return o.player == e.player; });
+                                        return std::none_of(
+                                            snap.economies.begin(), snap.economies.end(), [&](const EconomySnap &o) {
+                                                return o.player == e.player;
+                                            });
                                     }),
                                 mine.economies.end());
                             SnapshotTrace("repl", mine);
@@ -898,10 +925,13 @@ void Application::HandleEvents()
     m_input->ResetFrameEvents();
     if (m_hudController && m_touchUi)
     {
+        m_input->SetTouchMode(true);
         m_input->SetTouchPan(m_hudController->TouchPansCamera());
+        m_input->SetTouchPlacementGhost(m_hudController->TouchPlacementGhost());
+        m_input->SetTouchScrollPanel(m_hudController->TouchScrollPanel(m_windowW, m_windowH));
         m_input->SetTouchUiRects(m_hudController->TouchPanels(m_windowW, m_windowH));
     }
-#if ANDROID
+#if OAOW_TOUCH
     const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
     m_input->SetMenuOpen(
         !playing || (m_menuController && m_menuController->IsAnyMenuOpen())
@@ -943,7 +973,7 @@ void Application::HandleEvents()
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT
             && SoundRequests::HoverFlag() && m_sound)
             m_sound->PlaySfx("ui_click");
-#if ANDROID
+#if OAOW_TOUCH
         SDL_ConvertEventToRenderCoordinates(m_sdlRenderer, &event);
 #endif
         m_input->ProcessEvent(event, *m_camera);
@@ -983,6 +1013,28 @@ FrameContext Application::MakeFrameContext(float deltaTime)
 void Application::Update(float deltaTime)
 {
     m_globalAnimTimer += deltaTime;
+    const bool showcaseScreen = m_state == AppState::MainMenu || m_state == AppState::MenuAbout;
+    if (!showcaseScreen)
+    {
+        if (m_aboutScene)
+            m_sound->SetSceneMusicGain(1.0f);
+        m_aboutScene.reset();
+        m_aboutCredits.clear();
+        m_aboutMusicPlaying = false;
+        m_aboutViewActive = false;
+        m_aboutAttempted = false;
+    }
+    else if (!m_aboutAttempted)
+    {
+        m_aboutAttempted = true;
+        auto scene = std::make_unique<AboutSimulation>();
+        if (scene->Start(*m_texManager, m_windowW, m_windowH))
+        {
+            m_sound->SetSceneMusicGain(scene->MusicVolume());
+            m_aboutCredits = m_menuController->AboutLines();
+            m_aboutScene = std::move(scene);
+        }
+    }
     // The camera zoom belongs to the map of a running game: wheel steps made anywhere else are dropped
     if (m_state != AppState::CampaignPlaying && m_state != AppState::SkirmishPlaying)
         m_input->ConsumeMapWheel();
@@ -1193,6 +1245,29 @@ void Application::Update(float deltaTime)
         m_endScreenTimer = 0.0f;
     }
 
+    if (m_aboutScene && (m_state == AppState::MainMenu || m_state == AppState::MenuAbout))
+    {
+        if (m_state == AppState::MenuAbout && !m_aboutViewActive)
+        {
+            m_aboutScene->RestartCredits();
+            m_aboutMusicPlaying = m_sound->PlayNamedLoop(m_aboutScene->MusicName());
+            m_aboutViewActive = true;
+        }
+        else if (m_state == AppState::MainMenu && m_aboutViewActive)
+        {
+            m_aboutViewActive = false;
+            m_aboutMusicPlaying = false;
+        }
+        m_aboutScene->Update(deltaTime, m_sound.get());
+    }
+    else if (m_aboutScene)
+    {
+        m_aboutScene.reset();
+        m_aboutCredits.clear();
+        m_aboutMusicPlaying = m_aboutViewActive = m_aboutAttempted = false;
+        m_sound->SetSceneMusicGain(1.0f);
+    }
+
     const bool gameplayMusic = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
                                || m_state == AppState::Paused || m_state == AppState::Briefing
                                || m_state == AppState::Victory || m_state == AppState::Defeat;
@@ -1201,7 +1276,7 @@ void Application::Update(float deltaTime)
                            || m_state == AppState::MenuAbout || m_state == AppState::MenuSettings
                            || m_state == AppState::MenuNetwork || m_state == AppState::MenuReplay
                            || m_state == AppState::MenuMods;
-    m_sound->Update(menuMusic, gameplayMusic);
+    m_sound->Update(menuMusic, gameplayMusic, m_state == AppState::MenuAbout && m_aboutMusicPlaying);
 
     // The time of day of the match (campaign missions are by day): the picture and the loop of the surroundings
     const bool inMatch = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
@@ -1356,7 +1431,10 @@ void Application::Render()
     }
     else if (m_state == AppState::MainMenu)
     {
-        m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
+        if (m_aboutScene)
+            m_aboutScene->Render(*m_renderer, *m_fontRenderer, {}, m_windowW, m_windowH, false);
+        m_menuController->RenderMainMenu(
+            *m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH, !m_aboutScene);
     }
     else if (m_state == AppState::MenuHelp)
     {
@@ -1365,8 +1443,14 @@ void Application::Render()
     }
     else if (m_state == AppState::MenuAbout)
     {
-        m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
-        m_menuController->RenderMenuAbout(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
+        if (m_aboutScene)
+            m_aboutScene->Render(*m_renderer, *m_fontRenderer, m_aboutCredits, m_windowW, m_windowH);
+        else
+        {
+            m_menuController->RenderMainMenu(
+                *m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
+            m_menuController->RenderMenuAbout(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
+        }
     }
     else if (m_state == AppState::MenuSettings)
     {
@@ -1550,14 +1634,20 @@ void Application::Render()
             if (edgeTop > 0)
                 m_renderer->FillRectScreen(0, 0, edgeViewW, std::min(edgeViewH, edgeTop), black);
             if (edgeBottom < edgeViewH)
-                m_renderer->FillRectScreen(0, std::max(0, edgeBottom), edgeViewW, edgeViewH - std::max(0, edgeBottom), black);
+                m_renderer->FillRectScreen(
+                    0, std::max(0, edgeBottom), edgeViewW, edgeViewH - std::max(0, edgeBottom), black);
             if (innerBottom > innerTop)
             {
                 if (edgeLeft > 0)
-                    m_renderer->FillRectScreen(0, innerTop, std::min(edgeViewW, edgeLeft), innerBottom - innerTop, black);
+                    m_renderer->FillRectScreen(
+                        0, innerTop, std::min(edgeViewW, edgeLeft), innerBottom - innerTop, black);
                 if (edgeRight < edgeViewW)
                     m_renderer->FillRectScreen(
-                        std::max(0, edgeRight), innerTop, edgeViewW - std::max(0, edgeRight), innerBottom - innerTop, black);
+                        std::max(0, edgeRight),
+                        innerTop,
+                        edgeViewW - std::max(0, edgeRight),
+                        innerBottom - innerTop,
+                        black);
             }
         }
         RenderMapEdgeFade(worldCam);

@@ -215,8 +215,7 @@ void GameplayController::HandleControlGroupKeys(InputManager &input, EntityManag
         {
             // N selects the group, pressing it twice quickly brings the camera to its leader
             const std::uint64_t nowTicks = SDL_GetTicks();
-            if (m_lastGroupKey == groupIndex && nowTicks - m_lastGroupTicks < 400
-                && m_groups[groupIndex].leaderId > 0)
+            if (m_lastGroupKey == groupIndex && nowTicks - m_lastGroupTicks < 400 && m_groups[groupIndex].leaderId > 0)
             {
                 const Entity *leader = entities.GetEntity(m_groups[groupIndex].leaderId);
                 if (leader)
@@ -255,7 +254,7 @@ void GameplayController::CreateMatchAis(const MissionController &mission, Entity
 {
     m_matchAis.clear();
     m_sim.SetComputerPlayers({}, mission.IsMatch());
-    if (!mission.IsMatch())
+    if (!mission.IsMatch() || !m_sim.AdvancesWorld())
         return;
     const MatchSetup &setup = mission.matchSetup();
     auto findHqTile = [&](PlayerId playerId, int &hqTileX, int &hqTileY) {
@@ -522,8 +521,7 @@ void GameplayController::RenderGroupBar(
             }
         }
 
-        ui::FillVerticalGradient(
-            renderer, slot, hovered ? ui::Mix(topColor, edgeColor, 0.25f) : topColor, bottomColor);
+        ui::FillVerticalGradient(renderer, slot, hovered ? ui::Mix(topColor, edgeColor, 0.25f) : topColor, bottomColor);
         const Unit *leader = entities.GetUnit(leaderId);
         if (leader)
         {
@@ -531,7 +529,8 @@ void GameplayController::RenderGroupBar(
             if (cameoCompId >= 0)
                 renderer.SetDrawOwner(leader->owner);
             renderer.SetStructureFaction(leader->faction);
-            renderer.DrawCompositeScreen(cameoCompId, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
+            renderer.DrawCompositeScreen(
+                cameoCompId, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
             renderer.SetStructureFaction(Faction::Neutral);
             renderer.SetDrawOwner(kNoPlayer);
         }
@@ -702,6 +701,7 @@ void GameplayController::Update(const FrameContext &context)
     hud.SetTopInset(m_debugMode ? 32 : 0);
     bool openMenu = false;
     bool openObjectives = false;
+    hud.SetPointerPressOrigin(input.GetLeftPressX(), input.GetLeftPressY());
     bool mapInputConsumed = hud.HandleHudClick(
         mouseX,
         mouseY,
@@ -1150,8 +1150,7 @@ void GameplayController::Update(const FrameContext &context)
             // A tap on an own unit or building selects it (the unit selection ends), it is no order
             const bool tappedOwn = tappedEntity && tappedEntity->alive && tappedEntity->owner == Players::Local();
             const std::uint64_t nowTicks = SDL_GetTicks();
-            const bool isSecondOrderTap = nowTicks - m_touchOrderTicks < 450
-                                          && std::abs(mouseX - m_touchOrderX) <= 40
+            const bool isSecondOrderTap = nowTicks - m_touchOrderTicks < 450 && std::abs(mouseX - m_touchOrderX) <= 40
                                           && std::abs(mouseY - m_touchOrderY) <= 40;
             if (!combatUnits.empty() && !tappedOwn)
             {
@@ -1174,7 +1173,8 @@ void GameplayController::Update(const FrameContext &context)
                 for (int unitId : m_selectedUnits)
                 {
                     const Building *building = entities.GetBuilding(unitId);
-                    if (building && building->alive && building->owner == Players::Local() && building->IsUnitProducer())
+                    if (building && building->alive && building->owner == Players::Local()
+                        && building->IsUnitProducer())
                         m_touchRallyIds.push_back(unitId);
                 }
                 m_touchRallyTicks = nowTicks;
@@ -1272,8 +1272,9 @@ void GameplayController::Update(const FrameContext &context)
                 {
                     // Double click on a unit: every own unit of that kind on the screen
                     const int archetype = clickedUnit->archetypeId;
-                    SelectOwnUnits(
-                        entities, camera, true, [archetype](const Unit &unit) { return unit.archetypeId == archetype; });
+                    SelectOwnUnits(entities, camera, true, [archetype](const Unit &unit) {
+                        return unit.archetypeId == archetype;
+                    });
                 }
                 else if (isDoubleClick && clickedEntityId == 0)
                 {
@@ -1329,6 +1330,8 @@ void GameplayController::Update(const FrameContext &context)
             {
                 entities.GetUnitsInBox(minX, minY, maxX, maxY, Players::Local(), m_selectedUnits);
             }
+            if (m_touchMode && !input.IsLeftMouseDown())
+                input.CancelSelectionBox();
         }
     }
 
@@ -1505,8 +1508,7 @@ void GameplayController::RenderOrderLines(
                                      || (unit->targetWallTileX >= 0 && unit->targetWallTileY >= 0);
         if (unit->orderX >= 0 && unit->orderY >= 0)
         {
-            const LineStyle &style
-                = (unit->isAttackMoving || hasCombatTarget) ? m_overlay.attack : m_overlay.move;
+            const LineStyle &style = (unit->isAttackMoving || hasCombatTarget) ? m_overlay.attack : m_overlay.move;
             const float orderWorldX = static_cast<float>(unit->orderX);
             const float orderWorldY = static_cast<float>(unit->orderY);
             if (unit->targetEntityId == 0)
@@ -1523,9 +1525,8 @@ void GameplayController::RenderOrderLines(
         }
         for (const Unit::QueuedOrder &queuedOrder : unit->orderQueue)
         {
-            const LineStyle &style = static_cast<OrderKind>(queuedOrder.kind) == OrderKind::AttackMove
-                                         ? m_overlay.attack
-                                         : m_overlay.move;
+            const LineStyle &style
+                = static_cast<OrderKind>(queuedOrder.kind) == OrderKind::AttackMove ? m_overlay.attack : m_overlay.move;
             const float orderWorldX = static_cast<float>(queuedOrder.x);
             const float orderWorldY = static_cast<float>(queuedOrder.y);
             drawLine(fromX, fromY, orderWorldX, orderWorldY, style);
@@ -1823,8 +1824,7 @@ void GameplayController::RenderDebugSpawnDropdown(
     }
 
     // Column 3: BUILDINGS (items 14..29)
-    fontRenderer.DrawString(
-        "-- BUILDINGS --", dropdownX + columnWidth * 2 + 10, dropdownY + 6, 1, {255, 220, 80, 255});
+    fontRenderer.DrawString("-- BUILDINGS --", dropdownX + columnWidth * 2 + 10, dropdownY + 6, 1, {255, 220, 80, 255});
     for (int i = 14; i < 30 && i < static_cast<int>(catalog.size()); ++i)
     {
         int itemY = dropdownY + 26 + (i - 14) * 20;

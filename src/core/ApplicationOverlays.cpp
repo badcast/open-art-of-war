@@ -99,7 +99,7 @@ void Application::DrawLoadingFrame(
         }
     }
     int w = 0, h = 0;
-#if ANDROID
+#if OAOW_TOUCH
     w = m_windowW;
     h = m_windowH;
 #else

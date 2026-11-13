@@ -71,6 +71,11 @@ void Application::DriveNetworkBot(std::uint32_t tick)
     static const bool bot = DebugEnv("OAOW_NET_BOT") != nullptr;
     if (!bot)
         return;
+    // A replica sees the same tick for many frames: act once per tick
+    static std::uint32_t lastTick = UINT32_MAX;
+    if (tick == lastTick)
+        return;
+    lastTick = tick;
     const PlayerId me = Players::Local();
     const Faction myFaction = Players::FactionOf(me);
     // Economy traffic too (the commands that broke the other side's faction and unit ids): riflemen from
@@ -694,6 +699,8 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
     if (m_net->TakeStartedMatch(setup))
     {
         BeginMapLoading(MapTitleOf(setup.mapPath), setup.mapPath);
+        // Establish the execution role before map-load callbacks and match initialization.
+        m_net->Attach(m_gameplayController->simulation());
         if (!m_mission->LoadMatch(setup, *m_map, *m_entities, *m_economy, *m_pathfinder))
         {
             EndMapLoading();
@@ -707,7 +714,6 @@ void Application::UpdateNetwork(std::uint32_t nowMs)
         m_notices.clear();
         // A fresh simulation now, before the first turn's commands are scheduled into it
         m_gameplayController->ResetForMission(*m_mission, *m_hudController, *m_entities, *m_map);
-        m_net->Attach(m_gameplayController->simulation());
         m_entities->SetCollectReplicaEvents(m_net->AuthorityModeOn() && m_net->IsAuthority());
         m_net->SetReconnectWindow(
             static_cast<std::uint32_t>(m_env.Section("network").value("reconnect_window_s", 60)) * 1000u);

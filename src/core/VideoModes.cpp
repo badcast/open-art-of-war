@@ -73,7 +73,7 @@ void Apply(SDL_Window *window, SDL_Renderer *renderer, const Settings &settings)
 {
     if (!window)
         return;
-#if ANDROID
+#if OAOW_TOUCH
     SDL_SetWindowFullscreen(window, true);
 #else
     const SDL_DisplayID display = DisplayOf(window);

@@ -334,6 +334,23 @@ void ResetResearch(PlayerId player)
     std::fill(std::begin(g_completed[player]), std::end(g_completed[player]), false);
 }
 
+ResearchState CaptureResearchState()
+{
+    ResearchState state {};
+    for (int player = 0; player < kMaxPlayers; ++player)
+        for (int i = 0; i < kResearchCount; ++i)
+            if (g_completed[player][i])
+                state[player] |= (1u << i);
+    return state;
+}
+
+void RestoreResearchState(const ResearchState &state)
+{
+    for (int player = 0; player < kMaxPlayers; ++player)
+        for (int i = 0; i < kResearchCount; ++i)
+            g_completed[player][i] = (state[player] & (1u << i)) != 0;
+}
+
 bool IsResearched(PlayerId player, int index)
 {
     return Valid(player) && index >= 0 && index < kResearchCount && g_completed[player][index];

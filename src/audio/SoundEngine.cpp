@@ -453,6 +453,18 @@ bool SoundEngine::LoadTrack(const Track &track, bool loop)
     return true;
 }
 
+bool SoundEngine::PlayNamedLoop(const std::string &name)
+{
+    const auto it = std::find_if(
+        m_gameTracks.begin(), m_gameTracks.end(), [&](const Track &track) { return track.name == name; });
+    if (it == m_gameTracks.end() || !LoadTrack(*it, true))
+        return false;
+    m_musicContext = 3;
+    m_currentTrack = static_cast<int>(it - m_gameTracks.begin()) + 1;
+    m_manualPlayback = false;
+    return true;
+}
+
 void SoundEngine::PlayMenuMusic()
 {
     if (!m_initialized || !m_hasMenuTrack || m_menuTracks.empty())
@@ -667,11 +679,13 @@ std::string SoundEngine::GetCurrentTrackName() const
     return i < m_gameTracks.size() ? m_gameTracks[i].name : std::string();
 }
 
-void SoundEngine::Update(bool inMainMenu, bool inGame)
+void SoundEngine::Update(bool inMainMenu, bool inGame, bool preserveMusic)
 {
     if (!m_initialized)
         return;
     m_voices.Update(SDL_GetTicks()); // the next announcer line once the current one is over
+    if (preserveMusic)
+        return;
     const int area = inMainMenu ? 1 : (inGame ? 2 : 0);
     if (area != m_lastArea)
     {
@@ -742,7 +756,8 @@ void SoundEngine::ApplyGain()
     const float general = static_cast<float>(m_generalVolume) / 128.0f;
     if (m_stream)
     {
-        SDL_SetAudioStreamGain(m_stream, m_muted ? 0.0f : static_cast<float>(m_volume) / 128.0f * general);
+        SDL_SetAudioStreamGain(
+            m_stream, m_muted ? 0.0f : static_cast<float>(m_volume) / 128.0f * general * m_sceneMusicGain);
     }
     if (m_ambientStream)
         SDL_SetAudioStreamGain(
@@ -755,6 +770,12 @@ void SoundEngine::SetGeneralVolume(int volume)
     m_sfx.SetGeneralVolume(m_generalVolume);
     m_voices.SetGeneralVolume(m_generalVolume);
     ApplyGain(); // the music and the surroundings play on their own streams
+}
+
+void SoundEngine::SetSceneMusicGain(float gain)
+{
+    m_sceneMusicGain = std::clamp(gain, 0.0f, 1.0f);
+    ApplyGain();
 }
 
 void SoundEngine::SetMusicVolume(int volume)

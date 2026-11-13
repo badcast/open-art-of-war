@@ -29,6 +29,7 @@ class ReplayRecorder;
 struct SimCommand;
 class ReplayMenu;
 class ModsMenu;
+class AboutSimulation;
 
 class TextureManager;
 class Renderer;
@@ -84,7 +85,7 @@ public:
     // cannot be played
     bool OpenReplay(const std::string &path);
     void LaunchTestMap();
-    // The touch interface (AndroidHUD) instead of the desktop sidebar: the default on Android, --touch-ui elsewhere
+    // The touch interface (TouchHUD) instead of the desktop sidebar: the default on touch devices, --touch-ui elsewhere
     void SetTouchUi(bool on)
     {
         m_touchUi = on;
@@ -408,8 +409,13 @@ private:
 
     // Subsystem Controllers
     std::unique_ptr<MenuController> m_menuController;
+    std::unique_ptr<AboutSimulation> m_aboutScene;
+    std::vector<std::string> m_aboutCredits;
+    bool m_aboutMusicPlaying {false};
+    bool m_aboutViewActive {false};
+    bool m_aboutAttempted {false};
     std::unique_ptr<HUDController> m_hudController;
-#if ANDROID
+#if OAOW_TOUCH
     bool m_touchUi {true};
 #else
     bool m_touchUi {false};

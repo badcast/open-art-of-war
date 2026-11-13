@@ -190,7 +190,7 @@ bool TileMap::LoadMap(const std::string &jsonPath)
                     int wallWidth = wallEntry[2].get<int>();
                     int wallHeight = wallEntry[3].get<int>();
                     Faction faction = (wallEntry.size() >= 5 && wallEntry[4].get<int>() != 0) ? Faction::Resistance
-                                                                                             : Faction::Confederation;
+                                                                                              : Faction::Confederation;
                     int hp = (wallEntry.size() >= 6) ? wallEntry[5].get<int>() : 100;
                     for (int tileY = wallY; tileY < wallY + wallHeight; ++tileY)
                     {
@@ -627,8 +627,8 @@ void TileMap::RenderTerrain(Renderer &renderer, const Camera &camera, bool fogEn
                     for (int dx = -1; dx <= 1 && !hasSeenNeighbor; ++dx)
                     {
                         const int neighborX = tileX + dx, neighborY = tileY + dy;
-                        hasSeenNeighbor = neighborX >= 0 && neighborY >= 0 && neighborX < m_width && neighborY < m_height
-                                          && m_fog[neighborY][neighborX] != FogState::Hidden;
+                        hasSeenNeighbor = neighborX >= 0 && neighborY >= 0 && neighborX < m_width
+                                          && neighborY < m_height && m_fog[neighborY][neighborX] != FogState::Hidden;
                     }
                 }
                 if (!hasSeenNeighbor)
@@ -821,7 +821,8 @@ void TileMap::RenderFog(Renderer &renderer, const Camera &camera, bool smooth) c
             for (int texelY = 0; texelY < texelsPerTile; ++texelY)
             {
                 std::fill_n(
-                    &m_fogMask[static_cast<std::size_t>(tileY * texelsPerTile + texelY) * maskWidth + tileX * texelsPerTile],
+                    &m_fogMask
+                        [static_cast<std::size_t>(tileY * texelsPerTile + texelY) * maskWidth + tileX * texelsPerTile],
                     texelsPerTile,
                     alpha);
             }
@@ -911,9 +912,25 @@ void TileMap::RenderWallRow(
             Faction wallFaction = (wallValue >= 1101) ? Faction::Resistance : Faction::Confederation;
             renderer.SetDrawOwner(owner); // the wall wears its owner's army colour
             renderer.DrawBuildingWorld(
-                wallBuildingId, tileX * TILE_WIDTH, tileY * TILE_HEIGHT, 0, camera, wallFaction, globalAnimTick, 1.0f, false);
+                wallBuildingId,
+                tileX * TILE_WIDTH,
+                tileY * TILE_HEIGHT,
+                0,
+                camera,
+                wallFaction,
+                globalAnimTick,
+                1.0f,
+                false);
             renderer.DrawBuildingWorld(
-                wallBuildingId, tileX * TILE_WIDTH, tileY * TILE_HEIGHT, 1, camera, wallFaction, globalAnimTick, 1.0f, false);
+                wallBuildingId,
+                tileX * TILE_WIDTH,
+                tileY * TILE_HEIGHT,
+                1,
+                camera,
+                wallFaction,
+                globalAnimTick,
+                1.0f,
+                false);
         }
     }
     renderer.SetDrawOwner(kNoPlayer);

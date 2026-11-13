@@ -59,14 +59,14 @@ enum class MsgType : std::uint8_t
     FileData = 10,        // host -> client: the file (compressed by the game; empty: not there);
                           // owner -> dedicated room: a file the room offers from now on
     // Lockstep
-    Commands = 16,     // client -> host: the local player's commands for a turn
-    TurnBundle = 17,   // host -> clients: everybody's commands of a closed turn
-    WorldHash = 18,    // client -> host: checksum of the world after a tick
-    Desync = 19,       // host -> clients: the checksums of a tick differ
+    Commands = 16,       // client -> host: the local player's commands for a turn
+    TurnBundle = 17,     // host -> clients: everybody's commands of a closed turn
+    WorldHash = 18,      // client -> host: checksum of the world after a tick
+    Desync = 19,         // host -> clients: the checksums of a tick differ
     AuthorityState = 22, // authority -> relay -> one player: opaque, versioned game state
-    AuthorityAck = 23, // replica -> relay -> authority
-    PauseRequest = 20, // client -> host: pause / go on
-    PauseState = 21,   // host -> clients: paused or not, by whom
+    AuthorityAck = 23,   // replica -> relay -> authority
+    PauseRequest = 20,   // client -> host: pause / go on
+    PauseState = 21,     // host -> clients: paused or not, by whom
     // Room owner (dedicated server rooms: the first player decides what the host would)
     OwnerSetMap = 24,     // client -> room: the map and its start position count
     OwnerStart = 25,      // client -> room: the resolved match setup to start with

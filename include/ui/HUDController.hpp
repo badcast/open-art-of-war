@@ -49,7 +49,7 @@ public:
     HUDController() = default;
     virtual ~HUDController() = default;
 
-    // ---- What differs between the desktop sidebar and the touch interface (AndroidHUD) ----
+    // ---- What differs between the desktop sidebar and the touch interface (TouchHUD) ----
     // Width on the right the interface takes from the map viewport
     virtual int ReservedWidth() const
     {
@@ -78,6 +78,22 @@ public:
         (void) windowW;
         (void) windowH;
         return {};
+    }
+
+    virtual SDL_Rect TouchScrollPanel(int, int) const
+    {
+        return {0, 0, 0, 0};
+    }
+    virtual SDL_Rect TouchPlacementGhost() const
+    {
+        return {0, 0, 0, 0};
+    }
+
+    // Initial pointer position stays fixed throughout a drag.
+    virtual void SetPointerPressOrigin(int x, int y)
+    {
+        (void) x;
+        (void) y;
     }
 
     // Window of the technology tree: search, filter, the tree, the selected technology and its start button

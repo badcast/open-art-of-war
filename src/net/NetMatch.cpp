@@ -853,7 +853,7 @@ void NetMatch::StartFromLobby(std::uint32_t nowMs)
     setup.prebuilt = lobby.prebuilt;
     setup.fogOfWar = lobby.fogOfWar;
     setup.night = lobby.night;
-    setup.authorityMode = m_authorityMode; // the owner decides for everybody
+    setup.authorityMode = m_authorityMode;                           // the owner decides for everybody
     setup.techLevel = static_cast<std::int8_t>(lobby.techLevel) - 1; // (0 in the room: the map's / the default)
     std::mt19937 rng(setup.seed);
     // Start positions picked by the players first, the random ones get the free spots left
@@ -958,7 +958,8 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         if (ack.sender >= kMaxPlayers)
             continue;
         auto &peer = m_snapshotPeers[ack.sender];
-        const auto found = std::find_if(peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return s.tick == ack.tick; });
+        const auto found = std::find_if(
+            peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return s.tick == ack.tick; });
         if (found != peer.history.end() && (!peer.hasAck || ack.tick > peer.ack))
         {
             peer.ack = ack.tick;
@@ -977,20 +978,33 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         }
         WorldSnapshot current = snapshot;
         current.FilterForPlayer(entities, map, p.slot);
-        current.deaths.erase(std::remove_if(current.deaths.begin(), current.deaths.end(), [&](const DeathSnap &d) {
-            if (peer.history.empty())
-                return true;
-            const auto &previous = peer.history.back().entities;
-            return std::none_of(previous.begin(), previous.end(), [&](const EntitySnap &e) { return e.id == d.id; });
-        }), current.deaths.end());
+        current.deaths.erase(
+            std::remove_if(
+                current.deaths.begin(),
+                current.deaths.end(),
+                [&](const DeathSnap &d) {
+                    if (peer.history.empty())
+                        return true;
+                    const auto &previous = peer.history.back().entities;
+                    return std::none_of(
+                        previous.begin(), previous.end(), [&](const EntitySnap &e) { return e.id == d.id; });
+                }),
+            current.deaths.end());
         for (const auto &entity : current.entities)
             peer.knownEntities.insert(entity.id);
-        current.hiddenAlive.erase(std::remove_if(current.hiddenAlive.begin(), current.hiddenAlive.end(), [&](std::uint32_t id) {
-            return peer.knownEntities.count(id) == 0;
-        }), current.hiddenAlive.end());
-        const auto base = std::find_if(peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return peer.hasAck && s.tick == peer.ack; });
-        WorldSnapshot outgoing = (!peer.hasAck || snapshot.tick < peer.ack || snapshot.tick - peer.ack > 40 || base == peer.history.end() || snapshot.tick % 100 == 0)
-            ? current : current.DeltaFrom(*base);
+        current.hiddenAlive.erase(
+            std::remove_if(
+                current.hiddenAlive.begin(),
+                current.hiddenAlive.end(),
+                [&](std::uint32_t id) { return peer.knownEntities.count(id) == 0; }),
+            current.hiddenAlive.end());
+        const auto base = std::find_if(peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) {
+            return peer.hasAck && s.tick == peer.ack;
+        });
+        WorldSnapshot outgoing = (!peer.hasAck || snapshot.tick < peer.ack || snapshot.tick - peer.ack > 40
+                                  || base == peer.history.end() || snapshot.tick % 100 == 0)
+                                     ? current
+                                     : current.DeltaFrom(*base);
         Net::AuthorityState state;
         state.tick = snapshot.tick;
         state.recipient = p.slot;
@@ -1003,12 +1017,22 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
             peer.traceStart = now;
         if (DebugEnv("OAOW_NET_TRACE") && now - peer.traceStart >= 1000)
         {
-            std::printf("[Net] recipient %u snapshot bytes %llu in %u ms\n", p.slot, static_cast<unsigned long long>(peer.bytes), now - peer.traceStart);
+            std::printf(
+                "[Net] recipient %u snapshot bytes %llu in %u ms\n",
+                p.slot,
+                static_cast<unsigned long long>(peer.bytes),
+                now - peer.traceStart);
             peer.bytes = 0;
             peer.traceStart = now;
         }
-        current.projectiles.clear(); current.cues.clear(); current.blasts.clear(); current.explosions.clear(); current.deaths.clear(); current.groundMarks.clear();
-        current.hasWalls = false; current.walls.clear();
+        current.projectiles.clear();
+        current.cues.clear();
+        current.blasts.clear();
+        current.explosions.clear();
+        current.deaths.clear();
+        current.groundMarks.clear();
+        current.hasWalls = false;
+        current.walls.clear();
         if (DebugEnv("OAOW_NET_TRACE") && current.tick % 20 == 0)
         {
             // What this recipient is entitled to see, hashed: the replica prints the hash of what it holds (`repl`)
@@ -1018,7 +1042,11 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
             const std::vector<std::uint8_t> bytes = plain.Encode();
             for (std::uint8_t b : bytes)
                 h = (h ^ b) * 1099511628211ull;
-            std::printf("[Snap] auth tick %u entities %zu bytes %zu hash %016llx\n", current.tick, plain.entities.size(), bytes.size(),
+            std::printf(
+                "[Snap] auth tick %u entities %zu bytes %zu hash %016llx\n",
+                current.tick,
+                plain.entities.size(),
+                bytes.size(),
                 static_cast<unsigned long long>(h));
             std::fflush(stdout);
         }
@@ -1037,7 +1065,10 @@ bool NetMatch::TakeSnapshot(WorldSnapshot &out)
             continue;
         if (!out.full)
         {
-            const auto base = std::find_if(m_replicaSnapshots.begin(), m_replicaSnapshots.end(), [&](const WorldSnapshot &s) { return s.tick == out.baseTick; });
+            const auto base
+                = std::find_if(m_replicaSnapshots.begin(), m_replicaSnapshots.end(), [&](const WorldSnapshot &s) {
+                      return s.tick == out.baseTick;
+                  });
             if (base == m_replicaSnapshots.end() || !out.ExpandFrom(*base))
                 continue;
         }
@@ -1051,8 +1082,14 @@ void NetMatch::AckSnapshot(const WorldSnapshot &snapshot)
     if (!m_client)
         return;
     WorldSnapshot saved = snapshot;
-    saved.projectiles.clear(); saved.cues.clear(); saved.blasts.clear(); saved.explosions.clear(); saved.deaths.clear(); saved.groundMarks.clear();
-    saved.hasWalls = false; saved.walls.clear();
+    saved.projectiles.clear();
+    saved.cues.clear();
+    saved.blasts.clear();
+    saved.explosions.clear();
+    saved.deaths.clear();
+    saved.groundMarks.clear();
+    saved.hasWalls = false;
+    saved.walls.clear();
     m_replicaSnapshots.push_back(std::move(saved));
     if (m_replicaSnapshots.size() > 64)
         m_replicaSnapshots.pop_front();
@@ -1061,7 +1098,7 @@ void NetMatch::AckSnapshot(const WorldSnapshot &snapshot)
 
 void NetMatch::PumpReplica(std::uint32_t nowMs)
 {
-    (void)nowMs;
+    (void) nowMs;
     if (!IsReplica())
         return;
     // Nobody simulates the turns here: only the authority applies them
@@ -1173,7 +1210,8 @@ void NetMatch::AfterTick(std::uint32_t tick, std::uint64_t checksum)
     }
     if (tick % kHashIntervalTicks == 0)
     {
-        m_client->sendWorldHash(tick, checksum);
+        if (!m_authorityMode)
+            m_client->sendWorldHash(tick, checksum); // replicas have no independently simulated hash to compare
         // OAOW_NET_TRACE=1: the checksums on stdout, to compare two peers by eye or script
         static const bool trace = DebugEnv("OAOW_NET_TRACE") != nullptr;
         if (trace && tick % (kHashIntervalTicks * 10) == 0)

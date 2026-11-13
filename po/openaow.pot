@@ -2769,3 +2769,12 @@ msgstr "Connect by address (the host forwards UDP port 38100)"
 
 msgid "CREATE ROOM"
 msgstr "CREATE ROOM"
+
+msgid "TAP A LOCATION, THEN TAP THE BUILDING"
+msgstr "TAP A LOCATION, THEN TAP THE BUILDING"
+
+msgid "INSUFFICIENT FUNDS!"
+msgstr "INSUFFICIENT FUNDS!"
+
+msgid "CANNOT BUILD HERE!"
+msgstr "CANNOT BUILD HERE!"

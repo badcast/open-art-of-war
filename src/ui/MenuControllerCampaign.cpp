@@ -94,8 +94,13 @@ UiRect CustomCell(const UiRect &detailsRect, int rowIndex, int kind)
     // 8 army size, 9 tech level). The cells share the width of the row, so they stretch with the window
     static constexpr int kColumnShare[7] = {23, 17, 8, 8, 12, 15, 17};
     const UiRect rowRect = CustomRow(detailsRect, rowIndex);
-    const int columnIndex
-        = kind == 1 ? 1 : kind == 2 ? 2 : kind == 3 ? 3 : kind == 7 ? 4 : kind == 8 ? 5 : kind == 9 ? 6 : 0;
+    const int columnIndex = kind == 1   ? 1
+                            : kind == 2 ? 2
+                            : kind == 3 ? 3
+                            : kind == 7 ? 4
+                            : kind == 8 ? 5
+                            : kind == 9 ? 6
+                                        : 0;
     const int gap = 4;
     const int contentX = rowRect.x + 24;
     const int totalWidth = rowRect.w - 24 - 6 * gap - 4;
@@ -174,11 +179,11 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
     layout.dialog = ui::CenteredRect(windowWidth, windowHeight, windowWidth, windowHeight); // the whole screen
     int contentY = layout.dialog.y + 52 + 16;
     int footerY = layout.dialog.Bottom() - 64;
-    layout.list = {
-        layout.dialog.x + 20,
-        contentY,
-        std::clamp(static_cast<int>(layout.dialog.w * 0.27f), 300, 460),
-        footerY - contentY - 8};
+    layout.list
+        = {layout.dialog.x + 20,
+           contentY,
+           std::clamp(static_cast<int>(layout.dialog.w * 0.27f), 300, 460),
+           footerY - contentY - 8};
     int clampedCount = std::max(1, missionCount);
     layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 26, 44);
     layout.details
@@ -195,11 +200,11 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
     layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 28};
     layout.baseCheckbox = {optionsX, previewRect.y + 32, layout.details.Right() - 20 - optionsX, 28};
     layout.speedCheckbox = {optionsX, previewRect.y + 64, layout.details.Right() - 20 - optionsX, 28};
-    layout.difficultyBtn = {
-        layout.sideBtn[0].Right() + 12,
-        footerY + 10,
-        std::max(180, layout.editorBtn.x - 12 - (layout.sideBtn[0].Right() + 12)),
-        40};
+    layout.difficultyBtn
+        = {layout.sideBtn[0].Right() + 12,
+           footerY + 10,
+           std::max(180, layout.editorBtn.x - 12 - (layout.sideBtn[0].Right() + 12)),
+           40};
     return layout;
 }
 
@@ -212,10 +217,10 @@ void SpotMarkerPos(
         (previewRect.w - 4) / static_cast<float>(mapWidth), (previewRect.h - 4) / static_cast<float>(mapHeight));
     const float originX = previewRect.CenterX() - mapWidth * scale / 2;
     const float originY = previewRect.CenterY() - mapHeight * scale / 2;
-    screenX = std::clamp(
-        static_cast<int>(originX + (tileX + 0.5f) * scale), previewRect.x + 10, previewRect.Right() - 10);
-    screenY = std::clamp(
-        static_cast<int>(originY + (tileY + 0.5f) * scale), previewRect.y + 10, previewRect.Bottom() - 10);
+    screenX
+        = std::clamp(static_cast<int>(originX + (tileX + 0.5f) * scale), previewRect.x + 10, previewRect.Right() - 10);
+    screenY
+        = std::clamp(static_cast<int>(originY + (tileY + 0.5f) * scale), previewRect.y + 10, previewRect.Bottom() - 10);
 }
 
 constexpr int kMapFilterBarH = 72; // search box and the three filter buttons over the list of maps
@@ -241,15 +246,14 @@ int CustomListRows(CampaignLayout &layout)
 }
 
 // The picture of a map in the bottom part of the details panel, scaled to fit and centered
-void DrawMapPreviewIn(
-    Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &area)
+void DrawMapPreviewIn(Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &area)
 {
     renderer.FillRectScreen(area.x, area.y, area.w, area.h, col::PanelSunken);
     renderer.DrawRectScreen(area.x, area.y, area.w, area.h, col::Border);
     if (!texture || textureWidth <= 0 || textureHeight <= 0)
         return;
-    const float scale = std::min(
-        (area.w - 4) / static_cast<float>(textureWidth), (area.h - 4) / static_cast<float>(textureHeight));
+    const float scale
+        = std::min((area.w - 4) / static_cast<float>(textureWidth), (area.h - 4) / static_cast<float>(textureHeight));
     const int drawWidth = std::max(1, static_cast<int>(textureWidth * scale));
     const int drawHeight = std::max(1, static_cast<int>(textureHeight * scale));
     SDL_FRect destRect {
@@ -260,8 +264,7 @@ void DrawMapPreviewIn(
     SDL_RenderTexture(renderer.GetSdlRenderer(), texture, nullptr, &destRect);
 }
 
-void DrawMapPreview(
-    Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &panel)
+void DrawMapPreview(Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &panel)
 {
     const int margin = 20;
     const int maxHeight = std::min(panel.h / 2 - 12, 220);
@@ -405,7 +408,8 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
                 if (slotIndex == 0)
                 {
                     if (m_sideRandom)
-                        SetPlayerFaction((randomDevice() & 1u) ? Faction::Confederation : Faction::Resistance); // drawn now
+                        SetPlayerFaction(
+                            (randomDevice() & 1u) ? Faction::Confederation : Faction::Resistance); // drawn now
                     slot.faction = PlayerFaction();
                 }
                 else if (customSlot.faction == 0)
@@ -935,18 +939,16 @@ void MenuController::RenderCampaignMissionSelect(
             combo(
                 1,
                 slotIndex == 0
-                    ? (m_sideRandom ? _("Random")
-                                    : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
-                    : (customSlot.faction == 0
+                    ? (m_sideRandom
                            ? _("Random")
-                           : (customSlot.faction == 1 ? _("Resistance") : _("Confederation"))));
+                           : (PlayerFaction() == Faction::Confederation ? _("Confederation") : _("Resistance")))
+                    : (customSlot.faction == 0 ? _("Random")
+                                               : (customSlot.faction == 1 ? _("Resistance") : _("Confederation"))));
             combo(2, std::to_string(customSlot.team + 1));
             combo(7, customSlot.handicap == 0 ? std::string("-") : HandicapText(customSlot.handicap));
             combo(8, ui::ArmyCapChoices()[std::clamp(customSlot.armyCap, 0, kArmyCapCount - 1)]);
             combo(
-                9,
-                ui::TechLevelLabel(customSlot.techLevel, true),
-                customSlot.techLevel < 0 ? col::TextDim : col::Text);
+                9, ui::TechLevelLabel(customSlot.techLevel, true), customSlot.techLevel < 0 ? col::TextDim : col::Text);
             combo(3, "");
             const UiRect colorCellRect = CustomCell(detailsRect, spotIndex, 3);
             renderer.FillRectScreen(
@@ -956,7 +958,11 @@ void MenuController::RenderCampaignMissionSelect(
                 colorCellRect.h - 12,
                 ArmyColor(customSlot.color));
             renderer.DrawRectScreen(
-                colorCellRect.x + 6, colorCellRect.y + 6, colorCellRect.w - 28, colorCellRect.h - 12, col::BorderStrong);
+                colorCellRect.x + 6,
+                colorCellRect.y + 6,
+                colorCellRect.w - 28,
+                colorCellRect.h - 12,
+                col::BorderStrong);
         }
         const UiRect previewRect = CustomPreviewArea(detailsRect);
         int previewWidth = 0, previewHeight = 0;
@@ -1161,15 +1167,16 @@ void MenuController::RenderCampaignMissionSelect(
     if (m_combo.open >= kComboSide)
     { // the open list, over everything
         const int comboId = m_combo.open;
-        const UiRect fieldRect = comboId >= kComboSlot
-                                     ? CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10)
-                                     : (comboId >= kComboMapPlayers && comboId <= kComboMapSort
-                                            ? MapFilterBtn(layout, comboId - kComboMapPlayers)
-                                        : comboId == kComboSide    ? layout.sideBtn[0]
-                                        : comboId == kComboCredits ? layout.creditsBtn
-                                        : comboId == kComboTime    ? layout.timeBtn
-                                        : comboId == kComboTech    ? layout.techBtn
-                                                                   : layout.difficultyBtn);
+        const UiRect fieldRect
+            = comboId >= kComboSlot
+                  ? CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10)
+                  : (comboId >= kComboMapPlayers && comboId <= kComboMapSort
+                         ? MapFilterBtn(layout, comboId - kComboMapPlayers)
+                     : comboId == kComboSide    ? layout.sideBtn[0]
+                     : comboId == kComboCredits ? layout.creditsBtn
+                     : comboId == kComboTime    ? layout.timeBtn
+                     : comboId == kComboTech    ? layout.techBtn
+                                                : layout.difficultyBtn);
         std::vector<std::string> items = CampaignComboOptions(comboId);
         std::vector<bool> taken;
         std::vector<SDL_Color> swatches;
@@ -1297,9 +1304,10 @@ int MenuController::CampaignComboCurrent(int comboId) const
         if (kind == 0)
         {
             const std::vector<int> codes = CustomSeatCodes(row);
-            const int currentCode = slotIndex == 0 ? 1
-                                                   : (slotIndex > 0 ? 3 + std::clamp(m_customSlots[slotIndex].level, 0, 3)
-                                                                    : (((m_customBlocked >> row) & 1u) ? 7 : 2));
+            const int currentCode = slotIndex == 0
+                                        ? 1
+                                        : (slotIndex > 0 ? 3 + std::clamp(m_customSlots[slotIndex].level, 0, 3)
+                                                         : (((m_customBlocked >> row) & 1u) ? 7 : 2));
             for (std::size_t i = 0; i < codes.size(); ++i)
                 if (codes[i] == currentCode)
                     return static_cast<int>(i);

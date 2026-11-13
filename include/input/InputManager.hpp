@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <string>
-#if ANDROID
+#if OAOW_TOUCH
 #include <map>
 #endif
 
@@ -27,7 +27,7 @@ struct SelectionBox
 
     bool HasSignificantArea() const
     {
-#if ANDROID
+#if OAOW_TOUCH
         constexpr int threshold = 12;
 #else
         constexpr int threshold = 6;
@@ -41,15 +41,18 @@ class InputManager
 {
 public:
     InputManager();
-#if ANDROID
+#if OAOW_TOUCH
     void SetRenderer(SDL_Renderer *renderer)
     {
         m_touchRenderer = renderer;
     }
 #endif
 
-    // Touch screen: one finger dragging over the map draws a selection box by default (two fingers pan/pinch);
-    // the touch interface turns TouchPan on while placing a building so dragging outside the ghost pans the camera
+    // Touch HUD: drag to pan, or hold before dragging to select.
+    void SetTouchMode(bool on)
+    {
+        m_touchMode = on;
+    }
     void SetTouchPan(bool on)
     {
         m_touchPan = on;
@@ -60,6 +63,15 @@ public:
     {
         m_touchWheelScroll = on;
     }
+    void SetTouchScrollPanel(SDL_Rect rect)
+    {
+        m_touchScrollPanel = rect;
+    }
+    void SetTouchPlacementGhost(SDL_Rect rect)
+    {
+        m_touchPlacementGhost = rect;
+    }
+
     // Touch interface panels over the map (screen pixels): a finger that starts on one never pans the map
     void SetTouchUiRects(std::vector<SDL_Rect> rects)
     {
@@ -119,6 +131,14 @@ public:
     bool IsLeftMouseDown() const
     {
         return m_leftMouseDown;
+    }
+    int GetLeftPressX() const
+    {
+        return m_leftPressX;
+    }
+    int GetLeftPressY() const
+    {
+        return m_leftPressY;
     }
     // The left button went down since the last call (a click only fires on release), for grabbing scroll and seek bars
     bool ConsumeLeftPress(int &screenX, int &screenY)
@@ -200,11 +220,15 @@ public:
     void ResetFrameEvents();
 
 private:
+    SDL_Rect m_touchPlacementGhost {0, 0, 0, 0};
+    SDL_Rect m_touchScrollPanel {0, 0, 0, 0};
+    bool m_mouseScrollPanelPressed {false};
+    bool m_touchMode {false};
     bool m_touchPan {false};
     bool m_touchWheelScroll {true};
     float m_touchScroll {0.0f}; // finger travel not yet turned into wheel steps (menus scroll by swiping)
     std::vector<SDL_Rect> m_touchUiRects;
-#if ANDROID
+#if OAOW_TOUCH
     bool ProcessTouch(const SDL_Event &event, Camera &camera);
     SDL_Renderer *m_touchRenderer {nullptr};
     std::map<SDL_FingerID, SDL_FPoint> m_fingers;
@@ -212,6 +236,11 @@ private:
     bool m_touchGesture {false};
     bool m_touchMap {false};
     bool m_touchMoved {false};
+    bool m_touchOnGhost {false};
+    bool m_touchOnScrollPanel {false};
+    SDL_Rect m_touchGhostAtPress {0, 0, 0, 0};
+    bool m_touchSelecting {false};
+    bool m_touchPanning {false};
     Uint64 m_touchStart {0};
     SDL_FPoint m_touchOrigin {};
 #endif

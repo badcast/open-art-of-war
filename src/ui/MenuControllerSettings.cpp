@@ -8,6 +8,7 @@
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
 #include "graphics/ShaderEffects.hpp"
+#include "core/EnvironmentConfig.hpp"
 #include "game/Sides.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Localization.hpp"
@@ -224,7 +225,7 @@ std::vector<SettingsRow> BuildSettingsRows(
 
     if (tab == 0)
     { // VIDEO
-#if !ANDROID
+#if !OAOW_TOUCH
         static const char *const kModes[3] = {"Windowed", "Borderless", "Fullscreen"};
         choiceList(
             _("Window mode"),
@@ -330,6 +331,10 @@ std::vector<SettingsRow> BuildSettingsRows(
                 s.smoothing = on;
                 notify(SettingsArea::Graphics);
             });
+        toggle(_("Show shadows"), _("Draw shadows under units and buildings"), s.showShadows, [&s, notify](bool on) {
+            s.showShadows = on;
+            notify(SettingsArea::Graphics);
+        });
 
         if (renderApi.options && renderApi.configured && renderApi.active)
         {
@@ -581,7 +586,8 @@ std::vector<SettingsRow> BuildSettingsRows(
 // Settings of one tab back to their defaults
 void ResetSettingsTab(int tab, Settings &s)
 {
-    const Settings d;
+    Settings d;
+    d.ApplyFactoryDefaults(EnvironmentConfig::FactorySettings());
     if (tab == 0)
     {
         s.windowMode = d.windowMode;
@@ -598,6 +604,7 @@ void ResetSettingsTab(int tab, Settings &s)
     {
         s.graphicsQuality = d.graphicsQuality;
         s.smoothing = d.smoothing;
+        s.showShadows = d.showShadows;
         s.colorGrade = d.colorGrade;
         s.glow = d.glow;
         s.sharpPixels = d.sharpPixels;

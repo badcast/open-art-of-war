@@ -826,8 +826,16 @@ public:
         int anim {0};
         float delay {0.0f};
     };
-    std::unordered_set<int> &CollectedDeaths() { return m_collectedDeaths; }
-    struct ReplicaGroundMark { float x, y; int composite; float seconds; };
+    std::unordered_set<int> &CollectedDeaths()
+    {
+        return m_collectedDeaths;
+    }
+    struct ReplicaGroundMark
+    {
+        float x, y;
+        int composite;
+        float seconds;
+    };
     struct ReplicaEvents
     {
         std::vector<SoundCueEvent> cues;
@@ -862,7 +870,12 @@ public:
     // forces are destroyed as when a player leaves. Returns who dropped out on this call. Depends on the state of
     // the world only, so every peer does it on the same tick.
     std::vector<PlayerId> UpdateElimination(TileMap &map);
-    // How many more entities the player may get under MAX_UNITS (its even share of it in a match of 3+ players)
+    // Override the default match limit for self-contained scenes with larger starting armies.
+    void SetEntityLimit(int limit)
+    {
+        m_entityLimit = limit > 0 ? limit : MAX_UNITS;
+    }
+    // How many more entities the player may get (its even share in a match of 3+ players).
     int FreeEntitySlots(PlayerId owner) const;
     bool IsEliminated(PlayerId player) const
     {
@@ -941,6 +954,7 @@ private:
     };
     std::vector<RevealPing> m_revealPings; // attackers spotted by their muzzle flash
     bool m_unlimitedPower {false};
+    int m_entityLimit {MAX_UNITS};
     EntityContainer m_entities;
     std::vector<Projectile> m_projectiles;
     float m_renderAlpha {1.0f}; // render interpolation between the last two ticks (see SnapshotRenderState)

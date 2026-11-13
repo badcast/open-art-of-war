@@ -21,17 +21,27 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
         Entity *e = GetEntity(static_cast<int>(d.id));
         if (!e || e->state == ActionState::Die || m_replicaVisible.count(e->id) == 0)
             continue;
-        e->state = ActionState::Die; e->currentHp = 0; e->selected = false;
-        e->tileX = d.tileX; e->tileY = d.tileY; e->subX = d.subX; e->subY = d.subY;
-        e->deathTimer = d.timer; e->animTimer = 0.0f; e->animFrame = 0;
+        e->state = ActionState::Die;
+        e->currentHp = 0;
+        e->selected = false;
+        e->tileX = d.tileX;
+        e->tileY = d.tileY;
+        e->subX = d.subX;
+        e->subY = d.subY;
+        e->deathTimer = d.timer;
+        e->animTimer = 0.0f;
+        e->animFrame = 0;
         if (Unit *u = e->AsUnit())
         {
-            u->killedByFlame = d.flame; u->selectedDeathSeq = d.sequence;
-            u->wreckComposite = d.wreckComposite; u->wreckStages = d.wreckStages;
+            u->killedByFlame = d.flame;
+            u->selectedDeathSeq = d.sequence;
+            u->wreckComposite = d.wreckComposite;
+            u->wreckStages = d.wreckStages;
         }
         if (Building *b = e->AsBuilding())
         {
-            b->wreckComposite = d.wreckComposite; b->wreckStages = d.wreckStages;
+            b->wreckComposite = d.wreckComposite;
+            b->wreckStages = d.wreckStages;
         }
     }
     m_replicaVisible.clear();
@@ -59,7 +69,8 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
         drop.insert(static_cast<int>(id));
     m_entities.Raw().erase(
         std::remove_if(
-            m_entities.Raw().begin(), m_entities.Raw().end(),
+            m_entities.Raw().begin(),
+            m_entities.Raw().end(),
             [&](const std::unique_ptr<Entity> &e) {
                 if (e->state == ActionState::Die)
                     return false;
@@ -174,7 +185,13 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
     for (const CueSnap &c : snapshot.cues)
     {
         if (m_soundCues.size() < 256)
-            m_soundCues.push_back({static_cast<SoundCue>(c.cue), c.x, c.y, c.owner, c.sound.empty() ? std::uint16_t(0) : InternSound(c.sound), c.gain});
+            m_soundCues.push_back(
+                {static_cast<SoundCue>(c.cue),
+                 c.x,
+                 c.y,
+                 c.owner,
+                 c.sound.empty() ? std::uint16_t(0) : InternSound(c.sound),
+                 c.gain});
     }
     for (const BlastSnap &b : snapshot.blasts)
     {

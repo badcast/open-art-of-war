@@ -207,8 +207,10 @@ public:
         BitmapFontRenderer &fontRenderer,
         const SoundEngine &sound,
         int windowW,
-        int windowH);
+        int windowH,
+        bool drawBackdrop = true);
     void RenderMenuHelp(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
+    std::vector<std::string> AboutLines() const;
     void RenderMenuAbout(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
     void RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &fontRenderer, int windowW, int windowH);
     void RenderBriefing(

@@ -21,6 +21,8 @@ Renderer::~Renderer()
         SDL_DestroyTexture(m_maskTexture);
     if (m_glowTexture)
         SDL_DestroyTexture(m_glowTexture);
+    if (m_clipTex)
+        SDL_DestroyTexture(m_clipTex);
 }
 
 void Renderer::DrawAlphaMaskWorld(
@@ -169,6 +171,8 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
         return;
     const auto *frame = m_texManager->GetSpriteFrame(spriteId);
     if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
+        return;
+    if (!m_showShadows && frame->page == Sprites().ImageOf("shared_shadows"))
         return;
 
     // The Resistance draws from its own image of the object where there is one
@@ -382,6 +386,8 @@ void Renderer::RenderCompositePartsRotated(
 
             const auto *sf = tm->GetSpriteFrame(part->child);
             if (!sf || sf->srcW <= 0 || sf->srcH <= 0)
+                continue;
+            if (!m_showShadows && sf->page == Sprites().ImageOf("shared_shadows"))
                 continue;
             int page = faction == Faction::Resistance ? tm->ResistancePage(sf->page) : sf->page;
             SDL_Texture *sheet = BindSheet(page, faction, sf->recolor);
@@ -1222,6 +1228,66 @@ void Renderer::ApplyAnchor(int &x, int &y, int w, int h, int anchor) const
 void Renderer::SetClipRect(const SDL_Rect &rect)
 {
     SDL_SetRenderClipRect(m_renderer, &rect);
+}
+
+bool Renderer::BeginClipTarget(const SDL_Rect &rect, SDL_Color background)
+{
+    if (m_clipTargetActive || rect.w <= 0 || rect.h <= 0 || SDL_GetRenderTarget(m_renderer))
+        return false;
+    float sx = 1.0f, sy = 1.0f;
+    SDL_GetRenderScale(m_renderer, &sx, &sy);
+    const float scale = std::max(0.1f, sx);
+    int tw = 0, th = 0;
+    if (!SDL_GetRenderOutputSize(m_renderer, &tw, &th) || tw <= 0 || th <= 0)
+        return false;
+    if (!m_clipTex || m_clipTexW != tw || m_clipTexH != th)
+    {
+        if (m_clipTex)
+            SDL_DestroyTexture(m_clipTex);
+        m_clipTex = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, tw, th);
+        m_clipTexW = tw;
+        m_clipTexH = th;
+        if (!m_clipTex)
+            return false;
+        SDL_SetTextureScaleMode(m_clipTex, SDL_SCALEMODE_NEAREST);
+    }
+    m_clipPrevViewportSet = SDL_RenderViewportSet(m_renderer);
+    SDL_GetRenderViewport(m_renderer, &m_clipPrevViewport);
+    if (!SDL_SetRenderTarget(m_renderer, m_clipTex))
+        return false;
+    // Draw in the same coordinate space as the screen. Crop the texture when copying it back,
+    // avoiding negative viewports and driver-dependent scissor coordinates.
+    SDL_SetRenderScale(m_renderer, scale, scale);
+    SDL_SetRenderViewport(m_renderer, m_clipPrevViewportSet ? &m_clipPrevViewport : nullptr);
+    SDL_SetRenderClipRect(m_renderer, nullptr);
+    SDL_SetRenderDrawColor(m_renderer, background.r, background.g, background.b, 255);
+    SDL_RenderClear(m_renderer);
+    m_clipTargetRect = rect;
+    m_clipScale = scale;
+    m_clipTargetActive = true;
+    return true;
+}
+
+void Renderer::EndClipTarget(Uint8 opacity)
+{
+    if (!m_clipTargetActive)
+        return;
+    m_clipTargetActive = false;
+    SDL_SetRenderTarget(m_renderer, nullptr);
+    SDL_SetRenderViewport(m_renderer, m_clipPrevViewportSet ? &m_clipPrevViewport : nullptr);
+    const SDL_FRect dst {
+        static_cast<float>(m_clipTargetRect.x),
+        static_cast<float>(m_clipTargetRect.y),
+        static_cast<float>(m_clipTargetRect.w),
+        static_cast<float>(m_clipTargetRect.h)};
+    SDL_SetTextureBlendMode(m_clipTex, opacity == 255 ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND);
+    SDL_SetTextureAlphaMod(m_clipTex, opacity);
+    const SDL_FRect src {
+        (m_clipTargetRect.x + (m_clipPrevViewportSet ? m_clipPrevViewport.x : 0)) * m_clipScale,
+        (m_clipTargetRect.y + (m_clipPrevViewportSet ? m_clipPrevViewport.y : 0)) * m_clipScale,
+        m_clipTargetRect.w * m_clipScale,
+        m_clipTargetRect.h * m_clipScale};
+    SDL_RenderTexture(m_renderer, m_clipTex, &src, &dst);
 }
 
 void Renderer::ResetClipRect()

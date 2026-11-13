@@ -406,7 +406,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
         int slotY = slots[i].y;
         const int curDist = std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY));
         const int slotDist = std::max(std::abs(slotX - m_stagingX), std::abs(slotY - m_stagingY));
-        if ((std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1) && ( curDist > 8 || slotDist < curDist))
+        if ((std::abs(u->tileX - slotX) > 1 || std::abs(u->tileY - slotY) > 1) && (curDist > 8 || slotDist < curDist))
         {
             bool isPartial = false;
             bool found = pathfinder.FindPath(u->tileX, u->tileY, slotX, slotY, u->path, u->id, &isPartial);
@@ -490,8 +490,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
     bool isProducing = false;
     for (const Building *b : ownStructures)
     {
-        if ((b->type == UnitType::Barracks || b->type == UnitType::Factory)
-            && b->buildProgress >= 1.0f && b->isPowered && (b->isProducing || !b->productionQueue.empty()))
+        if ((b->type == UnitType::Barracks || b->type == UnitType::Factory) && b->buildProgress >= 1.0f && b->isPowered
+            && (b->isProducing || !b->productionQueue.empty()))
         {
             isProducing = true;
             break;
@@ -519,8 +519,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         if (idle)
             idleReserve.push_back(u->id);
         if (!u->isAttackMoving
-            && (distStaging <= 7
-                || (idle && (distStaging <= 16 || IsNearBase(*u, ownStructures, 4.0f)))))
+            && (distStaging <= 7 || (idle && (distStaging <= 16 || IsNearBase(*u, ownStructures, 4.0f)))))
         {
             ready.push_back(u->id);
         }
@@ -540,10 +539,9 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         std::vector<int> front = ready;
         const int groupSize = m_currentDifficultyConfig.tactics.dispatchGroupSize;
         int send = static_cast<int>(front.size());
-        const bool idleTimeout
-            = (!front.empty() || !idleReserve.empty())
-              && (m_waveAssemblyTimer >= 15.0f || (!m_hasProduction && m_waveAssemblyTimer >= 5.0f)
-                  || (!isProducing && m_waveAssemblyTimer >= 8.0f));
+        const bool idleTimeout = (!front.empty() || !idleReserve.empty())
+                                 && (m_waveAssemblyTimer >= 15.0f || (!m_hasProduction && m_waveAssemblyTimer >= 5.0f)
+                                     || (!isProducing && m_waveAssemblyTimer >= 8.0f));
         if (send < groupSize
             && (idleTimeout || (m_waveAssemblyTimer >= 10.0f && static_cast<int>(idleReserve.size()) >= groupSize)))
         {
@@ -614,8 +612,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         return;
 
     int required = static_cast<int>(m_currentPlan.archetypes.size());
-    const bool idleWave = (!isProducing && m_waveAssemblyTimer >= 12.0f)
-                          || (m_waveCooldown <= 0.0f && m_waveAssemblyTimer >= 20.0f);
+    const bool idleWave
+        = (!isProducing && m_waveAssemblyTimer >= 12.0f) || (m_waveCooldown <= 0.0f && m_waveAssemblyTimer >= 20.0f);
     if ((required == 0 || m_waveCooldown > 0.0f) && !idleWave)
         return;
 
@@ -629,10 +627,9 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         if (const Unit *ru = entities.GetUnit(id); ru && !ru->IsInfantry())
             ++readyVehicles;
     const int missingVehicles = std::max(0, plannedVehicles - readyVehicles);
-    const bool vehicleTimeout
-        = !full && required > 0 && m_waveCooldown <= 0.0f && missingVehicles > 0
-          && m_waveAssemblyTimer > m_currentDifficultyConfig.tactics.vehicleWaitSeconds
-          && static_cast<int>(allReady.size()) >= std::max(1, required - missingVehicles);
+    const bool vehicleTimeout = !full && required > 0 && m_waveCooldown <= 0.0f && missingVehicles > 0
+                                && m_waveAssemblyTimer > m_currentDifficultyConfig.tactics.vehicleWaitSeconds
+                                && static_cast<int>(allReady.size()) >= std::max(1, required - missingVehicles);
     bool stranded = !m_hasProduction && !allReady.empty() && m_waveAssemblyTimer > 5.0f;
     if (!full && !stranded && !vehicleTimeout && !idleWave)
         return;

@@ -227,6 +227,8 @@ void Simulation::Issue(SimCommand command)
 
 void Simulation::Schedule(std::uint32_t tick, SimCommand command)
 {
+    if (!AdvancesWorld())
+        return;
     std::sort(command.ids.begin(), command.ids.end());
     command.ids.erase(std::unique(command.ids.begin(), command.ids.end()), command.ids.end());
     m_pending.push_back({tick, std::move(command)});
@@ -967,7 +969,8 @@ void Simulation::FillEconomies(const SimContext &ctx, WorldSnapshot &out) const
             eco = &ctx.economy;
         if (!eco)
             continue;
-        out.economies.push_back({static_cast<std::uint8_t>(p), eco->GetCredits(), eco->GetPowerProduced(), eco->GetPowerConsumed()});
+        out.economies.push_back(
+            {static_cast<std::uint8_t>(p), eco->GetCredits(), eco->GetPowerProduced(), eco->GetPowerConsumed()});
     }
 }
 

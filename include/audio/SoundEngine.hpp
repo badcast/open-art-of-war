@@ -28,13 +28,15 @@ public:
     ~SoundEngine();
 
     bool Init();
-    void Update(bool inMainMenu, bool inGame);
+    void Update(bool inMainMenu, bool inGame, bool preserveMusic = false);
+    bool PlayNamedLoop(const std::string &name);
     void PlayMenuMusic();
     void PlayRandomGameTrack();
     void StopMusic();
     void NextTrack(); // player: mainmenu tracks -> the other tracks -> the main menu tracks again (once touched)
     void PrevTrack();
-    void SetMusicVolume(int volume); // 0..128
+    void SetMusicVolume(int volume);    // 0..128
+    void SetSceneMusicGain(float gain); // temporary multiplier; user settings remain unchanged
     // 0..128: the general volume, over every other one (music, surroundings, effects, interface, voices)
     void SetGeneralVolume(int volume);
     // The interface goes silent (a replay): UI sounds, alerts, unit replies and the announcer; battle sounds and the
@@ -116,12 +118,13 @@ private:
     bool m_initialized {false};
     bool m_muted {false};
     int m_volume {96};
+    float m_sceneMusicGain {1.0f};
     int m_generalVolume {128};
     int m_fxVolume {128};
     int m_currentTrack {-1};
     bool m_manualPlayback {false}; // the player was used: tracks follow the playlist instead of the default music
     int m_lastArea {0};            // 1 = menu, 2 = game, 0 = other; manual playback ends when it changes
-    int m_musicContext {0};        // 0 = stopped, 1 = menu, 2 = game
+    int m_musicContext {0};        // 0 = stopped, 1 = menu, 2 = game, 3 = showcase
     std::vector<Track> m_gameTracks;
     std::vector<std::size_t> m_shuffledTracks;
     std::size_t m_nextGameTrack {0};

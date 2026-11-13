@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace OpenArtOfWar
 {
@@ -47,8 +48,10 @@ bool EntitySnap::operator==(const EntitySnap &o) const
 bool WorldSnapshot::operator==(const WorldSnapshot &o) const
 {
     return tick == o.tick && baseTick == o.baseTick && full == o.full && entities == o.entities && removed == o.removed
-           && hiddenAlive == o.hiddenAlive && economies == o.economies && research == o.research && mines == o.mines && result == o.result && hasWalls == o.hasWalls && walls == o.walls && projectiles == o.projectiles && cues == o.cues && blasts == o.blasts
-           && explosions == o.explosions && deaths == o.deaths && groundMarks == o.groundMarks;
+           && hiddenAlive == o.hiddenAlive && economies == o.economies && research == o.research && mines == o.mines
+           && result == o.result && hasWalls == o.hasWalls && walls == o.walls && projectiles == o.projectiles
+           && cues == o.cues && blasts == o.blasts && explosions == o.explosions && deaths == o.deaths
+           && groundMarks == o.groundMarks;
 }
 
 WorldSnapshot WorldSnapshot::DeltaFrom(const WorldSnapshot &base) const
@@ -92,10 +95,13 @@ bool WorldSnapshot::ExpandFrom(const WorldSnapshot &base)
         return false;
     auto merged = base.entities;
     for (auto id : removed)
-        merged.erase(std::remove_if(merged.begin(), merged.end(), [id](const EntitySnap &e) { return e.id == id; }), merged.end());
+        merged.erase(
+            std::remove_if(merged.begin(), merged.end(), [id](const EntitySnap &e) { return e.id == id; }),
+            merged.end());
     for (const auto &e : entities)
     {
-        auto it = std::lower_bound(merged.begin(), merged.end(), e.id, [](const EntitySnap &a, std::uint32_t id) { return a.id < id; });
+        auto it = std::lower_bound(
+            merged.begin(), merged.end(), e.id, [](const EntitySnap &a, std::uint32_t id) { return a.id < id; });
         if (it != merged.end() && it->id == e.id)
             *it = e;
         else
@@ -118,32 +124,47 @@ void WorldSnapshot::FilterForPlayer(const EntityManager &manager, const TileMap 
     {
         bool enemyLeft = false;
         for (int p = 0; p < kMaxPlayers; ++p)
-            if (p != player && Players::IsActive(static_cast<PlayerId>(p)) && Players::Hostile(static_cast<PlayerId>(p), player)
+            if (p != player && Players::IsActive(static_cast<PlayerId>(p))
+                && Players::Hostile(static_cast<PlayerId>(p), player)
                 && !manager.IsEliminated(static_cast<PlayerId>(p)))
                 enemyLeft = true;
         result = manager.IsEliminated(player) ? 2 : (enemyLeft ? 0 : 1);
     }
-    economies.erase(std::remove_if(economies.begin(), economies.end(), [player](const EconomySnap &e) {
-        return Players::Hostile(e.player, player);
-    }), economies.end());
-    research.erase(std::remove_if(research.begin(), research.end(), [player](const ResearchSnap &r) {
-        return Players::Hostile(r.player, player);
-    }), research.end());
+    economies.erase(
+        std::remove_if(
+            economies.begin(),
+            economies.end(),
+            [player](const EconomySnap &e) { return Players::Hostile(e.player, player); }),
+        economies.end());
+    research.erase(
+        std::remove_if(
+            research.begin(),
+            research.end(),
+            [player](const ResearchSnap &r) { return Players::Hostile(r.player, player); }),
+        research.end());
     // The other side never sees a mine (EntityManager::RenderMines), fog or not
-    mines.erase(std::remove_if(mines.begin(), mines.end(), [&](const MineSnap &m) {
-        return player < kMaxPlayers && Players::Hostile(m.owner, player);
-    }), mines.end());
+    mines.erase(
+        std::remove_if(
+            mines.begin(),
+            mines.end(),
+            [&](const MineSnap &m) { return player < kMaxPlayers && Players::Hostile(m.owner, player); }),
+        mines.end());
     if (!map.IsFogEnabled())
         return;
-    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](const EntitySnap &s) {
-        const Entity *e = manager.GetEntity(static_cast<int>(s.id));
-        if (e && !manager.IsEntityVisibleToPlayer(*e, player, map))
-        {
-            hiddenAlive.push_back(s.id);
-            return true;
-        }
-        return false;
-    }), entities.end());
+    entities.erase(
+        std::remove_if(
+            entities.begin(),
+            entities.end(),
+            [&](const EntitySnap &s) {
+                const Entity *e = manager.GetEntity(static_cast<int>(s.id));
+                if (e && !manager.IsEntityVisibleToPlayer(*e, player, map))
+                {
+                    hiddenAlive.push_back(s.id);
+                    return true;
+                }
+                return false;
+            }),
+        entities.end());
 }
 
 WorldSnapshot WorldSnapshot::CaptureEntities(const EntityManager &entities, std::uint32_t tick)
@@ -199,7 +220,8 @@ WorldSnapshot WorldSnapshot::CaptureEntities(const EntityManager &entities, std:
         }
         s.entities.push_back(std::move(n));
     }
-    std::sort(s.entities.begin(), s.entities.end(), [](const EntitySnap &a, const EntitySnap &b) { return a.id < b.id; });
+    std::sort(
+        s.entities.begin(), s.entities.end(), [](const EntitySnap &a, const EntitySnap &b) { return a.id < b.id; });
     return s;
 }
 
@@ -215,10 +237,12 @@ void WorldSnapshot::CaptureWalls(const TileMap &map)
                 continue;
             const int hp = map.GetWallHp(x, y);
             const int max = std::max(1, map.GetWallMaxHp(x, y));
-            walls.push_back({static_cast<std::int16_t>(x), static_cast<std::int16_t>(y),
-                static_cast<std::uint8_t>(map.GetWallFaction(x, y)),
-                static_cast<std::uint8_t>(std::clamp(hp * 100 / max, 1, 100)),
-                static_cast<std::uint8_t>(map.GetWallOwner(x, y))});
+            walls.push_back(
+                {static_cast<std::int16_t>(x),
+                 static_cast<std::int16_t>(y),
+                 static_cast<std::uint8_t>(map.GetWallFaction(x, y)),
+                 static_cast<std::uint8_t>(std::clamp(hp * 100 / max, 1, 100)),
+                 static_cast<std::uint8_t>(map.GetWallOwner(x, y))});
         }
     }
 }
@@ -242,8 +266,14 @@ void WorldSnapshot::CaptureEffects(EntityManager &entities)
     {
         if (!p.active)
             continue;
-        projectiles.push_back({static_cast<std::uint8_t>(p.type), p.x, p.y, static_cast<std::uint8_t>(p.direction),
-            static_cast<std::uint8_t>(p.dir32), static_cast<std::uint8_t>(p.faction), static_cast<std::uint8_t>(p.owner)});
+        projectiles.push_back(
+            {static_cast<std::uint8_t>(p.type),
+             p.x,
+             p.y,
+             static_cast<std::uint8_t>(p.direction),
+             static_cast<std::uint8_t>(p.dir32),
+             static_cast<std::uint8_t>(p.faction),
+             static_cast<std::uint8_t>(p.owner)});
     }
     deaths.clear();
     for (const Entity &e : entities.GetAllEntities())
@@ -252,15 +282,22 @@ void WorldSnapshot::CaptureEffects(EntityManager &entities)
             continue;
         DeathSnap d;
         d.id = static_cast<std::uint32_t>(e.id);
-        d.tileX = e.tileX; d.tileY = e.tileY; d.subX = e.subX; d.subY = e.subY; d.timer = e.deathTimer;
+        d.tileX = e.tileX;
+        d.tileY = e.tileY;
+        d.subX = e.subX;
+        d.subY = e.subY;
+        d.timer = e.deathTimer;
         if (const Unit *u = e.AsUnit())
         {
-            d.flame = u->killedByFlame; d.sequence = u->selectedDeathSeq;
-            d.wreckComposite = u->wreckComposite; d.wreckStages = u->wreckStages;
+            d.flame = u->killedByFlame;
+            d.sequence = u->selectedDeathSeq;
+            d.wreckComposite = u->wreckComposite;
+            d.wreckStages = u->wreckStages;
         }
         if (const Building *b = e.AsBuilding())
         {
-            d.wreckComposite = b->wreckComposite; d.wreckStages = b->wreckStages;
+            d.wreckComposite = b->wreckComposite;
+            d.wreckStages = b->wreckStages;
         }
         deaths.push_back(d);
     }
@@ -270,8 +307,13 @@ void WorldSnapshot::CaptureEffects(EntityManager &entities)
         groundMarks.push_back({m.x, m.y, m.composite, m.seconds});
     cues.clear();
     for (const EntityManager::SoundCueEvent &c : events.cues)
-        cues.push_back({static_cast<std::uint8_t>(c.cue), c.x, c.y, static_cast<std::uint8_t>(c.owner),
-            entities.SoundName(c.sound), c.gain});
+        cues.push_back(
+            {static_cast<std::uint8_t>(c.cue),
+             c.x,
+             c.y,
+             static_cast<std::uint8_t>(c.owner),
+             entities.SoundName(c.sound),
+             c.gain});
     blasts.clear();
     for (const EntityManager::BuildingBlast &b : events.blasts)
         blasts.push_back({b.x, b.y, b.size});
@@ -410,15 +452,24 @@ std::vector<std::uint8_t> WorldSnapshot::Encode() const
     w.writeVarUint(deaths.size());
     for (const DeathSnap &d : deaths)
     {
-        w.writeVarUint(d.id); w.writeVarInt(d.tileX); w.writeVarInt(d.tileY);
-        w.writeFloat(d.subX); w.writeFloat(d.subY); w.writeFloat(d.timer);
-        w.writeVarInt(d.sequence); w.writeVarInt(d.wreckComposite); w.writeVarInt(d.wreckStages);
+        w.writeVarUint(d.id);
+        w.writeVarInt(d.tileX);
+        w.writeVarInt(d.tileY);
+        w.writeFloat(d.subX);
+        w.writeFloat(d.subY);
+        w.writeFloat(d.timer);
+        w.writeVarInt(d.sequence);
+        w.writeVarInt(d.wreckComposite);
+        w.writeVarInt(d.wreckStages);
         w.writeBool(d.flame);
     }
     w.writeVarUint(groundMarks.size());
     for (const GroundMarkSnap &m : groundMarks)
     {
-        w.writeFloat(m.x); w.writeFloat(m.y); w.writeVarInt(m.composite); w.writeFloat(m.seconds);
+        w.writeFloat(m.x);
+        w.writeFloat(m.y);
+        w.writeVarInt(m.composite);
+        w.writeFloat(m.seconds);
     }
     const std::size_t size = w.finish();
     if (w.overflowed())
@@ -443,7 +494,10 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
     for (std::uint64_t i = 0; i < count && !r.failed(); ++i)
     {
         EntitySnap e;
-        e.id = static_cast<std::uint32_t>(r.readVarUint());
+        const std::uint64_t entityId = r.readVarUint();
+        if (entityId == 0 || entityId >= static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
+            return false;
+        e.id = static_cast<std::uint32_t>(entityId);
         e.isBuilding = r.readBool();
         e.type = static_cast<std::int32_t>(r.readVarInt());
         e.archetype = static_cast<std::int32_t>(r.readVarInt());
@@ -460,7 +514,10 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
         e.alive = r.readBool();
         e.facing = static_cast<std::int32_t>(r.readVarInt());
         e.turret = static_cast<std::int32_t>(r.readVarInt());
-        e.target = static_cast<std::uint32_t>(r.readVarUint());
+        const std::uint64_t targetId = r.readVarUint();
+        if (targetId >= static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
+            return false;
+        e.target = static_cast<std::uint32_t>(targetId);
         e.orderX = static_cast<std::int32_t>(r.readVarInt());
         e.orderY = static_cast<std::int32_t>(r.readVarInt());
         e.siege = r.readBool();
@@ -604,12 +661,19 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
     for (std::uint64_t i = 0; i < deathCount && !r.failed(); ++i)
     {
         DeathSnap d;
-        d.id = static_cast<std::uint32_t>(r.readVarUint());
-        d.tileX = static_cast<std::int32_t>(r.readVarInt()); d.tileY = static_cast<std::int32_t>(r.readVarInt());
-        d.subX = r.readFloat(); d.subY = r.readFloat(); d.timer = r.readFloat();
+        const std::uint64_t deathId = r.readVarUint();
+        if (deathId == 0 || deathId >= static_cast<std::uint64_t>(std::numeric_limits<int>::max()))
+            return false;
+        d.id = static_cast<std::uint32_t>(deathId);
+        d.tileX = static_cast<std::int32_t>(r.readVarInt());
+        d.tileY = static_cast<std::int32_t>(r.readVarInt());
+        d.subX = r.readFloat();
+        d.subY = r.readFloat();
+        d.timer = r.readFloat();
         d.sequence = static_cast<std::int32_t>(r.readVarInt());
         d.wreckComposite = static_cast<std::int32_t>(r.readVarInt());
-        d.wreckStages = static_cast<std::int32_t>(r.readVarInt()); d.flame = r.readBool();
+        d.wreckStages = static_cast<std::int32_t>(r.readVarInt());
+        d.flame = r.readBool();
         s.deaths.push_back(d);
     }
     const std::uint64_t markCount = r.readVarUint();
@@ -618,11 +682,44 @@ bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnap
     for (std::uint64_t i = 0; i < markCount && !r.failed(); ++i)
     {
         GroundMarkSnap m;
-        m.x = r.readFloat(); m.y = r.readFloat(); m.composite = static_cast<std::int32_t>(r.readVarInt());
-        m.seconds = r.readFloat(); s.groundMarks.push_back(m);
+        m.x = r.readFloat();
+        m.y = r.readFloat();
+        m.composite = static_cast<std::int32_t>(r.readVarInt());
+        m.seconds = r.readFloat();
+        s.groundMarks.push_back(m);
     }
     if (r.failed() || !r.atEnd())
         return false;
+    const auto validId = [](std::uint32_t id) {
+        return id > 0 && id < static_cast<std::uint32_t>(std::numeric_limits<int>::max());
+    };
+    if (!std::all_of(s.removed.begin(), s.removed.end(), validId)
+        || !std::all_of(s.hiddenAlive.begin(), s.hiddenAlive.end(), validId))
+        return false;
+    for (const auto &v : s.research)
+        if (!std::isfinite(v.timer) || !std::isfinite(v.duration))
+            return false;
+    for (const auto &v : s.mines)
+        if (!std::isfinite(v.armLeft))
+            return false;
+    for (const auto &v : s.projectiles)
+        if (!std::isfinite(v.x) || !std::isfinite(v.y))
+            return false;
+    for (const auto &v : s.cues)
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.gain))
+            return false;
+    for (const auto &v : s.blasts)
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.size))
+            return false;
+    for (const auto &v : s.explosions)
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.delay))
+            return false;
+    for (const auto &v : s.deaths)
+        if (!std::isfinite(v.subX) || !std::isfinite(v.subY) || !std::isfinite(v.timer))
+            return false;
+    for (const auto &v : s.groundMarks)
+        if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.seconds))
+            return false;
     out = std::move(s);
     return true;
 }

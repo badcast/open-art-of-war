@@ -67,6 +67,41 @@ bool Hearable(const TileMap &map, bool fogEnabled, float x, float y, PlayerId ow
 
 } // namespace
 
+void GameSounds::PlayBattleCues(SoundEngine &sound, EntityManager &entities, const Camera &camera, float volume)
+{
+    const float zoom = std::max(0.01f, camera.GetZoom());
+    const float viewW = camera.GetViewportWidth() / zoom, viewH = camera.GetViewportHeight() / zoom;
+    for (const EntityManager::SoundCueEvent &cue : entities.TakeSoundCues())
+    {
+        const WorldSfx fallback = CueSound(cue.cue);
+        const std::string &named = entities.SoundName(cue.sound);
+        const SfxMixer::EventConfig *cfg = sound.SfxConfig(named);
+        const std::string event = cfg ? named : std::string(SoundIds::Name(fallback));
+        if (!cfg)
+            cfg = sound.SfxConfig(fallback);
+        const float gain = std::clamp(cue.gain * volume, 0.0f, 1.0f);
+        if (!cfg || gain <= 0.0f)
+            continue;
+        if (!cfg->positional)
+            sound.PlaySfx(event, gain);
+        else
+        {
+            const SfxPlacement placement = PlaceSfx(
+                cue.x,
+                cue.y,
+                camera.GetX(),
+                camera.GetY(),
+                viewW,
+                viewH,
+                cfg->rangeTiles * TILE_WIDTH,
+                zoom,
+                cfg->minGain);
+            if (placement.audible)
+                sound.PlaySfx(event, placement.gain * gain, placement.pan, placement.muffle);
+        }
+    }
+}
+
 void GameSounds::Reset()
 {
     m_seen.clear();
