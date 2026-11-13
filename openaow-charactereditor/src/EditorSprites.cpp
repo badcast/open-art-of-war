@@ -606,6 +606,80 @@ bool CharacterEditor::ResizeSpriteImage(int w, int h, bool smooth, bool uniform)
     return true;
 }
 
+bool CharacterEditor::ResizeSpriteCanvas(int w, int h, int anchor)
+{
+    if (spriteObject.empty() || spriteImageW <= 0 || spriteImageH <= 0)
+        return false;
+    w = std::clamp(w, 1, 16384);
+    h = std::clamp(h, 1, 16384);
+    if (w == spriteImageW && h == spriteImageH)
+    {
+        spriteReport = _("The canvas already has this size");
+        return true;
+    }
+    if (!EnsurePending())
+        return false;
+    const int oldW = spriteImageW, oldH = spriteImageH;
+    const int offsetX = (anchor == 1) ? (w - oldW) / 2 : 0;
+    const int offsetY = (anchor == 1) ? (h - oldH) / 2 : 0;
+    for (const SpriteFrameEdit &f : spriteFrames)
+    {
+        const int nx = f.rect[0] + offsetX;
+        const int ny = f.rect[1] + offsetY;
+        if (nx < 0 || ny < 0 || nx + f.rect[2] > w || ny + f.rect[3] > h)
+        {
+            spriteReport = f.name + _(" would extend outside the ") + std::to_string(w) + "x" + std::to_string(h)
+                           + _(" canvas (move or remove it first)");
+            return false;
+        }
+    }
+    std::map<std::string, SDL_Surface *> made;
+    for (const auto &[name, src] : spritePending)
+    {
+        SDL_Surface *dst = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+        if (!dst)
+        {
+            FreeSurfaces(made);
+            spriteReport = std::string(_("Could not resize canvas: ")) + SDL_GetError();
+            return false;
+        }
+        SDL_ClearSurface(dst, 0.0f, 0.0f, 0.0f, 0.0f);
+        const int srcX = std::max(0, -offsetX);
+        const int srcY = std::max(0, -offsetY);
+        const int dstX = std::max(0, offsetX);
+        const int dstY = std::max(0, offsetY);
+        const int copyW = std::min(src->w - srcX, w - dstX);
+        const int copyH = std::min(src->h - srcY, h - dstY);
+        if (copyW > 0 && copyH > 0)
+        {
+            SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
+            const SDL_Rect from {srcX, srcY, copyW, copyH};
+            SDL_Rect to {dstX, dstY, copyW, copyH};
+            SDL_BlitSurface(src, &from, dst, &to);
+        }
+        made[name] = dst;
+    }
+    for (auto &[name, img] : made)
+        SetPending(name, img);
+    if (offsetX != 0 || offsetY != 0)
+    {
+        for (SpriteFrameEdit &f : spriteFrames)
+        {
+            f.rect[0] += offsetX;
+            f.rect[1] += offsetY;
+        }
+    }
+    spriteImageW = w;
+    spriteImageH = h;
+    FreeSurfaces(spriteScaleBase);
+    spriteDirty = true;
+    RefreshPendingTexture();
+    spriteCameraPending = SpriteCamera::Fit;
+    spriteReport = _("Canvas resized ") + std::to_string(oldW) + "x" + std::to_string(oldH) + " -> " + std::to_string(w)
+                   + "x" + std::to_string(h) + _(" (1:1 pixels kept, not saved yet)");
+    return true;
+}
+
 bool CharacterEditor::FitSpriteImage()
 {
     namespace SM = SpriteMerge;
@@ -744,6 +818,30 @@ bool CharacterEditor::RearrangeSpriteImage(SpriteArrange mode, bool onlyIfSmalle
             }
             catch (const std::exception &)
             {}
+            // Reflect unsaved rect / size edits in `meta["frames"]` so AssemblyGroupsFromMeta uses current PPU.
+            if (meta && meta.IsMap())
+            {
+                YAML::Node mf = meta["frames"];
+                if (mf && mf.IsMap())
+                    for (const SpriteFrameEdit &f : spriteFrames)
+                    {
+                        const std::string &key = mf[f.name] ? f.name : f.original;
+                        if (key.empty() || !mf[key])
+                            continue;
+                        YAML::Node node(YAML::NodeType::Map);
+                        YAML::Node r(YAML::NodeType::Sequence);
+                        r.push_back(f.rect[0]);
+                        r.push_back(f.rect[1]);
+                        r.push_back(f.rect[2]);
+                        r.push_back(f.rect[3]);
+                        node["rect"] = r;
+                        YAML::Node s(YAML::NodeType::Sequence);
+                        s.push_back(f.size[0]);
+                        s.push_back(f.size[1]);
+                        node["size"] = s;
+                        mf[key] = node;
+                    }
+            }
             pos = SM::AssemblePack(sizes, SM::AssemblyGroupsFromMeta(meta, spriteObject, index, spriteScale), pad);
             break;
         }
@@ -910,6 +1008,164 @@ bool CharacterEditor::MoveSpriteFramesPixels(const std::vector<int> &frames, int
     spriteReport = (frames.size() == 1 ? _("Moved ") + spriteFrames[frames[0]].name
                                        : _("Moved ") + std::to_string(frames.size()) + _(" frames"))
                    + _(" with their pixels (not saved yet)");
+    return true;
+}
+
+bool CharacterEditor::ResizeSpriteFrames(
+    const std::vector<int> &frames, float scaleX, float scaleY, int anchorX, int anchorY, bool smooth, int method)
+{
+    if (frames.empty() || spriteObject.empty() || spriteImageW <= 0 || spriteImageH <= 0)
+        return false;
+    namespace SM = SpriteMerge;
+    std::vector<char> selectedMask(spriteFrames.size(), 0);
+    std::vector<int> validFrames;
+    std::vector<std::array<int, 4>> selRects, unselRects;
+    for (int i : frames)
+    {
+        if (i < 0 || i >= static_cast<int>(spriteFrames.size()) || selectedMask[i])
+            continue;
+        selectedMask[i] = 1;
+        validFrames.push_back(i);
+        const int *r = spriteFrames[i].rect;
+        selRects.push_back({r[0], r[1], r[2], r[3]});
+    }
+    if (validFrames.empty())
+        return false;
+    for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+        if (!selectedMask[i])
+        {
+            const int *r = spriteFrames[i].rect;
+            unselRects.push_back({r[0], r[1], r[2], r[3]});
+        }
+
+    const SM::ScaledGroupLayout layout = SM::ScaleGroupRects(
+        selRects,
+        unselRects,
+        scaleX,
+        scaleY,
+        anchorX,
+        anchorY,
+        spriteImageW,
+        spriteImageH,
+        std::clamp(spriteArrangePadding, 0, 64));
+
+    if (method != 2)
+    {
+        if (!EnsurePending())
+            return false;
+        const SDL_ScaleMode mode = smooth ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+        std::map<std::string, SDL_Surface *> made;
+        for (const auto &[name, img] : spritePending)
+        {
+            std::vector<SDL_Surface *> pieces;
+            pieces.reserve(validFrames.size());
+            bool pieceOk = true;
+            for (std::size_t k = 0; k < validFrames.size(); ++k)
+            {
+                const auto &sr = selRects[k];
+                const auto &dr = layout.rects[k];
+                const SDL_Rect from {sr[0], sr[1], sr[2], sr[3]};
+                SDL_Surface *crop = SDL_CreateSurface(std::max(1, sr[2]), std::max(1, sr[3]), SDL_PIXELFORMAT_RGBA32);
+                SDL_Surface *scaled = nullptr;
+                if (crop)
+                {
+                    SDL_SetSurfaceBlendMode(crop, SDL_BLENDMODE_NONE);
+                    SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
+                    SDL_BlitSurface(img, &from, crop, nullptr);
+                    scaled = SDL_ScaleSurface(crop, dr[2], dr[3], mode);
+                    SDL_DestroySurface(crop);
+                }
+                if (!scaled)
+                {
+                    pieceOk = false;
+                    break;
+                }
+                pieces.push_back(scaled);
+            }
+            if (!pieceOk)
+            {
+                for (SDL_Surface *p : pieces)
+                    SDL_DestroySurface(p);
+                FreeSurfaces(made);
+                spriteReport = SDL_GetError();
+                return false;
+            }
+            SDL_Surface *dst = SDL_CreateSurface(layout.canvasW, layout.canvasH, SDL_PIXELFORMAT_RGBA32);
+            if (!dst)
+            {
+                for (SDL_Surface *p : pieces)
+                    SDL_DestroySurface(p);
+                FreeSurfaces(made);
+                spriteReport = SDL_GetError();
+                return false;
+            }
+            SDL_ClearSurface(dst, 0.0f, 0.0f, 0.0f, 0.0f);
+            SDL_SetSurfaceBlendMode(dst, SDL_BLENDMODE_NONE);
+            SDL_SetSurfaceBlendMode(img, SDL_BLENDMODE_NONE);
+            SDL_Rect baseTo {0, 0, img->w, img->h};
+            SDL_BlitSurface(img, nullptr, dst, &baseTo);
+
+            // Clear old frame regions on dst, preserving any overlapping unselected frames.
+            for (const auto &sr : selRects)
+                for (int y = std::max(0, sr[1]); y < std::min(dst->h, sr[1] + sr[3]); ++y)
+                {
+                    auto *row = static_cast<std::uint8_t *>(dst->pixels) + y * dst->pitch;
+                    for (int x = std::max(0, sr[0]); x < std::min(dst->w, sr[0] + sr[2]); ++x)
+                    {
+                        bool keep = false;
+                        for (const auto &u : unselRects)
+                            if (x >= u[0] && x < u[0] + u[2] && y >= u[1] && y < u[1] + u[3])
+                            {
+                                keep = true;
+                                break;
+                            }
+                        if (!keep)
+                            std::memset(row + x * 4, 0, 4);
+                    }
+                }
+            for (std::size_t k = 0; k < validFrames.size(); ++k)
+            {
+                SDL_SetSurfaceBlendMode(pieces[k], SDL_BLENDMODE_NONE);
+                SDL_Rect to {layout.rects[k][0], layout.rects[k][1], layout.rects[k][2], layout.rects[k][3]};
+                SDL_BlitSurface(pieces[k], nullptr, dst, &to);
+                SDL_DestroySurface(pieces[k]);
+            }
+            made[name] = dst;
+        }
+        for (auto &[name, img] : made)
+            SetPending(name, img);
+        spriteImageW = layout.canvasW;
+        spriteImageH = layout.canvasH;
+    }
+
+    for (std::size_t k = 0; k < validFrames.size(); ++k)
+    {
+        SpriteFrameEdit &f = spriteFrames[validFrames[k]];
+        const int oldW = std::max(1, selRects[k][2]);
+        const int oldH = std::max(1, selRects[k][3]);
+        const auto &nr = layout.rects[k];
+        if (method == 2)
+        {
+            SetSpriteFrameRect(f, nr[0], nr[1], nr[2], nr[3]);
+            continue;
+        }
+        std::copy(nr.begin(), nr.end(), f.rect);
+        if (method == 1)
+        {
+            f.size[0] = std::max(0.01f, f.size[0] * (static_cast<float>(nr[2]) / oldW));
+            f.size[1] = std::max(0.01f, f.size[1] * (static_cast<float>(nr[3]) / oldH));
+            f.ownSize = true;
+        }
+        f.ppu[0] = nr[2] / std::max(0.01f, f.size[0]);
+        f.ppu[1] = nr[3] / std::max(0.01f, f.size[1]);
+        f.ownSize = true;
+    }
+
+    FreeSurfaces(spriteScaleBase);
+    spriteDirty = true;
+    RefreshPendingTexture();
+    spriteReport = _("Resized ") + std::to_string(validFrames.size()) + _(" frame(s)")
+                   + (layout.relocated ? _(" (relocated to avoid overlap)") : "") + _(" (not saved yet)");
     return true;
 }
 
@@ -1281,7 +1537,7 @@ void CharacterEditor::DrawSpriteTools()
         if (main || (inside && hovered))
             dl->AddText(
                 ImVec2(a.x + 2, a.y - ImGui::GetTextLineHeight() - 1), IM_COL32(255, 230, 180, 255), f.name.c_str());
-        if (main)
+        if (main && !spriteResizeMode)
             for (int c = 0; c < 4; ++c)
             {
                 const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
@@ -1290,6 +1546,44 @@ void CharacterEditor::DrawSpriteTools()
                     ImVec2(p.x + handle, p.y + handle),
                     IM_COL32(255, 180, 60, 255));
             }
+    }
+    // Group bounding box + proportional resize handles when Resize mode is active
+    bool hasResizeBox = false;
+    int resizeBox[4] {0, 0, 1, 1};
+    if (spriteResizeMode && !spriteFrames.empty())
+    {
+        int x0 = std::numeric_limits<int>::max(), y0 = x0, x1 = std::numeric_limits<int>::min(), y1 = x1;
+        for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+            if (isSelected(i))
+            {
+                const int *r = spriteFrames[i].rect;
+                x0 = std::min(x0, r[0]);
+                y0 = std::min(y0, r[1]);
+                x1 = std::max(x1, r[0] + r[2]);
+                y1 = std::max(y1, r[1] + r[3]);
+                hasResizeBox = true;
+            }
+        if (hasResizeBox)
+        {
+            resizeBox[0] = x0;
+            resizeBox[1] = y0;
+            resizeBox[2] = std::max(1, x1 - x0);
+            resizeBox[3] = std::max(1, y1 - y0);
+            if (spriteDrag != SpriteDrag::ResizePixels)
+            {
+                const ImVec2 a = toScreen(static_cast<float>(x0), static_cast<float>(y0));
+                const ImVec2 b = toScreen(static_cast<float>(x1), static_cast<float>(y1));
+                dl->AddRect(a, b, IM_COL32(80, 210, 255, 230), 0.0f, 0, 2.0f);
+                for (int c = 0; c < 4; ++c)
+                {
+                    const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
+                    dl->AddRectFilled(
+                        ImVec2(p.x - handle - 1, p.y - handle - 1),
+                        ImVec2(p.x + handle + 1, p.y + handle + 1),
+                        IM_COL32(80, 210, 255, 255));
+                }
+            }
+        }
     }
 
     // Magnetism: the image borders and the edges of the other frames attract what is being dragged (Alt: off)
@@ -1377,7 +1671,29 @@ void CharacterEditor::DrawSpriteTools()
         }
         else
         {
-            if (!spriteMoveMode && spriteFrameSel >= 0 && !io.KeyCtrl && !io.KeyShift)
+            if (spriteResizeMode && hasResizeBox && !io.KeyCtrl && !io.KeyShift)
+            {
+                const ImVec2 a = toScreen(static_cast<float>(resizeBox[0]), static_cast<float>(resizeBox[1]));
+                const ImVec2 b = toScreen(
+                    static_cast<float>(resizeBox[0] + resizeBox[2]), static_cast<float>(resizeBox[1] + resizeBox[3]));
+                for (int c = 0; c < 4; ++c)
+                {
+                    const ImVec2 p((c & 1) ? b.x : a.x, (c & 2) ? b.y : a.y);
+                    if (std::fabs(mouse.x - p.x) <= handle + 2 && std::fabs(mouse.y - p.y) <= handle + 2)
+                    {
+                        spriteDrag = SpriteDrag::ResizePixels;
+                        spriteDragCorner = c;
+                        std::copy(resizeBox, resizeBox + 4, spriteResizeOrigBox);
+                        spriteResizeAnchor[0] = (c & 1) ? resizeBox[0] : (resizeBox[0] + resizeBox[2]);
+                        spriteResizeAnchor[1] = (c & 2) ? resizeBox[1] : (resizeBox[1] + resizeBox[3]);
+                        spriteResizeDragScale[0] = spriteResizeDragScale[1] = 1.0f;
+                        rememberGroup();
+                        break;
+                    }
+                }
+            }
+            if (spriteDrag == SpriteDrag::None && !spriteMoveMode && !spriteResizeMode && spriteFrameSel >= 0
+                && !io.KeyCtrl && !io.KeyShift)
             {
                 const SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
                 const ImVec2 a = toScreen(static_cast<float>(f.rect[0]), static_cast<float>(f.rect[1]));
@@ -1523,6 +1839,73 @@ void CharacterEditor::DrawSpriteTools()
             SetSpriteFrameRect(
                 f, std::min(x0, x1), std::min(y0, y1), std::max(1, std::abs(x1 - x0)), std::max(1, std::abs(y1 - y0)));
         }
+        else if (spriteDrag == SpriteDrag::ResizePixels && !spriteGroupStart.empty())
+        {
+            const float rawW = (spriteDragCorner & 1) ? (mx - spriteResizeAnchor[0]) : (spriteResizeAnchor[0] - mx);
+            const float rawH = (spriteDragCorner & 2) ? (my - spriteResizeAnchor[1]) : (spriteResizeAnchor[1] - my);
+            float kx = std::clamp(rawW / std::max(1, spriteResizeOrigBox[2]), 0.05f, 32.0f);
+            float ky = std::clamp(rawH / std::max(1, spriteResizeOrigBox[3]), 0.05f, 32.0f);
+            if (spriteResizeKeepAspect)
+            {
+                const float k = std::fabs(kx - 1.0f) >= std::fabs(ky - 1.0f) ? kx : ky;
+                kx = ky = k;
+            }
+            spriteResizeDragScale[0] = kx;
+            spriteResizeDragScale[1] = ky;
+
+            std::vector<char> selMask(spriteFrames.size(), 0);
+            std::vector<std::array<int, 4>> selRects, unselRects;
+            for (const auto &g : spriteGroupStart)
+            {
+                selMask[g[0]] = 1;
+                selRects.push_back({g[1], g[2], g[3], g[4]});
+            }
+            for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
+                if (!selMask[i])
+                {
+                    const int *r = spriteFrames[i].rect;
+                    unselRects.push_back({r[0], r[1], r[2], r[3]});
+                }
+            const auto preview = SpriteMerge::ScaleGroupRects(
+                selRects,
+                unselRects,
+                kx,
+                ky,
+                spriteResizeAnchor[0],
+                spriteResizeAnchor[1],
+                spriteImageW,
+                spriteImageH,
+                std::clamp(spriteArrangePadding, 0, 64));
+            const ImU32 fillCol = preview.relocated ? IM_COL32(255, 190, 50, 50) : IM_COL32(60, 220, 140, 50);
+            const ImU32 edgeCol = preview.relocated ? IM_COL32(255, 190, 50, 255) : IM_COL32(80, 220, 255, 255);
+            for (std::size_t k = 0; k < preview.rects.size(); ++k)
+            {
+                const auto &nr = preview.rects[k];
+                const auto &sr = selRects[k];
+                const ImVec2 a = toScreen(static_cast<float>(nr[0]), static_cast<float>(nr[1]));
+                const ImVec2 b = toScreen(static_cast<float>(nr[0] + nr[2]), static_cast<float>(nr[1] + nr[3]));
+                if (tex && spriteImageW > 0 && spriteImageH > 0)
+                    dl->AddImage(
+                        reinterpret_cast<ImTextureID>(tex),
+                        a,
+                        b,
+                        ImVec2(static_cast<float>(sr[0]) / spriteImageW, static_cast<float>(sr[1]) / spriteImageH),
+                        ImVec2(
+                            static_cast<float>(sr[0] + sr[2]) / spriteImageW,
+                            static_cast<float>(sr[1] + sr[3]) / spriteImageH),
+                        IM_COL32(255, 255, 255, 175));
+                dl->AddRectFilled(a, b, fillCol);
+                dl->AddRect(a, b, edgeCol, 0.0f, 0, 2.0f);
+            }
+            char badge[64];
+            std::snprintf(
+                badge,
+                sizeof(badge),
+                "x%.2f (%s)",
+                0.5f * (kx + ky),
+                preview.relocated ? "relocate" : "keep layout");
+            dl->AddText(ImVec2(mouse.x + 12.0f, mouse.y + 12.0f), IM_COL32(255, 255, 255, 240), badge);
+        }
     }
     // The lines a dragged edge stuck to
     if (guideX != kNoGuide)
@@ -1573,6 +1956,22 @@ void CharacterEditor::DrawSpriteTools()
             for (const auto &g : spriteGroupStart)
                 moving.push_back(g[0]);
             MoveSpriteFramesPixels(moving, spriteGroupMove[0], spriteGroupMove[1]);
+        }
+        if (spriteDrag == SpriteDrag::ResizePixels)
+        {
+            std::vector<int> scaling;
+            for (const auto &g : spriteGroupStart)
+                scaling.push_back(g[0]);
+            if (std::fabs(spriteResizeDragScale[0] - 1.0f) > 1e-3f
+                || std::fabs(spriteResizeDragScale[1] - 1.0f) > 1e-3f)
+                ResizeSpriteFrames(
+                    scaling,
+                    spriteResizeDragScale[0],
+                    spriteResizeDragScale[1],
+                    spriteResizeAnchor[0],
+                    spriteResizeAnchor[1],
+                    spriteScaleSmooth == 1,
+                    spriteResizeMethod);
         }
         spriteDrag = SpriteDrag::None;
     }
@@ -1734,11 +2133,27 @@ void CharacterEditor::DrawSpritePropertiesBody()
     }
 
     if (ImGui::Checkbox(_("Draw new frames (drag on the image)"), &spriteDrawMode) && spriteDrawMode)
+    {
         spriteMoveMode = false;
+        spriteResizeMode = false;
+    }
     if (ImGui::Checkbox(_("Sprite change mode (drag a frame with its pixels)"), &spriteMoveMode) && spriteMoveMode)
+    {
         spriteDrawMode = false;
+        spriteResizeMode = false;
+    }
     ImGui::SetItemTooltip(
         "%s", _("Drag a frame to another place of the image; it is refused (red) when it would cover another frame."));
+    if (ImGui::Checkbox(_("Resize mode (drag corner to scale selected pixels with proportions)"), &spriteResizeMode)
+        && spriteResizeMode)
+    {
+        spriteDrawMode = false;
+        spriteMoveMode = false;
+    }
+    ImGui::SetItemTooltip(
+        "%s",
+        _("Shows resize handles around the selected frame(s); drag a corner or use 'Resize selected' below to scale "
+          "their pixels together while keeping proportions."));
 
     ImGui::Checkbox(_("Magnetism (stick to edges and corners)"), &spriteMagnet);
     ImGui::SetItemTooltip(
@@ -1779,39 +2194,68 @@ void CharacterEditor::DrawSpritePropertiesBody()
         if (Hinted(ImGui::Button(_("Apply##preset")), "Apply size"))
             ResizeSpriteImage(target[0], target[1], spriteScaleSmooth == 1, true);
 
-        // Custom size: the numbers follow the image until they are edited
+        // Custom size & custom canvas size: the numbers follow the image until they are edited
         static int syncedW = 0, syncedH = 0;
-        if (syncedW != spriteImageW || syncedH != spriteImageH || spriteCustomW <= 0 || spriteCustomH <= 0)
+        if (syncedW != spriteImageW || syncedH != spriteImageH)
         {
-            syncedW = spriteCustomW = spriteImageW;
-            syncedH = spriteCustomH = spriteImageH;
+            syncedW = spriteImageW;
+            syncedH = spriteImageH;
+            spriteCustomW = spriteCanvasW = spriteImageW;
+            spriteCustomH = spriteCanvasH = spriteImageH;
         }
+        if (spriteCustomW <= 0 || spriteCustomH <= 0)
+        {
+            spriteCustomW = spriteImageW;
+            spriteCustomH = spriteImageH;
+        }
+        if (spriteCanvasW <= 0 || spriteCanvasH <= 0)
+        {
+            spriteCanvasW = spriteImageW;
+            spriteCanvasH = spriteImageH;
+        }
+        auto editDimensions = [&](const char *tag, int &w, int &h, bool &keepAspect) {
+            ImGui::SetNextItemWidth(90.0f);
+            const bool editedW = ImGui::InputInt((std::string("##w-") + tag).c_str(), &w, 0);
+            ImGui::SameLine();
+            ImGui::TextUnformatted("x");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90.0f);
+            const bool editedH = ImGui::InputInt((std::string("##h-") + tag).c_str(), &h, 0);
+            if (editedW || editedH)
+            {
+                const std::array<int, 2> c
+                    = SpriteMerge::CustomSize(spriteImageW, spriteImageH, w, h, keepAspect, editedW);
+                w = c[0];
+                h = c[1];
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox((std::string(_("Keep aspect")) + "##" + tag).c_str(), &keepAspect) && keepAspect)
+            {
+                const std::array<int, 2> c
+                    = SpriteMerge::CustomSize(spriteImageW, spriteImageH, w, h, true, true);
+                w = c[0];
+                h = c[1];
+            }
+        };
+
         ImGui::TextDisabled("%s", _("Custom size"));
-        ImGui::SetNextItemWidth(90.0f);
-        const bool editedW = ImGui::InputInt("##custom-w", &spriteCustomW, 0);
-        ImGui::SameLine();
-        ImGui::TextUnformatted("x");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(90.0f);
-        const bool editedH = ImGui::InputInt("##custom-h", &spriteCustomH, 0);
-        if (editedW || editedH)
-        {
-            const std::array<int, 2> c = SpriteMerge::CustomSize(
-                spriteImageW, spriteImageH, spriteCustomW, spriteCustomH, spriteKeepAspect, editedW);
-            spriteCustomW = c[0];
-            spriteCustomH = c[1];
-        }
-        ImGui::SameLine();
-        if (ImGui::Checkbox(_("Keep aspect##custom"), &spriteKeepAspect) && spriteKeepAspect)
-        {
-            const std::array<int, 2> c
-                = SpriteMerge::CustomSize(spriteImageW, spriteImageH, spriteCustomW, spriteCustomH, true, true);
-            spriteCustomW = c[0];
-            spriteCustomH = c[1];
-        }
+        editDimensions("custom", spriteCustomW, spriteCustomH, spriteKeepAspect);
         ImGui::SameLine();
         if (ImGui::Button(_("Apply##custom")))
             ResizeSpriteImage(spriteCustomW, spriteCustomH, spriteScaleSmooth == 1, spriteKeepAspect);
+
+        ImGui::TextDisabled("%s", _("Custom canvas size"));
+        editDimensions("canvas", spriteCanvasW, spriteCanvasH, spriteCanvasKeepAspect);
+        ImGui::SetNextItemWidth(110.0f);
+        const char *anchors[] = {_("Top-Left"), _("Center")};
+        ImGui::Combo(_("Anchor##canvas"), &spriteCanvasAnchor, anchors, 2);
+        ImGui::SetItemTooltip("%s", _("Where existing pixels and frames stay when expanding or cropping the canvas"));
+        ImGui::SameLine();
+        if (ImGui::Button(_("Apply##canvas")))
+            ResizeSpriteCanvas(spriteCanvasW, spriteCanvasH, spriteCanvasAnchor);
+        ImGui::SetItemTooltip(
+            "%s",
+            _("Change canvas width and height without scaling pixels or frames (adds transparent space or crops)."));
         if (Hinted(ImGui::Button(_("Set to fit")), "Set to fit"))
             FitSpriteImage();
         ImGui::SetItemTooltip(
@@ -1860,7 +2304,10 @@ void CharacterEditor::DrawSpritePropertiesBody()
     // --- Frames ---
     if (ImGui::CollapsingHeader(_("Frames"), ImGuiTreeNodeFlags_DefaultOpen))
     {
+        if (spriteMulti.size() != spriteFrames.size())
+            spriteMulti.resize(spriteFrames.size(), 0);
         ImGui::BeginChild("frame-list", ImVec2(0.0f, 140.0f), true);
+        const ImGuiIO &io = ImGui::GetIO();
         for (int i = 0; i < static_cast<int>(spriteFrames.size()); ++i)
         {
             const SpriteFrameEdit &f = spriteFrames[i];
@@ -1875,10 +2322,188 @@ void CharacterEditor::DrawSpritePropertiesBody()
                 f.rect[2],
                 f.rect[3],
                 i);
-            if (ImGui::Selectable(label, i == spriteFrameSel))
-                spriteFrameSel = i;
+            const bool selected = (i == spriteFrameSel) || (spriteMulti[i] != 0);
+            if (ImGui::Selectable(label, selected))
+            {
+                if (io.KeyCtrl)
+                {
+                    if (spriteFrameSel >= 0 && spriteFrameSel < static_cast<int>(spriteMulti.size()))
+                        spriteMulti[spriteFrameSel] = 1;
+                    spriteMulti[i] = spriteMulti[i] ? 0 : 1;
+                    spriteFrameSel = spriteMulti[i] ? i : spriteFrameSel;
+                }
+                else if (io.KeyShift && spriteFrameSel >= 0)
+                {
+                    const int a = std::min(spriteFrameSel, i);
+                    const int b = std::max(spriteFrameSel, i);
+                    std::fill(spriteMulti.begin(), spriteMulti.end(), 0);
+                    for (int k = a; k <= b; ++k)
+                        spriteMulti[k] = 1;
+                    spriteFrameSel = i;
+                }
+                else
+                {
+                    std::fill(spriteMulti.begin(), spriteMulti.end(), 0);
+                    spriteFrameSel = i;
+                    spriteMulti[i] = 1;
+                }
+            }
         }
         ImGui::EndChild();
+        ImGui::SetItemTooltip("%s", _("Click to select, Ctrl+click to toggle, Shift+click for range"));
+
+        const std::vector<int> selFrames = SpriteSelection();
+        ImGui::BeginDisabled(selFrames.empty());
+        if (Hinted(ImGui::Button(_("Newplace...")), "Newplace..."))
+        {
+            const std::string sug = spriteObject + "_part";
+            std::snprintf(spriteNewplaceName.data(), spriteNewplaceName.size(), "%s", sug.c_str());
+            ImGui::OpenPopup("##newplace-modal");
+        }
+        ImGui::SetItemTooltip(
+            "%s",
+            _("Create a new sprite file + meta and move the selected frame(s) and their exclusive configs into it"));
+        ImGui::SameLine();
+        if (Hinted(ImGui::Button(_("Merge to...")), "Merge to..."))
+        {
+            if (spriteMergeTarget[0] == '\0' || spriteMergeTarget.data() == spriteObject)
+            {
+                for (const std::string &o : Sprites().ObjectNames())
+                    if (o != spriteObject)
+                    {
+                        std::snprintf(spriteMergeTarget.data(), spriteMergeTarget.size(), "%s", o.c_str());
+                        break;
+                    }
+            }
+            ImGui::OpenPopup("##merge-to-modal");
+        }
+        ImGui::SetItemTooltip(
+            "%s", _("Move the selected frame(s) and their exclusive configs into another existing sprite"));
+        ImGui::EndDisabled();
+
+        if (!selFrames.empty())
+        {
+            ImGui::Separator();
+            ImGui::Text(_("Resize selected (%zu)"), selFrames.size());
+            static const char *const kResizeModes[] = {
+                "Pixels + keep game size (HD)",
+                "Pixels + game size (larger in game)",
+                "Frame rects only",
+            };
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::Combo(_("##sel-resize-mode"), &spriteResizeMethod, kResizeModes, 3);
+            ImGui::SetItemTooltip(
+                "%s",
+                _("Choose how Resize updates selected frames: HD resolution only, both pixels and in-game size, or "
+                  "frame bounds only."));
+
+            const char *selFilters[] = {_("Pixels"), _("Smooth")};
+            ImGui::SetNextItemWidth(100.0f);
+            ImGui::Combo(_("Filter##sel-resize"), &spriteScaleSmooth, selFilters, 2);
+            ImGui::SameLine();
+            ImGui::Checkbox(_("Keep aspect##sel-resize"), &spriteResizeKeepAspect);
+
+            int boxX0 = std::numeric_limits<int>::max(), boxY0 = boxX0;
+            int boxX1 = std::numeric_limits<int>::min(), boxY1 = boxX1;
+            for (int idx : selFrames)
+            {
+                const int *r = spriteFrames[idx].rect;
+                boxX0 = std::min(boxX0, r[0]);
+                boxY0 = std::min(boxY0, r[1]);
+                boxX1 = std::max(boxX1, r[0] + r[2]);
+                boxY1 = std::max(boxY1, r[1] + r[3]);
+            }
+            const int boxW = std::max(1, boxX1 - boxX0), boxH = std::max(1, boxY1 - boxY0);
+
+            ImGui::SetNextItemWidth(110.0f);
+            if (ImGui::InputFloat(_("Scale##sel-resize"), &spriteResizeFactor, 0.25f, 1.0f, "%.2fx"))
+                spriteResizeFactor = std::clamp(spriteResizeFactor, 0.05f, 32.0f);
+            const float quickScales[] = {0.5f, 1.5f, 2.0f, 3.0f, 4.0f};
+            for (float qs : quickScales)
+            {
+                ImGui::SameLine();
+                char qbuf[16];
+                std::snprintf(qbuf, sizeof(qbuf), "%gx", qs);
+                if (ImGui::SmallButton(qbuf))
+                {
+                    spriteResizeFactor = qs;
+                    ResizeSpriteFrames(
+                        selFrames,
+                        spriteResizeFactor,
+                        spriteResizeFactor,
+                        boxX0,
+                        boxY0,
+                        spriteScaleSmooth == 1,
+                        spriteResizeMethod);
+                }
+            }
+            const int outBoxW = std::max(1, static_cast<int>(std::lround(boxW * spriteResizeFactor)));
+            const int outBoxH = std::max(1, static_cast<int>(std::lround(boxH * spriteResizeFactor)));
+            ImGui::TextDisabled(_("Group: %dx%d -> ~%dx%d px"), boxW, boxH, outBoxW, outBoxH);
+            if (ImGui::Button(_("Apply Resize##sel-resize")))
+                ResizeSpriteFrames(
+                    selFrames,
+                    spriteResizeFactor,
+                    spriteResizeFactor,
+                    boxX0,
+                    boxY0,
+                    spriteScaleSmooth == 1,
+                    spriteResizeMethod);
+        }
+
+        if (ImGui::BeginPopupModal("##newplace-modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text(_("Move %zu selected frame(s) from '%s' to a new sprite:"), selFrames.size(), spriteObject.c_str());
+            ImGui::InputText(_("New sprite name"), spriteNewplaceName.data(), spriteNewplaceName.size());
+            ImGui::SetNextItemWidth(120.0f);
+            ImGui::InputInt(_("Padding (px)"), &spriteSplitPadding);
+            spriteSplitPadding = std::clamp(spriteSplitPadding, 0, 64);
+            ImGui::TextDisabled(
+                "%s",
+                _("Exclusive parts/anims/buildings/families move automatically; cross-references and assets are updated."));
+            ImGui::Separator();
+            if (ImGui::Button(_("Create & Move"), ImVec2(130.0f, 0.0f)))
+            {
+                SplitSelectedFrames(spriteNewplaceName.data(), false);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(_("Cancel"), ImVec2(110.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        if (ImGui::BeginPopupModal("##merge-to-modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text(_("Merge %zu selected frame(s) from '%s' into:"), selFrames.size(), spriteObject.c_str());
+            if (ImGui::BeginCombo(_("Target sprite"), spriteMergeTarget.data()))
+            {
+                for (const std::string &o : Sprites().ObjectNames())
+                {
+                    if (o == spriteObject)
+                        continue;
+                    if (ImGui::Selectable(o.c_str(), o == spriteMergeTarget.data()))
+                        std::snprintf(spriteMergeTarget.data(), spriteMergeTarget.size(), "%s", o.c_str());
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::InputText(_("Or type name"), spriteMergeTarget.data(), spriteMergeTarget.size());
+            ImGui::SetNextItemWidth(120.0f);
+            ImGui::InputInt(_("Padding (px)"), &spriteSplitPadding);
+            spriteSplitPadding = std::clamp(spriteSplitPadding, 0, 64);
+            ImGui::TextDisabled(
+                "%s", _("Both target and source are backed up (.bak) and asset references are rewritten."));
+            ImGui::Separator();
+            if (ImGui::Button(_("Merge frames"), ImVec2(130.0f, 0.0f)))
+            {
+                SplitSelectedFrames(spriteMergeTarget.data(), true);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(_("Cancel"), ImVec2(110.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
         if (spriteFrameSel >= 0 && spriteFrameSel < static_cast<int>(spriteFrames.size()))
         {
             SpriteFrameEdit &f = spriteFrames[spriteFrameSel];
@@ -1943,6 +2568,408 @@ void CharacterEditor::DrawSpritePropertiesBody()
                             static_cast<float>(g.rect[1] + g.rect[3]) / spriteImageH));
                 }
             }
+        }
+    }
+
+    // --- Live Assembled Preview (how composites render at game offsets and drawn sizes) ---
+    if (ImGui::CollapsingHeader(_("Assembled preview"), ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        struct CachedMeta
+        {
+            std::string object;
+            std::string baseCopy;
+            fs::file_time_type mtime {};
+            bool valid {false};
+            YAML::Node node;
+        };
+        static CachedMeta cache;
+        const fs::path mpath = SpriteMetaPath(spriteObject);
+        std::error_code ec;
+        const fs::file_time_type mt = fs::exists(mpath, ec) ? fs::last_write_time(mpath, ec) : fs::file_time_type {};
+        if (!cache.valid || cache.object != spriteObject || cache.baseCopy != spriteMetaBase
+            || (spriteMetaBase.empty() && cache.mtime != mt))
+        {
+            cache.object = spriteObject;
+            cache.baseCopy = spriteMetaBase;
+            cache.mtime = mt;
+            cache.valid = true;
+            try
+            {
+                cache.node = YAML::Load(spriteMetaBase.empty() ? ReadFile(mpath) : spriteMetaBase);
+            }
+            catch (const std::exception &)
+            {
+                cache.node = YAML::Node();
+            }
+        }
+        const YAML::Node &meta = cache.node;
+
+        static const char *const kSectionKeys[] = {"buildings", "bodies", "parts", "anims"};
+        static const char *const kSectionLabels[] = {"Building", "Body", "Part", "Anim"};
+        std::vector<std::string> itemsByKind[4];
+        if (meta && meta.IsMap())
+            for (int k = 0; k < 4; ++k)
+                if (const YAML::Node s = meta[kSectionKeys[k]]; s && s.IsMap())
+                    for (const auto &kv : s)
+                        if (kv.first.IsScalar())
+                            itemsByKind[k].push_back(kv.first.as<std::string>(""));
+
+        if (spritePreviewKind < 0 || spritePreviewKind >= 4 || itemsByKind[spritePreviewKind].empty())
+        {
+            for (int k = 0; k < 4; ++k)
+                if (!itemsByKind[k].empty())
+                {
+                    spritePreviewKind = k;
+                    spritePreviewItem = 0;
+                    break;
+                }
+        }
+        const auto &curItems = itemsByKind[std::clamp(spritePreviewKind, 0, 3)];
+        if (curItems.empty())
+        {
+            ImGui::TextDisabled("%s", _("No buildings, bodies, parts or anims defined in meta."));
+        }
+        else
+        {
+            spritePreviewItem = std::clamp(spritePreviewItem, 0, static_cast<int>(curItems.size()) - 1);
+            ImGui::SetNextItemWidth(100.0f);
+            if (ImGui::BeginCombo("##preview-kind", kSectionLabels[spritePreviewKind]))
+            {
+                for (int k = 0; k < 4; ++k)
+                {
+                    if (itemsByKind[k].empty())
+                        continue;
+                    if (ImGui::Selectable(kSectionLabels[k], k == spritePreviewKind))
+                    {
+                        spritePreviewKind = k;
+                        spritePreviewItem = 0;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(-1.0f);
+            if (ImGui::BeginCombo("##preview-item", curItems[spritePreviewItem].c_str()))
+            {
+                for (int idx = 0; idx < static_cast<int>(curItems.size()); ++idx)
+                    if (ImGui::Selectable(curItems[idx].c_str(), idx == spritePreviewItem))
+                        spritePreviewItem = idx;
+                ImGui::EndCombo();
+            }
+            ImGui::Checkbox(_("Overlays (state>0 / flag>1)"), &spritePreviewShowOverlays);
+            ImGui::SameLine();
+            ImGui::Checkbox(_("Animate"), &spritePreviewAnimate);
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::SliderFloat(_("Zoom##preview"), &spritePreviewZoom, 0.25f, 4.0f, "%.2fx");
+
+            struct PreviewPiece
+            {
+                SDL_Texture *tex {nullptr};
+                int imgW {1}, imgH {1};
+                int src[4] {0, 0, 1, 1};
+                float wx {0.0f}, wy {0.0f}, ww {1.0f}, wh {1.0f};
+                int layer {0};
+                std::size_t order {0};
+            };
+            std::vector<PreviewPiece> pieces;
+            const std::size_t animTick = spritePreviewAnimate ? (SDL_GetTicks() / 130) : 0;
+
+            auto parseRef = [&](const std::string &raw, std::string &outObj, std::string &outName, int &outIdx) {
+                outIdx = 0;
+                std::string s = raw;
+                if (const auto dot = s.find('.'); dot != std::string::npos)
+                {
+                    outObj = s.substr(0, dot);
+                    s = s.substr(dot + 1);
+                }
+                else
+                {
+                    outObj = spriteObject;
+                }
+                if (const auto open = s.find('['); open != std::string::npos)
+                {
+                    outIdx = std::atoi(s.c_str() + open + 1);
+                    s = s.substr(0, open);
+                }
+                outName = s;
+            };
+            auto resolveFamily = [&](const std::string &name, const char *sec, int idx) -> std::string {
+                const YAML::Node fam = meta["families"];
+                if (!fam || !fam.IsMap())
+                    return {};
+                const YAML::Node f = fam[name];
+                if (!f || !f.IsMap() || !f[sec] || !f[sec].IsSequence() || idx < 0
+                    || idx >= static_cast<int>(f[sec].size()))
+                    return {};
+                return f[sec][idx].as<std::string>("");
+            };
+            const auto &tables = Sprites().Tables();
+            std::function<void(OpenArtOfWar::SpriteRef, float, float, int, int)> walkExternal;
+            walkExternal = [&](OpenArtOfWar::SpriteRef sr, float ox, float oy, int layer, int depth) {
+                if (!sr.Valid() || depth > 8)
+                    return;
+                if (sr.kind == SpriteKind::Frame && sr.handle < static_cast<int>(tables.frames.size()))
+                {
+                    const auto &sf = tables.frames[sr.handle];
+                    SDL_Texture *extTex = textures ? textures->GetSpriteSheet(sf.page) : nullptr;
+                    float tw = 1.0f, th = 1.0f;
+                    if (extTex && SDL_GetTextureSize(extTex, &tw, &th) && sf.srcW > 0 && sf.srcH > 0)
+                    {
+                        PreviewPiece pp;
+                        pp.tex = extTex;
+                        pp.imgW = static_cast<int>(tw);
+                        pp.imgH = static_cast<int>(th);
+                        pp.src[0] = static_cast<int>(sf.srcX);
+                        pp.src[1] = static_cast<int>(sf.srcY);
+                        pp.src[2] = static_cast<int>(sf.srcW);
+                        pp.src[3] = static_cast<int>(sf.srcH);
+                        pp.wx = ox;
+                        pp.wy = oy;
+                        pp.ww = sf.width;
+                        pp.wh = sf.height;
+                        pp.layer = layer;
+                        pp.order = pieces.size();
+                        pieces.push_back(pp);
+                    }
+                }
+                else if (sr.kind == SpriteKind::Part && sr.handle < static_cast<int>(tables.compositeRanges.size()))
+                {
+                    const auto &rg = tables.compositeRanges[sr.handle];
+                    for (int i = rg.start; i <= rg.end && i < static_cast<int>(tables.compositeParts.size()); ++i)
+                    {
+                        const auto &cp = tables.compositeParts[i];
+                        walkExternal(
+                            {static_cast<SpriteKind>(cp.isComp), cp.child}, ox + cp.ox, oy + cp.oy, layer, depth + 1);
+                    }
+                }
+                else if (sr.kind == SpriteKind::Anim && sr.handle < static_cast<int>(tables.animRanges.size()))
+                {
+                    const auto &rg = tables.animRanges[sr.handle];
+                    const int count = rg.end - rg.start + 1;
+                    if (count > 0)
+                    {
+                        const int idx = rg.start + static_cast<int>(animTick % static_cast<std::size_t>(count));
+                        if (idx < static_cast<int>(tables.animFrames.size()))
+                        {
+                            const auto &af = tables.animFrames[idx];
+                            walkExternal(
+                                {static_cast<SpriteKind>(af.isComp), af.child},
+                                ox + af.ox,
+                                oy + af.oy,
+                                layer,
+                                depth + 1);
+                        }
+                    }
+                }
+            };
+
+            // Walks local composite lists recursively using live `spriteFrames` + `SpriteCanvasTexture()` and external
+            // sprites via `Sprites()`.
+            std::function<void(const YAML::Node &, float, float, int, int)> walkSub;
+            walkSub = [&](const YAML::Node &list, float ox, float oy, int layer, int depth) {
+                if (!list || !list.IsSequence() || depth > 8)
+                    return;
+                for (const auto &e : list)
+                {
+                    try
+                    {
+                        if (!e.IsMap())
+                            continue;
+                        float ax = ox, ay = oy;
+                        if (const YAML::Node at = e["at"]; at && at.IsSequence() && at.size() == 2)
+                        {
+                            ax += at[0].as<float>(0.0f);
+                            ay += at[1].as<float>(0.0f);
+                        }
+                        const int eLayer = (e["layer"] && e["layer"].IsScalar()) ? e["layer"].as<int>(layer) : layer;
+                        std::string raw, obj, name;
+                        int idx = 0;
+                        SpriteKind want = SpriteKind::None;
+                        const char *secName = nullptr;
+                        if (const YAML::Node f = e["frame"]; f && f.IsScalar())
+                        {
+                            raw = f.as<std::string>("");
+                            want = SpriteKind::Frame;
+                            secName = "frames";
+                        }
+                        else if (const YAML::Node p = e["part"]; p && p.IsScalar())
+                        {
+                            raw = p.as<std::string>("");
+                            want = SpriteKind::Part;
+                            secName = "parts";
+                        }
+                        else if (const YAML::Node a = e["anim"]; a && a.IsScalar())
+                        {
+                            raw = a.as<std::string>("");
+                            want = SpriteKind::Anim;
+                            secName = "anims";
+                        }
+                        if (raw.empty())
+                            continue;
+                        parseRef(raw, obj, name, idx);
+                        if (obj != spriteObject)
+                        {
+                            walkExternal(Sprites().Resolve(raw, want), ax, ay, eLayer, depth + 1);
+                            continue;
+                        }
+                        if (want == SpriteKind::Frame)
+                        {
+                            auto findEdit = [&](const std::string &fn) -> const SpriteFrameEdit * {
+                                for (const SpriteFrameEdit &fe : spriteFrames)
+                                    if (fe.name == fn || (!fe.original.empty() && fe.original == fn))
+                                        return &fe;
+                                return nullptr;
+                            };
+                            const SpriteFrameEdit *fe = findEdit(name);
+                            if (!fe)
+                                fe = findEdit(resolveFamily(name, "frames", idx));
+                            SDL_Texture *localTex = SpriteCanvasTexture();
+                            if (fe && localTex && spriteImageW > 0 && spriteImageH > 0)
+                            {
+                                PreviewPiece pp;
+                                pp.tex = localTex;
+                                pp.imgW = spriteImageW;
+                                pp.imgH = spriteImageH;
+                                std::copy(fe->rect, fe->rect + 4, pp.src);
+                                pp.wx = ax;
+                                pp.wy = ay;
+                                pp.ww = fe->size[0];
+                                pp.wh = fe->size[1];
+                                pp.layer = eLayer;
+                                pp.order = pieces.size();
+                                pieces.push_back(pp);
+                            }
+                            continue;
+                        }
+                        const YAML::Node sec = meta[secName];
+                        YAML::Node tgt = (sec && sec[name]) ? sec[name] : YAML::Node();
+                        if (!tgt)
+                        {
+                            const std::string mem = resolveFamily(name, secName, idx);
+                            if (!mem.empty() && sec && sec[mem])
+                                tgt = sec[mem];
+                        }
+                        if (want == SpriteKind::Part)
+                        {
+                            walkSub(tgt, ax, ay, eLayer, depth + 1);
+                        }
+                        else if (want == SpriteKind::Anim && tgt && tgt.IsSequence() && tgt.size() > 0)
+                        {
+                            YAML::Node single(YAML::NodeType::Sequence);
+                            single.push_back(tgt[animTick % tgt.size()]);
+                            walkSub(single, ax, ay, eLayer, depth + 1);
+                        }
+                    }
+                    catch (const std::exception &)
+                    {}
+                }
+            };
+
+            const std::string &itemName = curItems[spritePreviewItem];
+            const YAML::Node node = meta[kSectionKeys[spritePreviewKind]][itemName];
+            if (spritePreviewKind == 0 && node && node.IsMap())
+            {
+                if (const YAML::Node bparts = node["parts"]; bparts && bparts.IsSequence())
+                    for (const auto &e : bparts)
+                    {
+                        if (!spritePreviewShowOverlays && e.IsMap() && e["state"] && e["state"].IsScalar()
+                            && e["state"].as<int>(0) > 0)
+                            continue;
+                        YAML::Node one(YAML::NodeType::Sequence);
+                        one.push_back(e);
+                        walkSub(one, 0.0f, 0.0f, 0, 0);
+                    }
+            }
+            else if (spritePreviewKind == 1 && node && node.IsSequence())
+            {
+                for (const auto &e : node)
+                {
+                    if (!spritePreviewShowOverlays && e.IsMap() && e["flag"] && e["flag"].IsScalar()
+                        && e["flag"].as<int>(0) > 1)
+                        continue;
+                    YAML::Node one(YAML::NodeType::Sequence);
+                    one.push_back(e);
+                    walkSub(one, 0.0f, 0.0f, 0, 0);
+                }
+            }
+            else if (spritePreviewKind == 2 && node && node.IsSequence())
+            {
+                walkSub(node, 0.0f, 0.0f, 0, 0);
+            }
+            else if (spritePreviewKind == 3 && node && node.IsSequence() && node.size() > 0)
+            {
+                YAML::Node single(YAML::NodeType::Sequence);
+                single.push_back(node[animTick % node.size()]);
+                walkSub(single, 0.0f, 0.0f, 0, 0);
+            }
+
+            std::stable_sort(pieces.begin(), pieces.end(), [](const PreviewPiece &a, const PreviewPiece &b) {
+                return a.layer != b.layer ? (a.layer < b.layer) : (a.order < b.order);
+            });
+
+            const float boxW = std::max(120.0f, ImGui::GetContentRegionAvail().x);
+            const float boxH = 220.0f;
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            ImGui::InvisibleButton("##assembled-preview-canvas", ImVec2(boxW, boxH));
+            ImDrawList *dl = ImGui::GetWindowDrawList();
+            const ImVec2 p1(p0.x + boxW, p0.y + boxH);
+            dl->AddRectFilled(p0, p1, IM_COL32(28, 30, 34, 255));
+            dl->PushClipRect(p0, p1, true);
+            for (int cy = 0; cy * 16 < static_cast<int>(boxH); ++cy)
+                for (int cx = 0; cx * 16 < static_cast<int>(boxW); ++cx)
+                    if ((cx + cy) & 1)
+                        dl->AddRectFilled(
+                            ImVec2(p0.x + cx * 16, p0.y + cy * 16),
+                            ImVec2(p0.x + (cx + 1) * 16, p0.y + (cy + 1) * 16),
+                            IM_COL32(36, 39, 44, 255));
+
+            if (!pieces.empty())
+            {
+                float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
+                bool first = true;
+                for (const PreviewPiece &pp : pieces)
+                {
+                    if (first)
+                    {
+                        minX = pp.wx;
+                        minY = pp.wy;
+                        maxX = pp.wx + pp.ww;
+                        maxY = pp.wy + pp.wh;
+                        first = false;
+                    }
+                    else
+                    {
+                        minX = std::min(minX, pp.wx);
+                        minY = std::min(minY, pp.wy);
+                        maxX = std::max(maxX, pp.wx + pp.ww);
+                        maxY = std::max(maxY, pp.wy + pp.wh);
+                    }
+                }
+                const float spanW = std::max(1.0f, maxX - minX);
+                const float spanH = std::max(1.0f, maxY - minY);
+                const float fit = std::min((boxW - 20.0f) / spanW, (boxH - 20.0f) / spanH) * spritePreviewZoom;
+                const float cx = p0.x + boxW * 0.5f - (minX + spanW * 0.5f) * fit;
+                const float cy = p0.y + boxH * 0.5f - (minY + spanH * 0.5f) * fit;
+
+                for (const PreviewPiece &pp : pieces)
+                {
+                    if (!pp.tex || pp.imgW <= 0 || pp.imgH <= 0)
+                        continue;
+                    const ImVec2 a(cx + pp.wx * fit, cy + pp.wy * fit);
+                    const ImVec2 b(cx + (pp.wx + pp.ww) * fit, cy + (pp.wy + pp.wh) * fit);
+                    const ImVec2 uv0(static_cast<float>(pp.src[0]) / pp.imgW, static_cast<float>(pp.src[1]) / pp.imgH);
+                    const ImVec2 uv1(
+                        static_cast<float>(pp.src[0] + pp.src[2]) / pp.imgW,
+                        static_cast<float>(pp.src[1] + pp.src[3]) / pp.imgH);
+                    dl->AddImage(reinterpret_cast<ImTextureID>(pp.tex), a, b, uv0, uv1);
+                }
+                // Subtle origin [0, 0] crosshair
+                dl->AddLine(ImVec2(cx - 6.0f, cy), ImVec2(cx + 6.0f, cy), IM_COL32(255, 220, 80, 140));
+                dl->AddLine(ImVec2(cx, cy - 6.0f), ImVec2(cx, cy + 6.0f), IM_COL32(255, 220, 80, 140));
+            }
+            dl->PopClipRect();
+            dl->AddRect(p0, p1, IM_COL32(90, 96, 110, 200));
+            ImGui::TextDisabled(_("%zu piece(s) rendered"), pieces.size());
         }
     }
 

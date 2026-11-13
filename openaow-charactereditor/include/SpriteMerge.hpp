@@ -4,6 +4,7 @@
 
 #include <array>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,9 +54,31 @@ YAML::Node MergeMetas(
 std::string EmitMeta(const YAML::Node &meta, std::string_view header);
 
 // References in another asset file: "<source>.<item>" (and "<source>.<item>[i]") -> "<merged>.<new item>" where the
-// item is one of the source's names; a whole line "sprite: <source>" / "reinforced_sprite: <source>" -> the merged
-// object. `count` gets the number of replacements.
-std::string RewriteText(std::string_view text, const NameMap &names, std::string_view merged, int &count);
+// item is one of the source's names; when `rewriteBare` is true, a whole line "sprite: <source>" /
+// "reinforced_sprite: <source>" -> `merged`. `count` gets the number of replacements.
+std::string RewriteText(
+    std::string_view text, const NameMap &names, std::string_view merged, int &count, bool rewriteBare = true);
+
+// Splits `movedFrames` (and any parts/anims/bodies/sequences/buildings/families whose local dependencies lie solely
+// inside the moved set) out of `srcMeta` (`srcObject`) into a new meta `newObjectMeta` (`newObject`), rewriting cross
+// references cleanly between the two objects.
+struct SplitResult
+{
+    YAML::Node remainingSourceMeta;
+    YAML::Node newObjectMeta;
+    std::set<std::string> movedItems;
+    bool movedEverything {false};
+};
+SplitResult SplitMeta(
+    std::string_view srcObject,
+    const YAML::Node &srcMeta,
+    const std::set<std::string> &movedFrames,
+    const FramePlaces &newPlaces,
+    std::string_view newObject,
+    std::string_view newImage,
+    std::string_view newResistanceImage,
+    int newW,
+    int newH);
 
 // True when a line of `text` is "sprite: <object>" (units bind their object by its bare name)
 bool BindsBare(std::string_view text, std::string_view object);
@@ -96,6 +119,27 @@ std::array<int, 2> PackExtent(const std::vector<std::array<int, 2>> &sizes, cons
 std::array<int, 2> FitToLongestSide(int w, int h, int n);
 // A free size ({newW, newH} typed by hand): with `keepAspect` the side that was not edited follows the other
 std::array<int, 2> CustomSize(int w, int h, int newW, int newH, bool keepAspect, bool changedW);
+
+// Scaled layout for a selected subset of frames around `(anchorX, anchorY)`. If scaling causes overlap with
+// `unselected` or previously disjoint selected frames, selected frames are shelf-packed cleanly below `unselected`
+// and `canvasW`/`canvasH` grow to hold the result.
+struct ScaledGroupLayout
+{
+    std::vector<std::array<int, 4>> rects;
+    int canvasW {1};
+    int canvasH {1};
+    bool relocated {false};
+};
+ScaledGroupLayout ScaleGroupRects(
+    const std::vector<std::array<int, 4>> &selected,
+    const std::vector<std::array<int, 4>> &unselected,
+    float scaleX,
+    float scaleY,
+    int anchorX,
+    int anchorY,
+    int canvasW,
+    int canvasH,
+    int padding);
 // The largest k such that the RGBA image (w x h) is an exact upscale by k: every aligned k x k block of equal
 // pixels, and every frame rectangle {x, y, w, h} on that grid. 1 when it is not
 int DetectIntegerUpscale(const unsigned char *rgba, int w, int h, const std::vector<std::array<int, 4>> &rects);

@@ -42,8 +42,9 @@ enum class SpriteDrag
     Move,
     Resize,
     Draw,
-    MovePixels, // Sprite change mode: the frames travel with their pixels
-    BoxSelect   // a box on empty ground picks the frames it touches
+    MovePixels,   // Sprite change mode: the frames travel with their pixels
+    ResizePixels, // Resize mode: scales selected frames and their pixels proportionally
+    BoxSelect     // a box on empty ground picks the frames it touches
 };
 
 // A frame on the Sprite Merge canvas: where it is in its object's image and where it goes in the result
@@ -236,11 +237,25 @@ private:
     // Resamples the image (and the Resistance image) to w x h; the frames follow, the drawn sizes stay. `uniform`:
     // the same factor on both axes (an aspect-keeping size)
     bool ResizeSpriteImage(int w, int h, bool smooth, bool uniform);
+    // Resizes the canvas (without scaling pixels or frames) to w x h, padding with transparency or cropping.
+    // `anchor`: 0 = top-left (existing coordinates stay), 1 = center (pixels and frames shift symmetrically).
+    bool ResizeSpriteCanvas(int w, int h, int anchor = 0);
+    // Scales `frames` around `(anchorX, anchorY)` by `(scaleX, scaleY)`. `method`: 0 = HD pixels (keep drawn size),
+    // 1 = pixels + drawn size, 2 = frame rects only. Expands canvas or relocates cleanly on collision.
+    bool ResizeSpriteFrames(
+        const std::vector<int> &frames, float scaleX, float scaleY, int anchorX, int anchorY, bool smooth, int method);
     // Smallest image without losing quality: exact integer upscale undone, empty space cut away
     bool FitSpriteImage();
     // The frames after the image was scaled by kx, ky: rects follow, the drawn sizes stay
     void ApplyImageScaleToFrames(float kx, float ky, bool forceEven);
     bool CreateSpriteObject(const fs::path &png, std::string_view name);
+    bool SplitSelectedFrames(std::string_view targetName, bool mergeIntoExisting);
+    std::pair<int, int> RewriteAssetReferences(
+        const std::vector<std::string> &needles,
+        const std::set<fs::path> &skipMetaPaths,
+        const std::map<std::string, std::map<std::string, std::string>> &names,
+        std::string_view targetObject,
+        bool rewriteBare);
     std::string FreeFrameName(std::string_view prefix) const;
     void AddSpriteFrame(int x, int y, int w, int h, std::string_view prefix);
     void RemoveSpriteFrame(int index);
@@ -266,6 +281,8 @@ private:
     void MergeBounds(int &x0, int &y0, int &x1, int &y1) const;
     std::vector<char> MergeOverlaps() const; // per piece: overlaps another one
     void MergePack();
+    void MergeAssemble();
+    void EnsureMergeObjectIncluded(std::string_view object, bool makeFirst);
     void MergeReset();
     bool MergePrepare(); // checks, and the text of the confirmation
     bool MergeObjectsSave();
@@ -529,6 +546,9 @@ private:
     int spriteSizePreset {1};   // 512, 1024, 2048, 4096 (the longer side)
     int spriteCustomW {0}, spriteCustomH {0};
     bool spriteKeepAspect {true};
+    int spriteCanvasW {0}, spriteCanvasH {0};
+    bool spriteCanvasKeepAspect {false};
+    int spriteCanvasAnchor {0}; // 0: top-left, 1: center
     int spriteDragStartV[2] {0, 0}; // draw mode with magnetism: the grid point where the drag began
     float spriteZoom {2.0f};
     ImVec2 spritePan {16.0f, 16.0f};
@@ -539,7 +559,14 @@ private:
     ImVec2 spriteDragStart {0.0f, 0.0f};
     int spriteDragRect[4] {0, 0, 0, 0};
     bool spriteDrawMode {false};
-    bool spriteMoveMode {false}; // Sprite change mode
+    bool spriteMoveMode {false};   // Sprite change mode
+    bool spriteResizeMode {false}; // Resize mode: drag selection corners or apply factor/target size
+    int spriteResizeMethod {0};    // 0: HD pixels (keep drawn size), 1: pixels + drawn size, 2: rects only
+    bool spriteResizeKeepAspect {true};
+    float spriteResizeFactor {2.0f};
+    int spriteResizeAnchor[2] {0, 0};
+    int spriteResizeOrigBox[4] {0, 0, 1, 1};
+    float spriteResizeDragScale[2] {1.0f, 1.0f};
     int spriteMoveTo[2] {0, 0};
     int spriteArrangePadding {2}; // pixels between the frames when rearranging
     int spriteScaleSmooth {0};    // 0: pixels (nearest), 1: smooth
@@ -550,6 +577,15 @@ private:
     std::array<char, 512> spriteNewPng {};
     std::array<char, 64> spriteNewName {};
     FolderPick spritePngPick;
+    std::array<char, 64> spriteNewplaceName {};
+    std::array<char, 64> spriteMergeTarget {};
+    int spriteSplitPadding {2};
+    int spritePreviewKind {0}; // 0: buildings, 1: bodies, 2: parts, 3: anims
+    int spritePreviewItem {0};
+    float spritePreviewZoom {1.0f};
+    bool spritePreviewShowOverlays {false};
+    bool spritePreviewAnimate {true};
+    double spritePreviewAnimStart {0.0};
     std::string spriteReport;
     // Sprite Merge tab
     bool mergeBake {false};                // false: merge objects, true: bake frames into one picture

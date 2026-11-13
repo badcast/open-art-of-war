@@ -233,6 +233,41 @@ std::string RewriteMetaRef(std::string_view ref, std::string_view fromObject, co
     return (found == it->second.end() ? name : found->second) + suffix;
 }
 
+YAML::Node BuildMergedFrameNode(
+    const YAML::Node &srcVal,
+    const std::array<int, 2> &place,
+    float srcScale,
+    float dstScale,
+    std::string_view srcRecolor,
+    std::string_view dstRecolor)
+{
+    const YAML::Node rect = srcVal.IsMap() ? srcVal["rect"] : srcVal;
+    double w = 1, h = 1;
+    if (rect && rect.IsSequence() && rect.size() >= 4)
+    {
+        w = rect[2].as<double>(1.0);
+        h = rect[3].as<double>(1.0);
+    }
+    YAML::Node f(YAML::NodeType::Map);
+    f.SetStyle(YAML::EmitterStyle::Flow);
+    f["rect"] = FlowSeq({double(place[0]), double(place[1]), w, h});
+    if (srcVal.IsMap() && srcVal["size"])
+        f["size"] = srcVal["size"];
+    else if (std::fabs(srcScale - dstScale) > 1e-4f)
+        f["size"] = FlowSeq({w / srcScale, h / srcScale});
+    const std::string fr = srcVal.IsMap() ? Str(srcVal, "recolor", srcRecolor) : std::string(srcRecolor);
+    if (fr != dstRecolor)
+        f["recolor"] = fr;
+    if (srcVal.IsMap())
+        for (const auto &e : srcVal)
+        {
+            const std::string k = e.first.as<std::string>("");
+            if (k != "rect" && k != "size" && k != "recolor")
+                f[k] = e.second;
+        }
+    return f;
+}
+
 YAML::Node MergeMetas(
     const std::vector<Source> &sources,
     const NameMap &names,
@@ -282,31 +317,7 @@ YAML::Node MergeMetas(
                     const auto place = places.find({src.object, name});
                     if (place == places.end())
                         continue;
-                    const YAML::Node rect = value.IsMap() ? value["rect"] : value;
-                    double w = 1, h = 1;
-                    if (rect && rect.IsSequence() && rect.size() >= 4)
-                    {
-                        w = rect[2].as<double>(1.0);
-                        h = rect[3].as<double>(1.0);
-                    }
-                    YAML::Node f(YAML::NodeType::Map);
-                    f.SetStyle(YAML::EmitterStyle::Flow);
-                    f["rect"] = FlowSeq({double(place->second[0]), double(place->second[1]), w, h});
-                    if (value.IsMap() && value["size"])
-                        f["size"] = value["size"];
-                    else if (std::fabs(srcScale - scale) > 1e-4f)
-                        f["size"] = FlowSeq({w / srcScale, h / srcScale});
-                    const std::string fr = value.IsMap() ? Str(value, "recolor", srcRecolor) : srcRecolor;
-                    if (fr != recolor)
-                        f["recolor"] = fr;
-                    if (value.IsMap())
-                        for (const auto &e : value)
-                        {
-                            const std::string k = e.first.as<std::string>("");
-                            if (k != "rect" && k != "size" && k != "recolor")
-                                f[k] = e.second;
-                        }
-                    value = f;
+                    value = BuildMergedFrameNode(kv.second, place->second, srcScale, scale, srcRecolor, recolor);
                 }
                 else if (std::string(sec) == "families")
                 {
@@ -337,7 +348,134 @@ std::string EmitMeta(const YAML::Node &meta, std::string_view header)
     return text;
 }
 
-std::string RewriteText(std::string_view text, const NameMap &names, std::string_view merged, int &count)
+// Note: qualifyObject non-empty qualifies local references belonging to that object (used during SplitMeta)
+std::string RewriteRefWithMoved(
+    std::string_view ref,
+    std::string_view currentObject,
+    const std::set<std::string> &movedItems,
+    std::string_view destObject,
+    bool rewriteMoved)
+{
+    const auto dot = ref.find('.');
+    const std::string object
+        = dot == std::string_view::npos ? std::string(currentObject) : std::string(ref.substr(0, dot));
+    std::string name = dot == std::string_view::npos ? std::string(ref) : std::string(ref.substr(dot + 1));
+    std::string suffix;
+    const auto open = name.find('[');
+    if (open != std::string::npos)
+    {
+        suffix = name.substr(open);
+        name = name.substr(0, open);
+    }
+    if (object != currentObject)
+        return std::string(ref);
+    const bool isMoved = movedItems.count(name) > 0;
+    if (isMoved == rewriteMoved)
+        return std::string(destObject) + "." + name + suffix;
+    return name + suffix;
+}
+
+void RewriteSplitEntries(
+    YAML::Node n,
+    std::string_view currentObject,
+    const std::set<std::string> &movedItems,
+    std::string_view destObject,
+    bool rewriteMoved)
+{
+    if (n.IsSequence())
+    {
+        for (YAML::Node child : n)
+            RewriteSplitEntries(child, currentObject, movedItems, destObject, rewriteMoved);
+    }
+    else if (n.IsMap())
+    {
+        for (auto kv : n)
+        {
+            const std::string key = kv.first.as<std::string>("");
+            YAML::Node value = kv.second;
+            const bool isRef
+                = std::any_of(std::begin(kEntryKeys), std::end(kEntryKeys), [&](const char *k) { return key == k; });
+            if (isRef && value.IsScalar())
+                value = RewriteRefWithMoved(value.as<std::string>(), currentObject, movedItems, destObject, rewriteMoved);
+            else
+                RewriteSplitEntries(value, currentObject, movedItems, destObject, rewriteMoved);
+        }
+    }
+}
+
+void RewriteSplitFamily(
+    YAML::Node fam,
+    std::string_view currentObject,
+    const std::set<std::string> &movedItems,
+    std::string_view destObject,
+    bool rewriteMoved)
+{
+    if (!fam.IsMap())
+        return;
+    for (auto kv : fam)
+    {
+        YAML::Node list = kv.second;
+        if (!list.IsSequence())
+            continue;
+        for (std::size_t i = 0; i < list.size(); ++i)
+            if (list[i].IsScalar())
+                list[i] = RewriteRefWithMoved(
+                    list[i].as<std::string>(), currentObject, movedItems, destObject, rewriteMoved);
+    }
+}
+
+void CollectLocalRefs(
+    const YAML::Node &n, std::string_view srcObject, std::vector<std::string> &out, bool isFamily = false)
+{
+    if (!n)
+        return;
+    if (isFamily && n.IsMap())
+    {
+        for (const auto &kv : n)
+            if (kv.second.IsSequence())
+                for (const auto &elem : kv.second)
+                    if (elem.IsScalar())
+                        CollectLocalRefs(elem, srcObject, out, false);
+        return;
+    }
+    if (n.IsScalar())
+    {
+        std::string r = n.as<std::string>("");
+        const auto dot = r.find('.');
+        if (dot != std::string::npos)
+        {
+            if (r.substr(0, dot) != srcObject)
+                return;
+            r = r.substr(dot + 1);
+        }
+        if (const auto open = r.find('['); open != std::string::npos)
+            r = r.substr(0, open);
+        if (!r.empty())
+            out.push_back(r);
+        return;
+    }
+    if (n.IsSequence())
+    {
+        for (const auto &c : n)
+            CollectLocalRefs(c, srcObject, out, false);
+    }
+    else if (n.IsMap())
+    {
+        for (const auto &kv : n)
+        {
+            const std::string key = kv.first.as<std::string>("");
+            const bool isRef
+                = std::any_of(std::begin(kEntryKeys), std::end(kEntryKeys), [&](const char *k) { return key == k; });
+            if (isRef && kv.second.IsScalar())
+                CollectLocalRefs(kv.second, srcObject, out, false);
+            else if (key == "parts")
+                CollectLocalRefs(kv.second, srcObject, out, false);
+        }
+    }
+}
+
+std::string RewriteText(
+    std::string_view text, const NameMap &names, std::string_view merged, int &count, bool rewriteBare)
 {
     count = 0;
     std::string out;
@@ -374,7 +512,7 @@ std::string RewriteText(std::string_view text, const NameMap &names, std::string
                     quote = value.substr(0, 1);
                     value = value.substr(1, value.size() - 2);
                 }
-                if (names.count(value))
+                if (rewriteBare && names.count(value))
                 {
                     line = line.substr(0, v) + quote + std::string(merged) + quote + line.substr(end);
                     ++count;
@@ -418,6 +556,141 @@ std::string RewriteText(std::string_view text, const NameMap &names, std::string
     if (!text.empty() && text.back() == '\n')
         out += '\n';
     return out;
+}
+
+SplitResult SplitMeta(
+    std::string_view srcObject,
+    const YAML::Node &srcMeta,
+    const std::set<std::string> &movedFrames,
+    const FramePlaces &newPlaces,
+    std::string_view newObject,
+    std::string_view newImage,
+    std::string_view newResistanceImage,
+    int newW,
+    int newH)
+{
+    SplitResult res;
+    res.remainingSourceMeta = YAML::Clone(srcMeta);
+    res.newObjectMeta = YAML::Node(YAML::NodeType::Map);
+    res.movedItems = movedFrames;
+
+    std::set<std::string> allLocal;
+    for (const std::string &n : DefinedNames(srcMeta))
+        allLocal.insert(n);
+
+    // Transitive closure: an item belongs exclusively to the moved set when all of its local refs are moved
+    std::map<std::string, std::set<std::string>> movedBySection;
+    movedBySection["frames"] = movedFrames;
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (std::size_t si = 1; si < std::size(kSections); ++si)
+        {
+            const char *sec = kSections[si];
+            const YAML::Node s = srcMeta[sec];
+            if (!s || !s.IsMap())
+                continue;
+            const bool isFam = std::string_view(sec) == "families";
+            for (const auto &kv : s)
+            {
+                const std::string itemName = kv.first.as<std::string>("");
+                if (itemName.empty() || movedBySection[sec].count(itemName))
+                    continue;
+                std::vector<std::string> refs;
+                CollectLocalRefs(kv.second, srcObject, refs, isFam);
+                bool usesMoved = false;
+                bool usesStaying = false;
+                for (const std::string &r : refs)
+                {
+                    if (res.movedItems.count(r))
+                        usesMoved = true;
+                    else if (allLocal.count(r))
+                        usesStaying = true;
+                }
+                if (usesMoved && !usesStaying)
+                {
+                    movedBySection[sec].insert(itemName);
+                    res.movedItems.insert(itemName);
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    const float scale = Scale(srcMeta);
+    const std::string recolor = Str(srcMeta, "recolor", "none");
+    res.newObjectMeta["image"] = std::string(newImage);
+    res.newObjectMeta["image_size"] = FlowSeq({double(newW), double(newH)});
+    if (!newResistanceImage.empty())
+        res.newObjectMeta["resistance_image"] = std::string(newResistanceImage);
+    if (srcMeta["scale"])
+        res.newObjectMeta["scale"] = srcMeta["scale"];
+    if (srcMeta["terrain"] && srcMeta["terrain"].as<bool>(false))
+        res.newObjectMeta["terrain"] = true;
+    if (recolor != "none")
+        res.newObjectMeta["recolor"] = recolor;
+
+    for (const char *sec : kSections)
+    {
+        const YAML::Node srcSec = srcMeta[sec];
+        if (!srcSec || !srcSec.IsMap())
+            continue;
+        YAML::Node remSec(YAML::NodeType::Map);
+        YAML::Node dstSec(YAML::NodeType::Map);
+        const bool isFrames = std::string_view(sec) == "frames";
+        const bool isFam = std::string_view(sec) == "families";
+        const auto &movedSet = movedBySection[sec];
+        for (const auto &kv : srcSec)
+        {
+            const std::string itemName = kv.first.as<std::string>("");
+            if (movedSet.count(itemName))
+            {
+                YAML::Node val = YAML::Clone(kv.second);
+                if (isFrames)
+                {
+                    const auto pl = newPlaces.find({std::string(srcObject), itemName});
+                    if (pl != newPlaces.end())
+                        val = BuildMergedFrameNode(val, pl->second, scale, scale, recolor, recolor);
+                }
+                else if (isFam)
+                {
+                    RewriteSplitFamily(val, srcObject, res.movedItems, srcObject, false);
+                }
+                else
+                {
+                    RewriteSplitEntries(val, srcObject, res.movedItems, srcObject, false);
+                }
+                dstSec[itemName] = val;
+            }
+            else
+            {
+                YAML::Node val = YAML::Clone(kv.second);
+                if (isFam)
+                    RewriteSplitFamily(val, srcObject, res.movedItems, newObject, true);
+                else if (!isFrames)
+                    RewriteSplitEntries(val, srcObject, res.movedItems, newObject, true);
+                remSec[itemName] = val;
+            }
+        }
+        if (remSec.size())
+            res.remainingSourceMeta[sec] = remSec;
+        else
+            res.remainingSourceMeta.remove(sec);
+        if (dstSec.size())
+            res.newObjectMeta[sec] = dstSec;
+    }
+
+    res.movedEverything = true;
+    for (const char *sec : kSections)
+    {
+        if (res.remainingSourceMeta[sec] && res.remainingSourceMeta[sec].size() > 0)
+        {
+            res.movedEverything = false;
+            break;
+        }
+    }
+    return res;
 }
 
 bool BindsBare(std::string_view text, std::string_view object)
@@ -636,11 +909,92 @@ int SnapDelta(int a0, int a1, const std::vector<int> &targets, int threshold, in
     return best;
 }
 
+namespace {
+
+/// Area-weighted median scale across `(value, weight)` pairs; falls back to `fallback` when empty.
+double WeightedMedianScale(std::vector<std::pair<double, double>> items, double fallback)
+{
+    if (items.empty())
+        return fallback;
+    std::sort(items.begin(), items.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+    double total = 0.0;
+    for (const auto &it : items)
+        total += it.second;
+    if (total <= 0.0)
+        return items[items.size() / 2].first;
+    double acc = 0.0;
+    for (const auto &it : items)
+    {
+        acc += it.second;
+        if (acc >= total * 0.5)
+            return it.first;
+    }
+    return items.back().first;
+}
+
+/// Safe integer read for YAML filter keys like `state` / `flag`.
+int NodeIntOr(const YAML::Node &n, int fallback)
+{
+    if (!n || !n.IsScalar())
+        return fallback;
+    try
+    {
+        return n.as<int>();
+    }
+    catch (const std::exception &)
+    {
+        return fallback;
+    }
+}
+
+} // namespace
+
 std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
     const YAML::Node &meta, std::string_view object, const std::map<std::string, int> &frameIndex, float scale)
 {
     std::vector<AssemblyGroup> groups;
     const YAML::Node frames = meta["frames"], parts = meta["parts"], anims = meta["anims"], families = meta["families"];
+
+    // Measure actual pixels-per-unit from each frame's `rect` and `size`; many metas have a stale header `scale`.
+    std::map<int, std::array<double, 2>> framePpu;
+    std::map<int, double> frameArea;
+    std::vector<std::pair<double, double>> allSx, allSy;
+    if (frames && frames.IsMap())
+    {
+        for (const auto &kv : frames)
+        {
+            const auto idxIt = frameIndex.find(kv.first.as<std::string>(""));
+            if (idxIt == frameIndex.end() || !kv.second.IsMap())
+                continue;
+            const YAML::Node r = kv.second["rect"];
+            const YAML::Node s = kv.second["size"];
+            if (!r || !r.IsSequence() || r.size() != 4 || !s || !s.IsSequence() || s.size() != 2)
+                continue;
+            try
+            {
+                const double rw = r[2].as<double>();
+                const double rh = r[3].as<double>();
+                const double sw = s[0].as<double>();
+                const double sh = s[1].as<double>();
+                if (rw > 0.0 && rh > 0.0 && sw > 0.0 && sh > 0.0)
+                {
+                    const double px = rw / sw;
+                    const double py = rh / sh;
+                    const double area = rw * rh;
+                    framePpu[idxIt->second] = {px, py};
+                    frameArea[idxIt->second] = area;
+                    allSx.push_back({px, area});
+                    allSy.push_back({py, area});
+                }
+            }
+            catch (const std::exception &)
+            {}
+        }
+    }
+    const double fallbackScale = scale > 0.0f ? static_cast<double>(scale) : 1.0;
+    const double objSx = WeightedMedianScale(std::move(allSx), fallbackScale);
+    const double objSy = WeightedMedianScale(std::move(allSy), fallbackScale);
+
     // "object.item[i]" / "item[i]" -> {item, i} for this object; another object's name is not ours (empty)
     auto local = [&](std::string name, int &index) -> std::string {
         index = 0;
@@ -667,17 +1021,23 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
         return f[kind][index].as<std::string>();
     };
 
-    AssemblyGroup group;
-    std::function<void(const YAML::Node &, int, int, int)> walk;
+    struct RawPiece
+    {
+        int frame;
+        double wx;
+        double wy;
+    };
+    std::vector<RawPiece> rawGroup;
+    std::function<void(const YAML::Node &, double, double, int, const char *, int)> walk;
     // One entry of a composite: a frame where it is drawn, a part / the first picture of an animation opened up
-    auto entry = [&](const YAML::Node &e, int ox, int oy, int depth) {
+    auto entry = [&](const YAML::Node &e, double ox, double oy, int depth) {
         if (!e.IsMap())
             return;
-        int ax = ox, ay = oy;
+        double ax = ox, ay = oy;
         if (const YAML::Node at = e["at"]; at && at.IsSequence() && at.size() == 2)
         {
-            ax += static_cast<int>(std::lround(at[0].as<float>() * scale));
-            ay += static_cast<int>(std::lround(at[1].as<float>() * scale));
+            ax += at[0].as<double>();
+            ay += at[1].as<double>();
         }
         int index = 0;
         if (const YAML::Node f = e["frame"])
@@ -687,7 +1047,7 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
                 name = member(name, "frames", index);
             const auto it = frameIndex.find(name);
             if (it != frameIndex.end())
-                group.push_back({it->second, ax, ay});
+                rawGroup.push_back({it->second, ax, ay});
         }
         else if (const YAML::Node p = e["part"]; p && depth < 6)
         {
@@ -695,7 +1055,7 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
             if (!name.empty() && !(parts && parts[name]))
                 name = member(name, "parts", index);
             if (!name.empty() && parts && parts[name])
-                walk(parts[name], ax, ay, depth + 1);
+                walk(parts[name], ax, ay, depth + 1, nullptr, 0);
         }
         else if (const YAML::Node a = e["anim"]; a && depth < 6)
         {
@@ -706,47 +1066,83 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
             {
                 YAML::Node first = YAML::Node(YAML::NodeType::Sequence);
                 first.push_back(anims[name][0]); // the picture the game shows first
-                walk(first, ax, ay, depth + 1);
+                walk(first, ax, ay, depth + 1, nullptr, 0);
             }
         }
     };
-    walk = [&](const YAML::Node &list, int ox, int oy, int depth) {
+    walk = [&](const YAML::Node &list, double ox, double oy, int depth, const char *filterKey, int baseMax) {
         if (!list.IsSequence())
             return;
-        for (const auto &e : list)
+        // Two-pass order when `filterKey` is set: base pieces (`val <= baseMax`) before overlays (`val > baseMax`).
+        const int passes = filterKey ? 2 : 1;
+        for (int pass = 0; pass < passes; ++pass)
         {
-            try
+            for (const auto &e : list)
             {
-                entry(e, ox, oy, depth);
+                try
+                {
+                    if (filterKey && e.IsMap())
+                    {
+                        const int v = NodeIntOr(e[filterKey], 0);
+                        if ((pass == 0 && v > baseMax) || (pass == 1 && v <= baseMax))
+                            continue;
+                    }
+                    else if (filterKey && pass == 1)
+                        continue;
+                    entry(e, ox, oy, depth);
+                }
+                catch (const std::exception &)
+                {}
             }
-            catch (const std::exception &)
-            {}
         }
     };
     auto close = [&]() {
-        if (!group.empty())
-            groups.push_back(std::move(group));
-        group.clear();
+        if (rawGroup.empty())
+            return;
+        std::vector<std::pair<double, double>> gSx, gSy;
+        for (const RawPiece &rp : rawGroup)
+        {
+            if (const auto it = framePpu.find(rp.frame); it != framePpu.end())
+            {
+                const double w = frameArea.count(rp.frame) ? frameArea[rp.frame] : 1.0;
+                gSx.push_back({it->second[0], w});
+                gSy.push_back({it->second[1], w});
+            }
+        }
+        const double sx = WeightedMedianScale(std::move(gSx), objSx);
+        const double sy = WeightedMedianScale(std::move(gSy), objSy);
+        AssemblyGroup group;
+        group.reserve(rawGroup.size());
+        for (const RawPiece &rp : rawGroup)
+            group.push_back({rp.frame, static_cast<int>(std::lround(rp.wx * sx)), static_cast<int>(std::lround(rp.wy * sy))});
+        groups.push_back(std::move(group));
+        rawGroup.clear();
     };
     // What the game draws as a whole first: a unit body (hull, turret, shadow...), a building with all its parts
     if (const YAML::Node bodies = meta["bodies"]; bodies && bodies.IsMap())
         for (const auto &kv : bodies)
         {
-            walk(kv.second, 0, 0, 0);
+            walk(kv.second, 0.0, 0.0, 0, "flag", 1);
             close();
         }
     if (const YAML::Node buildings = meta["buildings"]; buildings && buildings.IsMap())
         for (const auto &kv : buildings)
         {
             if (kv.second.IsMap())
-                walk(kv.second["parts"], 0, 0, 0);
+                walk(kv.second["parts"], 0.0, 0.0, 0, "state", 0);
             close();
         }
-    // Then the composites on their own (frames no body / building shows, e.g. the later pictures of an animation)
+    // Then standalone composites (parts, anims) for frames no body / building claims
     if (parts && parts.IsMap())
         for (const auto &kv : parts)
         {
-            walk(kv.second, 0, 0, 0);
+            walk(kv.second, 0.0, 0.0, 0, nullptr, 0);
+            close();
+        }
+    if (anims && anims.IsMap())
+        for (const auto &kv : anims)
+        {
+            walk(kv.second, 0.0, 0.0, 0, nullptr, 0);
             close();
         }
     return groups;
@@ -785,9 +1181,42 @@ std::vector<std::array<int, 2>> AssemblePack(
             };
             if (!free(q, 0))
             {
+                bool found = false;
+                // Check whether all collisions are tiny seam overlaps (`<= 3px` from rounding `at * scale`).
+                bool seamOnly = true;
+                for (const AssemblyPiece &o : mine)
+                {
+                    if (!hits(q, o, 0))
+                        continue;
+                    const int ovX = std::min(q.x + sizes[q.frame][0], o.x + sizes[o.frame][0]) - std::max(q.x, o.x);
+                    const int ovY = std::min(q.y + sizes[q.frame][1], o.y + sizes[o.frame][1]) - std::max(q.y, o.y);
+                    const int minEdge = std::min(sizes[q.frame][0], sizes[q.frame][1]);
+                    if (std::min(ovX, ovY) > 3 || std::min(ovX, ovY) >= std::max(1, minEdge / 2))
+                    {
+                        seamOnly = false;
+                        break;
+                    }
+                }
+                if (seamOnly)
+                {
+                    // Nudge only along X or Y with zero gap so edge-to-edge mosaic tiles stay aligned.
+                    for (int d = 1; d <= 6 && !found; ++d)
+                    {
+                        const std::array<std::array<int, 2>, 4> dirs {{{d, 0}, {-d, 0}, {0, d}, {0, -d}}};
+                        for (const auto &dir : dirs)
+                        {
+                            AssemblyPiece c {q.frame, p.x + dir[0], p.y + dir[1]};
+                            if (free(c, 0))
+                            {
+                                q = c;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
                 // A layer drawn over another one (a turret over its hull): the nearest free place around where the
                 // game draws it, ring by ring
-                bool found = false;
                 for (int r = 1; !found && r < 1 << 14; ++r)
                 {
                     AssemblyPiece best = q;
@@ -855,6 +1284,91 @@ std::vector<std::array<int, 2>> AssemblePack(
         for (const AssemblyPiece &p : blocks[i].pieces)
             out[p.frame] = {at[i][0] + p.x, at[i][1] + p.y};
     return out;
+}
+
+ScaledGroupLayout ScaleGroupRects(
+    const std::vector<std::array<int, 4>> &selected,
+    const std::vector<std::array<int, 4>> &unselected,
+    float scaleX,
+    float scaleY,
+    int anchorX,
+    int anchorY,
+    int canvasW,
+    int canvasH,
+    int padding)
+{
+    ScaledGroupLayout res;
+    res.canvasW = std::max(1, canvasW);
+    res.canvasH = std::max(1, canvasH);
+    if (selected.empty())
+        return res;
+
+    auto rectsOverlap = [](const std::array<int, 4> &a, const std::array<int, 4> &b) {
+        return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+    };
+
+    const float sx = std::max(0.01f, scaleX);
+    const float sy = std::max(0.01f, scaleY);
+    res.rects.reserve(selected.size());
+    int minX = std::numeric_limits<int>::max(), minY = std::numeric_limits<int>::max();
+    for (const auto &r : selected)
+    {
+        const int nx = anchorX + static_cast<int>(std::lround((r[0] - anchorX) * static_cast<double>(sx)));
+        const int ny = anchorY + static_cast<int>(std::lround((r[1] - anchorY) * static_cast<double>(sy)));
+        const int nw = std::max(1, static_cast<int>(std::lround(r[2] * static_cast<double>(sx))));
+        const int nh = std::max(1, static_cast<int>(std::lround(r[3] * static_cast<double>(sy))));
+        res.rects.push_back({nx, ny, nw, nh});
+        minX = std::min(minX, nx);
+        minY = std::min(minY, ny);
+    }
+    const int shiftX = minX < 0 ? -minX : 0;
+    const int shiftY = minY < 0 ? -minY : 0;
+    if (shiftX || shiftY)
+        for (auto &r : res.rects)
+        {
+            r[0] += shiftX;
+            r[1] += shiftY;
+        }
+
+    bool conflict = false;
+    for (std::size_t i = 0; i < res.rects.size() && !conflict; ++i)
+    {
+        for (const auto &u : unselected)
+            if (rectsOverlap(res.rects[i], u))
+            {
+                conflict = true;
+                break;
+            }
+        for (std::size_t j = i + 1; j < res.rects.size() && !conflict; ++j)
+            if (!rectsOverlap(selected[i], selected[j]) && rectsOverlap(res.rects[i], res.rects[j]))
+                conflict = true;
+    }
+
+    if (conflict)
+    {
+        std::vector<std::array<int, 2>> sizes;
+        sizes.reserve(res.rects.size());
+        for (const auto &r : res.rects)
+            sizes.push_back({r[2], r[3]});
+        const int pad = std::max(0, padding);
+        const auto pos = ShelfPack(sizes, pad);
+        int baseY = 0;
+        for (const auto &u : unselected)
+            baseY = std::max(baseY, u[1] + u[3] + pad);
+        for (std::size_t i = 0; i < res.rects.size(); ++i)
+        {
+            res.rects[i][0] = pos[i][0];
+            res.rects[i][1] = baseY + pos[i][1];
+        }
+        res.relocated = true;
+    }
+
+    for (const auto &r : res.rects)
+    {
+        res.canvasW = std::max(res.canvasW, r[0] + r[2]);
+        res.canvasH = std::max(res.canvasH, r[1] + r[3]);
+    }
+    return res;
 }
 
 } // namespace CharEditor::SpriteMerge

@@ -115,6 +115,73 @@ std::string MetaString(const YAML::Node &meta, const char *key, std::string_view
     return std::string(def);
 }
 
+float MetaScale(const YAML::Node &meta)
+{
+    try
+    {
+        if (meta["scale"] && meta["scale"].IsScalar())
+            return std::max(0.01f, meta["scale"].as<float>());
+    }
+    catch (...)
+    {}
+    return 1.0f;
+}
+
+/// True when two RGBA32 surfaces have matching dimensions and identical pixel bytes.
+bool SurfacesIdentical(const SDL_Surface *a, const SDL_Surface *b)
+{
+    if (!a || !b || a->w != b->w || a->h != b->h)
+        return false;
+    for (int y = 0; y < a->h; ++y)
+    {
+        const auto *pa = static_cast<const std::uint8_t *>(a->pixels) + y * a->pitch;
+        const auto *pb = static_cast<const std::uint8_t *>(b->pixels) + y * b->pitch;
+        if (std::memcmp(pa, pb, static_cast<std::size_t>(a->w) * 4) != 0)
+            return false;
+    }
+    return true;
+}
+
+/// Zeros RGBA pixels inside `r` while preserving any pixels covered by `keep` rectangles.
+void ClearSurfaceRect(SDL_Surface *s, const int r[4], const std::vector<std::array<int, 4>> &keep)
+{
+    if (!s)
+        return;
+    std::vector<std::array<int, 4>> overlap;
+    for (const auto &k : keep)
+        if (k[0] < r[0] + r[2] && r[0] < k[0] + k[2] && k[1] < r[1] + r[3] && r[1] < k[1] + k[3])
+            overlap.push_back(k);
+    for (int y = std::max(0, r[1]); y < std::min(s->h, r[1] + r[3]); ++y)
+    {
+        auto *row = static_cast<std::uint8_t *>(s->pixels) + y * s->pitch;
+        for (int x = std::max(0, r[0]); x < std::min(s->w, r[0] + r[2]); ++x)
+        {
+            bool kept = false;
+            for (const auto &k : overlap)
+                if (x >= k[0] && x < k[0] + k[2] && y >= k[1] && y < k[1] + k[3])
+                {
+                    kept = true;
+                    break;
+                }
+            if (!kept)
+                std::memset(row + x * 4, 0, 4);
+        }
+    }
+}
+
+/// Copies an object's meta and PNG sheets to `.bak` before modifying them.
+void BackupObjectFiles(const fs::path &spriteDir, const fs::path &metaPath, const YAML::Node &meta, std::string_view obj)
+{
+    std::error_code ec;
+    std::vector<fs::path> files = {metaPath};
+    files.push_back(spriteDir / MetaString(meta, "image", "sprite_" + std::string(obj) + ".png"));
+    if (const std::string res = MetaString(meta, "resistance_image", ""); !res.empty())
+        files.push_back(spriteDir / res);
+    for (const fs::path &f : files)
+        if (fs::exists(f, ec))
+            fs::copy_file(f, fs::path(f.string() + ".bak"), fs::copy_options::overwrite_existing, ec);
+}
+
 // Code that names `object` or one of its sprites in a string: such objects cannot be merged
 std::string CodeReference(std::string_view object)
 {
@@ -317,6 +384,107 @@ void CharacterEditor::MergePack()
     mergeCameraPending = SpriteCamera::Fit;
 }
 
+void CharacterEditor::MergeAssemble()
+{
+    std::vector<std::size_t> which;
+    for (std::size_t i = 0; i < mergePieces.size(); ++i)
+        if (mergePieces[i].selected)
+            which.push_back(i);
+    if (which.empty())
+    {
+        which.resize(mergePieces.size());
+        std::iota(which.begin(), which.end(), 0);
+    }
+    if (which.empty())
+        return;
+
+    // Group pieces by object so each sprite's composites assemble at accurate per-object scales.
+    std::vector<std::string> order;
+    std::map<std::string, std::vector<std::size_t>> byObj;
+    for (std::size_t idx : which)
+    {
+        const std::string &o = mergePieces[idx].object;
+        if (!byObj.count(o))
+            order.push_back(o);
+        byObj[o].push_back(idx);
+    }
+
+    struct ObjBlock
+    {
+        std::vector<std::size_t> pieces;
+        std::vector<std::array<int, 2>> localPos;
+        int w {1}, h {1};
+    };
+    std::vector<ObjBlock> objBlocks;
+    std::vector<std::array<int, 2>> objSizes;
+    for (const std::string &o : order)
+    {
+        const auto &idxs = byObj[o];
+        std::vector<std::array<int, 2>> sizes;
+        std::map<std::string, int> fIndex;
+        for (std::size_t k = 0; k < idxs.size(); ++k)
+        {
+            const MergePiece &p = mergePieces[idxs[k]];
+            sizes.push_back({std::max(1, p.src[2]), std::max(1, p.src[3])});
+            fIndex[p.frame] = static_cast<int>(k);
+        }
+        YAML::Node meta;
+        try
+        {
+            meta = YAML::LoadFile(SpriteMetaPath(o).string());
+        }
+        catch (...)
+        {}
+        const auto groups = SM::AssemblyGroupsFromMeta(meta, o, fIndex, MetaScale(meta));
+        const auto pos = SM::AssemblePack(sizes, groups, mergePadding);
+        const auto ext = SM::PackExtent(sizes, pos);
+        objBlocks.push_back({idxs, pos, ext[0], ext[1]});
+        objSizes.push_back(ext);
+    }
+
+    const auto blockAt = SM::ShelfPack(objSizes, mergePadding);
+    int baseX = 0, baseY = 0;
+    if (which.size() != mergePieces.size())
+    {
+        int x0, y0, x1, y1;
+        std::vector<MergePiece> rest;
+        for (std::size_t i = 0; i < mergePieces.size(); ++i)
+            if (!mergePieces[i].selected)
+                rest.push_back(mergePieces[i]);
+        std::swap(rest, mergePieces);
+        MergeBounds(x0, y0, x1, y1);
+        std::swap(rest, mergePieces);
+        baseX = x0;
+        baseY = y1 + mergePadding + 8;
+    }
+    for (std::size_t bi = 0; bi < objBlocks.size(); ++bi)
+        for (std::size_t k = 0; k < objBlocks[bi].pieces.size(); ++k)
+        {
+            MergePiece &p = mergePieces[objBlocks[bi].pieces[k]];
+            p.x = baseX + blockAt[bi][0] + objBlocks[bi].localPos[k][0];
+            p.y = baseY + blockAt[bi][1] + objBlocks[bi].localPos[k][1];
+        }
+    mergeCameraPending = SpriteCamera::Fit;
+}
+
+void CharacterEditor::EnsureMergeObjectIncluded(std::string_view object, bool makeFirst)
+{
+    const std::string key(object);
+    const auto it = std::find(mergeObjects.begin(), mergeObjects.end(), key);
+    if (it != mergeObjects.end())
+    {
+        if (makeFirst && it != mergeObjects.begin())
+        {
+            mergeObjects.erase(it);
+            mergeObjects.insert(mergeObjects.begin(), key);
+        }
+        return;
+    }
+    mergeObjects.insert(makeFirst ? mergeObjects.begin() : mergeObjects.end(), key);
+    MergeAddPieces(key, "");
+    mergeCameraPending = SpriteCamera::Fit;
+}
+
 void CharacterEditor::MergeReset()
 {
     mergeObjects.clear();
@@ -358,15 +526,22 @@ bool CharacterEditor::MergePrepare()
         return true;
     }
 
+    if (mergeObjects.empty())
+    {
+        mergeReport = _("Check at least two sprites (or one sprite into an existing target) to merge");
+        return false;
+    }
+    bool isSource = std::find(mergeObjects.begin(), mergeObjects.end(), name) != mergeObjects.end();
+    if (!isSource && fs::exists(SpriteMetaPath(name)))
+    {
+        // Merging into an already existing target automatically includes it first so its names remain canonical.
+        EnsureMergeObjectIncluded(name, true);
+        MergeBounds(x0, y0, x1, y1);
+        isSource = true;
+    }
     if (mergeObjects.size() < 2)
     {
         mergeReport = _("Check at least two sprites to merge");
-        return false;
-    }
-    const bool isSource = std::find(mergeObjects.begin(), mergeObjects.end(), name) != mergeObjects.end();
-    if (!isSource && fs::exists(SpriteMetaPath(name)))
-    {
-        mergeReport = _("This sprite exists already: ") + name;
         return false;
     }
     if (spriteDirty && std::find(mergeObjects.begin(), mergeObjects.end(), spriteObject) != mergeObjects.end())
@@ -563,20 +738,10 @@ bool CharacterEditor::MergeObjectsSave()
 
     const std::string imageName = "sprite_" + name + ".png";
     // Skip writing a redundant _resistance.png copy when all merged pixels match the base sheet
-    if (outRes && out && outRes->w == out->w && outRes->h == out->h)
+    if (outRes && SurfacesIdentical(out, outRes))
     {
-        bool identical = true;
-        for (int y = 0; y < out->h && identical; ++y)
-        {
-            const std::uint8_t *pa = static_cast<const std::uint8_t *>(out->pixels) + y * out->pitch;
-            const std::uint8_t *pb = static_cast<const std::uint8_t *>(outRes->pixels) + y * outRes->pitch;
-            identical = std::memcmp(pa, pb, static_cast<std::size_t>(out->w) * 4) == 0;
-        }
-        if (identical)
-        {
-            SDL_DestroySurface(outRes);
-            outRes = nullptr;
-        }
+        SDL_DestroySurface(outRes);
+        outRes = nullptr;
     }
     const std::string resName = outRes ? "sprite_" + name + "_resistance.png" : "";
     const SM::NameMap names = SM::BuildNameMap(sources);
@@ -586,42 +751,11 @@ bool CharacterEditor::MergeObjectsSave()
         header += " " + s.object;
     const std::string metaText = SM::EmitMeta(merged, header + ")\n");
 
-    // References in the other asset files
     std::set<fs::path> skip;
-    for (const std::string &o : mergeObjects)
-        skip.insert(fs::weakly_canonical(SpriteMetaPath(o)));
-    int files = 0, refs = 0;
     std::error_code ec;
-    for (fs::recursive_directory_iterator it(assetsRoot, fs::directory_options::skip_permission_denied, ec), end;
-         !ec && it != end;
-         it.increment(ec))
-    {
-        const fs::path &p = it->path();
-        if (it->is_directory())
-        {
-            if (p.filename().string().rfind('.', 0) == 0)
-                it.disable_recursion_pending();
-            continue;
-        }
-        const std::string ext = p.extension().string();
-        if (ext != ".yaml" && ext != ".yml" && ext != ".json")
-            continue;
-        if (skip.count(fs::weakly_canonical(p)))
-            continue;
-        const std::string text = ReadFile(p);
-        bool mentions = false;
-        for (const std::string &o : mergeObjects)
-            mentions |= text.find(o) != std::string::npos;
-        if (!mentions)
-            continue;
-        int count = 0;
-        const std::string changed = SM::RewriteText(text, names, name, count);
-        if (count && WriteFile(p, changed))
-        {
-            ++files;
-            refs += count;
-        }
-    }
+    for (const std::string &o : mergeObjects)
+        skip.insert(fs::weakly_canonical(SpriteMetaPath(o), ec));
+    const auto [files, refs] = RewriteAssetReferences(mergeObjects, skip, names, name, true);
 
     // The sources go; the new files come
     std::set<fs::path> keep = {SpriteDir() / imageName, SpriteMetaPath(name)};
@@ -660,6 +794,395 @@ bool CharacterEditor::MergeObjectsSave()
     const auto &errors = Sprites().Errors();
     if (!errors.empty())
         mergeReport += "\n" + std::to_string(errors.size()) + _(" sprite error(s); first: ") + errors.front();
+    return ok;
+}
+
+std::pair<int, int> CharacterEditor::RewriteAssetReferences(
+    const std::vector<std::string> &needles,
+    const std::set<fs::path> &skipMetaPaths,
+    const std::map<std::string, std::map<std::string, std::string>> &names,
+    std::string_view targetObject,
+    bool rewriteBare)
+{
+    int files = 0, refs = 0;
+    std::error_code ec;
+    const fs::path scanRoot = fs::weakly_canonical(assetsRoot, ec);
+    const fs::path &root = (!ec && !scanRoot.empty()) ? scanRoot : assetsRoot;
+    for (fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
+         !ec && it != end;
+         it.increment(ec))
+    {
+        const fs::path &p = it->path();
+        if (it->is_directory())
+        {
+            if (p.filename().string().rfind('.', 0) == 0)
+                it.disable_recursion_pending();
+            continue;
+        }
+        const std::string ext = p.extension().string();
+        if (ext != ".yaml" && ext != ".yml" && ext != ".json")
+            continue;
+        std::error_code wEc;
+        if (skipMetaPaths.count(fs::weakly_canonical(p, wEc)))
+            continue;
+        const std::string text = ReadFile(p);
+        bool mentions = false;
+        for (const std::string &n : needles)
+            mentions |= text.find(n) != std::string::npos;
+        if (!mentions)
+            continue;
+        int count = 0;
+        const std::string changed = SM::RewriteText(text, names, targetObject, count, rewriteBare);
+        if (count && WriteFile(p, changed))
+        {
+            ++files;
+            refs += count;
+        }
+    }
+    return {files, refs};
+}
+
+bool CharacterEditor::SplitSelectedFrames(std::string_view targetName, bool mergeIntoExisting)
+{
+    if (spriteObject.empty())
+        return false;
+    const std::string dst(targetName);
+    if (!ValidName(dst))
+    {
+        spriteReport = _("The target sprite name must use letters, digits and '_'");
+        return false;
+    }
+    if (dst == spriteObject)
+    {
+        spriteReport = _("Choose a different sprite name");
+        return false;
+    }
+    const std::vector<int> sel = SpriteSelection();
+    if (sel.empty())
+    {
+        spriteReport = _("Select at least one frame to move");
+        return false;
+    }
+    if (spriteDirty && !SaveSpriteObject(true))
+        return false;
+
+    const fs::path dstMetaPath = SpriteMetaPath(dst);
+    std::error_code ec;
+    if (!mergeIntoExisting && fs::exists(dstMetaPath, ec))
+    {
+        spriteReport = _("This sprite exists already: ") + dst;
+        return false;
+    }
+    if (mergeIntoExisting && !fs::exists(dstMetaPath, ec))
+    {
+        spriteReport = _("Target sprite does not exist: ") + dst;
+        return false;
+    }
+
+    const fs::path srcMetaPath = SpriteMetaPath(spriteObject);
+    YAML::Node srcMeta;
+    try
+    {
+        srcMeta = YAML::LoadFile(srcMetaPath.string());
+    }
+    catch (const std::exception &e)
+    {
+        spriteReport = srcMetaPath.filename().string() + ": " + e.what();
+        return false;
+    }
+    const std::string srcImgFile = MetaString(srcMeta, "image", "sprite_" + spriteObject + ".png");
+    const std::string srcResFile = MetaString(srcMeta, "resistance_image", "");
+    SDL_Surface *srcImg = LoadRgba(SpriteDir() / srcImgFile);
+    if (!srcImg)
+    {
+        spriteReport = _("Not a PNG image: ") + (SpriteDir() / srcImgFile).string();
+        return false;
+    }
+    SDL_Surface *srcRes = srcResFile.empty() ? nullptr : LoadRgba(SpriteDir() / srcResFile);
+    SM::FitMetaToImage(srcMeta, srcImg->w, srcImg->h);
+
+    std::set<std::string> movedSet;
+    for (int idx : sel)
+        if (idx >= 0 && idx < static_cast<int>(spriteFrames.size()))
+            movedSet.insert(spriteFrames[idx].name);
+
+    std::vector<std::string> movedOrder;
+    std::vector<std::array<int, 4>> movedRects, keepRects;
+    std::vector<std::array<int, 2>> movedSizes;
+    if (const YAML::Node framesNode = srcMeta["frames"]; framesNode && framesNode.IsMap())
+    {
+        for (const auto &kv : framesNode)
+        {
+            const std::string fname = kv.first.as<std::string>("");
+            const YAML::Node rNode = kv.second.IsMap() ? kv.second["rect"] : kv.second;
+            if (!rNode || !rNode.IsSequence() || rNode.size() != 4)
+                continue;
+            const std::array<int, 4> rect {
+                rNode[0].as<int>(0), rNode[1].as<int>(0), std::max(1, rNode[2].as<int>(1)), std::max(1, rNode[3].as<int>(1))};
+            if (movedSet.count(fname))
+            {
+                movedOrder.push_back(fname);
+                movedRects.push_back(rect);
+                movedSizes.push_back({rect[2], rect[3]});
+            }
+            else
+            {
+                keepRects.push_back(rect);
+            }
+        }
+    }
+    if (movedOrder.empty())
+    {
+        SDL_DestroySurface(srcImg);
+        if (srcRes)
+            SDL_DestroySurface(srcRes);
+        spriteReport = _("No selected frames found in source meta");
+        return false;
+    }
+
+    const bool allFramesMoved = keepRects.empty();
+    if (allFramesMoved)
+    {
+        if (const std::string code = CodeReference(spriteObject); !code.empty())
+        {
+            SDL_DestroySurface(srcImg);
+            if (srcRes)
+                SDL_DestroySurface(srcRes);
+            spriteReport = spriteObject + _(" is named in the game code (") + code + _("): keep at least one frame");
+            return false;
+        }
+    }
+
+    const int pad = std::clamp(spriteSplitPadding, 0, 64);
+    const std::string srcName = spriteObject;
+    bool ok = true;
+    int filesChanged = 0, refsChanged = 0, movedCfgCount = 0;
+
+    if (!mergeIntoExisting)
+    {
+        const auto pos = SM::ShelfPack(movedSizes, pad);
+        const auto ext = SM::PackExtent(movedSizes, pos);
+        SDL_Surface *out = NewSurface(ext[0], ext[1]);
+        SDL_Surface *outRes = srcRes ? NewSurface(ext[0], ext[1]) : nullptr;
+        SM::FramePlaces places;
+        for (std::size_t i = 0; i < movedOrder.size(); ++i)
+        {
+            Put(srcImg, movedRects[i].data(), out, pos[i][0], pos[i][1], false);
+            if (outRes)
+                Put(srcRes, movedRects[i].data(), outRes, pos[i][0], pos[i][1], false);
+            places[{srcName, movedOrder[i]}] = {pos[i][0], pos[i][1]};
+        }
+        if (outRes && SurfacesIdentical(out, outRes))
+        {
+            SDL_DestroySurface(outRes);
+            outRes = nullptr;
+        }
+        const std::string newImg = "sprite_" + dst + ".png";
+        const std::string newRes = outRes ? ("sprite_" + dst + "_resistance.png") : "";
+        const SM::SplitResult split
+            = SM::SplitMeta(srcName, srcMeta, movedSet, places, dst, newImg, newRes, ext[0], ext[1]);
+        movedCfgCount = static_cast<int>(split.movedItems.size());
+
+        const std::string newHeader = "# Sprite \"" + dst + "\" (split in the character editor from " + srcName + ")\n";
+        ok &= SDL_SavePNG(out, (SpriteDir() / newImg).string().c_str());
+        if (outRes)
+            ok &= SDL_SavePNG(outRes, (SpriteDir() / newRes).string().c_str());
+        ok &= WriteFile(dstMetaPath, SM::EmitMeta(split.newObjectMeta, newHeader));
+
+        BackupObjectFiles(SpriteDir(), srcMetaPath, srcMeta, srcName);
+        if (split.movedEverything && allFramesMoved)
+        {
+            fs::remove(SpriteDir() / srcImgFile, ec);
+            if (!srcResFile.empty())
+                fs::remove(SpriteDir() / srcResFile, ec);
+            fs::remove(srcMetaPath, ec);
+        }
+        else
+        {
+            for (const auto &r : movedRects)
+            {
+                ClearSurfaceRect(srcImg, r.data(), keepRects);
+                if (srcRes)
+                    ClearSurfaceRect(srcRes, r.data(), keepRects);
+            }
+            ok &= SDL_SavePNG(srcImg, (SpriteDir() / srcImgFile).string().c_str());
+            if (srcRes)
+                ok &= SDL_SavePNG(srcRes, (SpriteDir() / srcResFile).string().c_str());
+            const std::string remHeader = "# Sprite \"" + srcName + "\" (split -> " + dst + ")\n";
+            ok &= WriteFile(srcMetaPath, SM::EmitMeta(split.remainingSourceMeta, remHeader));
+        }
+
+        SM::NameMap nm;
+        for (const std::string &m : split.movedItems)
+            nm[srcName][m] = m;
+        const std::set<fs::path> skip
+            = {fs::weakly_canonical(srcMetaPath, ec), fs::weakly_canonical(dstMetaPath, ec)};
+        std::tie(filesChanged, refsChanged)
+            = RewriteAssetReferences({srcName}, skip, nm, dst, split.movedEverything && allFramesMoved);
+        SDL_DestroySurface(out);
+        if (outRes)
+            SDL_DestroySurface(outRes);
+    }
+    else
+    {
+        YAML::Node dstMeta;
+        try
+        {
+            dstMeta = YAML::LoadFile(dstMetaPath.string());
+        }
+        catch (const std::exception &e)
+        {
+            SDL_DestroySurface(srcImg);
+            if (srcRes)
+                SDL_DestroySurface(srcRes);
+            spriteReport = dstMetaPath.filename().string() + ": " + e.what();
+            return false;
+        }
+        const bool srcTerr = srcMeta["terrain"] && srcMeta["terrain"].as<bool>(false);
+        const bool dstTerr = dstMeta["terrain"] && dstMeta["terrain"].as<bool>(false);
+        if (srcTerr != dstTerr)
+        {
+            SDL_DestroySurface(srcImg);
+            if (srcRes)
+                SDL_DestroySurface(srcRes);
+            spriteReport = _("Map tiles (terrain) and other sprites cannot be merged");
+            return false;
+        }
+        const std::string dstImgFile = MetaString(dstMeta, "image", "sprite_" + dst + ".png");
+        const std::string dstResFile = MetaString(dstMeta, "resistance_image", "");
+        SDL_Surface *dstImg = LoadRgba(SpriteDir() / dstImgFile);
+        if (!dstImg)
+        {
+            SDL_DestroySurface(srcImg);
+            if (srcRes)
+                SDL_DestroySurface(srcRes);
+            spriteReport = _("Not a PNG image: ") + (SpriteDir() / dstImgFile).string();
+            return false;
+        }
+        SDL_Surface *dstRes = dstResFile.empty() ? nullptr : LoadRgba(SpriteDir() / dstResFile);
+        SM::FitMetaToImage(dstMeta, dstImg->w, dstImg->h);
+
+        // Extract isolated subset of source meta first so name collisions against `dst` resolve cleanly.
+        const SM::SplitResult split = SM::SplitMeta(srcName, srcMeta, movedSet, {}, "__split__", "", "", 1, 1);
+        movedCfgCount = static_cast<int>(split.movedItems.size());
+
+        const std::vector<SM::Source> sources {{dst, dstMeta}, {srcName, split.newObjectMeta}};
+        const SM::NameMap names = SM::BuildNameMap(sources);
+
+        const auto pos = SM::ShelfPack(movedSizes, pad);
+        const auto mExt = SM::PackExtent(movedSizes, pos);
+        const int belowW = std::max(dstImg->w, mExt[0]);
+        const int belowH = dstImg->h + pad + mExt[1];
+        const int rightW = dstImg->w + pad + mExt[0];
+        const int rightH = std::max(dstImg->h, mExt[1]);
+        const bool putBelow = static_cast<long long>(belowW) * belowH <= static_cast<long long>(rightW) * rightH;
+        const int outW = putBelow ? belowW : rightW;
+        const int outH = putBelow ? belowH : rightH;
+        const int offX = putBelow ? 0 : (dstImg->w + pad);
+        const int offY = putBelow ? (dstImg->h + pad) : 0;
+
+        SDL_Surface *out = NewSurface(outW, outH);
+        const bool anyRes = (dstRes != nullptr || srcRes != nullptr);
+        SDL_Surface *outRes = anyRes ? NewSurface(outW, outH) : nullptr;
+        const int dstFull[4] = {0, 0, dstImg->w, dstImg->h};
+        Put(dstImg, dstFull, out, 0, 0, false);
+        if (outRes)
+            Put(dstRes ? dstRes : dstImg, dstFull, outRes, 0, 0, false);
+
+        SM::FramePlaces places;
+        if (const YAML::Node df = dstMeta["frames"]; df && df.IsMap())
+            for (const auto &kv : df)
+            {
+                const YAML::Node r = kv.second.IsMap() ? kv.second["rect"] : kv.second;
+                if (r && r.IsSequence() && r.size() == 4)
+                    places[{dst, kv.first.as<std::string>("")}] = {r[0].as<int>(0), r[1].as<int>(0)};
+            }
+        for (std::size_t i = 0; i < movedOrder.size(); ++i)
+        {
+            const int px = offX + pos[i][0], py = offY + pos[i][1];
+            Put(srcImg, movedRects[i].data(), out, px, py, false);
+            if (outRes)
+                Put(srcRes ? srcRes : srcImg, movedRects[i].data(), outRes, px, py, false);
+            places[{srcName, movedOrder[i]}] = {px, py};
+        }
+        if (outRes && SurfacesIdentical(out, outRes))
+        {
+            SDL_DestroySurface(outRes);
+            outRes = nullptr;
+        }
+
+        std::string dstResName = dstResFile;
+        if (outRes && dstResName.empty())
+            dstResName = "sprite_" + dst + "_resistance.png";
+        else if (!outRes)
+            dstResName.clear();
+        const YAML::Node merged = SM::MergeMetas(sources, names, places, dstImgFile, dstResName, outW, outH);
+
+        BackupObjectFiles(SpriteDir(), dstMetaPath, dstMeta, dst);
+        BackupObjectFiles(SpriteDir(), srcMetaPath, srcMeta, srcName);
+
+        ok &= SDL_SavePNG(out, (SpriteDir() / dstImgFile).string().c_str());
+        if (outRes)
+            ok &= SDL_SavePNG(outRes, (SpriteDir() / dstResName).string().c_str());
+        const std::string dstHeader = "# Sprite \"" + dst + "\" (+ frames from " + srcName + ")\n";
+        ok &= WriteFile(dstMetaPath, SM::EmitMeta(merged, dstHeader));
+
+        if (split.movedEverything && allFramesMoved)
+        {
+            fs::remove(SpriteDir() / srcImgFile, ec);
+            if (!srcResFile.empty())
+                fs::remove(SpriteDir() / srcResFile, ec);
+            fs::remove(srcMetaPath, ec);
+        }
+        else
+        {
+            for (const auto &r : movedRects)
+            {
+                ClearSurfaceRect(srcImg, r.data(), keepRects);
+                if (srcRes)
+                    ClearSurfaceRect(srcRes, r.data(), keepRects);
+            }
+            ok &= SDL_SavePNG(srcImg, (SpriteDir() / srcImgFile).string().c_str());
+            if (srcRes)
+                ok &= SDL_SavePNG(srcRes, (SpriteDir() / srcResFile).string().c_str());
+            const auto splitIt = names.find(srcName);
+            SM::NameMap remMap;
+            if (splitIt != names.end())
+                remMap["__split__"] = splitIt->second;
+            int dummy = 0;
+            const std::string remHeader = "# Sprite \"" + srcName + "\" (split -> " + dst + ")\n";
+            const std::string remText
+                = SM::RewriteText(SM::EmitMeta(split.remainingSourceMeta, remHeader), remMap, dst, dummy, false);
+            ok &= WriteFile(srcMetaPath, remText);
+        }
+
+        SM::NameMap extMap;
+        if (const auto it = names.find(srcName); it != names.end())
+            extMap[srcName] = it->second;
+        const std::set<fs::path> skip
+            = {fs::weakly_canonical(srcMetaPath, ec), fs::weakly_canonical(dstMetaPath, ec)};
+        std::tie(filesChanged, refsChanged)
+            = RewriteAssetReferences({srcName}, skip, extMap, dst, split.movedEverything && allFramesMoved);
+
+        SDL_DestroySurface(dstImg);
+        if (dstRes)
+            SDL_DestroySurface(dstRes);
+        SDL_DestroySurface(out);
+        if (outRes)
+            SDL_DestroySurface(outRes);
+    }
+
+    SDL_DestroySurface(srcImg);
+    if (srcRes)
+        SDL_DestroySurface(srcRes);
+
+    spriteDirty = false;
+    spriteObject = dst;
+    ReloadSpriteData();
+    mergeFrameCache.clear();
+    spriteReport = (ok ? _("Moved ") : _("Moved with errors: ")) + std::to_string(movedOrder.size())
+                   + _(" frame(s) and ") + std::to_string(movedCfgCount) + _(" item(s) to ") + dst + ", "
+                   + std::to_string(refsChanged) + _(" ref(s) in ") + std::to_string(filesChanged) + _(" file(s)");
     return ok;
 }
 
@@ -983,12 +1506,18 @@ void CharacterEditor::DrawSpriteMergeProperties()
                       "are rewritten, the sources removed."));
     ImGui::Separator();
     Hinted(ImGui::InputText(_("New sprite"), mergeName.data(), mergeName.size()), "New sprite##merge");
+    if (!mergeBake && ValidName(mergeName.data()) && fs::exists(SpriteMetaPath(mergeName.data()))
+        && std::find(mergeObjects.begin(), mergeObjects.end(), mergeName.data()) == mergeObjects.end())
+        ImGui::TextDisabled("%s", _("Exists: Merge will add this sprite in first so its names stay."));
     ImGui::SetNextItemWidth(120.0f);
     if (Hinted(ImGui::InputInt(_("Padding"), &mergePadding), "Padding##merge"))
         mergePadding = std::clamp(mergePadding, 0, 64);
     ImGui::BeginDisabled(mergePieces.empty());
     if (Hinted(ImGui::Button(_("Pack")), "Pack##merge"))
         MergePack();
+    ImGui::SameLine();
+    if (Hinted(ImGui::Button(_("Assemble")), "Assemble##merge"))
+        MergeAssemble();
     ImGui::SameLine();
     if (ImGui::Button(_("Select all")))
         for (MergePiece &p : mergePieces)

@@ -225,6 +225,97 @@ buildings: {main: {size: [2, 2], parts: [ {part: bp, at: [0, 0]}, {anim: blink, 
         CHECK(!bg.empty() && bg[0].size() == 2);
         const auto bat = AssemblePack({{30, 20}, {3, 3}}, bg, 1);
         CHECK(bat[1][0] - bat[0][0] == 40 && bat[1][1] - bat[0][1] == 2);
+
+        // Per-frame ppu overrides stale header `scale`, state==0 precedes state>0, and <=3px seam overlaps nudge 1D
+        const YAML::Node smeta = YAML::Load(R"(
+scale: 1.0
+frames:
+  t0: { rect: [0, 0, 50, 40], size: [5.0, 4.0] }
+  t1: { rect: [50, 0, 50, 40], size: [5.0, 4.0] }
+  dmg: { rect: [0, 40, 20, 20], size: [2.0, 2.0] }
+parts:
+  p_dmg: [ {frame: dmg} ]
+buildings:
+  main:
+    parts:
+      - { part: p_dmg, at: [0, 0], state: 1 }
+      - { frame: t0, at: [0, 0], state: 0 }
+      - { frame: t1, at: [4.9, 0], state: 0 }
+)");
+        const auto sg = AssemblyGroupsFromMeta(smeta, "s", {{"t0", 0}, {"t1", 1}, {"dmg", 2}}, 1.0f);
+        CHECK(!sg.empty() && sg[0].size() == 3);
+        CHECK(sg[0][0].frame == 0 && sg[0][1].frame == 1 && sg[0][2].frame == 2); // state==0 base tiles before state>0
+        CHECK(sg[0][1].x == 49 && sg[0][1].y == 0);
+        const auto sat = AssemblePack({{50, 40}, {50, 40}, {20, 20}}, sg, 4);
+        // 1px seam overlap nudges t1 to x = t0.x + 50 (no extra padding gap) and keeps y aligned
+        CHECK(sat[1][0] - sat[0][0] == 50 && sat[1][1] == sat[0][1]);
+    }
+
+    // SplitMeta: move subset of frames + exclusive configs into a new sprite object cleanly
+    {
+        const YAML::Node src = YAML::Load(R"(
+frames:
+  keep_f: [0, 0, 10, 10]
+  move_f: [10, 0, 12, 12]
+parts:
+  p_keep: [ {frame: keep_f} ]
+  p_move: [ {frame: move_f} ]
+  p_mix:  [ {frame: keep_f}, {frame: move_f} ]
+buildings:
+  b_move: { parts: [ {part: p_move} ] }
+  b_stay: { parts: [ {part: p_keep}, {part: p_move} ] }
+)");
+        const auto split = SplitMeta(
+            "src",
+            src,
+            {"move_f"},
+            {{{"src", "move_f"}, {0, 0}}},
+            "dst",
+            "sprites/sprite_dst.png",
+            "",
+            12,
+            12);
+        CHECK(!split.movedEverything);
+        CHECK(!split.remainingSourceMeta["frames"]["move_f"]);
+        CHECK(split.remainingSourceMeta["frames"]["keep_f"]);
+        CHECK(split.newObjectMeta["frames"]["move_f"]);
+        CHECK(!split.newObjectMeta["frames"]["keep_f"]);
+        // p_move & b_move moved exclusively; p_mix & b_stay remained and qualify cross-references
+        CHECK(!split.remainingSourceMeta["parts"]["p_move"]);
+        CHECK(split.newObjectMeta["parts"]["p_move"]);
+        const std::string mixFrame = split.remainingSourceMeta["parts"]["p_mix"][1]["frame"].as<std::string>("");
+        CHECK(mixFrame == "dst.move_f");
+        CHECK(!split.remainingSourceMeta["buildings"]["b_move"]);
+        const std::string movePart = split.newObjectMeta["buildings"]["b_move"]["parts"][0]["part"].as<std::string>("");
+        CHECK(movePart == "p_move");
+        const std::string stayPart
+            = split.remainingSourceMeta["buildings"]["b_stay"]["parts"][1]["part"].as<std::string>("");
+        CHECK(stayPart == "dst.p_move");
+
+        int rPartial = 0;
+        NameMap nm;
+        for (const std::string &m : split.movedItems)
+            nm["src"][m] = m;
+        const std::string rewritten = RewriteText(
+            "use: src.p_move\nkeep: src.p_keep\nsprite: src\nbare: p_move\n", nm, "dst", rPartial, false);
+        CHECK(rPartial == 1);
+        CHECK(rewritten == "use: dst.p_move\nkeep: src.p_keep\nsprite: src\nbare: p_move\n");
+    }
+
+    // ScaleGroupRects: proportional scaling preserves group layout, expands canvas, or relocates cleanly on collision
+    {
+        const std::vector<std::array<int, 4>> sel {{10, 10, 20, 10}, {32, 10, 10, 10}};
+        const auto noHit = ScaleGroupRects(sel, {{0, 100, 30, 30}}, 2.0f, 2.0f, 10, 10, 64, 140, 2);
+        CHECK(!noHit.relocated);
+        CHECK(noHit.rects[0] == (std::array<int, 4> {10, 10, 40, 20}));
+        CHECK(noHit.rects[1] == (std::array<int, 4> {54, 10, 20, 20}));
+        CHECK(noHit.canvasW == 74 && noHit.canvasH == 140);
+
+        // Collision with unselected frame forces clean relocation below unselected
+        const auto hit = ScaleGroupRects({{0, 0, 20, 20}}, {{25, 0, 20, 30}}, 2.0f, 2.0f, 0, 0, 64, 64, 2);
+        CHECK(hit.relocated);
+        CHECK(hit.rects[0][1] == 32 && hit.rects[0][2] == 40 && hit.rects[0][3] == 40);
+        CHECK(hit.canvasH == 72);
     }
 
     if (fails)
