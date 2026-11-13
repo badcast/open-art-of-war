@@ -152,14 +152,15 @@ void ImGuiBridge::BeginFrame()
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     {
-        // The window is drawn through a logical presentation on Android: ImGui must use that space, not the window's
-        int lw = 0, lh = 0;
-        SDL_RendererLogicalPresentation mode = SDL_LOGICAL_PRESENTATION_DISABLED;
-        if (SDL_GetRenderLogicalPresentation(s_renderer, &lw, &lh, &mode) && mode != SDL_LOGICAL_PRESENTATION_DISABLED
-            && lw > 0 && lh > 0)
+        // Android draws through a render scale: ImGui must lay out in those units, not in window pixels
+        float sx = 1.0f, sy = 1.0f;
+        int ow = 0, oh = 0;
+        SDL_GetRenderScale(s_renderer, &sx, &sy);
+        if (SDL_GetRenderOutputSize(s_renderer, &ow, &oh) && ow > 0 && oh > 0 && sx > 0.0f && sy > 0.0f
+            && (sx != 1.0f || sy != 1.0f))
         {
             ImGuiIO &io = ImGui::GetIO();
-            io.DisplaySize = ImVec2(static_cast<float>(lw), static_cast<float>(lh));
+            io.DisplaySize = ImVec2(ow / sx, oh / sy);
             io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
         }
     }

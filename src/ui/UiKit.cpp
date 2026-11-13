@@ -412,6 +412,14 @@ ConfirmRects ConfirmLayout(int windowW, int windowH)
 }
 } // namespace
 
+// The touch interface draws and hit-tests the question itself (big buttons from the layout file); ImGui's modal is
+// the desktop's
+static bool ConfirmIsNative()
+{
+    const uilayout::Layout &file = uilayout::Current();
+    return !ImGuiBridge::IsInitialized() || uilayout::MenuProfile(file, "confirm") == "touch";
+}
+
 int ConfirmUpdate(
     const ConfirmState &state,
     int windowW,
@@ -433,7 +441,7 @@ int ConfirmUpdate(
         state.modalResult = -1;
         return ans;
     }
-    const bool useNativeHitTest = !ImGuiBridge::IsInitialized();
+    const bool useNativeHitTest = ConfirmIsNative();
     const ConfirmRects c = ConfirmLayout(windowW, windowH);
     if (enterPressed || (useNativeHitTest && clicked && c.yes.Contains(mx, my)))
     {
@@ -453,7 +461,7 @@ void DrawConfirm(
 {
     if (!state.open)
         return;
-    if (ImGuiBridge::IsFrameActive())
+    if (!ConfirmIsNative() && ImGuiBridge::IsFrameActive())
     {
         ImGuiBridge::DrawConfirmModal(const_cast<ConfirmState &>(state), windowW, windowH);
         return;

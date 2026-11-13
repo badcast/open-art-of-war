@@ -186,11 +186,16 @@ void Application::SyncWindowSize(int w, int h)
         return;
 
 #if ANDROID
-    // One shared coordinate space for menus, HUD, camera and touch hit testing.
-    // Preserve the display aspect ratio, with enough height for every dialog.
-    pw = std::max(960, static_cast<int>(std::lround(720.0 * pw / ph)));
-    ph = 720;
-    SDL_SetRenderLogicalPresentation(m_sdlRenderer, pw, ph, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    // One shared coordinate space for menus, HUD, camera and touch hit testing: the display scaled uniformly so that
+    // it is at least 960x720 units (every dialog fits). A plain render scale, not SDL's logical presentation: clip
+    // rects (radar, dialogs, the map edge) misbehaved behind the latter on devices.
+    {
+        const float scale = std::min(static_cast<float>(ph) / 720.0f, static_cast<float>(pw) / 960.0f);
+        SDL_SetRenderLogicalPresentation(m_sdlRenderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+        SDL_SetRenderScale(m_sdlRenderer, scale, scale);
+        pw = static_cast<int>(std::floor(pw / scale));
+        ph = static_cast<int>(std::floor(ph / scale));
+    }
 #endif
     if (m_windowW == pw && m_windowH == ph)
         return;
