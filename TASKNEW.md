@@ -190,7 +190,7 @@ Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen
 - [ ] Match loading builds the world and AI controllers on every client before `Attach` sets the role: set the role first.
 - [ ] `OAOW_NET_BOT` runs every frame on a replica (`Application.cpp` `DriveNetworkBot`): once per new snapshot tick only.
 - [ ] `Simulation::Schedule` / `EndTick` still work in Replica mode when called directly.
-- [ ] `tests/ReplicaLoopbackTests.cpp` (two peers, host ticks, replica stands still without snapshots): agy was not started (command refused / wrong flag order).
+- [x] `tests/ReplicaLoopbackTests.cpp` (agy): host ticks, replica stands still without snapshots, full + delta snapshots match (ctest openaow-replica-tests).
 
 ## Touch build (2026-11-13)
 

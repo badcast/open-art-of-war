@@ -501,6 +501,13 @@ set_target_properties(openaow-worldsnapshot-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-worldsnapshot-tests COMMAND openaow-worldsnapshot-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
+add_executable(openaow-replica-tests tests/ReplicaLoopbackTests.cpp)
+target_link_libraries(openaow-replica-tests PRIVATE openaow-core OpenAOWNetworking)
+set_target_properties(openaow-replica-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-replica-tests COMMAND openaow-replica-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
 add_executable(openaow-determinism-tests tests/DeterminismTests.cpp)
 target_link_libraries(openaow-determinism-tests PRIVATE openaow-core)
 set_target_properties(openaow-determinism-tests PROPERTIES
