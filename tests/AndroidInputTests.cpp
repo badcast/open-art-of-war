@@ -390,6 +390,36 @@ int main()
     Check(input.WasLeftClickIssued(x, y), "menu open click in touch-ui must still dispatch");
     input.SetMenuOpen(false);
 
+    // 9) Render-scale coordinate conversion (ApplicationSettings OAOW_TOUCH): logical tap screen coordinates survive a
+    // zoomed/panned Camera when menu is open.
+    Check(
+        SDL_SetRenderLogicalPresentation(renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED),
+        "disable logical presentation");
+    Check(SDL_SetRenderScale(renderer, 1.5f, 1.5f), "set touch render scale");
+    SDL_SetWindowSize(window, 1440, 1080); // 1440x1080 / 1.5 = 960x720 logical units
+    Camera scaledCam(960, 720);
+    scaledCam.SetPosition(1200.0f, 800.0f);
+    scaledCam.SetZoom(2.0f);
+    input.SetMenuOpen(true);
+    input.SetTouchMode(true);
+    auto scaledTouch = [&](Uint32 type, SDL_FingerID id, float lx, float ly) {
+        SDL_Event event {};
+        event.type = type;
+        event.tfinger.fingerID = id;
+        event.tfinger.x = lx / 960.0f;
+        event.tfinger.y = ly / 720.0f;
+        Check(SDL_ConvertEventToRenderCoordinates(renderer, &event), "scaled touch conversion");
+        input.ProcessEvent(event, scaledCam);
+        input.Update(0, scaledCam);
+    };
+    scaledTouch(SDL_EVENT_FINGER_DOWN, 3, 180.0f, 260.0f);
+    scaledTouch(SDL_EVENT_FINGER_UP, 3, 180.0f, 260.0f);
+    int sx = -1, sy = -1;
+    Check(
+        input.WasLeftClickIssued(x, y, sx, sy) && sx == 180 && sy == 260 && static_cast<int>(x) != 180,
+        "scaled OAOW_TOUCH menu tap must preserve screen coordinates separately from world coords");
+    input.SetMenuOpen(false);
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

@@ -188,12 +188,16 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
     int my = input.GetMouseScreenY();
     m_mouseX = mx;
     m_mouseY = my;
-    float lx, ly;
-    bool clicked = input.WasLeftClickIssued(lx, ly);
+    float lx = 0.0f, ly = 0.0f;
+    int clickSX = mx, clickSY = my;
+    bool clicked = input.WasLeftClickIssued(lx, ly, clickSX, clickSY);
+
+    const int tapX = clicked ? clickSX : mx;
+    const int tapY = clicked ? clickSY : my;
 
     if (m_campaignSelectOpen)
     {
-        UpdateCampaignSelect(ctx, mx, my, clicked);
+        UpdateCampaignSelect(ctx, tapX, tapY, clicked);
         return;
     }
 
@@ -209,12 +213,12 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
     int px = 0, py = 0;
     const bool pressed = input.ConsumeLeftPress(px, py);
     if (UpdateMusicPlayer(
-            clicked, pressed, px, py, input.IsLeftMouseDown(), mx, my, windowW, windowH, true, sound, m_scrollDrag))
+            clicked, pressed, px, py, input.IsLeftMouseDown(), tapX, tapY, windowW, windowH, true, sound, m_scrollDrag))
         return;
 
     for (int i = 0; i < kMainMenuItems; ++i)
     {
-        if (MainMenuItemRect(i, windowW, windowH).Contains(mx, my))
+        if (MainMenuItemRect(i, windowW, windowH).Contains(tapX, tapY))
         {
             m_selectedMenuItem = i;
             if (clicked)
@@ -413,34 +417,28 @@ void MenuController::RenderMainMenu(
         bool isExit = (i == kMainMenuItems - 1);
         std::string label = _(kMainMenuLabels[i]);
 
-        if (!touchMenu)
-        {
-            const SDL_Color itemAccent = isExit ? col::Danger : col::Accent;
-            const SDL_Color plateLeft
-                = selected ? ui::Mix(col::Hover, isExit ? col::DangerDeep : ui::color::AccentDeep, 0.56f)
-                           : ui::WithAlpha(ui::Mix(col::PanelRaised, ui::color::Info, 0.10f), 195);
-            const SDL_Color plateRight = selected ? ui::WithAlpha(col::Panel, 24) : ui::WithAlpha(col::Panel, 12);
-            const SDL_Color barCol = selected ? itemAccent : SDL_Color {0, 0, 0, 0};
-            ui::DrawButtonChrome(renderer, r, plateLeft, plateRight, {0, 0, 0, 0}, barCol, {0, 0, 0, 0}, 255, true);
+        const SDL_Color itemAccent = isExit ? col::Danger : col::Accent;
+        const SDL_Color plateLeft
+            = selected ? ui::Mix(col::Hover, isExit ? col::DangerDeep : ui::color::AccentDeep, 0.56f)
+                       : ui::WithAlpha(ui::Mix(col::PanelRaised, ui::color::Info, 0.10f), 195);
+        const SDL_Color plateRight = selected ? ui::WithAlpha(col::Panel, 24) : ui::WithAlpha(col::Panel, 12);
+        const SDL_Color barCol = selected ? itemAccent : SDL_Color {0, 0, 0, 0};
+        ui::DrawButtonChrome(renderer, r, plateLeft, plateRight, {0, 0, 0, 0}, barCol, {0, 0, 0, 0}, 255, true);
 
-            const SDL_Color rimStart = selected ? ui::WithAlpha(itemAccent, 185) : ui::WithAlpha(col::BorderStrong, 95);
-            ui::FillHorizontalGradient(renderer, {r.x + 1, r.y, r.w - 2, 1}, rimStart, ui::WithAlpha(rimStart, 0));
-            ui::FillHorizontalGradient(
-                renderer,
-                {r.x + 1, r.Bottom() - 1, r.w - 2, 1},
-                ui::WithAlpha(rimStart, static_cast<Uint8>(rimStart.a / 2)),
-                ui::WithAlpha(rimStart, 0));
-        }
+        const SDL_Color rimStart = selected ? ui::WithAlpha(itemAccent, 185) : ui::WithAlpha(col::BorderStrong, 95);
+        ui::FillHorizontalGradient(renderer, {r.x + 1, r.y, r.w - 2, 1}, rimStart, ui::WithAlpha(rimStart, 0));
+        ui::FillHorizontalGradient(
+            renderer,
+            {r.x + 1, r.Bottom() - 1, r.w - 2, 1},
+            ui::WithAlpha(rimStart, static_cast<Uint8>(rimStart.a / 2)),
+            ui::WithAlpha(rimStart, 0));
 
-        SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 204, 194, 255} : col::White) : col::TextDim;
-        if (touchMenu)
-        {
-            // Touch: the same text lines as on the desktop (no button plate), only bigger and always lit
-            textCol = isExit ? SDL_Color {255, 190, 180, 255} : col::Text;
-        }
+        const SDL_Color idleCol
+            = touchMenu ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
+        const SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 204, 194, 255} : col::White) : idleCol;
         fontRenderer.DrawString(
             label,
-            r.x + 20 + (selected && !touchMenu ? 6 : 0),
+            r.x + 20 + (selected ? 6 : 0),
             r.CenterY(),
             touchMenu ? ui::FONT_H1 : ui::FONT_H2,
             textCol,

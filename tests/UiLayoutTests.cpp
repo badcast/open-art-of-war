@@ -4,6 +4,7 @@
 #include "graphics/Renderer.hpp"
 #include "ui/TouchHUD.hpp"
 #include "ui/UiLayout.hpp"
+#include "../src/ui/MenuControllerInternal.hpp"
 #include "../src/ui/TouchMenuGeometry.hpp"
 
 #include <algorithm>
@@ -281,7 +282,7 @@ int main()
         {
             const auto item = menu_detail::TouchMainMenuItemRect(i, size.first, size.second);
             Check(
-                item.x >= 364 && item.Right() <= size.first && item.y >= 0 && item.Bottom() <= size.second - 30,
+                item.x >= 0 && item.Right() <= size.first && item.y >= 0 && item.Bottom() <= size.second - 30,
                 "touch main menu item stays on screen and clear of the music player");
         }
     }
@@ -346,6 +347,97 @@ int main()
                 Check(r >= 120 && r <= 136 && g < 20 && b < 20, "touch clip uses half opacity");
                 SDL_DestroySurface(pixel);
             }
+        }
+
+        // Touch main menu items never overlap the bottom music player and activate cleanly when tapped even when
+        // Camera is zoomed and panned.
+        {
+            auto overlaps = [](const ui::UiRect &a, const ui::UiRect &b) {
+                return a.x < b.Right() && a.Right() > b.x && a.y < b.Bottom() && a.Bottom() > b.y;
+            };
+            uilayout::SetMenuProfile("touch");
+            for (const auto size :
+                 {std::pair<int, int> {960, 540},
+                  {960, 720},
+                  {1280, 720},
+                  {1440, 720},
+                  {1920, 1080}})
+            {
+                const auto player = menu_detail::playerLayout(size.first, size.second);
+                for (int i = 0; i < 10; ++i)
+                {
+                    const auto item = menu_detail::TouchMainMenuItemRect(i, size.first, size.second);
+                    Check(
+                        !overlaps(item, player.panel) && !overlaps(item, player.seek),
+                        "touch main menu button must not overlap music player");
+                }
+            }
+
+            InputManager input;
+            input.SetTouchMode(true);
+            input.SetMenuOpen(true);
+            TileMap map;
+            Pathfinder pathfinder(&map);
+            EntityManager entities;
+            Economy economy;
+            AIController ai;
+            MissionController mission;
+            TouchHUD hud;
+            MenuController menu;
+            SoundEngine sound;
+
+            for (const auto size : {std::pair<int, int> {960, 720}, {1280, 720}})
+            {
+                Camera cam(size.first, size.second);
+                cam.SetZoom(2.0f);
+                cam.CenterOn(2400.0f, 1800.0f);
+
+                auto tapItem = [&](int index, AppState expectedState, bool expectedRunning) {
+                    const auto rect = menu_detail::TouchMainMenuItemRect(index, size.first, size.second);
+                    const float cx = static_cast<float>(rect.x + rect.w / 2);
+                    const float cy = static_cast<float>(rect.y + rect.h / 2);
+                    SDL_Event down {}, up {};
+                    down.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                    down.button.button = SDL_BUTTON_LEFT;
+                    down.button.x = cx;
+                    down.button.y = cy;
+                    up.type = SDL_EVENT_MOUSE_BUTTON_UP;
+                    up.button.button = SDL_BUTTON_LEFT;
+                    up.button.x = cx;
+                    up.button.y = cy;
+                    input.ProcessEvent(down, cam);
+                    input.ProcessEvent(up, cam);
+
+                    AppState state = AppState::MainMenu;
+                    bool running = true;
+                    FrameContext ctx {
+                        0.016f,
+                        size.first,
+                        size.second,
+                        input,
+                        cam,
+                        map,
+                        pathfinder,
+                        entities,
+                        economy,
+                        ai,
+                        mission,
+                        hud,
+                        menu,
+                        sound,
+                        state};
+                    menu.UpdateMainMenu(ctx, running);
+                    Check(
+                        state == expectedState && running == expectedRunning,
+                        "touch main menu tap must activate the clicked button");
+                };
+
+                tapItem(6, AppState::MenuSettings, true);
+                tapItem(7, AppState::MenuHelp, true);
+                tapItem(8, AppState::MenuAbout, true);
+                tapItem(9, AppState::MainMenu, false);
+            }
+            uilayout::SetMenuProfile("pc");
         }
         SDL_DestroyRenderer(sdlRenderer);
     }
