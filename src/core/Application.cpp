@@ -1473,6 +1473,8 @@ void Application::Render()
                 m_renderer->Clear({0, 0, 0, 255});
             }
         }
+        bool offscreenWorld = false;
+        int edgeLeft = 0, edgeTop = 0, edgeRight = 0, edgeBottom = 0, edgeViewW = 0, edgeViewH = 0;
         // Everything of the world stays inside the map: tiles, cliffs, trees, buildings and the fog no longer
         // stick out over its edge
         {
@@ -1487,7 +1489,21 @@ void Application::Render()
             const int top = std::max(0, static_cast<int>(std::floor(y0)));
             const int right = std::min(worldCam.GetViewportWidth(), static_cast<int>(std::ceil(x1)));
             const int bottom = std::min(worldCam.GetViewportHeight(), static_cast<int>(std::ceil(y1)));
-            m_renderer->SetClipRect({left, top, std::max(0, right - left), std::max(0, bottom - top)});
+            // An offscreen target is cleared black already; a hardware scissor on it misbehaves behind the logical
+            // presentation of the touch build (a dark slab over the picture), so the margins are filled instead
+            offscreenWorld = scene || (divisor > 1 && m_lowResTarget);
+            if (!offscreenWorld)
+                m_renderer->SetClipRect({left, top, std::max(0, right - left), std::max(0, bottom - top)});
+            else
+            {
+                const int vw = worldCam.GetViewportWidth(), vh = worldCam.GetViewportHeight();
+                edgeLeft = left;
+                edgeTop = top;
+                edgeRight = right;
+                edgeBottom = bottom;
+                edgeViewW = vw;
+                edgeViewH = vh;
+            }
         }
 
         // Layer 0: Base Terrain
@@ -1527,6 +1543,23 @@ void Application::Render()
             m_map->RenderFog(*m_renderer, worldCam, m_settings.graphicsQuality > 0);
         }
 
+        if (offscreenWorld)
+        {
+            const SDL_Color black {0, 0, 0, 255};
+            const int innerTop = std::max(0, edgeTop), innerBottom = std::min(edgeViewH, edgeBottom);
+            if (edgeTop > 0)
+                m_renderer->FillRectScreen(0, 0, edgeViewW, std::min(edgeViewH, edgeTop), black);
+            if (edgeBottom < edgeViewH)
+                m_renderer->FillRectScreen(0, std::max(0, edgeBottom), edgeViewW, edgeViewH - std::max(0, edgeBottom), black);
+            if (innerBottom > innerTop)
+            {
+                if (edgeLeft > 0)
+                    m_renderer->FillRectScreen(0, innerTop, std::min(edgeViewW, edgeLeft), innerBottom - innerTop, black);
+                if (edgeRight < edgeViewW)
+                    m_renderer->FillRectScreen(
+                        std::max(0, edgeRight), innerTop, edgeViewW - std::max(0, edgeRight), innerBottom - innerTop, black);
+            }
+        }
         RenderMapEdgeFade(worldCam);
         m_renderer->ResetClipRect();
         m_renderer->EndWorldPass();

@@ -137,7 +137,10 @@ void ImGuiBridge::ProcessEvent(const SDL_Event &event)
 {
     if (s_initialized)
     {
-        ImGui_ImplSDL3_ProcessEvent(&event);
+        // With a logical presentation (Android) pointer events must land in the logical space the UI is laid out in
+        SDL_Event converted = event;
+        SDL_ConvertEventToRenderCoordinates(s_renderer, &converted);
+        ImGui_ImplSDL3_ProcessEvent(&converted);
     }
 }
 
@@ -148,6 +151,18 @@ void ImGuiBridge::BeginFrame()
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    {
+        // The window is drawn through a logical presentation on Android: ImGui must use that space, not the window's
+        int lw = 0, lh = 0;
+        SDL_RendererLogicalPresentation mode = SDL_LOGICAL_PRESENTATION_DISABLED;
+        if (SDL_GetRenderLogicalPresentation(s_renderer, &lw, &lh, &mode) && mode != SDL_LOGICAL_PRESENTATION_DISABLED
+            && lw > 0 && lh > 0)
+        {
+            ImGuiIO &io = ImGui::GetIO();
+            io.DisplaySize = ImVec2(static_cast<float>(lw), static_cast<float>(lh));
+            io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+        }
+    }
     ImGui::NewFrame();
     s_frameActive = true;
 }
