@@ -37,7 +37,7 @@ Legend: `[x]` done, `[ ]` to do, `[~]` in progress.
       recipient is missing, refuse self-addressed state, add boundary/truncation tests (2 MiB limit, ENet fragmentation).
 - [~] (done: host ends the match when the authority is given up; todo: announce authority slot to clients) Authority leaving does not end the match (`SessionHost.cpp:505`): decide the rule (end match) and announce the
       authority slot to clients.
-- [ ] Replica guard is only in `GameplayController::SimulationStep`, not in `Simulation` itself.
+- [x] Replica guard now also in `Simulation` (ApplyCommands, UpdateEconomies, UpdateOrderQueues, UpdateResearch, UpdateSquads).
 - [x] (now 2, `matchId` added to `StartMatch`/`AuthorityState`) `kProtocolVersion` is still 1: bump with the first network-visible change, not at step 8.
 - Desync suspects: `Hypot` normalisation in movement (`Unit.cpp:442`), float bits hashed in `Simulation.cpp:63,776`;
   `DetMath::Hypot` change in the working tree already removes `std::hypot`. FMA is off for GCC/Clang only

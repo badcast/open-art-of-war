@@ -184,6 +184,8 @@ Economy &Simulation::EconomyOf(PlayerId player, SimContext &ctx)
 
 void Simulation::UpdateEconomies(float dt, SimContext &ctx)
 {
+    if (!AdvancesWorld()) // a replica only shows what the authority sends
+        return;
     // Every economy in slot order, the local one (SimContext::economy) at its own slot. Economies create
     // units: updating the local one first gave the new units other ids on every computer (desync, and the
     // owner's later commands no longer reached its units)
@@ -232,6 +234,8 @@ void Simulation::Schedule(std::uint32_t tick, SimCommand command)
 
 void Simulation::ApplyCommands(SimContext &ctx)
 {
+    if (!AdvancesWorld()) // a replica only shows what the authority sends
+        return;
     // Due commands in a fixed order: by tick, then by player; issue order within a player (stable sort)
     std::vector<TimedCommand> due;
     auto split = std::stable_partition(
@@ -379,6 +383,8 @@ void Simulation::ClearOrders(const std::vector<int> &units, EntityManager &entit
 
 void Simulation::UpdateOrderQueues(SimContext &ctx)
 {
+    if (!AdvancesWorld()) // a replica only shows what the authority sends
+        return;
     // Units whose order is done take the next queued one; units of a player that start the same order this tick go
     // together (one formation). Entity order and the ordered map keep it the same on every peer.
     std::map<std::tuple<PlayerId, int, int, int>, std::vector<int>> starting;
@@ -716,6 +722,8 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
 
 void Simulation::UpdateResearch(float dt, SimContext &ctx)
 {
+    if (!AdvancesWorld()) // a replica only shows what the authority sends
+        return;
     for (PlayerId p = 0; p < kMaxPlayers; ++p)
     {
         ResearchProgress &r = m_research[p];
@@ -737,6 +745,8 @@ void Simulation::UpdateResearch(float dt, SimContext &ctx)
 
 void Simulation::UpdateSquads(float dt, SimContext &ctx, const ChokepointMap &chokepoints)
 {
+    if (!AdvancesWorld()) // a replica only shows what the authority sends
+        return;
     for (auto &squads : m_squads)
     {
         squads.Update(dt, ctx.map, ctx.entities, ctx.pathfinder, chokepoints, GroupTactics());
