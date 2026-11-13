@@ -1097,7 +1097,10 @@ void NetMatch::Attach(Simulation &sim)
 void NetMatch::Detach()
 {
     if (m_sim)
+    {
         m_sim->SetCommandSink(nullptr);
+        m_sim->SetExecutionMode(Simulation::ExecutionMode::Standalone);
+    }
     m_sim = nullptr;
 }
 
@@ -1105,6 +1108,8 @@ bool NetMatch::CanRunTick(std::uint32_t tick)
 {
     if (!m_client || !m_sim)
         return true;
+    if (!m_sim->AdvancesWorld())
+        return false; // a replica never ticks on its own
     const std::uint32_t tpt = std::max<std::uint32_t>(1, m_client->ticksPerTurn());
     const std::uint32_t turn = tick / tpt;
     if (turn < m_scheduledTurn)
@@ -1121,6 +1126,8 @@ bool NetMatch::CanRunTick(std::uint32_t tick)
 
 void NetMatch::ScheduleBundle(Simulation &sim, const Net::TurnBundle &bundle, std::uint32_t ticksPerTurn)
 {
+    if (!sim.AdvancesWorld())
+        return;
     const std::uint32_t first = bundle.turn * ticksPerTurn;
     for (const Net::PlayerTurn &p : bundle.players)
     {
@@ -1147,7 +1154,7 @@ void NetMatch::ScheduleBundle(Simulation &sim, const Net::TurnBundle &bundle, st
 
 void NetMatch::AfterTick(std::uint32_t tick, std::uint64_t checksum)
 {
-    if (!m_client || !m_sim)
+    if (!m_client || !m_sim || !m_sim->AdvancesWorld())
         return;
     m_lastTick = tick;
     if (tick % kHashIntervalTicks == 0)

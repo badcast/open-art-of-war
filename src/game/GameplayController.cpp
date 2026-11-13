@@ -347,7 +347,7 @@ const AIController *GameplayController::MatchAi(PlayerId player) const
 
 ResearchProgress GameplayController::ResearchOf(PlayerId player) const
 {
-    if (const AIController *ai = MatchAi(player))
+    if (const AIController *ai = m_sim.AdvancesWorld() ? MatchAi(player) : nullptr)
     {
         ResearchProgress progress;
         if (ai->IsResearchActive())
