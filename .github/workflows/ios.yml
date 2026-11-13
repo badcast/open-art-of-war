@@ -1,0 +1,120 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main, "ios-*"]
+    tags: ["v*"]
+    paths:
+      - 'ios-setup/**'
+      - 'tools/fetch_game_data.sh'
+      - 'src/**'
+      - 'include/**'
+      - '3rdParty/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios-setup/**'
+      - 'tools/fetch_game_data.sh'
+      - 'src/**'
+      - 'include/**'
+      - '3rdParty/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+    inputs:
+      data_urls:
+        description: "Game data to bundle into the IPA (one URL per line, *.blob and *.mod); empty: the repository variable GAME_DATA_URLS"
+        required: false
+        default: ""
+      sdk:
+        description: "Target iOS SDK (iphoneos or iphonesimulator)"
+        required: false
+        default: "iphoneos"
+        type: choice
+        options:
+          - iphoneos
+          - iphonesimulator
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    environment: GAME_DATA_URLS
+    name: iOS (Xcode, ${{ inputs.sdk || 'iphoneos' }})
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools (cmake, spirv-cross for Metal shaders)
+        run: brew install cmake spirv-cross
+
+      - name: Cache iOS CMake / dependency sources & zstd
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios-setup/build-device/_deps
+            ios-setup/build-device/zstd-src
+            ios-setup/build-device/zstd-install
+            ios-setup/build-simulator/_deps
+            ios-setup/build-simulator/zstd-src
+            ios-setup/build-simulator/zstd-install
+          key: ios-deps-${{ inputs.sdk || 'iphoneos' }}-${{ hashFiles('cmake/IosDeps.cmake') }}
+
+      # assets.blob and mods listed in the repository variable GAME_DATA_URLS (docs/ci-game-data.md)
+      # are bundled into OpenArtOfWar.app and copied to writable storage on first launch.
+      - name: Fetch the game data (assets.blob, mods)
+        env:
+          GAME_DATA_URLS: ${{ inputs.data_urls || vars.GAME_DATA_URLS || secrets.GAME_DATA_URLS }}
+          GAME_DATA_TOKEN: ${{ secrets.GAME_DATA_TOKEN }}
+        run: |
+          tools/fetch_game_data.sh game-data
+          ASSETS=ios-setup/assets
+          rm -rf "$ASSETS"; mkdir -p "$ASSETS"
+          if [ -s game-data/bundled_files.txt ]; then
+            cp game-data/* "$ASSETS"/
+            echo "bundled into the IPA:"; cat game-data/bundled_files.txt
+          else
+            echo "no game data listed: app will expect assets.blob via Files/Finder (see ios-setup/README.md)"
+          fi
+
+      - name: Configure and build iOS app bundle
+        run: |
+          chmod +x ios-setup/build-ios.sh
+          if [ "${{ inputs.sdk || 'iphoneos' }}" = "iphoneos" ]; then
+            ./ios-setup/build-ios.sh device --ipa
+          else
+            ./ios-setup/build-ios.sh simulator
+          fi
+
+      - name: Upload device IPA artifact
+        if: (inputs.sdk || 'iphoneos') == 'iphoneos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openaow-ios-unsigned
+          path: ios-setup/out/*.ipa
+
+      - name: Upload simulator app artifact
+        if: inputs.sdk == 'iphonesimulator'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openaow-ios-simulator
+          path: ios-setup/build-simulator/Release-iphonesimulator/OpenArtOfWar.app
+
+      - name: Attach the IPA to the release (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v') && (inputs.sdk || 'iphoneos') == 'iphoneos'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp ios-setup/out/OpenArtOfWar-ios.ipa "openaow-ios-${GITHUB_REF_NAME}.ipa"
+          for i in $(seq 1 30); do
+            gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && break
+            sleep 60
+          done
+          gh release upload "$GITHUB_REF_NAME" "openaow-ios-${GITHUB_REF_NAME}.ipa" --repo "$GITHUB_REPOSITORY" --clobber

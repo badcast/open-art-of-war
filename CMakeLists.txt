@@ -51,6 +51,9 @@ set(OAOW_TESTS_RPATH "${OAOW_RPATH}/..")
 if(ANDROID)
     # No system packages on the NDK: everything is built from source
     include(cmake/AndroidDeps.cmake)
+elseif(IOS)
+    # Static mobile dependencies built from source for the iOS SDK
+    include(cmake/IosDeps.cmake)
 else()
     find_package(PkgConfig QUIET)
     # SDL3 core (window, renderer, input, audio streams, PNG loading) + SDL3_ttf for text
@@ -216,7 +219,7 @@ set(ENGINE_SOURCES
 
 # Translations: YAML catalogs in assets/locale/ (converted via tools/po2yaml.py)
 find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND AND NOT ANDROID)
+if(Python3_FOUND AND NOT ANDROID AND NOT IOS)
     add_custom_target(translations
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/po2yaml.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -302,8 +305,8 @@ set_source_files_properties(src/net/NetMatch.cpp PROPERTIES
     OBJECT_DEPENDS ${OAOW_SIM_OUT}/SimBuildIdGenerated.hpp)
 
 # Shared engine library: libopenaow.so (engine, game logic, UI, ImGui)
-# On Android the engine is linked statically into libmain.so (the library SDLActivity loads)
-if(ANDROID)
+# On Android and iOS the engine is linked statically into the app binary (SDL_main starts it)
+if(ANDROID OR IOS)
     set(OAOW_CORE_TYPE STATIC)
 else()
     set(OAOW_CORE_TYPE SHARED)
@@ -452,6 +455,44 @@ if(ANDROID)
     # The game: libmain.so, started by SDLActivity through SDL_main
     add_library(main SHARED src/main.cpp)
     target_link_libraries(main PRIVATE openaow-core)
+    return()
+endif()
+
+if(IOS)
+    # The game: an iOS app bundle statically linking openaow-core and SDL3 (SDL_main starts it)
+    set(OAOW_IOS_RESOURCES "")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ios-setup/assets")
+        file(GLOB OAOW_IOS_DATA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/ios-setup/assets/*")
+        list(APPEND OAOW_IOS_RESOURCES ${OAOW_IOS_DATA_FILES})
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/app-game-icon.png")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/docs/app-game-icon.png"
+            "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.png"
+            COPYONLY)
+        list(APPEND OAOW_IOS_RESOURCES "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.png")
+    endif()
+    add_executable(openaow-game MACOSX_BUNDLE
+        src/main.cpp
+        ${OAOW_IOS_RESOURCES}
+    )
+    target_link_libraries(openaow-game PRIVATE openaow-core)
+    set_target_properties(openaow-game PROPERTIES
+        OUTPUT_NAME "OpenArtOfWar"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios-setup/Info.plist.in"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.openartofwar.game"
+        MACOSX_BUNDLE_BUNDLE_NAME "Open Art of War"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.openartofwar.game"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
+        XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+        RESOURCE "${OAOW_IOS_RESOURCES}"
+    )
+    if(OAOW_IOS_RESOURCES)
+        set_source_files_properties(${OAOW_IOS_RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    endif()
     return()
 endif()
 

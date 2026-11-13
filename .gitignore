@@ -65,3 +65,8 @@ android-setup/.gradle/
 android-setup/app/build/
 android-setup/app/.cxx/
 android-setup/local.properties
+
+# iOS: bundled assets downloaded by CI / build-ios.sh and generated Xcode build dirs
+ios-setup/assets/
+ios-setup/build*/
+ios-setup/out/
