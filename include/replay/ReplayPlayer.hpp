@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -60,9 +61,9 @@ public:
     ~ReplayPlayer();
 
     // Reads and checks a file. False with `error` (translated) for anything that is not a replay this game can play.
-    bool Load(const std::string &path, std::string &error);
+    bool Load(std::string_view path, std::string &error);
     // Only what a list shows
-    static bool ReadInfo(const std::string &path, Info &out, std::string &error);
+    static bool ReadInfo(std::string_view path, Info &out, std::string &error);
 
     const Info &info() const
     {

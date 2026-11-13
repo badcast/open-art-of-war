@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_set>
 
@@ -48,27 +49,27 @@ public:
 
     // Listen server on `port` (UDP); false with `error` when the port cannot be opened
     // The room password: given to a game this computer hosts, sent when joining (empty: none)
-    void SetPassword(const std::string &password)
+    void SetPassword(std::string_view password)
     {
-        m_password = password;
+        m_password.assign(password);
     }
-    bool host(std::uint16_t port, const std::string &playerName, std::string &error);
+    bool host(std::uint16_t port, std::string_view playerName, std::string &error);
     // List the hosted game on the server (internet games without forwarded ports); its code shows up
     // in publicCode()
-    void Announce(const std::string &master, std::uint16_t masterPort);
+    void Announce(std::string_view master, std::uint16_t masterPort);
     const std::string &PublicCode() const;
     // Join a game hosted by a player through the server (by its code; NAT hole punching)
     bool joinHosted(
-        const std::string &master,
+        std::string_view master,
         std::uint16_t masterPort,
-        const std::string &code,
-        const std::string &playerName,
+        std::string_view code,
+        std::string_view playerName,
         std::string &error);
     // `dedicated`: a room of openaow-server (its first player, the owner, decides for the room)
     bool join(
-        const std::string &address,
+        std::string_view address,
         std::uint16_t port,
-        const std::string &playerName,
+        std::string_view playerName,
         std::string &error,
         bool dedicated = false);
     void leave();
@@ -114,7 +115,7 @@ public:
     std::uint8_t LocalSlot() const;
 
     // The room. Host: picks the map (its start positions follow from it). Everybody: own picks, chat.
-    void SetLobbyMap(const std::string &mapPath);
+    void SetLobbyMap(std::string_view mapPath);
     const Net::LobbyState *Lobby() const;
     // The room's map is here, exactly the room's version of it (else it is being downloaded)
     bool MapReady() const
@@ -150,7 +151,7 @@ public:
     // The owner sets the match options of the room
     // (techLevel: 0 the map's / the default, n = level n - 1 of Capabilities::Levels())
     void SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bool night, std::uint8_t techLevel);
-    void SendChat(const std::string &text);
+    void SendChat(std::string_view text);
     std::vector<Net::Chat> TakeChat();
     // Host: everybody in the room is ready (two players at least)
     bool CanStart() const;
@@ -267,7 +268,7 @@ public:
 
     // The match is over (or left): the replay of it is saved in the user's directory. `outcome`: "victory", "defeat",
     // "left", ... One file per match; empty result when nothing was recorded or it was saved already.
-    std::string FinishReplay(const std::string &outcome);
+    std::string FinishReplay(std::string_view outcome);
     // The local camera (world pixel centre, zoom): sent to the others with the turns, once in a while, when it moved.
     // Only a replay uses it, to follow a player's view.
     void SendView(float centerX, float centerY, float zoom);

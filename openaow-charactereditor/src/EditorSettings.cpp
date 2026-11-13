@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <sstream>
+#include <string_view>
 
 namespace CharEditor
 {
@@ -24,7 +25,7 @@ enum class Kind
     Other
 };
 
-bool IsInt(const std::string &s)
+bool IsInt(std::string_view s)
 {
     if (s.empty())
         return false;
@@ -37,17 +38,18 @@ bool IsInt(const std::string &s)
     return true;
 }
 
-bool IsFloat(const std::string &s)
+bool IsFloat(std::string_view s)
 {
     if (s.empty())
         return false;
+    const std::string tmp(s);
     char *end = nullptr;
-    std::strtod(s.c_str(), &end);
-    return end && *end == '\0' && s.find_first_of("0123456789") != std::string::npos
-           && s.find_first_of("xXnNiI") == std::string::npos;
+    std::strtod(tmp.c_str(), &end);
+    return end && *end == '\0' && s.find_first_of("0123456789") != std::string_view::npos
+           && s.find_first_of("xXnNiI") == std::string_view::npos;
 }
 
-bool IsHexColor(const std::string &s)
+bool IsHexColor(std::string_view s)
 {
     if (s.size() != 7 && s.size() != 9)
         return false;
@@ -95,7 +97,7 @@ std::string FormatFloat(float v)
     return s;
 }
 
-std::string Quote(const std::string &s)
+std::string Quote(std::string_view s)
 {
     std::string out = "\"";
     for (char c : s)
@@ -107,9 +109,9 @@ std::string Quote(const std::string &s)
     return out + "\"";
 }
 
-std::string Pretty(const std::string &key)
+std::string Pretty(std::string_view key)
 {
-    std::string s = key;
+    std::string s(key);
     for (char &c : s)
         if (c == '_')
             c = ' ';
@@ -118,19 +120,19 @@ std::string Pretty(const std::string &key)
     return s;
 }
 
-std::string LastKey(const std::string &path)
+std::string_view LastKey(std::string_view path)
 {
     const std::size_t dot = path.rfind('.');
-    return dot == std::string::npos ? path : path.substr(dot + 1);
+    return dot == std::string_view::npos ? path : path.substr(dot + 1);
 }
 
-void CommentTooltip(const std::string &text)
+void CommentTooltip(std::string_view text)
 {
     if (text.empty() || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort))
         return;
     ImGui::BeginTooltip();
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
-    ImGui::TextUnformatted(text.c_str());
+    ImGui::TextUnformatted(text.data(), text.data() + text.size());
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
 }
@@ -181,38 +183,40 @@ void CharacterEditor::DrawSettingsBar(CommentedYaml &y, const char *fileName)
     ImGui::TextDisabled("%s", fileName);
 }
 
-bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, const std::string &label)
+bool CharacterEditor::EditYamlScalar(CommentedYaml &y, std::string_view path, std::string_view label)
 {
-    const YAML::Node n = y.At(path);
+    const std::string pathStr(path);
+    const std::string labelStr(label);
+    const YAML::Node n = y.At(pathStr);
     if (!n.IsDefined())
         return false;
     const Kind kind = KindOf(n);
-    const std::string comment = y.Comment(path);
+    const std::string comment = y.Comment(pathStr);
     bool changed = false;
-    ImGui::PushID(path.c_str());
+    ImGui::PushID(path.data(), path.data() + path.size());
     ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x * 0.5f));
     switch (kind)
     {
         case Kind::Bool:
         {
             bool v = n.Scalar() == "true";
-            if (ImGui::Checkbox(label.c_str(), &v))
-                changed = y.Set(path, v ? "true" : "false");
+            if (ImGui::Checkbox(labelStr.c_str(), &v))
+                changed = y.Set(pathStr, v ? "true" : "false");
             break;
         }
         case Kind::Int:
         {
             int v = std::atoi(n.Scalar().c_str());
-            if (ImGui::DragInt(label.c_str(), &v, 1.0f))
-                changed = y.Set(path, std::to_string(v));
+            if (ImGui::DragInt(labelStr.c_str(), &v, 1.0f))
+                changed = y.Set(pathStr, std::to_string(v));
             break;
         }
         case Kind::Float:
         {
             float v = static_cast<float>(std::atof(n.Scalar().c_str()));
             const float step = std::max(0.001f, std::abs(v) * 0.01f);
-            if (ImGui::DragFloat(label.c_str(), &v, step, 0.0f, 0.0f, "%.4g"))
-                changed = y.Set(path, FormatFloat(v));
+            if (ImGui::DragFloat(labelStr.c_str(), &v, step, 0.0f, 0.0f, "%.4g"))
+                changed = y.Set(pathStr, FormatFloat(v));
             break;
         }
         case Kind::Color:
@@ -224,7 +228,7 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
                 std::sscanf(s.c_str() + 7, "%2x", &a);
             float col[4] = {r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f};
             if (ImGui::ColorEdit4(
-                    label.c_str(), col, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
+                    labelStr.c_str(), col, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
             {
                 char buf[16];
                 std::snprintf(
@@ -235,13 +239,13 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
                     static_cast<int>(col[1] * 255.0f + 0.5f),
                     static_cast<int>(col[2] * 255.0f + 0.5f),
                     static_cast<int>(col[3] * 255.0f + 0.5f));
-                changed = y.Set(path, buf);
+                changed = y.Set(pathStr, buf);
             }
             break;
         }
         case Kind::NumberList:
         {
-            auto &buf = yamlTextBuffers[path];
+            auto &buf = yamlTextBuffers[pathStr];
             if (!ImGui::IsAnyItemActive() || buf[0] == '\0')
             {
                 std::string joined;
@@ -254,10 +258,10 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
                 if (!ImGui::IsAnyItemActive())
                     std::snprintf(buf.data(), buf.size(), "%s", joined.c_str());
             }
-            if (ImGui::InputText(label.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+            if (ImGui::InputText(labelStr.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
             {
                 std::string text = std::string("[") + buf.data() + "]";
-                changed = y.Set(path, text);
+                changed = y.Set(pathStr, text);
                 if (!changed)
                     status = _("Not a list of numbers: ") + std::string(buf.data());
             }
@@ -265,23 +269,23 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
         }
         case Kind::String:
         {
-            auto &buf = yamlTextBuffers[path];
+            auto &buf = yamlTextBuffers[pathStr];
             if (!ImGui::IsAnyItemActive())
                 std::snprintf(buf.data(), buf.size(), "%s", n.Scalar().c_str());
-            if (ImGui::InputText(label.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+            if (ImGui::InputText(labelStr.c_str(), buf.data(), buf.size(), ImGuiInputTextFlags_EnterReturnsTrue))
             {
-                changed = y.Set(path, Quote(buf.data()));
+                changed = y.Set(pathStr, Quote(buf.data()));
             }
             break;
         }
         case Kind::Other:
-            ImGui::TextDisabled("%s", label.c_str());
+            ImGui::TextDisabled("%s", labelStr.c_str());
             break;
     }
     CommentTooltip(comment);
 
     // Animation references: a button arms the gallery, its next click goes into this key
-    if (yamlAnimPaths.count(path))
+    if (yamlAnimPaths.count(pathStr))
     {
         ImGui::SameLine();
         const bool armed = animPickPath == path;
@@ -289,7 +293,7 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.2f, 1.0f));
         if (Hinted(ImGui::SmallButton(armed ? _("Pick: click an animation") : _("Pick")), "Pick animation"))
         {
-            animPickPath = armed ? std::string() : path;
+            animPickPath = armed ? std::string() : pathStr;
         }
         if (armed)
             ImGui::PopStyleColor();
@@ -298,9 +302,9 @@ bool CharacterEditor::EditYamlScalar(CommentedYaml &y, const std::string &path, 
     return changed;
 }
 
-bool CharacterEditor::EditYamlTree(CommentedYaml &y, const std::string &path, int depth)
+bool CharacterEditor::EditYamlTree(CommentedYaml &y, std::string_view path, int depth)
 {
-    const YAML::Node n = y.At(path);
+    const YAML::Node n = y.At(std::string(path));
     if (!n.IsDefined() || !n.IsMap())
         return false;
     // Keys first: the loop edits the text, which re-parses the document
@@ -310,7 +314,7 @@ bool CharacterEditor::EditYamlTree(CommentedYaml &y, const std::string &path, in
     bool changed = false;
     for (const std::string &key : keys)
     {
-        const std::string sub = path.empty() ? key : path + "." + key;
+        const std::string sub = path.empty() ? key : std::string(path) + "." + key;
         const YAML::Node v = y.At(sub);
         if (!v.IsDefined())
             continue;

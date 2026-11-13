@@ -2,6 +2,8 @@
 
 #include "game/Entity.hpp"
 
+#include <string_view>
+
 namespace OpenArtOfWar
 {
 
@@ -25,7 +27,7 @@ constexpr int kClasses = 4; // TargetClass values
 // Back to the defaults overlaid with the file
 void Reload();
 // Defaults overlaid with this JSON text
-bool LoadText(const std::string &jsonText);
+bool LoadText(std::string_view jsonText);
 // The multiplier in percent (100 = unchanged)
 int Percent(ProjectileType type, TargetClass target);
 // `damage` scaled for the target class; never below 1 for a positive damage

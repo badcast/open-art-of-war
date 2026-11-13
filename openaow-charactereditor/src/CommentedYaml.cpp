@@ -10,17 +10,17 @@ namespace CharEditor
 namespace
 {
 
-std::string Trim(const std::string &s)
+std::string Trim(std::string_view s)
 {
     std::size_t a = s.find_first_not_of(" \t\r");
-    if (a == std::string::npos)
+    if (a == std::string_view::npos)
         return {};
     std::size_t b = s.find_last_not_of(" \t\r");
-    return s.substr(a, b - a + 1);
+    return std::string(s.substr(a, b - a + 1));
 }
 
 // Start of a trailing " # comment" outside quotes, npos when there is none
-std::size_t TrailingComment(const std::string &s)
+std::size_t TrailingComment(std::string_view s)
 {
     char quote = 0;
     for (std::size_t i = 0; i < s.size(); ++i)
@@ -174,14 +174,14 @@ void CommentedYaml::Index()
     }
 }
 
-YAML::Node CommentedYaml::At(const std::string &path) const
+YAML::Node CommentedYaml::At(std::string_view path) const
 {
     YAML::Node n = m_node; // a handle onto the same data; read only through const lookups below
     std::size_t start = 0;
     while (start <= path.size() && n.IsDefined())
     {
         const std::size_t dot = path.find('.', start);
-        const std::string key = path.substr(start, dot == std::string::npos ? std::string::npos : dot - start);
+        const std::string key(path.substr(start, dot == std::string_view::npos ? std::string_view::npos : dot - start));
         if (!key.empty())
         {
             const YAML::Node &cn = n;
@@ -199,13 +199,13 @@ YAML::Node CommentedYaml::At(const std::string &path) const
     return n;
 }
 
-std::string CommentedYaml::Comment(const std::string &path) const
+std::string CommentedYaml::Comment(std::string_view path) const
 {
     auto it = m_comments.find(path);
     return it == m_comments.end() ? std::string() : it->second;
 }
 
-bool CommentedYaml::Set(const std::string &path, const std::string &valueText)
+bool CommentedYaml::Set(std::string_view path, std::string_view valueText)
 {
     auto it = m_lineOf.find(path);
     if (it == m_lineOf.end())
@@ -226,7 +226,11 @@ bool CommentedYaml::Set(const std::string &path, const std::string &valueText)
         tail = "  " + rest.substr(c);
         (void) gap;
     }
-    m_lines[it->second] = old.substr(0, colon + 1) + " " + valueText + tail;
+    std::string newLine = old.substr(0, colon + 1);
+    newLine += ' ';
+    newLine += valueText;
+    newLine += tail;
+    m_lines[it->second] = std::move(newLine);
     try
     {
         m_node = YAML::Load(text());
@@ -236,7 +240,7 @@ bool CommentedYaml::Set(const std::string &path, const std::string &valueText)
         m_lines[it->second] = old;
         return false;
     }
-    m_edits.emplace_back(path, valueText);
+    m_edits.emplace_back(std::string(path), std::string(valueText));
     m_dirty = true;
     return true;
 }

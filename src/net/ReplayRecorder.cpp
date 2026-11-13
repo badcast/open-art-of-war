@@ -47,7 +47,7 @@ void ReplayRecorder::OnChecksum(std::uint32_t tick, std::uint64_t hash)
         m_checksums[tick] = hash;
 }
 
-std::string ReplayRecorder::Finish(const std::string &outcome, std::uint32_t tick)
+std::string ReplayRecorder::Finish(std::string_view outcome, std::uint32_t tick)
 {
     if (!m_active)
         return {};

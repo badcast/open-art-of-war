@@ -1,8 +1,9 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <string>
 #include <memory>
+#include <string>
+#include <string_view>
 #include "MapDocument.hpp"
 #include "EditorUI.hpp"
 #include "graphics/TextureManager.hpp"
@@ -18,7 +19,7 @@ public:
     MapEditorApp();
     ~MapEditorApp();
 
-    bool Init(int width = 1280, int height = 720, const std::string &initialMap = "");
+    bool Init(int width = 1280, int height = 720, std::string_view initialMap = "");
     void run();
 
 private:

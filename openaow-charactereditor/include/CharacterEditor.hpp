@@ -9,6 +9,7 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <set>
+#include <string_view>
 
 namespace CharEditor
 {
@@ -92,7 +93,7 @@ private:
     YAML::Node Section(const char *name);
 
     bool EditString(
-        YAML::Node parent, const char *key, const char *label, const std::string &scope, bool multiline = false);
+        YAML::Node parent, const char *key, const char *label, std::string_view scope, bool multiline = false);
 
     bool EditInt(YAML::Node parent, const char *key, const char *label, int fallback = 0);
 
@@ -207,11 +208,10 @@ private:
 
     // Sprite Tools tab: the per-object sprites (assets/sprites/sprite_<name>.png + _meta.yaml)
     fs::path SpriteDir() const;
-    fs::path SpriteMetaPath(const std::string &object) const;
+    fs::path SpriteMetaPath(std::string_view object) const;
     // metaFile / imageSuffix: read the frames from another file and the PNGs as `<name><suffix>` (the .bak files),
     // kept as unsaved changes
-    void LoadSpriteObject(
-        const std::string &object, const fs::path &metaFile = {}, const std::string &imageSuffix = {});
+    void LoadSpriteObject(std::string_view object, const fs::path &metaFile = {}, std::string_view imageSuffix = {});
     std::string SpriteFrameLine(const SpriteFrameEdit &f) const;
     bool SaveSpriteObject(bool backup = true);         // backup: the files as they were go to .bak first
     std::vector<std::string> SpriteImageNames() const; // the sprite's PNGs (the faction variant too)
@@ -228,11 +228,11 @@ private:
         SpriteArrange mode, bool onlyIfSmaller = false); // PNGs redrawn with the frames at new places, unsaved
     void ReloadSpriteData(); // the sprites again from disk, and the configs that keep sprite handles
     // Pixel edits are kept in memory (spritePending) until Save: the PNGs on disk stay as they were
-    bool EnsurePending();                                           // loads the sprite's PNGs into spritePending
-    void SetPending(const std::string &name, SDL_Surface *surface); // takes the surface
-    void DiscardPending();                                          // Revert / a new load: the unsaved pixels go
-    void RefreshPendingTexture();                                   // the canvas picture of the pending image
-    SDL_Texture *SpriteCanvasTexture();                             // pending picture, else the registry's sheet
+    bool EnsurePending();                                         // loads the sprite's PNGs into spritePending
+    void SetPending(std::string_view name, SDL_Surface *surface); // takes the surface
+    void DiscardPending();                                        // Revert / a new load: the unsaved pixels go
+    void RefreshPendingTexture();                                 // the canvas picture of the pending image
+    SDL_Texture *SpriteCanvasTexture();                           // pending picture, else the registry's sheet
     // Resamples the image (and the Resistance image) to w x h; the frames follow, the drawn sizes stay. `uniform`:
     // the same factor on both axes (an aspect-keeping size)
     bool ResizeSpriteImage(int w, int h, bool smooth, bool uniform);
@@ -240,9 +240,9 @@ private:
     bool FitSpriteImage();
     // The frames after the image was scaled by kx, ky: rects follow, the drawn sizes stay
     void ApplyImageScaleToFrames(float kx, float ky, bool forceEven);
-    bool CreateSpriteObject(const fs::path &png, const std::string &name);
-    std::string FreeFrameName(const std::string &prefix) const;
-    void AddSpriteFrame(int x, int y, int w, int h, const std::string &prefix);
+    bool CreateSpriteObject(const fs::path &png, std::string_view name);
+    std::string FreeFrameName(std::string_view prefix) const;
+    void AddSpriteFrame(int x, int y, int w, int h, std::string_view prefix);
     void RemoveSpriteFrame(int index);
     void SetSpriteFrameRect(SpriteFrameEdit &f, int x, int y, int w, int h);
     void SliceSpriteGrid();
@@ -260,9 +260,9 @@ private:
         std::string name;
         int rect[4];
     };
-    const std::vector<MergeFrameInfo> &MergeFramesOf(const std::string &object);
-    void MergeAddPieces(const std::string &object, const std::string &frame); // empty frame: all of them
-    void MergeRemovePieces(const std::string &object, const std::string &frame);
+    const std::vector<MergeFrameInfo> &MergeFramesOf(std::string_view object);
+    void MergeAddPieces(std::string_view object, std::string_view frame); // empty frame: all of them
+    void MergeRemovePieces(std::string_view object, std::string_view frame);
     void MergeBounds(int &x0, int &y0, int &x1, int &y1) const;
     std::vector<char> MergeOverlaps() const; // per piece: overlaps another one
     void MergePack();
@@ -278,8 +278,8 @@ private:
     bool LoadYamlFile(CommentedYaml &y, const char *name);
     bool SaveYamlFile(CommentedYaml &y);
     // One value / a whole map of a settings file as widgets (the comment above a key is its tooltip)
-    bool EditYamlScalar(CommentedYaml &y, const std::string &path, const std::string &label);
-    bool EditYamlTree(CommentedYaml &y, const std::string &path, int depth = 0);
+    bool EditYamlScalar(CommentedYaml &y, std::string_view path, std::string_view label);
+    bool EditYamlTree(CommentedYaml &y, std::string_view path, int depth = 0);
     void SaveActiveSettings(); // Ctrl+S / the Save button of the current tab
     void DrawSettingsBar(CommentedYaml &y, const char *fileName);
 
@@ -311,10 +311,10 @@ private:
 
     void EnsureEnvironment();
     bool SaveEnvironment();
-    bool EditEnvJson(nlohmann::ordered_json &node, const std::string &path, int depth);
+    bool EditEnvJson(nlohmann::ordered_json &node, std::string_view path, int depth);
     void DrawEnvironment();
     void DrawEnvironmentProperties();
-    SDL_Texture *FontPreview(const std::string &path, float size, const std::string &text);
+    SDL_Texture *FontPreview(std::string_view path, float size, std::string_view text);
 
     void EnsureAi();
     void DrawAiDifficulty();

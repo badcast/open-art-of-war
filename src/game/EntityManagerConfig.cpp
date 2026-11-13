@@ -28,7 +28,7 @@ namespace
 
 // animations.wreck_composite: "<object>.<family of stages>" (the stage count defaults to the family size) or a
 // single composite; animations.wreck_stages overrides the count
-void ReadWreck(const YAML::Node &anim, int &composite, int &stages, const std::string &where)
+void ReadWreck(const YAML::Node &anim, int &composite, int &stages, std::string_view where)
 {
     if (!anim || !anim.IsMap())
         return;
@@ -69,7 +69,7 @@ static const char *ProjectileTypeName(ProjectileType type)
     return Projectiles::KeyOf(type);
 }
 
-inline ProjectileType StringToProjectileType(const std::string &str)
+inline ProjectileType StringToProjectileType(std::string_view str)
 {
     return Projectiles::FromKey(str);
 }

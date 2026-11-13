@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <yaml-cpp/yaml.h>
@@ -125,9 +127,9 @@ class SpriteRegistry
 {
 public:
     // Every "sprite_<name>_meta.yaml" in `dir` (an asset path such as "assets/sprites"); then Compile()
-    bool LoadDirectory(const std::string &dir);
+    bool LoadDirectory(std::string_view dir);
     // One object from an already parsed meta; `dir` is where its image lives
-    void AddObject(const std::string &name, const YAML::Node &meta, const std::string &dir);
+    void AddObject(std::string_view name, const YAML::Node &meta, std::string_view dir);
     // Resolves every name; false when something did not resolve (see Errors(), the rest is still usable)
     bool Compile();
     void Clear();
@@ -145,16 +147,16 @@ public:
         return m_errors;
     }
 
-    bool HasObject(const std::string &name) const;
+    bool HasObject(std::string_view name) const;
     std::vector<std::string> ObjectNames() const;
     // The items of one kind of an object, in file order; its families
-    std::vector<std::string> ItemNames(const std::string &object, SpriteKind kind) const;
-    std::vector<std::string> FamilyNames(const std::string &object) const;
-    int ImageOf(const std::string &object) const;
+    std::vector<std::string> ItemNames(std::string_view object, SpriteKind kind) const;
+    std::vector<std::string> FamilyNames(std::string_view object) const;
+    int ImageOf(std::string_view object) const;
 
     // "<object>.<item>", "<object>.<family>" (its first member) or "<object>.<family>[i]"; `expected` None = any
-    SpriteRef Resolve(const std::string &ref, SpriteKind expected = SpriteKind::None) const;
-    const SpriteFamily *FindFamily(const std::string &object, const std::string &family) const;
+    SpriteRef Resolve(std::string_view ref, SpriteKind expected = SpriteKind::None) const;
+    const SpriteFamily *FindFamily(std::string_view object, std::string_view family) const;
     // Name of the item behind a handle ("<object>.<item>"), for editors and messages; empty when unknown
     std::string NameOf(SpriteRef ref) const;
 
@@ -199,22 +201,21 @@ private:
         SpriteImage image;
         int imageIndex {-1};
         std::vector<Item> items;
-        std::map<std::string, std::size_t> byName[7]; // per SpriteKind
+        std::map<std::string, std::size_t, std::less<>> byName[7]; // per SpriteKind
         std::vector<FamilyDef> families;
     };
 
-    const FamilyDef *FindFamilyDef(const Object &obj, const std::string &name) const;
-    SpriteRef FamilyMember(const Object &obj, const std::string &name, SpriteKind kind) const;
+    const FamilyDef *FindFamilyDef(const Object &obj, std::string_view name) const;
+    SpriteRef FamilyMember(const Object &obj, std::string_view name, SpriteKind kind) const;
     // `ref` ("item" or "object.item") as seen from `fromObject`: the item itself, never a family
-    const Item *LookupItem(const std::string &fromObject, const std::string &ref, SpriteKind kind) const;
+    const Item *LookupItem(std::string_view fromObject, std::string_view ref, SpriteKind kind) const;
     // An item or, failing that, a family's first member; reports the failure
-    SpriteRef LookupRef(
-        const std::string &fromObject, const std::string &ref, SpriteKind kind, const std::string &where);
+    SpriteRef LookupRef(std::string_view fromObject, std::string_view ref, SpriteKind kind, std::string_view where);
     int Allocate(SpriteKind kind);
-    void Emit(const std::string &object, const Item &item, int handle);
-    void Error(const std::string &msg);
+    void Emit(std::string_view object, const Item &item, int handle);
+    void Error(std::string_view msg);
 
-    std::map<std::string, Object> m_objects;
+    std::map<std::string, Object, std::less<>> m_objects;
     std::vector<std::string> m_errors;
     SpriteTables m_tables;
     std::map<std::pair<int, int>, std::string> m_names; // (kind, handle) -> "<object>.<item>"
@@ -251,11 +252,11 @@ private:
 
 // A sprite reference of a config ("<object>.<item>", "<object>.<family>", "<object>.<family>[i]") as a handle of
 // `kind`; -1 (with one message naming `context`) when it does not resolve. An empty name is -1 without a message.
-int SpriteHandle(const std::string &ref, SpriteKind kind, const std::string &context = {});
+int SpriteHandle(std::string_view ref, SpriteKind kind, std::string_view context = {});
 // The same for a YAML value: a string reference; anything else (a number of the old sheet sprites) is reported
-int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &context = {});
+int SpriteHandle(const YAML::Node &node, SpriteKind kind, std::string_view context = {});
 // A list of references (a single string is a list of one); unresolved ones are left out
-std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, const std::string &context = {});
+std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, std::string_view context = {});
 // The name to write back into a config for a handle ("" for -1 / unknown)
 std::string SpriteName(SpriteKind kind, int handle);
 

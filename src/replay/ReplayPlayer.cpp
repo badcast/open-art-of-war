@@ -23,10 +23,9 @@ namespace
 
 constexpr std::size_t kMaxOverlayBytes = 8u * 1024u * 1024u;
 
-bool EndsWith(const std::string &s, const char *suffix)
+bool EndsWith(std::string_view s, std::string_view suffix)
 {
-    const std::string t = suffix;
-    return s.size() >= t.size() && s.compare(s.size() - t.size(), t.size(), t) == 0;
+    return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
 }
 
 // The tick a recorded camera applies from, the number of turns decoded for it
@@ -128,35 +127,37 @@ ReplayPlayer::~ReplayPlayer()
         Assets::ClearSessionOverlay();
 }
 
-bool ReplayPlayer::ReadInfo(const std::string &path, Info &out, std::string &error)
+bool ReplayPlayer::ReadInfo(std::string_view path, Info &out, std::string &error)
 {
     Net::ReplayData data;
     std::string why;
-    if (!Net::readReplay(path, data, why))
+    const std::string pathStr(path);
+    if (!Net::readReplay(pathStr, data, why))
     {
         error = std::string(_("Not a readable replay")) + " (" + why + ")";
         return false;
     }
     out = Info {};
-    out.file = path;
+    out.file = pathStr;
     std::error_code ec;
-    out.fileBytes = static_cast<std::uint64_t>(std::filesystem::file_size(path, ec));
+    out.fileBytes = static_cast<std::uint64_t>(std::filesystem::file_size(std::filesystem::path(path), ec));
     if (ec)
         out.fileBytes = 0;
     return FillInfo(data, out, error);
 }
 
-bool ReplayPlayer::Load(const std::string &path, std::string &error)
+bool ReplayPlayer::Load(std::string_view path, std::string &error)
 {
     Net::ReplayData data;
     std::string why;
-    if (!Net::readReplay(path, data, why))
+    const std::string pathStr(path);
+    if (!Net::readReplay(pathStr, data, why))
     {
         error = std::string(_("Not a readable replay")) + " (" + why + ")";
         return false;
     }
     m_info = Info {};
-    m_info.file = path;
+    m_info.file = pathStr;
     if (!FillInfo(data, m_info, error))
         return false;
     m_turns = std::move(data.turns);

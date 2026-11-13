@@ -635,7 +635,7 @@ GameIdentity testIdentity()
     return GameIdentity {"1.0-test", 0x1234, 0x5678};
 }
 
-ClientConfig clientConfig(const std::string &name)
+ClientConfig clientConfig(std::string_view name)
 {
     ClientConfig c;
     c.identity = testIdentity();

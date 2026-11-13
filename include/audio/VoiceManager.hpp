@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -19,22 +20,22 @@ class VoiceManager
 {
 public:
     // Loads the lines of `language` (with the fallback ones); false when no line could be loaded
-    bool Load(const std::string &language);
-    inline bool load(const std::string &language)
+    bool Load(std::string_view language);
+    inline bool load(std::string_view language)
     {
         return Load(language);
     }
     // Loads another language when it differs from the current one
-    void SetLanguage(const std::string &language);
+    void SetLanguage(std::string_view language);
     const std::string &Language() const
     {
         return m_language;
     }
 
     // A unit reply (category voice); false when unknown or held back by its limits
-    bool Play(const std::string &event, std::uint64_t nowMs);
+    bool Play(std::string_view event, std::uint64_t nowMs);
     // An announcer line: queued, one at a time, each with its own cooldown
-    bool Announce(const std::string &event, std::uint64_t nowMs);
+    bool Announce(std::string_view event, std::uint64_t nowMs);
     // Starts the next announcer line when the current one is over; once per frame
     void Update(std::uint64_t nowMs);
     // Adds `frames` stereo frames (interleaved int16) of the voices speaking
@@ -46,7 +47,7 @@ public:
     void SetMuted(bool muted);
     // The voices keep quiet (an interface that is silent: replies and the announcer)
     void SetSilenced(bool silenced);
-    bool Has(const std::string &event) const;
+    bool Has(std::string_view event) const;
     std::size_t LineCount() const
     {
         return m_lines;

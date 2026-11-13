@@ -21,7 +21,7 @@ StatusPage::~StatusPage()
         enet_socket_destroy(m_impl->socket);
 }
 
-bool StatusPage::open(std::uint16_t port, const std::string &bindAddress, std::string &error)
+bool StatusPage::open(std::uint16_t port, std::string_view bindAddress, std::string &error)
 {
     m_impl->socket = enet_socket_create(ENET_SOCKET_TYPE_STREAM);
     if (m_impl->socket == ENET_SOCKET_NULL)
@@ -34,7 +34,7 @@ bool StatusPage::open(std::uint16_t port, const std::string &bindAddress, std::s
     ENetAddress address {};
     address.host = ENET_HOST_ANY;
     if (!bindAddress.empty() && bindAddress != "0.0.0.0")
-        enet_address_set_host_ip(&address, bindAddress.c_str());
+        enet_address_set_host_ip(&address, std::string(bindAddress).c_str());
     address.port = port;
     if (enet_socket_bind(m_impl->socket, &address) != 0 || enet_socket_listen(m_impl->socket, 16) != 0)
     {
@@ -46,7 +46,7 @@ bool StatusPage::open(std::uint16_t port, const std::string &bindAddress, std::s
     return true;
 }
 
-void StatusPage::serve(const std::string &json)
+void StatusPage::serve(std::string_view json)
 {
     if (m_impl->socket == ENET_SOCKET_NULL)
         return;
@@ -64,10 +64,10 @@ void StatusPage::serve(const std::string &json)
         enet_uint32 wait = ENET_SOCKET_WAIT_RECEIVE;
         if (enet_socket_wait(client, &wait, 200) == 0 && (wait & ENET_SOCKET_WAIT_RECEIVE))
             enet_socket_receive(client, nullptr, &in, 1);
-        const std::string response
-            = "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n"
-              "Content-Length: "
-              + std::to_string(json.size()) + "\r\nConnection: close\r\n\r\n" + json;
+        std::string response = "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n"
+                               "Content-Length: "
+                               + std::to_string(json.size()) + "\r\nConnection: close\r\n\r\n";
+        response.append(json);
         ENetBuffer out {};
         out.data = const_cast<char *>(response.data());
         out.dataLength = response.size();

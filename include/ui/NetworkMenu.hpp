@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -86,7 +87,7 @@ public:
         const Settings &settings,
         const std::vector<LanGame> &lan,
         const std::vector<LanGame> &server,
-        const std::string &serverStatus);
+        std::string_view serverStatus);
     inline void render(
         Renderer &renderer,
         BitmapFontRenderer &font,
@@ -97,7 +98,7 @@ public:
         const Settings &settings,
         const std::vector<LanGame> &lan,
         const std::vector<LanGame> &server,
-        const std::string &serverStatus)
+        std::string_view serverStatus)
     {
         Render(renderer, font, textures, windowW, windowH, net, settings, lan, server, serverStatus);
     }
@@ -143,9 +144,9 @@ public:
     // Where the focused text field is on the screen (the soft keyboard of a phone must not cover it); false when none
     bool FocusedFieldRect(int windowW, int windowH, bool inRoom, SDL_Rect &out) const;
     // A message for the browser (a failed connection, a rejection)
-    void SetNotice(std::string text)
+    void SetNotice(std::string_view text)
     {
-        m_notice = std::move(text);
+        m_notice = std::string(text);
     }
     void Reset();
 
@@ -170,9 +171,16 @@ private:
     {
         ui::UiRect dialog, nameField, passwordField, tabLan, tabInternet, list, addressField, directBtn, lanRefreshBtn,
             serverList, refreshBtn, codeField, codeBtn, joinBtn, hostBtn, serverBtn, backBtn;
-        ui::UiRect ServerRow(int i) const
+        static constexpr int kServerRowH = 40;
+        static constexpr int kLanRowH = 44;
+        ui::UiRect ServerRow(int i, int scrollPx = 0) const
         {
-            return {serverList.x + 4, serverList.y + 4 + i * 34, serverList.w - 8, 30};
+            return {
+                serverList.x + 4, serverList.y + 4 + i * kServerRowH - scrollPx, serverList.w - 14, kServerRowH - 4};
+        }
+        ui::UiRect LanRow(int i, int scrollPx = 0) const
+        {
+            return {list.x + 4, list.y + 4 + i * kLanRowH - scrollPx, list.w - 14, kLanRowH - 4};
         }
     };
     // The room is laid out like the custom game window (left: search, filters, list of maps and the chat; right: the
@@ -181,20 +189,20 @@ private:
     {
         ui::UiRect dialog, details, mapSearch, mapList, players, map, chatLog, chatField, chatSend, readyBtn, startBtn,
             leaveBtn, prebuiltBtn, creditsBtn, timeBtn, techBtn, fogCheckbox;
-        int listRowH {28};
-        int rowH {34};
+        int listRowH {36};
+        int rowH {38};
         ui::UiRect Filter(int i) const
         {
             const int w = (mapSearch.w - 2 * 6) / 3;
-            return {mapSearch.x + i * (w + 6), mapSearch.y + 36, w, 28};
+            return {mapSearch.x + i * (w + 6), mapSearch.Bottom() + 6, w, 34};
         }
         int MapRows() const
         {
             return std::max(1, mapList.h / listRowH);
         }
-        ui::UiRect MapItem(int i) const
+        ui::UiRect MapItem(int i, int scrollPx = 0) const
         {
-            return {mapList.x, mapList.y + i * listRowH, mapList.w, listRowH - 2};
+            return {mapList.x, mapList.y + i * listRowH - scrollPx, mapList.w - 8, listRowH - 2};
         }
         ui::UiRect Row(int i) const
         {
@@ -259,7 +267,7 @@ private:
         const std::vector<LanGame> &server);
     NetworkAction UpdateLobby(InputManager &input, int w, int h, NetMatch &net);
     void EditText(InputManager &input, std::string &text, std::size_t maxLength);
-    bool ParseAddress(const std::string &text);
+    bool ParseAddress(std::string_view text);
     // The map picture area: where a start position (tile) lands on the screen
     bool SpotOnScreen(const ui::UiRect &area, int mapW, int mapH, int tileX, int tileY, int &sx, int &sy) const;
 
@@ -276,7 +284,9 @@ private:
     std::vector<SkirmishMapInfo> m_maps;      // every map
     std::vector<SkirmishMapInfo> m_mapsShown; // after the search and the filters
     ui::MapFilter m_mapFilter;
-    int m_mapTop {0}; // first visible row of the map list
+    ui::SmoothListScroll m_mapScroll;
+    ui::SmoothListScroll m_lanScroll;
+    ui::SmoothListScroll m_serverScroll;
     void RebuildMapsShown();
     std::string m_password;
     ui::ConfirmState m_confirm; // "leave the room?"

@@ -13,7 +13,7 @@ namespace
 // No 0 / O and 1 / I: codes are read out loud and typed in
 constexpr char kCodeAlphabet[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-std::string jsonEscape(const std::string &s)
+std::string jsonEscape(std::string_view s)
 {
     std::string out;
     for (char c : s)
@@ -65,7 +65,7 @@ bool RoomServer::start(std::string &error)
 }
 
 // A game socket says hello with its token: that is its address as the internet sees it
-void RoomServer::handleRaw(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)
+void RoomServer::handleRaw(std::string_view ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)
 {
     RawKind kind {};
     const std::uint8_t *payload = nullptr;
@@ -76,10 +76,10 @@ void RoomServer::handleRaw(const std::string &ip, std::uint16_t port, const std:
         m_sockets.clear(); // a flood must not grow it without end
     SocketToken token {};
     std::copy(payload, payload + 16, token.begin());
-    m_sockets[token] = {ip, port, m_nowMs};
+    m_sockets[token] = {std::string(ip), port, m_nowMs};
 }
 
-bool RoomServer::codeTaken(const std::string &code) const
+bool RoomServer::codeTaken(std::string_view code) const
 {
     return std::any_of(m_rooms.begin(), m_rooms.end(), [&](const auto &r) { return r->code == code; })
            || std::any_of(m_hosted.begin(), m_hosted.end(), [&](const HostedGame &h) { return h.code == code; });
@@ -351,7 +351,7 @@ void RoomServer::update(std::uint32_t nowMs)
         m_rooms.end());
 }
 
-std::vector<RoomListing> RoomServer::listing(const std::string &gameVersion) const
+std::vector<RoomListing> RoomServer::listing(std::string_view gameVersion) const
 {
     std::vector<RoomListing> out;
     for (const auto &room : m_rooms)

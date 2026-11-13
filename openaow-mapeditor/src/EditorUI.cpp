@@ -1,5 +1,6 @@
 #include "EditorUI.hpp"
 #include "core/LoaderResources.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "MapGenerator.hpp"
 #include "game/TileCollision.hpp"
 #include "core/AssetStore.hpp"
@@ -41,6 +42,8 @@ void DrawSpriteFrame(
         return;
     const SpriteFrame *frame = textureManager.GetSpriteFrame(spriteId);
     if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
+        return;
+    if (frame->page == Sprites().ImageOf("shared_shadows"))
         return;
 
     const int page = faction == Faction::Resistance ? textureManager.ResistancePage(frame->page) : frame->page;
@@ -124,7 +127,7 @@ struct SpriteBounds
 void IncludeSpriteBounds(TextureManager &textureManager, int spriteId, float x, float y, SpriteBounds &bounds)
 {
     const SpriteFrame *frame = textureManager.GetSpriteFrame(spriteId);
-    if (frame)
+    if (frame && frame->page != Sprites().ImageOf("shared_shadows"))
         bounds.Include(x, y, static_cast<float>(frame->width), static_cast<float>(frame->height));
 }
 
@@ -202,6 +205,39 @@ void DrawDecorThumbnail(
     DrawThumbnailFrame(drawList, min, max);
 }
 
+void IncludeAnimBounds(TextureManager &textureManager, int animId, float x, float y, SpriteBounds &bounds)
+{
+    const IndexRange range = textureManager.GetAnimRange(animId);
+    if (range.end < range.start)
+        return;
+    const AnimFrame *frame = textureManager.GetAnimFrame(range.start);
+    if (!frame)
+        return;
+    const float fx = x + frame->ox;
+    const float fy = y + frame->oy;
+    if (frame->isComp == 0)
+        IncludeSpriteBounds(textureManager, frame->child, fx, fy, bounds);
+    else
+        IncludeCompositeBounds(textureManager, frame->child, fx, fy, bounds);
+}
+
+void DrawAnimFirstFrame(
+    ImDrawList *drawList, TextureManager &textureManager, int animId, float x, float y, float scale, Faction faction)
+{
+    const IndexRange range = textureManager.GetAnimRange(animId);
+    if (range.end < range.start)
+        return;
+    const AnimFrame *frame = textureManager.GetAnimFrame(range.start);
+    if (!frame)
+        return;
+    const float fx = x + frame->ox * scale;
+    const float fy = y + frame->oy * scale;
+    if (frame->isComp == 0)
+        DrawSpriteFrame(drawList, textureManager, frame->child, fx, fy, scale, faction);
+    else
+        DrawCompositeSprite(drawList, textureManager, frame->child, fx, fy, scale, faction);
+}
+
 void DrawBuildingThumbnail(
     ImDrawList *drawList,
     TextureManager &textureManager,
@@ -210,75 +246,46 @@ void DrawBuildingThumbnail(
     const ImVec2 &min,
     const ImVec2 &max)
 {
-    const BuildingDef *def = textureManager.GetBuildingDef(buildingType);
+    const BuildingDef *def = textureManager.GetBuildingDef(textureManager.GetBuildingSprite(buildingType));
     if (!def || def->end < def->start)
         return;
-    SpriteBounds bounds;
+
+    std::vector<const BuildingPart *> parts;
+    parts.reserve(def->end - def->start + 1);
     for (int index = def->start; index <= def->end; ++index)
     {
         const BuildingPart *part = textureManager.GetBuildingPart(index);
-        if (!part || part->state != 0)
+        if (!part)
             continue;
+        // Intact building thumbnail: base state 0 layers plus layer-2 rotating turret heads (state 2).
+        if (part->state == 0 || (part->layer == 2 && part->state == 2))
+            parts.push_back(part);
+    }
+    std::stable_sort(
+        parts.begin(), parts.end(), [](const BuildingPart *a, const BuildingPart *b) { return a->layer < b->layer; });
+
+    SpriteBounds bounds;
+    for (const BuildingPart *part : parts)
+    {
         if (part->isComp == 0)
             IncludeSpriteBounds(textureManager, part->child, part->ox, part->oy, bounds);
         else if (part->isComp == 1)
             IncludeCompositeBounds(textureManager, part->child, part->ox, part->oy, bounds);
         else
-        {
-            const IndexRange range = textureManager.GetAnimRange(part->child);
-            if (range.end < range.start)
-                continue;
-            const AnimFrame *frame = textureManager.GetAnimFrame(range.start);
-            if (!frame)
-                continue;
-            const float x = part->ox + frame->ox;
-            const float y = part->oy + frame->oy;
-            if (frame->isComp == 0)
-                IncludeSpriteBounds(textureManager, frame->child, x, y, bounds);
-            else
-                IncludeCompositeBounds(textureManager, frame->child, x, y, bounds);
-        }
+            IncludeAnimBounds(textureManager, part->child, part->ox, part->oy, bounds);
     }
     const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
     drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f), ImVec2(min.x + 48.0f, max.y - 4.0f), true);
-    for (int index = def->start; index <= def->end; ++index)
+    for (const BuildingPart *part : parts)
     {
-        const BuildingPart *part = textureManager.GetBuildingPart(index);
-        if (!part || part->state != 0)
-            continue;
         const float x = transform.origin.x + part->ox * transform.scale;
         const float y = transform.origin.y + part->oy * transform.scale;
         if (part->isComp == 0)
-        {
             DrawSpriteFrame(drawList, textureManager, part->child, x, y, transform.scale, faction);
-        }
         else if (part->isComp == 1)
-        {
             DrawCompositeSprite(drawList, textureManager, part->child, x, y, transform.scale, faction);
-        }
         else
-        {
-            const IndexRange range = textureManager.GetAnimRange(part->child);
-            if (range.end >= range.start)
-            {
-                const AnimFrame *frame = textureManager.GetAnimFrame(range.start);
-                if (frame)
-                {
-                    const float frameX = x + frame->ox * transform.scale;
-                    const float frameY = y + frame->oy * transform.scale;
-                    if (frame->isComp == 0)
-                    {
-                        DrawSpriteFrame(
-                            drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
-                    }
-                    else
-                    {
-                        DrawCompositeSprite(
-                            drawList, textureManager, frame->child, frameX, frameY, transform.scale, faction);
-                    }
-                }
-            }
-        }
+            DrawAnimFirstFrame(drawList, textureManager, part->child, x, y, transform.scale, faction);
     }
     drawList->PopClipRect();
     DrawThumbnailFrame(drawList, min, max);
@@ -292,6 +299,22 @@ void DrawUnitThumbnail(
     const ImVec2 &min,
     const ImVec2 &max)
 {
+    if (const UnitVisual *vis = textureManager.GetUnitVisual(unitType); vis && vis->icon >= 0)
+    {
+        SpriteBounds bounds;
+        IncludeCompositeBounds(textureManager, vis->icon, 0.0f, 0.0f, bounds);
+        if (bounds.valid)
+        {
+            const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
+            drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f), ImVec2(min.x + 48.0f, max.y - 4.0f), true);
+            DrawCompositeSprite(
+                drawList, textureManager, vis->icon, transform.origin.x, transform.origin.y, transform.scale, faction);
+            drawList->PopClipRect();
+            DrawThumbnailFrame(drawList, min, max);
+            return;
+        }
+    }
+
     const int sequence = textureManager.GetUnitBaseSeq(unitType, static_cast<int>(ActionState::Idle));
     const IndexRange sequenceRange = textureManager.GetUnitSequenceRange(sequence);
     if (sequenceRange.end < sequenceRange.start)
@@ -310,8 +333,10 @@ void DrawUnitThumbnail(
         const float y = step->oy + layer->oy;
         if (layer->isComp == 0)
             IncludeSpriteBounds(textureManager, layer->child, x, y, bounds);
-        else
+        else if (layer->isComp == 1)
             IncludeCompositeBounds(textureManager, layer->child, x, y, bounds);
+        else
+            IncludeAnimBounds(textureManager, layer->child, x, y, bounds);
     }
     const ThumbnailTransform transform = FitThumbnail(bounds, min, max);
     drawList->PushClipRect(ImVec2(min.x + 4.0f, min.y + 4.0f), ImVec2(min.x + 48.0f, max.y - 4.0f), true);
@@ -323,13 +348,11 @@ void DrawUnitThumbnail(
         const float x = transform.origin.x + (step->ox + layer->ox) * transform.scale;
         const float y = transform.origin.y + (step->oy + layer->oy) * transform.scale;
         if (layer->isComp == 0)
-        {
             DrawSpriteFrame(drawList, textureManager, layer->child, x, y, transform.scale, faction);
-        }
-        else
-        {
+        else if (layer->isComp == 1)
             DrawCompositeSprite(drawList, textureManager, layer->child, x, y, transform.scale, faction);
-        }
+        else
+            DrawAnimFirstFrame(drawList, textureManager, layer->child, x, y, transform.scale, faction);
     }
     drawList->PopClipRect();
     DrawThumbnailFrame(drawList, min, max);
@@ -353,9 +376,9 @@ void EditorUI::Init()
     ScanAvailableMaps();
 }
 
-void EditorUI::ShowToast(const std::string &message, float duration)
+void EditorUI::ShowToast(std::string_view message, float duration)
 {
-    m_toastMessage = message;
+    m_toastMessage = std::string(message);
     m_toastTimer = duration;
 }
 
@@ -1069,7 +1092,7 @@ void EditorUI::RenderPalettePanel(MapDocument &doc, TextureManager &texManager, 
                        {12, 13, "MLRS (Resistance)", "Grad (Confederation)"},
                        {14, -1, "Sniper in siege mode", ""},
                        {15, -1, "Tank in siege mode", ""},
-                       {16, -1, "MLRS in siege mode", ""}};
+                       {-1, 16, "", "Grad in siege mode"}};
 
                 for (const auto &ud : udefs)
                 {

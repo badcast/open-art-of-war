@@ -133,18 +133,11 @@ std::string UnitDesc(const UnitCameoDef &unitDef, const EntityManager &entities)
 
 void DrawInfinity(Renderer &renderer, const UiRect &buttonRect, bool active, bool hovered)
 {
-    renderer.FillRectScreen(
-        buttonRect.x,
-        buttonRect.y,
-        buttonRect.w,
-        buttonRect.h,
-        active ? SDL_Color {60, 44, 20, 235} : SDL_Color {6, 8, 12, hovered ? Uint8(235) : Uint8(190)});
-    renderer.DrawRectScreen(
-        buttonRect.x,
-        buttonRect.y,
-        buttonRect.w,
-        buttonRect.h,
-        active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+    const SDL_Color topFill = active ? ui::Mix(col::Accent, col::PanelRaised, 0.35f)
+                                     : (hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.42f) : col::PanelRaised);
+    const SDL_Color botFill = active ? ui::color::AccentDeep : col::PanelSunken;
+    const SDL_Color border = active ? col::Accent : (hovered ? col::BorderStrong : col::Border);
+    ui::DrawButtonChrome(renderer, buttonRect, topFill, botFill, border, {0, 0, 0, 0}, {0, 0, 0, 0}, 235);
     // two rings side by side: the infinity sign
     const SDL_Color ringColor = active ? col::Accent : col::TextDim;
     renderer.DrawRingScreen(
@@ -168,7 +161,7 @@ void DrawInfinity(Renderer &renderer, const UiRect &buttonRect, bool active, boo
 } // namespace
 
 void DrawCostTag(
-    Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell, const std::string &text, SDL_Color color)
+    Renderer &renderer, BitmapFontRenderer &fontRenderer, const UiRect &cell, std::string_view text, SDL_Color color)
 {
     int tagWidth = fontRenderer.GetTextWidth(text, ui::FONT_SMALL_BOLD) + 10;
     const int tagHeight = std::clamp(cell.h * 18 / 84, 15, 28);
@@ -190,12 +183,12 @@ void DrawCameo(
     BitmapFontRenderer &fontRenderer,
     const UiRect &cell,
     int compId,
-    const std::string &name,
+    std::string_view name,
     bool hovered,
     bool selected,
     bool locked)
 {
-    renderer.FillRectScreen(cell.x, cell.y, cell.w, cell.h, col::PanelSunken);
+    ui::DrawPanel(renderer, cell, col::PanelSunken, col::Border);
     const int bandHeight = std::clamp(cell.h * 20 / 84, 16, 36);
     if (compId >= 0)
     {
@@ -227,7 +220,7 @@ void DrawCameo(
         Anchor::HCENTER | Anchor::VCENTER);
 
     SDL_Color border = selected ? col::Accent : (hovered ? col::BorderStrong : col::Border);
-    renderer.DrawRectScreen(cell.x, cell.y, cell.w, cell.h, border);
+    ui::DrawPanelFrame(renderer, cell, border);
     if (selected)
         renderer.DrawRectScreen(cell.x + 1, cell.y + 1, cell.w - 2, cell.h - 2, ui::WithAlpha(col::Accent, 120));
 }
@@ -305,7 +298,25 @@ void HUDController::DrawRadar(
     RadarView view = radarView(radarRect, mapWidth, mapHeight, m_radarZoom, m_radarCenterX, m_radarCenterY);
     if (view.w > 0 && view.h > 0)
     {
-        // No hardware scissor here: on devices it cut the whole radar away. The surplus is painted over instead.
+        const SDL_Rect radarInner {
+            radarRect.x + 1, radarRect.y + 1, std::max(0, radarRect.w - 2), std::max(0, radarRect.h - 2)};
+        // Clip into an offscreen target when supported (safe against zoomed tiles/alert waves overflowing);
+        // otherwise keep hardware clip + explicit bounds clamping so nothing spills outside radarRect.
+        const bool softClip
+            = radarInner.w > 0 && radarInner.h > 0 && renderer.BeginClipTarget(radarInner, {6, 12, 10, 255});
+        if (!softClip)
+        {
+            renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
+            renderer.SetClipRect({view.ox, view.oy, view.w, view.h});
+        }
+        auto fillClamped = [&](int x, int y, int w, int h, SDL_Color color) {
+            const int x0 = std::max(x, view.ox);
+            const int y0 = std::max(y, view.oy);
+            const int x1 = std::min(x + w, view.ox + view.w);
+            const int y1 = std::min(y + h, view.oy + view.h);
+            if (x1 > x0 && y1 > y0)
+                renderer.FillRectScreen(x0, y0, x1 - x0, y1 - y0, color);
+        };
         renderer.FillRectScreen(view.ox, view.oy, view.w, view.h, {14, 30, 22, 255});
         const bool fogEnabled = m_radarFog && map.IsFogEnabled() && !m_showAll;
         const int minTileX = std::max(0, static_cast<int>(view.viewX));
@@ -344,7 +355,7 @@ void HUDController::DrawRadar(
                 const FogState fogState = fogEnabled ? map.GetFogState(tileX, tileY) : FogState::Visible;
                 if (fogState == FogState::Hidden)
                 {
-                    renderer.FillRectScreen(pixelX, pixelY, pixelWidth, pixelHeight, hiddenColor);
+                    fillClamped(pixelX, pixelY, pixelWidth, pixelHeight, hiddenColor);
                     continue;
                 }
                 // Walls as the local player knows them: under the fog of war the ones seen there last
@@ -353,7 +364,7 @@ void HUDController::DrawRadar(
                 {
                     const PlayerId owner
                         = fogEnabled ? map.ViewerWallOwner(tileX, tileY) : map.GetWallOwner(tileX, tileY);
-                    renderer.FillRectScreen(
+                    fillClamped(
                         pixelX,
                         pixelY,
                         pixelWidth,
@@ -363,7 +374,7 @@ void HUDController::DrawRadar(
                 else if (map.GetWall(tileX, tileY) == 0 && !map.IsPassable(tileX, tileY)) // an unseen wall is no
                                                                                           // terrain
                 {
-                    renderer.FillRectScreen(pixelX, pixelY, pixelWidth, pixelHeight, {30, 54, 40, 255});
+                    fillClamped(pixelX, pixelY, pixelWidth, pixelHeight, {30, 54, 40, 255});
                 }
             }
         }
@@ -403,7 +414,7 @@ void HUDController::DrawRadar(
                     pixelY,
                     pixelWidth,
                     pixelHeight);
-                renderer.FillRectScreen(
+                fillClamped(
                     pixelX,
                     pixelY,
                     std::max(3, pixelWidth),
@@ -422,7 +433,7 @@ void HUDController::DrawRadar(
                     pixelWidth,
                     pixelHeight);
                 const int unitSize = std::max(2, std::min(pixelWidth, pixelHeight));
-                renderer.FillRectScreen(
+                fillClamped(
                     pixelX + (pixelWidth - unitSize) / 2,
                     pixelY + (pixelHeight - unitSize) / 2,
                     unitSize,
@@ -508,8 +519,12 @@ void HUDController::DrawRadar(
                 renderer.FillRectScreen(
                     view.ox + view.w, top, radarRect.Right() - (view.ox + view.w), bottom - top, back);
         }
+        if (softClip)
+            renderer.EndClipTarget(255);
+        else
+            renderer.ResetClipRect();
     }
-    renderer.DrawRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, col::BorderStrong);
+    ui::DrawPanelFrame(renderer, radarRect, col::BorderStrong);
 
     // Radar alarm: the radar's sides flash red, the band fading inward
     if (m_radarAlert.BlinkOn(SDL_GetTicks()))
@@ -534,10 +549,11 @@ void HUDController::DrawRadar(
         const bool hovered = enabled && buttonRect.Contains(mouseX, mouseY);
         if (hovered)
             SoundRequests::MarkHover();
-        renderer.FillRectScreen(
-            buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, hovered ? col::Hover : SDL_Color {10, 16, 14, 210});
-        renderer.DrawRectScreen(
-            buttonRect.x, buttonRect.y, buttonRect.w, buttonRect.h, enabled ? col::BorderStrong : col::Border);
+        const SDL_Color topFill = hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.45f)
+                                          : ui::Mix(col::PanelRaised, col::Panel, 0.35f);
+        const SDL_Color border = hovered ? col::Accent : (enabled ? col::BorderStrong : col::Border);
+        ui::DrawButtonChrome(
+            renderer, buttonRect, topFill, col::PanelSunken, border, {0, 0, 0, 0}, {0, 0, 0, 0}, enabled ? 235 : 170);
         const SDL_Color symbolColor = enabled ? col::Text : col::TextMuted;
         renderer.FillRectScreen(buttonRect.x + 5, buttonRect.CenterY() - 1, buttonRect.w - 10, 2, symbolColor);
         if (k == 1)
@@ -572,9 +588,7 @@ void HUDController::RenderGameHud(
     SidebarLayout layout = sidebarLayout(windowWidth, windowHeight, m_topInset, !m_observer && m_speedEnabled);
 
     // Frame
-    ui::FillVerticalGradient(renderer, layout.panel, {20, 24, 32, 255}, {12, 15, 20, 255});
-    renderer.FillRectScreen(layout.panel.x, 0, 1, windowHeight, col::BorderStrong);
-    renderer.FillRectScreen(layout.panel.x + 1, 0, 1, windowHeight, {0, 0, 0, 120});
+    ui::DrawPanel(renderer, layout.panel, col::Panel, col::BorderStrong);
 
     // --- Header: credits & power ---------------------------------------------------------
     {
@@ -682,16 +696,7 @@ void HUDController::RenderGameHud(
             bool hovered = tabRect.Contains(mouseX, mouseY);
             if (hovered)
                 SoundRequests::MarkHover();
-            renderer.FillRectScreen(
-                tabRect.x,
-                tabRect.y,
-                tabRect.w,
-                tabRect.h,
-                active ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-            renderer.DrawRectScreen(
-                tabRect.x, tabRect.y, tabRect.w, tabRect.h, active ? col::BorderStrong : col::Border);
-            if (active)
-                renderer.FillRectScreen(tabRect.x, tabRect.Bottom() - 3, tabRect.w, 3, col::Accent);
+            ui::DrawTab(renderer, tabRect, active, hovered, col::Accent);
 
             if (TabIcon(tabIndex) >= 0)
             {
@@ -721,9 +726,14 @@ void HUDController::RenderGameHud(
         }
 
         // --- Strip: tab title, primary building, scroll arrows ---------------------------------------
-        int maxScroll = MaxScrollRows(m_activeTab, layout.grid.h);
-        int &scroll = m_scrollRow[m_activeTab];
-        scroll = std::clamp(scroll, 0, maxScroll);
+        const int gridRows = (ItemCountForTab(m_activeTab) + SidebarLayout::kCols - 1) / SidebarLayout::kCols;
+        const int gridContentH
+            = gridRows > 0 ? gridRows * (SidebarLayout::kCellH + SidebarLayout::kGap) - SidebarLayout::kGap : 0;
+        const float maxScrollPx = std::max(0.0f, static_cast<float>(gridContentH - layout.grid.h));
+        auto &gridScroll = m_gridScroll[m_activeTab];
+        gridScroll.offset = std::clamp(gridScroll.offset, 0.0f, maxScrollPx);
+        gridScroll.target = std::clamp(gridScroll.target, 0.0f, maxScrollPx);
+        const int scrollPx = gridScroll.PixelOffset();
         {
             ui::DrawCaption(fontRenderer, renderer, layout.strip.x, layout.strip.y + 4, _(kTabNames[m_activeTab]));
 
@@ -769,14 +779,15 @@ void HUDController::RenderGameHud(
                     Anchor::RIGHT | Anchor::VCENTER);
             }
 
-            if (maxScroll > 0)
+            if (maxScrollPx > 0.0f)
             {
                 auto drawArrow = [&](const UiRect &arrowRect, bool isUp, bool enabled) {
                     bool hovered = enabled && arrowRect.Contains(mouseX, mouseY);
-                    renderer.FillRectScreen(
-                        arrowRect.x, arrowRect.y, arrowRect.w, arrowRect.h, hovered ? col::Hover : col::PanelRaised);
-                    renderer.DrawRectScreen(
-                        arrowRect.x, arrowRect.y, arrowRect.w, arrowRect.h, hovered ? col::BorderStrong : col::Border);
+                    ui::DrawPanel(
+                        renderer,
+                        arrowRect,
+                        hovered ? col::Hover : col::PanelRaised,
+                        hovered ? col::BorderStrong : col::Border);
                     SDL_Color arrowColor = enabled ? (hovered ? col::Accent : col::Text) : col::TextMuted;
                     for (int i = 0; i < 5; ++i)
                     {
@@ -784,8 +795,8 @@ void HUDController::RenderGameHud(
                         renderer.FillRectScreen(arrowRect.CenterX() - i, rowY, 2 * i + 1, 1, arrowColor);
                     }
                 };
-                drawArrow(layout.scrollUp, true, scroll > 0);
-                drawArrow(layout.scrollDown, false, scroll < maxScroll);
+                drawArrow(layout.scrollUp, true, scrollPx > 0);
+                drawArrow(layout.scrollDown, false, gridScroll.offset < maxScrollPx - 0.5f);
             }
         }
 
@@ -811,7 +822,7 @@ void HUDController::RenderGameHud(
         int itemCount = ItemCountForTab(m_activeTab);
         for (int i = 0; i < itemCount; ++i)
         {
-            UiRect cellRect = layout.Cell(i, scroll);
+            UiRect cellRect = layout.Cell(i, scrollPx);
             if (cellRect.Bottom() < layout.grid.y || cellRect.y > layout.grid.Bottom())
                 continue;
             const int itemIndex = ItemAt(m_activeTab, i); // (the tech level hides what it leaves out)
@@ -1004,33 +1015,34 @@ void HUDController::RenderGameHud(
                         }
                         active = anySelected && allMatch;
                     }
-                    renderer.FillRectScreen(
-                        cellRect.x,
-                        cellRect.y,
-                        cellRect.w,
-                        cellRect.h,
-                        active ? SDL_Color {60, 44, 20, 255} : (hovered ? col::Hover : col::PanelRaised));
-                    renderer.DrawRectScreen(
-                        cellRect.x,
-                        cellRect.y,
-                        cellRect.w,
-                        cellRect.h,
-                        active ? col::Accent : (hovered ? col::BorderStrong : col::Border));
+                    const SDL_Color cardTop = active
+                                                  ? ui::Mix(col::Accent, col::PanelRaised, 0.58f)
+                                                  : (hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.45f)
+                                                             : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.16f));
+                    const SDL_Color cardBot = active ? ui::color::AccentDeep : col::PanelSunken;
+                    const SDL_Color cardBorder
+                        = active ? col::Accent : (hovered ? ui::Mix(col::Accent, col::White, 0.2f) : col::BorderStrong);
+                    const SDL_Color cardCorners = (active || hovered) ? col::Accent : col::BorderStrong;
+                    ui::DrawButtonChrome(renderer, cellRect, cardTop, cardBot, cardBorder, {0, 0, 0, 0}, cardCorners);
                     fontRenderer.DrawString(
                         ui::FitText(fontRenderer, _(orderDef.name), ui::FONT_BODY_BOLD, cellRect.w - 16),
                         cellRect.CenterX(),
                         cellRect.CenterY() + 6,
                         ui::FONT_BODY_BOLD,
-                        active ? col::Accent : col::Text,
-                        false,
+                        active ? col::Accent : (hovered ? col::White : col::Text),
+                        true,
                         Anchor::HCENTER | Anchor::VCENTER);
                     if (orderDef.key[0] != '\0')
                     {
-                        UiRect keyChipRect {cellRect.x + 6, cellRect.y + 6, 22, 22};
-                        renderer.FillRectScreen(
-                            keyChipRect.x, keyChipRect.y, keyChipRect.w, keyChipRect.h, col::PanelSunken);
-                        renderer.DrawRectScreen(
-                            keyChipRect.x, keyChipRect.y, keyChipRect.w, keyChipRect.h, col::BorderStrong);
+                        UiRect keyChipRect {cellRect.x + 8, cellRect.y + 6, 22, 22};
+                        ui::DrawButtonChrome(
+                            renderer,
+                            keyChipRect,
+                            col::PanelRaised,
+                            col::PanelSunken,
+                            active ? col::Accent : col::BorderStrong,
+                            {0, 0, 0, 0},
+                            {0, 0, 0, 0});
                         fontRenderer.DrawString(
                             orderDef.key,
                             keyChipRect.CenterX(),
@@ -1054,13 +1066,13 @@ void HUDController::RenderGameHud(
         renderer.ResetClipRect();
 
         // Scroll position hint on the right edge of the grid
-        if (maxScroll > 0)
+        if (maxScrollPx > 0.0f)
         {
             int trackX = layout.panel.Right() - 5;
             renderer.FillRectScreen(trackX, layout.grid.y, 2, layout.grid.h, col::PanelRaised);
-            int totalRows = maxScroll + layout.VisibleRows();
-            int thumbHeight = std::max(16, layout.grid.h * layout.VisibleRows() / totalRows);
-            int thumbY = layout.grid.y + (layout.grid.h - thumbHeight) * scroll / maxScroll;
+            int thumbHeight = std::max(16, layout.grid.h * layout.grid.h / std::max(1, gridContentH));
+            int thumbY
+                = layout.grid.y + static_cast<int>((layout.grid.h - thumbHeight) * (gridScroll.offset / maxScrollPx));
             renderer.FillRectScreen(trackX, thumbY, 2, thumbHeight, col::Accent);
         }
 
@@ -1210,26 +1222,15 @@ void HUDController::RenderGameHud(
                     const UiRect repairRect = RepairBtn(infoRect);
                     const bool isRepairing = allRepairing;
                     const bool repairHovered = repairRect.Contains(mouseX, mouseY);
-                    renderer.FillRectScreen(
-                        repairRect.x,
-                        repairRect.y,
-                        repairRect.w,
-                        repairRect.h,
-                        isRepairing ? SDL_Color {60, 44, 20, 255} : (repairHovered ? col::Hover : col::PanelRaised));
-                    renderer.DrawRectScreen(
-                        repairRect.x,
-                        repairRect.y,
-                        repairRect.w,
-                        repairRect.h,
-                        isRepairing ? col::Accent : col::BorderStrong);
-                    fontRenderer.DrawString(
+                    ui::DrawButton(
+                        renderer,
+                        fontRenderer,
+                        repairRect,
                         isRepairing ? _("REPAIRING") : _("REPAIR [R]"),
-                        repairRect.CenterX(),
-                        repairRect.CenterY(),
-                        ui::FONT_SMALL_BOLD,
-                        isRepairing ? col::Accent : col::Text,
-                        false,
-                        Anchor::HCENTER | Anchor::VCENTER);
+                        isRepairing ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
+                        repairHovered,
+                        true,
+                        ui::FONT_SMALL_BOLD);
                 }
             }
             if (!OwnSelectedBuildings(entities, selected).empty())
@@ -1237,22 +1238,15 @@ void HUDController::RenderGameHud(
                 const UiRect destroyRect = DestroyBtn(infoRect);
                 const bool armed = m_destroyArmed > 0.0f;
                 const bool destroyHovered = destroyRect.Contains(mouseX, mouseY);
-                renderer.FillRectScreen(
-                    destroyRect.x,
-                    destroyRect.y,
-                    destroyRect.w,
-                    destroyRect.h,
-                    armed ? col::Danger
-                          : (destroyHovered ? ui::Mix(col::PanelRaised, col::Danger, 0.35f) : col::PanelRaised));
-                renderer.DrawRectScreen(destroyRect.x, destroyRect.y, destroyRect.w, destroyRect.h, col::Danger);
-                fontRenderer.DrawString(
+                ui::DrawButton(
+                    renderer,
+                    fontRenderer,
+                    destroyRect,
                     armed ? _("CONFIRM?") : _("DESTROY"),
-                    destroyRect.CenterX(),
-                    destroyRect.CenterY(),
-                    ui::FONT_SMALL_BOLD,
-                    armed ? col::Text : col::Danger,
-                    false,
-                    Anchor::HCENTER | Anchor::VCENTER);
+                    ui::ButtonStyle::Danger,
+                    destroyHovered || armed,
+                    true,
+                    ui::FONT_SMALL_BOLD);
             }
         }
     }

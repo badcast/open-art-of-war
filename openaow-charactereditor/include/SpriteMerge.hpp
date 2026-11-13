@@ -5,6 +5,7 @@
 #include <array>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -33,7 +34,7 @@ NameMap BuildNameMap(const std::vector<Source> &sources);
 
 // A reference as written in the meta of `fromObject` ("item", "item[i]", "object.item[i]"), inside the merged
 // object: references into a merged source lose their prefix and follow the renames; others stay as they are
-std::string RewriteMetaRef(const std::string &ref, const std::string &fromObject, const NameMap &names);
+std::string RewriteMetaRef(std::string_view ref, std::string_view fromObject, const NameMap &names);
 
 // Where each frame goes in the merged image: (object, frame) -> x, y
 using FramePlaces = std::map<std::pair<std::string, std::string>, std::array<int, 2>>;
@@ -45,19 +46,19 @@ YAML::Node MergeMetas(
     const std::vector<Source> &sources,
     const NameMap &names,
     const FramePlaces &places,
-    const std::string &image,
-    const std::string &resistanceImage,
+    std::string_view image,
+    std::string_view resistanceImage,
     int imageW,
     int imageH);
-std::string EmitMeta(const YAML::Node &meta, const std::string &header);
+std::string EmitMeta(const YAML::Node &meta, std::string_view header);
 
 // References in another asset file: "<source>.<item>" (and "<source>.<item>[i]") -> "<merged>.<new item>" where the
 // item is one of the source's names; a whole line "sprite: <source>" / "reinforced_sprite: <source>" -> the merged
 // object. `count` gets the number of replacements.
-std::string RewriteText(const std::string &text, const NameMap &names, const std::string &merged, int &count);
+std::string RewriteText(std::string_view text, const NameMap &names, std::string_view merged, int &count);
 
 // True when a line of `text` is "sprite: <object>" (units bind their object by its bare name)
-bool BindsBare(const std::string &text, const std::string &object);
+bool BindsBare(std::string_view text, std::string_view object);
 
 // Shelf packing, largest first: the top left corner of each size, `padding` pixels apart
 std::vector<std::array<int, 2>> ShelfPack(const std::vector<std::array<int, 2>> &sizes, int padding);
@@ -80,7 +81,7 @@ using AssemblyGroup = std::vector<AssemblyPiece>;
 // building first (parts, the first picture of an animation and family members opened up, offsets added), then every
 // composite (parts) on its own. `frameIndex`: frame name -> index; `scale`: pixels per game unit for the offsets
 std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
-    const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale);
+    const YAML::Node &meta, std::string_view object, const std::map<std::string, int> &frameIndex, float scale);
 // Where each frame goes: every picture becomes one block with its frames at their offsets (a frame goes with the
 // first picture that uses it; a frame the game draws over another one goes to the nearest free place beside where it
 // is drawn), the blocks and the frames no picture uses are shelf-packed, `padding` pixels apart

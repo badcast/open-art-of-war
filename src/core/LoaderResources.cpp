@@ -34,13 +34,12 @@ State &state()
     return s;
 }
 
-bool LoadInto(State &s, const std::string &path)
+bool LoadInto(State &s, std::string_view path)
 {
     nlohmann::json doc = nlohmann::json::object();
     std::string text;
     bool ok = false;
-    const std::string &actualPath = path;
-    Assets::ReadText(actualPath, text);
+    Assets::ReadText(path, text);
     if (!text.empty())
     {
         nlohmann::json file = JsonFile::ReadYamlFromString(text);
@@ -60,8 +59,7 @@ bool LoadInto(State &s, const std::string &path)
         }
         else
         {
-            std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest object: no resources"
-                      << std::endl;
+            std::cerr << "[LoaderResources] " << path << " is not a valid manifest object: no resources" << std::endl;
         }
         if (doc.is_object() && doc.contains("version") && doc["version"].is_number_integer())
         {
@@ -74,7 +72,7 @@ bool LoadInto(State &s, const std::string &path)
 
         if (doc.empty())
         {
-            std::cerr << "[LoaderResources] " << actualPath << " is not a valid manifest version" << std::endl;
+            std::cerr << "[LoaderResources] " << path << " is not a valid manifest version" << std::endl;
         }
     }
     else
@@ -104,11 +102,11 @@ void EnsureLoaded()
     });
 }
 
-std::string WithExt(const std::string &name, const std::string &ext)
+std::string WithExt(std::string_view name, std::string_view ext)
 {
     if (ext.empty() || (name.size() >= ext.size() && name.compare(name.size() - ext.size(), ext.size(), ext) == 0))
-        return name;
-    return name + ext;
+        return std::string(name);
+    return std::string(name) + std::string(ext);
 }
 } // namespace
 
@@ -142,11 +140,11 @@ bool LoaderResources::Reload()
     return LoadInto(s, path);
 }
 
-void LoaderResources::SetAssetRoot(const std::string &root)
+void LoaderResources::SetAssetRoot(std::string_view root)
 {
     State &s = state();
     std::lock_guard<std::mutex> guard(s.lock);
-    s.root = root.empty() ? std::string(kDefaultRoot) : root;
+    s.root = root.empty() ? std::string(kDefaultRoot) : std::string(root);
 }
 
 std::string LoaderResources::AssetRoot()
@@ -174,16 +172,16 @@ const nlohmann::json &LoaderResources::Manifest()
     return state().doc;
 }
 
-std::string LoaderResources::join(const std::string &relative)
+std::string LoaderResources::join(std::string_view relative)
 {
     if (relative.empty())
         return std::string(); // not named in main.yaml: no file (never the bare root folder)
     const std::string root = AssetRoot();
     if (root.empty())
-        return relative;
+        return std::string(relative);
     if (root.back() == '/' || root.back() == '\\')
-        return root + relative;
-    return root + "/" + relative;
+        return root + std::string(relative);
+    return root + "/" + std::string(relative);
 }
 
 std::string LoaderResources::Str(const char *section, const char *key)
@@ -272,7 +270,7 @@ std::vector<std::pair<std::string, std::string>> LoaderResources::UiTextures()
     return out;
 }
 
-std::string LoaderResources::AudioFile(const std::string &name)
+std::string LoaderResources::AudioFile(std::string_view name)
 {
     return join(name);
 }
@@ -306,7 +304,7 @@ std::string LoaderResources::VoicesConfig()
     return join(Str("voices", "config"));
 }
 
-std::vector<std::string> LoaderResources::VoiceClips(const std::string &language)
+std::vector<std::string> LoaderResources::VoiceClips(std::string_view language)
 {
     std::vector<std::string> out;
     const nlohmann::json &m = Manifest();
@@ -316,7 +314,7 @@ std::vector<std::string> LoaderResources::VoiceClips(const std::string &language
     auto clips = it->find("clips");
     if (clips == it->end() || !clips->is_object())
         return out;
-    auto lang = clips->find(language);
+    auto lang = clips->find(std::string(language));
     if (lang == clips->end() || !lang->is_array())
         return out;
     for (const auto &v : *lang)
@@ -382,9 +380,9 @@ std::string LoaderResources::Capabilities()
     return join(Str(nullptr, "capabilities"));
 }
 
-std::string LoaderResources::Research(const std::string &faction)
+std::string LoaderResources::Research(std::string_view faction)
 {
-    return join(Str("research", faction.c_str()));
+    return join(Str("research", std::string(faction).c_str()));
 }
 
 std::string LoaderResources::TileCollision()
@@ -402,7 +400,7 @@ std::string LoaderResources::MapsDir()
     return join(Str("maps", "dir"));
 }
 
-std::string LoaderResources::MapPath(const std::string &name)
+std::string LoaderResources::MapPath(std::string_view name)
 {
     static const std::unordered_map<std::string, std::string> kAliases
         = {{"map_mission_1", "confederation_mission_1"},
@@ -464,7 +462,7 @@ std::string LoaderResources::MissionMapsDir()
     return dir.empty() ? MapsDir() + "/mission" : join(dir);
 }
 
-std::string LoaderResources::MissionMapPath(const std::string &name)
+std::string LoaderResources::MissionMapPath(std::string_view name)
 {
     // The mission's own name for its map; an alias or a path is resolved as for any map
     if (name.find('/') != std::string::npos || name.find('\\') != std::string::npos)

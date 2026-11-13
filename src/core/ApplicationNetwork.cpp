@@ -554,7 +554,7 @@ void Application::UpdateNetworkMenu()
 namespace
 {
 // The name of a map for its loading screen
-std::string MapTitleOf(const std::string &path)
+std::string MapTitleOf(std::string_view path)
 {
     for (const SkirmishMapInfo &m : MissionController::ListSkirmishMaps())
     {
@@ -588,11 +588,11 @@ bool Application::AuthorityMatchContinues() const
 }
 
 void Application::HostNetworkGame(
-    std::uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch)
+    std::uint16_t port, int players, std::string_view mapPath, std::string_view name, bool fromScratch)
 {
     m_net = std::make_unique<NetMatch>();
     std::string error;
-    if (!m_net->host(port, name, error))
+    if (!m_net->host(port, std::string(name), error))
     {
         std::cerr << "[Net] Cannot host on port " << port << ": " << error << std::endl;
         m_net.reset();
@@ -601,23 +601,23 @@ void Application::HostNetworkGame(
     if (m_networkMenu)
         m_networkMenu->SetPrebuilt(!fromScratch);
     m_netWantedPlayers = std::clamp(players, 1, kMaxPlayers);
-    m_netMapPath = mapPath;
+    m_netMapPath.assign(mapPath);
     m_netAuto = true;
     m_state = AppState::MenuNetwork; // the room shows who has joined
     std::cout << "[Net] Hosting on UDP " << port << ", waiting for " << m_netWantedPlayers << " players" << std::endl;
 }
 
-void Application::AnnounceNetworkGame(const std::string &server, std::uint16_t port)
+void Application::AnnounceNetworkGame(std::string_view server, std::uint16_t port)
 {
     if (m_net)
-        m_net->Announce(server, port);
+        m_net->Announce(std::string(server), port);
 }
 
-void Application::JoinNetworkGame(const std::string &address, std::uint16_t port, const std::string &name)
+void Application::JoinNetworkGame(std::string_view address, std::uint16_t port, std::string_view name)
 {
     m_net = std::make_unique<NetMatch>();
     std::string error;
-    if (!m_net->join(address, port, name, error))
+    if (!m_net->join(std::string(address), port, std::string(name), error))
     {
         std::cerr << "[Net] Cannot join " << address << ":" << port << ": " << error << std::endl;
         m_net.reset();
@@ -629,27 +629,27 @@ void Application::JoinNetworkGame(const std::string &address, std::uint16_t port
 }
 
 void Application::ServerNetworkGame(
-    const std::string &server,
+    std::string_view server,
     std::uint16_t port,
-    const std::string &code,
+    std::string_view code,
     int players,
-    const std::string &mapPath,
-    const std::string &name,
+    std::string_view mapPath,
+    std::string_view name,
     bool fromScratch)
 {
     if (m_networkMenu && code.empty())
         m_networkMenu->SetPrebuilt(!fromScratch);
-    m_serverOverride = server;
+    m_serverOverride.assign(server);
     m_serverOverridePort = port;
     m_cliServerAction = code.empty() ? 1 : 2;
-    m_cliServerCode = code;
+    m_cliServerCode.assign(code);
     m_netWantedPlayers = std::clamp(players, 1, kMaxPlayers);
-    m_netMapPath = mapPath;
+    m_netMapPath.assign(mapPath);
     m_netAuto = true;
-    m_settings.playerName = name;
+    m_settings.playerName.assign(name);
     m_state = AppState::MenuNetwork;
-    std::cout << "[Net] Server " << server << ":" << port << (code.empty() ? ", creating a room" : ", room " + code)
-              << std::endl;
+    std::cout << "[Net] Server " << server << ":" << port
+              << (code.empty() ? ", creating a room" : ", room " + std::string(code)) << std::endl;
 }
 
 void Application::UpdateNetwork(std::uint32_t nowMs)

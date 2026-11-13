@@ -110,7 +110,7 @@ struct FamilyRef
     int start {-1};
     int count {0};
 };
-FamilyRef SpriteFamilyRef(const std::string &ref);                           // a family by name; {-1, 0} unknown
+FamilyRef SpriteFamilyRef(std::string_view ref);                             // a family by name; {-1, 0} unknown
 int SpriteRefHandle(const YAML::Node &value, OpenArtOfWar::SpriteKind kind); // -1: none / unknown
 std::vector<int> SpriteRefHandles(const YAML::Node &list, OpenArtOfWar::SpriteKind kind);
 // The name to write for a handle: the family for the first member of a family ("<object>.<family>")
@@ -132,7 +132,7 @@ inline T YamlValue(const YAML::Node &node, const char *key, T fallback = {})
     }
 }
 
-std::string YamlString(const YAML::Node &node, const char *key, const std::string &fallback = {});
+std::string YamlString(const YAML::Node &node, const char *key, std::string_view fallback = {});
 
 int YamlInt(const YAML::Node &node, const char *key, int fallback = 0);
 
@@ -217,7 +217,7 @@ AnimTiming ReadAnimTiming(const YAML::Node &doc);
 // Seconds per firing-pose frame with the archetype's default applied
 float AttackFrameTime(const AnimTiming &t, int archetypeId);
 // Default length of the firing pose after the first shot: by projectile (hit-scan 0.12 s, others 0.22 s)
-float DefaultAttackPose(const std::string &projectile);
+float DefaultAttackPose(std::string_view projectile);
 
 enum class EditorMode
 {

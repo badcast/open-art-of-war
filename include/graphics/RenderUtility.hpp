@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -69,7 +69,7 @@ void DrawLine(
     float widthPx = 1.0f);
 
 // "#RRGGBB" or "#RRGGBBAA" (the # is optional); `fallback` when the text is not a color
-SDL_Color ParseHexColor(const std::string &text, SDL_Color fallback);
+SDL_Color ParseHexColor(std::string_view text, SDL_Color fallback);
 
 } // namespace RenderUtility
 

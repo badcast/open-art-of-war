@@ -27,7 +27,7 @@ static int fails = 0;
         }                                                           \
     } while (0)
 
-static void Write(const fs::path &p, const std::string &text)
+static void Write(const fs::path &p, std::string_view text)
 {
     fs::create_directories(p.parent_path());
     std::ofstream(p, std::ios::binary) << text;
@@ -84,12 +84,13 @@ manifest:
     Write(user / "alpha" / "preview.png", "PNG_ALPHA_PREVIEW");
     // beta: 1.0 next to the game and in the user directory (the user's counts), both bring data/x.yaml
     WriteTar(app / "beta.mod", {{"mod.yaml", "id: beta\nversion: \"1.0\"\n"}, {"data/x.yaml", "from: beta app\n"}});
-    WriteTar(user / "beta.mod",
+    WriteTar(
+        user / "beta.mod",
         {{"mod.yaml", "id: beta\nversion: \"1.0\"\n"},
-            {"data/x.yaml", "from: beta user\n"},
-            {"preview.png", "PNG_BETA_PREVIEW"},
-            {"assets/data/y.yaml", "y: 1\n"},
-            {"../evil.yaml", "no\n"}});
+         {"data/x.yaml", "from: beta user\n"},
+         {"preview.png", "PNG_BETA_PREVIEW"},
+         {"assets/data/y.yaml", "y: 1\n"},
+         {"../evil.yaml", "no\n"}});
     // gamma: 2.0 next to the game wins over 1.5 of the user
     WriteTar(app / "gamma.mod", {{"mod.yaml", "id: gamma\nversion: \"2.0\"\n"}});
     WriteTar(user / "gamma.mod", {{"mod.yaml", "id: gamma\nversion: \"1.5\"\n"}});
@@ -97,7 +98,7 @@ manifest:
     Write(user / "broken" / "mod.yaml", "id: Not Valid\n");
 
     const std::vector<Mods::ModInfo> found = Mods::Scan();
-    auto find = [&](const std::string &id) -> const Mods::ModInfo * {
+    auto find = [&](std::string_view id) -> const Mods::ModInfo * {
         for (const auto &m : found)
             if (m.id == id)
                 return &m;
@@ -120,8 +121,9 @@ manifest:
     std::string key;
     CHECK(Mods::KeyOf("./sprites/../sprites/a.png", key) && key == "sprites/a.png");
     CHECK(Mods::KeyOf("assets/maps/m.json", key) && key == "maps/m.json");
-    CHECK(!Mods::KeyOf("../x", key) && !Mods::KeyOf("/etc/passwd", key) && !Mods::KeyOf("C:/x", key)
-          && !Mods::KeyOf("a\\b", key));
+    CHECK(
+        !Mods::KeyOf("../x", key) && !Mods::KeyOf("/etc/passwd", key) && !Mods::KeyOf("C:/x", key)
+        && !Mods::KeyOf("a\\b", key));
 
     // alpha then beta: beta's data/x.yaml wins, alpha's files are there, the escaping entry is refused
     Mods::ActivateReport report;
@@ -167,11 +169,9 @@ manifest:
         cert1 += "assets/data/v1.yaml  " + hash1 + "\n";
         cert1 += "assets/data/common.yaml  " + hashCommonBase + "\n";
 
-        WriteTar(blobDir / "00_base.blob", {
-            {"certificate.sha256", cert1},
-            {"data/v1.yaml", text1},
-            {"data/common.yaml", textCommon}
-        });
+        WriteTar(
+            blobDir / "00_base.blob",
+            {{"certificate.sha256", cert1}, {"data/v1.yaml", text1}, {"data/common.yaml", textCommon}});
 
         // Blob 2: overrides common.yaml, adds v2.yaml + certificate
         const std::string text2 = "version: 2\n";
@@ -183,11 +183,9 @@ manifest:
         cert2 += "assets/data/v2.yaml  " + hash2 + "\n";
         cert2 += "assets/data/common.yaml  " + hashCommonPatch + "\n";
 
-        WriteTar(blobDir / "01_patch.blob", {
-            {"certificate.sha256", cert2},
-            {"data/v2.yaml", text2},
-            {"data/common.yaml", textCommonPatch}
-        });
+        WriteTar(
+            blobDir / "01_patch.blob",
+            {{"certificate.sha256", cert2}, {"data/v2.yaml", text2}, {"data/common.yaml", textCommonPatch}});
 
         const fs::path oldCwd = fs::current_path(dirEc);
         fs::current_path(blobDir, dirEc);

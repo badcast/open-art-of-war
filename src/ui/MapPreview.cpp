@@ -26,8 +26,8 @@ void MapPreview::Clear()
 SDL_Texture *MapPreview::Get(
     SDL_Renderer *renderer,
     TextureManager &textures,
-    const std::string &key,
-    const std::string &mapPath,
+    std::string_view key,
+    std::string_view mapPath,
     const std::vector<PreviewMarker> &markers,
     int &width,
     int &height)
@@ -105,7 +105,7 @@ SDL_Texture *MapPreview::Get(
             SDL_DestroySurface(surface);
         }
     }
-    m_cache[key] = entry;
+    m_cache.insert_or_assign(std::string(key), entry);
     width = entry.width;
     height = entry.height;
     return entry.texture;

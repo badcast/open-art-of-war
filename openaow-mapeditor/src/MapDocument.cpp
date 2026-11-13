@@ -3,9 +3,11 @@
 #include "core/Utility.hpp"
 #include "game/TileCollision.hpp"
 #include "graphics/TextureManager.hpp"
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
 #include <queue>
 #include <cmath>
 #include <tuple>
@@ -132,7 +134,7 @@ void MapDocument::NewMap(int width, int height, int tilesetId, std::uint8_t fill
     m_modified = false;
 }
 
-bool MapDocument::LoadMap(const std::string &path)
+bool MapDocument::LoadMap(std::string_view path)
 {
     std::string fileText;
     if (!OpenArtOfWar::Assets::ReadText(path, fileText))
@@ -266,7 +268,7 @@ bool MapDocument::LoadMap(const std::string &path)
     return true;
 }
 
-bool MapDocument::SaveMap(const std::string &path)
+bool MapDocument::SaveMap(std::string_view path)
 {
     nlohmann::json j = m_mapData.is_object() ? m_mapData : nlohmann::json::object();
     j["name"] = m_name;
@@ -410,7 +412,7 @@ bool MapDocument::SaveMap(const std::string &path)
         j["start_positions"] = std::move(list);
     }
 
-    std::ofstream out(path);
+    std::ofstream out {std::filesystem::path(path)};
     if (!out.is_open())
     {
         std::cerr << "[MapDocument] Failed to write file: " << path << std::endl;

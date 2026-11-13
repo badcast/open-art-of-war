@@ -55,7 +55,7 @@ const char *const kClassKeys[WeaponBalance::kClasses] = {"infantry", "vehicle", 
 namespace WeaponBalance
 {
 
-bool LoadText(const std::string &jsonText)
+bool LoadText(std::string_view jsonText)
 {
     const nlohmann::json doc = JsonFile::ReadFromString(jsonText);
     Table t = Defaults();

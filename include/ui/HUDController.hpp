@@ -8,6 +8,7 @@
 #include <SDL3/SDL_rect.h>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -92,8 +93,8 @@ public:
     // Initial pointer position stays fixed throughout a drag.
     virtual void SetPointerPressOrigin(int x, int y)
     {
-        (void) x;
-        (void) y;
+        m_gridPressX = x;
+        m_gridPressY = y;
     }
 
     // Window of the technology tree: search, filter, the tree, the selected technology and its start button
@@ -141,6 +142,21 @@ public:
         m_speedEnabled = enabled;
         m_speedMultiplier = multiplier;
         m_onSpeedStep = std::move(onStep);
+    }
+
+    void SetStatsOpen(bool open)
+    {
+        m_statsOpen = open;
+    }
+    bool IsStatsOpen() const
+    {
+        return m_statsOpen;
+    }
+    bool ConsumeStatsToggle()
+    {
+        const bool was = m_statsToggleRequested;
+        m_statsToggleRequested = false;
+        return was;
     }
 
     // Returns true when the mouse is over the sidebar (map input must be ignored)
@@ -339,9 +355,9 @@ public:
     // The window of the technology tree (opened by the button under OBJECTIVES, or by the observer bar)
     void OpenResearchWindow();
     void CloseResearchWindow();
-    void SetNotification(const std::string &msg, float time = 3.0f)
+    void SetNotification(std::string_view msg, float time = 3.0f)
     {
-        m_hudNotification = msg;
+        m_hudNotification = std::string(msg);
         m_hudNotificationTimer = time;
     }
 
@@ -379,8 +395,8 @@ protected:
     int m_researchFilter {0}; // 0 all, 1 available, 2 researched, 3 locked, 4 in progress
     ui::ComboState m_researchCombo;
     float m_researchScrollX {0.0f}, m_researchScrollY {0.0f};
-    float m_researchScale {1.25f}; // size of the whole window and its icons (wheel, + / - buttons)
-    int m_researchScrollDrag {0};  // 1: the vertical scroll bar is held, 2: the horizontal one
+    float m_researchScale {1.0f}; // size of the tree cards and icons (wheel, + / - / reset buttons)
+    int m_researchScrollDrag {0}; // 1: the vertical scroll bar is held, 2: the horizontal one
     // The tree follows the pointer (a finger, or the mouse held on it): a press on it starts a drag, past the tap slop
     // it pans, and the speed it had at the release carries on and fades (the glide of a flick)
     bool m_researchDrag {false};                  // the pointer went down on the tree and is still down
@@ -395,7 +411,9 @@ protected:
 
     int m_activeTab {TabBuild};
     int m_topInset {0};
-    int m_scrollRow[TabCount] {0, 0, 0, 0};
+    ui::SmoothListScroll m_gridScroll[TabCount];
+    int m_gridPressX {0}, m_gridPressY {0};
+    bool m_prevLeftDown {false};
     int m_primaryBarracksId {0};
     int m_primaryFactoryId {0};
     std::string m_hudNotification;
@@ -421,6 +439,8 @@ protected:
     bool m_buildMode {false};
     int m_selectedBlueprint {0};
     bool m_attackMoveMode {false};
+    bool m_statsOpen {false};
+    bool m_statsToggleRequested {false};
 
     bool m_speedEnabled {false};
     float m_speedMultiplier {1.0f};

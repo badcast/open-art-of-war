@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar::Net
@@ -75,7 +76,7 @@ public:
     // address). They start with their own magic, ENet never sees them.
     using RawHandler
         = std::function<void(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size)>;
-    virtual void sendRaw(const std::string &ip, std::uint16_t port, const std::vector<std::uint8_t> &data)
+    virtual void sendRaw(std::string_view ip, std::uint16_t port, const std::vector<std::uint8_t> &data)
     {
         (void) ip;
         (void) port;
@@ -86,7 +87,7 @@ public:
         (void) handler;
     }
     // A client socket made without a peer (createEnetSocket): connect it now; PeerId 0 from then on
-    virtual bool connectTo(const std::string &host, std::uint16_t port)
+    virtual bool connectTo(std::string_view host, std::uint16_t port)
     {
         (void) host;
         (void) port;
@@ -111,8 +112,8 @@ std::unique_ptr<Transport> createEnetServer(
     int maxPeers,
     std::string *error = nullptr,
     std::uint16_t *boundPort = nullptr,
-    const std::string &bindAddress = "");
-std::unique_ptr<Transport> createEnetClient(const std::string &host, std::uint16_t port, std::string *error = nullptr);
+    std::string_view bindAddress = "");
+std::unique_ptr<Transport> createEnetClient(std::string_view host, std::uint16_t port, std::string *error = nullptr);
 // A client socket that is not connected yet (punch first, then connectTo)
 std::unique_ptr<Transport> createEnetSocket(std::string *error = nullptr);
 

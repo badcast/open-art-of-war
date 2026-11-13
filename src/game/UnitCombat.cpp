@@ -259,17 +259,55 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         return;
     }
 
-    // 1. If attacking an auto-acquired wall, prioritize any enemy unit entering firing range
-    if (targetWallTileX >= 0 && !isManualWallTarget)
+    // 1. If attacking an auto-acquired wall (attack-move or idle), prioritize any enemy unit or building in
+    //    attackRange, or retaliate immediately against whoever is shooting this unit.
+    if (targetWallTileX >= 0 && !isManualWallTarget && (isAttackMoving || !HasMoveTarget()))
     {
         if (delegates.findEnemyInAttackRange)
         {
-            int enemyInRange = delegates.findEnemyInAttackRange(*this);
+            const int enemyInRange = delegates.findEnemyInAttackRange(*this);
             if (enemyInRange != 0)
             {
-                targetWallTileX = -1;
-                targetWallTileY = -1;
-                targetEntityId = enemyInRange;
+                const Entity *candidate = delegates.getEntity ? delegates.getEntity(enemyInRange) : nullptr;
+                if (candidate && StanceAllowsTarget(*candidate))
+                {
+                    targetWallTileX = -1;
+                    targetWallTileY = -1;
+                    targetEntityId = enemyInRange;
+                    isDirectEngaged = false;
+                    isSupportAssisting = false;
+                    waitingForPath = false;
+                }
+            }
+        }
+        if (targetWallTileX >= 0 && lastAttackedTimer > 0.0f && lastAttackerId != 0
+            && !(state == ActionState::Move && !isAttackMoving) && !HoldsGround() && !isSiegeMode && moveSpeed > 0.0f)
+        {
+            const Entity *attacker = delegates.getEntity ? delegates.getEntity(lastAttackerId) : nullptr;
+            if (attacker && attacker->alive && attacker->state != ActionState::Die
+                && Players::Hostile(attacker->owner, owner))
+            {
+                if (StanceAllowsTarget(*attacker)
+                    && (ComputeDistanceToEntityPixels(*this, *attacker) <= attackRange * TILE_WIDTH
+                        || HasOpenRouteToEntity(*attacker, pathfinder)))
+                {
+                    targetWallTileX = -1;
+                    targetWallTileY = -1;
+                    targetEntityId = lastAttackerId;
+                    isDirectEngaged = false;
+                    isSupportAssisting = false;
+                    waitingForPath = false;
+                    if (state == ActionState::Attack)
+                    {
+                        state = ActionState::Idle;
+                        animFrame = 0;
+                    }
+                }
+            }
+            else
+            {
+                lastAttackerId = 0;
+                lastAttackedTimer = 0.0f;
             }
         }
     }
@@ -486,109 +524,16 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         return;
     }
 
-    // 3. Auto-acquire blocking wall if path is blocked and no enemy is in sight.
-    //    A partial path is often just congestion (allies standing in the way): only breach when
-    //    the goal is unreachable over terrain and walls, checked at most once per second.
-    if (wallCheckCooldown > 0.0f)
-        wallCheckCooldown -= deltaTime;
-    //    Only a unit the wall actually hinders shoots at it: one whose goal is walled off, whose way around
-    //    is a long detour, or that has been queueing in front of a gap for a while. Units that can walk
-    //    on through an open route leave the wall alone.
-    const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath)
-                               || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
-    // On auto-attack, a hostile wall beside the way is shot down with a 50% chance (decided once per unit and wall,
-    // deterministically). Low priority: this only runs without a target, and any enemy in sight drops the wall.
-    if (isAttackMoving && HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && targetEntityId == 0
-        && targetWallTileX < 0 && wallCheckCooldown <= 0.0f)
-    {
-        wallCheckCooldown = 1.0f;
-        constexpr int kReach = 3;
-        int bestX = -1, bestY = -1, bestDist = 1 << 20;
-        for (int y = tileY - kReach; y <= tileY + kReach; ++y)
-        {
-            for (int x = tileX - kReach; x <= tileX + kReach; ++x)
-            {
-                if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
-                    continue;
-                const std::uint32_t wallHash = static_cast<std::uint32_t>(id) * 73856093u
-                                               ^ static_cast<std::uint32_t>(x) * 19349663u
-                                               ^ static_cast<std::uint32_t>(y) * 83492791u;
-                if (((wallHash >> 7) & 1u) == 0u)
-                    continue; // this one is left alone
-                const int tileDist = std::abs(x - tileX) + std::abs(y - tileY);
-                if (tileDist < bestDist)
-                {
-                    bestDist = tileDist;
-                    bestX = x;
-                    bestY = y;
-                }
-            }
-        }
-        if (bestX >= 0)
-        {
-            targetWallTileX = bestX;
-            targetWallTileY = bestY;
-            if (state == ActionState::Move)
-            {
-                ClearPathState(); // the move goal stays: the way is planned again once the wall is down
-                state = ActionState::Idle;
-                animFrame = 0;
-            }
-            waitingForPath = false;
-            blockedTimer = 0.0f;
-            return;
-        }
-    }
-    // Held up for a while at a gap that an ally standing in it shuts (one fighting from the gap, say)
-    constexpr float kGapJamSeconds = 2.0f;
-    const bool jammedAtGap
-        = HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && blockedTimer >= kGapJamSeconds;
-    if (targetEntityId == 0 && targetWallTileX < 0 && (stuckWithGoal || jammedAtGap) && HasMoveTarget()
-        && CanBreachWalls() && wallCheckCooldown <= 0.0f)
-    {
-        wallCheckCooldown = 1.0f;
-        int wallX = -1, wallY = -1;
-        // (no search left this tick: look again soon)
-        const bool searchAllowed = pathfinder.TakeBackgroundSearch();
-        if (!searchAllowed)
-            wallCheckCooldown = 0.1f;
-        if (searchAllowed && stuckWithGoal && delegates.findWallTarget
-            && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
-            delegates.findWallTarget(*this, wallX, wallY);
-        // The way through is open, only jammed: shoot the wall beside the gap, so it widens
-        if (wallX < 0 && jammedAtGap)
-            FindJammedGapWall(*this, map, delegates, wallX, wallY);
-        if (wallX >= 0)
-        {
-            targetWallTileX = wallX;
-            targetWallTileY = wallY;
-            if (state == ActionState::Move)
-            {
-                // Keep the move goal: the route is planned again once the wall is down
-                ClearPathState();
-                state = ActionState::Idle;
-                animFrame = 0;
-            }
-            waitingForPath = false;
-            blockedTimer = 0.0f;
-            return;
-        }
-    }
+    // 3. Retaliation and Auto-acquire Enemy Target (always run BEFORE auto-acquiring any wall so walls stay low
+    //    priority; plain manual moves skip combat and only breach blocking walls if stuck).
+    const bool plainMove
+        = (state == ActionState::Move && !isAttackMoving && targetEntityId == 0 && targetWallTileX < 0);
 
-    // A plain move (group or not) got here only for the breach check above: it picks no other fights
-    if (state == ActionState::Move && !isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
-    {
-        isDirectEngaged = false;
-        return;
-    }
-
-    // 3b. Retaliation: a unit shot at from beyond its reach goes after the shooter. Not while holding
-    //     position, deployed (siege), immobile, breaching a wall, or fighting something it can hit already.
-    //     A plain move order never gets here (see the early return above), so explicit moves are kept.
-    if (lastAttackedTimer > 0.0f && lastAttackerId != 0 && lastAttackerId != targetEntityId
-        && !(state == ActionState::Move && !isAttackMoving) && !HoldsGround() && !isSiegeMode && moveSpeed > 0.0f
-        && targetWallTileX < 0 && attackDamage > 0 && state != ActionState::Transform
-        && (targetEntityId == 0 || targetEntityId != orderedTargetId))
+    // 3a. Retaliation: a unit shot at (whether on attack-move or idle) goes after the shooter. Not while holding
+    //     position, deployed (siege), immobile, or already fighting something it can hit in range.
+    if (!plainMove && lastAttackedTimer > 0.0f && lastAttackerId != 0 && lastAttackerId != targetEntityId
+        && !HoldsGround() && !isSiegeMode && moveSpeed > 0.0f && targetWallTileX < 0 && attackDamage > 0
+        && state != ActionState::Transform && (targetEntityId == 0 || targetEntityId != orderedTargetId))
     {
         Entity *attacker = delegates.getEntity ? delegates.getEntity(lastAttackerId) : nullptr;
         if (attacker && attacker->alive && attacker->state != ActionState::Die
@@ -601,7 +546,7 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 busyInRange = currentTarget && currentTarget->alive && currentTarget->state != ActionState::Die
                               && ComputeDistanceToEntityPixels(*this, *currentTarget) <= attackRange * TILE_WIDTH;
             }
-            if (!busyInRange)
+            if (!busyInRange && StanceAllowsTarget(*attacker))
             {
                 targetEntityId = lastAttackerId;
                 isSupportAssisting = false;
@@ -621,8 +566,8 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
         }
     }
 
-    // 4. Auto-acquire Enemy Target & Support Assist (Depth = 1)
-    if (targetEntityId == 0
+    // 3b. Auto-acquire Enemy Target & Support Assist (Depth = 1)
+    if (!plainMove && targetEntityId == 0
         && (state == ActionState::Idle || isAttackMoving || waitingForPath || !Players::Slot(owner).human))
     {
         if (delegates.findTarget)
@@ -713,6 +658,101 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 }
             }
         }
+    }
+
+    // 4. Auto-acquire blocking wall if no enemy target was found and no enemy is within attackRange.
+    //    A partial path is often just congestion (allies standing in the way): only breach when
+    //    the goal is unreachable over terrain and walls, checked at most once per second.
+    if (wallCheckCooldown > 0.0f)
+        wallCheckCooldown -= deltaTime;
+    const bool enemyInAttackRange = (isAttackMoving || !HasMoveTarget()) && delegates.findEnemyInAttackRange
+                                    && delegates.findEnemyInAttackRange(*this) != 0;
+    const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath)
+                               || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
+    // On auto-attack, a hostile wall beside the way is shot down with a 50% chance (decided once per unit and wall,
+    // deterministically). Low priority: runs only without a target, not under fire, and without enemies in range.
+    if (isAttackMoving && HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && targetEntityId == 0
+        && targetWallTileX < 0 && !enemyInAttackRange && lastAttackedTimer <= 0.0f && wallCheckCooldown <= 0.0f)
+    {
+        wallCheckCooldown = 1.0f;
+        constexpr int kReach = 3;
+        int bestX = -1, bestY = -1, bestDist = 1 << 20;
+        for (int y = tileY - kReach; y <= tileY + kReach; ++y)
+        {
+            for (int x = tileX - kReach; x <= tileX + kReach; ++x)
+            {
+                if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
+                    continue;
+                const std::uint32_t wallHash = static_cast<std::uint32_t>(id) * 73856093u
+                                               ^ static_cast<std::uint32_t>(x) * 19349663u
+                                               ^ static_cast<std::uint32_t>(y) * 83492791u;
+                if (((wallHash >> 7) & 1u) == 0u)
+                    continue; // this one is left alone
+                const int tileDist = std::abs(x - tileX) + std::abs(y - tileY);
+                if (tileDist < bestDist)
+                {
+                    bestDist = tileDist;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+        if (bestX >= 0)
+        {
+            targetWallTileX = bestX;
+            targetWallTileY = bestY;
+            if (state == ActionState::Move)
+            {
+                ClearPathState(); // the move goal stays: the way is planned again once the wall is down
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            waitingForPath = false;
+            blockedTimer = 0.0f;
+            return;
+        }
+    }
+    // Held up for a while at a gap that an ally standing in it shuts (one fighting from the gap, say)
+    constexpr float kGapJamSeconds = 2.0f;
+    const bool jammedAtGap
+        = HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && blockedTimer >= kGapJamSeconds;
+    if (targetEntityId == 0 && targetWallTileX < 0 && !enemyInAttackRange && (stuckWithGoal || jammedAtGap)
+        && HasMoveTarget() && CanBreachWalls() && wallCheckCooldown <= 0.0f)
+    {
+        wallCheckCooldown = 1.0f;
+        int wallX = -1, wallY = -1;
+        // (no search left this tick: look again soon)
+        const bool searchAllowed = pathfinder.TakeBackgroundSearch();
+        if (!searchAllowed)
+            wallCheckCooldown = 0.1f;
+        if (searchAllowed && stuckWithGoal && delegates.findWallTarget
+            && ShouldBreachWalls(targetTileX, targetTileY, pathfinder))
+            delegates.findWallTarget(*this, wallX, wallY);
+        // The way through is open, only jammed: shoot the wall beside the gap, so it widens
+        if (wallX < 0 && jammedAtGap)
+            FindJammedGapWall(*this, map, delegates, wallX, wallY);
+        if (wallX >= 0)
+        {
+            targetWallTileX = wallX;
+            targetWallTileY = wallY;
+            if (state == ActionState::Move)
+            {
+                // Keep the move goal: the route is planned again once the wall is down
+                ClearPathState();
+                state = ActionState::Idle;
+                animFrame = 0;
+            }
+            waitingForPath = false;
+            blockedTimer = 0.0f;
+            return;
+        }
+    }
+
+    // A plain move (group or not) picks no fights on its own
+    if (state == ActionState::Move && !isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
+    {
+        isDirectEngaged = false;
+        return;
     }
 
     // 5. Handle Active Enemy Entity Target
@@ -910,6 +950,24 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
             {
                 state = ActionState::Idle;
                 animFrame = 0;
+            }
+
+            // An enemy unit or building strictly inside attackRange comes before breaching a wall for an unreachable
+            // target
+            if (isAttackMoving && targetEntityId != orderedTargetId && delegates.findEnemyInAttackRange)
+            {
+                const int enemyInRange = delegates.findEnemyInAttackRange(*this);
+                if (enemyInRange != 0 && enemyInRange != targetEntityId)
+                {
+                    const Entity *candidate = delegates.getEntity ? delegates.getEntity(enemyInRange) : nullptr;
+                    if (candidate && StanceAllowsTarget(*candidate))
+                    {
+                        targetEntityId = enemyInRange;
+                        isSupportAssisting = false;
+                        waitingForPath = false;
+                        return;
+                    }
+                }
             }
 
             // Stuck in front of the target (a base walled in all around): shoot a way through the wall

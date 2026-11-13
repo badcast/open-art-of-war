@@ -72,11 +72,11 @@ void Read(const YAML::Node &n, const char *key, T &out)
     {}
 }
 
-bool LoadText(const std::string &yamlText)
+bool LoadText(std::string_view yamlText)
 {
     try
     {
-        const YAML::Node all = YAML::Load(yamlText)["mines"];
+        const YAML::Node all = YAML::Load(std::string(yamlText))["mines"];
         if (!all || !all.IsMap())
             return false;
         std::vector<MineSpec> &specs = Storage();
@@ -151,7 +151,7 @@ void Reload()
         LoadText(text);
 }
 
-bool Apply(const std::string &yamlText)
+bool Apply(std::string_view yamlText)
 {
     Loaded() = true;
     Storage() = Defaults();

@@ -1,4 +1,5 @@
 #include "ui/ModsMenu.hpp"
+#include "ui/UiLayout.hpp"
 #include "audio/SoundRequests.hpp"
 #include "core/Localization.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -58,10 +59,10 @@ void ModsMenu::Refresh(const std::vector<std::string> &enabled)
     m_selected = std::clamp(m_selected, 0, std::max(0, static_cast<int>(m_entries.size()) - 1));
 }
 
-void ModsMenu::SetReport(const Mods::ActivateReport &report, const std::string &notice)
+void ModsMenu::SetReport(const Mods::ActivateReport &report, std::string_view notice)
 {
     m_report = report;
-    m_notice = notice;
+    m_notice = std::string(notice);
 }
 
 std::vector<std::string> ModsMenu::EnabledIds() const
@@ -106,19 +107,22 @@ void ModsMenu::Move(int index, int by)
 ModsMenu::Layout ModsMenu::MakeLayout(int windowW, int windowH)
 {
     Layout l;
+    const bool touch = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch";
     l.dialog = ui::CenteredRect(windowW, windowH, 980, 580);
-    const int pad = 18, titleH = 48, footerH = 56;
+    const int pad = 18, titleH = 52, footerH = 60;
     const int bodyY = l.dialog.y + titleH + pad;
     const int bodyH = l.dialog.h - titleH - footerH - pad * 2;
     const int listW = (l.dialog.w - pad * 3) * 5 / 11;
-    l.list = {l.dialog.x + pad, bodyY, listW, bodyH};
-    l.details = {l.list.Right() + pad, bodyY, l.dialog.w - listW - pad * 3, bodyH};
+    l.rowH = touch ? 50 : 42;
+    l.list = {l.dialog.x + pad, bodyY, listW - 10, bodyH};
+    l.track = {l.list.Right() + 4, l.list.y, 6, l.list.h};
+    l.details = {l.list.Right() + pad + 6, bodyY, l.dialog.w - listW - pad * 3, bodyH};
     l.rows = std::max(1, l.list.h / l.rowH);
     const int by = l.dialog.Bottom() - footerH + 8;
-    l.backBtn = {l.dialog.x + pad, by, 150, 38};
-    l.upBtn = {l.backBtn.Right() + 12, by, 110, 38};
-    l.downBtn = {l.upBtn.Right() + 8, by, 110, 38};
-    l.applyBtn = {l.dialog.Right() - pad - 190, by, 190, 38};
+    l.backBtn = {l.dialog.x + pad, by, 160, 44};
+    l.upBtn = {l.backBtn.Right() + 12, by, 120, 44};
+    l.downBtn = {l.upBtn.Right() + 8, by, 120, 44};
+    l.applyBtn = {l.dialog.Right() - pad - 200, by, 200, 44};
     return l;
 }
 
@@ -129,8 +133,11 @@ ModsMenu::Result ModsMenu::Update(InputManager &input, int windowW, int windowH)
     m_mouseX = input.GetMouseScreenX();
     m_mouseY = input.GetMouseScreenY();
     float lx, ly;
-    const bool clicked = input.WasLeftClickIssued(lx, ly);
+    bool clicked = input.WasLeftClickIssued(lx, ly);
     const int wheel = input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
+    const bool down = input.IsLeftMouseDown();
     const int count = static_cast<int>(m_entries.size());
     if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
     {
@@ -141,6 +148,7 @@ ModsMenu::Result ModsMenu::Update(InputManager &input, int windowW, int windowH)
         result.apply = true;
         result.enabled = EnabledIds();
     };
+    bool moved = false;
     if (count > 0)
     {
         const bool shift = input.IsKeyPressed(SDL_SCANCODE_LSHIFT) || input.IsKeyPressed(SDL_SCANCODE_RSHIFT);
@@ -150,6 +158,7 @@ ModsMenu::Result ModsMenu::Update(InputManager &input, int windowW, int windowH)
                 Move(m_selected, -1);
             else
                 m_selected = std::max(0, m_selected - 1);
+            moved = true;
         }
         if (input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
         {
@@ -157,17 +166,28 @@ ModsMenu::Result ModsMenu::Update(InputManager &input, int windowW, int windowH)
                 Move(m_selected, 1);
             else
                 m_selected = std::min(count - 1, m_selected + 1);
+            moved = true;
         }
         if (input.IsKeyJustPressed(SDL_SCANCODE_SPACE))
             Toggle(m_selected);
-        if (wheel != 0 && l.list.Contains(m_mouseX, m_mouseY))
-            m_top = std::clamp(m_top - wheel * 3, 0, std::max(0, count - l.rows));
     }
     m_selected = std::clamp(m_selected, 0, std::max(0, count - 1));
-    if (m_selected < m_top)
-        m_top = m_selected;
-    if (m_selected >= m_top + l.rows)
-        m_top = m_selected - l.rows + 1;
+    if (moved)
+        m_scroll.EnsureVisible(m_selected, l.rowH, l.list.h, count);
+    ui::UpdateSmoothList(
+        m_scroll,
+        l.list,
+        l.track,
+        count * l.rowH,
+        l.rowH * 2,
+        m_mouseX,
+        m_mouseY,
+        down,
+        pressed,
+        pressX,
+        pressY,
+        wheel,
+        clicked);
     if (clicked)
     {
         if (l.backBtn.Contains(m_mouseX, m_mouseY))
@@ -183,11 +203,12 @@ ModsMenu::Result ModsMenu::Update(InputManager &input, int windowW, int windowH)
             Move(m_selected, 1);
         else if (l.list.Contains(m_mouseX, m_mouseY))
         {
-            const int row = m_top + (m_mouseY - l.list.y) / l.rowH;
+            const int row = (m_mouseY - l.list.y + m_scroll.PixelOffset()) / l.rowH;
             if (row >= 0 && row < count)
             {
                 m_selected = row;
-                if (m_mouseX < l.list.x + 40) // the box
+                m_scroll.EnsureVisible(m_selected, l.rowH, l.list.h, count);
+                if (m_mouseX < l.list.x + 48) // the box
                     Toggle(row);
             }
         }
@@ -259,33 +280,37 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
         }
     }
     int order = 0;
+    const int scrollOff = m_scroll.PixelOffset();
     for (int i = 0; i < count; ++i)
     {
         if (m_entries[i].enabled)
             ++order;
-        if (i < m_top || i >= m_top + l.rows)
+        const ui::UiRect r {l.list.x + 2, l.list.y + i * l.rowH - scrollOff, l.list.w - 4, l.rowH - 2};
+        if (r.Bottom() <= l.list.y || r.y >= l.list.Bottom())
             continue;
         const Entry &e = m_entries[i];
-        const ui::UiRect r {l.list.x + 2, l.list.y + (i - m_top) * l.rowH, l.list.w - 4, l.rowH};
         const bool selected = i == m_selected;
+        const bool hovered = l.list.Contains(m_mouseX, m_mouseY) && r.Contains(m_mouseX, m_mouseY);
         if (selected)
             ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 255), ui::WithAlpha(col::Hover, 40));
-        else if (r.Contains(m_mouseX, m_mouseY))
-            renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 120));
+        else if (hovered)
+            renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 140));
+        if (selected)
+            renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
         ui::DrawCheckbox(
             renderer,
             font,
-            {r.x + 8, r.CenterY() - 10, 20, 20},
+            {r.x + 10, r.CenterY() - 12, 24, 24},
             "",
             e.enabled,
-            r.Contains(m_mouseX, m_mouseY) && m_mouseX < l.list.x + 40,
+            hovered && m_mouseX < l.list.x + 48,
             e.info.error.empty());
         std::string title = (e.enabled ? std::to_string(order) + ". " : std::string()) + e.info.name;
         font.DrawString(
-            ui::FitText(font, title, ui::FONT_BODY, r.w - 150),
-            r.x + 40,
+            ui::FitText(font, title, ui::FONT_BODY_BOLD, r.w - 150),
+            r.x + 46,
             r.CenterY(),
-            ui::FONT_BODY,
+            ui::FONT_BODY_BOLD,
             e.info.error.empty() ? (selected ? col::Text : col::TextDim) : col::Danger,
             false,
             Anchor::LEFT | Anchor::VCENTER);
@@ -299,11 +324,18 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
             Anchor::RIGHT | Anchor::VCENTER);
     }
     renderer.ResetClipRect();
+    ui::DrawScrollBar(
+        renderer,
+        l.track,
+        m_scroll.offset,
+        static_cast<float>(count * l.rowH),
+        static_cast<float>(l.list.h),
+        m_scroll.barDrag || ui::OnScrollTrack(l.track, m_mouseX, m_mouseY));
 
     // The selected mod
     int y = l.details.y + 14;
     const int x = l.details.x + 16;
-    auto line = [&](const std::string &text, SDL_Color color, int scale = ui::FONT_BODY) {
+    auto line = [&](std::string_view text, SDL_Color color, int scale = ui::FONT_BODY) {
         font.DrawString(ui::FitText(font, text, scale, l.details.w - 32), x, y, scale, color, false);
         y += font.GetTextHeight(scale) + 6;
     };

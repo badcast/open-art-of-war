@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -44,7 +45,7 @@ public:
     void OnChecksum(std::uint32_t tick, std::uint64_t hash);
     // Writes the file; one call per match (later calls do nothing). `outcome`: "victory", "defeat", "left",
     // "disconnected". Returns the path, empty when nothing was written.
-    std::string Finish(const std::string &outcome, std::uint32_t tick);
+    std::string Finish(std::string_view outcome, std::uint32_t tick);
 
     // The folder of the user's replays
     static std::string Directory();

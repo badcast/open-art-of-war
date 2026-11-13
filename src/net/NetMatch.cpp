@@ -190,13 +190,13 @@ void DropOldOverlay(bool &changed)
 }
 } // namespace
 
-bool NetMatch::host(std::uint16_t port, const std::string &playerName, std::string &error)
+bool NetMatch::host(std::uint16_t port, std::string_view playerName, std::string &error)
 {
     leave();
     DropOldOverlay(m_dataChanged);
     Net::HostConfig hc;
     hc.identity = Identity();
-    hc.roomName = playerName;
+    hc.roomName.assign(playerName);
     hc.password = m_password;
     // A player whose game data differ can fetch these files from this host (see DataSync)
     hc.dataManifest = DataManifest();
@@ -226,7 +226,7 @@ bool NetMatch::host(std::uint16_t port, const std::string &playerName, std::stri
     m_host->addTransport(m_loopback->hub.server());
     Net::ClientConfig cc;
     cc.identity = hc.identity;
-    cc.playerName = playerName;
+    cc.playerName.assign(playerName);
     cc.password = m_password;
     m_client = std::make_unique<Net::SessionClient>(m_loopback->hub.client(), cc);
     return true;
@@ -251,33 +251,33 @@ bool NetMatch::IsOwner() const
 }
 
 bool NetMatch::join(
-    const std::string &address, std::uint16_t port, const std::string &playerName, std::string &error, bool dedicated)
+    std::string_view address, std::uint16_t port, std::string_view playerName, std::string &error, bool dedicated)
 {
     leave();
     DropOldOverlay(m_dataChanged);
     m_dedicated = dedicated;
-    m_address = address;
+    m_address.assign(address);
     m_port = port;
-    m_name = playerName;
+    m_name.assign(playerName);
     m_joinStartMs = SDL_GetTicks();
-    auto transport = Net::createEnetClient(address, port, &error);
+    auto transport = Net::createEnetClient(m_address, port, &error);
     if (!transport)
         return false;
     Net::ClientConfig cc;
     cc.identity = Identity();
-    cc.playerName = playerName;
+    cc.playerName = m_name;
     cc.password = m_password;
     cc.canSync = !m_synced;
     m_client = std::make_unique<Net::SessionClient>(std::move(transport), cc);
     return true;
 }
 
-void NetMatch::Announce(const std::string &master, std::uint16_t masterPort)
+void NetMatch::Announce(std::string_view master, std::uint16_t masterPort)
 {
     if (!m_host || !m_gameSocket || m_announcer)
         return;
-    m_announcer
-        = std::make_unique<Net::HostAnnouncer>(master, masterPort, *m_gameSocket, m_gamePort, Net::localLanIp());
+    m_announcer = std::make_unique<Net::HostAnnouncer>(
+        std::string(master), masterPort, *m_gameSocket, m_gamePort, Net::localLanIp());
 }
 
 const std::string &NetMatch::PublicCode() const
@@ -287,26 +287,28 @@ const std::string &NetMatch::PublicCode() const
 }
 
 bool NetMatch::joinHosted(
-    const std::string &master,
+    std::string_view master,
     std::uint16_t masterPort,
-    const std::string &code,
-    const std::string &playerName,
+    std::string_view code,
+    std::string_view playerName,
     std::string &error)
 {
     leave();
     DropOldOverlay(m_dataChanged);
     m_joinStartMs = SDL_GetTicks();
-    m_hostedJoin = std::make_unique<Net::HostedJoin>(master, masterPort, code);
+    const std::string masterStr(master);
+    const std::string codeStr(code);
+    m_hostedJoin = std::make_unique<Net::HostedJoin>(masterStr, masterPort, codeStr);
     if (m_hostedJoin->state() == Net::HostedJoin::State::Failed)
     {
         error = m_hostedJoin->error();
         m_hostedJoin.reset();
         return false;
     }
-    m_name = playerName;
-    m_hostedMaster = master;
+    m_name.assign(playerName);
+    m_hostedMaster = masterStr;
     m_hostedMasterPort = masterPort;
-    m_hostedCode = code;
+    m_hostedCode = codeStr;
     m_rejoinToken = {};
     return true;
 }
@@ -716,24 +718,25 @@ std::string NetMatch::StatusText() const
     return "";
 }
 
-void NetMatch::SetLobbyMap(const std::string &mapPath)
+void NetMatch::SetLobbyMap(std::string_view mapPath)
 {
     if (!ControlsRoom())
         return;
+    const std::string mapPathStr(mapPath);
     const std::uint8_t spots = static_cast<std::uint8_t>(
-        std::min<std::size_t>(MissionController::StartPositions(mapPath).size(), kMaxPlayers));
+        std::min<std::size_t>(MissionController::StartPositions(mapPathStr).size(), kMaxPlayers));
     const std::uint64_t hash = MapFiles::HashOf(mapPath);
     // The room hands the map out to whoever does not have this very file (~20 KB compressed)
     const std::vector<std::uint8_t> packed = MapFiles::Packed(mapPath);
     if (m_host)
     {
         m_host->offerFile(hash, packed);
-        m_host->setLobbyMap(mapPath, spots, hash);
+        m_host->setLobbyMap(mapPathStr, spots, hash);
     }
     else
     {
         m_client->uploadFile(hash, packed);
-        m_client->sendOwnerSetMap(mapPath, spots, hash);
+        m_client->sendOwnerSetMap(mapPathStr, spots, hash);
     }
 }
 
@@ -825,10 +828,10 @@ void NetMatch::SetOptions(bool fogOfWar, bool prebuilt, std::uint8_t credits, bo
     else if (IsOwner())
         m_client->sendOwnerSetOptions(Net::OwnerSetOptions {fogOfWar, prebuilt, credits, night, techLevel});
 }
-void NetMatch::SendChat(const std::string &text)
+void NetMatch::SendChat(std::string_view text)
 {
     if (m_client && !text.empty())
-        m_client->sendChat(text, false);
+        m_client->sendChat(std::string(text), false);
 }
 std::vector<Net::Chat> NetMatch::TakeChat()
 {
@@ -1313,7 +1316,7 @@ NetMatch::Stats NetMatch::stats(std::uint32_t nowMs, std::uint32_t tick)
     return s;
 }
 
-std::string NetMatch::FinishReplay(const std::string &outcome)
+std::string NetMatch::FinishReplay(std::string_view outcome)
 {
     return m_recorder.Finish(outcome, m_lastTick);
 }

@@ -3,6 +3,7 @@
 #include "core/LoaderResources.hpp"
 
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -11,10 +12,8 @@ class Localization
 {
 public:
     static void Init(
-        const std::string &localeDir = LoaderResources::LocaleDir(),
-        const std::string &defaultLang = LoaderResources::DefaultLanguage(),
-        const std::string &domain = "openaow");
-    static void SetLanguage(const std::string &langCode);
+        std::string_view localeDir = {}, std::string_view defaultLang = {}, std::string_view domain = "openaow");
+    static void SetLanguage(std::string_view langCode);
     static const std::string &GetLanguage();
     static const std::string &GetDomain();
     static void ToggleLanguage();

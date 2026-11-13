@@ -39,7 +39,7 @@ namespace
 {
 
 // Starts openaow-mapeditor (next to the game, or in the working directory) with `mapPath`; false when it is missing
-bool LaunchMapEditor(const std::string &mapPath)
+bool LaunchMapEditor(std::string_view mapPath)
 {
 #ifdef _WIN32
     const char *exeName = "openaow-mapeditor.exe";
@@ -57,7 +57,8 @@ bool LaunchMapEditor(const std::string &mapPath)
         if (!std::filesystem::is_regular_file(exe, errorCode))
             continue;
         const std::string exePath = std::filesystem::absolute(exe, errorCode).string();
-        const char *args[] = {exePath.c_str(), mapPath.c_str(), nullptr};
+        const std::string mapPathStr(mapPath);
+        const char *args[] = {exePath.c_str(), mapPathStr.c_str(), nullptr};
         SDL_Process *process = SDL_CreateProcess(args, false);
         if (!process)
             continue;
@@ -79,7 +80,7 @@ std::string HandicapText(int index)
 // left, the options and the map size on its right
 int CustomRowH(const UiRect &detailsRect)
 {
-    return std::clamp((detailsRect.h - 118 - 150 - 30) / 8, 30, 40);
+    return std::clamp((detailsRect.h - 118 - 150 - 30) / 8, 34, 46);
 }
 
 UiRect CustomRow(const UiRect &detailsRect, int rowIndex)
@@ -139,27 +140,36 @@ struct CampaignLayout
     UiRect creditsBtn;    // custom game: starting credits (top right of the details)
     UiRect timeBtn;       // custom game: time of day (left of the credits)
     UiRect techBtn;       // custom game: tech level of the match (left of the time of day)
-    int itemH {40};
+    int itemH {42};
     int itemGap {4};
+    bool touch {false};
 
     UiRect Item(int rowIndex) const
     {
         return {list.x, list.y + rowIndex * (itemH + itemGap), list.w, itemH};
+    }
+    UiRect ItemAt(int rowIndex, int scrollPx) const
+    {
+        return {list.x, list.y + rowIndex * (itemH + itemGap) - scrollPx, list.w, itemH};
     }
 };
 
 CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCount)
 {
     CampaignLayout layout;
+    const std::string profile = uilayout::MenuProfile(uilayout::Current(), "map_select");
+    layout.touch = profile == "touch";
     // ui/layout.yaml (screen map_select, shared with the network room); the numbers below stand in without it
-    if (uilayout::Current().Has("map_select", "pc"))
+    if (uilayout::Current().Has("map_select", profile))
     {
-        const uilayout::Solved solved = uilayout::Current().Solve(
-            "map_select", uilayout::MenuProfile(uilayout::Current(), "map_select"), windowWidth, windowHeight, {});
+        const uilayout::Solved solved = uilayout::Current().Solve("map_select", profile, windowWidth, windowHeight, {});
         layout.dialog = solved.Rect("dialog");
         layout.list = solved.Rect("list");
         const int clampedCount = std::max(1, missionCount);
-        layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 26, 44);
+        layout.itemH = std::clamp(
+            (layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount,
+            layout.touch ? 46 : 36,
+            layout.touch ? 56 : 46);
         layout.details = solved.Rect("details");
         layout.backBtn = solved.Rect("back");
         layout.startBtn = solved.Rect("start");
@@ -171,9 +181,11 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
         layout.techBtn = solved.Rect("tech");
         const UiRect previewRect = CustomPreviewArea(layout.details);
         const int optionsX = previewRect.Right() + 20;
-        layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 28};
-        layout.baseCheckbox = {optionsX, previewRect.y + 32, layout.details.Right() - 20 - optionsX, 28};
-        layout.speedCheckbox = {optionsX, previewRect.y + 64, layout.details.Right() - 20 - optionsX, 28};
+        const int cbH = layout.touch ? 36 : 32;
+        const int cbStep = layout.touch ? 40 : 36;
+        layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, cbH};
+        layout.baseCheckbox = {optionsX, previewRect.y + cbStep, layout.details.Right() - 20 - optionsX, cbH};
+        layout.speedCheckbox = {optionsX, previewRect.y + cbStep * 2, layout.details.Right() - 20 - optionsX, cbH};
         return layout;
     }
     layout.dialog = ui::CenteredRect(windowWidth, windowHeight, windowWidth, windowHeight); // the whole screen
@@ -185,21 +197,21 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
            std::clamp(static_cast<int>(layout.dialog.w * 0.27f), 300, 460),
            footerY - contentY - 8};
     int clampedCount = std::max(1, missionCount);
-    layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 26, 44);
+    layout.itemH = std::clamp((layout.list.h - (clampedCount - 1) * layout.itemGap) / clampedCount, 36, 46);
     layout.details
         = {layout.list.Right() + 16, contentY, layout.dialog.Right() - 20 - (layout.list.Right() + 16), layout.list.h};
     layout.backBtn = {layout.dialog.Right() - 20 - 140, footerY + 10, 140, 40};
     layout.startBtn = {layout.backBtn.x - 12 - 200, footerY + 10, 200, 40};
     layout.sideBtn[0] = {layout.dialog.x + 20, footerY + 10, 240, 40};
     layout.editorBtn = {layout.startBtn.x - 12 - 140, footerY + 10, 140, 40};
-    layout.creditsBtn = {layout.details.Right() - 20 - 200, layout.details.y + 12, 200, 32};
-    layout.timeBtn = {layout.creditsBtn.x - 12 - 160, layout.details.y + 12, 160, 32};
-    layout.techBtn = {layout.timeBtn.x - 12 - 180, layout.details.y + 12, 180, 32};
+    layout.creditsBtn = {layout.details.Right() - 20 - 200, layout.details.y + 10, 200, 36};
+    layout.timeBtn = {layout.creditsBtn.x - 12 - 160, layout.details.y + 10, 160, 36};
+    layout.techBtn = {layout.timeBtn.x - 12 - 180, layout.details.y + 10, 180, 36};
     const UiRect previewRect = CustomPreviewArea(layout.details);
     const int optionsX = previewRect.Right() + 20;
-    layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 28};
-    layout.baseCheckbox = {optionsX, previewRect.y + 32, layout.details.Right() - 20 - optionsX, 28};
-    layout.speedCheckbox = {optionsX, previewRect.y + 64, layout.details.Right() - 20 - optionsX, 28};
+    layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 32};
+    layout.baseCheckbox = {optionsX, previewRect.y + 36, layout.details.Right() - 20 - optionsX, 32};
+    layout.speedCheckbox = {optionsX, previewRect.y + 72, layout.details.Right() - 20 - optionsX, 32};
     layout.difficultyBtn
         = {layout.sideBtn[0].Right() + 12,
            footerY + 10,
@@ -223,33 +235,45 @@ void SpotMarkerPos(
         = std::clamp(static_cast<int>(originY + (tileY + 0.5f) * scale), previewRect.y + 10, previewRect.Bottom() - 10);
 }
 
-constexpr int kMapFilterBarH = 72; // search box and the three filter buttons over the list of maps
+int MapFilterBarH(const CampaignLayout &layout)
+{
+    return layout.touch ? 96 : 80;
+}
 
 UiRect MapSearchRect(const CampaignLayout &layout)
 {
-    return {layout.list.x, layout.list.y - kMapFilterBarH, layout.list.w, 30};
+    return {layout.list.x, layout.list.y - MapFilterBarH(layout), layout.list.w, layout.touch ? 42 : 36};
+}
+
+UiRect MapSearchClearRect(const CampaignLayout &layout)
+{
+    const UiRect s = MapSearchRect(layout);
+    return {s.Right() - s.h, s.y + 2, s.h - 2, s.h - 4};
 }
 
 UiRect MapFilterBtn(const CampaignLayout &layout, int filterIndex)
 {
     const int buttonWidth = (layout.list.w - 2 * 6) / 3;
-    return {layout.list.x + filterIndex * (buttonWidth + 6), layout.list.y - kMapFilterBarH + 36, buttonWidth, 28};
+    const int barH = MapFilterBarH(layout);
+    const int yOff = layout.touch ? 48 : 40;
+    const int btnH = layout.touch ? 42 : 34;
+    return {layout.list.x + filterIndex * (buttonWidth + 6), layout.list.y - barH + yOff, buttonWidth, btnH};
 }
 
 int CustomListRows(CampaignLayout &layout)
 {
     // (idempotent: the bar takes the top of the list for a custom game)
-    layout.list.y += kMapFilterBarH;
-    layout.list.h -= kMapFilterBarH;
-    layout.itemH = 30;
+    const int barH = MapFilterBarH(layout);
+    layout.list.y += barH;
+    layout.list.h -= barH;
+    layout.itemH = layout.touch ? 48 : 38;
     return std::max(1, (layout.list.h + layout.itemGap) / (layout.itemH + layout.itemGap));
 }
 
 // The picture of a map in the bottom part of the details panel, scaled to fit and centered
 void DrawMapPreviewIn(Renderer &renderer, SDL_Texture *texture, int textureWidth, int textureHeight, const UiRect &area)
 {
-    renderer.FillRectScreen(area.x, area.y, area.w, area.h, col::PanelSunken);
-    renderer.DrawRectScreen(area.x, area.y, area.w, area.h, col::Border);
+    ui::DrawPanel(renderer, area, col::PanelSunken, col::BorderStrong);
     if (!texture || textureWidth <= 0 || textureHeight <= 0)
         return;
     const float scale
@@ -298,7 +322,7 @@ void MenuController::RebuildMapList()
     for (std::size_t i = 0; i < m_skirmishMaps.size(); ++i)
         if (m_skirmishMaps[i].path == keep)
             m_skirmishSelected = static_cast<int>(i);
-    m_skirmishTop = 0;
+    m_skirmishScroll.Reset();
 }
 
 bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouseX, int mouseY, bool leftClicked)
@@ -437,11 +461,24 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
         m_campaignSelectOpen = false;
     };
 
+    // Consume wheel and press once per frame before any dropdown or list scroll uses them
+    const int wheel = input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
+    const bool down = input.IsLeftMouseDown();
+
     // Custom game: search box and filter buttons over the list of maps
     if (m_customGame)
     {
         if (leftClicked)
         {
+            if (!m_mapSearch.empty() && MapSearchClearRect(layout).Contains(mouseX, mouseY))
+            {
+                m_mapSearch.clear();
+                RebuildMapList();
+                m_mapSearchFocus = true;
+                return true;
+            }
             m_mapSearchFocus = MapSearchRect(layout).Contains(mouseX, mouseY);
             if (m_mapSearchFocus)
                 return true;
@@ -464,68 +501,8 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
             }
         }
     }
-    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_UP))
-    {
-        selected = (selected - 1 + itemCount) % itemCount;
-    }
-    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
-    {
-        selected = (selected + 1) % itemCount;
-    }
-    if (m_customGame && itemCount > 0)
-    {
-        if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP))
-            selected = std::max(0, selected - visibleRows);
-        if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
-            selected = std::min(itemCount - 1, selected + visibleRows);
-        // The wheel scrolls the list, the selection stays where it is
-        m_skirmishTop = std::clamp(m_skirmishTop - input.ConsumeWheel(), 0, std::max(0, itemCount - visibleRows));
-        if (input.IsKeyJustPressed(SDL_SCANCODE_UP) || input.IsKeyJustPressed(SDL_SCANCODE_DOWN)
-            || input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP) || input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
-        {
-            if (selected < m_skirmishTop)
-                m_skirmishTop = selected;
-            if (selected >= m_skirmishTop + visibleRows)
-                m_skirmishTop = selected - visibleRows + 1;
-        }
-    }
-    if (m_customGame && itemCount > visibleRows)
-    {
-        const UiRect scrollBarRect {layout.list.Right() + 4, layout.list.y, 4, layout.list.h};
-        int pressX = 0, pressY = 0;
-        if (input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown()
-            && OnScrollBar(scrollBarRect, pressX, pressY))
-            m_scrollDrag = 1;
-        if (m_scrollDrag == 1)
-        {
-            if (input.IsLeftMouseDown())
-                m_skirmishTop = ScrollTopFromMouse(scrollBarRect, mouseY, itemCount, visibleRows);
-            else
-                m_scrollDrag = 0;
-            return true;
-        }
-    }
-    if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
-    {
-        if (m_combo.open >= kComboSide)
-        { // closes the open list first
-            m_combo.open = -1;
-            return true;
-        }
-        m_campaignSelectOpen = false;
-        return true;
-    }
-    if (!m_mapSearchFocus && (input.IsKeyJustPressed(SDL_SCANCODE_LEFT) || input.IsKeyJustPressed(SDL_SCANCODE_RIGHT)))
-    {
-        SetPlayerFaction(OpposingFaction(PlayerFaction()));
-    }
-
-    if (input.IsKeyJustPressed(SDL_SCANCODE_TAB))
-        cycleDifficulty();
     const bool hasLayoutChoice
         = m_customGame && m_skirmishSelected >= 0 && m_skirmishSelected < static_cast<int>(m_skirmishMaps.size());
-    // The drop-down lists of the footer (side, difficulty), of the map (prebuilt bases / from scratch) and of the
-    // players
     if (hasLayoutChoice)
         EnsureCustomSlots();
     auto comboField = [&](int comboId) {
@@ -560,8 +537,12 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
                 mouseX,
                 mouseY,
                 leftClicked,
-                input.ConsumeWheel(),
-                pickedIndex))
+                wheel,
+                pickedIndex,
+                down,
+                pressed,
+                pressX,
+                pressY))
         {
             if (pickedIndex >= 0)
                 CampaignComboApply(comboId, pickedIndex);
@@ -573,6 +554,65 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
             return true;
         }
     }
+
+    const int stepH = layout.itemH + layout.itemGap;
+    const int contentH = m_customGame ? (itemCount * stepH - (itemCount > 0 ? layout.itemGap : 0)) : layout.list.h;
+    bool navMoved = false;
+    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_UP))
+    {
+        selected = (selected - 1 + itemCount) % itemCount;
+        navMoved = true;
+    }
+    if (itemCount > 0 && input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
+    {
+        selected = (selected + 1) % itemCount;
+        navMoved = true;
+    }
+    if (m_customGame && itemCount > 0)
+    {
+        if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP))
+        {
+            selected = std::max(0, selected - visibleRows);
+            navMoved = true;
+        }
+        if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
+        {
+            selected = std::min(itemCount - 1, selected + visibleRows);
+            navMoved = true;
+        }
+        if (navMoved)
+            m_skirmishScroll.EnsureVisible(selected, stepH, layout.list.h, itemCount);
+
+        const UiRect scrollBarRect {layout.list.Right() + 4, layout.list.y, 6, layout.list.h};
+        ui::UpdateSmoothList(
+            m_skirmishScroll,
+            layout.list,
+            scrollBarRect,
+            contentH,
+            stepH * 2,
+            mouseX,
+            mouseY,
+            down,
+            pressed,
+            pressX,
+            pressY,
+            wheel,
+            leftClicked);
+        if (m_skirmishScroll.barDrag)
+            return true;
+    }
+    if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
+    {
+        m_campaignSelectOpen = false;
+        return true;
+    }
+    if (!m_mapSearchFocus && (input.IsKeyJustPressed(SDL_SCANCODE_LEFT) || input.IsKeyJustPressed(SDL_SCANCODE_RIGHT)))
+    {
+        SetPlayerFaction(OpposingFaction(PlayerFaction()));
+    }
+
+    if (input.IsKeyJustPressed(SDL_SCANCODE_TAB))
+        cycleDifficulty();
     if (leftClicked)
     {
         auto openCombo = [&](int comboId) {
@@ -669,20 +709,18 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
                 = LaunchMapEditor(mapPath) ? "" : _("Map editor (openaow-mapeditor) not found next to the game");
             return true;
         }
-        const int firstVisible = m_customGame ? m_skirmishTop : 0;
-        for (int row = 0; row < visibleRows && firstVisible + row < itemCount; ++row)
+        if (layout.list.Contains(mouseX, mouseY))
         {
-            if (layout.Item(row).Contains(mouseX, mouseY))
+            const int scrollOff = m_customGame ? m_skirmishScroll.PixelOffset() : 0;
+            const int relY = mouseY - layout.list.y + scrollOff;
+            const int row = relY / stepH;
+            if (relY >= 0 && (relY % stepH) < layout.itemH && row >= 0 && row < itemCount)
             {
                 // First click selects, clicking the selected mission or map starts it
-                if (selected == firstVisible + row)
-                {
+                if (selected == row)
                     startSelected();
-                }
                 else
-                {
-                    selected = firstVisible + row;
-                }
+                    selected = row;
                 return true;
             }
         }
@@ -717,7 +755,9 @@ void MenuController::RenderCampaignMissionSelect(
     const int itemCount = m_customGame ? static_cast<int>(m_skirmishMaps.size()) : missionCount;
     CampaignLayout layout = campaignLayout(windowWidth, windowHeight, itemCount);
     const int visibleRows = m_customGame ? CustomListRows(layout) : itemCount;
-    const int firstVisible = m_customGame ? std::clamp(m_skirmishTop, 0, std::max(0, itemCount - visibleRows)) : 0;
+    const int stepH = layout.itemH + layout.itemGap;
+    const int contentH = m_customGame ? (itemCount * stepH - (itemCount > 0 ? layout.itemGap : 0)) : layout.list.h;
+    const int scrollOff = m_customGame ? m_skirmishScroll.PixelOffset() : 0;
     const int selected = m_customGame ? m_skirmishSelected : m_campaignMissionSelected;
     ui::DrawDialog(
         renderer,
@@ -729,19 +769,33 @@ void MenuController::RenderCampaignMissionSelect(
     if (m_customGame)
     {
         const UiRect searchBoxRect = MapSearchRect(layout);
-        ui::DrawPanel(renderer, searchBoxRect, col::PanelSunken, m_mapSearchFocus ? col::Accent : col::Border);
+        ui::DrawPanel(renderer, searchBoxRect, col::PanelSunken, m_mapSearchFocus ? col::Accent : col::BorderStrong);
         const bool blink = (SDL_GetTicks() / 500) % 2 == 0;
         const std::string displayText = m_mapSearch.empty() && !m_mapSearchFocus
                                             ? std::string(_("Search map..."))
                                             : m_mapSearch + (m_mapSearchFocus && blink ? "|" : "");
+        const int searchRightPad = m_mapSearch.empty() ? 20 : 44;
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, displayText, ui::FONT_BODY, searchBoxRect.w - 20),
-            searchBoxRect.x + 10,
+            ui::FitText(fontRenderer, displayText, ui::FONT_BODY, searchBoxRect.w - searchRightPad),
+            searchBoxRect.x + 12,
             searchBoxRect.CenterY(),
             ui::FONT_BODY,
             m_mapSearch.empty() && !m_mapSearchFocus ? col::TextMuted : col::Text,
             false,
             Anchor::LEFT | Anchor::VCENTER);
+        if (!m_mapSearch.empty())
+        {
+            const UiRect clr = MapSearchClearRect(layout);
+            const bool clrHot = clr.Contains(m_mouseX, m_mouseY);
+            fontRenderer.DrawString(
+                "X",
+                clr.CenterX(),
+                clr.CenterY(),
+                ui::FONT_BODY_BOLD,
+                clrHot ? col::Accent : col::TextDim,
+                false,
+                Anchor::HCENTER | Anchor::VCENTER);
+        }
         for (int comboId = kComboMapPlayers; comboId <= kComboMapSort; ++comboId)
         {
             const UiRect filterBtnRect = MapFilterBtn(layout, comboId - kComboMapPlayers);
@@ -764,39 +818,53 @@ void MenuController::RenderCampaignMissionSelect(
                 Anchor::HCENTER | Anchor::VCENTER);
     }
 
-    for (int row = 0; row < visibleRows && firstVisible + row < itemCount; ++row)
+    const int nameFont = layout.touch ? ui::FONT_H2 : ui::FONT_BODY_BOLD;
+    renderer.SetClipRect({layout.list.x, layout.list.y, layout.list.w, layout.list.h});
+    for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex)
     {
-        const int itemIndex = firstVisible + row;
-        UiRect itemRect = layout.Item(row);
+        UiRect itemRect = layout.ItemAt(itemIndex, scrollOff);
+        if (itemRect.Bottom() <= layout.list.y || itemRect.y >= layout.list.Bottom())
+            continue;
         bool isSelected = (itemIndex == selected);
-        bool hovered = itemRect.Contains(m_mouseX, m_mouseY);
+        bool hovered = layout.list.Contains(m_mouseX, m_mouseY) && itemRect.Contains(m_mouseX, m_mouseY);
         if (hovered)
             SoundRequests::MarkHover();
 
-        renderer.FillRectScreen(
-            itemRect.x,
-            itemRect.y,
-            itemRect.w,
-            itemRect.h,
-            isSelected ? col::Hover : (hovered ? col::PanelRaised : col::PanelSunken));
-        renderer.DrawRectScreen(
-            itemRect.x, itemRect.y, itemRect.w, itemRect.h, isSelected ? col::BorderStrong : col::Border);
-        if (isSelected)
-            renderer.FillRectScreen(itemRect.x, itemRect.y, 3, itemRect.h, col::Accent);
+        ui::DrawButtonChrome(
+            renderer,
+            itemRect,
+            isSelected ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.45f)
+                       : (hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.22f)
+                                  : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.10f)),
+            isSelected ? col::Panel : col::PanelSunken,
+            isSelected ? col::Accent : (hovered ? col::BorderStrong : ui::Mix(col::Border, col::AccentDeep, 0.25f)),
+            isSelected ? col::Accent : (hovered ? col::BorderStrong : SDL_Color {0, 0, 0, 0}),
+            isSelected ? col::Accent : SDL_Color {0, 0, 0, 0});
 
         std::string numberText = std::to_string(itemIndex + 1);
         fontRenderer.DrawString(
             numberText,
-            itemRect.x + 26,
+            itemRect.x + 24,
             itemRect.CenterY(),
             ui::FONT_BODY_BOLD,
             isSelected ? col::Accent : col::TextMuted,
             false,
             Anchor::HCENTER | Anchor::VCENTER);
         std::string name;
+        int rightReserve = 16;
         if (m_customGame)
         {
             name = m_skirmishMaps[itemIndex].DisplayName();
+            const std::string pBadge = std::to_string(m_skirmishMaps[itemIndex].players) + "P";
+            fontRenderer.DrawString(
+                pBadge,
+                itemRect.Right() - 12,
+                itemRect.CenterY(),
+                ui::FONT_SMALL_BOLD,
+                isSelected ? col::Accent : col::TextDim,
+                false,
+                Anchor::RIGHT | Anchor::VCENTER);
+            rightReserve = 44;
         }
         else
         {
@@ -807,24 +875,26 @@ void MenuController::RenderCampaignMissionSelect(
                 name = name.substr(colon + 2);
         }
         fontRenderer.DrawString(
-            ui::FitText(fontRenderer, name, ui::FONT_BODY, itemRect.w - 56),
-            itemRect.x + 48,
+            ui::FitText(fontRenderer, name, nameFont, itemRect.w - 46 - rightReserve),
+            itemRect.x + 46,
             itemRect.CenterY(),
-            ui::FONT_BODY,
+            nameFont,
             isSelected ? col::Text : col::TextDim,
             false,
             Anchor::LEFT | Anchor::VCENTER);
     }
+    renderer.ResetClipRect();
 
     if (m_customGame && itemCount > visibleRows)
     {
-        // Scroll bar beside the list
-        const int trackX = layout.list.Right() + 4;
-        renderer.FillRectScreen(trackX, layout.list.y, 4, layout.list.h, col::PanelSunken);
-        const int thumbH = std::max(20, layout.list.h * visibleRows / itemCount);
-        const int thumbY
-            = layout.list.y + (layout.list.h - thumbH) * firstVisible / std::max(1, itemCount - visibleRows);
-        renderer.FillRectScreen(trackX, thumbY, 4, thumbH, col::BorderStrong);
+        const UiRect scrollBarRect {layout.list.Right() + 4, layout.list.y, 6, layout.list.h};
+        ui::DrawScrollBar(
+            renderer,
+            scrollBarRect,
+            m_skirmishScroll.offset,
+            static_cast<float>(contentH),
+            static_cast<float>(layout.list.h),
+            m_skirmishScroll.barDrag || ui::OnScrollTrack(scrollBarRect, m_mouseX, m_mouseY));
     }
 
     if (m_customGame && selected >= 0 && selected < itemCount)
@@ -910,13 +980,13 @@ void MenuController::RenderCampaignMissionSelect(
                 slotIndex >= 0 ? ArmyColor(m_customSlots[slotIndex].color) : col::TextMuted,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
-            auto combo = [&](int kind, const std::string &text, SDL_Color textColor = col::Text) {
+            auto combo = [&](int kind, std::string_view text, SDL_Color textColor = col::Text) {
                 const UiRect cell = CustomCell(detailsRect, spotIndex, kind);
                 ui::DrawComboField(
                     renderer,
                     fontRenderer,
                     cell,
-                    ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w - 34),
+                    text,
                     m_combo.open == kComboSlot + spotIndex * 10 + kind,
                     cell.Contains(m_mouseX, m_mouseY),
                     true,

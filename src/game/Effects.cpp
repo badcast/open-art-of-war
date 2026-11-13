@@ -193,11 +193,11 @@ void ExplosionCentering(int animId, float &outOx, float &outOy)
     outOy = it != table.end() ? it->second.second : 0.0f;
 }
 
-bool EffectsConfig::LoadText(const std::string &yamlText)
+bool EffectsConfig::LoadText(std::string_view yamlText)
 {
     try
     {
-        const YAML::Node root = YAML::Load(yamlText);
+        const YAML::Node root = YAML::Load(std::string(yamlText));
         if (!root.IsMap())
             return false;
         const YAML::Node ex = root["explosions"];
@@ -258,7 +258,7 @@ EffectsConfig &EffectsConfig::Get()
     return cfg;
 }
 
-void EffectsConfig::Apply(const std::string &yamlText)
+void EffectsConfig::Apply(std::string_view yamlText)
 {
     EffectsConfig fresh;
     fresh.LoadText(yamlText);

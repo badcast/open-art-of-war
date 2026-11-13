@@ -109,7 +109,7 @@ struct Dumper
     }
 
 private:
-    void Field(const char *name, const std::string &value)
+    void Field(const char *name, std::string_view value)
     {
         out += lineOpen ? " " : "";
         out += name;

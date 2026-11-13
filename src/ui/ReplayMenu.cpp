@@ -1,4 +1,5 @@
 #include "ui/ReplayMenu.hpp"
+#include "ui/UiLayout.hpp"
 #include "core/AssetStore.hpp"
 #include "core/Localization.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -57,7 +58,7 @@ std::string FormatSize(std::uint64_t bytes)
 }
 
 // What was played: a network match, a custom game of this computer, a campaign mission
-std::string ModeName(const std::string &mode)
+std::string ModeName(std::string_view mode)
 {
     if (mode == "custom")
         return _("Custom game");
@@ -66,7 +67,7 @@ std::string ModeName(const std::string &mode)
     return _("Network");
 }
 
-SDL_Color ModeColor(const std::string &mode)
+SDL_Color ModeColor(std::string_view mode)
 {
     if (mode == "custom")
         return ui::color::Ok;
@@ -75,7 +76,7 @@ SDL_Color ModeColor(const std::string &mode)
     return ui::color::Accent;
 }
 
-std::string MapName(const std::string &path)
+std::string MapName(std::string_view path)
 {
     return fs::path(path).stem().string();
 }
@@ -90,7 +91,7 @@ void ReplayMenu::Refresh()
 {
     m_entries.clear();
     m_selected = 0;
-    m_top = 0;
+    m_scroll.Reset();
     std::vector<std::string> files;
     std::error_code ec;
     for (const auto &e : fs::directory_iterator(ReplayRecorder::Directory(), ec))
@@ -118,29 +119,21 @@ void ReplayMenu::Refresh()
 ReplayMenu::Layout ReplayMenu::MakeLayout(int windowW, int windowH)
 {
     Layout l;
-    l.dialog = ui::CenteredRect(windowW, windowH, 980, 560);
-    const int pad = 18, titleH = 48, footerH = 56;
+    const bool touch = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch";
+    l.dialog = ui::CenteredRect(windowW, windowH, 980, 580);
+    const int pad = 18, titleH = 52, footerH = 60;
     const int bodyY = l.dialog.y + titleH + pad;
     const int bodyH = l.dialog.h - titleH - footerH - pad * 2;
     const int listW = (l.dialog.w - pad * 3) * 5 / 11;
-    l.list = {l.dialog.x + pad, bodyY, listW, bodyH};
-    l.details = {l.list.Right() + pad, bodyY, l.dialog.w - listW - pad * 3, bodyH};
+    l.rowH = touch ? 50 : 42;
+    l.list = {l.dialog.x + pad, bodyY, listW - 10, bodyH};
+    l.track = {l.list.Right() + 4, l.list.y, 6, l.list.h};
+    l.details = {l.list.Right() + pad + 6, bodyY, l.dialog.w - listW - pad * 3, bodyH};
     l.rows = std::max(1, l.list.h / l.rowH);
     const int by = l.dialog.Bottom() - footerH + 8;
-    l.backBtn = {l.dialog.x + pad, by, 150, 38};
-    l.openBtn = {l.dialog.Right() - pad - 190, by, 190, 38};
+    l.backBtn = {l.dialog.x + pad, by, 160, 44};
+    l.openBtn = {l.dialog.Right() - pad - 200, by, 200, 44};
     return l;
-}
-
-void ReplayMenu::ClampScroll(int rows)
-{
-    const int count = static_cast<int>(m_entries.size());
-    m_selected = std::clamp(m_selected, 0, std::max(0, count - 1));
-    m_top = std::clamp(m_top, 0, std::max(0, count - rows));
-    if (m_selected < m_top)
-        m_top = m_selected;
-    if (m_selected >= m_top + rows)
-        m_top = m_selected - rows + 1;
 }
 
 ReplayMenu::Result ReplayMenu::Update(InputManager &input, int windowW, int windowH)
@@ -150,28 +143,58 @@ ReplayMenu::Result ReplayMenu::Update(InputManager &input, int windowW, int wind
     m_mouseX = input.GetMouseScreenX();
     m_mouseY = input.GetMouseScreenY();
     float lx, ly;
-    const bool clicked = input.WasLeftClickIssued(lx, ly);
+    bool clicked = input.WasLeftClickIssued(lx, ly);
     const int wheel = input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
+    const bool down = input.IsLeftMouseDown();
     const int count = static_cast<int>(m_entries.size());
     if (input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE))
     {
         result.back = true;
         return result;
     }
+    bool moved = false;
     if (count > 0)
     {
         if (input.IsKeyJustPressed(SDL_SCANCODE_UP))
+        {
             m_selected = std::max(0, m_selected - 1);
+            moved = true;
+        }
         if (input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
+        {
             m_selected = std::min(count - 1, m_selected + 1);
+            moved = true;
+        }
         if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP))
+        {
             m_selected = std::max(0, m_selected - l.rows);
+            moved = true;
+        }
         if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
+        {
             m_selected = std::min(count - 1, m_selected + l.rows);
-        if (wheel != 0 && l.list.Contains(m_mouseX, m_mouseY))
-            m_top = std::clamp(m_top - wheel * 3, 0, std::max(0, count - l.rows));
+            moved = true;
+        }
     }
-    ClampScroll(l.rows);
+    m_selected = std::clamp(m_selected, 0, std::max(0, count - 1));
+    if (moved)
+        m_scroll.EnsureVisible(m_selected, l.rowH, l.list.h, count);
+    ui::UpdateSmoothList(
+        m_scroll,
+        l.list,
+        l.track,
+        count * l.rowH,
+        l.rowH * 2,
+        m_mouseX,
+        m_mouseY,
+        down,
+        pressed,
+        pressX,
+        pressY,
+        wheel,
+        clicked);
     auto openSelected = [&]() {
         if (count > 0 && m_entries[m_selected].ok)
             result.open = m_entries[m_selected].info.file;
@@ -189,13 +212,14 @@ ReplayMenu::Result ReplayMenu::Update(InputManager &input, int windowW, int wind
             openSelected();
         else if (l.list.Contains(m_mouseX, m_mouseY))
         {
-            const int row = m_top + (m_mouseY - l.list.y) / l.rowH;
+            const int row = (m_mouseY - l.list.y + m_scroll.PixelOffset()) / l.rowH;
             if (row >= 0 && row < count)
             {
                 const std::uint32_t now = SDL_GetTicks();
                 if (row == m_lastClickRow && now - m_lastClickMs < 400)
                     openSelected();
                 m_selected = row;
+                m_scroll.EnsureVisible(m_selected, l.rowH, l.list.h, count);
                 m_lastClickRow = row;
                 m_lastClickMs = now;
             }
@@ -224,15 +248,19 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             col::TextDim,
             false);
     }
-    for (int i = 0; i < l.rows && m_top + i < count; ++i)
+    const int scrollOff = m_scroll.PixelOffset();
+    for (int i = 0; i < count; ++i)
     {
-        const Entry &e = m_entries[m_top + i];
-        const ui::UiRect r {l.list.x + 2, l.list.y + i * l.rowH, l.list.w - 4, l.rowH};
-        const bool selected = m_top + i == m_selected;
+        const ui::UiRect r {l.list.x + 2, l.list.y + i * l.rowH - scrollOff, l.list.w - 4, l.rowH - 2};
+        if (r.Bottom() <= l.list.y || r.y >= l.list.Bottom())
+            continue;
+        const Entry &e = m_entries[i];
+        const bool selected = i == m_selected;
+        const bool hovered = l.list.Contains(m_mouseX, m_mouseY) && r.Contains(m_mouseX, m_mouseY);
         if (selected)
             ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 255), ui::WithAlpha(col::Hover, 40));
-        else if (r.Contains(m_mouseX, m_mouseY))
-            renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 120));
+        else if (hovered)
+            renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 140));
         if (selected)
             renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
         std::string title = e.ok ? FormatTime(e.info.recordedAt) + "  " + MapName(e.info.map) : e.name;
@@ -249,10 +277,10 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             titleX += tw + 8;
         }
         font.DrawString(
-            ui::FitText(font, title, ui::FONT_BODY, r.Right() - 150 - titleX),
+            ui::FitText(font, title, ui::FONT_BODY_BOLD, r.Right() - 150 - titleX),
             titleX,
             r.CenterY(),
-            ui::FONT_BODY,
+            ui::FONT_BODY_BOLD,
             e.ok ? (selected ? col::Text : col::TextDim) : col::Danger,
             false,
             Anchor::LEFT | Anchor::VCENTER);
@@ -267,6 +295,13 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
                 Anchor::RIGHT | Anchor::VCENTER);
     }
     renderer.ResetClipRect();
+    ui::DrawScrollBar(
+        renderer,
+        l.track,
+        m_scroll.offset,
+        static_cast<float>(count * l.rowH),
+        static_cast<float>(l.list.h),
+        m_scroll.barDrag || ui::OnScrollTrack(l.track, m_mouseX, m_mouseY));
 
     // The match of the selected replay
     if (count > 0)
@@ -274,7 +309,7 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
         const Entry &e = m_entries[m_selected];
         int y = l.details.y + 14;
         const int x = l.details.x + 16;
-        auto line = [&](const std::string &text, SDL_Color color, int scale = ui::FONT_BODY) {
+        auto line = [&](std::string_view text, SDL_Color color, int scale = ui::FONT_BODY) {
             font.DrawString(ui::FitText(font, text, scale, l.details.w - 32), x, y, scale, color, false);
             y += font.GetTextHeight(scale) + 6;
         };

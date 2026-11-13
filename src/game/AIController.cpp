@@ -40,7 +40,7 @@ std::string DifficultyToString(AIDifficulty diff)
     return "medium";
 }
 
-AIDifficulty StringToDifficulty(const std::string &str)
+AIDifficulty StringToDifficulty(std::string_view str)
 {
     if (str == "easy" || str == "Easy")
         return AIDifficulty::Easy;
@@ -156,7 +156,7 @@ void AIController::InitDifficultyDefaults()
     m_credits = m_currentDifficultyConfig.startingCredits;
 }
 
-bool AIController::LoadDifficultyConfig(const std::string &path)
+bool AIController::LoadDifficultyConfig(std::string_view path)
 {
     try
     {
@@ -167,7 +167,7 @@ bool AIController::LoadDifficultyConfig(const std::string &path)
         if (!root.IsDefined() || !root.IsMap())
             return false;
 
-        auto parseMode = [&](const std::string &key, AIDifficulty diff) {
+        auto parseMode = [&](const char *key, AIDifficulty diff) {
             if (!root[key] || !root[key].IsMap())
                 return;
             YAML::Node node = root[key];
@@ -272,21 +272,21 @@ void AIController::SetDebugConfig(const AIDebugConfig &config)
     }
 }
 
-void AIController::Think(const std::string &category, const std::string &text)
+void AIController::Think(std::string_view category, std::string_view text)
 {
-    m_thoughts.push_back({m_gameTime, category, text});
+    m_thoughts.push_back({m_gameTime, std::string(category), std::string(text)});
     ++m_thoughtSerial;
     while (m_thoughts.size() > 300)
         m_thoughts.pop_front();
     std::cout << "[AIController p" << int(m_player) << "] " << text << std::endl;
 }
 
-void AIController::ThinkOnce(const std::string &key, const std::string &category, const std::string &text)
+void AIController::ThinkOnce(std::string_view key, std::string_view category, std::string_view text)
 {
     auto it = m_lastThoughtByKey.find(key);
     if (it != m_lastThoughtByKey.end() && it->second == text)
         return;
-    m_lastThoughtByKey[key] = text;
+    m_lastThoughtByKey.insert_or_assign(std::string(key), std::string(text));
     Think(category, text);
 }
 
@@ -387,10 +387,61 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         m_eliminatedFoes |= 1u << p;
         newlyOut = true;
     }
-    if (!newlyOut && m_foeAnchorTimer > 0.0f)
+    // Every living foe's known structures/units are pruned whenever an elimination happens (and on full passes)
+    // so stale ruins from defeated opponents never hijack targeting.
+    auto pruneIntel = [&]() {
+        for (auto it = m_knownBuildings.begin(); it != m_knownBuildings.end();)
+        {
+            const Entity *e = entities.GetEntity(it->first);
+            if (!e || !e->alive || e->state == ActionState::Die || !IsFoe(*e))
+                it = m_knownBuildings.erase(it);
+            else
+                ++it;
+        }
+        for (auto it = m_seenEnemyUnits.begin(); it != m_seenEnemyUnits.end();)
+        {
+            const Entity *e = entities.GetEntity(it->first);
+            if (!e || !e->alive || e->state == ActionState::Die || !IsFoe(*e))
+                it = m_seenEnemyUnits.erase(it);
+            else
+                ++it;
+        }
+    };
+    if (newlyOut)
+        pruneIntel();
+
+    const bool timerElapsed = (m_foeAnchorTimer <= 0.0f);
+    if (!newlyOut && !timerElapsed && !m_noFoesLeft)
+    {
+        bool anchorValid = false;
+        if (m_playerHqX > 0 && m_playerHqY > 0)
+        {
+            for (const auto &e : entities.GetAllEntities())
+            {
+                const Building *b = e.AsBuilding();
+                if (!b || !b->alive || b->state == ActionState::Die || !IsFoe(e))
+                    continue;
+                if (m_playerHqX >= b->tileX && m_playerHqX < b->tileX + b->buildWidth && m_playerHqY >= b->tileY
+                    && m_playerHqY < b->tileY + b->buildHeight)
+                {
+                    anchorValid = true;
+                    break;
+                }
+            }
+        }
+        if (anchorValid)
+            return;
+    }
+    else if (!newlyOut && !timerElapsed)
+    {
         return;
-    m_foeAnchorTimer = 2.0f;
-    m_anchorHoldSeconds = std::max(0.0f, m_anchorHoldSeconds - 2.0f);
+    }
+    if (timerElapsed)
+    {
+        m_foeAnchorTimer = 2.0f;
+        m_anchorHoldSeconds = std::max(0.0f, m_anchorHoldSeconds - 2.0f);
+    }
+    pruneIntel();
     // Every living foe gets a score: near (by its nearest headquarters, else any building), the one that keeps
     // attacking this base (m_foeHostility) and the weak one (few structures known) are preferred. The objective is
     // kept at least kAnchorHoldSeconds unless its building is gone. Tuning:
@@ -407,10 +458,25 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
     FoeCandidate foes[kMaxPlayers];
     bool anyFoe = false, anchorHolds = false;
     int anchorOwner = -1;
+    const Entity *nearestFoeUnit = nullptr;
+    float nearestFoeUnitDist = 1e9f;
     for (const auto &e : entities.GetAllEntities())
     {
+        if (!e.alive || e.state == ActionState::Die || !IsFoe(e))
+            continue;
         const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die || !IsFoe(e) || b->owner >= kMaxPlayers)
+        if (!b)
+        {
+            const float d
+                = DetMath::Hypot(static_cast<float>(e.tileX - m_enemyHqX), static_cast<float>(e.tileY - m_enemyHqY));
+            if (d < nearestFoeUnitDist)
+            {
+                nearestFoeUnitDist = d;
+                nearestFoeUnit = &e;
+            }
+            continue;
+        }
+        if (b->owner >= kMaxPlayers)
             continue;
         anyFoe = true;
         if (m_playerHqX >= b->tileX && m_playerHqX < b->tileX + b->buildWidth && m_playerHqY >= b->tileY
@@ -484,19 +550,14 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
             m_anchorHoldSeconds = kAnchorHoldSeconds;
         }
     }
-    if (!anyFoe)
-    {
-        // Units of a living foe may still be about (no building left, not out yet): they stay targets
-        for (const auto &e : entities.GetAllEntities())
-            if (e.alive && e.state != ActionState::Die && !e.isBuilding && IsFoe(e))
-            {
-                anyFoe = true;
-                break;
-            }
-    }
+    if (!anyFoe && nearestFoeUnit)
+        anyFoe = true;
     if (m_noFoesLeft != !anyFoe)
         Think("ATTACK", anyFoe ? "A foe is in sight again" : "No foe is left: no more waves");
     m_noFoesLeft = !anyFoe;
+
+    const int prevHqX = m_playerHqX;
+    const int prevHqY = m_playerHqY;
     if (best && !anchorHolds)
     {
         const Building *b = best->AsBuilding();
@@ -509,6 +570,36 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         why << "Objective chosen by score " << bestScore << " (near, attacks on this base, weakness)";
         Think("ATTACK", why.str());
     }
+    else if (anyFoe && !anchorHolds && nearestFoeUnit)
+    {
+        m_playerHqX = nearestFoeUnit->tileX;
+        m_playerHqY = nearestFoeUnit->tileY;
+    }
+    else if (!anyFoe)
+    {
+        m_playerHqX = -1;
+        m_playerHqY = -1;
+        m_anchorHoldSeconds = 0.0f;
+    }
+
+    auto clearStaleMarchOrder = [&](int unitId) {
+        Unit *u = entities.GetUnit(unitId);
+        if (!u || !u->alive || u->state == ActionState::Die)
+            return;
+        if (const Entity *t = u->targetEntityId ? entities.GetEntity(u->targetEntityId) : nullptr;
+            t && t->alive && t->state != ActionState::Die && IsFoe(*t))
+            return;
+        u->targetEntityId = 0;
+        u->orderedTargetId = 0;
+        u->targetWallTileX = -1;
+        u->targetWallTileY = -1;
+        u->ClearPathState();
+        u->ClearMoveTarget();
+        u->isAttackMoving = false;
+        if (u->state == ActionState::Move)
+            u->state = ActionState::Idle;
+    };
+
     if (newlyOut)
     {
         std::vector<int> marching;
@@ -517,28 +608,17 @@ void AIController::RefreshFoeAnchor(EntityManager &entities)
         if (!marching.empty())
         {
             m_squadController.ReleaseUnits(marching, entities);
-            // Released troops must stop marching at the dead base: idle, they go on to the new objective
-            // (UpdateOffensive), they never turn back home while a foe is left.
-            // Only a unit fighting a living foe keeps its fight: the target of the troops that have just destroyed
-            // the player is one of its (now dead) structures, the elimination came after the units' update
+            // Move released troops into m_offensive immediately so defense/staging never pull them back to base
+            RecallReleasedUnits(entities);
             for (int id : marching)
-            {
-                Unit *u = entities.GetUnit(id);
-                if (!u || !u->alive || u->state == ActionState::Die)
-                    continue;
-                if (const Entity *t = u->targetEntityId ? entities.GetEntity(u->targetEntityId) : nullptr;
-                    t && t->alive && t->state != ActionState::Die && IsFoe(*t))
-                    continue;
-                u->targetEntityId = 0;
-                u->orderedTargetId = 0;
-                u->ClearPathState();
-                u->ClearMoveTarget();
-                u->isAttackMoving = false;
-                if (u->state == ActionState::Move)
-                    u->state = ActionState::Idle;
-            }
+                clearStaleMarchOrder(id);
             Think("ATTACK", "A foe is out of the game: the squads go on to a new objective");
         }
+    }
+    if (newlyOut || prevHqX != m_playerHqX || prevHqY != m_playerHqY)
+    {
+        for (int id : m_offensive)
+            clearStaleMarchOrder(id);
     }
 }
 
@@ -749,7 +829,7 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     RefreshFoeAnchor(entities);
 
     // Auto-synchronize Enemy & Player base coordinates from living entities if uninitialized or destroyed
-    if (m_enemyHqX <= 0 || m_enemyHqY <= 0 || m_playerHqX <= 0 || m_playerHqY <= 0)
+    if (m_enemyHqX <= 0 || m_enemyHqY <= 0 || (!m_noFoesLeft && (m_playerHqX <= 0 || m_playerHqY <= 0)))
     {
         bool foundEnemyHq = false;
         bool foundPlayerHq = false;
@@ -913,6 +993,7 @@ void AIController::RecallReleasedUnits(EntityManager &entities)
         {
             m_offensive.insert(id);
             m_waveRoster.erase(id);
+            m_defenders.erase(id);
         }
     }
 }

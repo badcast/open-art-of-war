@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // The dedicated server (openaow-server): a master port where players list rooms, create one or find
@@ -56,7 +57,7 @@ public:
         int masterClients {0};
     };
     Stats stats() const;
-    std::vector<RoomListing> listing(const std::string &gameVersion) const;
+    std::vector<RoomListing> listing(std::string_view gameVersion) const;
     // Rooms and numbers as JSON (the status page)
     std::string statusJson() const;
     // What happened since the last call (rooms opened / closed), for the log
@@ -79,8 +80,8 @@ private:
         std::uint32_t atMs {0};
     };
     void handleMaster(const TransportEvent &e, std::uint32_t nowMs);
-    void handleRaw(const std::string &ip, std::uint16_t port, const std::uint8_t *data, std::size_t size);
-    bool codeTaken(const std::string &code) const;
+    void handleRaw(std::string_view ip, std::uint16_t port, const std::uint8_t *data, std::size_t size);
+    bool codeTaken(std::string_view code) const;
     void sendMaster(PeerId peer, const BitWriter &w, std::size_t size);
     void reject(PeerId peer, RejectReason reason);
     std::string newCode() const;

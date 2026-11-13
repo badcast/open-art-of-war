@@ -4,6 +4,7 @@
 #include "ui/UiKit.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -32,7 +33,7 @@ public:
     // Looks for the mods again; `enabled`: the ids in use now, in order
     void Refresh(const std::vector<std::string> &enabled);
     // After applying: what came of it (problems, files several mods bring)
-    void SetReport(const Mods::ActivateReport &report, const std::string &notice);
+    void SetReport(const Mods::ActivateReport &report, std::string_view notice);
     Result Update(InputManager &input, int windowW, int windowH);
     void Render(Renderer &renderer, BitmapFontRenderer &font, int windowW, int windowH);
 
@@ -44,8 +45,8 @@ private:
     };
     struct Layout
     {
-        ui::UiRect dialog, list, details, backBtn, applyBtn, upBtn, downBtn;
-        int rowH {34};
+        ui::UiRect dialog, list, track, details, backBtn, applyBtn, upBtn, downBtn;
+        int rowH {42};
         int rows {0};
     };
     static Layout MakeLayout(int windowW, int windowH);
@@ -60,7 +61,7 @@ private:
     std::string m_notice;
     std::vector<std::string> m_dirs;
     int m_selected {0};
-    int m_top {0};
+    ui::SmoothListScroll m_scroll;
     int m_mouseX {0}, m_mouseY {0};
 
     SDL_Texture *m_previewTexture {nullptr};

@@ -49,10 +49,11 @@ std::uint64_t getU64(const std::uint8_t *p)
     return v;
 }
 
-bool addEntry(archive *a, const std::string &name, const std::uint8_t *data, std::size_t size, std::string &error)
+bool addEntry(archive *a, std::string_view name, const std::uint8_t *data, std::size_t size, std::string &error)
 {
     archive_entry *e = archive_entry_new();
-    archive_entry_set_pathname(e, name.c_str());
+    const std::string nameStr(name);
+    archive_entry_set_pathname(e, nameStr.c_str());
     archive_entry_set_size(e, static_cast<la_int64_t>(size));
     archive_entry_set_filetype(e, AE_IFREG);
     archive_entry_set_perm(e, 0644);
@@ -60,27 +61,27 @@ bool addEntry(archive *a, const std::string &name, const std::uint8_t *data, std
     const bool ok = archive_write_header(a, e) == ARCHIVE_OK
                     && (size == 0 || archive_write_data(a, data, size) == static_cast<la_ssize_t>(size));
     if (!ok)
-        error = std::string("cannot write ") + name + ": " + archive_error_string(a);
+        error = "cannot write " + nameStr + ": " + archive_error_string(a);
     archive_entry_free(e);
     return ok;
 }
 
 } // namespace
 
-bool validReplayFileName(const std::string &name)
+bool validReplayFileName(std::string_view name)
 {
     if (name.empty() || name.size() > kMaxReplayNameLength)
         return false;
     if (name.rfind("maps/", 0) != 0 && name.rfind("data/", 0) != 0)
         return false;
-    if (name.back() == '/' || name.find("//") != std::string::npos)
+    if (name.back() == '/' || name.find("//") != std::string_view::npos)
         return false;
     std::size_t partStart = 0;
     for (std::size_t i = 0; i <= name.size(); ++i)
     {
         if (i == name.size() || name[i] == '/')
         {
-            const std::string part = name.substr(partStart, i - partStart);
+            const std::string_view part = name.substr(partStart, i - partStart);
             if (part.empty() || part == "." || part == "..")
                 return false;
             partStart = i + 1;
@@ -95,7 +96,7 @@ bool validReplayFileName(const std::string &name)
     return true;
 }
 
-std::string replayFileName(const std::string &mapName, std::int64_t when)
+std::string replayFileName(std::string_view mapName, std::int64_t when)
 {
     const std::time_t t = static_cast<std::time_t>(when);
     std::tm local {};
@@ -118,7 +119,7 @@ std::string replayFileName(const std::string &mapName, std::int64_t when)
     return std::string("open-art-of-war-") + stamp + "_" + map + ".awr";
 }
 
-bool writeReplay(const std::string &path, const ReplayData &data, std::string &error)
+bool writeReplay(std::string_view path, const ReplayData &data, std::string &error)
 {
     // Apply the reader's limits before touching the destination. Otherwise a
     // successful recording can produce a replay we cannot open ourselves.
@@ -163,7 +164,7 @@ bool writeReplay(const std::string &path, const ReplayData &data, std::string &e
     const fs::path target(path);
     if (target.has_parent_path())
         fs::create_directories(target.parent_path(), ec);
-    const std::string tmp = path + ".tmp";
+    const std::string tmp = std::string(path) + ".tmp";
 
     archive *a = archive_write_new();
     if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK || archive_write_add_filter_zstd(a) != ARCHIVE_OK)
@@ -217,20 +218,20 @@ bool writeReplay(const std::string &path, const ReplayData &data, std::string &e
     fs::rename(tmp, target, ec);
     if (ec)
     {
-        error = "cannot rename to " + path + ": " + ec.message();
+        error = "cannot rename to " + std::string(path) + ": " + ec.message();
         fs::remove(tmp, ec);
         return false;
     }
     return true;
 }
 
-bool readReplay(const std::string &path, ReplayData &out, std::string &error)
+bool readReplay(std::string_view path, ReplayData &out, std::string &error)
 {
     out = ReplayData {};
     archive *a = archive_read_new();
     archive_read_support_filter_all(a);
     archive_read_support_format_tar(a);
-    if (archive_read_open_filename(a, path.c_str(), 1 << 16) != ARCHIVE_OK)
+    if (archive_read_open_filename(a, std::string(path).c_str(), 1 << 16) != ARCHIVE_OK)
     {
         error = std::string("cannot open: ") + archive_error_string(a);
         archive_read_free(a);

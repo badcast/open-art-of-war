@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -21,7 +22,7 @@ public:
         TextureManager &textures,
         int width,
         int height,
-        const std::string &configPath = "assets/data/aboutgame_simulation.yaml");
+        std::string_view configPath = "assets/data/aboutgame_simulation.yaml");
     void Update(float deltaTime, SoundEngine *sound = nullptr);
     void Render(
         Renderer &renderer,

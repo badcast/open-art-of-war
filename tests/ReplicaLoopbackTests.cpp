@@ -41,7 +41,7 @@ Net::GameIdentity TestIdentity()
     return Net::GameIdentity {"1.0-test", 0x1234, 0x5678};
 }
 
-Net::ClientConfig MakeClientConfig(const std::string &name)
+Net::ClientConfig MakeClientConfig(std::string_view name)
 {
     Net::ClientConfig c;
     c.identity = TestIdentity();
@@ -245,8 +245,9 @@ int main()
     }
     Check(hostSim.Tick() == 2 * kTicks, "host simulated second batch of N ticks");
     Check(replicaSim.Tick() == 0, "replica tick still 0 without snapshots");
-    Check(WorldSnapshot::CaptureEntities(replicaEntities, base.tick) == base,
-          "replica entities stayed untouched while host simulated more ticks");
+    Check(
+        WorldSnapshot::CaptureEntities(replicaEntities, base.tick) == base,
+        "replica entities stayed untouched while host simulated more ticks");
 
     const WorldSnapshot hostAfter2N = WorldSnapshot::CaptureEntities(hostEntities, hostSim.Tick());
     Check(!(hostAfter2N == base), "host world advanced again");
@@ -341,7 +342,8 @@ int main()
         // Destroy player 0's headquarters: player 0 is eliminated, teams 1 and 2 continue.
         em3.GetEntity(b0)->alive = false;
         em3.UpdateElimination(m3);
-        Check(em3.IsEliminated(0) && !em3.IsEliminated(1) && !em3.IsEliminated(2), "authority player 0 eliminated first");
+        Check(
+            em3.IsEliminated(0) && !em3.IsEliminated(1) && !em3.IsEliminated(2), "authority player 0 eliminated first");
 
         auto sendFiltered = [&](std::uint8_t slot) {
             WorldSnapshot s = WorldSnapshot::CaptureEntities(em3, s3.Tick());
@@ -359,8 +361,12 @@ int main()
         pump3(20);
         Net::AuthorityState r1, r2;
         WorldSnapshot d1, d2;
-        Check(p1.takeAuthorityState(r1) && WorldSnapshot::Decode(r1.bytes.data(), r1.bytes.size(), d1), "p1 received snapshot");
-        Check(p2.takeAuthorityState(r2) && WorldSnapshot::Decode(r2.bytes.data(), r2.bytes.size(), d2), "p2 received snapshot");
+        Check(
+            p1.takeAuthorityState(r1) && WorldSnapshot::Decode(r1.bytes.data(), r1.bytes.size(), d1),
+            "p1 received snapshot");
+        Check(
+            p2.takeAuthorityState(r2) && WorldSnapshot::Decode(r2.bytes.data(), r2.bytes.size(), d2),
+            "p2 received snapshot");
         Check(d1.result == 0 && d2.result == 0, "surviving teams keep playing after authority eliminated");
 
         // Advance host ticks while player 0 is eliminated and have player 1 leave via SessionHost.
@@ -395,8 +401,9 @@ int main()
         pump3(20);
         Net::AuthorityState r2End;
         WorldSnapshot d2End;
-        Check(p2.takeAuthorityState(r2End) && WorldSnapshot::Decode(r2End.bytes.data(), r2End.bytes.size(), d2End),
-              "p2 received post-leave snapshot");
+        Check(
+            p2.takeAuthorityState(r2End) && WorldSnapshot::Decode(r2End.bytes.data(), r2End.bytes.size(), d2End),
+            "p2 received post-leave snapshot");
         Check(d2End.result == 1 && !em3.GetEntity(b1), "remaining team receives victory after opponent leaves");
     }
 
@@ -506,12 +513,14 @@ int main()
         pumpR(30);
         Net::AuthorityState inR;
         WorldSnapshot decR;
-        Check(replC->takeAuthorityState(inR) && WorldSnapshot::Decode(inR.bytes.data(), inR.bytes.size(), decR)
-                  && decR.full && replEmR.ApplySnapshot(decR),
-              "reconnected replica decodes and applies full snapshot");
-        Check(replEmR.GetEntity(extraUnit) != nullptr
-                  && WorldSnapshot::CaptureEntities(replEmR, hostSimR.Tick()) == fullSnap,
-              "reconnected replica matches current host world without turn replay");
+        Check(
+            replC->takeAuthorityState(inR) && WorldSnapshot::Decode(inR.bytes.data(), inR.bytes.size(), decR)
+                && decR.full && replEmR.ApplySnapshot(decR),
+            "reconnected replica decodes and applies full snapshot");
+        Check(
+            replEmR.GetEntity(extraUnit) != nullptr
+                && WorldSnapshot::CaptureEntities(replEmR, hostSimR.Tick()) == fullSnap,
+            "reconnected replica matches current host world without turn replay");
     }
 
     if (failures == 0)

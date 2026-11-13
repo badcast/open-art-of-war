@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Read access to the game assets, either from an "assets" directory or from a "assets.blob" (tar.zst) that
@@ -78,26 +79,26 @@ bool HasModLayers();
 // Every regular file of a tar archive (compressed as libarchive reads it: zstd, gzip...) into memory, by its path
 // inside; `only`: just that entry. False when it cannot be read.
 bool ReadArchive(
-    const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only = "");
-bool Exists(const std::string &path);
-bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out);
-bool ReadText(const std::string &path, std::string &out);
+    std::string_view file, std::map<std::string, std::vector<std::uint8_t>> &files, std::string_view only = {});
+bool Exists(std::string_view path);
+bool ReadBytes(std::string_view path, std::vector<std::uint8_t> &out);
+bool ReadText(std::string_view path, std::string &out);
 
 // Regular files directly inside `dir`, sorted, as "<dir>/<name>"; `extension` is e.g. ".json" (empty = all)
-std::vector<std::string> List(const std::string &dir, const std::string &extension = "");
+std::vector<std::string> List(std::string_view dir, std::string_view extension = {});
 
 // Where to write `path`: unchanged in directory mode, below the per-user directory in blob mode.
 // Parent directories are created.
-std::string WritablePath(const std::string &path);
+std::string WritablePath(std::string_view path);
 
 // A directory on disk with the contents of `dir` (for libraries that need real files, like gettext):
 // `dir` itself in directory mode, an extracted copy in the per-user cache in blob mode.
-std::string RealDirectory(const std::string &dir);
+std::string RealDirectory(std::string_view dir);
 
 // Per-user directory for settings, saves and caches: SDL_GetPrefPath("openaow", "openaow"), i.e. below
 // ~/.local/share (Linux), %APPDATA% (Windows) or ~/Library/Application Support (macOS)
 std::string UserDataDir();
 // Replaces that directory (tests use a temporary one); call before anything reads or writes there
-void SetUserDataDir(const std::string &dir);
+void SetUserDataDir(std::string_view dir);
 
 } // namespace OpenArtOfWar::Assets

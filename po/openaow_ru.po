@@ -2799,3 +2799,6 @@ msgstr "Б"
 
 msgid "age"
 msgstr "возраст"
+
+msgid "TAP MAP: SET RALLY POINT"
+msgstr "КОСНИТЕСЬ КАРТЫ: ТОЧКА СБОРА"

@@ -335,7 +335,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     m_gameplayController->LoadOverlayStyle(m_env);
     m_hudController->SetResearchProbe([this](PlayerId p) { return m_gameplayController->ResearchOf(p); });
     m_menuController->BindLoading(
-        [this](const std::string &title, const std::string &path) { BeginMapLoading(title, path); },
+        [this](std::string_view title, std::string_view path) { BeginMapLoading(title, path); },
         [this]() { EndMapLoading(); });
 
     // Difficulty from the options, zoom range and graphics quality
@@ -361,7 +361,7 @@ bool Application::Init(int windowWidth, int windowHeight)
         api.configured = [this]() {
             return RenderBackend::Configured(m_env);
         };
-        api.select = [this](const std::string &name) {
+        api.select = [this](std::string_view name) {
             RenderBackend::select(m_env, name);
         };
         api.applyNow = [this]() {
@@ -472,7 +472,7 @@ void Application::LaunchTestMap()
               << std::endl;
 }
 
-bool Application::LaunchMap(const std::string &nameOrPath, bool fromScratch)
+bool Application::LaunchMap(std::string_view nameOrPath, bool fromScratch)
 {
     if (!m_mission || !m_map || !m_entities || !m_economy || !m_pathfinder || !m_camera)
         return false;
@@ -942,7 +942,7 @@ void Application::HandleEvents()
     SyncWindowSize();
     uilayout::Poll(SDL_GetTicks()); // the layout file was edited: the interface follows
     if (m_hudController)
-        m_input->SetTouchWheelScroll(!m_hudController->IsResearchWindowOpen()); // the tree follows the finger itself
+        m_input->SetTouchWheelScroll(false); // every scrollable view follows the finger with kinetic glide
     m_input->ResetFrameEvents();
     if (m_hudController && m_touchUi)
     {
@@ -1141,6 +1141,12 @@ void Application::Update(float deltaTime)
     }
     if (m_hudController)
     {
+        if (m_state != AppState::CampaignPlaying && m_state != AppState::SkirmishPlaying && m_state != AppState::Victory
+            && m_state != AppState::Defeat)
+        {
+            m_scoreboardOpen = false;
+        }
+        m_hudController->SetStatsOpen((m_replay || m_spectating) ? m_replayUi.stats : m_scoreboardOpen);
         const bool singlePlayerSpeed
             = !InNetworkMatch() && !m_replay && !m_spectating && IsSpeedControlAllowed()
               && (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying);
@@ -1153,6 +1159,20 @@ void Application::Update(float deltaTime)
         m_gameplayController->Update(MakeFrameContext(deltaTime));
         if (m_gameplayController->simulation().Tick() != tickBefore)
             LocalTickRan(tickBefore);
+        if (m_hudController && m_hudController->ConsumeStatsToggle())
+        {
+            if (m_replay || m_spectating)
+                m_replayUi.stats = !m_replayUi.stats;
+            else
+                m_scoreboardOpen = !m_scoreboardOpen;
+        }
+        if ((m_menuController
+             && (m_menuController->IsInGameMenuOpen() || m_menuController->IsObjectivesDialogOpen()
+                 || m_menuController->IsMissionDialogOpen()))
+            || (m_hudController && m_hudController->IsResearchWindowOpen()))
+        {
+            m_scoreboardOpen = false;
+        }
     }
     else if (m_state == AppState::SplashLogo)
     {

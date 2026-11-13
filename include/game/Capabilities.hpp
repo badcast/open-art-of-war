@@ -4,6 +4,7 @@
 #include "game/Players.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -22,19 +23,19 @@ namespace Capabilities
 // The level names in file order (empty when the file is missing: nothing is restricted)
 const std::vector<std::string> &Levels();
 // Index into Levels(), -1 when there is no such level
-int LevelIndex(const std::string &name);
+int LevelIndex(std::string_view name);
 // The file's `default` level (the last one when it names none; empty without levels)
 const std::string &DefaultLevel();
 
 // The level a player plays at: the slot's own when it has one (>= 0), else the match's (>= 0), else the map's or
 // mission's preset (when it names a level), else the default
-std::string ResolveLevel(int matchLevel, int slotLevel, const std::string &preset = {});
+std::string ResolveLevel(int matchLevel, int slotLevel, std::string_view preset = {});
 // Sets every active player's level at the start of a game: its slot's (PlayerSlot::techLevel), else the match's,
 // else the map's preset; the others are unrestricted
-void ApplyLevels(int matchLevel, const std::string &preset, const EntityManager &entities);
+void ApplyLevels(int matchLevel, std::string_view preset, const EntityManager &entities);
 
 // Sets a player's level, the names resolved through the character configs; an unknown level restricts nothing
-void SetPlayerLevel(PlayerId player, const std::string &level, const EntityManager &entities);
+void SetPlayerLevel(PlayerId player, std::string_view level, const EntityManager &entities);
 // Every player unrestricted (before a match, and in tools)
 void ResetLevels();
 // The level a player plays at (empty: unrestricted)
@@ -48,7 +49,7 @@ bool AllowsUnit(PlayerId player, int archetype);
 bool AllowsResearch(PlayerId player, int index);
 
 // Reads the file text over "no levels"; false when it cannot be parsed (then nothing is restricted)
-bool LoadText(const std::string &yamlText);
+bool LoadText(std::string_view yamlText);
 // From data/capabilities.yaml again (the host's, while a network session has its files)
 void Reload();
 

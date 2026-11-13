@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace CharEditor
 {
@@ -27,7 +28,7 @@ nlohmann::ordered_json MergeJsonEdits(
 YAML::Node ReadYamlFile(const std::filesystem::path &path);
 
 // Writes through a temporary file next to `path` and a rename: a crash never leaves half a config
-bool WriteFileAtomic(const std::filesystem::path &path, const std::string &text, std::string &error);
+bool WriteFileAtomic(const std::filesystem::path &path, std::string_view text, std::string &error);
 
 // YAML text of a node the way the editor writes it (two spaces of indentation, trailing newline)
 std::string YamlText(const YAML::Node &node);

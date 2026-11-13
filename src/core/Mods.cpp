@@ -34,17 +34,17 @@ State &state()
     return s;
 }
 
-bool ValidId(const std::string &id)
+bool ValidId(std::string_view id)
 {
     return !id.empty() && std::all_of(id.begin(), id.end(), [](unsigned char c) {
         return std::islower(c) || std::isdigit(c) || c == '_';
     });
 }
 
-std::string Text(const nlohmann::json &j, const char *key, const std::string &fallback = "")
+std::string Text(const nlohmann::json &j, const char *key, std::string_view fallback = {})
 {
     if (!j.contains(key))
-        return fallback;
+        return std::string(fallback);
     const nlohmann::json &v = j[key];
     if (v.is_string())
         return v.get<std::string>();
@@ -55,11 +55,11 @@ std::string Text(const nlohmann::json &j, const char *key, const std::string &fa
         std::string s = v.dump();
         return s;
     }
-    return fallback;
+    return std::string(fallback);
 }
 
 // The description of one mod from its mod.yaml text
-ModInfo Describe(const std::string &text, const fs::path &path, bool archive, bool fromUser)
+ModInfo Describe(std::string_view text, const fs::path &path, bool archive, bool fromUser)
 {
     ModInfo m;
     m.path = path.string();
@@ -173,12 +173,12 @@ void FolderKeys(const fs::path &root, std::vector<std::string> &keys)
 
 } // namespace
 
-void SetSearchDirs(const std::string &appMods, const std::string &userMods)
+void SetSearchDirs(std::string_view appMods, std::string_view userMods)
 {
     State &s = state();
     std::lock_guard<std::mutex> guard(s.lock);
-    s.appDir = appMods;
-    s.userDir = userMods;
+    s.appDir.assign(appMods);
+    s.userDir.assign(userMods);
 }
 
 std::vector<std::string> SearchDirs()
@@ -281,25 +281,26 @@ std::vector<ModInfo> Scan()
     return out;
 }
 
-int CompareVersions(const std::string &a, const std::string &b)
+int CompareVersions(std::string_view a, std::string_view b)
 {
     std::size_t i = 0, j = 0;
     while (i < a.size() || j < b.size())
     {
-        auto part = [](const std::string &s, std::size_t &k) {
-            std::string out;
+        auto part = [](std::string_view s, std::size_t &k) {
+            const std::size_t start = k;
             while (k < s.size() && s[k] != '.' && s[k] != '-')
-                out += s[k++];
+                ++k;
+            const std::string_view out = s.substr(start, k - start);
             if (k < s.size())
                 ++k;
             return out;
         };
-        const std::string pa = part(a, i), pb = part(b, j);
+        const std::string_view pa = part(a, i), pb = part(b, j);
         const bool na = !pa.empty() && std::all_of(pa.begin(), pa.end(), ::isdigit);
         const bool nb = !pb.empty() && std::all_of(pb.begin(), pb.end(), ::isdigit);
         if (na && nb)
         {
-            const unsigned long long x = std::stoull(pa), y = std::stoull(pb);
+            const unsigned long long x = std::stoull(std::string(pa)), y = std::stoull(std::string(pb));
             if (x != y)
                 return x < y ? -1 : 1;
         }
@@ -313,7 +314,7 @@ int CompareVersions(const std::string &a, const std::string &b)
     return 0;
 }
 
-bool KeyOf(const std::string &path, std::string &key)
+bool KeyOf(std::string_view path, std::string &key)
 {
     if (path.empty() || path.find('\\') != std::string::npos || path.find(':') != std::string::npos)
         return false;

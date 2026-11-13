@@ -3,6 +3,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Mods: data packages over the installed game data (docs/modding.md).
@@ -41,18 +42,18 @@ struct ModInfo
 bool LoadPreview(const ModInfo &mod, std::vector<std::uint8_t> &out);
 
 // The folders searched (tests use their own); empty strings: the defaults
-void SetSearchDirs(const std::string &appMods, const std::string &userMods);
+void SetSearchDirs(std::string_view appMods, std::string_view userMods);
 std::vector<std::string> SearchDirs();
 
 // Every mod found, one per id (the higher version, the user's on a tie), sorted by name
 std::vector<ModInfo> Scan();
 
 // -1 / 0 / 1: "1.10" > "1.9", numbers compared as numbers, the rest as text
-int CompareVersions(const std::string &a, const std::string &b);
+int CompareVersions(std::string_view a, std::string_view b);
 
 // A path inside a mod as a key below assets/ ("./sprites/../sprites/x.png" -> "sprites/x.png"; an "assets/" in front is
 // dropped); false for anything that would leave it (".." on top, absolute, drive letters, backslashes) or is empty
-bool KeyOf(const std::string &path, std::string &key);
+bool KeyOf(std::string_view path, std::string &key);
 
 struct ActivateReport
 {

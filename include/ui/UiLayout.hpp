@@ -3,9 +3,10 @@
 #include "ui/UiKit.hpp"
 
 #include <functional>
-#include <memory>
 #include <map>
+#include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -43,16 +44,16 @@ struct Node
 };
 
 // Answers a condition name (an unknown name is false)
-using Conditions = std::function<bool(const std::string &)>;
+using Conditions = std::function<bool(std::string_view)>;
 
 struct Solved
 {
     float u {1.0f};
     std::vector<Node> nodes;
-    const Node *Find(const std::string &id) const;
+    const Node *Find(std::string_view id) const;
     // The rect of a node (empty when there is none or it is not shown)
-    ui::UiRect Rect(const std::string &id) const;
-    bool Shown(const std::string &id) const;
+    ui::UiRect Rect(std::string_view id) const;
+    bool Shown(std::string_view id) const;
     // The topmost shown button (enabled or not) under the point; nullptr when none
     const Node *HitButton(int x, int y) const;
     // Any shown node that takes touches (buttons, panels, radar, cards, ...) is under the point
@@ -63,11 +64,11 @@ class Layout
 {
 public:
     // Parses a layout file; on an error nothing changes and `error` says where
-    bool Load(const std::string &yamlText, std::string &error);
-    bool Has(const std::string &screen, const std::string &profile) const;
+    bool Load(std::string_view yamlText, std::string &error);
+    bool Has(std::string_view screen, std::string_view profile) const;
     Solved Solve(
-        const std::string &screen,
-        const std::string &profile,
+        std::string_view screen,
+        std::string_view profile,
         int windowW,
         int windowH,
         const Conditions &cond,
@@ -76,13 +77,13 @@ public:
     struct Def; // (the parsed form; opaque outside the .cpp)
 
 private:
-    std::shared_ptr<const std::map<std::string, Def>> m_defs;
+    std::shared_ptr<const std::map<std::string, Def, std::less<>>> m_defs;
 };
 
 // The profile the menus use (the HUD picks its own): "touch" with the touch interface, else "pc". A screen without
 // the profile falls back to pc.
-void SetMenuProfile(const std::string &profile);
-const std::string &MenuProfile(const Layout &layout, const std::string &screen);
+void SetMenuProfile(std::string_view profile);
+const std::string &MenuProfile(const Layout &layout, std::string_view screen);
 
 // The game's layout, read from the file named by main.yaml (`ui_layout`)
 const Layout &Current();

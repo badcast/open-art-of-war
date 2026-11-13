@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -82,12 +83,12 @@ struct Settings
     // Brings every value into its valid range
     void Clamp();
 
-    bool Load(const std::string &path);
-    inline bool load(const std::string &path)
+    bool Load(std::string_view path);
+    inline bool load(std::string_view path)
     {
         return Load(path);
     }
-    bool Save(const std::string &path) const;
+    bool Save(std::string_view path) const;
     // The factory defaults: the "settings" section of assets/data/game_environment.yaml (same keys as settings.json),
     // laid over the built-in values before the player's own settings.json is read
     void ApplyFactoryDefaults(const nlohmann::json &section);

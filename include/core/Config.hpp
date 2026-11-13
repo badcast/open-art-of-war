@@ -103,14 +103,14 @@ enum class AppState
 };
 
 // Anchor flags
-namespace Anchor
+enum Anchor : int
 {
-constexpr int TOP = 0x01;
-constexpr int BOTTOM = 0x02;
-constexpr int LEFT = 0x04;
-constexpr int RIGHT = 0x08;
-constexpr int HCENTER = 0x10;
-constexpr int VCENTER = 0x20;
-} // namespace Anchor
+    TOP = 0x01,
+    BOTTOM = 0x02,
+    LEFT = 0x04,
+    RIGHT = 0x08,
+    HCENTER = 0x10,
+    VCENTER = 0x20
+};
 
 } // namespace OpenArtOfWar

@@ -41,9 +41,9 @@ fs::path FindAssetRoot()
     return {};
 }
 
-std::string YamlString(const YAML::Node &node, const char *key, const std::string &fallback)
+std::string YamlString(const YAML::Node &node, const char *key, std::string_view fallback)
 {
-    return YamlValue<std::string>(node, key, fallback);
+    return YamlValue<std::string>(node, key, std::string(fallback));
 }
 
 int YamlInt(const YAML::Node &node, const char *key, int fallback)
@@ -154,10 +154,10 @@ void WreckOf(const YAML::Node &doc, int &composite, int &stages)
     stages = std::max(1, YamlInt(anim, "wreck_stages", stages));
 }
 
-FamilyRef SpriteFamilyRef(const std::string &ref)
+FamilyRef SpriteFamilyRef(std::string_view ref)
 {
     const auto dot = ref.find('.');
-    if (dot == std::string::npos)
+    if (dot == std::string_view::npos)
         return {};
     const OpenArtOfWar::SpriteFamily *f = OpenArtOfWar::Sprites().FindFamily(ref.substr(0, dot), ref.substr(dot + 1));
     return f && f->count > 0 ? FamilyRef {f->start, f->count} : FamilyRef {};

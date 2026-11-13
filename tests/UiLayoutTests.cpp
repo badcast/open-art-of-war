@@ -58,7 +58,9 @@ int main()
     Check(l.Load(kFile, err), "the file parses");
     Check(l.Has("hud", "touch") && l.Has("hud", "pc") && !l.Has("hud", "tv"), "profiles");
 
-    const uilayout::Conditions cond = [](const std::string &n) { return n == "on"; };
+    const uilayout::Conditions cond = [](std::string_view n) {
+        return n == "on";
+    };
     uilayout::Solved s = l.Solve("hud", "touch", 1280, 720, cond);
     Check(s.u == 1.0f, "scale 1 at 720p");
     Check(s.Rect("a").x == 1180 && s.Rect("a").w == 90, "expressions with units");
@@ -68,7 +70,9 @@ int main()
     const uilayout::Solved big = l.Solve("hud", "touch", 2880, 1440, cond);
     Check(big.u == 2.0f && big.Rect("a").w == 180, "the scale follows the window, clamped");
 
-    const uilayout::Conditions off = [](const std::string &n) { return n == "on" || n == "off"; };
+    const uilayout::Conditions off = [](std::string_view n) {
+        return n == "on" || n == "off";
+    };
     Check(!l.Solve("hud", "touch", 1280, 720, off).Shown("b"), "a false condition hides the node");
 
     Check(s.Shown("c1") && !s.Shown("c2") && s.Rect("c3").x == 110, "a flow skips hidden children");
@@ -97,43 +101,67 @@ int main()
         const uilayout::Solved hud = shipped.Solve("hud", "pc", 1280, 720, {});
         Check(hud.Rect("radar").x == 990 && hud.Rect("radar").y == 54 && hud.Rect("grid").w == 280, "sidebar numbers");
         const uilayout::Solved menu = shipped.Solve("main_menu", "pc", 1280, 720, {});
-        Check(menu.Rect("item0").x == 91 && menu.Rect("item0").y == 176 && menu.Rect("item9").y == 626, "main menu numbers");
+        Check(
+            menu.Rect("item0").x == 91 && menu.Rect("item0").y == 176 && menu.Rect("item9").y == 626,
+            "main menu numbers");
         const uilayout::Solved pause = shipped.Solve("pause", "pc", 1280, 720, {});
         Check(pause.Rect("dialog").y == 142 && pause.Rect("item5").y == 142 + 362, "pause numbers");
         const uilayout::Solved maps = shipped.Solve("map_select", "pc", 1280, 720, {});
-        Check(maps.Rect("list").x == 20 && maps.Rect("list").y == 68 && maps.Rect("list").w == 358 && maps.Rect("list").h == 580,
-              "map window list");
-        Check(maps.Rect("details").x == 394 && maps.Rect("back").x == 1120 && maps.Rect("start").x == 908, "map window details and footer");
+        Check(
+            maps.Rect("list").x == 20 && maps.Rect("list").y == 68 && maps.Rect("list").w == 358
+                && maps.Rect("list").h == 580,
+            "map window list");
+        Check(
+            maps.Rect("details").x == 394 && maps.Rect("back").x == 1120 && maps.Rect("start").x == 908,
+            "map window details and footer");
         Check(maps.Rect("room_chat_field").y == 68 + 580 - 36, "room chat under the list");
         const uilayout::Solved yn = shipped.Solve("confirm", "touch", 1280, 720, {});
-        Check(yn.Rect("yes").h >= 70 && yn.Rect("no").h >= 70 && yn.Rect("yes").w >= 300, "touch Yes / No buttons are big");
+        Check(
+            yn.Rect("yes").h >= 70 && yn.Rect("no").h >= 70 && yn.Rect("yes").w >= 300,
+            "touch Yes / No buttons are big");
         Check(shipped.Solve("pause", "touch", 1280, 720, {}).Rect("item0").h > 46, "touch pause buttons are bigger");
         // The technology tree window: the old numbers on the PC, finger-sized controls inside the screen on touch
         Check(shipped.Has("research", "pc") && shipped.Has("research", "touch"), "both research profiles");
         const std::map<std::string, float> top {{"T", 0.0f}};
         const uilayout::Solved tech = shipped.Solve("research", "pc", 1280, 720, {}, &top);
-        Check(tech.Rect("content").x == 16 && tech.Rect("content").y == 60 && tech.Rect("content").h == 644, "research content");
-        Check(tech.Rect("details").w == 324 && tech.Rect("tree").w == 912 && tech.Rect("zoom_out").x == 898, "research tree and details");
-        Check(tech.Rect("close").h == 30 && tech.Rect("zoom_in").w == 24 && tech.Rect("start").h == 40, "research PC controls");
+        Check(
+            tech.Rect("content").x == 16 && tech.Rect("content").y == 60 && tech.Rect("content").h == 644,
+            "research content");
+        Check(
+            tech.Rect("details").w == 324 && tech.Rect("tree").w == 912 && tech.Rect("zoom_out").x == 776,
+            "research tree and details");
+        Check(
+            tech.Rect("close").h == 36 && tech.Rect("zoom_in").w == 34 && tech.Rect("start").h == 46,
+            "research PC controls");
         for (const auto &size : {std::pair<int, int> {1280, 720}, {2400, 1080}, {1600, 720}})
         {
             const uilayout::Solved fingers = shipped.Solve("research", "touch", size.first, size.second, {}, &top);
             const ui::UiRect tree = fingers.Rect("tree"), details = fingers.Rect("details");
-            Check(fingers.Rect("close").h >= 50 && fingers.Rect("search").h >= 50 && fingers.Rect("start").h >= 64,
-                  "research touch controls are finger-sized");
-            Check(fingers.Rect("zoom_in").w >= 56 && fingers.Rect("zoom_in").h >= 56, "research touch zoom buttons are big");
-            Check(tree.w > size.first / 2 && tree.Right() < details.x && details.Right() <= size.first,
-                  "research tree keeps most of the screen, details fit");
-            Check(fingers.Rect("start").Bottom() <= details.Bottom() && details.Bottom() <= size.second, "research start button fits");
+            Check(
+                fingers.Rect("close").h >= 50 && fingers.Rect("search").h >= 50 && fingers.Rect("start").h >= 64,
+                "research touch controls are finger-sized");
+            Check(
+                fingers.Rect("zoom_in").w >= 56 && fingers.Rect("zoom_in").h >= 56,
+                "research touch zoom buttons are big");
+            Check(
+                tree.w > size.first / 2 && tree.Right() < details.x && details.Right() <= size.first,
+                "research tree keeps most of the screen, details fit");
+            Check(
+                fingers.Rect("start").Bottom() <= details.Bottom() && details.Bottom() <= size.second,
+                "research start button fits");
         }
         const std::map<std::string, float> bar {{"T", 64.0f}};
         const uilayout::Solved watched = shipped.Solve("research", "touch", 1280, 720, {}, &bar);
-        Check(watched.Rect("dialog").y == 64 && watched.Rect("dialog").h == 720 - 64, "research window leaves the observer bar");
+        Check(
+            watched.Rect("dialog").y == 64 && watched.Rect("dialog").h == 720 - 64,
+            "research window leaves the observer bar");
         const uilayout::Solved net = shipped.Solve("network", "pc", 1280, 720, {});
-        Check(net.Rect("dialog").w == 1000 && net.Rect("join").w == 220 && net.Rect("host").x == net.Rect("join").x - 232,
-              "network numbers");
+        Check(
+            net.Rect("dialog").w == 1000 && net.Rect("join").w == 220 && net.Rect("host").x == net.Rect("join").x - 232,
+            "network numbers");
 
-        // Touch HUD layout across landscape resolutions and aspect ratios: no BOX toggle, no overlaps or off-screen clipping
+        // Touch HUD layout across landscape resolutions and aspect ratios: no BOX toggle, no overlaps or off-screen
+        // clipping
         const std::pair<int, int> touchSizes[] = {
             {800, 480},
             {800, 600},
@@ -153,7 +181,7 @@ int main()
         for (const auto &sz : touchSizes)
         {
             const int w = sz.first, h = sz.second;
-            const uilayout::Conditions normalCond = [](const std::string &n) {
+            const uilayout::Conditions normalCond = [](std::string_view n) {
                 return n == "has_combat" || n == "has_building" || n == "has_selection";
             };
             const uilayout::Solved hudTouch = shipped.Solve("hud", "touch", w, h, normalCond);
@@ -170,14 +198,16 @@ int main()
             const ui::UiRect dockBuild = hudTouch.Rect("dock_build");
             const ui::UiRect dockUnits = hudTouch.Rect("dock_units");
             Check(res.Right() < techBtn.x, "resources panel does not overlap top-right tech button");
-            Check(radar.Right() < dockBuild.x && dockBuild.Right() < dockUnits.x && dockUnits.Right() <= w,
-                  "radar and dock buttons do not overlap across landscape resolutions");
+            Check(
+                radar.Right() < dockBuild.x && dockBuild.Right() < dockUnits.x && dockUnits.Right() <= w,
+                "radar and dock buttons do not overlap across landscape resolutions");
             const ui::UiRect orders = hudTouch.Rect("orders");
-            Check(orders.x > radar.Right() && orders.Right() < dockBuild.x,
-                  "orders bar sits cleanly between radar and dock");
+            Check(
+                orders.x > radar.Right() && orders.Right() < dockBuild.x,
+                "orders bar sits cleanly between radar and dock");
 
             // Units drawer open: cards and INF/VEH tabs fit and scale with u
-            const uilayout::Conditions unitsCond = [](const std::string &n) {
+            const uilayout::Conditions unitsCond = [](std::string_view n) {
                 return n == "panel_open" || n == "panel_units" || n == "units_inf";
             };
             const uilayout::Solved unitsHud = shipped.Solve("hud", "touch", w, h, unitsCond);
@@ -186,25 +216,31 @@ int main()
             const ui::UiRect scrollR = unitsHud.Rect("scroll_right");
             const ui::UiRect infBtn = unitsHud.Rect("units_inf");
             const ui::UiRect vehBtn = unitsHud.Rect("units_veh");
-            Check(inBounds(cards, w, h) && inBounds(scrollL, w, h) && inBounds(scrollR, w, h),
-                  "touch card drawer and scroll arrows stay in bounds");
+            Check(
+                inBounds(cards, w, h) && inBounds(scrollL, w, h) && inBounds(scrollR, w, h),
+                "touch card drawer and scroll arrows stay in bounds");
             Check(cards.h == static_cast<int>(std::lround(88 * unitsHud.u)), "card drawer height scales with u");
-            Check(infBtn.x > scrollL.Right() && vehBtn.x > scrollL.Right() && vehBtn.Bottom() <= cards.Bottom(),
-                  "INF/VEH buttons fit inside card drawer without overlapping scroll arrow");
+            Check(
+                infBtn.x > scrollL.Right() && vehBtn.x > scrollL.Right() && vehBtn.Bottom() <= cards.Bottom(),
+                "INF/VEH buttons fit inside card drawer without overlapping scroll arrow");
 
             // Building placement mode: CANCEL and BUILD HERE stay in bounds and clear the radar
-            const uilayout::Conditions placingCond = [](const std::string &n) { return n == "placing"; };
+            const uilayout::Conditions placingCond = [](std::string_view n) {
+                return n == "placing";
+            };
             const uilayout::Solved placingHud = shipped.Solve("hud", "touch", w, h, placingCond);
             const ui::UiRect cancelBtn = placingHud.Rect("cancel");
             const ui::UiRect confirmBtn = placingHud.Rect("confirm");
             Check(inBounds(cancelBtn, w, h) && inBounds(confirmBtn, w, h), "placing buttons stay in bounds");
-            Check(placingHud.Rect("radar").Right() < cancelBtn.x && cancelBtn.Right() < confirmBtn.x,
-                  "placing buttons do not overlap radar or each other");
+            Check(
+                placingHud.Rect("radar").Right() < cancelBtn.x && cancelBtn.Right() < confirmBtn.x,
+                "placing buttons do not overlap radar or each other");
 
             // Touch main menu items stay inside viewport across short and tall landscape screens
             const uilayout::Solved mmTouch = shipped.Solve("main_menu", "touch", w, h, {});
             for (int i = 0; i < 10; ++i)
-                Check(inBounds(mmTouch.Rect("item" + std::to_string(i)), w, h), "touch main menu items fit in viewport");
+                Check(
+                    inBounds(mmTouch.Rect("item" + std::to_string(i)), w, h), "touch main menu items fit in viewport");
         }
 
         // TouchHUD runtime behavior: box selection always on except when placing/building; responsive TouchPanels
@@ -223,16 +259,18 @@ int main()
             return mr;
         };
         Check(!panels1280.empty() && panels1280.size() == panels1600.size(), "TouchPanels adapts across widths");
-        Check(maxRight(panels1600) > maxRight(panels1280),
-              "TouchPanels shifts right-anchored HUD panels right on wider aspect ratio");
+        Check(
+            maxRight(panels1600) > maxRight(panels1280),
+            "TouchPanels shifts right-anchored HUD panels right on wider aspect ratio");
         Check(panels1920[0].w > panels1280[0].w, "TouchPanels scales panels up on higher resolution");
 
         touchHud.SetBuildMode(true);
         Check(touchHud.TouchPansCamera(), "TouchHUD disables box selection (enables pan) during building mode");
         Check(touchHud.OwnsMapInput(), "TouchHUD owns map input during building mode");
         touchHud.SetBuildMode(false);
-        Check(!touchHud.TouchPansCamera() && !touchHud.OwnsMapInput(),
-              "TouchHUD restores always-on box selection when leaving building mode");
+        Check(
+            !touchHud.TouchPansCamera() && !touchHud.OwnsMapInput(),
+            "TouchHUD restores always-on box selection when leaving building mode");
     }
 
     if (g_failures == 0)
@@ -242,8 +280,9 @@ int main()
         for (int i = 0; i < 10; ++i)
         {
             const auto item = menu_detail::TouchMainMenuItemRect(i, size.first, size.second);
-            Check(item.x >= 364 && item.Right() <= size.first && item.y >= 0 && item.Bottom() <= size.second - 30,
-                  "touch main menu item stays on screen and clear of the music player");
+            Check(
+                item.x >= 364 && item.Right() <= size.first && item.y >= 0 && item.Bottom() <= size.second - 30,
+                "touch main menu item stays on screen and clear of the music player");
         }
     }
 
@@ -272,8 +311,14 @@ int main()
                 if (pixel)
                 {
                     Uint8 r, g, b, a;
-                    SDL_GetRGBA(*static_cast<Uint32 *>(pixel->pixels), SDL_GetPixelFormatDetails(pixel->format),
-                                nullptr, &r, &g, &b, &a);
+                    SDL_GetRGBA(
+                        *static_cast<Uint32 *>(pixel->pixels),
+                        SDL_GetPixelFormatDetails(pixel->format),
+                        nullptr,
+                        &r,
+                        &g,
+                        &b,
+                        &a);
                     Check(r > 200 && g < 20 && b < 20, "touch clip displays content at scale");
                     SDL_DestroySurface(pixel);
                 }
@@ -290,8 +335,14 @@ int main()
             if (pixel)
             {
                 Uint8 r, g, b, a;
-                SDL_GetRGBA(*static_cast<Uint32 *>(pixel->pixels), SDL_GetPixelFormatDetails(pixel->format),
-                            nullptr, &r, &g, &b, &a);
+                SDL_GetRGBA(
+                    *static_cast<Uint32 *>(pixel->pixels),
+                    SDL_GetPixelFormatDetails(pixel->format),
+                    nullptr,
+                    &r,
+                    &g,
+                    &b,
+                    &a);
                 Check(r >= 120 && r <= 136 && g < 20 && b < 20, "touch clip uses half opacity");
                 SDL_DestroySurface(pixel);
             }

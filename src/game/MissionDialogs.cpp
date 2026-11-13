@@ -8,9 +8,9 @@ namespace OpenArtOfWar
 namespace
 {
 // The translation of a key, or empty when the catalog does not have it (gettext then returns the key itself)
-std::string Lookup(const std::string &key)
+std::string Lookup(std::string_view key)
 {
-    std::string value = Localization::Tr(key);
+    std::string value = Localization::Tr(std::string(key));
     return value == key ? std::string() : value;
 }
 

@@ -9,6 +9,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -1002,9 +1003,9 @@ private:
         return {m_corner[CIdx(x, y)], m_corner[CIdx(x + 1, y)], m_corner[CIdx(x, y + 1)], m_corner[CIdx(x + 1, y + 1)]};
     }
 
-    bool HasPicture(const std::string &code) const
+    bool HasPicture(std::string_view code) const
     {
-        return m_tileset.plain.count(code) != 0 || m_tileset.variants.count(code) != 0;
+        return m_tileset.plain.count(std::string(code)) != 0 || m_tileset.variants.count(std::string(code)) != 0;
     }
 
     void FixCorners()

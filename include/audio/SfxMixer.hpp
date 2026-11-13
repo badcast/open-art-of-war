@@ -2,11 +2,13 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -35,7 +37,7 @@ SfxPlacement PlaceSfx(
 
 // Extracts event name from audio filename ("fire_rifle_2.ogg" -> "fire_rifle", "ui_show_dialog.ogg" ->
 // "ui_show_dialog")
-std::string EventOfFile(const std::string &path);
+std::string EventOfFile(std::string_view path);
 
 // Sound effects: short clips decoded once (mono 44.1 kHz), mixed into a stereo stream by up to `voices`
 // voices. Events (assets/data/audio_sfx.json) pick one of their clips at random and bring their own volume,
@@ -74,25 +76,25 @@ public:
     };
 
     // audio_sfx.json and the listed <event>_<n>.ogg files (read through AssetStore); false when nothing loaded
-    bool LoadBank(const std::string &configPath, const std::vector<std::string> &clips);
+    bool LoadBank(std::string_view configPath, const std::vector<std::string> &clips);
     // The listed <event>_<n>.ogg clips; `onlyMissing`: only for events that have no clip yet (a fallback
     // language). Returns the number of clips loaded.
     int LoadClips(const std::vector<std::string> &files, bool onlyMissing = false);
     // Event settings from JSON ({"defaults": {...}, "events": {name: {...}}, "voices": n})
     void Configure(const nlohmann::json &doc);
     // A clip of an event (mono, kRate); tests and loadBank
-    void AddClip(const std::string &event, std::vector<std::int16_t> pcm);
+    void AddClip(std::string_view event, std::vector<std::int16_t> pcm);
 
-    bool Has(const std::string &event) const;
-    const EventConfig *Config(const std::string &event) const;
+    bool Has(std::string_view event) const;
+    const EventConfig *Config(std::string_view event) const;
     std::size_t EventCount() const;
 
     // Starts one of the event's clips; `gain` 0..1 (distance), `pan` -1..1. False when the event is
     // unknown, silent or held back by its limits.
     // `muffle` 0..1 (SfxPlacement::muffle) rolls the highs off with a low-pass filter.
-    bool Play(const std::string &event, float gain, float pan, std::uint64_t nowMs, float muffle = 0.0f);
+    bool Play(std::string_view event, float gain, float pan, std::uint64_t nowMs, float muffle = 0.0f);
     // Queues an announcer line (dropped while its cooldown runs or when it is queued already)
-    bool Announce(const std::string &event, std::uint64_t nowMs);
+    bool Announce(std::string_view event, std::uint64_t nowMs);
     // Starts the next announcer line once the current one is over; call once per frame
     void Update(std::uint64_t nowMs);
     // Adds `frames` stereo frames (interleaved int16) of everything playing
@@ -160,7 +162,7 @@ private:
         bool played {false};
     };
 
-    int EventIndex(const std::string &event) const;
+    int EventIndex(std::string_view event) const;
     bool StartLocked(int eventIdx, float gain, float pan, std::uint64_t nowMs, bool announcer, float muffle = 0.0f);
     bool AnnounceLocked(int eventIdx, std::uint64_t nowMs);
     int InstancesLocked(int eventIdx) const;
@@ -168,7 +170,7 @@ private:
     mutable std::mutex m_lock;
     std::vector<std::vector<std::int16_t>> m_clips;
     std::vector<EventState> m_events;
-    std::map<std::string, int> m_eventIndex;
+    std::map<std::string, int, std::less<>> m_eventIndex;
     nlohmann::json m_defaults = nlohmann::json::object();
     std::vector<Voice> m_voices;
     int m_maxVoices {32};

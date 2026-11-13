@@ -3,6 +3,7 @@
 #include "game/Entity.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -45,10 +46,10 @@ inline const ProjectileSpec &of(ProjectileType type)
 }
 const char *KeyOf(ProjectileType type);
 // A key of the file / a weapon's `projectile:` (unknown: bullet)
-ProjectileType FromKey(const std::string &key);
+ProjectileType FromKey(std::string_view key);
 
 // Reads the file text over the defaults; false when it cannot be parsed
-bool LoadText(const std::string &yamlText);
+bool LoadText(std::string_view yamlText);
 // Back to the defaults overlaid with assets/characters/projectiles.yaml
 void Reload();
 inline void reload()
@@ -56,7 +57,7 @@ inline void reload()
     Reload();
 }
 // Defaults overlaid with this text (the editor shows its changes at once)
-void Apply(const std::string &yamlText);
+void Apply(std::string_view yamlText);
 } // namespace Projectiles
 
 } // namespace OpenArtOfWar

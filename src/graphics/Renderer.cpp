@@ -1175,6 +1175,66 @@ void Renderer::DrawRawSpriteScreen(int spriteId, int screenX, int screenY, float
     SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
 }
 
+void Renderer::DrawSpritePartScreen(
+    int spriteId,
+    const SDL_FRect &dstRect,
+    float insetLeft,
+    float insetTop,
+    float insetRight,
+    float insetBottom,
+    SDL_FlipMode flip,
+    Faction faction,
+    Uint8 alpha,
+    SDL_Color tint)
+{
+    PlainState();
+    if (!m_texManager || dstRect.w <= 0.0f || dstRect.h <= 0.0f || alpha == 0)
+        return;
+    const auto *frame = m_texManager->GetSpriteFrame(spriteId);
+    if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
+        return;
+    const float usableW = static_cast<float>(frame->width) - insetLeft - insetRight;
+    const float usableH = static_cast<float>(frame->height) - insetTop - insetBottom;
+    if (usableW <= 0.0f || usableH <= 0.0f)
+        return;
+
+    int page = faction == Faction::Resistance ? m_texManager->ResistancePage(frame->page) : frame->page;
+    SDL_Texture *sheet
+        = m_drawOwner < kMaxPlayers ? BindSheet(page, faction, frame->recolor) : m_texManager->GetSpriteSheet(page);
+    if (!sheet)
+        return;
+    const bool customTint = m_drawOwner >= kMaxPlayers && (tint.r != 255 || tint.g != 255 || tint.b != 255);
+    if (m_drawOwner >= kMaxPlayers)
+    {
+        if (customTint || (page >= 0 && page < static_cast<int>(m_tintedSheet.size()) && m_tintedSheet[page]))
+        {
+            SDL_SetTextureColorMod(sheet, tint.r, tint.g, tint.b);
+            if (page >= 0 && page < static_cast<int>(m_tintedSheet.size()))
+                m_tintedSheet[page] = false;
+        }
+    }
+
+    const float scaleX = frame->srcW / static_cast<float>(frame->width);
+    const float scaleY = frame->srcH / static_cast<float>(frame->height);
+    const SDL_FRect srcRect {
+        std::round(frame->srcX + insetLeft * scaleX),
+        std::round(frame->srcY + insetTop * scaleY),
+        std::max(1.0f, std::round(usableW * scaleX)),
+        std::max(1.0f, std::round(usableH * scaleY)),
+    };
+    const Uint8 savedAlpha = static_cast<Uint8>(m_drawAlpha * 255.0f + 0.5f);
+    if (alpha != 255 || m_drawOwner >= kMaxPlayers)
+        SDL_SetTextureAlphaMod(sheet, alpha);
+    if (flip == SDL_FLIP_NONE)
+        SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
+    else
+        SDL_RenderTextureRotated(m_renderer, sheet, &srcRect, &dstRect, 0.0, nullptr, flip);
+    if (customTint)
+        SDL_SetTextureColorMod(sheet, 255, 255, 255);
+    if (alpha != 255)
+        SDL_SetTextureAlphaMod(sheet, m_drawOwner < kMaxPlayers ? savedAlpha : Uint8(255));
+}
+
 void Renderer::DrawCompositeScreen(int compId, int screenX, int screenY, float scale, Faction faction, int depth)
 {
     if (depth > 6 || !m_texManager)
@@ -1260,10 +1320,11 @@ bool Renderer::BeginClipTarget(const SDL_Rect &rect, SDL_Color background)
     SDL_SetRenderScale(m_renderer, scale, scale);
     SDL_SetRenderViewport(m_renderer, m_clipPrevViewportSet ? &m_clipPrevViewport : nullptr);
     SDL_SetRenderClipRect(m_renderer, nullptr);
-    SDL_SetRenderDrawColor(m_renderer, background.r, background.g, background.b, 255);
+    SDL_SetRenderDrawColor(m_renderer, background.r, background.g, background.b, background.a);
     SDL_RenderClear(m_renderer);
     m_clipTargetRect = rect;
     m_clipScale = scale;
+    m_clipBackgroundTranslucent = background.a < 255;
     m_clipTargetActive = true;
     return true;
 }
@@ -1273,6 +1334,8 @@ void Renderer::EndClipTarget(Uint8 opacity)
     if (!m_clipTargetActive)
         return;
     m_clipTargetActive = false;
+    const bool blend = m_clipBackgroundTranslucent || opacity < 255;
+    m_clipBackgroundTranslucent = false;
     SDL_SetRenderTarget(m_renderer, nullptr);
     SDL_SetRenderViewport(m_renderer, m_clipPrevViewportSet ? &m_clipPrevViewport : nullptr);
     const SDL_FRect dst {
@@ -1280,7 +1343,7 @@ void Renderer::EndClipTarget(Uint8 opacity)
         static_cast<float>(m_clipTargetRect.y),
         static_cast<float>(m_clipTargetRect.w),
         static_cast<float>(m_clipTargetRect.h)};
-    SDL_SetTextureBlendMode(m_clipTex, opacity == 255 ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND);
+    SDL_SetTextureBlendMode(m_clipTex, blend ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
     SDL_SetTextureAlphaMod(m_clipTex, opacity);
     const SDL_FRect src {
         (m_clipTargetRect.x + (m_clipPrevViewportSet ? m_clipPrevViewport.x : 0)) * m_clipScale,

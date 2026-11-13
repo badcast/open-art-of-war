@@ -9,7 +9,7 @@
 namespace OpenArtOfWar
 {
 
-bool VoiceManager::Load(const std::string &language)
+bool VoiceManager::Load(std::string_view language)
 {
     // A fresh set is prepared off to the side and swapped in, so the audio thread never mixes a half-loaded one
     auto mixer = std::make_unique<SfxMixer>();
@@ -33,7 +33,7 @@ bool VoiceManager::Load(const std::string &language)
         std::lock_guard<std::mutex> guard(m_swap);
         m_mixer = std::move(mixer);
     }
-    m_language = language;
+    m_language.assign(language);
     m_lines = static_cast<std::size_t>(lines + borrowed);
     std::cout << "[VoiceManager] " << lines << " voice lines in '" << language << "'";
     if (borrowed > 0)
@@ -42,20 +42,20 @@ bool VoiceManager::Load(const std::string &language)
     return m_lines > 0;
 }
 
-void VoiceManager::SetLanguage(const std::string &language)
+void VoiceManager::SetLanguage(std::string_view language)
 {
     if (language == m_language && m_mixer)
         return;
     load(language);
 }
 
-bool VoiceManager::Play(const std::string &event, std::uint64_t nowMs)
+bool VoiceManager::Play(std::string_view event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     return m_mixer && m_mixer->Play(event, 1.0f, 0.0f, nowMs);
 }
 
-bool VoiceManager::Announce(const std::string &event, std::uint64_t nowMs)
+bool VoiceManager::Announce(std::string_view event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_swap);
     return m_mixer && m_mixer->Announce(event, nowMs);
@@ -117,7 +117,7 @@ void VoiceManager::SetMuted(bool muted)
         m_mixer->SetMuted(muted);
 }
 
-bool VoiceManager::Has(const std::string &event) const
+bool VoiceManager::Has(std::string_view event) const
 {
     std::lock_guard<std::mutex> guard(m_swap);
     return m_mixer && m_mixer->Has(event);

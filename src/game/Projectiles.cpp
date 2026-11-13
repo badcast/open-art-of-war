@@ -13,18 +13,18 @@ namespace OpenArtOfWar
 namespace
 {
 
-int Named(const std::string &name, SpriteKind kind)
+int Named(std::string_view name, SpriteKind kind)
 {
     return SpriteHandle(name, kind, "projectile defaults");
 }
 
 // "<object>.<prefix>0" .. "<object>.<prefix>(n-1)"
-std::vector<int> NamedList(const std::string &prefix, int first, int count, SpriteKind kind)
+std::vector<int> NamedList(std::string_view prefix, int first, int count, SpriteKind kind)
 {
     std::vector<int> v;
     for (int i = first; i < first + count; ++i)
     {
-        const int h = Named(prefix + std::to_string(i), kind);
+        const int h = Named(std::string(prefix) + std::to_string(i), kind);
         if (h >= 0)
             v.push_back(h);
     }
@@ -32,7 +32,7 @@ std::vector<int> NamedList(const std::string &prefix, int first, int count, Spri
 }
 
 // The first member of a family (projectile directions)
-int FamilyStart(const std::string &object, const std::string &family)
+int FamilyStart(std::string_view object, std::string_view family)
 {
     const SpriteFamily *f = Sprites().FindFamily(object, family);
     return f && f->count > 0 ? f->start : -1;
@@ -154,7 +154,7 @@ const char *KeyOf(ProjectileType type)
     return Of(type).key;
 }
 
-ProjectileType FromKey(const std::string &key)
+ProjectileType FromKey(std::string_view key)
 {
     for (int i = 0; i < kCount; ++i)
     {
@@ -164,11 +164,11 @@ ProjectileType FromKey(const std::string &key)
     return ProjectileType::Bullet;
 }
 
-bool LoadText(const std::string &yamlText)
+bool LoadText(std::string_view yamlText)
 {
     try
     {
-        const YAML::Node root = YAML::Load(yamlText);
+        const YAML::Node root = YAML::Load(std::string(yamlText));
         const YAML::Node all = root["projectiles"];
         if (!all || !all.IsMap())
             return false;
@@ -226,7 +226,7 @@ void Reload()
         LoadText(text);
 }
 
-void Apply(const std::string &yamlText)
+void Apply(std::string_view yamlText)
 {
     Specs() = Defaults();
     LoadText(yamlText);

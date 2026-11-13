@@ -157,7 +157,7 @@ float Eval(const std::string &text, const Vars &vars, float u, std::string *err 
 // ---- conditions: names with ! && || ( ) ----
 struct CondParser
 {
-    const std::string &s;
+    std::string_view s;
     const Conditions &cond;
     std::size_t i {0};
     void Ws()
@@ -217,13 +217,13 @@ struct CondParser
         std::size_t j = i;
         while (j < s.size() && (std::isalnum(static_cast<unsigned char>(s[j])) || s[j] == '_' || s[j] == '.'))
             ++j;
-        const std::string name = s.substr(i, j - i);
+        const std::string_view name = s.substr(i, j - i);
         i = j;
         return !name.empty() && cond && cond(name);
     }
 };
 
-bool EvalCond(const std::string &text, const Conditions &cond)
+bool EvalCond(std::string_view text, const Conditions &cond)
 {
     if (text.empty())
         return true;
@@ -299,18 +299,18 @@ Layout::Def::NodeDef ReadNode(const YAML::Node &n, std::string &error)
 
 } // namespace
 
-bool Layout::Load(const std::string &yamlText, std::string &error)
+bool Layout::Load(std::string_view yamlText, std::string &error)
 {
     try
     {
-        const YAML::Node root = YAML::Load(yamlText);
+        const YAML::Node root = YAML::Load(std::string(yamlText));
         const YAML::Node screens = root["screens"];
         if (!screens || !screens.IsMap())
         {
             error = "no 'screens' map";
             return false;
         }
-        auto defs = std::make_shared<std::map<std::string, Def>>();
+        auto defs = std::make_shared<std::map<std::string, Def, std::less<>>>();
         std::string err;
         for (const auto &sc : screens)
         {
@@ -339,14 +339,14 @@ bool Layout::Load(const std::string &yamlText, std::string &error)
     }
 }
 
-bool Layout::Has(const std::string &screen, const std::string &profile) const
+bool Layout::Has(std::string_view screen, std::string_view profile) const
 {
-    return m_defs && m_defs->count(screen + "/" + profile) > 0;
+    return m_defs && m_defs->count(std::string(screen) + "/" + std::string(profile)) > 0;
 }
 
 Solved Layout::Solve(
-    const std::string &screen,
-    const std::string &profile,
+    std::string_view screen,
+    std::string_view profile,
     int windowW,
     int windowH,
     const Conditions &cond,
@@ -355,7 +355,7 @@ Solved Layout::Solve(
     Solved out;
     if (!m_defs)
         return out;
-    auto it = m_defs->find(screen + "/" + profile);
+    auto it = m_defs->find(std::string(screen) + "/" + std::string(profile));
     if (it == m_defs->end())
         return out;
     Vars vars {{"W", static_cast<float>(windowW)}, {"H", static_cast<float>(windowH)}, {"u", 1.0f}};
@@ -445,7 +445,7 @@ Solved Layout::Solve(
     return out;
 }
 
-const Node *Solved::Find(const std::string &id) const
+const Node *Solved::Find(std::string_view id) const
 {
     for (const Node &n : nodes)
         if (n.id == id)
@@ -453,13 +453,13 @@ const Node *Solved::Find(const std::string &id) const
     return nullptr;
 }
 
-ui::UiRect Solved::Rect(const std::string &id) const
+ui::UiRect Solved::Rect(std::string_view id) const
 {
     const Node *n = Find(id);
     return n && n->visible ? n->rect : ui::UiRect {};
 }
 
-bool Solved::Shown(const std::string &id) const
+bool Solved::Shown(std::string_view id) const
 {
     const Node *n = Find(id);
     return n && n->visible;
@@ -486,11 +486,11 @@ namespace
 {
 std::string g_menuProfile = "pc";
 }
-void SetMenuProfile(const std::string &profile)
+void SetMenuProfile(std::string_view profile)
 {
-    g_menuProfile = profile;
+    g_menuProfile = std::string(profile);
 }
-const std::string &MenuProfile(const Layout &layout, const std::string &screen)
+const std::string &MenuProfile(const Layout &layout, std::string_view screen)
 {
     static const std::string pc = "pc";
     return layout.Has(screen, g_menuProfile) ? g_menuProfile : pc;

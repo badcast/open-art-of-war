@@ -17,16 +17,16 @@ namespace fs = std::filesystem;
 
 // The font file named in assets/main.yaml, as it is (the working directory is the folder that holds "assets",
 // Assets::Init): no other folder and no system font is looked at
-std::string ResolveFontPath(const std::string &path, bool bold)
+std::string ResolveFontPath(std::string_view path, bool bold)
 {
     (void) bold;
-    return path;
+    return std::string(path);
 }
 
 } // namespace
 
 BitmapFontRenderer::BitmapFontRenderer(
-    SDL_Renderer *renderer, const std::string &regularFontPath, const std::string &boldFontPath, const FontSizes &sizes)
+    SDL_Renderer *renderer, std::string_view regularFontPath, std::string_view boldFontPath, const FontSizes &sizes)
     : m_renderer(renderer)
 {
     if (!TTF_WasInit())
@@ -38,12 +38,16 @@ BitmapFontRenderer::BitmapFontRenderer(
         }
     }
 
-    std::string regPath = ResolveFontPath(regularFontPath, false);
-    std::string bldPath = ResolveFontPath(boldFontPath, true);
+    const std::string resolvedReg
+        = regularFontPath.empty() ? LoaderResources::FontRegular() : ResolveFontPath(regularFontPath, false);
+    const std::string resolvedBld
+        = boldFontPath.empty() ? LoaderResources::FontBold() : ResolveFontPath(boldFontPath, true);
+    const std::string &regPath = resolvedReg;
+    const std::string &bldPath = resolvedBld;
 
     // Fonts packed in assets.blob are opened from memory (the buffers stay alive with the fonts)
-    const bool packedRegular = Assets::IsBlob() && Assets::ReadBytes(regularFontPath, m_fontDataRegular);
-    const bool packedBold = Assets::IsBlob() && Assets::ReadBytes(boldFontPath, m_fontDataBold);
+    const bool packedRegular = Assets::IsBlob() && Assets::ReadBytes(regPath, m_fontDataRegular);
+    const bool packedBold = Assets::IsBlob() && Assets::ReadBytes(bldPath, m_fontDataBold);
     auto openFont = [&](bool packed, bool bold, const std::string &path, float size) {
         if (!packed)
             return TTF_OpenFont(path.c_str(), size);
@@ -143,7 +147,7 @@ TTF_Font *BitmapFontRenderer::GetFontForScale(int scale) const
     return m_fontTitle ? m_fontTitle : (m_fontLarge ? m_fontLarge : m_fontMedium);
 }
 
-CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int scale, SDL_Color color)
+CachedText BitmapFontRenderer::GetOrCreateTexture(std::string_view text, int scale, SDL_Color color)
 {
     if (text.empty() || !m_renderer)
     {
@@ -152,7 +156,7 @@ CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int s
 
     std::uint32_t colorKey = (static_cast<std::uint32_t>(color.r) << 24) | (static_cast<std::uint32_t>(color.g) << 16)
                              | (static_cast<std::uint32_t>(color.b) << 8) | (static_cast<std::uint32_t>(color.a));
-    TextCacheKey key {text, scale, colorKey};
+    TextCacheKey key {std::string(text), scale, colorKey};
 
     auto it = m_cache.find(key);
     if (it != m_cache.end())
@@ -168,7 +172,7 @@ CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int s
     }
 
     // Render text to surface with anti-aliasing
-    SDL_Surface *surface = TTF_RenderText_Blended(font, text.c_str(), text.size(), color);
+    SDL_Surface *surface = TTF_RenderText_Blended(font, text.data(), text.size(), color);
     if (!surface)
     {
         return {nullptr, 0, 0, 0};
@@ -210,7 +214,7 @@ CachedText BitmapFontRenderer::GetOrCreateTexture(const std::string &text, int s
     return cached;
 }
 
-int BitmapFontRenderer::GetTextWidth(const std::string &text, int scale) const
+int BitmapFontRenderer::GetTextWidth(std::string_view text, int scale) const
 {
     if (text.empty())
         return 0;
@@ -219,7 +223,7 @@ int BitmapFontRenderer::GetTextWidth(const std::string &text, int scale) const
         return static_cast<int>(text.size()) * (scale <= 1 ? 8 : (scale * 8));
 
     int w = 0, h = 0;
-    TTF_GetStringSize(font, text.c_str(), text.size(), &w, &h);
+    TTF_GetStringSize(font, text.data(), text.size(), &w, &h);
     return w;
 }
 
@@ -231,35 +235,44 @@ int BitmapFontRenderer::GetTextHeight(int scale) const
     return TTF_GetFontHeight(font);
 }
 
+std::tuple<int, int> BitmapFontRenderer::GetTextPointFromAnchor(
+    std::string_view text, int x, int y, int scale, int anchor) const
+{
+    int W = GetTextWidth(text, scale);
+    int H = GetTextHeight(scale);
+
+    if (anchor & Anchor::HCENTER)
+    {
+        x -= W / 2;
+    }
+    else if (anchor & Anchor::RIGHT)
+    {
+        x -= W;
+    }
+
+    if (anchor & Anchor::VCENTER)
+    {
+        y -= H / 2;
+    }
+    else if (anchor & Anchor::BOTTOM)
+    {
+        y -= H;
+    }
+
+    return {x, y};
+}
+
 void BitmapFontRenderer::DrawString(
-    const std::string &text, int x, int y, int scale, SDL_Color color, bool dropShadow, int anchor)
+    std::string_view text, int x, int y, int scale, SDL_Color color, bool dropShadow, int anchor)
 {
     if (text.empty() || !m_renderer)
         return;
 
     m_currentFrame++;
 
-    int totalW = GetTextWidth(text, scale);
-    int totalH = GetTextHeight(scale);
-
-    if (anchor & Anchor::HCENTER)
-    {
-        x -= totalW / 2;
-    }
-    else if (anchor & Anchor::RIGHT)
-    {
-        x -= totalW;
-    }
-
-    if (anchor & Anchor::VCENTER)
-    {
-        y -= totalH / 2;
-    }
-    else if (anchor & Anchor::BOTTOM)
-    {
-        y -= totalH;
-    }
-
+    auto t = GetTextPointFromAnchor(text, x, y, scale, anchor);
+    x = std::get<0>(t);
+    y = std::get<1>(t);
     // Shadow pass
     if (dropShadow)
     {
@@ -291,7 +304,7 @@ void BitmapFontRenderer::DrawString(
 }
 
 int BitmapFontRenderer::DrawTextWrapped(
-    const std::string &text, int x, int y, int maxLineWidth, int scale, SDL_Color color, bool dropShadow)
+    std::string_view text, int x, int y, int maxLineWidth, int scale, SDL_Color color, bool dropShadow)
 {
     if (text.empty() || !m_renderer)
         return 0;
@@ -299,7 +312,7 @@ int BitmapFontRenderer::DrawTextWrapped(
     int lineHeight = GetTextHeight(scale) + 3;
     int curY = y;
 
-    std::istringstream stream(text);
+    std::istringstream stream {std::string(text)};
     std::string line;
 
     // Process newlines first

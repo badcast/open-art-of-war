@@ -453,7 +453,7 @@ bool SoundEngine::LoadTrack(const Track &track, bool loop)
     return true;
 }
 
-bool SoundEngine::PlayNamedLoop(const std::string &name)
+bool SoundEngine::PlayNamedLoop(std::string_view name)
 {
     const auto it = std::find_if(
         m_gameTracks.begin(), m_gameTracks.end(), [&](const Track &track) { return track.name == name; });
@@ -813,7 +813,7 @@ void SoundEngine::SetVoiceVolume(int volume)
     m_voices.SetVolume(m_voiceVolume);
 }
 
-void SoundEngine::PlaySfx(const std::string &event, float gain, float pan, float muffle)
+void SoundEngine::PlaySfx(std::string_view event, float gain, float pan, float muffle)
 {
     if (!m_sfxStream)
         return;
@@ -826,7 +826,7 @@ void SoundEngine::PlaySfx(const std::string &event, float gain, float pan, float
 
 void SoundEngine::PlaySfx(WorldSfx sound, float gain, float pan, float muffle)
 {
-    PlaySfx(std::string(SoundIds::Name(sound)), gain, pan, muffle);
+    PlaySfx(std::string_view(SoundIds::Name(sound)), gain, pan, muffle);
 }
 
 const SfxMixer::EventConfig *SoundEngine::SfxConfig(WorldSfx sound) const
@@ -834,22 +834,22 @@ const SfxMixer::EventConfig *SoundEngine::SfxConfig(WorldSfx sound) const
     return m_sfx.Config(SoundIds::Name(sound));
 }
 
-const SfxMixer::EventConfig *SoundEngine::SfxConfig(const std::string &event) const
+const SfxMixer::EventConfig *SoundEngine::SfxConfig(std::string_view event) const
 {
     return event.empty() || !m_sfx.Has(event) ? nullptr : m_sfx.Config(event);
 }
 
 void SoundEngine::Announce(Announcement line)
 {
-    Announce(std::string(SoundIds::Name(line)));
+    Announce(std::string_view(SoundIds::Name(line)));
 }
 
 void SoundEngine::PlayVoice(UnitReply reply, bool infantry)
 {
-    PlayVoice(std::string(SoundIds::Name(reply, infantry)));
+    PlayVoice(std::string_view(SoundIds::Name(reply, infantry)));
 }
 
-void SoundEngine::Announce(const std::string &event)
+void SoundEngine::Announce(std::string_view event)
 {
     if (!m_sfxStream)
         return;
@@ -859,7 +859,7 @@ void SoundEngine::Announce(const std::string &event)
         std::cout << "[Sfx] announcer (" << m_voices.Language() << "): " << event << std::endl;
 }
 
-void SoundEngine::PlayVoice(const std::string &event)
+void SoundEngine::PlayVoice(std::string_view event)
 {
     if (!m_sfxStream)
         return;
@@ -869,7 +869,7 @@ void SoundEngine::PlayVoice(const std::string &event)
         std::cout << "[Sfx] voice (" << m_voices.Language() << "): " << event << std::endl;
 }
 
-void SoundEngine::SetVoiceLanguage(const std::string &language)
+void SoundEngine::SetVoiceLanguage(std::string_view language)
 {
     if (!m_initialized || language == m_voices.Language())
         return;

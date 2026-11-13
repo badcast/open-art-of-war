@@ -185,18 +185,19 @@ public:
     }
 
     // A datagram that is not ENet's: a local network browser asking who is there
-    void sendRaw(const std::string &ip, std::uint16_t port, const std::vector<std::uint8_t> &data) override
+    void sendRaw(std::string_view ip, std::uint16_t port, const std::vector<std::uint8_t> &data) override
     {
         ENetAddress to {};
+        const std::string ipStr(ip);
         // An address, or a name resolved once and kept
-        if (enet_address_set_host_ip(&to, ip.c_str()) != 0)
+        if (enet_address_set_host_ip(&to, ipStr.c_str()) != 0)
         {
-            auto known = m_resolved.find(ip);
+            auto known = m_resolved.find(ipStr);
             if (known == m_resolved.end())
             {
-                if (enet_address_set_host(&to, ip.c_str()) != 0)
+                if (enet_address_set_host(&to, ipStr.c_str()) != 0)
                     return;
-                known = m_resolved.emplace(ip, to.host).first;
+                known = m_resolved.emplace(ipStr, to.host).first;
             }
             to.host = known->second;
         }
@@ -212,12 +213,12 @@ public:
         m_raw = std::move(handler);
     }
 
-    bool connectTo(const std::string &hostName, std::uint16_t port) override
+    bool connectTo(std::string_view hostName, std::uint16_t port) override
     {
         if (!m_client || !m_peers.empty() || m_pending)
             return false;
         ENetAddress address {};
-        if (enet_address_set_host(&address, hostName.c_str()) != 0)
+        if (enet_address_set_host(&address, std::string(hostName).c_str()) != 0)
             return false;
         address.port = port;
         m_pending = enet_host_connect(m_host, &address, kChannels, 0);
@@ -276,7 +277,7 @@ private:
 } // namespace
 
 std::unique_ptr<Transport> createEnetServer(
-    std::uint16_t port, int maxPeers, std::string *error, std::uint16_t *boundPort, const std::string &bindAddress)
+    std::uint16_t port, int maxPeers, std::string *error, std::uint16_t *boundPort, std::string_view bindAddress)
 {
     if (!initialize())
     {
@@ -287,11 +288,11 @@ std::unique_ptr<Transport> createEnetServer(
     ENetAddress address {};
     address.host = ENET_HOST_ANY;
     if (!bindAddress.empty() && bindAddress != "0.0.0.0"
-        && enet_address_set_host_ip(&address, bindAddress.c_str()) != 0)
+        && enet_address_set_host_ip(&address, std::string(bindAddress).c_str()) != 0)
     {
         shutdown();
         if (error)
-            *error = "bad bind address " + bindAddress;
+            *error = "bad bind address " + std::string(bindAddress);
         return nullptr;
     }
     address.port = port;
@@ -361,7 +362,7 @@ bool decodeRaw(
     return true;
 }
 
-std::unique_ptr<Transport> createEnetClient(const std::string &hostName, std::uint16_t port, std::string *error)
+std::unique_ptr<Transport> createEnetClient(std::string_view hostName, std::uint16_t port, std::string *error)
 {
     if (!initialize())
     {
@@ -379,12 +380,12 @@ std::unique_ptr<Transport> createEnetClient(const std::string &hostName, std::ui
     }
     configureHost(host);
     ENetAddress address {};
-    if (enet_address_set_host(&address, hostName.c_str()) != 0)
+    if (enet_address_set_host(&address, std::string(hostName).c_str()) != 0)
     {
         enet_host_destroy(host);
         shutdown();
         if (error)
-            *error = "unknown host " + hostName;
+            *error = "unknown host " + std::string(hostName);
         return nullptr;
     }
     address.port = port;

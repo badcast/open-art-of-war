@@ -1165,50 +1165,25 @@ void GameplayController::Update(const FrameContext &context)
                 m_touchOrderY = mouseY;
                 touchOrdered = true;
             }
-            else if (!tappedEntity && combatUnits.empty() && !m_selectedUnits.empty())
+            else if (combatUnits.empty() && !tappedOwn && !m_selectedUnits.empty())
             {
-                // Barracks / Factories selected, a tap on empty ground: the selection ends, but the buildings
-                // are remembered for a moment: a second tap close by sets their rally point
-                m_touchRallyIds.clear();
+                // Unit-producing building(s) selected: every tap on the map sets their rally point
+                // immediately and keeps the building selected so subsequent taps move the rally point too.
+                SimCommand command = Command(CommandType::SetRally);
                 for (int unitId : m_selectedUnits)
                 {
                     const Building *building = entities.GetBuilding(unitId);
                     if (building && building->alive && building->owner == Players::Local()
                         && building->IsUnitProducer())
-                        m_touchRallyIds.push_back(unitId);
+                        command.ids.push_back(static_cast<std::uint32_t>(unitId));
                 }
-                m_touchRallyTicks = nowTicks;
-                m_touchRallyX = mouseX;
-                m_touchRallyY = mouseY;
-            }
-            else if (!tappedEntity && m_selectedUnits.empty() && !m_touchRallyIds.empty())
-            {
-                const bool isSecondRallyTap = nowTicks - m_touchRallyTicks < 450
-                                              && std::abs(mouseX - m_touchRallyX) <= 40
-                                              && std::abs(mouseY - m_touchRallyY) <= 40;
-                SimCommand command = Command(CommandType::SetRally);
-                if (isSecondRallyTap)
+                if (!command.ids.empty())
                 {
-                    for (int unitId : m_touchRallyIds)
-                    {
-                        Entity *entity = entities.GetEntity(unitId);
-                        const Building *building = entities.GetBuilding(unitId);
-                        if (entity && building && building->alive && building->owner == Players::Local())
-                        {
-                            command.ids.push_back(static_cast<std::uint32_t>(unitId));
-                            entity->selected = true;
-                            m_selectedUnits.push_back(unitId); // the buildings stay in focus after the rally point
-                        }
-                    }
                     command.x = static_cast<std::int32_t>(leftClickWorldX);
                     command.y = static_cast<std::int32_t>(leftClickWorldY);
-                    if (!command.ids.empty())
-                    {
-                        m_sim.Issue(std::move(command));
-                        touchOrdered = true;
-                    }
+                    m_sim.Issue(std::move(command));
+                    touchOrdered = true;
                 }
-                m_touchRallyIds.clear();
             }
         }
 
@@ -1421,6 +1396,16 @@ void GameplayController::RenderSelectionBox(Renderer &renderer, const Camera &ca
         int boxHeight = std::abs(selectionBox.currentScreenY - selectionBox.startScreenY);
         renderer.FillRectScreen(boxX, boxY, boxWidth, boxHeight, {0, 255, 0, 45});
         renderer.DrawRectScreen(boxX, boxY, boxWidth, boxHeight, {0, 255, 0, 255});
+    }
+    else
+    {
+        int holdX = 0, holdY = 0;
+        if (input.IsTouchSelectionHoldReady(holdX, holdY))
+        {
+            constexpr int half = 12;
+            renderer.FillRectScreen(holdX - half, holdY - half, half * 2, half * 2, {0, 255, 0, 45});
+            renderer.DrawRectScreen(holdX - half, holdY - half, half * 2, half * 2, {0, 255, 0, 255});
+        }
     }
 }
 

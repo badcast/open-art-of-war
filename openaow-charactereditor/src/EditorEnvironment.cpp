@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
+#include <string_view>
 
 namespace CharEditor
 {
@@ -142,7 +143,7 @@ const EnvHint kEnvHints[] = {
     {"render.fallback", "API used when the preferred one does not work."},
 };
 
-const char *envHint(const std::string &path)
+const char *envHint(std::string_view path)
 {
     for (const EnvHint &h : kEnvHints)
         if (path == h.path)
@@ -150,15 +151,15 @@ const char *envHint(const std::string &path)
     return nullptr;
 }
 
-bool HiddenKey(const std::string &path)
+bool HiddenKey(std::string_view path)
 {
     return path == "font" || path == "render.probed" || path == "render.probe_key" || path == "render.init_pending"
            || path == "render.confirm_from";
 }
 
-std::string Pretty(const std::string &key)
+std::string Pretty(std::string_view key)
 {
-    std::string s = key;
+    std::string s(key);
     for (char &c : s)
         if (c == '_')
             c = ' ';
@@ -225,13 +226,13 @@ bool CharacterEditor::SaveEnvironment()
     return true;
 }
 
-bool CharacterEditor::EditEnvJson(Json &node, const std::string &path, int depth)
+bool CharacterEditor::EditEnvJson(Json &node, std::string_view path, int depth)
 {
     bool changed = false;
     for (auto it = node.begin(); it != node.end(); ++it)
     {
         const std::string key = it.key();
-        const std::string sub = path.empty() ? key : path + "." + key;
+        const std::string sub = path.empty() ? key : std::string(path) + "." + key;
         if (HiddenKey(sub))
             continue;
         Json &v = it.value();
@@ -360,9 +361,9 @@ bool CharacterEditor::EditEnvJson(Json &node, const std::string &path, int depth
     return changed;
 }
 
-SDL_Texture *CharacterEditor::FontPreview(const std::string &path, float size, const std::string &text)
+SDL_Texture *CharacterEditor::FontPreview(std::string_view path, float size, std::string_view text)
 {
-    const std::string key = path + "|" + std::to_string(size) + "|" + text;
+    const std::string key = std::string(path) + "|" + std::to_string(size) + "|" + std::string(text);
     auto it = fontPreviews.find(key);
     if (it != fontPreviews.end())
         return it->second;
@@ -374,7 +375,8 @@ SDL_Texture *CharacterEditor::FontPreview(const std::string &path, float size, c
     {
         if (TTF_Font *font = TTF_OpenFont(resolved.string().c_str(), size))
         {
-            if (SDL_Surface *surf = TTF_RenderText_Blended(font, text.c_str(), 0, SDL_Color {255, 255, 255, 255}))
+            if (SDL_Surface *surf
+                = TTF_RenderText_Blended(font, std::string(text).c_str(), 0, SDL_Color {255, 255, 255, 255}))
             {
                 tex = SDL_CreateTextureFromSurface(renderer, surf);
                 SDL_DestroySurface(surf);

@@ -57,25 +57,25 @@ nlohmann::json &RenderSection(EnvironmentConfig &env)
 }
 
 // What this run found out (in memory only)
-std::map<std::string, bool> &Probed()
+std::map<std::string, bool, std::less<>> &Probed()
 {
-    static std::map<std::string, bool> probed;
+    static std::map<std::string, bool, std::less<>> probed;
     return probed;
 }
 
-void MarkProbed(const std::string &name, bool works)
+void MarkProbed(std::string_view name, bool works)
 {
-    Probed()[name] = works;
+    Probed()[std::string(name)] = works;
 }
 
-bool KnownToFail(const std::string &name)
+bool KnownToFail(std::string_view name)
 {
     auto it = Probed().find(name);
     return it != Probed().end() && !it->second;
 }
 
 // Checks what the game needs from a renderer; logs the reason when it falls short
-bool Usable(SDL_Renderer *renderer, const std::string &name)
+bool Usable(SDL_Renderer *renderer, std::string_view name)
 {
     const char *actual = SDL_GetRendererName(renderer);
     if (!actual || name != actual)
@@ -101,14 +101,15 @@ bool Usable(SDL_Renderer *renderer, const std::string &name)
     return true;
 }
 
-SDL_Renderer *TryCreate(SDL_Window *window, const std::string &name)
+SDL_Renderer *TryCreate(SDL_Window *window, std::string_view name)
 {
 #ifdef _WIN32
     // The shader effects are built as SPIR-V (and Metal source), not DXIL: SDL GPU on Vulkan here
     if (name == "gpu")
         SDL_SetHint(SDL_HINT_GPU_DRIVER, "vulkan");
 #endif
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, name.c_str());
+    const std::string nameStr(name);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, nameStr.c_str());
     if (!renderer)
     {
         std::cerr << "[Render] " << name << " failed: " << SDL_GetError() << std::endl;
@@ -142,14 +143,14 @@ std::vector<std::string> Candidates()
     return out;
 }
 
-std::string Label(const std::string &name)
+std::string Label(std::string_view name)
 {
     for (const DriverName &d : kPreference)
     {
         if (name == d.name)
             return d.label;
     }
-    return name;
+    return std::string(name);
 }
 
 std::string Configured(const EnvironmentConfig &env)
@@ -157,27 +158,28 @@ std::string Configured(const EnvironmentConfig &env)
     return env.Section("render").value("api", std::string());
 }
 
-void Select(EnvironmentConfig &env, const std::string &name)
+void Select(EnvironmentConfig &env, std::string_view name)
 {
     nlohmann::json &r = RenderSection(env);
     const std::string previous = r.value("api", std::string());
     if (previous == name)
         return;
-    r["api"] = name;
+    r["api"] = std::string(name);
     // The one that ran so far is a good fallback for the new choice
     if (!previous.empty() && !KnownToFail(previous))
         r["fallback"] = previous;
     env.Save();
 }
 
-SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced)
+SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, std::string_view forced)
 {
     // Without a real display (dummy / offscreen video: servers, CI, tests) nothing found out here says
     // anything about the player's system: work on a copy, store nothing
     const char *video = SDL_GetCurrentVideoDriver();
-    if (video && (std::string(video) == "dummy" || std::string(video) == "offscreen"))
+    if (video && (std::string_view(video) == "dummy" || std::string_view(video) == "offscreen"))
     {
-        SDL_Renderer *renderer = SDL_CreateRenderer(window, forced.empty() ? nullptr : forced.c_str());
+        const std::string forcedStr(forced);
+        SDL_Renderer *renderer = SDL_CreateRenderer(window, forced.empty() ? nullptr : forcedStr.c_str());
         if (!renderer)
             renderer = SDL_CreateRenderer(window, nullptr);
         if (renderer)
@@ -199,7 +201,7 @@ SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::stri
 
     const std::vector<std::string> all = Candidates();
     std::vector<std::string> order;
-    auto add = [&](const std::string &name) {
+    auto add = [&](std::string_view name) {
         if (name.empty() || std::find(order.begin(), order.end(), name) != order.end())
             return;
         if (std::find(all.begin(), all.end(), name) == all.end())
@@ -207,7 +209,7 @@ SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::stri
             std::cerr << "[Render] " << name << " is not available in this SDL build" << std::endl;
             return;
         }
-        order.push_back(name);
+        order.emplace_back(name);
     };
     add(forced);
     add(r.value("api", std::string()));
@@ -284,7 +286,7 @@ void ConfirmFirstFrame(EnvironmentConfig &env)
     env.Save();
 }
 
-bool Probe(const std::string &name)
+bool Probe(std::string_view name)
 {
     SDL_Window *window = SDL_CreateWindow("probe", 64, 64, SDL_WINDOW_HIDDEN);
     if (!window)

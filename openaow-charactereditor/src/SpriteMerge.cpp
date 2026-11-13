@@ -26,7 +26,7 @@ bool WordChar(char c)
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
 
-std::string Str(const YAML::Node &n, const char *key, const std::string &def)
+std::string Str(const YAML::Node &n, const char *key, std::string_view def)
 {
     try
     {
@@ -35,7 +35,7 @@ std::string Str(const YAML::Node &n, const char *key, const std::string &def)
     }
     catch (...)
     {}
-    return def;
+    return std::string(def);
 }
 
 float Scale(const YAML::Node &meta)
@@ -66,7 +66,7 @@ YAML::Node FlowSeq(std::initializer_list<double> values)
 }
 
 // The references of entries ({frame: x, at: ...}) anywhere below `n`
-void RewriteEntries(YAML::Node n, const std::string &from, const NameMap &names)
+void RewriteEntries(YAML::Node n, std::string_view from, const NameMap &names)
 {
     if (n.IsSequence())
     {
@@ -90,7 +90,7 @@ void RewriteEntries(YAML::Node n, const std::string &from, const NameMap &names)
 }
 
 // The members of families: { idle: { sequences: [a, b] } }
-void RewriteFamily(YAML::Node fam, const std::string &from, const NameMap &names)
+void RewriteFamily(YAML::Node fam, std::string_view from, const NameMap &names)
 {
     if (!fam.IsMap())
         return;
@@ -213,14 +213,15 @@ NameMap BuildNameMap(const std::vector<Source> &sources)
     return map;
 }
 
-std::string RewriteMetaRef(const std::string &ref, const std::string &fromObject, const NameMap &names)
+std::string RewriteMetaRef(std::string_view ref, std::string_view fromObject, const NameMap &names)
 {
     const auto dot = ref.find('.');
-    const std::string object = dot == std::string::npos ? fromObject : ref.substr(0, dot);
-    std::string name = dot == std::string::npos ? ref : ref.substr(dot + 1);
+    const std::string object
+        = dot == std::string_view::npos ? std::string(fromObject) : std::string(ref.substr(0, dot));
+    std::string name = dot == std::string_view::npos ? std::string(ref) : std::string(ref.substr(dot + 1));
     const auto it = names.find(object);
     if (it == names.end())
-        return ref; // another object: unchanged
+        return std::string(ref); // another object: unchanged
     std::string suffix;
     const auto open = name.find('[');
     if (open != std::string::npos)
@@ -236,8 +237,8 @@ YAML::Node MergeMetas(
     const std::vector<Source> &sources,
     const NameMap &names,
     const FramePlaces &places,
-    const std::string &image,
-    const std::string &resistanceImage,
+    std::string_view image,
+    std::string_view resistanceImage,
     int imageW,
     int imageH)
 {
@@ -247,10 +248,10 @@ YAML::Node MergeMetas(
     const YAML::Node &first = sources.front().meta;
     const float scale = Scale(first);
     const std::string recolor = Str(first, "recolor", "none");
-    out["image"] = image;
+    out["image"] = std::string(image);
     out["image_size"] = FlowSeq({double(imageW), double(imageH)});
     if (!resistanceImage.empty())
-        out["resistance_image"] = resistanceImage;
+        out["resistance_image"] = std::string(resistanceImage);
     if (std::fabs(scale - std::round(scale)) < 1e-4f)
         out["scale"] = static_cast<long long>(std::llround(scale));
     else
@@ -324,24 +325,24 @@ YAML::Node MergeMetas(
     return out;
 }
 
-std::string EmitMeta(const YAML::Node &meta, const std::string &header)
+std::string EmitMeta(const YAML::Node &meta, std::string_view header)
 {
     YAML::Emitter e;
     e.SetIndent(2);
     e.SetSeqFormat(YAML::Block);
     e << meta;
-    std::string text = header + e.c_str();
+    std::string text = std::string(header) + e.c_str();
     if (text.empty() || text.back() != '\n')
         text += '\n';
     return text;
 }
 
-std::string RewriteText(const std::string &text, const NameMap &names, const std::string &merged, int &count)
+std::string RewriteText(std::string_view text, const NameMap &names, std::string_view merged, int &count)
 {
     count = 0;
     std::string out;
     out.reserve(text.size());
-    std::istringstream in(text);
+    std::istringstream in {std::string(text)};
     std::string line;
     bool firstLine = true;
     while (std::getline(in, line))
@@ -375,7 +376,7 @@ std::string RewriteText(const std::string &text, const NameMap &names, const std
                 }
                 if (names.count(value))
                 {
-                    line = line.substr(0, v) + quote + merged + quote + line.substr(end);
+                    line = line.substr(0, v) + quote + std::string(merged) + quote + line.substr(end);
                     ++count;
                 }
             }
@@ -403,7 +404,7 @@ std::string RewriteText(const std::string &text, const NameMap &names, const std
                 const auto item = obj->second.find(line.substr(e + 1, n - e - 1));
                 if (item != obj->second.end())
                 {
-                    res += merged + "." + item->second;
+                    res += std::string(merged) + "." + item->second;
                     ++count;
                     p = n;
                     continue;
@@ -419,9 +420,9 @@ std::string RewriteText(const std::string &text, const NameMap &names, const std
     return out;
 }
 
-bool BindsBare(const std::string &text, const std::string &object)
+bool BindsBare(std::string_view text, std::string_view object)
 {
-    std::istringstream in(text);
+    std::istringstream in {std::string(text)};
     std::string line;
     while (std::getline(in, line))
     {
@@ -636,14 +637,14 @@ int SnapDelta(int a0, int a1, const std::vector<int> &targets, int threshold, in
 }
 
 std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
-    const YAML::Node &meta, const std::string &object, const std::map<std::string, int> &frameIndex, float scale)
+    const YAML::Node &meta, std::string_view object, const std::map<std::string, int> &frameIndex, float scale)
 {
     std::vector<AssemblyGroup> groups;
     const YAML::Node frames = meta["frames"], parts = meta["parts"], anims = meta["anims"], families = meta["families"];
     // "object.item[i]" / "item[i]" -> {item, i} for this object; another object's name is not ours (empty)
     auto local = [&](std::string name, int &index) -> std::string {
         index = 0;
-        const std::string prefix = object + ".";
+        const std::string prefix = std::string(object) + ".";
         if (name.rfind(prefix, 0) == 0)
             name = name.substr(prefix.size());
         if (name.find('.') != std::string::npos)
@@ -656,10 +657,10 @@ std::vector<AssemblyGroup> AssemblyGroupsFromMeta(
         return name;
     };
     // A family member by kind ("frames" / "parts" / "anims"): the name of its index-th member
-    auto member = [&](const std::string &family, const char *kind, int index) -> std::string {
+    auto member = [&](std::string_view family, const char *kind, int index) -> std::string {
         if (!families || !families.IsMap())
             return {};
-        const YAML::Node f = families[family];
+        const YAML::Node f = families[std::string(family)];
         if (!f || !f.IsMap() || !f[kind] || !f[kind].IsSequence() || index < 0
             || index >= static_cast<int>(f[kind].size()))
             return {};

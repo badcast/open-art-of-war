@@ -145,14 +145,43 @@ int main()
     Check(!input.WasLeftClickIssued(x, y), "pan must not click");
     const float selectionCamX = touchCam.GetX();
     touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
-    SDL_Delay(510);
+    int holdX = 0, holdY = 0;
+    Check(!input.IsTouchSelectionHoldReady(holdX, holdY), "hold indicator waits for hold threshold");
+    SDL_Delay(250);
+    Check(
+        input.IsTouchSelectionHoldReady(holdX, holdY) && holdX == 200 && holdY == 200,
+        "hold past threshold arms box selection indicator");
     touchFull(SDL_EVENT_FINGER_MOTION, 1, 360, 320);
     Check(input.GetSelectionBox().active && input.GetSelectionBox().HasSignificantArea(), "hold drag selects");
     Check(touchCam.GetX() == selectionCamX, "selection must not pan");
     touchFull(SDL_EVENT_FINGER_UP, 1, 360, 320);
+    Check(!input.IsTouchSelectionHoldReady(holdX, holdY), "release clears hold indicator");
     Check(input.GetSelectionBox().active, "completed selection persists until consumed");
     input.CancelSelectionBox();
     Check(!input.WasLeftClickIssued(x, y), "selection must not click");
+
+    // Same-frame hold drag + lift (without intermediate Update) still keeps selection box valid
+    SDL_Event fDown {};
+    fDown.type = SDL_EVENT_FINGER_DOWN;
+    fDown.tfinger.fingerID = 1;
+    fDown.tfinger.x = 220.0f / 1280.0f;
+    fDown.tfinger.y = 220.0f / 720.0f;
+    Check(SDL_ConvertEventToRenderCoordinates(renderer, &fDown), "touch conversion");
+    input.ProcessEvent(fDown, touchCam);
+    SDL_Delay(510);
+    SDL_Event fMove = fDown;
+    fMove.type = SDL_EVENT_FINGER_MOTION;
+    fMove.tfinger.x = 340.0f / 1280.0f;
+    fMove.tfinger.y = 320.0f / 720.0f;
+    Check(SDL_ConvertEventToRenderCoordinates(renderer, &fMove), "touch conversion");
+    input.ProcessEvent(fMove, touchCam);
+    SDL_Event fUp = fMove;
+    fUp.type = SDL_EVENT_FINGER_UP;
+    input.ProcessEvent(fUp, touchCam);
+    Check(
+        input.GetSelectionBox().active && input.GetSelectionBox().HasSignificantArea(),
+        "same-frame finger drag+release completes selection box");
+    input.CancelSelectionBox();
 
     // 2) Small diagonal drag (>12px Euclidean, <=12px per axis) must not issue a stray tap click
     touchFull(SDL_EVENT_FINGER_DOWN, 1, 200, 200);
@@ -290,6 +319,76 @@ int main()
     input.SetTouchPlacementGhost(SDL_Rect {604, 300, 120, 120});
     mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 646.0f, 360.0f);
     Check(!input.WasLeftClickIssued(x, y), "mouse release after moving ghost must not build");
+
+    // 8) Desktop --touch-ui mouse on map: quick drag pans camera; hold >= 0.5s then drag draws Select Box
+    input.SetTouchPan(false);
+    input.SetTouchPlacementGhost(SDL_Rect {0, 0, 0, 0});
+    input.SetTouchUiRects({radarRect, buildBtnRect});
+    auto mouseMoveEvt = [&](float mx, float my) {
+        SDL_Event event {};
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        event.motion.which = 0;
+        event.motion.x = mx;
+        event.motion.y = my;
+        input.ProcessEvent(event, touchCam);
+        input.Update(0, touchCam);
+    };
+    const float mouseCamStartX = touchCam.GetX();
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    Check(!input.GetSelectionBox().active, "touch-ui mouse press waits for hold or drag");
+    mouseMoveEvt(420.0f, 310.0f);
+    Check(!input.GetSelectionBox().active && touchCam.GetX() < mouseCamStartX, "quick touch-ui mouse drag pans camera");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 420.0f, 310.0f);
+    Check(!input.WasLeftClickIssued(x, y), "quick pan release must not click");
+
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 300.0f, 250.0f);
+    Check(input.WasLeftClickIssued(x, y), "quick touch-ui mouse tap on map clicks");
+
+    const float subHoldCamX = touchCam.GetX();
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    Check(!input.IsTouchSelectionHoldReady(holdX, holdY), "touch-ui mouse hold stays off before threshold");
+    mouseMoveEvt(420.0f, 310.0f);
+    Check(!input.GetSelectionBox().active && touchCam.GetX() < subHoldCamX, "immediate drag pans camera");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 420.0f, 310.0f);
+
+    const float mouseBoxCamX = touchCam.GetX();
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    Check(!input.IsTouchSelectionHoldReady(holdX, holdY), "touch-ui mouse hold indicator waits for threshold");
+    SDL_Delay(250);
+    Check(
+        input.IsTouchSelectionHoldReady(holdX, holdY) && holdX == 300 && holdY == 250,
+        "touch-ui mouse hold arms box selection");
+    mouseMoveEvt(460.0f, 390.0f);
+    Check(
+        input.GetSelectionBox().active && input.GetSelectionBox().HasSignificantArea(),
+        "touch-ui mouse hold >= 0.5 s drag draws Select Box");
+    Check(touchCam.GetX() == mouseBoxCamX, "touch-ui mouse box selection must not pan camera");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 460.0f, 390.0f);
+    Check(input.GetSelectionBox().active, "touch-ui mouse selection persists until consumed");
+    input.CancelSelectionBox();
+    Check(!input.WasLeftClickIssued(x, y), "touch-ui mouse selection release must not click");
+
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    SDL_Delay(510);
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 300.0f, 250.0f);
+    Check(!input.GetSelectionBox().active && !input.WasLeftClickIssued(x, y), "aborted mouse hold does not click or box");
+
+    input.SetTouchPan(true);
+    const float mousePlaceCamX = touchCam.GetX();
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    SDL_Delay(510);
+    Check(!input.IsTouchSelectionHoldReady(holdX, holdY), "placing mode never arms box selection");
+    mouseMoveEvt(380.0f, 250.0f);
+    Check(!input.GetSelectionBox().active && touchCam.GetX() < mousePlaceCamX, "placing mode pans even after hold");
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 380.0f, 250.0f);
+
+    input.SetTouchPan(false);
+    input.SetMenuOpen(true);
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_DOWN, 300.0f, 250.0f);
+    mouseEvt(SDL_EVENT_MOUSE_BUTTON_UP, 300.0f, 250.0f);
+    Check(input.WasLeftClickIssued(x, y), "menu open click in touch-ui must still dispatch");
+    input.SetMenuOpen(false);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

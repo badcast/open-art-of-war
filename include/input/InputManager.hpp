@@ -120,6 +120,9 @@ public:
     {
         return m_selectionBox;
     }
+    // Non-placing TouchHUD: true once a map press has held >= kTouchHoldSelectMs so drag switches from pan to box
+    // selection.
+    bool IsTouchSelectionHoldReady(int &screenX, int &screenY) const;
     void CancelSelectionBox()
     {
         m_selectionBox.active = false;
@@ -230,6 +233,26 @@ private:
     bool m_touchWheelScroll {true};
     float m_touchScroll {0.0f}; // finger travel not yet turned into wheel steps (menus scroll by swiping)
     std::vector<SDL_Rect> m_touchUiRects;
+    static constexpr Uint64 kTouchHoldSelectMs = 200;
+    static constexpr float kTouchDragSlopPx = 12.0f;
+    struct TouchMapDragState
+    {
+        bool active {false};
+        bool moved {false};
+        bool panning {false};
+        bool selecting {false};
+        Uint64 startTicks {0};
+        float originX {0.0f};
+        float originY {0.0f};
+        float prevX {0.0f};
+        float prevY {0.0f};
+
+        void Begin(float x, float y, Uint64 ticks);
+        void Reset();
+        bool HoldReady(Uint64 nowTicks, bool menuOpen, bool panOnly) const;
+    };
+    void UpdateTouchMapDrag(TouchMapDragState &drag, float x, float y, Camera &camera, bool clearLeftDownOnPan);
+    TouchMapDragState m_touchMouseDrag;
 #if OAOW_TOUCH
     bool ProcessTouch(const SDL_Event &event, Camera &camera);
     SDL_Renderer *m_touchRenderer {nullptr};
@@ -240,8 +263,7 @@ private:
     bool m_touchMoved {false};
     bool m_touchOnGhost {false};
     bool m_touchOnScrollPanel {false};
-    bool m_touchSelecting {false};
-    bool m_touchPanning {false};
+    TouchMapDragState m_touchDrag;
     Uint64 m_touchStart {0};
     SDL_FPoint m_touchOrigin {};
 #endif

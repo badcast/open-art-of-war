@@ -4,6 +4,7 @@
 #include "game/Players.hpp"
 #include "graphics/Renderer.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -48,7 +49,7 @@ class TileMap
 public:
     TileMap();
 
-    bool LoadMap(const std::string &jsonPath);
+    bool LoadMap(std::string_view jsonPath);
     // Takes away the walls the map file placed (a game that starts from scratch)
     void ClearWalls();
     // Takes the environment settings (fog look, construction rules); missing keys keep the defaults

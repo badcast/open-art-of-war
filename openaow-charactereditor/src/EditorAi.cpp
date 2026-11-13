@@ -14,7 +14,7 @@ const char *const kLevelLabels[4] = {"Easy", "Medium", "Hard", "Hardcore"};
 const ImU32 kLevelColors[4] = {
     IM_COL32(104, 204, 124, 255), IM_COL32(232, 200, 74, 255), IM_COL32(236, 140, 60, 255), IM_COL32(226, 80, 70, 255)};
 
-double Num(const CommentedYaml &y, const std::string &path, double fallback)
+double Num(const CommentedYaml &y, std::string_view path, double fallback)
 {
     const YAML::Node n = y.At(path);
     try

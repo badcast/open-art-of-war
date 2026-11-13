@@ -29,7 +29,7 @@ MapEditorApp::~MapEditorApp()
     SDL_Quit();
 }
 
-bool MapEditorApp::Init(int width, int height, const std::string &initialMap)
+bool MapEditorApp::Init(int width, int height, std::string_view initialMap)
 {
     m_windowW = width;
     m_windowH = height;
@@ -771,7 +771,8 @@ void MapEditorApp::render()
             {
                 int bw = 1;
                 int bh = 1;
-                const BuildingDef *buildingDef = m_texManager->GetBuildingDef(m_ui.GetSelectedBuildingType());
+                const BuildingDef *buildingDef
+                    = m_texManager->GetBuildingDef(m_texManager->GetBuildingSprite(m_ui.GetSelectedBuildingType()));
                 if (buildingDef)
                 {
                     bw = buildingDef->width;

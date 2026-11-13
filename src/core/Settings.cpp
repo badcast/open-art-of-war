@@ -56,7 +56,7 @@ std::string Settings::DefaultUserName()
     return name;
 }
 
-bool Settings::Save(const std::string &path) const
+bool Settings::Save(std::string_view path) const
 {
     try
     {
@@ -106,11 +106,11 @@ bool Settings::Save(const std::string &path) const
     }
 }
 
-bool Settings::Load(const std::string &path)
+bool Settings::Load(std::string_view path)
 {
     try
     {
-        std::ifstream fh(path);
+        std::ifstream fh {std::filesystem::path(path)};
         if (!fh.is_open())
             return false;
         const nlohmann::json j = nlohmann::json::parse(fh, nullptr, false);

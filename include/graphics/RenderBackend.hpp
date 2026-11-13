@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct SDL_Window;
@@ -42,18 +43,18 @@ namespace RenderBackend
 
 // Drivers compiled into SDL, in the order of preference of this platform
 std::vector<std::string> Candidates();
-std::string Label(const std::string &name);
+std::string Label(std::string_view name);
 
 // Creates the renderer for `window`: `forced` (command line, not stored) or the configured API first,
 // then the fallback and the rest in order of preference, software last. Failed attempts are logged,
 // skipped for the rest of the run; `env` gets the API that came up and the next working one. Saves `env`.
-SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, const std::string &forced = "");
+SDL_Renderer *Create(SDL_Window *window, EnvironmentConfig &env, std::string_view forced = {});
 
 // The first frame of the new renderer is on the screen: the API is safe, clear init_pending
 void ConfirmFirstFrame(EnvironmentConfig &env);
 
 // Brings `name` up on a hidden throw-away window and tears it down again
-bool Probe(const std::string &name);
+bool Probe(std::string_view name);
 
 // The options for the settings screen: every candidate with what is known about it.
 // `probeUnknown` tries the not yet probed ones now (results are kept for this run only).
@@ -64,8 +65,8 @@ inline std::vector<RenderApiOption> options(EnvironmentConfig &env, bool probeUn
 }
 
 // The API to use from the next start (or the next renderer recreation) on
-void Select(EnvironmentConfig &env, const std::string &name);
-inline void select(EnvironmentConfig &env, const std::string &name)
+void Select(EnvironmentConfig &env, std::string_view name);
+inline void select(EnvironmentConfig &env, std::string_view name)
 {
     Select(env, name);
 }

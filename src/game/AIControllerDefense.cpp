@@ -319,7 +319,7 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         }
         else if (
             defenderIt == m_defenders.end() && unit->state != ActionState::Idle
-            && !(unit->state == ActionState::Move && !unit->isAttackMoving))
+            && !(unit->state == ActionState::Move && (!unit->isAttackMoving || m_waveRoster.count(unit->id))))
             continue; // (firing, transforming, attack-moving to its guard post)
         // The computer's own troops come from all over the base; the mission's garrisons only from close by
         const float reach = atBase(*unit) && !m_garrison.count(unit->id) ? kHomeReachTiles : kDefenderReachTiles;

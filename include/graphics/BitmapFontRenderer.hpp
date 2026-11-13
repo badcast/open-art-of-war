@@ -2,6 +2,9 @@
 
 #include "core/LoaderResources.hpp"
 
+#include <tuple>
+#include <string_view>
+
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <string>
@@ -58,13 +61,13 @@ class BitmapFontRenderer
 public:
     BitmapFontRenderer(
         SDL_Renderer *renderer,
-        const std::string &regularFontPath = LoaderResources::FontRegular(),
-        const std::string &boldFontPath = LoaderResources::FontBold(),
+        std::string_view regularFontPath = {},
+        std::string_view boldFontPath = {},
         const FontSizes &sizes = {});
     ~BitmapFontRenderer();
 
     void DrawString(
-        const std::string &text,
+        std::string_view text,
         int x,
         int y,
         int scale = 2,
@@ -74,7 +77,7 @@ public:
 
     // Returns the height of the drawn block in pixels
     int DrawTextWrapped(
-        const std::string &text,
+        std::string_view text,
         int x,
         int y,
         int maxLineWidth,
@@ -82,14 +85,17 @@ public:
         SDL_Color color = {255, 255, 255, 255},
         bool dropShadow = true);
 
-    int GetTextWidth(const std::string &text, int scale = 2) const;
+    int GetTextWidth(std::string_view text, int scale = 2) const;
     int GetTextHeight(int scale = 2) const;
+
+    std::tuple<int, int> GetTextPointFromAnchor(
+        std::string_view text, int x, int y, int scale = 2, int anchor = Anchor::TOP | Anchor::LEFT) const;
 
     void ClearCache();
 
 private:
     TTF_Font *GetFontForScale(int scale) const;
-    CachedText GetOrCreateTexture(const std::string &text, int scale, SDL_Color color);
+    CachedText GetOrCreateTexture(std::string_view text, int scale, SDL_Color color);
 
     SDL_Renderer *m_renderer {nullptr};
     TTF_Font *m_fontSmall {nullptr};             // scale 1 (~13px)

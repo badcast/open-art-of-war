@@ -85,6 +85,7 @@ private:
         None,
         Menu,
         Goals,
+        Stats,
         Tech,
         DockBuild,
         DockUnits,
@@ -142,13 +143,12 @@ private:
     void StartPlacing(const Camera &camera);
     bool ConfirmPlacing(Economy &economy, const EntityManager &entities, const TileMap &map);
     void SyncPanelWithTab();
+    static int IconSpriteForAction(Act act);
 
     Panel m_panel {Panel::None};
     int m_unitTab {TabInfantry};
-    float m_scroll[3] {0, 0, 0}; // vertical offset in pixels: build, infantry, vehicles
-    bool m_cardsTracking {false};
-    bool m_cardsDragging {false};
-    float m_cardsStartScroll {0.0f};
+    ui::SmoothListScroll m_cardScroll[3]; // smooth kinetic vertical scroll: build, infantry, vehicles
+    bool m_prevLeftDown {false};
     bool m_placing {false};
     int m_ghostX {0};
     int m_ghostY {0};
@@ -165,6 +165,7 @@ private:
     int m_seenTab {TabBuild};
     mutable bool m_lastHasCombat {false};
     mutable bool m_lastHasBuilding {false};
+    mutable bool m_lastHasProducer {false};
     mutable int m_lastSelectedCount {0};
 };
 

@@ -148,7 +148,7 @@ struct AboutSimulation::Impl
         Leave();
     }
 
-    bool LoadConfig(const std::string &configPath)
+    bool LoadConfig(std::string_view configPath)
     {
         std::string text;
         nlohmann::json cfg;
@@ -291,7 +291,7 @@ AboutSimulation::AboutSimulation()
 {}
 AboutSimulation::~AboutSimulation() = default;
 
-bool AboutSimulation::Start(TextureManager &textures, int width, int height, const std::string &configPath)
+bool AboutSimulation::Start(TextureManager &textures, int width, int height, std::string_view configPath)
 {
     auto &s = *m_impl;
     try

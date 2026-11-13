@@ -175,12 +175,12 @@ int EffectiveArmyCap(int lobbyUnits)
     return hard > 0 ? std::min(lobbyUnits, hard) : lobbyUnits;
 }
 
-bool LoadText(const std::string &yamlText)
+bool LoadText(std::string_view yamlText)
 {
     Table t;
     try
     {
-        const YAML::Node root = YAML::Load(yamlText);
+        const YAML::Node root = YAML::Load(std::string(yamlText));
         if (!root || !root.IsMap())
             return false;
         if (const YAML::Node d = root["default"])

@@ -20,9 +20,9 @@ const char *const kSettingsKey = "environment";
 
 } // namespace
 
-bool EnvironmentConfig::Load(const std::string &assetPath)
+bool EnvironmentConfig::Load(std::string_view assetPath)
 {
-    m_assetPath = assetPath;
+    m_assetPath.assign(assetPath);
     m_dirty = false;
     std::string text;
     const bool found = Assets::ReadText(assetPath, text);
@@ -58,7 +58,7 @@ bool EnvironmentConfig::Load(const std::string &assetPath)
     return found;
 }
 
-nlohmann::json EnvironmentConfig::FactorySettings(const std::string &assetPath)
+nlohmann::json EnvironmentConfig::FactorySettings(std::string_view assetPath)
 {
     std::string text;
     if (!Assets::ReadText(assetPath, text))
@@ -69,17 +69,17 @@ nlohmann::json EnvironmentConfig::FactorySettings(const std::string &assetPath)
     return nlohmann::json::object();
 }
 
-const nlohmann::json &EnvironmentConfig::Section(const std::string &name) const
+const nlohmann::json &EnvironmentConfig::Section(std::string_view name) const
 {
     static const nlohmann::json kEmpty = nlohmann::json::object();
-    auto it = m_root.find(name);
+    auto it = m_root.find(std::string(name));
     return (it != m_root.end() && it->is_object()) ? *it : kEmpty;
 }
 
-nlohmann::json &EnvironmentConfig::Edit(const std::string &name)
+nlohmann::json &EnvironmentConfig::Edit(std::string_view name)
 {
     m_dirty = true;
-    nlohmann::json &s = m_root[name];
+    nlohmann::json &s = m_root[std::string(name)];
     if (!s.is_object())
         s = nlohmann::json::object();
     return s;

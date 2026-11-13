@@ -310,10 +310,10 @@ bool SessionClient::takeDataManifest(std::vector<DataEntry> &files)
     return true;
 }
 
-void SessionClient::requestDataFile(const std::string &path)
+void SessionClient::requestDataFile(std::string_view path)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
-    encode(w, FilePathRequest {path});
+    encode(w, FilePathRequest {std::string(path)});
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
@@ -369,10 +369,10 @@ bool SessionClient::takeFile(std::uint64_t &hash, std::vector<std::uint8_t> &byt
     return true;
 }
 
-void SessionClient::sendOwnerSetMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash)
+void SessionClient::sendOwnerSetMap(std::string_view map, std::uint8_t spawnCount, std::uint64_t mapHash)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
-    encode(w, OwnerSetMap {map, mapHash, spawnCount});
+    encode(w, OwnerSetMap {std::string(map), mapHash, spawnCount});
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
@@ -412,10 +412,10 @@ void SessionClient::sendOwnerSetOptions(const OwnerSetOptions &change)
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 
-void SessionClient::sendChat(const std::string &text, bool teamOnly)
+void SessionClient::sendChat(std::string_view text, bool teamOnly)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
-    encode(w, Chat {0, teamOnly, text});
+    encode(w, Chat {0, teamOnly, std::string(text)});
     send(Channel::Control, m_buffer.data(), w.finish());
 }
 

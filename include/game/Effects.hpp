@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -55,12 +56,12 @@ struct EffectsConfig
     Wreck WreckOfBuilding(int width, int height) const;
 
     // Reads effects.yaml text over the current values; false when it cannot be parsed
-    bool LoadText(const std::string &yamlText);
+    bool LoadText(std::string_view yamlText);
     // The shared instance (read from assets/characters/effects.yaml on first use)
     static EffectsConfig &Get();
     static void reload();
     // Replaces the shared instance by the defaults overlaid with this text (the editor shows changes at once)
-    static void Apply(const std::string &yamlText);
+    static void Apply(std::string_view yamlText);
 };
 
 // Where the picture of an explosion / impact animation sits relative to the point it is spawned at

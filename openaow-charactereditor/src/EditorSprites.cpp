@@ -19,6 +19,7 @@
 #include <limits>
 #include <regex>
 #include <sstream>
+#include <string_view>
 
 namespace CharEditor
 {
@@ -52,7 +53,7 @@ std::string Num(float v)
 
 const char *const kRecolorNames[] = {"none", "blue", "red"};
 
-bool ValidName(const std::string &n)
+bool ValidName(std::string_view n)
 {
     if (n.empty())
         return false;
@@ -70,7 +71,7 @@ std::string ReadFile(const fs::path &p)
     return ss.str();
 }
 
-bool WriteFile(const fs::path &p, const std::string &text)
+bool WriteFile(const fs::path &p, std::string_view text)
 {
     std::ofstream out(p, std::ios::binary | std::ios::trunc);
     out << text;
@@ -134,9 +135,9 @@ fs::path CharacterEditor::SpriteDir() const
     return assetsRoot / "sprites";
 }
 
-fs::path CharacterEditor::SpriteMetaPath(const std::string &object) const
+fs::path CharacterEditor::SpriteMetaPath(std::string_view object) const
 {
-    return SpriteDir() / ("sprite_" + object + "_meta.yaml");
+    return SpriteDir() / ("sprite_" + std::string(object) + "_meta.yaml");
 }
 
 void SpriteCanvasCamera(
@@ -210,12 +211,11 @@ void SpriteCanvasCamera(
     }
 }
 
-void CharacterEditor::LoadSpriteObject(
-    const std::string &object, const fs::path &metaFile, const std::string &imageSuffix)
+void CharacterEditor::LoadSpriteObject(std::string_view object, const fs::path &metaFile, std::string_view imageSuffix)
 {
     DiscardPending();
     spriteMetaBase.clear();
-    spriteObject = object;
+    spriteObject = std::string(object);
     spriteFrames.clear();
     spriteRemoved.clear();
     spriteFrameSel = -1;
@@ -239,7 +239,7 @@ void CharacterEditor::LoadSpriteObject(
             spriteScale = 1.0f;
         const std::string rc = meta["recolor"] ? meta["recolor"].as<std::string>() : "none";
         spriteRecolor = rc == "blue" ? 1 : rc == "red" ? 2 : 0;
-        spriteImageName = meta["image"] ? meta["image"].as<std::string>() : "sprite_" + object + ".png";
+        spriteImageName = meta["image"] ? meta["image"].as<std::string>() : "sprite_" + std::string(object) + ".png";
         if (const YAML::Node d = meta["image_size"]; d && d.IsSequence() && d.size() == 2)
         {
             declaredW = d[0].as<float>(0.0f);
@@ -292,7 +292,7 @@ void CharacterEditor::LoadSpriteObject(
     {
         for (const std::string &name : SpriteImageNames())
         {
-            SDL_Surface *img = LoadRgba(SpriteDir() / (name + imageSuffix));
+            SDL_Surface *img = LoadRgba(SpriteDir() / (name + std::string(imageSuffix)));
             if (!img)
             {
                 DiscardPending();
@@ -518,11 +518,12 @@ bool CharacterEditor::EnsurePending()
     return !spritePending.empty();
 }
 
-void CharacterEditor::SetPending(const std::string &name, SDL_Surface *surface)
+void CharacterEditor::SetPending(std::string_view name, SDL_Surface *surface)
 {
-    const auto it = spritePending.find(name);
+    const std::string key(name);
+    const auto it = spritePending.find(key);
     if (it == spritePending.end())
-        spritePending[name] = surface;
+        spritePending[key] = surface;
     else if (it->second != surface)
     {
         SDL_DestroySurface(it->second);
@@ -941,7 +942,7 @@ void CharacterEditor::ReloadSpriteData()
         spriteReport = std::to_string(errors.size()) + _(" sprite error(s); first: ") + errors.front();
 }
 
-bool CharacterEditor::CreateSpriteObject(const fs::path &png, const std::string &name)
+bool CharacterEditor::CreateSpriteObject(const fs::path &png, std::string_view name)
 {
     if (!ValidName(name))
     {
@@ -950,7 +951,7 @@ bool CharacterEditor::CreateSpriteObject(const fs::path &png, const std::string 
     }
     if (fs::exists(SpriteMetaPath(name)))
     {
-        spriteReport = _("This sprite exists already: ") + name;
+        spriteReport = _("This sprite exists already: ") + std::string(name);
         return false;
     }
     SDL_Surface *s = LoadRgba(png);
@@ -962,16 +963,18 @@ bool CharacterEditor::CreateSpriteObject(const fs::path &png, const std::string 
     const int w = s->w, h = s->h;
     SDL_DestroySurface(s);
     std::error_code ec;
-    fs::copy_file(png, SpriteDir() / ("sprite_" + name + ".png"), fs::copy_options::overwrite_existing, ec);
+    fs::copy_file(
+        png, SpriteDir() / ("sprite_" + std::string(name) + ".png"), fs::copy_options::overwrite_existing, ec);
     if (ec)
     {
         spriteReport = ec.message();
         return false;
     }
-    const std::string meta = "# Sprite \"" + name + "\" (made in the character editor from " + png.filename().string()
-                             + ")\nimage: sprite_" + name + ".png\nimage_size: [" + std::to_string(w) + ", "
-                             + std::to_string(h) + "]\nscale: 1\nframes:\n  f0: {rect: [0, 0, " + std::to_string(w)
-                             + ", " + std::to_string(h) + "]}\n";
+    const std::string meta = "# Sprite \"" + std::string(name) + "\" (made in the character editor from "
+                             + png.filename().string() + ")\nimage: sprite_" + std::string(name) + ".png\nimage_size: ["
+                             + std::to_string(w) + ", " + std::to_string(h)
+                             + "]\nscale: 1\nframes:\n  f0: {rect: [0, 0, " + std::to_string(w) + ", "
+                             + std::to_string(h) + "]}\n";
     if (!WriteFile(SpriteMetaPath(name), meta))
     {
         spriteReport = _("Could not write ") + SpriteMetaPath(name).string();
@@ -979,15 +982,15 @@ bool CharacterEditor::CreateSpriteObject(const fs::path &png, const std::string 
     }
     ReloadSpriteData();
     LoadSpriteObject(name);
-    spriteReport = _("Made sprite ") + name;
+    spriteReport = _("Made sprite ") + std::string(name);
     return true;
 }
 
-std::string CharacterEditor::FreeFrameName(const std::string &prefix) const
+std::string CharacterEditor::FreeFrameName(std::string_view prefix) const
 {
     for (int i = 0;; ++i)
     {
-        const std::string n = prefix + std::to_string(i);
+        const std::string n = std::string(prefix) + std::to_string(i);
         bool used = false;
         for (const SpriteFrameEdit &f : spriteFrames)
             used |= f.name == n;
@@ -996,7 +999,7 @@ std::string CharacterEditor::FreeFrameName(const std::string &prefix) const
     }
 }
 
-void CharacterEditor::AddSpriteFrame(int x, int y, int w, int h, const std::string &prefix)
+void CharacterEditor::AddSpriteFrame(int x, int y, int w, int h, std::string_view prefix)
 {
     SpriteFrameEdit f;
     f.name = FreeFrameName(prefix);

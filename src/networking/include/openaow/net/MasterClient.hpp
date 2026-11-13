@@ -7,6 +7,7 @@
 #include <future>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar::Net
@@ -25,7 +26,7 @@ public:
         Failed
     };
 
-    MasterClient(const std::string &host, std::uint16_t port);
+    MasterClient(std::string_view host, std::uint16_t port);
 
     void update(std::uint32_t nowMs);
     State state() const
@@ -42,14 +43,13 @@ public:
     }
 
     // Requests (sent once connected)
-    void requestList(const std::string &gameVersion);
-    void createRoom(
-        const GameIdentity &identity, const std::string &name, bool listed, const std::string &password = {});
-    void findRoom(const std::string &code);
+    void requestList(std::string_view gameVersion);
+    void createRoom(const GameIdentity &identity, std::string_view name, bool listed, std::string_view password = {});
+    void findRoom(std::string_view code);
 
     // A game hosted by a player: list it (send again every few seconds) / ask for a hosted game's address
     void registerHost(const RegisterHost &info);
-    void joinHosted(const std::string &code, const SocketToken &token);
+    void joinHosted(std::string_view code, const SocketToken &token);
 
     // Results
     bool hasList() const

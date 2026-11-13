@@ -50,13 +50,13 @@ SessionHost::~SessionHost()
     finishReplay("the room was closed");
 }
 
-void SessionHost::logLine(const std::string &line) const
+void SessionHost::logLine(std::string_view line) const
 {
     if (m_config.log)
-        m_config.log(line);
+        m_config.log(std::string(line));
 }
 
-void SessionHost::finishReplay(const std::string &reason)
+void SessionHost::finishReplay(std::string_view reason)
 {
     if (!m_replayOpen)
         return;
@@ -106,7 +106,9 @@ void SessionHost::finishReplay(const std::string &reason)
         = (std::filesystem::path(m_config.replayDir) / replayFileName(m_lobby.map, m_replayStartedAt)).string();
     std::string error;
     if (writeReplay(path, data, error))
-        logLine("replay saved: " + path + " (" + std::to_string(data.turns.size()) + " turns, " + reason + ")");
+        logLine(
+            "replay saved: " + path + " (" + std::to_string(data.turns.size()) + " turns, " + std::string(reason)
+            + ")");
     else
         logLine("replay NOT saved: " + path + ": " + error);
 }
@@ -132,10 +134,10 @@ void SessionHost::broadcast(Channel channel, const std::uint8_t *data, std::size
     }
 }
 
-void SessionHost::reject(std::size_t connection, RejectReason reason, const std::string &detail)
+void SessionHost::reject(std::size_t connection, RejectReason reason, std::string_view detail)
 {
     BitWriter w(m_buffer.data(), m_buffer.size());
-    encode(w, Reject {reason, detail});
+    encode(w, Reject {reason, std::string(detail)});
     sendTo(connection, Channel::Control, m_buffer.data(), w.finish());
     const Connection &c = m_connections[connection];
     m_transports[c.transport]->disconnect(c.peer);
@@ -171,7 +173,7 @@ void SessionHost::offerFile(std::uint64_t hash, std::vector<std::uint8_t> bytes)
         m_files.erase(m_files.begin());
 }
 
-void SessionHost::setLobbyMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash)
+void SessionHost::setLobbyMap(std::string_view map, std::uint8_t spawnCount, std::uint64_t mapHash)
 {
     if (m_running)
         return;
@@ -181,7 +183,7 @@ void SessionHost::setLobbyMap(const std::string &map, std::uint8_t spawnCount, s
         inRoom += s.used ? 1 : 0;
     if (spawnCount > 0 && inRoom > spawnCount)
         return;
-    m_lobby.map = map;
+    m_lobby.map.assign(map);
     m_lobby.mapHash = mapHash;
     m_lobby.spawnCount = std::min<std::uint8_t>(spawnCount, kMaxPlayers);
     // Another map: nobody is ready for it yet, blocked places are open again, everybody keeps a place of his own

@@ -24,13 +24,13 @@ namespace
 std::mutex s_mutex;
 std::unordered_map<std::string, std::string> s_translations;
 
-bool LoadYamlFile(const std::string &path)
+bool LoadYamlFile(std::string_view path)
 {
     std::string text;
     if (!Assets::ReadText(path, text) || text.empty())
     {
         // Try fallback with assets/ prefix if needed
-        if (path.compare(0, 7, "assets/") != 0 && Assets::ReadText("assets/" + path, text) && !text.empty())
+        if (path.substr(0, 7) != "assets/" && Assets::ReadText("assets/" + std::string(path), text) && !text.empty())
         {
             // Successfully read with assets/ prefix
         }
@@ -40,7 +40,7 @@ bool LoadYamlFile(const std::string &path)
             std::error_code ec;
             if (std::filesystem::is_regular_file(path, ec))
             {
-                std::ifstream fin(path, std::ios::binary);
+                std::ifstream fin(std::filesystem::path(path), std::ios::binary);
                 if (fin)
                 {
                     text.assign((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
@@ -80,7 +80,7 @@ bool LoadYamlFile(const std::string &path)
     }
 }
 
-void ReloadTranslations(const std::string &localeDir, const std::string &domain, const std::string &lang)
+void ReloadTranslations(std::string_view localeDir, std::string_view domain, std::string_view lang)
 {
     s_translations.clear();
 
@@ -91,33 +91,35 @@ void ReloadTranslations(const std::string &localeDir, const std::string &domain,
         return;
     }
 
-    std::filesystem::path dir = localeDir.empty() ? "assets/locale" : localeDir;
+    const std::string langStr(lang);
+    std::filesystem::path dir
+        = localeDir.empty() ? std::filesystem::path("assets/locale") : std::filesystem::path(localeDir);
 
     // 1. Language subfolder: assets/locale/<lang>/openaow.yaml (or <domain>.yaml)
-    const std::string domainName = domain.empty() ? "openaow" : domain;
-    LoadYamlFile((dir / lang / (domainName + ".yaml")).generic_string());
+    const std::string domainName = domain.empty() ? "openaow" : std::string(domain);
+    LoadYamlFile((dir / langStr / (domainName + ".yaml")).generic_string());
     if (domainName != "openaow")
     {
         // Fallback to base openaow.yaml for common strings
-        LoadYamlFile((dir / lang / "openaow.yaml").generic_string());
+        LoadYamlFile((dir / langStr / "openaow.yaml").generic_string());
     }
 
     // Load any other .yaml in assets/locale/<lang>/ (e.g. additional catalogs or mod files)
-    const std::string langSubdir = (dir / lang).generic_string();
+    const std::string langSubdir = (dir / langStr).generic_string();
     for (const std::string &path : Assets::List(langSubdir, ".yaml"))
     {
         LoadYamlFile(path);
     }
 
     // 2. Fallbacks for flat layout: assets/locale/<lang>.yaml or openaow_<lang>.yaml
-    LoadYamlFile((dir / (lang + ".yaml")).generic_string());
-    LoadYamlFile((dir / ("openaow_" + lang + ".yaml")).generic_string());
+    LoadYamlFile((dir / (langStr + ".yaml")).generic_string());
+    LoadYamlFile((dir / ("openaow_" + langStr + ".yaml")).generic_string());
 
     // 3. Active mods providing translation files in locale root directory:
     for (const std::string &path : Assets::List(dir.generic_string(), ".yaml"))
     {
         const std::string filename = std::filesystem::path(path).filename().string();
-        const std::string suffix = "_" + lang + ".yaml";
+        const std::string suffix = "_" + langStr + ".yaml";
         if (filename.size() >= suffix.size()
             && filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0)
         {
@@ -131,19 +133,21 @@ void ReloadTranslations(const std::string &localeDir, const std::string &domain,
 
 } // namespace
 
-void Localization::Init(const std::string &localeDir, const std::string &defaultLang, const std::string &domain)
+void Localization::Init(std::string_view localeDir, std::string_view defaultLang, std::string_view domain)
 {
     std::lock_guard<std::mutex> guard(s_mutex);
 
-    s_localeDir = localeDir.empty() ? LoaderResources::LocaleDir() : localeDir;
-    s_domain = domain.empty() ? "openaow" : domain;
-    s_currentLanguage = (defaultLang == "ru") ? "ru" : "en";
+    s_localeDir = localeDir.empty() ? LoaderResources::LocaleDir() : std::string(localeDir);
+    s_domain = domain.empty() ? "openaow" : std::string(domain);
+    const std::string resolvedDefault
+        = defaultLang.empty() ? LoaderResources::DefaultLanguage() : std::string(defaultLang);
+    s_currentLanguage = (resolvedDefault == "ru") ? "ru" : "en";
     s_initialized = true;
 
     ReloadTranslations(s_localeDir, s_domain, s_currentLanguage);
 }
 
-void Localization::SetLanguage(const std::string &langCode)
+void Localization::SetLanguage(std::string_view langCode)
 {
     std::lock_guard<std::mutex> guard(s_mutex);
     s_currentLanguage = (langCode == "ru") ? "ru" : "en";

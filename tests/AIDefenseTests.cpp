@@ -952,6 +952,74 @@ int main()
             "idle base units outside the 7-tile staging spot launch on a wave instead of staying stuck at the base");
     }
 
+    // Attack-move: enemy buildings/units strictly in attackRange take priority over auto-acquired walls,
+    // while manual wall orders stay on the wall; taking fire on an auto-wall or while Idle switches to the shooter.
+    {
+        World w;
+        const int uAuto = w.Foe(30, 30, 0);
+        const int uManual = w.Foe(30, 34, 0);
+        w.map.SetWall(31, 30, kOwn, 100, w.ai.Player());
+        w.map.SetWall(31, 34, kOwn, 100, w.ai.Player());
+        const int foeBldg = w.entities.SpawnBuildingByIndex(0, 32, 29, kOwn, 1.0f, w.ai.Player());
+        w.entities.IssueAttackMoveOrder({uAuto}, 40, 30, w.pf);
+        if (Unit *ua = w.entities.GetUnit(uAuto))
+        {
+            ua->targetWallTileX = 31;
+            ua->targetWallTileY = 30;
+            ua->isManualWallTarget = false;
+        }
+        w.entities.IssueAttackWallOrder({uManual}, 31, 34, w.pf);
+        w.entities.Update(0.05f, w.map, w.pf);
+        const Unit *uaAfter = w.entities.GetUnit(uAuto);
+        const Unit *umAfter = w.entities.GetUnit(uManual);
+        Check(
+            uaAfter && uaAfter->targetEntityId == foeBldg && uaAfter->targetWallTileX < 0,
+            "attack-move switches from auto-acquired wall to enemy building inside attackRange");
+        Check(
+            umAfter && umAfter->isManualWallTarget && umAfter->targetWallTileX == 31 && umAfter->targetEntityId == 0,
+            "manual wall attack order stays on the ordered wall despite enemy inside attackRange");
+
+        // Taking fire from a distant attacker while breaking an auto-wall drops the wall and targets the shooter
+        const int uWallBreaker = w.Foe(20, 50, 0);
+        const int longShooter = w.Own(35, 50, 1);
+        w.map.SetWall(21, 50, kOwn, 100, w.ai.Player());
+        w.entities.IssueAttackMoveOrder({uWallBreaker}, 25, 50, w.pf);
+        if (Unit *ub = w.entities.GetUnit(uWallBreaker))
+        {
+            ub->targetWallTileX = 21;
+            ub->targetWallTileY = 50;
+            ub->isManualWallTarget = false;
+            ub->lastAttackerId = longShooter;
+            ub->lastAttackedTimer = 5.0f;
+        }
+        w.entities.Update(0.05f, w.map, w.pf);
+        const Unit *ubAfter = w.entities.GetUnit(uWallBreaker);
+        Check(
+            ubAfter && ubAfter->targetEntityId == longShooter && ubAfter->targetWallTileX < 0,
+            "unit breaking an auto-wall retaliates against distant attacker");
+
+        // Idle unit taking fire from beyond sight/attackRange immediately targets the attacker
+        const int uIdle = w.Foe(10, 60, 0);
+        const int distantShooter = w.Own(40, 60, 1);
+        if (Unit *ui = w.entities.GetUnit(uIdle))
+        {
+            ui->lastAttackerId = distantShooter;
+            ui->lastAttackedTimer = 5.0f;
+        }
+        w.entities.Update(0.05f, w.map, w.pf);
+        const Unit *uiAfter = w.entities.GetUnit(uIdle);
+        Check(
+            uiAfter && uiAfter->targetEntityId == distantShooter,
+            "idle unit taking damage retaliates against distant attacker");
+
+        // AI staging moves always use attack-move
+        const int staged = w.Own(kHqX + 20, kHqY + 1, 1);
+        AIDefenseTest::Prepare(w.ai, {staged}, 4, kHqX + 3, kHqY + 3);
+        AIDefenseTest::Stage(w.ai, w.map, w.entities, w.pf);
+        const Unit *us = w.entities.GetUnit(staged);
+        Check(us && us->state == ActionState::Move && us->isAttackMoving, "AI staging move uses attack-move");
+    }
+
     std::printf(failures ? "%d failed\n" : "all passed\n", failures);
     return failures ? 1 : 0;
 }

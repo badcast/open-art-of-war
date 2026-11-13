@@ -30,13 +30,13 @@ using ui::UiRect;
 namespace col = ui::color;
 
 // Cameo drawing shared by the PC sidebar and the touch interface (HUDControllerRender.cpp)
-void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, const std::string &text, SDL_Color color);
+void DrawCostTag(Renderer &r, BitmapFontRenderer &font, const UiRect &cell, std::string_view text, SDL_Color color);
 void DrawCameo(
     Renderer &r,
     BitmapFontRenderer &font,
     const UiRect &cell,
     int compId,
-    const std::string &name,
+    std::string_view name,
     bool hovered,
     bool selected,
     bool locked);
@@ -152,11 +152,11 @@ struct SidebarLayout
     static constexpr int kCellH = 84;
     static constexpr int kGap = 8;
 
-    UiRect Cell(int index, int scrollRow) const
+    UiRect Cell(int index, int scrollPx) const
     {
         int col = index % kCols;
-        int row = index / kCols - scrollRow;
-        return {grid.x + col * (kCellW + kGap), grid.y + row * (kCellH + kGap), kCellW, kCellH};
+        int row = index / kCols;
+        return {grid.x + col * (kCellW + kGap), grid.y + row * (kCellH + kGap) - scrollPx, kCellW, kCellH};
     }
     int VisibleRows() const
     {
@@ -216,7 +216,7 @@ inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showS
         return sidebarLayoutBuiltIn(windowW, windowH, top, showSpeed);
     const std::map<std::string, float> extra {{"T", static_cast<float>(top)}};
     const uilayout::Solved s = file.Solve(
-        "hud", "pc", windowW, windowH, [showSpeed](const std::string &n) { return n == "speed" && showSpeed; }, &extra);
+        "hud", "pc", windowW, windowH, [showSpeed](std::string_view n) { return n == "speed" && showSpeed; }, &extra);
     SidebarLayout l;
     l.panel = s.Rect("panel");
     l.header = s.Rect("header");

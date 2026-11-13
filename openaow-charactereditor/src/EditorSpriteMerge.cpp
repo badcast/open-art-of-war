@@ -8,9 +8,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <numeric>
 #include <sstream>
+#include <string_view>
 
 #ifndef OPENAOW_SOURCE_DIR
 #define OPENAOW_SOURCE_DIR ""
@@ -25,7 +27,7 @@ namespace
 using OpenArtOfWar::Sprites;
 namespace SM = SpriteMerge;
 
-bool ValidName(const std::string &n)
+bool ValidName(std::string_view n)
 {
     if (n.empty())
         return false;
@@ -43,7 +45,7 @@ std::string ReadFile(const fs::path &p)
     return ss.str();
 }
 
-bool WriteFile(const fs::path &p, const std::string &text)
+bool WriteFile(const fs::path &p, std::string_view text)
 {
     std::ofstream out(p, std::ios::binary | std::ios::trunc);
     out << text;
@@ -101,7 +103,7 @@ SDL_Surface *NewSurface(int w, int h)
     return s;
 }
 
-std::string MetaString(const YAML::Node &meta, const char *key, const std::string &def)
+std::string MetaString(const YAML::Node &meta, const char *key, std::string_view def)
 {
     try
     {
@@ -110,17 +112,17 @@ std::string MetaString(const YAML::Node &meta, const char *key, const std::strin
     }
     catch (...)
     {}
-    return def;
+    return std::string(def);
 }
 
 // Code that names `object` or one of its sprites in a string: such objects cannot be merged
-std::string CodeReference(const std::string &object)
+std::string CodeReference(std::string_view object)
 {
     const fs::path root = OPENAOW_SOURCE_DIR;
     if (root.empty() || !fs::exists(root))
         return {};
     // "<object>.<item>" or the bare "<object>"
-    const std::string dotted = "\"" + object + ".", bare = "\"" + object + "\"";
+    const std::string dotted = "\"" + std::string(object) + ".", bare = "\"" + std::string(object) + "\"";
     for (const char *sub : {"src", "include", "openaow-charactereditor/src"})
     {
         std::error_code ec;
@@ -149,17 +151,18 @@ bool Intersects(const Box &a, const Box &b)
 
 } // namespace
 
-const std::vector<CharacterEditor::MergeFrameInfo> &CharacterEditor::MergeFramesOf(const std::string &object)
+const std::vector<CharacterEditor::MergeFrameInfo> &CharacterEditor::MergeFramesOf(std::string_view object)
 {
-    auto it = mergeFrameCache.find(object);
+    const std::string key(object);
+    auto it = mergeFrameCache.find(key);
     if (it != mergeFrameCache.end())
         return it->second;
-    std::vector<MergeFrameInfo> &out = mergeFrameCache[object];
+    std::vector<MergeFrameInfo> &out = mergeFrameCache[key];
     try
     {
         YAML::Node meta = YAML::LoadFile(SpriteMetaPath(object).string());
         // The rectangles in the pixels of the image as it is (image_size may describe an older size)
-        if (SDL_Texture *tex = textures->GetSpriteSheet(Sprites().ImageOf(object)))
+        if (SDL_Texture *tex = textures->GetSpriteSheet(Sprites().ImageOf(key)))
         {
             float tw = 0.0f, th = 0.0f;
             SDL_GetTextureSize(tex, &tw, &th);
@@ -204,7 +207,7 @@ void CharacterEditor::MergeBounds(int &x0, int &y0, int &x1, int &y1) const
     }
 }
 
-void CharacterEditor::MergeAddPieces(const std::string &object, const std::string &frame)
+void CharacterEditor::MergeAddPieces(std::string_view object, std::string_view frame)
 {
     // To the right of what is there; an object's frames keep their places relative to each other
     int x0, y0, x1, y1;
@@ -227,7 +230,7 @@ void CharacterEditor::MergeAddPieces(const std::string &object, const std::strin
         if (!frame.empty() && f.name != frame)
             continue;
         MergePiece p;
-        p.object = object;
+        p.object = std::string(object);
         p.frame = f.name;
         std::copy(f.rect, f.rect + 4, p.src);
         p.x = ox + f.rect[0] - minX;
@@ -237,7 +240,7 @@ void CharacterEditor::MergeAddPieces(const std::string &object, const std::strin
     }
 }
 
-void CharacterEditor::MergeRemovePieces(const std::string &object, const std::string &frame)
+void CharacterEditor::MergeRemovePieces(std::string_view object, std::string_view frame)
 {
     mergePieces.erase(
         std::remove_if(
@@ -559,7 +562,23 @@ bool CharacterEditor::MergeObjectsSave()
     cleanup();
 
     const std::string imageName = "sprite_" + name + ".png";
-    const std::string resName = anyResistance ? "sprite_" + name + "_resistance.png" : "";
+    // Skip writing a redundant _resistance.png copy when all merged pixels match the base sheet
+    if (outRes && out && outRes->w == out->w && outRes->h == out->h)
+    {
+        bool identical = true;
+        for (int y = 0; y < out->h && identical; ++y)
+        {
+            const std::uint8_t *pa = static_cast<const std::uint8_t *>(out->pixels) + y * out->pitch;
+            const std::uint8_t *pb = static_cast<const std::uint8_t *>(outRes->pixels) + y * outRes->pitch;
+            identical = std::memcmp(pa, pb, static_cast<std::size_t>(out->w) * 4) == 0;
+        }
+        if (identical)
+        {
+            SDL_DestroySurface(outRes);
+            outRes = nullptr;
+        }
+    }
+    const std::string resName = outRes ? "sprite_" + name + "_resistance.png" : "";
     const SM::NameMap names = SM::BuildNameMap(sources);
     const YAML::Node merged = SM::MergeMetas(sources, names, places, imageName, resName, x1 - x0, y1 - y0);
     std::string header = "# Sprite \"" + name + "\" (merged in the character editor from";
@@ -605,7 +624,9 @@ bool CharacterEditor::MergeObjectsSave()
     }
 
     // The sources go; the new files come
-    const std::set<fs::path> keep = {SpriteDir() / imageName, SpriteMetaPath(name), SpriteDir() / resName};
+    std::set<fs::path> keep = {SpriteDir() / imageName, SpriteMetaPath(name)};
+    if (!resName.empty())
+        keep.insert(SpriteDir() / resName);
     for (const fs::path &p : remove)
         if (!keep.count(p))
             fs::remove(p, ec);

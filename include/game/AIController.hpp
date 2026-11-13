@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <map>
 #include <unordered_set>
 #include <deque>
@@ -61,7 +62,7 @@ struct AIDifficultyConfig
 };
 
 std::string DifficultyToString(AIDifficulty diff);
-AIDifficulty StringToDifficulty(const std::string &str);
+AIDifficulty StringToDifficulty(std::string_view str);
 
 struct AIStructurePlan
 {
@@ -215,7 +216,7 @@ public:
     }
 
     // Difficulty system
-    bool LoadDifficultyConfig(const std::string &path); // LoaderResources::aiDifficulty()
+    bool LoadDifficultyConfig(std::string_view path); // LoaderResources::aiDifficulty()
     // The difficulty file read again (the data of a network game or a replay), the chosen difficulty kept
     void ReloadDifficultyConfig();
     void SetDifficulty(AIDifficulty difficulty);
@@ -445,9 +446,9 @@ private:
     void UpdateOffensive(const TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
     void FlankPoint(int group, int targetX, int targetY, const TileMap &map, int &outX, int &outY) const;
     // Adds a line to the reasoning log (and the console)
-    void Think(const std::string &category, const std::string &text);
+    void Think(std::string_view category, std::string_view text);
     // Same, but only when the text for that key changed (state transitions, not every tick)
-    void ThinkOnce(const std::string &key, const std::string &category, const std::string &text);
+    void ThinkOnce(std::string_view key, std::string_view category, std::string_view text);
 
     PlayerId m_player {1};
     bool m_playerFixed {false};
@@ -554,7 +555,7 @@ private:
 
     std::deque<AIThought> m_thoughts;
     std::size_t m_thoughtSerial {0};
-    std::map<std::string, std::string> m_lastThoughtByKey;
+    std::map<std::string, std::string, std::less<>> m_lastThoughtByKey;
 
     // Intel (ordered containers: the same iteration on every peer)
     std::map<int, std::pair<int, int>> m_knownBuildings; // enemy structure id -> centre tile

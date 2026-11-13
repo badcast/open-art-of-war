@@ -3,7 +3,10 @@
 #include "core/LoaderResources.hpp"
 
 #include <SDL3/SDL.h>
+#include <functional>
+#include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 #include "core/Config.hpp"
@@ -120,7 +123,7 @@ public:
     bool LoadAllAssets();
     // The sprites again from disk (metas and images; the editors after a change), with the bindings of the characters
     void ReloadSprites();
-    SDL_Texture *LoadTexture(const std::string &filePath);
+    SDL_Texture *LoadTexture(std::string_view filePath);
 
     // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).
     // `sharpPixels` (pixel-art filter of the shader effects) needs linear samples on the sprite sheets but
@@ -142,7 +145,7 @@ public:
     // The page to draw `page` from for the Resistance: its Resistance image when the object has one
     int ResistancePage(int page) const;
     SDL_Texture *GetTileset(int index) const;
-    SDL_Texture *GetUiTexture(const std::string &name) const;
+    SDL_Texture *GetUiTexture(std::string_view name) const;
     const SpriteFrame *GetSpriteFrame(int spriteId) const;
 
     // Average color of a map tile's picture (for minimap-like previews); computed from the sprite sheet
@@ -189,7 +192,7 @@ private:
     void SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);
 
     SDL_Renderer *m_renderer {nullptr};
-    std::unordered_map<std::string, SDL_Texture *> m_textureCache;
+    std::map<std::string, SDL_Texture *, std::less<>> m_textureCache;
     std::vector<SDL_Texture *> m_spriteSheets;
     std::unordered_map<std::uint64_t, SDL_Texture *> m_recoloredSheets;
     SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
@@ -201,7 +204,7 @@ private:
     std::vector<SDL_Texture *> m_tilesets;
     std::vector<bool> m_terrainPages; // sheet pages that hold terrain tiles (worked out on first use)
     void CollectTerrainPages();
-    std::unordered_map<std::string, SDL_Texture *> m_uiTextures;
+    std::map<std::string, SDL_Texture *, std::less<>> m_uiTextures;
     std::vector<SpriteFrame> m_spriteFrames;
 
     // Decoded graphics tables

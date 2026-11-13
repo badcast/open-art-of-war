@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -25,7 +26,7 @@ public:
     // False when the manifest is missing or broken: there are no resources then.
     static bool Init();
     // Sets only the asset root used to resolve relative resource paths
-    static void SetAssetRoot(const std::string &root);
+    static void SetAssetRoot(std::string_view root);
     // Gets the current asset root
     static std::string AssetRoot();
 
@@ -52,7 +53,7 @@ public:
     // Named UI pictures ("logo", "title", "icon") in manifest order
     static std::vector<std::pair<std::string, std::string>> UiTextures();
     // A music file named in the tracklist by its path below the assets root
-    static std::string AudioFile(const std::string &name);
+    static std::string AudioFile(std::string_view name);
     static std::string Tracklist();
     static std::string AudioLicense();
     // The loop of the surroundings in a match (audio.ambient_day / audio.ambient_night; empty: none)
@@ -63,7 +64,7 @@ public:
     // Voice lines (unit replies, announcer): settings (audio_voices.yaml) and every <event>_<n>.ogg of a language
     // (voices.clips.<language>); lines missing in a language come from the fallback one
     static std::string VoicesConfig();
-    static std::vector<std::string> VoiceClips(const std::string &language);
+    static std::vector<std::string> VoiceClips(std::string_view language);
     static std::string VoicesFallbackLanguage();
     static std::string AiDifficulty();
     static inline std::string aiDifficulty()
@@ -94,8 +95,8 @@ public:
         return WeaponBalance();
     }
     // `faction` is "confederation" or "resistance"
-    static std::string Research(const std::string &faction);
-    static inline std::string research(const std::string &faction)
+    static std::string Research(std::string_view faction);
+    static inline std::string research(std::string_view faction)
     {
         return Research(faction);
     }
@@ -117,9 +118,9 @@ public:
     // "skirmish_2" -> "maps/skirmish_2.json"; a campaign map's name or an old alias ("m26", "resistance_mission_4")
     // -> "maps/mission/resistance_mission_4.json"; a name with a path separator is returned unchanged (".json" added,
     // an old mission path moved to the mission folder)
-    static std::string MapPath(const std::string &name);
+    static std::string MapPath(std::string_view name);
     // The map of a campaign mission (MissionData::mapFile) in the mission folder
-    static std::string MissionMapPath(const std::string &name);
+    static std::string MissionMapPath(std::string_view name);
     static std::string TestMap();
     static std::string NetDefaultMap();
     // The shipped skirmish maps (maps.files), then in a blob install the player's own maps from the per-user directory
@@ -137,7 +138,7 @@ public:
 
 private:
     static const nlohmann::json &Manifest();
-    static std::string join(const std::string &relative);
+    static std::string join(std::string_view relative);
     static std::string Str(const char *section, const char *key);
     // A string array of the manifest (empty when missing)
     static std::vector<std::string> List(const char *section, const char *key);

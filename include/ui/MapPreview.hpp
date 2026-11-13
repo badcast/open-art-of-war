@@ -1,8 +1,10 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -33,8 +35,8 @@ public:
     SDL_Texture *Get(
         SDL_Renderer *renderer,
         TextureManager &textures,
-        const std::string &key,
-        const std::string &mapPath,
+        std::string_view key,
+        std::string_view mapPath,
         const std::vector<PreviewMarker> &markers,
         int &width,
         int &height);
@@ -47,7 +49,7 @@ private:
         int width {0};
         int height {0};
     };
-    std::map<std::string, Entry> m_cache;
+    std::map<std::string, Entry, std::less<>> m_cache;
 };
 
 } // namespace OpenArtOfWar

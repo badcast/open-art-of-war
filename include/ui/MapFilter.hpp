@@ -5,13 +5,14 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar::ui
 {
 
 // Case-insensitive text for ASCII and Cyrillic (UTF-8)
-inline std::string LowerText(const std::string &t)
+inline std::string LowerText(std::string_view t)
 {
     std::string out;
     for (std::size_t i = 0; i < t.size(); ++i)

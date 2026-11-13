@@ -1,9 +1,112 @@
 #include "input/InputManager.hpp"
+#include <algorithm>
 #include <cstring>
 #include <cmath>
 
 namespace OpenArtOfWar
 {
+
+namespace
+{
+
+bool IsDirectPointerMouseEvent(SDL_MouseID which)
+{
+#if OAOW_TOUCH
+    return which != SDL_TOUCH_MOUSEID;
+#else
+    (void) which;
+    return true;
+#endif
+}
+
+} // namespace
+
+void InputManager::TouchMapDragState::Begin(float x, float y, Uint64 ticks)
+{
+    active = true;
+    moved = false;
+    panning = false;
+    selecting = false;
+    startTicks = ticks;
+    originX = x;
+    originY = y;
+    prevX = x;
+    prevY = y;
+}
+
+void InputManager::TouchMapDragState::Reset()
+{
+    active = false;
+    moved = false;
+    panning = false;
+    selecting = false;
+}
+
+bool InputManager::TouchMapDragState::HoldReady(Uint64 nowTicks, bool menuOpen, bool panOnly) const
+{
+    return active && !menuOpen && !panOnly && !panning && (selecting || (nowTicks - startTicks >= kTouchHoldSelectMs));
+}
+
+void InputManager::UpdateTouchMapDrag(
+    TouchMapDragState &drag, float x, float y, Camera &camera, bool clearLeftDownOnPan)
+{
+    drag.moved = drag.moved || std::hypot(x - drag.originX, y - drag.originY) > kTouchDragSlopPx;
+    const float dx = drag.prevX - x;
+    const float dy = drag.prevY - y;
+    drag.prevX = x;
+    drag.prevY = y;
+    if (!drag.moved)
+        return;
+
+    if (!drag.panning && !drag.selecting)
+    {
+        drag.selecting = !m_touchPan && (SDL_GetTicks() - drag.startTicks >= kTouchHoldSelectMs);
+        drag.panning = !drag.selecting;
+        if (drag.selecting)
+        {
+            m_selectionBox.active = true;
+            m_selectionBox.startScreenX = static_cast<int>(drag.originX);
+            m_selectionBox.startScreenY = static_cast<int>(drag.originY);
+            camera.ScreenToWorld(drag.originX, drag.originY, m_selectionBox.startWorldX, m_selectionBox.startWorldY);
+        }
+    }
+    if (drag.panning)
+    {
+        m_selectionBox.active = false;
+        if (clearLeftDownOnPan)
+            m_leftMouseDown = false;
+        camera.Pan(dx, dy);
+    }
+    else if (drag.selecting)
+    {
+        m_selectionBox.currentScreenX = static_cast<int>(x);
+        m_selectionBox.currentScreenY = static_cast<int>(y);
+        camera.ScreenToWorld(x, y, m_selectionBox.currentWorldX, m_selectionBox.currentWorldY);
+    }
+}
+
+bool InputManager::IsTouchSelectionHoldReady(int &screenX, int &screenY) const
+{
+    if (!m_touchMode)
+        return false;
+    const Uint64 nowTicks = SDL_GetTicks();
+    if (m_touchMouseDrag.HoldReady(nowTicks, m_menuOpen, m_touchPan))
+    {
+        screenX = static_cast<int>(m_touchMouseDrag.originX);
+        screenY = static_cast<int>(m_touchMouseDrag.originY);
+        return true;
+    }
+#if OAOW_TOUCH
+    if (!m_touchGesture && m_fingers.size() == 1 && !m_touchOnGhost && !m_touchMoved
+        && m_touchDrag.HoldReady(nowTicks, m_menuOpen, m_touchPan))
+    {
+        screenX = static_cast<int>(m_touchDrag.originX);
+        screenY = static_cast<int>(m_touchDrag.originY);
+        return true;
+    }
+#endif
+    return false;
+}
 
 InputManager::InputManager()
 {
@@ -74,6 +177,11 @@ void InputManager::Update(float /*deltaTime*/, Camera &camera)
         mouseX = static_cast<float>(m_mouseScreenX);
         mouseY = static_cast<float>(m_mouseScreenY);
     }
+    else if (m_touchMouseDrag.active)
+    {
+        mouseX = m_touchMouseDrag.prevX;
+        mouseY = m_touchMouseDrag.prevY;
+    }
     else
     {
         SDL_GetMouseState(&mouseX, &mouseY);
@@ -81,12 +189,28 @@ void InputManager::Update(float /*deltaTime*/, Camera &camera)
             SDL_RenderCoordinatesFromWindow(m_touchRenderer, mouseX, mouseY, &mouseX, &mouseY);
     }
 #else
-    SDL_GetMouseState(&mouseX, &mouseY);
+    if (m_touchMouseDrag.active)
+    {
+        mouseX = m_touchMouseDrag.prevX;
+        mouseY = m_touchMouseDrag.prevY;
+    }
+    else
+    {
+        SDL_GetMouseState(&mouseX, &mouseY);
+    }
 #endif
     m_mouseScreenX = static_cast<int>(mouseX);
     m_mouseScreenY = static_cast<int>(mouseY);
     camera.ScreenToWorld(
         static_cast<float>(m_mouseScreenX), static_cast<float>(m_mouseScreenY), m_mouseWorldX, m_mouseWorldY);
+
+    if (m_menuOpen)
+    {
+        m_touchMouseDrag.Reset();
+#if OAOW_TOUCH
+        m_touchDrag.Reset();
+#endif
+    }
 
     if (m_selectionBox.active)
     {
@@ -109,15 +233,19 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
         || ((event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP)
             && event.button.which != SDL_TOUCH_MOUSEID))
         m_touchPointer = false;
+#endif
     if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
     {
+#if OAOW_TOUCH
         m_fingers.clear();
         m_touchGesture = false;
+        m_touchDrag.Reset();
+#endif
+        m_touchMouseDrag.Reset();
         m_mouseScrollPanelPressed = m_mouseGhostPressed = false;
         m_leftMouseDown = m_leftPressed = m_leftClickIssued = m_rightClickIssued = m_middleMouseDown = false;
         m_selectionBox.active = false;
     }
-#endif
     switch (event.type)
     {
         case SDL_EVENT_TEXT_INPUT:
@@ -195,10 +323,24 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                         break;
                     }
                 }
-                if (px >= camera.GetViewportWidth() || py <= 40 || inTouchPanel)
+                if (px >= camera.GetViewportWidth() || (!m_touchMode && py <= 40) || inTouchPanel || m_menuOpen)
                 {
                     m_leftClickIssued = !m_mouseScrollPanelPressed && !m_mouseGhostPressed;
                     m_selectionBox.active = false;
+                    m_touchMouseDrag.Reset();
+                }
+                else if (
+                    m_touchMode && !m_mouseScrollPanelPressed && !m_mouseGhostPressed
+                    && IsDirectPointerMouseEvent(event.button.which))
+                {
+                    m_selectionBox.active = false;
+                    m_leftClickIssued = false;
+                    m_touchMouseDrag.Begin(event.button.x, event.button.y, SDL_GetTicks());
+                }
+                else if (m_touchMode && (m_mouseScrollPanelPressed || m_mouseGhostPressed))
+                {
+                    m_selectionBox.active = false;
+                    m_touchMouseDrag.Reset();
                 }
                 else
                 {
@@ -224,6 +366,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                     m_rightClickWorldX,
                     m_rightClickWorldY);
                 m_selectionBox.active = false;
+                m_touchMouseDrag.Reset();
             }
             else if (event.button.button == SDL_BUTTON_MIDDLE)
             {
@@ -239,6 +382,22 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
             if (event.button.button == SDL_BUTTON_LEFT)
             {
                 m_leftMouseDown = false;
+                if (m_touchMouseDrag.active && IsDirectPointerMouseEvent(event.button.which))
+                {
+                    const bool selecting = m_touchMouseDrag.selecting;
+                    if (!m_touchMouseDrag.moved
+                        && (m_touchPan || SDL_GetTicks() - m_touchMouseDrag.startTicks < kTouchHoldSelectMs))
+                    {
+                        m_leftClickIssued = true;
+                        m_leftClickScreenX = static_cast<int>(event.button.x);
+                        m_leftClickScreenY = static_cast<int>(event.button.y);
+                        camera.ScreenToWorld(event.button.x, event.button.y, m_leftClickWorldX, m_leftClickWorldY);
+                    }
+                    if (!selecting || !m_selectionBox.HasSignificantArea())
+                        m_selectionBox.active = false;
+                    m_touchMouseDrag.Reset();
+                    break;
+                }
                 if (m_mouseGhostPressed)
                 {
                     const bool sameGhost = m_touchGhostAtPress.x == m_touchPlacementGhost.x
@@ -262,7 +421,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                 {
                     const float dx = event.button.x - m_leftPressX;
                     const float dy = event.button.y - m_leftPressY;
-                    if (std::hypot(dx, dy) <= 12.0f)
+                    if (std::hypot(dx, dy) <= kTouchDragSlopPx)
                     {
                         m_leftClickIssued = true;
                         m_leftClickScreenX = static_cast<int>(event.button.x);
@@ -275,7 +434,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                 {
                     if (!m_selectionBox.HasSignificantArea()
 #if OAOW_TOUCH
-                        && !m_touchSelecting
+                        && !m_touchDrag.selecting
 #endif
                     )
                     {
@@ -289,7 +448,7 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                             m_leftClickWorldY);
                     }
 #if OAOW_TOUCH
-                    if (!m_touchSelecting || !m_selectionBox.HasSignificantArea())
+                    if (!m_touchDrag.selecting || !m_selectionBox.HasSignificantArea())
 #endif
                         m_selectionBox.active = false;
                 }
@@ -310,6 +469,11 @@ bool InputManager::ProcessEvent(const SDL_Event &event, Camera &camera)
                 camera.Pan(dx, dy);
                 m_lastMouseX = static_cast<int>(event.motion.x);
                 m_lastMouseY = static_cast<int>(event.motion.y);
+            }
+            else if (
+                m_touchMode && m_touchMouseDrag.active && !m_menuOpen && IsDirectPointerMouseEvent(event.motion.which))
+            {
+                UpdateTouchMapDrag(m_touchMouseDrag, event.motion.x, event.motion.y, camera, true);
             }
             break;
         }
@@ -366,7 +530,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
         {
             m_touchGesture = false;
             m_touchMoved = false;
-            m_touchSelecting = m_touchPanning = false;
+            m_touchDrag.Reset();
             m_touchOnGhost
                 = m_touchMode && !m_menuOpen && m_touchPlacementGhost.w > 0 && point.x >= m_touchPlacementGhost.x
                   && point.x < m_touchPlacementGhost.x + m_touchPlacementGhost.w && point.y >= m_touchPlacementGhost.y
@@ -384,6 +548,8 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
             }
             m_touchOrigin = point;
             m_touchStart = SDL_GetTicks();
+            if (m_touchMode && m_touchMap)
+                m_touchDrag.Begin(point.x, point.y, m_touchStart);
             m_touchScroll = 0.0f;
             SetMouseScreenPosition(static_cast<int>(point.x), static_cast<int>(point.y));
             mouse(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_LEFT);
@@ -396,6 +562,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
         else
         {
             m_touchGesture = true;
+            m_touchDrag.Reset();
             m_leftMouseDown = m_leftPressed = m_leftClickIssued = false;
             m_selectionBox.active = false;
         }
@@ -408,6 +575,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
     {
         m_fingers.erase(it);
         m_touchGesture = !m_fingers.empty();
+        m_touchDrag.Reset();
         m_leftMouseDown = m_leftPressed = m_leftClickIssued = m_rightClickIssued = false;
         m_selectionBox.active = false;
         return true;
@@ -431,7 +599,8 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
         if (!m_touchGesture)
         {
             SetMouseScreenPosition(static_cast<int>(point.x), static_cast<int>(point.y));
-            m_touchMoved = m_touchMoved || std::hypot(point.x - m_touchOrigin.x, point.y - m_touchOrigin.y) > 12.0f;
+            m_touchMoved
+                = m_touchMoved || std::hypot(point.x - m_touchOrigin.x, point.y - m_touchOrigin.y) > kTouchDragSlopPx;
             if (m_menuOpen && m_touchMoved)
             {
                 // A menu, a list, a window: the finger scrolls it. Every 32 px of travel is a wheel step (content
@@ -450,6 +619,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
                     m_touchScroll += m_touchScroll < 0.0f ? kStepPx : -kStepPx;
                 }
                 // what the touch began (a pressed button, a selection box) is dropped: it was a scroll
+                m_touchDrag.Reset();
                 m_selectionBox.active = false;
             }
             if (m_touchMode && !m_menuOpen && !m_touchMap && !m_touchOnScrollPanel && m_touchMoved)
@@ -461,27 +631,9 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
                     m_touchScroll += m_touchScroll < 0.0f ? 48.0f : -48.0f;
                 }
             }
-            if (m_touchMode && m_touchMap && m_touchMoved)
+            if (m_touchMode && m_touchMap && !m_menuOpen)
             {
-                if (!m_touchPanning && !m_touchSelecting)
-                {
-                    m_touchSelecting = !m_touchPan && SDL_GetTicks() - m_touchStart >= 500;
-                    m_touchPanning = !m_touchSelecting;
-                    if (m_touchSelecting)
-                    {
-                        m_selectionBox.active = true;
-                        m_selectionBox.startScreenX = static_cast<int>(m_touchOrigin.x);
-                        m_selectionBox.startScreenY = static_cast<int>(m_touchOrigin.y);
-                        camera.ScreenToWorld(
-                            m_touchOrigin.x, m_touchOrigin.y, m_selectionBox.startWorldX, m_selectionBox.startWorldY);
-                    }
-                }
-                if (m_touchPanning)
-                {
-                    m_selectionBox.active = false;
-                    m_leftMouseDown = false;
-                    camera.Pan(previous.x - point.x, previous.y - point.y);
-                }
+                UpdateTouchMapDrag(m_touchDrag, point.x, point.y, camera, true);
             }
             else if (!m_touchMode && m_touchPan && m_touchMap && m_touchMoved)
             {
@@ -496,7 +648,7 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
     if (!m_touchGesture)
     {
         SetMouseScreenPosition(static_cast<int>(point.x), static_cast<int>(point.y));
-        if (!m_touchMoved && !m_touchOnGhost && !m_menuOpen && SDL_GetTicks() - m_touchStart >= 500)
+        if (!m_touchMoved && !m_touchOnGhost && !m_menuOpen && SDL_GetTicks() - m_touchStart >= kTouchHoldSelectMs)
         {
             // Hold: move/attack/rally on the map, cancel an order in the production grid.
             mouse(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_RIGHT);
@@ -517,10 +669,11 @@ bool InputManager::ProcessTouch(const SDL_Event &event, Camera &camera)
         else
         {
             // A finger that dragged past the tap slop must never turn into a stray tap click on release
-            if (!m_touchSelecting)
+            if (!m_touchDrag.selecting)
                 m_selectionBox.active = false;
         }
         mouse(SDL_EVENT_MOUSE_BUTTON_UP, SDL_BUTTON_LEFT);
+        m_touchDrag.Reset();
     }
     if (m_fingers.empty())
         m_touchGesture = false;

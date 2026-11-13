@@ -3,8 +3,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -39,12 +41,12 @@ public:
     std::string text() const;
 
     // Node at the path; an undefined node when there is none
-    YAML::Node At(const std::string &path) const;
+    YAML::Node At(std::string_view path) const;
     // The comment lines right above the key
-    std::string Comment(const std::string &path) const;
+    std::string Comment(std::string_view path) const;
     // Replaces the value of a "key: value" line; valueText is YAML ("12", "true", "\"name\"", "[1, 2]").
     // False (nothing changed) when the key has no value line or the result would not parse.
-    bool Set(const std::string &path, const std::string &valueText);
+    bool Set(std::string_view path, std::string_view valueText);
 
 private:
     void Index();
@@ -54,8 +56,8 @@ private:
     // then, so lines and keys added there meanwhile (by hand, a newer game) are not lost
     std::vector<std::pair<std::string, std::string>> m_edits;
     std::vector<std::string> m_lines;
-    std::map<std::string, int> m_lineOf;
-    std::map<std::string, std::string> m_comments;
+    std::map<std::string, int, std::less<>> m_lineOf;
+    std::map<std::string, std::string, std::less<>> m_comments;
     YAML::Node m_node;
     bool m_loaded {false};
     bool m_dirty {false};

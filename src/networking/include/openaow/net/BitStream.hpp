@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar::Net
@@ -113,7 +114,7 @@ public:
         m_bytes += size;
     }
     // Length-prefixed; longer strings are cut to `maxLength` bytes
-    void writeString(const std::string &s, std::size_t maxLength)
+    void writeString(std::string_view s, std::size_t maxLength)
     {
         const std::size_t n = s.size() < maxLength ? s.size() : maxLength;
         writeVarUint(n);

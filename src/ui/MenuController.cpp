@@ -138,7 +138,7 @@ void MenuController::ActivateMenuItem(
             m_customOpen = 0;
             m_customSpectator = false;
             m_skirmishSelected = 0;
-            m_skirmishTop = 0;
+            m_skirmishScroll.Reset();
             break;
         case 2: // Network game: local network / internet, then the game room
             state = AppState::MenuNetwork;
@@ -209,7 +209,7 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
     int px = 0, py = 0;
     const bool pressed = input.ConsumeLeftPress(px, py);
     if (UpdateMusicPlayer(
-            clicked, pressed, px, py, input.IsLeftMouseDown(), mx, my, windowH, true, sound, m_scrollDrag))
+            clicked, pressed, px, py, input.IsLeftMouseDown(), mx, my, windowW, windowH, true, sound, m_scrollDrag))
         return;
 
     for (int i = 0; i < kMainMenuItems; ++i)
@@ -242,30 +242,47 @@ void MenuController::UpdateInfoScreen(InputManager &input, AppState &state)
     m_mouseY = input.GetMouseScreenY();
     float lx, ly;
     bool clicked = input.WasLeftClickIssued(lx, ly);
+    const int wheel = input.ConsumeWheel();
     int px = 0, py = 0;
-    if (input.ConsumeLeftPress(px, py) && input.IsLeftMouseDown() && OnScrollBar(m_infoTrack, px, py))
-        m_scrollDrag = 2;
-    if (m_scrollDrag == 2)
-    {
-        if (input.IsLeftMouseDown())
-            m_infoScroll = ScrollTopFromMouse(m_infoTrack, m_mouseY, m_infoTotal, m_infoVisible);
-        else
-            m_scrollDrag = 0;
+    const bool down = input.IsLeftMouseDown();
+    const bool pressed = input.ConsumeLeftPress(px, py) && down;
+
+    constexpr int kInfoLineH = 30;
+    const int contentH = m_infoTotal * kInfoLineH;
+    ui::UpdateSmoothList(
+        m_infoScroll,
+        m_infoListRect,
+        m_infoTrack,
+        contentH,
+        kInfoLineH * 3,
+        m_mouseX,
+        m_mouseY,
+        down,
+        pressed,
+        px,
+        py,
+        wheel,
+        clicked);
+    if (m_infoScroll.barDrag)
         return;
-    }
-    m_infoScroll = std::max(0, m_infoScroll - input.ConsumeWheel() * 3);
+
+    const float maxScroll = std::max(0.0f, static_cast<float>(contentH - m_infoListRect.h));
+    auto nudgeInfo = [&](float deltaPx) {
+        m_infoScroll.velocity = 0.0f;
+        m_infoScroll.target = std::clamp(m_infoScroll.target + deltaPx, 0.0f, maxScroll);
+    };
     if (input.IsKeyJustPressed(SDL_SCANCODE_UP))
-        m_infoScroll = std::max(0, m_infoScroll - 1);
+        nudgeInfo(-static_cast<float>(kInfoLineH));
     if (input.IsKeyJustPressed(SDL_SCANCODE_DOWN))
-        ++m_infoScroll;
+        nudgeInfo(static_cast<float>(kInfoLineH));
     if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEUP))
-        m_infoScroll = std::max(0, m_infoScroll - 10);
+        nudgeInfo(-static_cast<float>(kInfoLineH * 10));
     if (input.IsKeyJustPressed(SDL_SCANCODE_PAGEDOWN))
-        m_infoScroll += 10;
+        nudgeInfo(static_cast<float>(kInfoLineH * 10));
     if (clicked || input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || input.IsConfirmJustPressed())
     {
         state = AppState::MainMenu;
-        m_infoScroll = 0;
+        m_infoScroll.Reset();
     }
 }
 
@@ -396,12 +413,26 @@ void MenuController::RenderMainMenu(
         bool isExit = (i == kMainMenuItems - 1);
         std::string label = _(kMainMenuLabels[i]);
 
-        // if (selected)
-        // {
-        //     ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 250), ui::WithAlpha(col::Hover, 0));
-        //     renderer.FillRectScreen(r.x, r.y, 4, r.h, isExit ? col::Danger : col::Accent);
-        // }
-        SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
+        if (!touchMenu)
+        {
+            const SDL_Color itemAccent = isExit ? col::Danger : col::Accent;
+            const SDL_Color plateLeft
+                = selected ? ui::Mix(col::Hover, isExit ? col::DangerDeep : ui::color::AccentDeep, 0.56f)
+                           : ui::WithAlpha(ui::Mix(col::PanelRaised, ui::color::Info, 0.10f), 195);
+            const SDL_Color plateRight = selected ? ui::WithAlpha(col::Panel, 24) : ui::WithAlpha(col::Panel, 12);
+            const SDL_Color barCol = selected ? itemAccent : SDL_Color {0, 0, 0, 0};
+            ui::DrawButtonChrome(renderer, r, plateLeft, plateRight, {0, 0, 0, 0}, barCol, {0, 0, 0, 0}, 255, true);
+
+            const SDL_Color rimStart = selected ? ui::WithAlpha(itemAccent, 185) : ui::WithAlpha(col::BorderStrong, 95);
+            ui::FillHorizontalGradient(renderer, {r.x + 1, r.y, r.w - 2, 1}, rimStart, ui::WithAlpha(rimStart, 0));
+            ui::FillHorizontalGradient(
+                renderer,
+                {r.x + 1, r.Bottom() - 1, r.w - 2, 1},
+                ui::WithAlpha(rimStart, static_cast<Uint8>(rimStart.a / 2)),
+                ui::WithAlpha(rimStart, 0));
+        }
+
+        SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 204, 194, 255} : col::White) : col::TextDim;
         if (touchMenu)
         {
             // Touch: the same text lines as on the desktop (no button plate), only bigger and always lit
@@ -409,7 +440,7 @@ void MenuController::RenderMainMenu(
         }
         fontRenderer.DrawString(
             label,
-            r.x + 20 + (selected && !touchMenu ? 5 : 0),
+            r.x + 20 + (selected && !touchMenu ? 6 : 0),
             r.CenterY(),
             touchMenu ? ui::FONT_H1 : ui::FONT_H2,
             textCol,
@@ -418,21 +449,27 @@ void MenuController::RenderMainMenu(
         if (i == kMainMenuItems - 2)
         {
             // Separator between the game modes / info items and Exit
-            renderer.FillRectScreen(r.x + 20, r.Bottom() + 2, 120, 1, col::Border);
+            ui::FillHorizontalGradient(
+                renderer, {r.x + 12, r.Bottom() + 2, 220, 1}, col::BorderStrong, ui::WithAlpha(col::Border, 0));
         }
     }
 
     // Footer
+    constexpr int thikn = 6;
+    const std::string ver = std::string(_("Version")) + " " + OAOW_VERSION;
+    std::tuple<int, int> t = fontRenderer.GetTextPointFromAnchor(
+        ver, windowW - 24, windowH - 30, ui::FONT_SMALL, Anchor::RIGHT | Anchor::TOP);
+    const UiRect verRect {
+        std::get<0>(t) - thikn - 4,
+        std::get<1>(t) - thikn,
+        fontRenderer.GetTextWidth(ver, ui::FONT_SMALL) + thikn * 2 + 8,
+        fontRenderer.GetTextHeight(ui::FONT_SMALL) + thikn * 2};
+    ui::DrawPanel(renderer, verRect, ui::WithAlpha(col::Panel, 230), col::BorderStrong);
+    renderer.FillRectScreen(verRect.x + 1, verRect.y + 3, 2, std::max(1, verRect.h - 6), col::Accent);
     fontRenderer.DrawString(
-        std::string(_("Version")) + " " + OAOW_VERSION,
-        windowW - 24,
-        windowH - 30,
-        ui::FONT_SMALL,
-        col::TextMuted,
-        false,
-        Anchor::RIGHT | Anchor::TOP);
+        ver, windowW - 24, windowH - 30, ui::FONT_SMALL, col::White, true, Anchor::RIGHT | Anchor::TOP);
 
-    RenderMusicPlayer(renderer, fontRenderer, sound, windowH, true, m_mouseX, m_mouseY);
+    RenderMusicPlayer(renderer, fontRenderer, sound, windowW, windowH, true, m_mouseX, m_mouseY);
 
     if (m_campaignSelectOpen)
     {
@@ -445,42 +482,55 @@ void MenuController::RenderInfoDialog(
     BitmapFontRenderer &fontRenderer,
     int windowW,
     int windowH,
-    const std::string &title,
+    std::string_view title,
     const std::vector<std::string> &lines)
 {
     UiRect d = InfoDialogRect(windowW, windowH);
     UiRect content = ui::DrawDialog(renderer, fontRenderer, windowW, windowH, d, title);
 
     // Long texts scroll: the footer button takes the bottom of the dialog
-    const int visible = std::max(1, (DialogFooterButton(d).y - 10 - content.y) / 30);
+    constexpr int kLineH = 30;
+    const int listH = std::max(kLineH, DialogFooterButton(d).y - 10 - content.y);
+    const int visible = std::max(1, listH / kLineH);
     const int total = static_cast<int>(lines.size());
-    m_infoScroll = std::clamp(m_infoScroll, 0, std::max(0, total - visible));
-    int y = content.y;
-    for (int i = m_infoScroll; i < total && i < m_infoScroll + visible; ++i)
+    const int contentH = total * kLineH;
+    const float maxScroll = std::max(0.0f, static_cast<float>(contentH - listH));
+    m_infoListRect = {content.x, content.y, content.w, listH};
+    m_infoTotal = total;
+    m_infoVisible = visible;
+    m_infoScroll.offset = std::clamp(m_infoScroll.offset, 0.0f, maxScroll);
+    m_infoScroll.target = std::clamp(m_infoScroll.target, 0.0f, maxScroll);
+    const int scrollPx = m_infoScroll.PixelOffset();
+    renderer.SetClipRect({m_infoListRect.x, m_infoListRect.y, m_infoListRect.w, m_infoListRect.h});
+    const int firstLine = std::max(0, scrollPx / kLineH);
+    for (int i = firstLine; i < total; ++i)
     {
+        const int y = content.y + i * kLineH - scrollPx;
+        if (y >= m_infoListRect.Bottom())
+            break;
         if (!lines[i].empty())
         {
             fontRenderer.DrawString(
-                ui::FitText(fontRenderer, lines[i], ui::FONT_BODY, content.w - 12),
+                ui::FitText(fontRenderer, lines[i], ui::FONT_BODY, content.w - 14),
                 content.x,
                 y,
                 ui::FONT_BODY,
                 col::Text,
                 false);
         }
-        y += 30;
     }
+    renderer.ResetClipRect();
     m_infoTrack = {};
-    m_infoTotal = total;
-    m_infoVisible = visible;
-    if (total > visible)
+    if (maxScroll > 0.0f)
     {
-        m_infoTrack = {content.Right() - 4, content.y, 4, visible * 30};
-        const int trackH = visible * 30;
-        const int thumbH = std::max(24, trackH * visible / total);
-        const int thumbY = content.y + (trackH - thumbH) * m_infoScroll / (total - visible);
-        renderer.FillRectScreen(content.Right() - 4, content.y, 4, trackH, col::PanelSunken);
-        renderer.FillRectScreen(content.Right() - 4, thumbY, 4, thumbH, col::BorderStrong);
+        m_infoTrack = {content.Right() - 5, content.y, 5, listH};
+        ui::DrawScrollBar(
+            renderer,
+            m_infoTrack,
+            m_infoScroll.offset,
+            static_cast<float>(contentH),
+            static_cast<float>(listH),
+            m_infoScroll.barDrag || ui::OnScrollTrack(m_infoTrack, m_mouseX, m_mouseY));
     }
 
     UiRect back = DialogFooterButton(d);
@@ -517,9 +567,14 @@ void MenuController::RenderMenuHelp(Renderer &renderer, BitmapFontRenderer &font
         std::string keys = b.localizedKeys ? std::string(_(b.keys)) : std::string(b.keys);
         int kw = fontRenderer.GetTextWidth(keys, ui::FONT_SMALL_BOLD) + 16;
         UiRect chip {content.x, y, kw, 26};
-        renderer.FillRectScreen(chip.x, chip.y, chip.w, chip.h, col::PanelRaised);
-        renderer.DrawRectScreen(chip.x, chip.y, chip.w, chip.h, col::BorderStrong);
-        renderer.FillRectScreen(chip.x + 1, chip.Bottom() - 3, chip.w - 2, 2, col::PanelSunken);
+        ui::DrawButtonChrome(
+            renderer,
+            chip,
+            ui::Mix(col::Hover, ui::color::AccentDeep, 0.25f),
+            col::PanelSunken,
+            col::BorderStrong,
+            {0, 0, 0, 0},
+            ui::Mix(col::Accent, col::BorderStrong, 0.35f));
         fontRenderer.DrawString(
             keys,
             chip.CenterX(),

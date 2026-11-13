@@ -1,13 +1,17 @@
 #include "ui/TouchHUD.hpp"
 #include "HUDControllerInternal.hpp"
 
+#include "core/Settings.hpp"
 #include "game/Mines.hpp"
 #include "game/Simulation.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "ui/UiLayout.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <map>
+#include <utility>
 
 namespace OpenArtOfWar
 {
@@ -36,7 +40,7 @@ TouchHUD::Layout TouchHUD::MakeLayout(
     int windowWidth, int windowHeight, bool hasCombat, bool hasBuilding, int selectedCount) const
 {
     // Where things stand is ui/layout.yaml (screen hud, profile touch); this only answers its conditions
-    const uilayout::Conditions conditions = [&](const std::string &name) {
+    const uilayout::Conditions conditions = [&](std::string_view name) {
         if (name == "placing")
             return m_placing;
         if (name == "panel_open")
@@ -63,11 +67,14 @@ TouchHUD::Layout TouchHUD::MakeLayout(
             return hasBuilding;
         if (name == "has_selection")
             return selectedCount > 0;
+        if (name == "stats_open")
+            return m_statsOpen;
         return false;
     };
     static const std::map<std::string, Act> kActions
         = {{"menu", Act::Menu},
            {"goals", Act::Goals},
+           {"stats", Act::Stats},
            {"tech", Act::Tech},
            {"dock_build", Act::DockBuild},
            {"dock_units", Act::DockUnits},
@@ -137,7 +144,7 @@ UiRect TouchHUD::CardRect(const Layout &layout, int slot) const
     const int width = (layout.cards.w - (kCardColumns - 1) * gap) / kCardColumns;
     const int height = (layout.cards.h - (kCardRows - 1) * gap) / kCardRows;
     const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
-    const int offset = static_cast<int>(m_scroll[scrollSlot]) % (height + gap);
+    const int offset = m_cardScroll[scrollSlot].PixelOffset() % (height + gap);
     return {
         layout.cards.x + (slot % kCardColumns) * (width + gap),
         layout.cards.y + (slot / kCardColumns) * (height + gap) - offset,
@@ -149,7 +156,7 @@ int TouchHUD::FirstCard(const Layout &layout, int scrollSlot) const
 {
     const int gap = static_cast<int>(std::lround(kCardGap * layout.u));
     const int step = (layout.cards.h - (kCardRows - 1) * gap) / kCardRows + gap;
-    return kCardColumns * (static_cast<int>(m_scroll[scrollSlot]) / std::max(1, step));
+    return kCardColumns * (m_cardScroll[scrollSlot].PixelOffset() / std::max(1, step));
 }
 
 float TouchHUD::MaxCardScroll(const Layout &layout, int tab) const
@@ -326,6 +333,9 @@ void TouchHUD::Press(
         case Act::Goals:
             outOpenObjectives = true;
             break;
+        case Act::Stats:
+            m_statsToggleRequested = true;
+            break;
         case Act::Tech:
             OpenResearchWindow();
             break;
@@ -415,11 +425,11 @@ void TouchHUD::Press(
             break;
         case Act::UnitsInfantry:
             m_unitTab = m_activeTab = TabInfantry;
-            m_scroll[1] = 0;
+            m_cardScroll[1].Reset();
             break;
         case Act::UnitsVehicles:
             m_unitTab = m_activeTab = TabVehicles;
-            m_scroll[2] = 0;
+            m_cardScroll[2].Reset();
             break;
         case Act::ScrollLeft:
         case Act::ScrollRight:
@@ -427,8 +437,9 @@ void TouchHUD::Press(
             const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
             const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
             const float maxStart = MaxCardScroll(layout, tab);
-            m_scroll[scrollSlot]
-                = std::clamp(m_scroll[scrollSlot] + (act == Act::ScrollLeft ? -48.0f : 48.0f), 0.0f, maxStart);
+            m_cardScroll[scrollSlot].velocity = 0.0f;
+            m_cardScroll[scrollSlot].target = std::clamp(
+                m_cardScroll[scrollSlot].target + (act == Act::ScrollLeft ? -72.0f : 72.0f) * layout.u, 0.0f, maxStart);
             break;
         }
         case Act::RadarZoomIn:
@@ -468,14 +479,9 @@ bool TouchHUD::HandleHudClick(
     m_lastHasCombat = hasCombat;
     m_lastHasBuilding = hasBuilding;
     m_lastSelectedCount = static_cast<int>(selectedUnits.size());
+    const bool pressed = leftMouseDown && !m_prevLeftDown;
+    m_prevLeftDown = leftMouseDown;
     const Layout layout = MakeLayout(windowWidth, windowHeight, hasCombat, hasBuilding, m_lastSelectedCount);
-    if (m_panel != Panel::None)
-    {
-        const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-        const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
-        const float maxStart = MaxCardScroll(layout, tab);
-        m_scroll[scrollSlot] = std::clamp(m_scroll[scrollSlot], 0.0f, maxStart);
-    }
 
     if (!leftMouseDown)
         m_radarHeld = false;
@@ -484,7 +490,8 @@ bool TouchHUD::HandleHudClick(
     bool onButton = false;
     for (const Button &button : layout.buttons)
         onButton = onButton || button.r.Contains(mouseX, mouseY);
-    if (layout.radar.Contains(mouseX, mouseY) && !onButton && (leftMouseDown || leftClicked))
+    if (layout.radar.Contains(mouseX, mouseY) && layout.radar.Contains(m_pressX, m_pressY) && !onButton
+        && (leftMouseDown || leftClicked))
         m_radarHeld = true;
     m_radarDragging = m_radarHeld && leftMouseDown; // a zoomed radar holds still while the camera follows the finger
     if (m_radarHeld)
@@ -506,12 +513,32 @@ bool TouchHUD::HandleHudClick(
         return true;
     }
 
-    if (!leftMouseDown)
-        m_cardsTracking = m_cardsDragging = false;
+    const int activeSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
+    if (m_panel != Panel::None && !m_placing)
+    {
+        const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
+        const int contentH = layout.cards.h + static_cast<int>(std::lround(MaxCardScroll(layout, tab)));
+        const int stepPx = std::max(48, static_cast<int>(std::lround(72.0f * layout.u)));
+        ui::UpdateSmoothList(
+            m_cardScroll[activeSlot],
+            layout.cards,
+            {},
+            contentH,
+            stepPx,
+            mouseX,
+            mouseY,
+            leftMouseDown,
+            pressed,
+            m_pressX,
+            m_pressY,
+            wheelSteps,
+            leftClicked,
+            false);
+    }
     const bool onPanel
         = OverPanels(layout, mouseX, mouseY)
           || (leftMouseDown
-              && (m_cardsTracking
+              && (m_cardScroll[activeSlot].dragging
                   || (m_panel != Panel::None && !m_placing && layout.cards.Contains(m_pressX, m_pressY))));
     UpdateGhostRect(camera);
     if (!m_placing)
@@ -603,33 +630,6 @@ bool TouchHUD::HandleHudClick(
         return false;
     }
 
-    if (m_panel != Panel::None && !m_placing && leftMouseDown)
-    {
-        const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
-        const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-        if (!m_cardsTracking && layout.cards.Contains(m_pressX, m_pressY))
-        {
-            m_cardsTracking = true;
-            m_cardsDragging = false;
-            m_cardsStartScroll = m_scroll[scrollSlot];
-        }
-        if (m_cardsTracking && (m_cardsDragging || std::abs(mouseY - m_pressY) > 12))
-        {
-            m_cardsDragging = true;
-            m_scroll[scrollSlot] = std::clamp(m_cardsStartScroll + m_pressY - mouseY, 0.0f, MaxCardScroll(layout, tab));
-        }
-    }
-    else if (!leftMouseDown)
-    {
-        m_cardsTracking = m_cardsDragging = false;
-    }
-    if (wheelSteps && !m_cardsTracking && m_panel != Panel::None && layout.cards.Contains(mouseX, mouseY))
-    {
-        const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
-        const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
-        const float maxStart = MaxCardScroll(layout, tab);
-        m_scroll[scrollSlot] = std::clamp(m_scroll[scrollSlot] - wheelSteps * 48.0f * layout.u, 0.0f, maxStart);
-    }
     if (rightClicked && m_panel == Panel::Units && layout.cards.Contains(mouseX, mouseY))
     {
         // Holding a unit card takes one order back
@@ -674,6 +674,38 @@ bool TouchHUD::HandleHudClick(
     return true;
 }
 
+int TouchHUD::IconSpriteForAction(Act act)
+{
+    static const std::pair<Act, CachedSprite> kIcons[] = {
+        {Act::DockBuild, CachedSprite("ui_touch.build", SpriteKind::Frame)},
+        {Act::DockUnits, CachedSprite("ui_touch.units", SpriteKind::Frame)},
+        {Act::Stats, CachedSprite("ui_touch.stats", SpriteKind::Frame)},
+        {Act::Tech, CachedSprite("ui_touch.tech", SpriteKind::Frame)},
+        {Act::Goals, CachedSprite("ui_touch.goals", SpriteKind::Frame)},
+        {Act::Menu, CachedSprite("ui_touch.menu", SpriteKind::Frame)},
+        {Act::AttackMove, CachedSprite("ui_touch.attack", SpriteKind::Frame)},
+        {Act::Stop, CachedSprite("ui_touch.stop", SpriteKind::Frame)},
+        {Act::Hold, CachedSprite("ui_touch.hold", SpriteKind::Frame)},
+        {Act::Siege, CachedSprite("ui_touch.siege", SpriteKind::Frame)},
+        {Act::Repair, CachedSprite("ui_touch.repair", SpriteKind::Frame)},
+        {Act::Sell, CachedSprite("ui_touch.sell", SpriteKind::Frame)},
+        {Act::ClearSel, CachedSprite("ui_touch.clear", SpriteKind::Frame)},
+        {Act::SelectAll, CachedSprite("ui_touch.all", SpriteKind::Frame)},
+        {Act::Confirm, CachedSprite("ui_touch.confirm", SpriteKind::Frame)},
+        {Act::Cancel, CachedSprite("ui_touch.cancel", SpriteKind::Frame)},
+        {Act::UnitsInfantry, CachedSprite("ui_touch.infantry", SpriteKind::Frame)},
+        {Act::UnitsVehicles, CachedSprite("ui_touch.vehicles", SpriteKind::Frame)},
+        {Act::RadarZoomIn, CachedSprite("ui_touch.zoom_in", SpriteKind::Frame)},
+        {Act::RadarZoomOut, CachedSprite("ui_touch.zoom_out", SpriteKind::Frame)},
+    };
+    for (const auto &entry : kIcons)
+    {
+        if (entry.first == act)
+            return entry.second.Get();
+    }
+    return -1;
+}
+
 void TouchHUD::RenderGameHud(
     Renderer &renderer,
     BitmapFontRenderer &fontRenderer,
@@ -688,9 +720,13 @@ void TouchHUD::RenderGameHud(
     const std::vector<int> &selected)
 {
     const bool hasCombat = HasCombatUnits(entities, selected);
-    const bool hasBuilding = !OwnSelectedBuildings(entities, selected).empty();
+    const auto selectedBuildings = OwnSelectedBuildings(entities, selected);
+    const bool hasBuilding = !selectedBuildings.empty();
+    const bool hasProducer = std::any_of(
+        selectedBuildings.begin(), selectedBuildings.end(), [](const Building *b) { return b && b->IsUnitProducer(); });
     m_lastHasCombat = hasCombat;
     m_lastHasBuilding = hasBuilding;
+    m_lastHasProducer = hasProducer;
     m_lastSelectedCount = static_cast<int>(selected.size());
     const Layout layout = MakeLayout(windowWidth, windowHeight, hasCombat, hasBuilding, m_lastSelectedCount);
     const auto scalePx = [&](int value) {
@@ -703,51 +739,100 @@ void TouchHUD::RenderGameHud(
         UpdateGhostRect(camera);
     }
 
-    // Credits and power
+    const SDL_Color armyColor = []() -> SDL_Color {
+        const int colorIdx = Players::Slot(Players::Local()).color;
+        if (colorIdx >= 1 && colorIdx <= Settings::kArmyColors)
+            return ArmyColor(colorIdx);
+        const Faction f = Players::Slot(Players::Local()).faction;
+        if (f == Faction::Confederation)
+            return ArmyColor(1);
+        if (f == Faction::Resistance)
+            return ArmyColor(2);
+        return col::Accent;
+    }();
+
+    // Credits and power (TouchHUD flat tactical slate plate matching touch buttons)
     {
         const UiRect &resourcesRect = layout.resources;
-        const int padding = scalePx(8);
-        const int barHeight = std::max(3, scalePx(5));
-        renderer.FillRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, {10, 13, 18, 210});
-        renderer.DrawRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, col::BorderStrong);
-        fontRenderer.DrawString(
-            "$ " + std::to_string(economy.GetCredits()),
-            resourcesRect.x + padding,
-            resourcesRect.y + scalePx(3),
-            ui::FONT_H2,
-            col::Accent,
-            true);
+        const int padX = scalePx(10);
+        const int stripeW = std::max(2, scalePx(3));
+        const int barHeight = std::max(4, scalePx(6));
+
         const int powerProduced = economy.GetPowerProduced();
         const int powerConsumed = economy.GetPowerConsumed();
         const bool hasDeficit = economy.HasPowerDeficit();
         const SDL_Color powerColor = hasDeficit ? col::Danger : col::Ok;
+        const SDL_Color borderColor = (hasDeficit && PowerIconBlinkOn()) ? col::Danger : SDL_Color {160, 172, 190, 145};
+
+        renderer.FillRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, {12, 16, 22, 165});
+        renderer.DrawRectScreen(resourcesRect.x, resourcesRect.y, resourcesRect.w, resourcesRect.h, borderColor);
+        if (resourcesRect.h > 2)
+            renderer.FillRectScreen(
+                resourcesRect.x + 1, resourcesRect.y + 1, stripeW, resourcesRect.h - 2, ui::WithAlpha(armyColor, 240));
+
+        const int contentLeft = resourcesRect.x + 1 + stripeW + padX;
+        const int dividerX
+            = resourcesRect.x + 1 + stripeW + std::max(scalePx(102), (resourcesRect.w - stripeW) * 43 / 100);
+        if (resourcesRect.h > scalePx(14))
+            renderer.FillRectScreen(
+                dividerX, resourcesRect.y + scalePx(7), 1, resourcesRect.h - scalePx(14), {160, 172, 190, 75});
+
+        // Left compartment: Credits
+        const std::string amountText = std::to_string(economy.GetCredits());
+        const int maxCreditsW = std::max(20, dividerX - padX - contentLeft);
+        const int dollarW = fontRenderer.GetTextWidth("$", ui::FONT_H2);
+        const int dollarGap = scalePx(4);
+        const auto amountFont
+            = (dollarW + dollarGap + fontRenderer.GetTextWidth(amountText, ui::FONT_H2) <= maxCreditsW) ? ui::FONT_H2
+                                                                                                        : ui::FONT_BODY;
+        fontRenderer.DrawString(
+            "$",
+            contentLeft,
+            resourcesRect.CenterY(),
+            ui::FONT_H2,
+            {242, 196, 86, 255},
+            true,
+            Anchor::LEFT | Anchor::VCENTER);
+        fontRenderer.DrawString(
+            amountText,
+            contentLeft + dollarW + dollarGap,
+            resourcesRect.CenterY(),
+            amountFont,
+            {248, 244, 232, 255},
+            true,
+            Anchor::LEFT | Anchor::VCENTER);
+
+        // Right compartment: Power readout + bar
+        const int powerLeft = dividerX + padX;
+        const int powerRight = resourcesRect.Right() - padX;
+        const int powerW = std::max(16, powerRight - powerLeft);
         const std::string powerText = std::to_string(powerConsumed) + "/" + std::to_string(powerProduced) + _(" kW");
-        // The lightning of the game next to the figures; it blinks while the power is short
+
         if (!hasDeficit || PowerIconBlinkOn())
         {
-            const int textWidth = fontRenderer.GetTextWidth(powerText, ui::FONT_SMALL_BOLD);
-            renderer.DrawRawSpriteScreen(
-                PowerIconSprite(),
-                resourcesRect.Right() - padding - textWidth - scalePx(26),
-                resourcesRect.y + scalePx(2),
-                layout.u);
+            renderer.DrawRawSpriteScreen(PowerIconSprite(), powerLeft, resourcesRect.y + scalePx(3), layout.u);
         }
         fontRenderer.DrawString(
             powerText,
-            resourcesRect.Right() - padding,
-            resourcesRect.y + scalePx(5),
+            powerRight,
+            resourcesRect.y + scalePx(6),
             ui::FONT_SMALL_BOLD,
             powerColor,
-            false,
+            true,
             Anchor::RIGHT | Anchor::TOP);
-        ui::DrawProgressBar(
-            renderer,
-            {resourcesRect.x + scalePx(6),
-             resourcesRect.Bottom() - scalePx(4) - barHeight,
-             resourcesRect.w - scalePx(12),
-             barHeight},
-            static_cast<float>(powerConsumed) / static_cast<float>(std::max(1, powerProduced)),
-            powerColor);
+
+        const int barY = resourcesRect.Bottom() - scalePx(7) - barHeight;
+        renderer.FillRectScreen(powerLeft, barY, powerW, barHeight, {8, 11, 16, 220});
+        const float ratio = std::clamp(
+            static_cast<float>(powerConsumed) / static_cast<float>(std::max(1, powerProduced)), 0.0f, 1.0f);
+        const int innerW = std::max(0, powerW - 2);
+        const int fillW = static_cast<int>(std::lround(innerW * ratio));
+        if (fillW > 0 && barHeight > 2)
+        {
+            renderer.FillRectScreen(powerLeft + 1, barY + 1, fillW, barHeight - 2, powerColor);
+            renderer.FillRectScreen(powerLeft + 1, barY + 1, fillW, 1, {255, 255, 255, 60});
+        }
+        renderer.DrawRectScreen(powerLeft, barY, powerW, barHeight, {160, 172, 190, 95});
     }
 
     // The radar (no zoom buttons: a tap puts the camera there)
@@ -759,15 +844,19 @@ void TouchHUD::RenderGameHud(
         const int tab = m_panel == Panel::Build ? static_cast<int>(TabBuild) : m_unitTab;
         const int scrollSlot = m_panel == Panel::Build ? 0 : (m_unitTab == TabInfantry ? 1 : 2);
         const float maxStart = MaxCardScroll(layout, tab);
-        m_scroll[scrollSlot] = std::clamp(m_scroll[scrollSlot], 0.0f, maxStart);
+        m_cardScroll[scrollSlot].offset = std::clamp(m_cardScroll[scrollSlot].offset, 0.0f, maxStart);
+        m_cardScroll[scrollSlot].target = std::clamp(m_cardScroll[scrollSlot].target, 0.0f, maxStart);
         const int firstIndex = FirstCard(layout, scrollSlot);
         const bool missingHq = !entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true);
         const bool hasBarracks = entities.HasBuildingType(UnitType::Barracks, Players::Local());
         const bool hasFactory = entities.HasBuildingType(UnitType::Factory, Players::Local());
         const bool softClip = renderer.BeginClipTarget(
-            {layout.cards.x, layout.cards.y, layout.cards.w, layout.cards.h}, {10, 13, 18, 255});
+            {layout.cards.x, layout.cards.y, layout.cards.w, layout.cards.h}, {12, 16, 22, 200});
         if (!softClip)
+        {
+            renderer.FillRectScreen(layout.cards.x, layout.cards.y, layout.cards.w, layout.cards.h, {12, 16, 22, 200});
             renderer.SetClipRect({layout.cards.x, layout.cards.y, layout.cards.w, layout.cards.h});
+        }
         for (int cardSlot = 0; cardSlot < layout.cardsFit; ++cardSlot)
         {
             const int itemIndex = ItemAt(tab, firstIndex + cardSlot);
@@ -854,9 +943,10 @@ void TouchHUD::RenderGameHud(
             }
         }
         if (softClip)
-            renderer.EndClipTarget(200);
+            renderer.EndClipTarget(255);
         else
             renderer.ResetClipRect();
+        renderer.DrawRectScreen(layout.cards.x, layout.cards.y, layout.cards.w, layout.cards.h, {160, 172, 190, 145});
         const int count = ItemCountForTab(tab);
         if (count == 0)
             fontRenderer.DrawString(
@@ -870,18 +960,81 @@ void TouchHUD::RenderGameHud(
     }
 
     // Buttons
+    // Buttons: solid semi-transparent plates with centered opaque icons tinted in the local army's color
     for (const Button &button : layout.buttons)
     {
-        ui::DrawButton(
-            renderer,
-            fontRenderer,
-            button.r,
-            button.label,
-            button.active ? ui::ButtonStyle::Primary : button.style,
-            button.r.Contains(mouseX, mouseY),
-            !button.disabled,
-            ui::ButtonFontForScale(button.fontScale),
-            200);
+        const ui::ButtonStyle style = button.active ? ui::ButtonStyle::Primary : button.style;
+        const bool hovered = button.r.Contains(mouseX, mouseY);
+        if (hovered && !button.disabled)
+            SoundRequests::MarkHover();
+
+        SDL_Color fill {12, 16, 22, 155};
+        SDL_Color border {160, 172, 190, 145};
+        if (button.disabled)
+        {
+            fill = {10, 13, 18, 105};
+            border = {84, 92, 104, 115};
+        }
+        else if (style == ui::ButtonStyle::Danger)
+        {
+            const bool armed = (button.act == Act::Sell && m_destroyArmed > 0.0f);
+            fill = (armed || hovered) ? SDL_Color {104, 24, 24, 190} : SDL_Color {62, 16, 16, 165};
+            border = (armed || hovered) ? SDL_Color {245, 96, 84, 235} : SDL_Color {210, 72, 62, 200};
+        }
+        else if (style == ui::ButtonStyle::Primary)
+        {
+            fill = ui::WithAlpha(ui::Mix(armyColor, SDL_Color {12, 16, 22, 255}, hovered ? 0.62f : 0.72f), 190);
+            border = ui::WithAlpha(ui::Mix(armyColor, col::White, hovered ? 0.25f : 0.0f), 235);
+        }
+        else if (hovered)
+        {
+            fill = {24, 30, 40, 180};
+            border = ui::WithAlpha(armyColor, 210);
+        }
+
+        renderer.FillRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, fill);
+        renderer.DrawRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, border);
+        if (!button.disabled && button.active && button.r.h > 4)
+            renderer.FillRectScreen(
+                button.r.x + 1, button.r.Bottom() - 3, std::max(0, button.r.w - 2), 2, ui::WithAlpha(armyColor, 245));
+
+        const Act iconAct = (button.act == Act::Sell && m_destroyArmed > 0.0f) ? Act::Confirm : button.act;
+        const int iconId = IconSpriteForAction(iconAct);
+        if (iconId < 0)
+        {
+            const std::string shown = ui::FitText(
+                fontRenderer,
+                button.label,
+                ui::ButtonFontForScale(button.fontScale),
+                std::max(16, button.r.w - scalePx(8)));
+            fontRenderer.DrawString(
+                shown,
+                button.r.CenterX(),
+                button.r.CenterY(),
+                ui::ButtonFontForScale(button.fontScale),
+                button.disabled ? col::TextMuted : ui::WithAlpha(armyColor, 255),
+                false,
+                Anchor::HCENTER | Anchor::VCENTER);
+            continue;
+        }
+
+        SDL_Color iconTint = button.disabled ? ui::Mix(armyColor, SDL_Color {50, 54, 64, 255}, 0.58f) : armyColor;
+        iconTint.a = 255;
+        const int iconSz = std::max(16, static_cast<int>(std::lround(std::min(button.r.w, button.r.h) * 0.60f)));
+        renderer.DrawSpritePartScreen(
+            iconId,
+            {static_cast<float>(button.r.CenterX() - iconSz / 2),
+             static_cast<float>(button.r.CenterY() - iconSz / 2),
+             static_cast<float>(iconSz),
+             static_cast<float>(iconSz)},
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            SDL_FLIP_NONE,
+            Faction::Resistance,
+            255,
+            iconTint);
     }
 
     // What is selected, over the orders (or above the open cards drawer so it never overlaps)
@@ -898,13 +1051,14 @@ void TouchHUD::RenderGameHud(
         notice = _("TAP THE TARGET: ATTACK-MOVE");
     if (notice.empty() && m_placing)
         notice = _("TAP A LOCATION, THEN TAP THE BUILDING");
+    if (notice.empty() && !hasCombat && m_lastHasProducer && !m_statsOpen && !IsResearchWindowOpen())
+        notice = _("TAP MAP: SET RALLY POINT");
     if (!notice.empty())
     {
         const int maxWidth = std::max(120, windowWidth - scalePx(16));
         const int noticeWidth = std::min(maxWidth, fontRenderer.GetTextWidth(notice, ui::FONT_BODY_BOLD) + scalePx(24));
         const UiRect noticeRect {windowWidth / 2 - noticeWidth / 2, layout.notice.y, noticeWidth, layout.notice.h};
-        renderer.FillRectScreen(noticeRect.x, noticeRect.y, noticeRect.w, noticeRect.h, {10, 13, 18, 220});
-        renderer.DrawRectScreen(noticeRect.x, noticeRect.y, noticeRect.w, noticeRect.h, col::Accent);
+        ui::DrawPanel(renderer, noticeRect, {10, 13, 18, 220}, col::Accent);
         fontRenderer.DrawString(
             ui::FitText(fontRenderer, notice, ui::FONT_BODY_BOLD, std::max(40, noticeWidth - scalePx(16))),
             noticeRect.CenterX(),

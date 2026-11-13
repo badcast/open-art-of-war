@@ -2,7 +2,7 @@
 
 #include "game/EntityManager.hpp"
 #include <SDL3/SDL.h>
-#include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -45,7 +45,7 @@ struct NightConfig
     float buildingUnderConstruction {0.0f}; // times the light of a building not yet finished
 
     // Reads the file (missing values keep their defaults); false: not found / not readable
-    bool Load(const std::string &path);
+    bool Load(std::string_view path);
 };
 
 // The night of a match: a light map the size of the view (a fraction of it), filled with the night's colour, with a

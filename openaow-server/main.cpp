@@ -44,7 +44,7 @@ struct Log
     Level level {Level::Info};
     std::ofstream file;
 
-    void write(Level l, const std::string &text)
+    void write(Level l, std::string_view text)
     {
         if (l < level)
             return;
@@ -52,7 +52,7 @@ struct Log
         char stamp[32];
         const std::time_t now = std::time(nullptr);
         std::strftime(stamp, sizeof stamp, "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-        const std::string line = std::string(stamp) + " [" + kNames[static_cast<int>(l)] + "] " + text;
+        const std::string line = std::string(stamp) + " [" + kNames[static_cast<int>(l)] + "] " + std::string(text);
         (l >= Level::Warn ? std::cerr : std::cout) << line << std::endl;
         if (file.is_open())
             file << line << std::endl;

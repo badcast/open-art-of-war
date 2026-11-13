@@ -105,7 +105,7 @@ void ReadList(const YAML::Node &node, std::set<std::string> &out)
             out.insert(v.as<std::string>());
 }
 
-const Level *FindLevel(const std::string &name)
+const Level *FindLevel(std::string_view name)
 {
     for (const Level &l : Current().levels)
         if (l.name == name)
@@ -120,7 +120,7 @@ const std::vector<std::string> &Levels()
     return Current().names;
 }
 
-int LevelIndex(const std::string &name)
+int LevelIndex(std::string_view name)
 {
     const auto &names = Levels();
     for (std::size_t i = 0; i < names.size(); ++i)
@@ -134,7 +134,7 @@ const std::string &DefaultLevel()
     return Current().defaultLevel;
 }
 
-std::string ResolveLevel(int matchLevel, int slotLevel, const std::string &preset)
+std::string ResolveLevel(int matchLevel, int slotLevel, std::string_view preset)
 {
     const auto &names = Levels();
     if (slotLevel >= 0 && slotLevel < static_cast<int>(names.size()))
@@ -144,13 +144,13 @@ std::string ResolveLevel(int matchLevel, int slotLevel, const std::string &prese
     if (!preset.empty())
     {
         if (LevelIndex(preset) >= 0)
-            return preset;
+            return std::string(preset);
         std::cerr << "[Capabilities] the map names an unknown level '" << preset << "'" << std::endl;
     }
     return DefaultLevel();
 }
 
-void ApplyLevels(int matchLevel, const std::string &preset, const EntityManager &entities)
+void ApplyLevels(int matchLevel, std::string_view preset, const EntityManager &entities)
 {
     ResetLevels();
     for (int p = 0; p < kMaxPlayers; ++p)
@@ -161,7 +161,7 @@ void ApplyLevels(int matchLevel, const std::string &preset, const EntityManager 
     }
 }
 
-void SetPlayerLevel(PlayerId player, const std::string &level, const EntityManager &entities)
+void SetPlayerLevel(PlayerId player, std::string_view level, const EntityManager &entities)
 {
     if (player >= kMaxPlayers)
         return;
@@ -262,12 +262,12 @@ bool AllowsResearch(PlayerId player, int index)
            && PlayerTable()[player].researches.test(static_cast<std::size_t>(index));
 }
 
-bool LoadText(const std::string &yamlText)
+bool LoadText(std::string_view yamlText)
 {
     Table t;
     try
     {
-        const YAML::Node root = YAML::Load(yamlText);
+        const YAML::Node root = YAML::Load(std::string(yamlText));
         if (!root || !root.IsMap())
             return false;
         for (const auto &entry : root)

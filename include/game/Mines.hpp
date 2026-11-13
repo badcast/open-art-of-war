@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -40,7 +41,7 @@ const std::vector<MineSpec> &Specs();
 // Reads the file again (a game started, the data of a network host arrived)
 void Reload();
 // Reads the text of a mines.yaml over the built-in defaults; false when it is not valid
-bool Apply(const std::string &yamlText);
+bool Apply(std::string_view yamlText);
 } // namespace Mines
 
 } // namespace OpenArtOfWar

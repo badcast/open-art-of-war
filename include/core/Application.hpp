@@ -6,6 +6,7 @@
 #include "core/EnvironmentConfig.hpp"
 #include "core/FrameContext.hpp"
 #include "ui/MapPreview.hpp"
+#include "ui/UiKit.hpp"
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
 #include "graphics/CameraShake.hpp"
@@ -16,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct SDL_Window;
@@ -84,7 +86,7 @@ public:
     }
     // Opens a recorded network game (.awr) and plays it back; false (with the reason on the replay screen) when it
     // cannot be played
-    bool OpenReplay(const std::string &path);
+    bool OpenReplay(std::string_view path);
     void LaunchTestMap();
     // The touch interface (TouchHUD) instead of the desktop sidebar: the default on touch devices, --touch-ui elsewhere
     void SetTouchUi(bool on)
@@ -93,16 +95,16 @@ public:
     }
     // Single-player game on a map straight from the command line (--map=<name|path>, --from-scratch):
     // the same start as a custom game picked in the menu. False when the map is unknown or fails to load.
-    bool LaunchMap(const std::string &nameOrPath, bool fromScratch);
+    bool LaunchMap(std::string_view nameOrPath, bool fromScratch);
 
     const Settings &settings() const
     {
         return m_settings;
     }
     // Before init: render API from the command line (one-off, not stored)
-    void SetRendererOverride(const std::string &name)
+    void SetRendererOverride(std::string_view name)
     {
-        m_rendererOverride = name;
+        m_rendererOverride.assign(name);
     }
     // Before init: self-test run, the renderer is whatever SDL picks (no probing, no config changes)
     void SetHeadless(bool headless)
@@ -117,19 +119,19 @@ public:
     // Network game from the command line (until the lobby screen exists): host on `port` and start the
     // match on `mapPath` once `players` have joined, or join address:port
     void HostNetworkGame(
-        std::uint16_t port, int players, const std::string &mapPath, const std::string &name, bool fromScratch = false);
-    void JoinNetworkGame(const std::string &address, std::uint16_t port, const std::string &name);
+        std::uint16_t port, int players, std::string_view mapPath, std::string_view name, bool fromScratch = false);
+    void JoinNetworkGame(std::string_view address, std::uint16_t port, std::string_view name);
     // The hosted game is listed on the server (reachable by its code through NAT hole punching)
-    void AnnounceNetworkGame(const std::string &server, std::uint16_t port);
+    void AnnounceNetworkGame(std::string_view server, std::uint16_t port);
     // Through a dedicated server (host:port): create a room (code empty) or join the room with `code`;
     // `players` / `mapPath` as for hostNetworkGame (the creator owns the room)
     void ServerNetworkGame(
-        const std::string &server,
+        std::string_view server,
         std::uint16_t port,
-        const std::string &code,
+        std::string_view code,
         int players,
-        const std::string &mapPath,
-        const std::string &name,
+        std::string_view mapPath,
+        std::string_view name,
         bool fromScratch = false);
     // Applies the options of one area to the running game and stores them in settings.json
     void ApplySettings(SettingsArea area);
@@ -181,7 +183,7 @@ private:
     // Network match: notices who drops out / comes back / leaves (from the room's roster)
     void TrackNetPlayers(std::uint32_t nowMs);
     // Short messages over the battlefield ("Player X has disconnected"), they fade after a few seconds
-    void PushNotice(const std::string &text, std::uint32_t nowMs);
+    void PushNotice(std::string_view text, std::uint32_t nowMs);
     void RenderNotices();
     // In-game chat of a network match: Enter opens the input line, Enter sends, Esc closes
     void UpdateGameChat(std::uint32_t nowMs);
@@ -198,13 +200,13 @@ private:
     AppState m_soundState {AppState::SplashLogo};       // the state the last updateSounds saw
     // Draws the loading screen right now (for work that blocks the main loop: start-up, loading a match); the window
     // stays alive. `progress` 0..1, negative for an unknown length. Nothing in headless mode.
-    void ShowLoading(const std::string &status, float progress);
+    void ShowLoading(std::string_view status, float progress);
     // A map is being loaded: the loading screen with the map's picture stays up for at least three seconds, so it can
     // be read (begin before the work, end after it)
-    void BeginMapLoading(const std::string &title, const std::string &mapPath);
+    void BeginMapLoading(std::string_view title, std::string_view mapPath);
     void EndMapLoading();
     void DrawLoadingFrame(
-        const std::string &title, const std::string &status, float progress, SDL_Texture *preview, int pw, int ph);
+        std::string_view title, std::string_view status, float progress, SDL_Texture *preview, int pw, int ph);
     // Render API chosen in the settings: rebuild the window now, confirm or go back after the restart
     void SwitchRenderApi();
     void RequestRestart();
@@ -219,6 +221,7 @@ private:
     SDL_Texture *m_mapLoadTexture {nullptr};
     int m_mapLoadW {0}, m_mapLoadH {0};
     bool m_debugMode {false};
+    bool m_scoreboardOpen {false};
     AppState m_state {AppState::SplashLogo};
     // Fade of the main menu out of black (RenderMenuFade)
     static constexpr std::uint64_t kMenuFadeMs = 2000;
@@ -290,13 +293,12 @@ private:
         float lastCamX {0.0f}, lastCamY {0.0f}, lastCamZoom {0.0f};
         bool cameraSet {false};
         bool interfaceSound {false}; // "Voice the interface": off at the start of every replay, the interface is silent
-        int comboOpen {-1};          // the view combobox: -1 closed, else it is open
-        int comboScroll {0};
-        bool stats {false};         // the table of every player is shown
-    } m_replayUi;                   // also the bar of a custom match watched without playing (m_spectating)
-    bool m_modsMenuFresh {false};   // the mods screen looked for the mods since it opened
-    bool m_replayMenuFresh {false}; // the list of the open replay screen was read since the screen opened
-    std::string m_pendingReplay;    // a file dropped on the window / given on the command line, opened when possible
+        ui::ComboState combo;        // the view combobox (smooth kinetic scroll state)
+        bool stats {false};          // the table of every player is shown
+    } m_replayUi;                    // also the bar of a custom match watched without playing (m_spectating)
+    bool m_modsMenuFresh {false};    // the mods screen looked for the mods since it opened
+    bool m_replayMenuFresh {false};  // the list of the open replay screen was read since the screen opened
+    std::string m_pendingReplay;     // a file dropped on the window / given on the command line, opened when possible
     bool StartReplay(int watchSlot);
     void CloseReplay();
     void ReplayWatch(int slot);
@@ -325,7 +327,7 @@ private:
     float m_localViewX {-1e9f}, m_localViewY {-1e9f}, m_localViewZoom {0.0f};
     void UpdateLocalReplay(); // starts / ends the recording with the match
     void LocalTickRan(std::uint32_t tick);
-    void FinishLocalReplay(const std::string &outcome);
+    void FinishLocalReplay(std::string_view outcome);
     // The observer of a replay sees the whole map (drawing only: the simulation's fog is part of the match)
     bool ReplayShowsAll() const
     {

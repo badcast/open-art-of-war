@@ -249,7 +249,7 @@ CharacterEditor::~CharacterEditor()
 
 void CharacterEditor::SortCatalogFiles()
 {
-    auto factionRank = [](const std::string &f) -> int {
+    auto factionRank = [](std::string_view f) -> int {
         switch (OpenArtOfWar::Utility::ParseFaction(f, OpenArtOfWar::Faction::Neutral))
         {
             case OpenArtOfWar::Faction::Confederation:
@@ -260,7 +260,7 @@ void CharacterEditor::SortCatalogFiles()
                 return 2;
         }
     };
-    auto typeRank = [](const std::string &t) -> int {
+    auto typeRank = [](std::string_view t) -> int {
         if (t == "unit")
             return 0;
         if (t == "building")
@@ -508,9 +508,11 @@ YAML::Node CharacterEditor::Section(const char *name)
 }
 
 bool CharacterEditor::EditString(
-    YAML::Node parent, const char *key, const char *label, const std::string &scope, bool multiline)
+    YAML::Node parent, const char *key, const char *label, std::string_view scope, bool multiline)
 {
-    const std::string bufferKey = scope + "/" + key;
+    std::string bufferKey(scope);
+    bufferKey += '/';
+    bufferKey += key;
     auto found = textBuffers.find(bufferKey);
     if (found == textBuffers.end())
     {

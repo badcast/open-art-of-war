@@ -11,8 +11,10 @@
 #include "graphics/ShaderEffects.hpp"
 #include "game/Sides.hpp"
 #include "ui/UiKit.hpp"
+#include "ui/UiLayout.hpp"
 #include "core/Localization.hpp"
 #include "graphics/Renderer.hpp"
+#include "graphics/SpriteRegistry.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/TextureManager.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
@@ -44,20 +46,24 @@ namespace col = ui::color;
 namespace menu_detail
 {
 
-// Music player in the bottom left corner: previous, track name, next; the main menu adds a seek bar with the time above
+// Music player centered at the bottom: previous, track name, next; the main menu adds a seek bar with the time above
 struct PlayerLayout
 {
     UiRect panel, prev, next, name, seek;
 };
 
-inline PlayerLayout playerLayout(int windowH)
+inline PlayerLayout playerLayout(int windowW, int windowH)
 {
     PlayerLayout l;
-    l.panel = {24, windowH - 24 - 40, 340, 40};
-    l.prev = {l.panel.x, l.panel.y, 40, 40};
-    l.next = {l.panel.Right() - 40, l.panel.y, 40, 40};
-    l.name = {l.prev.Right() + 8, l.panel.y, l.panel.w - 2 * 40 - 16, 40};
-    l.seek = {l.panel.x, l.panel.y - 30, l.panel.w, 22};
+    const bool touch = uilayout::MenuProfile(uilayout::Current(), "main_menu") == "touch";
+    const int btnSz = touch ? 80 : 40;
+    const int w = std::min(windowW - 48, touch ? 440 : 340);
+    const int x = std::max(24, (windowW - w) / 2);
+    l.panel = {x, windowH - (touch ? 20 : 24) - btnSz, w, btnSz};
+    l.prev = {l.panel.x, l.panel.y, btnSz, btnSz};
+    l.next = {l.panel.Right() - btnSz, l.panel.y, btnSz, btnSz};
+    l.name = {l.prev.Right() + 8, l.panel.y, l.panel.w - 2 * btnSz - 16, btnSz};
+    l.seek = {l.panel.x, l.panel.y - (touch ? 34 : 30), l.panel.w, touch ? 26 : 22};
     return l;
 }
 
@@ -95,12 +101,13 @@ inline bool UpdateMusicPlayer(
     bool down,
     int mx,
     int my,
+    int windowW,
     int windowH,
     bool withSeek,
     SoundEngine &sound,
     int &drag)
 {
-    const PlayerLayout l = playerLayout(windowH);
+    const PlayerLayout l = playerLayout(windowW, windowH);
     if (drag == 3)
     {
         if (!down)
@@ -145,24 +152,66 @@ inline void RenderMusicPlayer(
     Renderer &renderer,
     BitmapFontRenderer &fontRenderer,
     const SoundEngine &sound,
+    int windowW,
     int windowH,
     bool withSeek,
     int mx,
     int my)
 {
-    const PlayerLayout l = playerLayout(windowH);
+    static const CachedSprite sPrevSprite("ui_music_player.prev", SpriteKind::Frame);
+    static const CachedSprite sNextSprite("ui_music_player.next", SpriteKind::Frame);
+    static const CachedSprite sNoteSprite("ui_music_player.note", SpriteKind::Frame);
+
+    const PlayerLayout l = playerLayout(windowW, windowH);
+    const bool touch = l.prev.h >= 72;
     renderer.FillRectScreen(l.name.x, l.name.y, l.name.w, l.name.h, col::PanelSunken);
     renderer.DrawRectScreen(l.name.x, l.name.y, l.name.w, l.name.h, col::Border);
+
+    const int noteId = sNoteSprite.Get();
+    int textLeft = l.name.x + 8;
+    if (noteId >= 0)
+    {
+        const int noteSz = touch ? 30 : 20;
+        renderer.DrawSpritePartScreen(
+            noteId,
+            {static_cast<float>(l.name.x + 8),
+             static_cast<float>(l.name.CenterY() - noteSz / 2),
+             static_cast<float>(noteSz),
+             static_cast<float>(noteSz)});
+        textLeft = l.name.x + 8 + noteSz + 6;
+    }
+    const int textFont = touch ? ui::FONT_BODY : ui::FONT_SMALL;
+    const int textW = std::max(20, l.name.Right() - 8 - textLeft);
     fontRenderer.DrawString(
-        ui::FitText(fontRenderer, sound.GetCurrentTrackName(), ui::FONT_SMALL, l.name.w - 16),
-        l.name.CenterX(),
+        ui::FitText(fontRenderer, sound.GetCurrentTrackName(), textFont, textW),
+        textLeft + textW / 2,
         l.name.CenterY(),
-        ui::FONT_SMALL,
+        textFont,
         col::TextDim,
         false,
         Anchor::HCENTER | Anchor::VCENTER);
-    ui::DrawButton(renderer, fontRenderer, l.prev, "<", ui::ButtonStyle::Secondary, l.prev.Contains(mx, my));
-    ui::DrawButton(renderer, fontRenderer, l.next, ">", ui::ButtonStyle::Secondary, l.next.Contains(mx, my));
+
+    auto drawIconBtn = [&](const UiRect &btn, int spriteId, const char *fallback) {
+        ui::DrawButton(
+            renderer,
+            fontRenderer,
+            btn,
+            spriteId >= 0 ? "" : fallback,
+            ui::ButtonStyle::Secondary,
+            btn.Contains(mx, my));
+        if (spriteId >= 0)
+        {
+            const int iconSz = touch ? 44 : 22;
+            renderer.DrawSpritePartScreen(
+                spriteId,
+                {static_cast<float>(btn.CenterX() - iconSz / 2),
+                 static_cast<float>(btn.CenterY() - iconSz / 2),
+                 static_cast<float>(iconSz),
+                 static_cast<float>(iconSz)});
+        }
+    };
+    drawIconBtn(l.prev, sPrevSprite.Get(), "<");
+    drawIconBtn(l.next, sNextSprite.Get(), ">");
     if (!withSeek)
         return;
 
@@ -170,16 +219,21 @@ inline void RenderMusicPlayer(
     const double ratio = length > 0.0 ? std::clamp(sound.GetTrackPosition() / length, 0.0, 1.0) : 0.0;
     const std::string elapsed = FormatTime(sound.GetTrackPosition());
     const std::string total = FormatTime(length);
-    const int labelW = 44;
+    const int labelW = touch ? 52 : 44;
     const int barX = l.seek.x + labelW, barW = l.seek.w - 2 * labelW;
-    const int barY = l.seek.CenterY() - 2;
+    const int barH = touch ? 6 : 4;
+    const int barY = l.seek.CenterY() - barH / 2;
+    const int timeFont = touch ? ui::FONT_SMALL_BOLD : ui::FONT_SMALL;
     fontRenderer.DrawString(
-        elapsed, l.seek.x, l.seek.CenterY(), ui::FONT_SMALL, col::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
+        elapsed, l.seek.x, l.seek.CenterY(), timeFont, col::TextDim, false, Anchor::LEFT | Anchor::VCENTER);
     fontRenderer.DrawString(
-        total, l.seek.Right(), l.seek.CenterY(), ui::FONT_SMALL, col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
-    renderer.FillRectScreen(barX, barY, barW, 4, col::PanelSunken);
-    renderer.FillRectScreen(barX, barY, static_cast<int>(barW * ratio), 4, col::Accent);
-    renderer.FillRectScreen(barX + static_cast<int>(barW * ratio) - 3, l.seek.CenterY() - 7, 6, 14, col::Text);
+        total, l.seek.Right(), l.seek.CenterY(), timeFont, col::TextDim, false, Anchor::RIGHT | Anchor::VCENTER);
+    renderer.FillRectScreen(barX, barY, barW, barH, col::PanelSunken);
+    renderer.FillRectScreen(barX, barY, static_cast<int>(barW * ratio), barH, col::Accent);
+    const int knobW = touch ? 10 : 6;
+    const int knobH = touch ? 22 : 14;
+    renderer.FillRectScreen(
+        barX + static_cast<int>(barW * ratio) - knobW / 2, l.seek.CenterY() - knobH / 2, knobW, knobH, col::Text);
 }
 
 inline UiRect DialogFooterButton(const UiRect &dialog, int w = 200)
@@ -210,8 +264,8 @@ inline int DrawTextSection(
     int x,
     int y,
     int w,
-    const std::string &caption,
-    const std::string &body,
+    std::string_view caption,
+    std::string_view body,
     SDL_Color bodyColor,
     int bodyScale)
 {

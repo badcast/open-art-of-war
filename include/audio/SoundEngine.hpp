@@ -9,6 +9,7 @@
 #include <SDL3/SDL.h>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct stb_vorbis;
@@ -29,7 +30,7 @@ public:
 
     bool Init();
     void Update(bool inMainMenu, bool inGame, bool preserveMusic = false);
-    bool PlayNamedLoop(const std::string &name);
+    bool PlayNamedLoop(std::string_view name);
     void PlayMenuMusic();
     void PlayRandomGameTrack();
     void StopMusic();
@@ -58,19 +59,19 @@ public:
         return m_sfx;
     }
     // An event heard as is (interface, announcer-free alerts); `gain` 0..1, `pan` -1..1
-    void PlaySfx(const std::string &event, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
+    void PlaySfx(std::string_view event, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
     // The sounds of the game itself, by constant (SoundIds.hpp)
     void PlaySfx(WorldSfx sound, float gain = 1.0f, float pan = 0.0f, float muffle = 0.0f);
     const SfxMixer::EventConfig *SfxConfig(WorldSfx sound) const;
     // An event by name with clips to play (null: unknown, or no clip of it was found)
-    const SfxMixer::EventConfig *SfxConfig(const std::string &event) const;
+    const SfxMixer::EventConfig *SfxConfig(std::string_view event) const;
     void Announce(Announcement line);
     void PlayVoice(UnitReply reply, bool infantry);
     // Voices (VoiceManager, the game's language): an announcer line (queued, one at a time) and a unit reply
-    void Announce(const std::string &event);
-    void PlayVoice(const std::string &event);
+    void Announce(std::string_view event);
+    void PlayVoice(std::string_view event);
     // The language of the voices (the game's language; lines missing in it are English)
-    void SetVoiceLanguage(const std::string &language);
+    void SetVoiceLanguage(std::string_view language);
     VoiceManager &Voices()
     {
         return m_voices;

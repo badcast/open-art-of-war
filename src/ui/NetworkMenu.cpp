@@ -196,8 +196,8 @@ void DrawField(
     Renderer &renderer,
     BitmapFontRenderer &font,
     const UiRect &rect,
-    const std::string &text,
-    const std::string &placeholder,
+    std::string_view text,
+    std::string_view placeholder,
     bool focused)
 {
     ui::DrawPanel(renderer, rect, col::PanelSunken, focused ? col::Accent : col::Border);
@@ -232,6 +232,9 @@ void NetworkMenu::Reset()
     m_optionsSent = false;
     m_focus = Field::None;
     m_combo = ui::ComboState {};
+    m_mapScroll.Reset();
+    m_lanScroll.Reset();
+    m_serverScroll.Reset();
     m_confirm.open = false;
     m_chatLog.clear();
     m_chatInput.clear();
@@ -246,7 +249,7 @@ NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int windowW, int windowH) 
     BrowserLayout layout;
     const bool isLan = m_tab == Tab::Lan;
     const uilayout::Solved solved
-        = uilayout::Current().Solve("network", "pc", windowW, windowH, [isLan](const std::string &name) {
+        = uilayout::Current().Solve("network", "pc", windowW, windowH, [isLan](std::string_view name) {
               return name == (isLan ? "tab_lan" : "tab_internet");
           });
     layout.dialog = solved.Rect("dialog");
@@ -311,8 +314,8 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int windowW, int windowH)
     const int leftWidth = std::clamp(static_cast<int>(layout.dialog.w * 0.30f), 330, 480);
     // Left: search and filters, the list of maps, the chat
     const int chatHeight = std::max(170, static_cast<int>(columnH * 0.36f));
-    layout.mapSearch = {contentX, contentY, leftWidth, 30};
-    layout.mapList = {contentX, contentY + 72, leftWidth, columnH - 72 - chatHeight - 10};
+    layout.mapSearch = {contentX, contentY, leftWidth, 36};
+    layout.mapList = {contentX, contentY + 82, leftWidth, columnH - 82 - chatHeight - 10};
     layout.chatField = {contentX, contentY + columnH - 36, leftWidth - 52, 36};
     layout.chatSend = {layout.chatField.Right() + 8, layout.chatField.y, 44, 36};
     layout.chatLog
@@ -323,7 +326,7 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int windowW, int windowH)
     const ui::UiRect &detailsRect = layout.details;
     // The seat table takes the whole width of the details (its cells share it); the map picture sits under it on the
     // left, the options and the hint on its right
-    const int rowHeight = std::clamp((detailsRect.h - 74 - 24 - 150 - 30) / 8, 30, 40);
+    const int rowHeight = std::clamp((detailsRect.h - 74 - 24 - 150 - 30) / 8, 34, 44);
     layout.rowH = rowHeight;
     layout.players = {detailsRect.x + 20, detailsRect.y + 74, detailsRect.w - 40, 24 + 8 * rowHeight};
     const int belowHeight = detailsRect.Bottom() - 16 - (layout.players.Bottom() + 12);
@@ -332,9 +335,9 @@ NetworkMenu::LobbyLayout NetworkMenu::lobbyLayout(int windowW, int windowH)
     const int optionsX = layout.map.Right() + 20;
     const int optionsW = detailsRect.Right() - 20 - optionsX;
     // Match options: the time of day and the credits next to the title, the check boxes beside the picture
-    layout.creditsBtn = {detailsRect.Right() - 20 - 200, detailsRect.y + 12, 200, 32};
-    layout.timeBtn = {layout.creditsBtn.x - 12 - 160, detailsRect.y + 12, 160, 32};
-    layout.techBtn = {layout.timeBtn.x - 12 - 180, detailsRect.y + 12, 180, 32};
+    layout.creditsBtn = {detailsRect.Right() - 20 - 200, detailsRect.y + 10, 200, 36};
+    layout.timeBtn = {layout.creditsBtn.x - 12 - 160, detailsRect.y + 10, 160, 36};
+    layout.techBtn = {layout.timeBtn.x - 12 - 180, detailsRect.y + 10, 180, 36};
     layout.fogCheckbox = {optionsX, layout.map.y, optionsW, 28};
     layout.prebuiltBtn = {optionsX, layout.map.y + 32, optionsW, 28}; // a check box: start with a base
     // Footer: Leave on the left, Ready and Start on the right - never on top of each other
@@ -349,7 +352,7 @@ void NetworkMenu::RebuildMapsShown()
     if (m_maps.empty())
         m_maps = MissionController::ListSkirmishMaps();
     m_mapsShown = m_mapFilter.Apply(m_maps);
-    m_mapTop = 0;
+    m_mapScroll.Reset();
 }
 
 void NetworkMenu::EditText(InputManager &input, std::string &text, std::size_t maxLength)
@@ -361,9 +364,9 @@ void NetworkMenu::EditText(InputManager &input, std::string &text, std::size_t m
         PopUtf8(text);
 }
 
-bool NetworkMenu::ParseAddress(const std::string &text)
+bool NetworkMenu::ParseAddress(std::string_view text)
 {
-    std::string address = text;
+    std::string address(text);
     address.erase(std::remove(address.begin(), address.end(), ' '), address.end());
     if (address.empty())
         return false;
@@ -456,7 +459,11 @@ NetworkAction NetworkMenu::UpdateBrowser(
 {
     const BrowserLayout layout = browserLayout(windowW, windowH);
     float clickX, clickY;
-    const bool clicked = input.WasLeftClickIssued(clickX, clickY);
+    bool clicked = input.WasLeftClickIssued(clickX, clickY);
+    const int wheel = input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
+    const bool down = input.IsLeftMouseDown();
     const int mouseX = m_mouseX, mouseY = m_mouseY;
 
     if (m_focus == Field::Name)
@@ -520,6 +527,42 @@ NetworkAction NetworkMenu::UpdateBrowser(
             return joinCode();
         m_focus = Field::None;
     }
+    if (m_tab == Tab::Internet)
+    {
+        const UiRect sTrack {layout.serverList.Right() - 8, layout.serverList.y + 4, 5, layout.serverList.h - 8};
+        ui::UpdateSmoothList(
+            m_serverScroll,
+            layout.serverList,
+            sTrack,
+            static_cast<int>(server.size()) * BrowserLayout::kServerRowH + 8,
+            BrowserLayout::kServerRowH * 2,
+            mouseX,
+            mouseY,
+            down,
+            pressed,
+            pressX,
+            pressY,
+            wheel,
+            clicked);
+    }
+    else
+    {
+        const UiRect lTrack {layout.list.Right() - 8, layout.list.y + 4, 5, layout.list.h - 8};
+        ui::UpdateSmoothList(
+            m_lanScroll,
+            layout.list,
+            lTrack,
+            static_cast<int>(lan.size()) * BrowserLayout::kLanRowH + 8,
+            BrowserLayout::kLanRowH * 2,
+            mouseX,
+            mouseY,
+            down,
+            pressed,
+            pressX,
+            pressY,
+            wheel,
+            clicked);
+    }
     if (!clicked)
         return NetworkAction::None;
 
@@ -550,25 +593,29 @@ NetworkAction NetworkMenu::UpdateBrowser(
         m_lanSelected = -1;
         return NetworkAction::LanRefresh;
     }
-    const int serverRows = std::max(1, (layout.serverList.h - 8) / 34);
-    for (int i = 0; m_tab == Tab::Internet && i < static_cast<int>(server.size()) && i < serverRows; ++i)
+    if (m_tab == Tab::Internet && layout.serverList.Contains(mouseX, mouseY))
     {
-        if (!layout.ServerRow(i).Contains(mouseX, mouseY))
-            continue;
-        if (i == m_serverSelected)
-            return join(); // a second click joins
-        m_serverSelected = i;
-        m_lanSelected = -1;
+        const int idx
+            = (mouseY - (layout.serverList.y + 4) + m_serverScroll.PixelOffset()) / BrowserLayout::kServerRowH;
+        if (idx >= 0 && idx < static_cast<int>(server.size())
+            && layout.ServerRow(idx, m_serverScroll.PixelOffset()).Contains(mouseX, mouseY))
+        {
+            if (idx == m_serverSelected)
+                return join(); // a second click joins
+            m_serverSelected = idx;
+            m_lanSelected = -1;
+        }
     }
     if (layout.serverBtn.Contains(mouseX, mouseY))
     {
         m_notice.clear();
         return NetworkAction::ServerCreate;
     }
-    if (layout.list.Contains(mouseX, mouseY))
+    if (m_tab == Tab::Lan && layout.list.Contains(mouseX, mouseY))
     {
-        const int row = (mouseY - layout.list.y - 4) / 40;
-        if (row >= 0 && row < static_cast<int>(lan.size()) && row < std::max(1, (layout.list.h - 8) / 40))
+        const int row = (mouseY - (layout.list.y + 4) + m_lanScroll.PixelOffset()) / BrowserLayout::kLanRowH;
+        if (row >= 0 && row < static_cast<int>(lan.size())
+            && layout.LanRow(row, m_lanScroll.PixelOffset()).Contains(mouseX, mouseY))
         {
             if (row == m_lanSelected)
                 return join(); // a second click joins
@@ -619,7 +666,11 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
     const LobbyLayout layout = lobbyLayout(windowW, windowH);
     const Net::LobbyState *lobby = net.Lobby();
     float clickX, clickY;
-    const bool clicked = input.WasLeftClickIssued(clickX, clickY);
+    bool clicked = input.WasLeftClickIssued(clickX, clickY);
+    const int wheel = input.ConsumeWheel();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && input.IsLeftMouseDown();
+    const bool down = input.IsLeftMouseDown();
     const int mouseX = m_mouseX, mouseY = m_mouseY;
 
     for (Net::Chat &chatMsg : net.TakeChat())
@@ -743,8 +794,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
                 mouseX,
                 mouseY,
                 clicked,
-                input.ConsumeWheel(),
-                picked))
+                wheel,
+                picked,
+                down,
+                pressed,
+                pressX,
+                pressY))
         {
             if (picked >= 0)
             {
@@ -795,8 +850,12 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
                     mouseX,
                     mouseY,
                     clicked,
-                    input.ConsumeWheel(),
-                    picked))
+                    wheel,
+                    picked,
+                    down,
+                    pressed,
+                    pressX,
+                    pressY))
             {
                 if (picked >= 0 && comboId == kCreditsCombo)
                 {
@@ -936,10 +995,27 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
             return NetworkAction::None;
         }
     }
-    // The wheel over the list of maps scrolls it
-    if (m_combo.open < 0 && layout.mapList.Contains(mouseX, mouseY))
-        m_mapTop = std::clamp(
-            m_mapTop - input.ConsumeWheel(), 0, std::max(0, static_cast<int>(m_mapsShown.size()) - layout.MapRows()));
+    // Smooth scrolling over the list of maps (wheel, touch drag & flick, scrollbar)
+    if (m_combo.open < 0)
+    {
+        const ui::UiRect mapTrack {layout.mapList.Right() - 6, layout.mapList.y + 2, 5, layout.mapList.h - 4};
+        ui::UpdateSmoothList(
+            m_mapScroll,
+            layout.mapList,
+            mapTrack,
+            static_cast<int>(m_mapsShown.size()) * layout.listRowH,
+            layout.listRowH * 2,
+            mouseX,
+            mouseY,
+            down,
+            pressed,
+            pressX,
+            pressY,
+            wheel,
+            clicked);
+        if (m_mapScroll.barDrag)
+            return NetworkAction::None;
+    }
     auto sendChat = [&]() {
         if (m_chatInput.empty())
             return;
@@ -1010,7 +1086,7 @@ NetworkAction NetworkMenu::UpdateLobby(InputManager &input, int windowW, int win
             return openCombo(kFilterPlayers + k);
     if (net.ControlsRoom() && layout.mapList.Contains(mouseX, mouseY))
     {
-        const int mapIdx = m_mapTop + (mouseY - layout.mapList.y) / layout.listRowH;
+        const int mapIdx = (mouseY - layout.mapList.y + m_mapScroll.PixelOffset()) / layout.listRowH;
         if (mapIdx >= 0 && mapIdx < static_cast<int>(m_mapsShown.size()))
         {
             // Only a map with a start position for everybody in the room
@@ -1098,7 +1174,7 @@ void NetworkMenu::Render(
     const Settings &settings,
     const std::vector<LanGame> &lan,
     const std::vector<LanGame> &server,
-    const std::string &serverStatus)
+    std::string_view serverStatus)
 {
     renderer.FillRectScreen(0, 0, windowW, windowH, col::Scrim);
     if (net && net->connected())
@@ -1177,7 +1253,7 @@ void NetworkMenu::Render(
                         renderer,
                         font,
                         typeCell,
-                        ui::FitText(font, typeText, ui::FONT_SMALL, typeCell.w - 36),
+                        typeText,
                         m_combo.open == i * 10,
                         typeCell.Contains(m_mouseX, m_mouseY),
                         true,
@@ -1196,7 +1272,7 @@ void NetworkMenu::Render(
                 }
                 if (!lobbySlot)
                     continue;
-                auto cell = [&](const UiRect &cellRect, const std::string &text) {
+                auto cell = [&](const UiRect &cellRect, std::string_view text) {
                     ui::DrawPanel(renderer, cellRect, col::PanelSunken, col::Border);
                     font.DrawString(
                         text,
@@ -1207,7 +1283,7 @@ void NetworkMenu::Render(
                         false,
                         Anchor::HCENTER | Anchor::VCENTER);
                 };
-                auto combo = [&](const UiRect &comboRect, int kind, const std::string &text) {
+                auto combo = [&](const UiRect &comboRect, int kind, std::string_view text) {
                     ui::DrawComboField(
                         renderer,
                         font,
@@ -1303,25 +1379,26 @@ void NetworkMenu::Render(
                     renderer,
                     font,
                     layout.Filter(k),
-                    ui::FitText(
-                        font,
-                        items[std::clamp(selectedIdx, 0, static_cast<int>(items.size()) - 1)],
-                        ui::FONT_SMALL,
-                        layout.Filter(k).w - 34),
+                    items[std::clamp(selectedIdx, 0, static_cast<int>(items.size()) - 1)],
                     m_combo.open == kFilterPlayers + k,
                     layout.Filter(k).Contains(m_mouseX, m_mouseY));
             }
             ui::DrawPanel(renderer, layout.mapList, col::PanelSunken, col::Border);
             const std::size_t inRoom = lobby ? lobby->slots.size() : 1;
-            const int rows = layout.MapRows();
-            renderer.SetClipRect({layout.mapList.x, layout.mapList.y, layout.mapList.w, layout.mapList.h});
-            for (int row = 0; row < rows && m_mapTop + row < static_cast<int>(m_mapsShown.size()); ++row)
+            const int scrollPx = m_mapScroll.PixelOffset();
+            const int contentH = static_cast<int>(m_mapsShown.size()) * layout.listRowH;
+            renderer.SetClipRect(
+                {layout.mapList.x + 1, layout.mapList.y + 1, layout.mapList.w - 2, layout.mapList.h - 2});
+            for (std::size_t idx = 0; idx < m_mapsShown.size(); ++idx)
             {
-                const SkirmishMapInfo &mapInfo = m_mapsShown[m_mapTop + row];
-                const ui::UiRect itemRect = layout.MapItem(row);
+                const SkirmishMapInfo &mapInfo = m_mapsShown[idx];
+                const ui::UiRect itemRect = layout.MapItem(static_cast<int>(idx), scrollPx);
+                if (itemRect.Bottom() < layout.mapList.y || itemRect.y > layout.mapList.Bottom())
+                    continue;
                 const bool selected = lobby && mapInfo.path == lobby->map;
                 const bool unfit = MissionController::StartPositions(mapInfo.path).size() < inRoom;
-                const bool hot = net->ControlsRoom() && itemRect.Contains(m_mouseX, m_mouseY);
+                const bool hot = net->ControlsRoom() && layout.mapList.Contains(m_mouseX, m_mouseY)
+                                 && itemRect.Contains(m_mouseX, m_mouseY);
                 renderer.FillRectScreen(
                     itemRect.x + 2,
                     itemRect.y,
@@ -1348,6 +1425,14 @@ void NetworkMenu::Render(
                     Anchor::RIGHT | Anchor::VCENTER);
             }
             renderer.ResetClipRect();
+            const ui::UiRect mapTrack {layout.mapList.Right() - 6, layout.mapList.y + 2, 5, layout.mapList.h - 4};
+            ui::DrawScrollBar(
+                renderer,
+                mapTrack,
+                static_cast<float>(scrollPx),
+                static_cast<float>(contentH),
+                static_cast<float>(layout.mapList.h),
+                ui::OnScrollTrack(mapTrack, m_mouseX, m_mouseY) || m_mapScroll.barDrag);
         }
         ui::DrawPanel(renderer, layout.map, col::PanelSunken, col::Border);
         if (lobby && !lobby->map.empty() && !net->MapReady())
@@ -1762,20 +1847,22 @@ void NetworkMenu::Render(
         ui::ButtonStyle::Secondary,
         layout.directBtn.Contains(m_mouseX, m_mouseY),
         !settings.lastAddress.empty());
-    ui::DrawButton(
+    ui::DrawTab(
         renderer,
-        font,
         layout.tabLan,
-        _("LOCAL NETWORK"),
-        m_tab == Tab::Lan ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
-        layout.tabLan.Contains(m_mouseX, m_mouseY));
-    ui::DrawButton(
+        m_tab == Tab::Lan,
+        layout.tabLan.Contains(m_mouseX, m_mouseY),
+        ui::color::Accent,
+        &font,
+        _("LOCAL NETWORK"));
+    ui::DrawTab(
         renderer,
-        font,
         layout.tabInternet,
-        _("INTERNET"),
-        m_tab == Tab::Internet ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
-        layout.tabInternet.Contains(m_mouseX, m_mouseY));
+        m_tab == Tab::Internet,
+        layout.tabInternet.Contains(m_mouseX, m_mouseY),
+        ui::color::Accent,
+        &font,
+        _("INTERNET"));
     if (m_tab == Tab::Lan)
     {
         ui::DrawCaption(font, renderer, layout.list.x, layout.refreshBtn.y + 6, _("LOCAL NETWORK"));
@@ -1798,12 +1885,22 @@ void NetworkMenu::Render(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
-        for (std::size_t i = 0; i < lan.size() && static_cast<int>(i) < std::max(1, (layout.list.h - 8) / 40); ++i)
+        const int scrollPx = m_lanScroll.PixelOffset();
+        const int contentH = static_cast<int>(lan.size()) * BrowserLayout::kLanRowH + 8;
+        const UiRect lTrack {layout.list.Right() - 8, layout.list.y + 4, 5, layout.list.h - 8};
+        renderer.SetClipRect({layout.list.x + 1, layout.list.y + 1, layout.list.w - 2, layout.list.h - 2});
+        for (std::size_t i = 0; i < lan.size(); ++i)
         {
-            const UiRect row {layout.list.x + 4, layout.list.y + 4 + static_cast<int>(i) * 40, layout.list.w - 8, 36};
+            const UiRect row = layout.LanRow(static_cast<int>(i), scrollPx);
+            if (row.Bottom() < layout.list.y || row.y > layout.list.Bottom())
+                continue;
             const bool isSelected = static_cast<int>(i) == m_lanSelected;
+            const bool hot = layout.list.Contains(m_mouseX, m_mouseY) && row.Contains(m_mouseX, m_mouseY);
             ui::DrawPanel(
-                renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
+                renderer,
+                row,
+                isSelected ? col::Hover : col::PanelRaised,
+                isSelected ? col::Accent : (hot ? col::Accent : col::Border));
             const LanGame &game = lan[i];
             font.DrawString(
                 ui::FitText(font, game.name, ui::FONT_BODY_BOLD, row.w * 26 / 100),
@@ -1840,6 +1937,14 @@ void NetworkMenu::Render(
             if (game.locked)
                 DrawLock(renderer, row.x + row.w * 62 / 100 - 28, row.CenterY() - 7, col::Accent);
         }
+        renderer.ResetClipRect();
+        ui::DrawScrollBar(
+            renderer,
+            lTrack,
+            static_cast<float>(scrollPx),
+            static_cast<float>(contentH),
+            static_cast<float>(layout.list.h),
+            ui::OnScrollTrack(lTrack, m_mouseX, m_mouseY) || m_lanScroll.barDrag);
     }
     else
     {
@@ -1848,7 +1953,7 @@ void NetworkMenu::Render(
             renderer,
             layout.serverList.x,
             layout.refreshBtn.y + 6,
-            std::string(_("SERVER")) + "  " + serverStatus);
+            std::string(_("SERVER")) + "  " + std::string(serverStatus));
         ui::DrawButton(
             renderer,
             font,
@@ -1868,13 +1973,24 @@ void NetworkMenu::Render(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
         }
-        for (int i = 0; i < static_cast<int>(server.size()) && i < std::max(1, (layout.serverList.h - 8) / 34); ++i)
+        const int scrollPx = m_serverScroll.PixelOffset();
+        const int contentH = static_cast<int>(server.size()) * BrowserLayout::kServerRowH + 8;
+        const UiRect sTrack {layout.serverList.Right() - 8, layout.serverList.y + 4, 5, layout.serverList.h - 8};
+        renderer.SetClipRect(
+            {layout.serverList.x + 1, layout.serverList.y + 1, layout.serverList.w - 2, layout.serverList.h - 2});
+        for (int i = 0; i < static_cast<int>(server.size()); ++i)
         {
-            const UiRect row = layout.ServerRow(i);
+            const UiRect row = layout.ServerRow(i, scrollPx);
+            if (row.Bottom() < layout.serverList.y || row.y > layout.serverList.Bottom())
+                continue;
             const bool isSelected = i == m_serverSelected;
+            const bool hot = layout.serverList.Contains(m_mouseX, m_mouseY) && row.Contains(m_mouseX, m_mouseY);
             const LanGame &game = server[i];
             ui::DrawPanel(
-                renderer, row, isSelected ? col::Hover : col::PanelRaised, isSelected ? col::Accent : col::Border);
+                renderer,
+                row,
+                isSelected ? col::Hover : col::PanelRaised,
+                isSelected ? col::Accent : (hot ? col::Accent : col::Border));
             font.DrawString(
                 game.code,
                 row.x + 10,
@@ -1910,6 +2026,14 @@ void NetworkMenu::Render(
             if (game.locked)
                 DrawLock(renderer, row.Right() - 56, row.CenterY() - 7, col::Accent);
         }
+        renderer.ResetClipRect();
+        ui::DrawScrollBar(
+            renderer,
+            sTrack,
+            static_cast<float>(scrollPx),
+            static_cast<float>(contentH),
+            static_cast<float>(layout.serverList.h),
+            ui::OnScrollTrack(sTrack, m_mouseX, m_mouseY) || m_serverScroll.barDrag);
         font.DrawString(
             _("Room code"),
             layout.serverList.x,

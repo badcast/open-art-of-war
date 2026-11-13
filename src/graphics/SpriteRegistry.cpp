@@ -18,7 +18,7 @@ constexpr const char *kMetaPrefix = "sprite_";
 constexpr const char *kMetaSuffix = "_meta.yaml";
 
 // Width and height from the IHDR chunk of a PNG
-bool PngSize(const std::string &path, int &w, int &h)
+bool PngSize(std::string_view path, int &w, int &h)
 {
     std::vector<std::uint8_t> bytes;
     if (!Assets::ReadBytes(path, bytes) || bytes.size() < 24 || bytes[1] != 'P' || bytes[2] != 'N' || bytes[3] != 'G'
@@ -32,12 +32,12 @@ bool PngSize(const std::string &path, int &w, int &h)
     return w > 0 && h > 0;
 }
 
-bool EndsWith(const std::string &s, const std::string &suffix)
+bool EndsWith(std::string_view s, std::string_view suffix)
 {
     return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
-SpriteKind SectionKind(const std::string &section)
+SpriteKind SectionKind(std::string_view section)
 {
     if (section == "frames")
         return SpriteKind::Frame;
@@ -110,7 +110,7 @@ bool EntryAllowed(SpriteKind container, SpriteKind target)
 }
 
 // "none" / "blue" / "red" -> 0 / 1 / 2; -1 unknown
-int ParseRecolor(const std::string &v)
+int ParseRecolor(std::string_view v)
 {
     if (v == "none")
         return 0;
@@ -122,13 +122,13 @@ int ParseRecolor(const std::string &v)
 }
 
 template <typename T>
-T Narrow(int v, const std::string &where, std::vector<std::string> &errors)
+T Narrow(int v, std::string_view where, std::vector<std::string> &errors)
 {
     constexpr int lo = static_cast<int>(std::numeric_limits<T>::min());
     constexpr int hi = static_cast<int>(std::numeric_limits<T>::max());
     if (v < lo || v > hi)
     {
-        errors.push_back(where + ": value " + std::to_string(v) + " out of range");
+        errors.push_back(std::string(where) + ": value " + std::to_string(v) + " out of range");
         v = std::clamp(v, lo, hi);
     }
     return static_cast<T>(v);
@@ -164,12 +164,12 @@ void SpriteRegistry::Clear()
     m_names.clear();
 }
 
-void SpriteRegistry::Error(const std::string &msg)
+void SpriteRegistry::Error(std::string_view msg)
 {
-    m_errors.push_back(msg);
+    m_errors.emplace_back(msg);
 }
 
-bool SpriteRegistry::LoadDirectory(const std::string &dir)
+bool SpriteRegistry::LoadDirectory(std::string_view dir)
 {
     for (const std::string &path : Assets::List(dir, ".yaml"))
     {
@@ -197,10 +197,10 @@ bool SpriteRegistry::LoadDirectory(const std::string &dir)
     return Compile();
 }
 
-void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, const std::string &dir)
+void SpriteRegistry::AddObject(std::string_view name, const YAML::Node &meta, std::string_view dir)
 {
-    const std::string where = "sprite '" + name + "'";
-    if (name.empty() || name.find('.') != std::string::npos)
+    const std::string where = "sprite '" + std::string(name) + "'";
+    if (name.empty() || name.find('.') != std::string_view::npos)
     {
         Error(where + ": an object name must be non-empty and have no '.'");
         return;
@@ -211,10 +211,10 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
         return;
     }
     Object obj;
-    obj.name = name;
-    obj.image.object = name;
-    const std::string image = meta["image"] ? meta["image"].as<std::string>() : kMetaPrefix + name + ".png";
-    obj.image.path = dir.empty() ? image : dir + "/" + image;
+    obj.name.assign(name);
+    obj.image.object = obj.name;
+    const std::string image = meta["image"] ? meta["image"].as<std::string>() : kMetaPrefix + obj.name + ".png";
+    obj.image.path = dir.empty() ? image : std::string(dir) + "/" + image;
     obj.image.scale = meta["scale"] ? meta["scale"].as<float>() : 1.0f;
     if (obj.image.scale <= 0.0f)
     {
@@ -234,7 +234,7 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
     if (meta["resistance_image"])
     {
         const std::string alt = meta["resistance_image"].as<std::string>();
-        obj.image.resistancePath = dir.empty() ? alt : dir + "/" + alt;
+        obj.image.resistancePath = dir.empty() ? alt : std::string(dir) + "/" + alt;
     }
 
     auto parseEntries = [&](SpriteKind container, const YAML::Node &list, const std::string &at, Item &item) {
@@ -436,7 +436,7 @@ void SpriteRegistry::AddObject(const std::string &name, const YAML::Node &meta, 
     m_objects.emplace(name, std::move(obj));
 }
 
-const SpriteRegistry::FamilyDef *SpriteRegistry::FindFamilyDef(const Object &obj, const std::string &name) const
+const SpriteRegistry::FamilyDef *SpriteRegistry::FindFamilyDef(const Object &obj, std::string_view name) const
 {
     for (const FamilyDef &f : obj.families)
         if (f.name == name)
@@ -445,11 +445,11 @@ const SpriteRegistry::FamilyDef *SpriteRegistry::FindFamilyDef(const Object &obj
 }
 
 const SpriteRegistry::Item *SpriteRegistry::LookupItem(
-    const std::string &fromObject, const std::string &ref, SpriteKind kind) const
+    std::string_view fromObject, std::string_view ref, SpriteKind kind) const
 {
     const auto dot = ref.find('.');
-    const std::string objName = dot == std::string::npos ? fromObject : ref.substr(0, dot);
-    const std::string itemName = dot == std::string::npos ? ref : ref.substr(dot + 1);
+    const std::string_view objName = dot == std::string_view::npos ? fromObject : ref.substr(0, dot);
+    const std::string_view itemName = dot == std::string_view::npos ? ref : ref.substr(dot + 1);
     const auto it = m_objects.find(objName);
     if (it == m_objects.end())
         return nullptr;
@@ -459,39 +459,40 @@ const SpriteRegistry::Item *SpriteRegistry::LookupItem(
 }
 
 SpriteRef SpriteRegistry::LookupRef(
-    const std::string &fromObject, const std::string &ref, SpriteKind kind, const std::string &where)
+    std::string_view fromObject, std::string_view ref, SpriteKind kind, std::string_view where)
 {
     if (const Item *item = LookupItem(fromObject, ref, kind))
         return {kind, item->handle};
     const auto dot = ref.find('.');
-    const std::string objName = dot == std::string::npos ? fromObject : ref.substr(0, dot);
+    const std::string_view objName = dot == std::string_view::npos ? fromObject : ref.substr(0, dot);
     const auto it = m_objects.find(objName);
     if (it == m_objects.end())
     {
-        Error(where + ": no sprite object '" + objName + "' (for '" + ref + "')");
+        Error(
+            std::string(where) + ": no sprite object '" + std::string(objName) + "' (for '" + std::string(ref) + "')");
         return {};
     }
-    const SpriteRef r = FamilyMember(it->second, dot == std::string::npos ? ref : ref.substr(dot + 1), kind);
+    const SpriteRef r = FamilyMember(it->second, dot == std::string_view::npos ? ref : ref.substr(dot + 1), kind);
     if (r.Valid())
         return r;
-    Error(where + ": no " + std::string(SpriteKindName(kind)) + " '" + ref + "'");
+    Error(std::string(where) + ": no " + std::string(SpriteKindName(kind)) + " '" + std::string(ref) + "'");
     return {};
 }
 
-SpriteRef SpriteRegistry::FamilyMember(const Object &obj, const std::string &name, SpriteKind kind) const
+SpriteRef SpriteRegistry::FamilyMember(const Object &obj, std::string_view name, SpriteKind kind) const
 {
     // "family" or "family[i]"
-    std::string famName = name;
+    std::string_view famName = name;
     int index = 0;
     const auto open = name.find('[');
-    if (open != std::string::npos)
+    if (open != std::string_view::npos)
     {
         if (name.back() != ']')
             return {};
         famName = name.substr(0, open);
         try
         {
-            index = std::stoi(name.substr(open + 1, name.size() - open - 2));
+            index = std::stoi(std::string(name.substr(open + 1, name.size() - open - 2)));
         }
         catch (const std::exception &)
         {
@@ -531,9 +532,10 @@ int SpriteRegistry::Allocate(SpriteKind kind)
     }
 }
 
-void SpriteRegistry::Emit(const std::string &object, const Item &item, int handle)
+void SpriteRegistry::Emit(std::string_view object, const Item &item, int handle)
 {
-    const std::string where = "sprite '" + object + "' " + SpriteKindName(item.kind) + " '" + item.name + "'";
+    const std::string where
+        = "sprite '" + std::string(object) + "' " + SpriteKindName(item.kind) + " '" + item.name + "'";
     auto &t = m_tables;
     auto childOf = [&](const Entry &e) -> std::int16_t {
         const SpriteRef r = LookupRef(object, e.ref, e.kind, where);
@@ -716,7 +718,7 @@ bool SpriteRegistry::Compile()
     return m_errors.empty();
 }
 
-bool SpriteRegistry::HasObject(const std::string &name) const
+bool SpriteRegistry::HasObject(std::string_view name) const
 {
     return m_objects.count(name) != 0;
 }
@@ -730,7 +732,7 @@ std::vector<std::string> SpriteRegistry::ObjectNames() const
     return names;
 }
 
-std::vector<std::string> SpriteRegistry::ItemNames(const std::string &object, SpriteKind kind) const
+std::vector<std::string> SpriteRegistry::ItemNames(std::string_view object, SpriteKind kind) const
 {
     std::vector<std::string> out;
     const auto it = m_objects.find(object);
@@ -741,7 +743,7 @@ std::vector<std::string> SpriteRegistry::ItemNames(const std::string &object, Sp
     return out;
 }
 
-std::vector<std::string> SpriteRegistry::FamilyNames(const std::string &object) const
+std::vector<std::string> SpriteRegistry::FamilyNames(std::string_view object) const
 {
     std::vector<std::string> out;
     const auto it = m_objects.find(object);
@@ -751,19 +753,19 @@ std::vector<std::string> SpriteRegistry::FamilyNames(const std::string &object) 
     return out;
 }
 
-int SpriteRegistry::ImageOf(const std::string &object) const
+int SpriteRegistry::ImageOf(std::string_view object) const
 {
     const auto it = m_objects.find(object);
     return it == m_objects.end() ? -1 : it->second.imageIndex;
 }
 
-SpriteRef SpriteRegistry::Resolve(const std::string &ref, SpriteKind expected) const
+SpriteRef SpriteRegistry::Resolve(std::string_view ref, SpriteKind expected) const
 {
     const auto dot = ref.find('.');
-    if (dot == std::string::npos)
+    if (dot == std::string_view::npos)
         return {};
-    const std::string objName = ref.substr(0, dot);
-    const std::string itemName = ref.substr(dot + 1);
+    const std::string_view objName = ref.substr(0, dot);
+    const std::string_view itemName = ref.substr(dot + 1);
     const auto it = m_objects.find(objName);
     if (it == m_objects.end())
         return {};
@@ -778,7 +780,7 @@ SpriteRef SpriteRegistry::Resolve(const std::string &ref, SpriteKind expected) c
     return FamilyMember(it->second, itemName, expected);
 }
 
-const SpriteFamily *SpriteRegistry::FindFamily(const std::string &object, const std::string &family) const
+const SpriteFamily *SpriteRegistry::FindFamily(std::string_view object, std::string_view family) const
 {
     const auto it = m_objects.find(object);
     if (it == m_objects.end())
@@ -851,20 +853,20 @@ int CachedSprite::Get() const
     return m_handle;
 }
 
-int SpriteHandle(const std::string &ref, SpriteKind kind, const std::string &context)
+int SpriteHandle(std::string_view ref, SpriteKind kind, std::string_view context)
 {
     if (ref.empty())
         return -1;
     const SpriteRef r = Sprites().Resolve(ref, kind);
     if (r.Valid())
         return r.handle;
-    if (g_reported.insert(context + "|" + ref).second)
-        std::cerr << "[SpriteRegistry] " << (context.empty() ? std::string() : context + ": ") << "no "
+    if (g_reported.insert(std::string(context) + "|" + std::string(ref)).second)
+        std::cerr << "[SpriteRegistry] " << (context.empty() ? std::string() : std::string(context) + ": ") << "no "
                   << SpriteKindName(kind) << " '" << ref << "'" << std::endl;
     return -1;
 }
 
-int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &context)
+int SpriteHandle(const YAML::Node &node, SpriteKind kind, std::string_view context)
 {
     if (!node || node.IsNull())
         return -1;
@@ -876,7 +878,7 @@ int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &con
     const std::string v = node.as<std::string>();
     if (!v.empty() && v.find_first_not_of("-0123456789") == std::string::npos)
     {
-        if (g_reported.insert(context + "|" + v).second)
+        if (g_reported.insert(std::string(context) + "|" + v).second)
             std::cerr << "[SpriteRegistry] " << context << ": '" << v
                       << "' is a number of the old sheet sprites; write the sprite name (<object>.<item>)" << std::endl;
         return -1;
@@ -884,7 +886,7 @@ int SpriteHandle(const YAML::Node &node, SpriteKind kind, const std::string &con
     return SpriteHandle(v, kind, context);
 }
 
-std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, const std::string &context)
+std::vector<int> SpriteHandles(const YAML::Node &node, SpriteKind kind, std::string_view context)
 {
     std::vector<int> out;
     if (!node)

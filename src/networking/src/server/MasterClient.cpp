@@ -10,11 +10,11 @@ namespace
 constexpr std::uint32_t kConnectTimeoutMs = 6000;
 } // namespace
 
-MasterClient::MasterClient(const std::string &host, std::uint16_t port)
+MasterClient::MasterClient(std::string_view host, std::uint16_t port)
 {
-    m_creating = std::async(std::launch::async, [host, port]() {
+    m_creating = std::async(std::launch::async, [hostStr = std::string(host), port]() {
         Created c;
-        c.transport = createEnetClient(host, port, &c.error);
+        c.transport = createEnetClient(hostStr, port, &c.error);
         return c;
     });
 }
@@ -38,17 +38,23 @@ static std::vector<std::uint8_t> encodeMessage(const T &m)
     return buf;
 }
 
-void MasterClient::requestList(const std::string &gameVersion)
+void MasterClient::requestList(std::string_view gameVersion)
 {
-    m_queue.push_back(encodeMessage(ListRooms {gameVersion}));
+    m_queue.push_back(encodeMessage(ListRooms {std::string(gameVersion)}));
     flush();
 }
 
 void MasterClient::createRoom(
-    const GameIdentity &identity, const std::string &name, bool listed, const std::string &password)
+    const GameIdentity &identity, std::string_view name, bool listed, std::string_view password)
 {
     m_queue.push_back(encodeMessage(
-        CreateRoom {identity.gameVersion, identity.simBuildId, identity.assetsHash, name, listed, password}));
+        CreateRoom {
+            identity.gameVersion,
+            identity.simBuildId,
+            identity.assetsHash,
+            std::string(name),
+            listed,
+            std::string(password)}));
     flush();
 }
 
@@ -58,9 +64,9 @@ void MasterClient::registerHost(const RegisterHost &info)
     flush();
 }
 
-void MasterClient::joinHosted(const std::string &code, const SocketToken &token)
+void MasterClient::joinHosted(std::string_view code, const SocketToken &token)
 {
-    m_queue.push_back(encodeMessage(JoinHosted {code, token}));
+    m_queue.push_back(encodeMessage(JoinHosted {std::string(code), token}));
     flush();
 }
 
@@ -82,9 +88,9 @@ bool MasterClient::takeHostedEndpoint(HostedEndpoint &out)
     return true;
 }
 
-void MasterClient::findRoom(const std::string &code)
+void MasterClient::findRoom(std::string_view code)
 {
-    m_queue.push_back(encodeMessage(FindRoom {code}));
+    m_queue.push_back(encodeMessage(FindRoom {std::string(code)}));
     flush();
 }
 

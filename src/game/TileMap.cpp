@@ -26,7 +26,7 @@ TileMap::TileMap()
     }
 }
 
-bool TileMap::LoadMap(const std::string &jsonPath)
+bool TileMap::LoadMap(std::string_view jsonPath)
 {
     std::string text;
     if (!Assets::ReadText(jsonPath, text))

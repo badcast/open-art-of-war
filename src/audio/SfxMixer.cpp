@@ -58,14 +58,15 @@ SfxPlacement PlaceSfx(
 }
 
 // "fire_rifle_2.ogg" -> "fire_rifle"; clips without a trailing _<number> keep their base name
-std::string EventOfFile(const std::string &path)
+std::string EventOfFile(std::string_view path)
 {
-    std::string name = path.substr(path.find_last_of("/\\") + 1);
-    if (name.size() < 5 || name.compare(name.size() - 4, 4, ".ogg") != 0)
+    const std::size_t slash = path.find_last_of("/\\");
+    std::string_view name = (slash == std::string_view::npos) ? path : path.substr(slash + 1);
+    if (name.size() < 5 || name.substr(name.size() - 4) != ".ogg")
         return {};
-    name.resize(name.size() - 4);
+    name.remove_suffix(4);
     const std::size_t us = name.find_last_of('_');
-    if (us != std::string::npos && us + 1 < name.size())
+    if (us != std::string_view::npos && us + 1 < name.size())
     {
         bool allDigits = true;
         for (std::size_t i = us + 1; i < name.size(); ++i)
@@ -77,14 +78,14 @@ std::string EventOfFile(const std::string &path)
             }
         }
         if (allDigits)
-            return name.substr(0, us);
+            return std::string(name.substr(0, us));
     }
-    return name;
+    return std::string(name);
 }
 
 namespace
 {
-SfxMixer::Category ParseCategory(const std::string &s)
+SfxMixer::Category ParseCategory(std::string_view s)
 {
     if (s == "weapon")
         return SfxMixer::Category::Weapon;
@@ -134,7 +135,7 @@ bool DecodeOgg(const std::vector<std::uint8_t> &data, std::vector<std::int16_t> 
 }
 } // namespace
 
-bool SfxMixer::LoadBank(const std::string &configPath, const std::vector<std::string> &clips)
+bool SfxMixer::LoadBank(std::string_view configPath, const std::vector<std::string> &clips)
 {
     std::string text;
     if (Assets::ReadText(configPath, text))
@@ -217,7 +218,7 @@ void SfxMixer::Configure(const nlohmann::json &doc)
     }
 }
 
-void SfxMixer::AddClip(const std::string &event, std::vector<std::int16_t> pcm)
+void SfxMixer::AddClip(std::string_view event, std::vector<std::int16_t> pcm)
 {
     if (pcm.size() < 2)
         return;
@@ -230,27 +231,28 @@ void SfxMixer::AddClip(const std::string &event, std::vector<std::int16_t> pcm)
         // A clip without settings: the defaults of audio_sfx.json (or the built-in ones)
         idx = static_cast<int>(m_events.size());
         m_events.push_back({});
-        m_events.back().name = event;
-        m_eventIndex[event] = idx;
+        std::string key(event);
+        m_events.back().name = key;
+        m_eventIndex[std::move(key)] = idx;
     }
     m_clips.push_back(std::move(pcm));
     m_events[static_cast<std::size_t>(idx)].cfg.clips.push_back(static_cast<int>(m_clips.size()) - 1);
 }
 
-int SfxMixer::EventIndex(const std::string &event) const
+int SfxMixer::EventIndex(std::string_view event) const
 {
     auto it = m_eventIndex.find(event);
     return it == m_eventIndex.end() ? -1 : it->second;
 }
 
-bool SfxMixer::Has(const std::string &event) const
+bool SfxMixer::Has(std::string_view event) const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
     return idx >= 0 && !m_events[static_cast<std::size_t>(idx)].cfg.clips.empty();
 }
 
-const SfxMixer::EventConfig *SfxMixer::Config(const std::string &event) const
+const SfxMixer::EventConfig *SfxMixer::Config(std::string_view event) const
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
@@ -336,7 +338,7 @@ bool SfxMixer::StartLocked(int eventIdx, float gain, float pan, std::uint64_t no
     return true;
 }
 
-bool SfxMixer::Play(const std::string &event, float gain, float pan, std::uint64_t nowMs, float muffle)
+bool SfxMixer::Play(std::string_view event, float gain, float pan, std::uint64_t nowMs, float muffle)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);
@@ -347,7 +349,7 @@ bool SfxMixer::Play(const std::string &event, float gain, float pan, std::uint64
     return StartLocked(idx, gain, pan, nowMs, false, muffle);
 }
 
-bool SfxMixer::Announce(const std::string &event, std::uint64_t nowMs)
+bool SfxMixer::Announce(std::string_view event, std::uint64_t nowMs)
 {
     std::lock_guard<std::mutex> guard(m_lock);
     const int idx = EventIndex(event);

@@ -18,18 +18,18 @@ namespace fs = std::filesystem;
 namespace
 {
 
-std::string DownloadedPath(const std::string &path, std::uint64_t hash)
+std::string DownloadedPath(std::string_view path, std::uint64_t hash)
 {
     char suffix[24];
     std::snprintf(suffix, sizeof suffix, "_%016llx.json", static_cast<unsigned long long>(hash));
     return (fs::path(Assets::UserDataDir()) / "downloaded_maps" / (fs::path(path).stem().string() + suffix)).string();
 }
 
-bool ReadAll(const std::string &path, std::vector<std::uint8_t> &out)
+bool ReadAll(std::string_view path, std::vector<std::uint8_t> &out)
 {
     if (Assets::ReadBytes(path, out))
         return true;
-    std::ifstream in(path, std::ios::binary);
+    std::ifstream in(fs::path(path), std::ios::binary);
     if (!in)
         return false;
     out.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
@@ -47,21 +47,21 @@ std::uint64_t HashOfBytes(const std::vector<std::uint8_t> &bytes)
     return (static_cast<std::uint64_t>(a) << 32) | b;
 }
 
-std::uint64_t HashOf(const std::string &path)
+std::uint64_t HashOf(std::string_view path)
 {
     std::vector<std::uint8_t> bytes;
     return ReadAll(path, bytes) ? HashOfBytes(bytes) : 0;
 }
 
-std::string Resolve(const std::string &path, std::uint64_t hash)
+std::string Resolve(std::string_view path, std::uint64_t hash)
 {
     if (hash == 0 || HashOf(path) == hash)
-        return path;
+        return std::string(path);
     const std::string copy = DownloadedPath(path, hash);
     return HashOf(copy) == hash ? copy : std::string();
 }
 
-std::vector<std::uint8_t> Packed(const std::string &path)
+std::vector<std::uint8_t> Packed(std::string_view path)
 {
     std::vector<std::uint8_t> raw;
     if (!ReadAll(path, raw))
@@ -97,12 +97,12 @@ bool Unpack(
     return true;
 }
 
-bool Read(const std::string &path, std::vector<std::uint8_t> &bytes)
+bool Read(std::string_view path, std::vector<std::uint8_t> &bytes)
 {
     return ReadAll(path, bytes);
 }
 
-std::string StoreRaw(const std::string &path, std::uint64_t hash, const std::vector<std::uint8_t> &raw)
+std::string StoreRaw(std::string_view path, std::uint64_t hash, const std::vector<std::uint8_t> &raw)
 {
     if (raw.empty() || raw.size() > 16u * 1024 * 1024 || HashOfBytes(raw) != hash)
         return {};
@@ -126,7 +126,7 @@ std::string StoreRaw(const std::string &path, std::uint64_t hash, const std::vec
     return ec ? std::string() : target;
 }
 
-std::string Store(const std::string &path, std::uint64_t hash, const std::vector<std::uint8_t> &packedBytes)
+std::string Store(std::string_view path, std::uint64_t hash, const std::vector<std::uint8_t> &packedBytes)
 {
     std::vector<std::uint8_t> raw;
     if (!Unpack(packedBytes, hash, raw, 16u * 1024 * 1024))

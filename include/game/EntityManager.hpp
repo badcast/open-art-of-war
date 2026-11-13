@@ -15,6 +15,7 @@
 #include <array>
 #include <unordered_map>
 #include <string>
+#include <string_view>
 
 namespace YAML
 {
@@ -500,7 +501,7 @@ public:
     // Taken by value: lookups of missing keys need a mutable node (pass YAML::Clone to keep yours intact).
     bool LoadCharacterYaml(YAML::Node root);
     // gettext key of a character's description: "<id>.description" (the text lives in po/*.po)
-    static std::string DescriptionKey(const std::string &characterId);
+    static std::string DescriptionKey(std::string_view characterId);
     void RebuildBlueprints();
     const UnitConfig *GetUnitConfig(int archetypeId) const;
     const BuildingConfig *GetBuildingConfig(int buildingIndex) const;
@@ -1001,7 +1002,7 @@ private:
             m_eventCues.push_back({c, x, y, owner, sound, gain});
     }
     std::vector<std::string> m_soundNames; // only grows: projectiles in flight keep their ids over a reload
-    std::uint16_t InternSound(const std::string &name);
+    std::uint16_t InternSound(std::string_view name);
     // The gun firing now: weapons[1] while a unit's second gun shoots, else the main one (null: none in the file)
     const WeaponConfig *FiringWeapon(const Entity &e) const;
     void AddGroundMark(float x, float y, int composite, float seconds);

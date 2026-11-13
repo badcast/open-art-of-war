@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 // Games hosted by players, reachable without forwarded ports: the server (openaow-server's master port)
 // lists them and introduces host and player, both punch a hole through their NAT from their game
@@ -20,11 +21,11 @@ class HostAnnouncer
 public:
     // `gameSocket`: the host's listening transport (it must outlive the announcer)
     HostAnnouncer(
-        const std::string &master,
+        std::string_view master,
         std::uint16_t masterPort,
         Transport &gameSocket,
         std::uint16_t gamePort,
-        const std::string &lanIp);
+        std::string_view lanIp);
     void update(std::uint32_t nowMs, const RoomInfo &room, bool listed);
     const std::string &code() const
     {
@@ -64,7 +65,7 @@ public:
         Failed
     };
 
-    HostedJoin(const std::string &master, std::uint16_t masterPort, const std::string &code);
+    HostedJoin(std::string_view master, std::uint16_t masterPort, std::string_view code);
     void update(std::uint32_t nowMs);
     State state() const
     {

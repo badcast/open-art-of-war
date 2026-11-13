@@ -6,6 +6,7 @@
 #include "graphics/Camera.hpp"
 #include "graphics/TextureManager.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -114,7 +115,7 @@ public:
         m_selectedTile = tile;
         m_activeTool = EditorTool::TileBrush;
     }
-    void ShowToast(const std::string &message, float duration = 3.5f);
+    void ShowToast(std::string_view message, float duration = 3.5f);
 
     void OpenContextMenu(int tx, int ty)
     {

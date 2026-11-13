@@ -32,11 +32,11 @@ void MigrateLegacySave(const std::filesystem::path &target)
 
 } // namespace
 
-SaveManager::SaveManager(const std::string &saveFilePath)
+SaveManager::SaveManager(std::string_view saveFilePath)
 {
     if (!saveFilePath.empty())
     {
-        m_savePath = saveFilePath;
+        m_savePath.assign(saveFilePath);
         return;
     }
     const std::filesystem::path target = std::filesystem::path(Assets::UserDataDir()) / "savegame.json";

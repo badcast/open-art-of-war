@@ -86,7 +86,7 @@ void Application::RenderMapEdgeFade(const Camera &camera)
 }
 
 void Application::DrawLoadingFrame(
-    const std::string &title, const std::string &status, float progress, SDL_Texture *preview, int pw, int ph)
+    std::string_view title, std::string_view status, float progress, SDL_Texture *preview, int pw, int ph)
 {
     // Keep the window answering while the main loop is busy
     SDL_Event event;
@@ -113,22 +113,28 @@ void Application::DrawLoadingFrame(
     SDL_RenderPresent(m_sdlRenderer);
 }
 
-void Application::ShowLoading(const std::string &status, float progress)
+void Application::ShowLoading(std::string_view status, float progress)
 {
     if (m_headless || !m_sdlRenderer || !m_renderer || !m_fontRenderer)
         return;
     DrawLoadingFrame("OPEN ART OF WAR: FREEDOM FOR LIBERTY", status, progress, nullptr, 0, 0);
 }
 
-void Application::BeginMapLoading(const std::string &title, const std::string &mapPath)
+void Application::BeginMapLoading(std::string_view title, std::string_view mapPath)
 {
     if (m_headless || !m_sdlRenderer || !m_renderer || !m_fontRenderer)
         return;
     m_mapLoading = true;
     m_mapLoadStartMs = SDL_GetTicks();
-    m_mapLoadTitle = title;
-    m_mapLoadTexture
-        = m_loadingPreview.Get(m_sdlRenderer, *m_texManager, "loading:" + mapPath, mapPath, {}, m_mapLoadW, m_mapLoadH);
+    m_mapLoadTitle.assign(title);
+    m_mapLoadTexture = m_loadingPreview.Get(
+        m_sdlRenderer,
+        *m_texManager,
+        "loading:" + std::string(mapPath),
+        std::string(mapPath),
+        {},
+        m_mapLoadW,
+        m_mapLoadH);
     DrawLoadingFrame(m_mapLoadTitle, _("Loading the map..."), 0.05f, m_mapLoadTexture, m_mapLoadW, m_mapLoadH);
 }
 
@@ -273,11 +279,11 @@ void Application::TrackNetPlayers(std::uint32_t nowMs)
     }
 }
 
-void Application::PushNotice(const std::string &text, std::uint32_t nowMs)
+void Application::PushNotice(std::string_view text, std::uint32_t nowMs)
 {
     constexpr std::uint32_t kShowMs = 7000;
     constexpr std::size_t kMaxNotices = 5;
-    m_notices.push_back({text, nowMs + kShowMs});
+    m_notices.push_back({std::string(text), nowMs + kShowMs});
     if (m_notices.size() > kMaxNotices)
         m_notices.erase(m_notices.begin(), m_notices.end() - kMaxNotices);
 }
@@ -321,7 +327,7 @@ void Application::RenderNotices()
 
 void Application::RenderScoreboard()
 {
-    if (!m_input || !m_input->isKeyPressed(SDL_SCANCODE_TAB) || !m_entities)
+    if (!m_input || (!m_input->isKeyPressed(SDL_SCANCODE_TAB) && !m_scoreboardOpen) || !m_entities)
         return;
     if (!(m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying || m_state == AppState::Victory
           || m_state == AppState::Defeat))
@@ -395,7 +401,7 @@ void Application::RenderScoreboard()
     const int colName = 16, colFaction = 250, colColor = 410, colPoints = 520, colKills = 620, colLosses = 700;
     const int w = std::min(viewW - 32, 780);
     const int h = headH + static_cast<int>(rows.size()) * rowH + 34 + (hasDefeated ? rowH : 0);
-    const int x = (viewW - w) / 2, y = std::max(60, (m_windowH - h) / 3);
+    const int x = (viewW - w) / 2, y = std::max(72, (m_windowH - h) / 3);
     m_renderer->FillRectScreen(x, y, w, h, col::Panel);
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
     m_renderer->FillRectScreen(x, y, w, 2, col::Accent);

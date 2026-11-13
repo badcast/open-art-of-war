@@ -3,6 +3,7 @@
 #include "game/Players.hpp"
 
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -54,7 +55,7 @@ int MaxArmy();
 int EffectiveArmyCap(int lobbyUnits);
 
 // Reads the file text over "no limits"; false when it cannot be parsed (then nothing is limited)
-bool LoadText(const std::string &yamlText);
+bool LoadText(std::string_view yamlText);
 // From data/limits.yaml again (the host's, while a network session has its files)
 void Reload();
 

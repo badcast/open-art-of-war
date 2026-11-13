@@ -50,15 +50,15 @@ nlohmann::json YamlToJson(const YAML::Node &node)
 
 } // namespace
 
-nlohmann::json ReadFromString(const std::string &text)
+nlohmann::json ReadFromString(std::string_view text)
 {
-    nlohmann::json j = nlohmann::json::parse(text, nullptr, false, true);
+    nlohmann::json j = nlohmann::json::parse(text.begin(), text.end(), nullptr, false, true);
     if (j.is_object())
         return j;
 
     try
     {
-        YAML::Node root = YAML::Load(text);
+        YAML::Node root = YAML::Load(std::string(text));
         if (root.IsMap())
         {
             nlohmann::json yj = YamlToJson(root);
@@ -72,11 +72,11 @@ nlohmann::json ReadFromString(const std::string &text)
     return nlohmann::json::object();
 }
 
-nlohmann::json ReadYamlFromString(const std::string &text)
+nlohmann::json ReadYamlFromString(std::string_view text)
 {
     try
     {
-        YAML::Node root = YAML::Load(text);
+        YAML::Node root = YAML::Load(std::string(text));
         if (root.IsMap())
         {
             nlohmann::json yj = YamlToJson(root);
@@ -89,16 +89,16 @@ nlohmann::json ReadYamlFromString(const std::string &text)
     return nlohmann::json::object();
 }
 
-nlohmann::json ReadObjectFromFileName(const std::string &path)
+nlohmann::json ReadObjectFromFileName(std::string_view path)
 {
-    std::ifstream in(path, std::ios::binary);
+    std::ifstream in(fs::path(path), std::ios::binary);
     if (!in)
         return nlohmann::json::object();
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     return ReadFromString(text);
 }
 
-bool WriteAtomic(const std::string &path, const nlohmann::json &doc)
+bool WriteAtomic(std::string_view path, const nlohmann::json &doc)
 {
     std::error_code ec;
     const fs::path target(path);

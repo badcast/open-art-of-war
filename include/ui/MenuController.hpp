@@ -39,7 +39,7 @@ struct RenderApiBinding
     std::function<const std::vector<RenderApiOption> &()> options; // what this system offers (probed once)
     std::function<std::string()> active;                           // the API drawing right now
     std::function<std::string()> configured;                       // the API of the next start
-    std::function<void(const std::string &)> select;
+    std::function<void(std::string_view)> select;
     std::function<void()> applyNow;         // rebuild the window with the configured API (asked for by a dialog)
     std::function<bool()> effectsAvailable; // shader effects work with the running API
 };
@@ -50,7 +50,7 @@ public:
     MenuController() = default;
     // The player's options the settings screen edits; onChanged applies (and stores) one group of them
     // The application shows its loading screen (the map's picture, at least three seconds) around the loading of a game
-    void BindLoading(std::function<void(const std::string &, const std::string &)> begin, std::function<void()> end)
+    void BindLoading(std::function<void(std::string_view, std::string_view)> begin, std::function<void()> end)
     {
         m_beginLoading = std::move(begin);
         m_endLoading = std::move(end);
@@ -68,7 +68,7 @@ public:
     {
         m_settingsTab = tab;
         m_settingsSelected = 0;
-        m_settingsTop = 0;
+        m_settingsScroll.Reset();
     }
 
     // Menu States
@@ -242,7 +242,7 @@ private:
         BitmapFontRenderer &fontRenderer,
         int windowW,
         int windowH,
-        const std::string &title,
+        std::string_view title,
         const std::vector<std::string> &lines);
 
     std::string m_editorNotice; // why the map editor did not start, shown in the selection dialog
@@ -304,9 +304,8 @@ private:
     std::string m_spotsPath;                  // map whose start positions m_spots holds
     std::vector<std::pair<int, int>> m_spots; // start positions of that map (tiles), for the numbers on its picture
     std::vector<bool> CustomTakenColors(int row) const;
-    int m_skirmishTop {0};
-    AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update            //
-                                                      // first visible row of the map list
+    ui::SmoothListScroll m_skirmishScroll;
+    AIDifficulty m_difficulty {AIDifficulty::Medium}; // shown in the custom game dialog, set in update
     int m_settingsSelected {0};
     // Ids of the open list: the settings rows use their index, the custom game dialog the ones from kComboSide up
     static constexpr int kComboSide = 100, kComboDifficulty = 101, kComboCredits = 103, kComboTime = 107,
@@ -318,7 +317,7 @@ private:
     std::vector<std::string> CampaignComboOptions(int id) const;
     int CampaignComboCurrent(int id) const;
     void CampaignComboApply(int id, int index);
-    std::function<void(const std::string &, const std::string &)> m_beginLoading; // loading screen with a map's picture
+    std::function<void(std::string_view, std::string_view)> m_beginLoading; // loading screen with a map's picture
     std::function<void()> m_endLoading;
     ui::ConfirmState m_apiConfirm;     // "switch the render API?" of the graphics settings
     std::string m_apiPending;          // the API that question is about
@@ -326,7 +325,7 @@ private:
     ui::ComboState m_combo;            // the open drop-down list of the settings / the custom game dialog
     bool m_inGameSettingsOpen {false}; // the settings screen opened from the pause menu
     int m_settingsTab {0};
-    int m_settingsTop {0}; // first row of the settings tab in view (a long tab scrolls)
+    ui::SmoothListScroll m_settingsScroll;
     int m_sliderDrag {-1}; // settings row whose slider the mouse is dragging
     Settings *m_settings {nullptr};
     std::function<void(SettingsArea)> m_onSettingsChanged;
@@ -335,8 +334,9 @@ private:
     int m_scrollDrag {0}; // scroll bar or seek bar held by the mouse: 0 none, 1 map list, 2 About, 3 track position,
                           // 4 settings rows
     ui::UiRect m_infoTrack {}; // About scroll bar of the last frame (empty when the text fits)
+    ui::UiRect m_infoListRect {};
     int m_infoTotal {0}, m_infoVisible {0};
-    int m_infoScroll {0}; // first visible line of the About dialog
+    ui::SmoothListScroll m_infoScroll;
     int m_mouseX {0};
     int m_mouseY {0};
 };

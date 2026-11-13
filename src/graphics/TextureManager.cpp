@@ -70,7 +70,7 @@ void TextureManager::Cleanup()
     m_terrainPages.clear();
 }
 
-SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
+SDL_Texture *TextureManager::LoadTexture(std::string_view filePath)
 {
     auto it = m_textureCache.find(filePath);
     if (it != m_textureCache.end())
@@ -107,7 +107,7 @@ SDL_Texture *TextureManager::LoadTexture(const std::string &filePath)
         return nullptr;
     }
 
-    m_textureCache[filePath] = texture;
+    m_textureCache[std::string(filePath)] = texture;
     return texture;
 }
 
@@ -264,7 +264,7 @@ void TextureManager::LoadSpriteBindings()
         m_unitVisuals[arch] = v;
     };
     // A building type, or a family of them (walls by damage)
-    auto bindBuilding = [&](int type, const std::string &ref, const std::string &file) {
+    auto bindBuilding = [&](int type, std::string_view ref, std::string_view file) {
         if (type < 0 || ref.empty())
             return;
         const auto dot = ref.find('.');
@@ -534,7 +534,7 @@ SDL_Texture *TextureManager::GetTileset(int index) const
     return nullptr;
 }
 
-SDL_Texture *TextureManager::GetUiTexture(const std::string &name) const
+SDL_Texture *TextureManager::GetUiTexture(std::string_view name) const
 {
     auto it = m_uiTextures.find(name);
     if (it != m_uiTextures.end())

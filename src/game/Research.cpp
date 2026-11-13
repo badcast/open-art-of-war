@@ -65,9 +65,9 @@ struct LoadedCatalog
     std::array<std::string, kResearchCount> names, descs;
 };
 
-void ApplyYaml(LoadedCatalog &c, const std::string &text)
+void ApplyYaml(LoadedCatalog &c, std::string_view text)
 {
-    const YAML::Node list = YAML::Load(text)["research"];
+    const YAML::Node list = YAML::Load(std::string(text))["research"];
     if (!list || !list.IsSequence())
         return;
     auto num = [](const YAML::Node &n, const char *key, int fallback) {
@@ -260,7 +260,7 @@ const char *ResearchEffectName(ResearchEffect effect)
     return i >= 0 && i < static_cast<int>(ResearchEffect::Count) ? kEffectNames[i] : "";
 }
 
-bool ParseResearchEffect(const std::string &name, ResearchEffect &out)
+bool ParseResearchEffect(std::string_view name, ResearchEffect &out)
 {
     for (int i = 0; i < static_cast<int>(ResearchEffect::Count); ++i)
     {

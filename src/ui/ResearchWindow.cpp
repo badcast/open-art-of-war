@@ -31,16 +31,18 @@ namespace col = ui::color;
 namespace
 {
 
-// Sizes of the tree at scale 1: the technologies of the tree (their size and icons) are drawn bigger by
-// m_researchScale, the window itself keeps its size
-constexpr int kNodeW0 = 270;
-constexpr int kNodeH0 = 66;
-constexpr float kIconScale0 = 0.9f;       // the icon of a technology in the tree (the picture is about 64 px)
-constexpr int kIconBox0 = 62;             // ... and the room it takes on the left of the node
-constexpr float kDetailsIconScale = 1.3f; // the icon of the selected technology
-constexpr int kGapX0 = 34;
+// Sizes of the tree at scale 1: the technologies of the tree (their size and icons) scale by m_researchScale
+// while keeping a balanced 3-division schematic inside the viewport on desktop and touch.
+constexpr int kNodeW0 = 254;
+constexpr int kNodeH0 = 76;
+constexpr int kIndentX0 = 18; // dependent child horizontal offset per prerequisite depth
+constexpr int kColGapX0 = 16; // gutter between the 3 technology divisions
 constexpr int kGapY0 = 10;
-constexpr int kDetailsW0 = 270;
+constexpr int kHeaderH0 = 32; // division column header bar
+constexpr int kHeaderGapY0 = 10;
+constexpr int kPadX0 = 14;
+constexpr int kPadY0 = 12;
+constexpr int kDetailsW0 = 290;
 constexpr float kScaleMin = 0.75f, kScaleMax = 4.0f, kScaleStep = 0.125f;
 // The glide of a flick on the tree after the finger lifts: px/s limit, the speed below which it stops, how fast it
 // slows
@@ -61,7 +63,7 @@ struct WindowLayout
 WindowLayout builtinLayout(int windowW, int windowH, int top)
 {
     WindowLayout windowLayout;
-    windowLayout.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH); // the whole window
+    windowLayout.dialog = ui::CenteredRect(windowW, windowH, windowW, windowH);
     windowLayout.dialog.y += top;
     windowLayout.dialog.h -= top;
     windowLayout.content
@@ -69,30 +71,29 @@ WindowLayout builtinLayout(int windowW, int windowH, int top)
            windowLayout.dialog.y + 60,
            windowLayout.dialog.w - 32,
            windowLayout.dialog.h - 60 - 16};
-    const int kDetailsW = std::clamp(static_cast<int>(windowLayout.content.w * 0.26f), kDetailsW0, 440);
+    const int kDetailsW = std::clamp(static_cast<int>(windowLayout.content.w * 0.27f), kDetailsW0, 440);
     windowLayout.search
         = {windowLayout.content.x,
            windowLayout.content.y,
            std::clamp(static_cast<int>(windowLayout.content.w * 0.28f), 280, 460),
-           30};
+           36};
     windowLayout.filter
         = {windowLayout.search.Right() + 10,
            windowLayout.content.y,
            std::clamp(static_cast<int>(windowLayout.content.w * 0.18f), 200, 300),
-           30};
-    windowLayout.closeBtn = {windowLayout.content.Right() - 130, windowLayout.content.y, 130, 30};
+           36};
+    windowLayout.closeBtn = {windowLayout.content.Right() - 144, windowLayout.content.y, 144, 36};
     windowLayout.details = {
-        windowLayout.content.Right() - kDetailsW, windowLayout.content.y + 42, kDetailsW, windowLayout.content.h - 42};
+        windowLayout.content.Right() - kDetailsW, windowLayout.content.y + 46, kDetailsW, windowLayout.content.h - 46};
     windowLayout.tree
         = {windowLayout.content.x,
-           windowLayout.content.y + 42,
+           windowLayout.content.y + 46,
            windowLayout.details.x - 12 - windowLayout.content.x,
-           windowLayout.content.h - 42};
+           windowLayout.content.h - 46};
     windowLayout.startBtn
-        = {windowLayout.details.x + 12, windowLayout.details.Bottom() - 52, windowLayout.details.w - 24, 40};
-    // + / - at the bottom right of the tree, like the radar's zoom buttons
-    windowLayout.zoomOut = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 30, 24, 24};
-    windowLayout.zoomIn = {windowLayout.tree.Right() - 30, windowLayout.tree.Bottom() - 58, 24, 24};
+        = {windowLayout.details.x + 12, windowLayout.details.Bottom() - 58, windowLayout.details.w - 24, 46};
+    windowLayout.zoomOut = {windowLayout.tree.Right() - 152, windowLayout.tree.Bottom() - 44, 34, 34};
+    windowLayout.zoomIn = {windowLayout.tree.Right() - 44, windowLayout.tree.Bottom() - 44, 34, 34};
     return windowLayout;
 }
 
@@ -140,17 +141,70 @@ WindowLayout windowLayout(int windowW, int windowH, int top = 0)
     return builtinLayout(windowW, windowH, top);
 }
 
-// Columns are the depth in the chain of requirements, rows are leaves in tree order, a parent sits in the middle of
-// its children (as in the character editor)
+// Technologies are grouped dynamically into 3 tactical divisions (Infantry, Armor & Vehicles, Base & Command) so
+// independent root techs fill balanced side-by-side columns while dependent upgrades indent directly under their
+// parent.
 struct TreeLayout
 {
-    std::vector<int> parent, depth;
+    std::vector<int> parent, depth, division;
     std::vector<float> row;
     std::vector<bool> shown; // the local player's tech level (data/capabilities.yaml) has it
-    int first {-1};          // the first one shown
-    int maxDepth {0};
-    float rows {1.0f};
+    int colMaxDepth[3] {0, 0, 0};
+    int colCount[3] {0, 0, 0};
+    int first {-1};
+    float maxRows {1.0f};
 };
+
+int classifyRootDivision(const ResearchDef &r)
+{
+    switch (r.effect)
+    {
+        case ResearchEffect::InfantryArmor:
+        case ResearchEffect::InfantryRegen:
+        case ResearchEffect::InfantrySpeed:
+        case ResearchEffect::TrainTime:
+            return 0;
+        case ResearchEffect::FireRate:
+        case ResearchEffect::Damage:
+        case ResearchEffect::VisionRange:
+        case ResearchEffect::UnlockUnit:
+        case ResearchEffect::Reload:
+            return (r.archA >= 0 && r.archA <= 5) ? 0 : 1;
+        case ResearchEffect::VehicleSpeed:
+        case ResearchEffect::VehicleArmor:
+        case ResearchEffect::RepairSpeed:
+        case ResearchEffect::FortressFlamethrower:
+        case ResearchEffect::SiegeMode:
+        case ResearchEffect::RocketTurret:
+        case ResearchEffect::RangePercent:
+        case ResearchEffect::VehicleTime:
+            return 1;
+        case ResearchEffect::PowerBonus:
+        case ResearchEffect::BuildingArmor:
+        case ResearchEffect::WallStrength:
+        case ResearchEffect::UnlockRadar:
+        case ResearchEffect::Income:
+        case ResearchEffect::KillReward:
+        case ResearchEffect::BuildRadius:
+        case ResearchEffect::Mine:
+            return 2;
+        default:
+            return 1;
+    }
+}
+
+const char *divisionTitle(int div)
+{
+    switch (div)
+    {
+        case 0:
+            return "INFANTRY";
+        case 1:
+            return "ARMOR & VEHICLES";
+        default:
+            return "BASE & COMMAND";
+    }
+}
 
 TreeLayout buildTree(Faction faction)
 {
@@ -158,6 +212,7 @@ TreeLayout buildTree(Faction faction)
     TreeLayout t;
     t.parent.assign(count, -1);
     t.depth.assign(count, 0);
+    t.division.assign(count, 1);
     t.row.assign(count, 0.0f);
     t.shown.assign(count, false);
     std::vector<std::vector<int>> children(count);
@@ -188,28 +243,111 @@ TreeLayout buildTree(Faction faction)
         else
             children[need].push_back(i);
     }
-    float nextRow = 0.0f;
-    std::function<void(int, int)> place = [&](int node, int d) {
+    float colNextRow[3] {0.0f, 0.0f, 0.0f};
+    std::function<void(int, int, int)> place = [&](int node, int d, int div) {
         t.depth[node] = d;
-        if (children[node].empty())
-        {
-            t.row[node] = nextRow;
-            nextRow += 1.0f;
-            return;
-        }
+        t.division[node] = div;
+        t.colMaxDepth[div] = std::max(t.colMaxDepth[div], d);
+        t.colCount[div] += 1;
+        t.row[node] = colNextRow[div];
+        colNextRow[div] += 1.0f;
         for (int c : children[node])
-            place(c, d + 1);
-        t.row[node] = (t.row[children[node].front()] + t.row[children[node].back()]) * 0.5f;
+            place(c, d + 1, div);
     };
     for (int r : roots)
-        place(r, 0);
-    for (int d : t.depth)
-        t.maxDepth = std::max(t.maxDepth, d);
-    t.rows = std::max(1.0f, nextRow);
+    {
+        const int div = classifyRootDivision(researchDef(faction, r));
+        place(r, 0, div);
+    }
+    t.maxRows = std::max({1.0f, colNextRow[0], colNextRow[1], colNextRow[2]});
     return t;
 }
 
-[[maybe_unused]] std::string lower(const std::string &s)
+struct TreeMetrics
+{
+    int colX[3] {0, 0, 0};
+    int colW[3] {0, 0, 0};
+    bool colShown[3] {false, false, false};
+    int headerH {0};
+    int headerGapY {0};
+    int nodeW {0}, nodeH {0}, indentX {0}, gapY {0}, padY {0};
+    float contentW {0.0f}, contentH {0.0f};
+    int originX {0};
+};
+
+TreeMetrics measureTree(const TreeLayout &tree, const WindowLayout &l, float sc)
+{
+    TreeMetrics m;
+    m.nodeW = sz(kNodeW0, sc);
+    m.nodeH = sz(kNodeH0, sc);
+    m.indentX = sz(kIndentX0, sc);
+    m.gapY = sz(kGapY0, sc);
+    m.headerH = sz(kHeaderH0, sc);
+    m.headerGapY = sz(kHeaderGapY0, sc);
+    m.padY = sz(kPadY0, sc);
+    const int padX = sz(kPadX0, sc);
+    const int colGap = sz(kColGapX0, sc);
+    int x = padX;
+    bool any = false;
+    for (int c = 0; c < 3; ++c)
+    {
+        if (tree.colCount[c] <= 0)
+            continue;
+        any = true;
+        m.colShown[c] = true;
+        m.colW[c] = m.nodeW + std::min(tree.colMaxDepth[c], 3) * m.indentX;
+        m.colX[c] = x;
+        x += m.colW[c] + colGap;
+    }
+    m.contentW = any ? static_cast<float>(x - colGap + padX) : static_cast<float>(l.tree.w);
+    const int contentWInt = static_cast<int>(std::lround(m.contentW));
+    m.originX = contentWInt < l.tree.w ? (l.tree.w - contentWInt) / 2 : 0;
+    const float cardsH
+        = tree.maxRows * static_cast<float>(m.nodeH) + std::max(0.0f, tree.maxRows - 1.0f) * static_cast<float>(m.gapY);
+    m.contentH = static_cast<float>(m.padY + m.headerH + m.headerGapY) + cardsH + static_cast<float>(sz(50, sc));
+    return m;
+}
+
+UiRect nodeRect(const TreeLayout &tree, const TreeMetrics &m, int i, const UiRect &view, float scrollX, float scrollY)
+{
+    const int div = std::clamp(tree.division[i], 0, 2);
+    const int indent = std::min(tree.depth[i], 3) * m.indentX;
+    return {
+        view.x + m.originX + m.colX[div] + indent - static_cast<int>(scrollX),
+        view.y + m.padY + m.headerH + m.headerGapY + static_cast<int>(tree.row[i] * (m.nodeH + m.gapY))
+            - static_cast<int>(scrollY),
+        m.nodeW,
+        m.nodeH};
+}
+
+UiRect searchClearRect(const WindowLayout &l)
+{
+    const int side = std::max(20, l.search.h - 8);
+    return {l.search.Right() - side - 4, l.search.y + (l.search.h - side) / 2, side, side};
+}
+
+UiRect zoomResetRect(const WindowLayout &l)
+{
+    const int gap = l.zoomIn.x - l.zoomOut.Right();
+    if (gap >= l.zoomOut.h && std::abs(l.zoomIn.y - l.zoomOut.y) <= 8)
+        return {l.zoomOut.Right() + 4, l.zoomOut.y, gap - 8, l.zoomOut.h};
+    return {};
+}
+
+UiRect detailsReqRect(const WindowLayout &l)
+{
+    const int pad = l.touch ? 16 : 14;
+    const int x = l.details.x + pad;
+    const int w = l.details.w - pad * 2;
+    const int headerH = l.touch ? 92 : 82;
+    const int tilesY = l.details.y + pad + headerH + 10;
+    const int tileH = l.touch ? 60 : 52;
+    const int reqY = tilesY + tileH + 10;
+    const int reqH = l.touch ? 50 : 42;
+    return {x, reqY, w, reqH};
+}
+
+[[maybe_unused]] std::string lower(std::string_view s)
 {
     std::string out;
     for (unsigned char c : s)
@@ -218,7 +356,7 @@ TreeLayout buildTree(Faction faction)
 }
 
 // Case-insensitive for Cyrillic (UTF-8) too
-std::string lowerUtf8(const std::string &t)
+std::string lowerUtf8(std::string_view t)
 {
     std::string out;
     for (std::size_t i = 0; i < t.size(); ++i)
@@ -378,20 +516,24 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     if (!m_researchOpen)
         return false;
     const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
-    const float sc = m_researchScale * l.u; // (the touch profile: bigger with the screen)
-    const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
+    const float sc = m_researchScale * l.u;                       // (the touch profile: bigger with the screen)
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
+    TreeMetrics metrics = measureTree(tree, l, sc);
     const ResearchProgress researchNow = ResearchShown();
     const ResearchProgress *progress = &researchNow;
     m_researchSel = std::clamp(m_researchSel, 0, kResearchCount - 1);
     if (!tree.shown[m_researchSel] && tree.first >= 0)
         m_researchSel = tree.first;
-    // The window covers the map as well: every wheel step is its own, over the map or the sidebar
+
+    // The window covers the map as well: every wheel step and left press belongs to it cleanly once per frame
     const int wheel = input.ConsumeWheel();
     input.ConsumeUiWheel();
+    const bool down = input.IsLeftMouseDown();
+    int pressX = 0, pressY = 0;
+    const bool pressed = input.ConsumeLeftPress(pressX, pressY) && down;
 
-    // The open filter list takes the mouse first
+    // The open filter list takes priority over underlying widgets
     if (m_researchCombo.open == 0)
     {
         int picked = -1;
@@ -404,7 +546,11 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
                 my,
                 leftClicked,
                 wheel,
-                picked))
+                picked,
+                down,
+                pressed,
+                pressX,
+                pressY))
         {
             if (picked >= 0)
                 m_researchFilter = picked;
@@ -439,57 +585,56 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     }
 
     // The tree scrolls with the wheel (Shift: sideways), the scroll bars and by dragging the background
-    const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
-    const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
-    const float maxX = std::max(0.0f, treeW - l.tree.w), maxY = std::max(0.0f, treeH - l.tree.h);
-    auto setScale = [&](float v) {
-        m_researchScale = std::clamp(std::round(v / kScaleStep) * kScaleStep, kScaleMin, kScaleMax);
+    float treeW = metrics.contentW;
+    float treeH = metrics.contentH;
+    float maxX = std::max(0.0f, treeW - l.tree.w);
+    float maxY = std::max(0.0f, treeH - l.tree.h);
+    auto applyZoom = [&](float nextScale) {
+        const float before = m_researchScale;
+        m_researchScale = std::clamp(std::round(nextScale / kScaleStep) * kScaleStep, kScaleMin, kScaleMax);
+        const float k = m_researchScale / before;
+        m_researchScrollX *= k;
+        m_researchScrollY *= k;
+        metrics = measureTree(tree, l, m_researchScale * l.u);
+        treeW = metrics.contentW;
+        treeH = metrics.contentH;
+        maxX = std::max(0.0f, treeW - l.tree.w);
+        maxY = std::max(0.0f, treeH - l.tree.h);
     };
     if (wheel != 0 && l.tree.Contains(mx, my))
     {
-        // Over the tree the wheel scrolls it (Shift: sideways); Ctrl + wheel scales its contents (the window keeps
-        // its size; the + / - buttons do that too)
         const bool shift = input.isKeyPressed(SDL_SCANCODE_LSHIFT) || input.isKeyPressed(SDL_SCANCODE_RSHIFT);
         const bool ctrl = input.isKeyPressed(SDL_SCANCODE_LCTRL) || input.isKeyPressed(SDL_SCANCODE_RCTRL);
         if (ctrl)
-        {
-            const float before = m_researchScale;
-            setScale(m_researchScale + wheel * kScaleStep);
-            const float k = m_researchScale / before;
-            m_researchScrollX *= k;
-            m_researchScrollY *= k;
-        }
-        else if (shift)
+            applyZoom(m_researchScale + wheel * kScaleStep);
+        else if (shift || (maxY <= 0.0f && maxX > 0.0f))
             m_researchScrollX -= wheel * 60.0f;
         else
             m_researchScrollY -= wheel * 60.0f;
     }
-    // The tree follows the pointer (a finger, or the mouse held on it); the scroll bars along the right and the bottom
-    // edge are grabbed by a press (not with the touch profile: the finger pans the tree itself), or a click on the
-    // track jumps there
+
     const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
+    const UiRect zoomReset = zoomResetRect(l);
+    const bool onZoomWidget = l.zoomIn.Contains(pressX, pressY) || l.zoomOut.Contains(pressX, pressY)
+                              || (zoomReset.w > 0 && zoomReset.Contains(pressX, pressY));
     const std::uint32_t nowMs = SDL_GetTicks();
     const float dtS = std::clamp(static_cast<float>(nowMs - m_researchTickMs) * 0.001f, 0.0f, 0.1f);
     m_researchTickMs = nowMs;
-    const bool down = input.IsLeftMouseDown();
-    int pressX = 0, pressY = 0;
-    if (input.ConsumeLeftPress(pressX, pressY) && down) // (a press from before the window opened is long over)
+    if (pressed)
     {
-        m_researchGlideX = m_researchGlideY = 0.0f; // a finger put on the tree stops the glide
+        m_researchGlideX = m_researchGlideY = 0.0f;
         m_researchDragMoved = false;
         if (!l.touch && maxY > 0.0f && ui::OnScrollTrack(vTrack, pressX, pressY))
             m_researchScrollDrag = 1;
         else if (!l.touch && maxX > 0.0f && ui::OnScrollTrack(hTrack, pressX, pressY))
             m_researchScrollDrag = 2;
-        m_researchDrag = m_researchScrollDrag == 0 && l.tree.Contains(pressX, pressY);
+        m_researchDrag = m_researchScrollDrag == 0 && !onZoomWidget && l.tree.Contains(pressX, pressY);
         m_researchDragX = pressX;
         m_researchDragY = pressY;
     }
     const bool wasDragging = m_researchDrag;
     if (m_researchDrag)
     {
-        // Within the slop it is a tap (the touch input counts 12 px as well); past it the tree follows, the travel
-        // since the press included, and the speed is kept (smoothed over a few frames) for the glide
         constexpr float kSlop = 12.0f;
         bool justMoved = false;
         if (!m_researchDragMoved
@@ -517,7 +662,6 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     }
     else if (m_researchGlideX != 0.0f || m_researchGlideY != 0.0f)
     {
-        // After the lift the tree glides on at the speed of the flick and slows down
         if (std::hypot(m_researchGlideX, m_researchGlideY) < kGlideStop)
         {
             m_researchGlideX = m_researchGlideY = 0.0f;
@@ -531,7 +675,7 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             m_researchGlideY *= keep;
         }
     }
-    // A scroll bar that is held follows the pointer (also on the frame of the release)
+
     const bool scrollDragFrame = m_researchScrollDrag != 0;
     if (m_researchScrollDrag == 1)
         m_researchScrollY = ui::ScrollPosFromMouse(vTrack, my, treeH, static_cast<float>(l.tree.h));
@@ -539,7 +683,7 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         m_researchScrollX = ui::ScrollPosFromMouse(hTrack, mx, treeW, static_cast<float>(l.tree.w));
     if (!down)
         m_researchScrollDrag = 0;
-    // Against an edge the glide stops
+
     const float scrollX = std::clamp(m_researchScrollX, 0.0f, maxX),
                 scrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
     if (scrollX != m_researchScrollX)
@@ -551,10 +695,18 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     if (scrollDragFrame)
         return true;
     if (wasDragging && !m_researchDrag && m_researchDragMoved)
-        leftClicked = false; // the finger lifted at the end of a pan: not a tap on whatever it stopped over
+        leftClicked = false;
 
     if (leftClicked)
     {
+        const UiRect clearBtn = searchClearRect(l);
+        if (!m_researchSearch.empty() && clearBtn.Contains(mx, my))
+        {
+            m_researchSearch.clear();
+            m_researchSearchFocus = true;
+            SoundRequests::Play("ui_click");
+            return true;
+        }
         m_researchSearchFocus = l.search.Contains(mx, my);
         if (l.closeBtn.Contains(mx, my))
         {
@@ -564,10 +716,17 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         }
         if (l.zoomIn.Contains(mx, my) || l.zoomOut.Contains(mx, my))
         {
-            const float before = m_researchScale;
-            setScale(m_researchScale + (l.zoomIn.Contains(mx, my) ? kScaleStep : -kScaleStep));
-            m_researchScrollX *= m_researchScale / before;
-            m_researchScrollY *= m_researchScale / before;
+            applyZoom(m_researchScale + (l.zoomIn.Contains(mx, my) ? kScaleStep : -kScaleStep));
+            m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
+            m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
+            SoundRequests::Play("ui_click");
+            return true;
+        }
+        if (zoomReset.w > 0 && zoomReset.Contains(mx, my))
+        {
+            applyZoom(1.0f);
+            m_researchScrollX = std::clamp(m_researchScrollX, 0.0f, maxX);
+            m_researchScrollY = std::clamp(m_researchScrollY, 0.0f, maxY);
             SoundRequests::Play("ui_click");
             return true;
         }
@@ -582,24 +741,32 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
             TryStartResearch(m_researchSel, economy, entities);
             return true;
         }
+        if (tree.shown[m_researchSel])
+        {
+            const int need = researchDef(faction, m_researchSel).needs;
+            if (need >= 0 && need < kResearchCount && tree.shown[need] && detailsReqRect(l).Contains(mx, my))
+            {
+                m_researchSel = need;
+                const UiRect n0 = nodeRect(tree, metrics, need, l.tree, 0.0f, 0.0f);
+                m_researchScrollX = std::clamp(static_cast<float>(n0.CenterX() - l.tree.CenterX()), 0.0f, maxX);
+                m_researchScrollY = std::clamp(static_cast<float>(n0.CenterY() - l.tree.CenterY()), 0.0f, maxY);
+                m_researchGlideX = m_researchGlideY = 0.0f;
+                m_researchClickNode = -1;
+                SoundRequests::Play("ui_click");
+                return true;
+            }
+        }
         if (l.tree.Contains(mx, my))
         {
             for (int i = 0; i < kResearchCount; ++i)
             {
                 if (!tree.shown[i])
                     continue;
-                const UiRect n {
-                    l.tree.x + 8 + tree.depth[i] * (kNodeW + kGapX) - static_cast<int>(m_researchScrollX),
-                    l.tree.y + 8 + static_cast<int>(tree.row[i] * (kNodeH + kGapY))
-                        - static_cast<int>(m_researchScrollY),
-                    kNodeW,
-                    kNodeH};
+                const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
                 if (!n.Contains(mx, my))
                     continue;
                 const std::uint32_t now = SDL_GetTicks();
                 m_researchSel = i;
-                // Twice on the same technology starts it, and the window closes (when it was not started, the reason
-                // shows in the window)
                 if (m_researchClickNode == i && now - m_researchClickMs < 400 && TryStartResearch(i, economy, entities))
                 {
                     m_researchClickNode = -1;
@@ -614,12 +781,195 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
         }
         else if (!l.dialog.Contains(mx, my))
         {
-            CloseResearchWindow(); // a click outside the window closes it
+            CloseResearchWindow();
         }
     }
     (void) progress;
-    return true; // while the window is open nothing else reacts
+    return true;
 }
+
+namespace
+{
+struct CardPalette
+{
+    SDL_Color topFill;
+    SDL_Color bottomFill;
+    SDL_Color border;
+    SDL_Color spine;
+    SDL_Color badgeFill;
+    SDL_Color badgeText;
+};
+
+CardPalette paletteForState(State st, bool affordable)
+{
+    switch (st)
+    {
+        case State::Done:
+            return {{30, 52, 36, 255}, {20, 35, 24, 255}, col::Ok, {96, 214, 132, 255}, {22, 48, 30, 255}, col::Ok};
+        case State::Active:
+            return {
+                {58, 43, 21, 255}, {36, 27, 14, 255}, col::Accent, {246, 200, 88, 255}, {64, 46, 18, 255}, col::Accent};
+        case State::Available:
+            return {
+                {40, 31, 23, 255},
+                {26, 20, 15, 255},
+                affordable ? SDL_Color {148, 110, 70, 255} : SDL_Color {145, 84, 72, 255},
+                affordable ? col::Accent : col::Danger,
+                {24, 18, 14, 255},
+                affordable ? col::Accent : col::Danger};
+        case State::Locked:
+        default:
+            return {
+                {25, 20, 16, 255},
+                {17, 14, 11, 255},
+                {68, 52, 39, 255},
+                {82, 65, 50, 255},
+                {19, 15, 12, 255},
+                col::TextMuted};
+    }
+}
+
+void drawTitle2Lines(
+    BitmapFontRenderer &font, std::string_view text, int x, int y, int boxH, int maxW, int fontId, SDL_Color color)
+{
+    const int lineH = std::max(14, font.GetTextHeight(fontId));
+    if (font.GetTextWidth(text, fontId) <= maxW)
+    {
+        font.DrawString(text, x, y + boxH / 2, fontId, color, false, Anchor::LEFT | Anchor::VCENTER);
+        return;
+    }
+    std::string line1;
+    std::string_view rem = text;
+    std::size_t bestSplit = std::string_view::npos;
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] != ' ')
+            continue;
+        if (font.GetTextWidth(text.substr(0, i), fontId) <= maxW)
+            bestSplit = i;
+        else
+            break;
+    }
+    if (bestSplit != std::string_view::npos)
+    {
+        line1 = std::string(text.substr(0, bestSplit));
+        rem = text.substr(bestSplit + 1);
+    }
+    else
+    {
+        line1 = ui::FitText(font, text, fontId, maxW);
+        rem = {};
+    }
+    const std::string line2 = rem.empty() ? std::string {} : ui::FitText(font, rem, fontId, maxW);
+    const int totalH = line2.empty() ? lineH : lineH * 2 + 1;
+    const int topY = y + std::max(0, (boxH - totalH) / 2);
+    font.DrawString(line1, x, topY, fontId, color, false);
+    if (!line2.empty())
+        font.DrawString(line2, x, topY + lineH + 1, fontId, color, false);
+}
+
+void drawBlueprintBackdrop(Renderer &renderer, const UiRect &view, float scrollX, float scrollY, float sc)
+{
+    ui::FillVerticalGradient(renderer, view, {23, 18, 14, 255}, {12, 10, 8, 255});
+    const int minorStep = std::max(28, sz(40, sc));
+    const int majorStep = minorStep * 4;
+    const int offX = static_cast<int>(scrollX);
+    const int offY = static_cast<int>(scrollY);
+    auto firstGridCoord = [](int startScreen, int scroll, int step) {
+        const int rem = scroll % step;
+        return startScreen - (rem >= 0 ? rem : rem + step);
+    };
+    const int xStart = firstGridCoord(view.x, offX, minorStep);
+    const int yStart = firstGridCoord(view.y, offY, minorStep);
+    const SDL_Color minorColor {38, 30, 23, 85};
+    const SDL_Color majorColor {56, 43, 31, 130};
+    for (int x = xStart; x <= view.Right(); x += minorStep)
+    {
+        const bool major = ((x - view.x + offX) % majorStep) == 0;
+        renderer.DrawLineScreen(x, view.y, x, view.Bottom(), major ? majorColor : minorColor);
+    }
+    for (int y = yStart; y <= view.Bottom(); y += minorStep)
+    {
+        const bool major = ((y - view.y + offY) % majorStep) == 0;
+        renderer.DrawLineScreen(view.x, y, view.Right(), y, major ? majorColor : minorColor);
+    }
+    const int xMaj = firstGridCoord(view.x, offX, majorStep);
+    const int yMaj = firstGridCoord(view.y, offY, majorStep);
+    const SDL_Color tickColor {108, 82, 56, 155};
+    for (int x = xMaj; x <= view.Right(); x += majorStep)
+    {
+        for (int y = yMaj; y <= view.Bottom(); y += majorStep)
+        {
+            renderer.DrawLineScreen(x - 4, y, x + 4, y, tickColor);
+            renderer.DrawLineScreen(x, y - 4, x, y + 4, tickColor);
+        }
+    }
+}
+
+void drawStatusBadge(
+    Renderer &renderer,
+    BitmapFontRenderer &font,
+    const UiRect &rect,
+    std::string_view label,
+    int fontId,
+    SDL_Color fill,
+    SDL_Color border,
+    SDL_Color textColor)
+{
+    renderer.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
+    renderer.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
+    font.DrawString(label, rect.CenterX(), rect.CenterY(), fontId, textColor, false, Anchor::HCENTER | Anchor::VCENTER);
+}
+
+void drawStatTile(
+    Renderer &renderer,
+    BitmapFontRenderer &font,
+    const UiRect &rect,
+    std::string_view caption,
+    std::string_view value,
+    SDL_Color valueColor,
+    bool touch)
+{
+    ui::FillVerticalGradient(renderer, rect, {26, 20, 15, 255}, {17, 14, 11, 255});
+    renderer.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, col::Border);
+    renderer.FillRectScreen(rect.x + 1, rect.y + 1, rect.w - 2, 1, {72, 54, 40, 255});
+    font.DrawString(caption, rect.x + 10, rect.y + 7, ui::FONT_SMALL, col::TextMuted, false);
+    font.DrawString(
+        value,
+        rect.x + 10,
+        rect.Bottom() - (touch ? 28 : 22),
+        touch ? ui::FONT_H2 : ui::FONT_BODY_BOLD,
+        valueColor,
+        false);
+}
+
+std::string buildStatusCallout(
+    std::string_view hudNotification,
+    Faction faction,
+    State st,
+    bool hasLab,
+    bool otherActive,
+    bool canAfford,
+    const ResearchDef &r)
+{
+    if (!hudNotification.empty())
+        return std::string(hudNotification);
+    if (!hasLab)
+        return faction == Faction::Confederation ? std::string(_("Build a Tech Center to start research"))
+                                                 : std::string(_("Build a Laboratory to start research"));
+    if (st == State::Done)
+        return std::string(_("THIS TECHNOLOGY IS ALREADY RESEARCHED!"));
+    if (st == State::Active)
+        return std::string(_("RESEARCHING"));
+    if (st == State::Locked && r.needs >= 0)
+        return std::string(_("REQUIRES: ")) + _(researchDef(faction, r.needs).name);
+    if (otherActive)
+        return std::string(_("ANOTHER RESEARCH IS ALREADY IN PROGRESS!"));
+    if (!canAfford)
+        return std::string(_("INSUFFICIENT CREDITS FOR RESEARCH!"));
+    return {};
+}
+} // namespace
 
 void HUDController::RenderResearchWindow(
     Renderer &renderer,
@@ -634,20 +984,19 @@ void HUDController::RenderResearchWindow(
     if (!m_researchOpen)
         return;
     const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
-    const float sc = m_researchScale * l.u; // (the touch profile: bigger with the screen)
-    const int kNodeW = sz(kNodeW0, sc), kNodeH = sz(kNodeH0, sc), kGapX = sz(kGapX0, sc), kGapY = sz(kGapY0, sc);
+    const float sc = m_researchScale * l.u;                       // (the touch profile: bigger with the screen)
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
+    const TreeMetrics metrics = measureTree(tree, l, sc);
     const ResearchProgress researchNow = ResearchShown();
     const ResearchProgress *progress = &researchNow;
     const bool hasLab = HasResearchBuilding(Players::Local(), entities);
-    // A finger leaves no hovering pointer behind; the touch profile also reads bigger text in the nodes and the details
     auto over = [&](const UiRect &r) {
         return !l.touch && r.Contains(mx, my);
     };
-    const int nodeNameFont = l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD;
-    const int nodeStateFont = l.touch ? ui::FONT_BODY : ui::FONT_SMALL;
-    const int textFont = l.touch ? ui::FONT_BODY : ui::FONT_SMALL;
+    const int nodeNameFont = (l.touch || sc >= 1.15f) ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD;
+    const int nodeStateFont = l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD;
+    const int textFont = ui::FONT_BODY;
 
     ui::DrawDialog(
         renderer,
@@ -657,20 +1006,40 @@ void HUDController::RenderResearchWindow(
         l.dialog,
         faction == Faction::Confederation ? _("TECH CENTER - RESEARCH") : _("LABORATORY - RESEARCH"));
 
-    // Search and filter
-    ui::DrawPanel(renderer, l.search, col::PanelSunken, m_researchSearchFocus ? col::Accent : col::Border);
+    // Search bar with clear 'X' button
+    ui::FillVerticalGradient(renderer, l.search, {20, 16, 12, 255}, {14, 11, 9, 255});
+    renderer.DrawRectScreen(
+        l.search.x, l.search.y, l.search.w, l.search.h, m_researchSearchFocus ? col::Accent : col::BorderStrong);
+    const UiRect clearBtn = searchClearRect(l);
+    const int searchMaxW = l.search.w - 20 - (m_researchSearch.empty() ? 0 : clearBtn.w + 8);
     const bool blink = (SDL_GetTicks() / 500) % 2 == 0;
     const std::string shown = m_researchSearch.empty() && !m_researchSearchFocus
                                   ? std::string(_("Search technology..."))
                                   : m_researchSearch + (m_researchSearchFocus && blink ? "|" : "");
     font.DrawString(
-        ui::FitText(font, shown, ui::FONT_BODY, l.search.w - 20),
+        ui::FitText(font, shown, ui::FONT_BODY, std::max(40, searchMaxW)),
         l.search.x + 10,
         l.search.CenterY(),
         ui::FONT_BODY,
         m_researchSearch.empty() && !m_researchSearchFocus ? col::TextMuted : col::Text,
         false,
         Anchor::LEFT | Anchor::VCENTER);
+    if (!m_researchSearch.empty())
+    {
+        const bool clearHot = over(clearBtn);
+        renderer.FillRectScreen(
+            clearBtn.x, clearBtn.y, clearBtn.w, clearBtn.h, clearHot ? col::Hover : SDL_Color {38, 29, 22, 255});
+        renderer.DrawRectScreen(clearBtn.x, clearBtn.y, clearBtn.w, clearBtn.h, clearHot ? col::Accent : col::Border);
+        font.DrawString(
+            "X",
+            clearBtn.CenterX(),
+            clearBtn.CenterY(),
+            ui::FONT_SMALL_BOLD,
+            col::Text,
+            false,
+            Anchor::HCENTER | Anchor::VCENTER);
+    }
+
     const std::vector<std::string> filters = filterChoices();
     ui::DrawComboField(
         renderer,
@@ -680,17 +1049,28 @@ void HUDController::RenderResearchWindow(
         m_researchCombo.open == 0,
         over(l.filter));
     ui::DrawButton(renderer, font, l.closeBtn, _("CLOSE"), ui::ButtonStyle::Secondary, over(l.closeBtn));
-    // Credits
-    font.DrawString(
-        "$ " + std::to_string(economy.GetCredits()),
-        l.closeBtn.x - 16,
-        l.closeBtn.CenterY(),
-        ui::FONT_H2,
-        col::Accent,
-        false,
-        Anchor::RIGHT | Anchor::VCENTER);
 
-    // Which technologies stand out under the search and the filter
+    // Credits pill cleanly positioned right of the filter combo
+    const std::string credStr = "$ " + std::to_string(economy.GetCredits());
+    const int credW = std::max(106, font.GetTextWidth(credStr, ui::FONT_H2) + 28);
+    const int credSpace = l.closeBtn.x - 12 - (l.filter.Right() + 12);
+    if (credSpace >= 76)
+    {
+        const UiRect credRect {
+            l.closeBtn.x - 12 - std::min(credW, credSpace), l.closeBtn.y, std::min(credW, credSpace), l.closeBtn.h};
+        ui::FillVerticalGradient(renderer, credRect, {30, 23, 17, 255}, {18, 14, 10, 255});
+        renderer.DrawRectScreen(credRect.x, credRect.y, credRect.w, credRect.h, col::BorderStrong);
+        font.DrawString(
+            credStr,
+            credRect.CenterX(),
+            credRect.CenterY(),
+            ui::FONT_H2,
+            col::Accent,
+            false,
+            Anchor::HCENTER | Anchor::VCENTER);
+    }
+
+    // Filter matcher
     const std::string needle = lowerUtf8(m_researchSearch);
     auto matches = [&](int i) {
         const auto &r = researchDef(faction, i);
@@ -713,208 +1093,411 @@ void HUDController::RenderResearchWindow(
         }
     };
 
-    // The tree
-    ui::DrawPanel(renderer, l.tree, col::PanelSunken, col::Border);
-    // Touch: the scissor of some devices lands in the wrong place, so the tree is drawn into its own picture
-    const bool softClip
-        = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch"
-          && renderer.BeginClipTarget({l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2}, col::PanelSunken);
+    // Tactical blueprint viewport
+    const SDL_Rect innerTree {l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2};
+    const bool softClip = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch"
+                          && renderer.BeginClipTarget(innerTree, {16, 13, 10, 255});
     if (!softClip)
-        renderer.SetClipRect({l.tree.x + 1, l.tree.y + 1, l.tree.w - 2, l.tree.h - 2});
-    auto nodeRect = [&](int i) {
-        return UiRect {
-            l.tree.x + 8 + tree.depth[i] * (kNodeW + kGapX) - static_cast<int>(m_researchScrollX),
-            l.tree.y + 8 + static_cast<int>(tree.row[i] * (kNodeH + kGapY)) - static_cast<int>(m_researchScrollY),
-            kNodeW,
-            kNodeH};
-    };
-    // Links first
+        renderer.SetClipRect(innerTree);
+
+    drawBlueprintBackdrop(
+        renderer, {innerTree.x, innerTree.y, innerTree.w, innerTree.h}, m_researchScrollX, m_researchScrollY, sc);
+
+    // Division headers & completion progress
+    int colDone[3] {0, 0, 0};
+    for (int i = 0; i < kResearchCount; ++i)
+    {
+        if (tree.shown[i] && IsResearched(Players::Local(), i))
+            colDone[std::clamp(tree.division[i], 0, 2)] += 1;
+    }
+    for (int c = 0; c < 3; ++c)
+    {
+        if (!metrics.colShown[c])
+            continue;
+        const UiRect hdr {
+            l.tree.x + metrics.originX + metrics.colX[c] - static_cast<int>(m_researchScrollX),
+            l.tree.y + metrics.padY - static_cast<int>(m_researchScrollY),
+            metrics.colW[c],
+            metrics.headerH};
+        if (hdr.Right() < l.tree.x || hdr.x > l.tree.Right() || hdr.Bottom() < l.tree.y || hdr.y > l.tree.Bottom())
+            continue;
+        ui::DrawButtonChrome(
+            renderer, hdr, {44, 34, 24, 255}, {28, 22, 16, 255}, col::BorderStrong, col::Accent, col::BorderStrong);
+        font.DrawString(
+            _(divisionTitle(c)),
+            hdr.x + 12,
+            hdr.CenterY(),
+            l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD,
+            col::Accent,
+            false,
+            Anchor::LEFT | Anchor::VCENTER);
+        const std::string tally = std::to_string(colDone[c]) + "/" + std::to_string(tree.colCount[c]);
+        font.DrawString(
+            tally,
+            hdr.Right() - 10,
+            hdr.CenterY(),
+            ui::FONT_SMALL_BOLD,
+            colDone[c] == tree.colCount[c] ? col::Ok : col::TextDim,
+            false,
+            Anchor::RIGHT | Anchor::VCENTER);
+    }
+
+    // Circuit prerequisite traces (orthogonal 2px bus from parent bottom-left port into indented child left port)
+    const float linkWidth = std::max(2.0f, 2.0f * sc);
     for (int i = 0; i < kResearchCount; ++i)
     {
         if (!tree.shown[i] || tree.parent[i] < 0)
             continue;
-        const UiRect a = nodeRect(tree.parent[i]), b = nodeRect(i);
-        const int midX = (a.Right() + b.x) / 2;
+        const UiRect a = nodeRect(tree, metrics, tree.parent[i], l.tree, m_researchScrollX, m_researchScrollY);
+        const UiRect b = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
+        const int busX = a.x + std::min(metrics.indentX / 2, std::max(7, sz(9, sc)));
         const bool hot = i == m_researchSel || tree.parent[i] == m_researchSel;
         const bool done = IsResearched(Players::Local(), tree.parent[i]);
-        const SDL_Color c = hot ? col::Accent : (done ? SDL_Color {70, 150, 100, 255} : SDL_Color {90, 110, 120, 255});
-        renderer.DrawLineScreen(a.Right(), a.CenterY(), midX, a.CenterY(), c);
-        renderer.DrawLineScreen(midX, a.CenterY(), midX, b.CenterY(), c);
-        renderer.DrawLineScreen(midX, b.CenterY(), b.x, b.CenterY(), c);
+        const SDL_Color c = hot ? col::Accent : (done ? col::Ok : SDL_Color {112, 86, 63, 255});
+        renderer.DrawThickLineScreen(
+            static_cast<float>(busX),
+            static_cast<float>(a.Bottom()),
+            static_cast<float>(busX),
+            static_cast<float>(b.CenterY()),
+            linkWidth,
+            c);
+        renderer.DrawThickLineScreen(
+            static_cast<float>(busX),
+            static_cast<float>(b.CenterY()),
+            static_cast<float>(b.x),
+            static_cast<float>(b.CenterY()),
+            linkWidth,
+            c);
+        renderer.FillRectScreen(busX - 2, a.Bottom() - 1, 5, 5, c);
+        renderer.FillRectScreen(busX - 2, b.CenterY() - 2, 4, 4, c);
+        renderer.FillRectScreen(b.x - 3, b.CenterY() - 2, 5, 5, c);
     }
+
+    // Technology cards
+    const int iconPad = std::max(5, sz(6, sc));
+    const int pillH = std::max(18, sz(20, sc));
     for (int i = 0; i < kResearchCount; ++i)
     {
         if (!tree.shown[i])
             continue;
-        const UiRect n = nodeRect(i);
+        const UiRect n = nodeRect(tree, metrics, i, l.tree, m_researchScrollX, m_researchScrollY);
         if (n.Right() < l.tree.x || n.x > l.tree.Right() || n.Bottom() < l.tree.y || n.y > l.tree.Bottom())
             continue;
         const auto &r = researchDef(faction, i);
         const State st = stateOf(i, progress);
+        const bool affordable = economy.CanAfford(r.cost);
         const bool selected = i == m_researchSel;
         const bool hovered = over(n) && l.tree.Contains(mx, my);
         const bool lit = matches(i);
-        SDL_Color fill = st == State::Done        ? SDL_Color {28, 52, 38, 255}
-                         : st == State::Active    ? SDL_Color {26, 44, 66, 255}
-                         : st == State::Available ? SDL_Color {36, 40, 30, 255}
-                                                  : SDL_Color {24, 26, 32, 255};
+
+        CardPalette pal = paletteForState(st, affordable);
         if (hovered)
-            fill = {
-                static_cast<Uint8>(fill.r + 14), static_cast<Uint8>(fill.g + 14), static_cast<Uint8>(fill.b + 14), 255};
-        SDL_Color edge = st == State::Done
-                             ? col::Ok
-                             : (st == State::Active ? col::Info : (st == State::Available ? col::Accent : col::Border));
-        renderer.FillRectScreen(n.x, n.y, n.w, n.h, fill);
-        renderer.DrawRectScreen(n.x, n.y, n.w, n.h, selected ? col::Text : edge);
+        {
+            pal.topFill = ui::Mix(pal.topFill, col::Accent, 0.14f);
+            pal.bottomFill = ui::Mix(pal.bottomFill, col::Accent, 0.08f);
+        }
+        ui::DrawButtonChrome(
+            renderer,
+            n,
+            pal.topFill,
+            pal.bottomFill,
+            selected ? col::Text : pal.border,
+            pal.spine,
+            selected ? col::Accent : pal.border);
         if (selected)
-            renderer.DrawRectScreen(n.x + 1, n.y + 1, n.w - 2, n.h - 2, edge);
+            renderer.DrawRectScreen(n.x + 1, n.y + 1, n.w - 2, n.h - 2, pal.border);
+
+        const int iconSize = std::max(28, n.h - iconPad * 2);
+        const UiRect iconFrame {n.x + iconPad + 4, n.y + iconPad, iconSize, iconSize};
+        renderer.FillRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, {12, 10, 8, 255});
+        renderer.DrawRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, col::Border);
+        const float iconScale = static_cast<float>(std::max(16, iconSize - 6)) / 64.0f;
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        const int iconBox = sz(kIconBox0, sc);
-        renderer.DrawCompositeScreen(r.compId, n.x + 4, n.y + (n.h - iconBox) / 2, kIconScale0 * sc, faction);
+        renderer.DrawCompositeScreen(r.compId, iconFrame.x + 3, iconFrame.y + 3, iconScale, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
-        const std::string state = st == State::Done     ? std::string(_("RESEARCHED"))
-                                  : st == State::Active ? std::string(_("RESEARCHING"))
-                                  : st == State::Locked ? std::string(_("LOCKED"))
-                                                        : "$" + std::to_string(r.cost);
-        const int textX = n.x + 4 + iconBox + 6;
-        font.DrawString(
-            ui::FitText(font, _(r.name), nodeNameFont, n.Right() - 6 - textX),
-            textX,
-            n.CenterY() - 20,
-            nodeNameFont,
-            lit ? col::Text : col::TextMuted,
-            false);
-        font.DrawString(
-            state,
-            textX,
-            n.CenterY() + 2,
+
+        const int textX = iconFrame.Right() + std::max(8, sz(9, sc));
+        const int textW = std::max(36, n.Right() - 8 - textX);
+        const int pillY = n.Bottom() - iconPad - pillH;
+        const int titleH = std::max(16, pillY - (n.y + iconPad) - 2);
+        drawTitle2Lines(
+            font, _(r.name), textX, n.y + iconPad, titleH, textW, nodeNameFont, lit ? col::Text : col::TextMuted);
+
+        std::string badgeLabel;
+        if (st == State::Done)
+            badgeLabel = std::string(_("RESEARCHED"));
+        else if (st == State::Active)
+        {
+            const int pct = progress ? std::clamp(
+                                           static_cast<int>(std::lround(
+                                               100.0f * progress->timer / std::max(0.1f, progress->duration))),
+                                           0,
+                                           100)
+                                     : 0;
+            badgeLabel = std::string(_("RESEARCHING")) + " " + std::to_string(pct) + "%";
+        }
+        else if (st == State::Locked)
+            badgeLabel = std::string(_("LOCKED"));
+        else
+            badgeLabel = "$" + std::to_string(r.cost);
+
+        const int timeW
+            = st == State::Done
+                  ? 0
+                  : font.GetTextWidth(std::to_string(static_cast<int>(r.seconds)) + "s", ui::FONT_SMALL) + 6;
+        const int badgeW
+            = std::clamp(font.GetTextWidth(badgeLabel, nodeStateFont) + 12, 42, std::max(42, textW - timeW));
+        drawStatusBadge(
+            renderer,
+            font,
+            {textX, pillY, badgeW, pillH},
+            ui::FitText(font, badgeLabel, nodeStateFont, badgeW - 6),
             nodeStateFont,
-            st == State::Done     ? col::Ok
-            : st == State::Active ? col::Info
-            : st == State::Locked ? col::TextDim
-                                  : (economy.CanAfford(r.cost) ? col::Accent : col::Danger),
-            false);
+            pal.badgeFill,
+            pal.border,
+            pal.badgeText);
+
+        if (st != State::Done && textW - badgeW >= 34)
+        {
+            font.DrawString(
+                std::to_string(static_cast<int>(r.seconds)) + " " + _("s"),
+                n.Right() - 8,
+                pillY + pillH / 2,
+                ui::FONT_SMALL,
+                col::TextMuted,
+                false,
+                Anchor::RIGHT | Anchor::VCENTER);
+        }
+
         if (st == State::Active && progress)
+        {
             ui::DrawProgressBar(
                 renderer,
-                {n.x + 4, n.Bottom() - 6, n.w - 8, 4},
+                {iconFrame.x, n.Bottom() - 4, n.Right() - 6 - iconFrame.x, 3},
                 progress->timer / std::max(0.1f, progress->duration),
-                col::Info);
+                col::Accent);
+        }
         if (!lit)
-            renderer.FillRectScreen(n.x, n.y, n.w, n.h, {8, 10, 14, 170}); // not what the search / filter asks for
+            renderer.FillRectScreen(n.x, n.y, n.w, n.h, {10, 8, 6, 185});
     }
+
     if (softClip)
         renderer.EndClipTarget();
     else
         renderer.ResetClipRect();
+
+    ui::DrawPanelFrame(renderer, l.tree, col::BorderStrong);
+
+    // Scroll bars
     {
-        const float treeW = 16.0f + (tree.maxDepth + 1) * (kNodeW + kGapX);
-        const float treeH = 16.0f + tree.rows * (kNodeH + kGapY);
         const UiRect vTrack = researchVTrack(l.tree), hTrack = researchHTrack(l.tree);
         ui::DrawScrollBar(
             renderer,
             vTrack,
             m_researchScrollY,
-            treeH,
+            metrics.contentH,
             static_cast<float>(l.tree.h),
             m_researchScrollDrag == 1 || ui::OnScrollTrack(vTrack, mx, my));
         ui::DrawScrollBar(
             renderer,
             hTrack,
             m_researchScrollX,
-            treeW,
+            metrics.contentW,
             static_cast<float>(l.tree.w),
             m_researchScrollDrag == 2 || ui::OnScrollTrack(hTrack, mx, my));
     }
-    ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, over(l.zoomIn));
-    ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, over(l.zoomOut));
 
-    // The selected technology
-    ui::DrawPanel(renderer, l.details, col::PanelRaised, col::Border);
+    // Floating zoom bar [ - ] [ 100% ] [ + ]
+    const UiRect zoomReset = zoomResetRect(l);
+    if (zoomReset.w > 0)
+    {
+        const UiRect dock {l.zoomOut.x - 4, l.zoomOut.y - 4, l.zoomIn.Right() - l.zoomOut.x + 8, l.zoomOut.h + 8};
+        ui::FillVerticalGradient(renderer, dock, {26, 20, 16, 238}, {15, 12, 9, 238});
+        renderer.DrawRectScreen(dock.x, dock.y, dock.w, dock.h, col::BorderStrong);
+        const bool pctHot = over(zoomReset);
+        ui::FillVerticalGradient(
+            renderer,
+            zoomReset,
+            pctHot ? SDL_Color {56, 42, 30, 255} : SDL_Color {28, 22, 17, 255},
+            pctHot ? SDL_Color {38, 28, 20, 255} : SDL_Color {18, 14, 11, 255});
+        renderer.DrawRectScreen(zoomReset.x, zoomReset.y, zoomReset.w, zoomReset.h, pctHot ? col::Accent : col::Border);
+        font.DrawString(
+            std::to_string(static_cast<int>(std::lround(m_researchScale * 100.0f))) + "%",
+            zoomReset.CenterX(),
+            zoomReset.CenterY(),
+            l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD,
+            pctHot ? col::Accent : col::Text,
+            false,
+            Anchor::HCENTER | Anchor::VCENTER);
+    }
+    ui::DrawButton(renderer, font, l.zoomOut, "-", ui::ButtonStyle::Secondary, over(l.zoomOut));
+    ui::DrawButton(renderer, font, l.zoomIn, "+", ui::ButtonStyle::Secondary, over(l.zoomIn));
+
+    // Selected Technology Dossier Panel
+    ui::DrawPanel(renderer, l.details, col::PanelRaised, col::BorderStrong);
     if (const int i = std::clamp(m_researchSel, 0, kResearchCount - 1); tree.shown[i])
     {
         const auto &r = researchDef(faction, i);
         const State st = stateOf(i, progress);
-        const int x = l.details.x + 12, w = l.details.w - 24;
-        int y = l.details.y + 12;
+        const bool affordable = economy.CanAfford(r.cost);
+        const CardPalette pal = paletteForState(st, affordable);
+        const int pad = l.touch ? 16 : 14;
+        const int x = l.details.x + pad;
+        const int w = l.details.w - pad * 2;
+        int y = l.details.y + pad;
+
+        // 1. Header block (pedestal + division + title + state pill)
+        const int iconSize = l.touch ? 84 : 74;
+        const int headerH = l.touch ? 92 : 82;
+        const UiRect iconFrame {x, y, iconSize, iconSize};
+        ui::FillVerticalGradient(renderer, iconFrame, {22, 17, 13, 255}, {12, 10, 8, 255});
+        renderer.DrawRectScreen(iconFrame.x, iconFrame.y, iconFrame.w, iconFrame.h, pal.border);
         renderer.SetDrawOwner(Players::Local());
         renderer.SetStructureFaction(faction);
-        renderer.DrawCompositeScreen(r.compId, x, y, kDetailsIconScale, faction);
+        renderer.DrawCompositeScreen(
+            r.compId, iconFrame.x + 4, iconFrame.y + 4, static_cast<float>(iconSize - 8) / 64.0f, faction);
         renderer.SetStructureFaction(Faction::Neutral);
         renderer.SetDrawOwner(kNoPlayer);
-        const int iconW = static_cast<int>(66 * kDetailsIconScale);
-        font.DrawTextWrapped(_(r.name), x + iconW + 8, y, w - iconW - 8, ui::FONT_BODY_BOLD, col::Accent, true);
-        y += iconW + 6;
-        renderer.FillRectScreen(x, y, w, 1, col::Border);
-        y += 10;
-        font.DrawString(std::string(_("Cost")) + ": $" + std::to_string(r.cost), x, y, ui::FONT_BODY, col::Text, false);
-        y += 22;
+
+        const int hx = iconFrame.Right() + 12;
+        const int hw = std::max(60, w - iconSize - 12);
         font.DrawString(
-            std::string(_("Time")) + ": " + std::to_string(static_cast<int>(r.seconds)) + " " + _("s"),
-            x,
+            ui::FitText(font, _(divisionTitle(tree.division[i])), ui::FONT_SMALL_BOLD, hw),
+            hx,
             y,
-            ui::FONT_BODY,
-            col::Text,
+            ui::FONT_SMALL_BOLD,
+            col::Accent,
             false);
-        y += 22;
-        if (r.needs >= 0)
-        {
-            font.DrawTextWrapped(
-                std::string(_("Requires")) + ": " + _(researchDef(faction, r.needs).name),
-                x,
-                y,
-                w,
-                textFont,
-                IsResearched(Players::Local(), r.needs) ? col::Ok : col::Danger,
-                false);
-            y += l.touch ? 48 : 36;
-        }
-        font.DrawTextWrapped(_(r.desc), x, y, w, textFont, col::TextDim, false);
-        // The state and the button
+        const int titleFont = l.touch ? ui::FONT_H2 : ui::FONT_BODY_BOLD;
+        const int pillDossierH = l.touch ? 24 : 20;
+        drawTitle2Lines(
+            font, _(r.name), hx, y + 16, std::max(24, headerH - 16 - pillDossierH - 4), hw, titleFont, col::Text);
         const std::string stateText = st == State::Done     ? std::string(_("RESEARCHED"))
                                       : st == State::Active ? std::string(_("RESEARCHING"))
                                       : st == State::Locked ? std::string(_("LOCKED"))
                                                             : std::string(_("AVAILABLE"));
-        font.DrawString(
+        const int stateBadgeW = std::min(hw, std::max(84, font.GetTextWidth(stateText, ui::FONT_SMALL_BOLD) + 18));
+        drawStatusBadge(
+            renderer,
+            font,
+            {hx, y + headerH - pillDossierH, stateBadgeW, pillDossierH},
             stateText,
-            l.details.CenterX(),
-            l.startBtn.y - 40,
-            ui::FONT_BODY_BOLD,
-            st == State::Done ? col::Ok
-                              : (st == State::Active ? col::Info : (st == State::Locked ? col::TextDim : col::Accent)),
-            false,
-            Anchor::HCENTER | Anchor::VCENTER);
-        if (st == State::Active && progress)
-            ui::DrawProgressBar(
+            ui::FONT_SMALL_BOLD,
+            pal.badgeFill,
+            pal.border,
+            pal.badgeText);
+
+        // 2. Stat Tiles (Cost + Time)
+        y += headerH + 10;
+        const int tileGap = 8;
+        const int tileW = (w - tileGap) / 2;
+        const int tileH = l.touch ? 60 : 52;
+        drawStatTile(
+            renderer,
+            font,
+            {x, y, tileW, tileH},
+            _("Cost"),
+            "$" + std::to_string(r.cost),
+            (affordable || st == State::Done) ? col::Accent : col::Danger,
+            l.touch);
+        drawStatTile(
+            renderer,
+            font,
+            {x + tileW + tileGap, y, w - tileW - tileGap, tileH},
+            _("Time"),
+            std::to_string(static_cast<int>(r.seconds)) + " " + _("s"),
+            col::Text,
+            l.touch);
+        y += tileH + 10;
+
+        // 3. Clickable Prerequisite Chip (matches detailsReqRect(l) exactly!)
+        if (r.needs >= 0)
+        {
+            const UiRect reqRect = detailsReqRect(l);
+            const bool reqDone = IsResearched(Players::Local(), r.needs);
+            const bool reqHot = over(reqRect) && tree.shown[r.needs];
+            const SDL_Color reqEdge = reqHot ? col::Accent : (reqDone ? col::Ok : col::Danger);
+            ui::DrawButtonChrome(
                 renderer,
-                {x, l.startBtn.y - 28, w, 8},
-                progress->timer / std::max(0.1f, progress->duration),
-                col::Info);
-        const bool canStart
-            = st == State::Available && hasLab && economy.CanAfford(r.cost) && progress && progress->active < 0;
+                reqRect,
+                reqHot ? SDL_Color {46, 35, 25, 255} : SDL_Color {26, 20, 15, 255},
+                reqHot ? SDL_Color {32, 24, 17, 255} : SDL_Color {17, 14, 11, 255},
+                reqEdge,
+                reqDone ? col::Ok : col::Danger,
+                reqEdge);
+            font.DrawString(_("Requires"), reqRect.x + 12, reqRect.y + 5, ui::FONT_SMALL, col::TextMuted, false);
+            if (tree.shown[r.needs])
+                font.DrawString(
+                    ">",
+                    reqRect.Right() - 10,
+                    reqRect.CenterY(),
+                    ui::FONT_SMALL_BOLD,
+                    reqEdge,
+                    false,
+                    Anchor::RIGHT | Anchor::VCENTER);
+            font.DrawString(
+                ui::FitText(
+                    font,
+                    _(researchDef(faction, r.needs).name),
+                    l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD,
+                    reqRect.w - 34),
+                reqRect.x + 12,
+                reqRect.Bottom() - (l.touch ? 22 : 18),
+                l.touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD,
+                reqDone ? col::Ok : col::Danger,
+                false);
+            y = reqRect.Bottom() + 10;
+        }
+
+        // 4. Footer layout from Start button upwards (progress bar + callout banner)
+        const bool otherActive = progress && progress->active >= 0 && progress->active != i;
+        const bool canStart = st == State::Available && hasLab && affordable && progress && progress->active < 0;
+        const std::string callout
+            = buildStatusCallout(m_hudNotification, faction, st, hasLab, otherActive, affordable, r);
+        int footerTop = l.startBtn.y - 10;
+        if (st == State::Active && progress)
+        {
+            const int barH = 10;
+            const UiRect barRect {x, footerTop - barH, w, barH};
+            ui::DrawProgressBar(renderer, barRect, progress->timer / std::max(0.1f, progress->duration), col::Accent);
+            footerTop = barRect.y - 8;
+        }
+        if (!callout.empty())
+        {
+            const int bannerH = l.touch ? 48 : 38;
+            const UiRect banner {x, footerTop - bannerH, w, bannerH};
+            const bool isError = !m_hudNotification.empty() || (!canStart && st != State::Done && st != State::Active);
+            const SDL_Color bFill = st == State::Done
+                                        ? SDL_Color {22, 42, 28, 255}
+                                        : (isError ? SDL_Color {46, 22, 20, 255} : SDL_Color {42, 32, 22, 255});
+            const SDL_Color bEdge = st == State::Done ? col::Ok : (isError ? col::Danger : col::Accent);
+            renderer.FillRectScreen(banner.x, banner.y, banner.w, banner.h, bFill);
+            renderer.DrawRectScreen(banner.x, banner.y, banner.w, banner.h, bEdge);
+            font.DrawString(
+                ui::FitText(font, callout, l.touch ? ui::FONT_BODY : ui::FONT_SMALL_BOLD, banner.w - 16),
+                banner.CenterX(),
+                banner.CenterY(),
+                l.touch ? ui::FONT_BODY : ui::FONT_SMALL_BOLD,
+                bEdge,
+                false,
+                Anchor::HCENTER | Anchor::VCENTER);
+            footerTop = banner.y - 10;
+        }
+
+        // 5. Framed description box cleanly filling remaining dossier height
+        const UiRect descBox {x, y, w, std::max(48, footerTop - y)};
+        ui::FillVerticalGradient(renderer, descBox, {22, 17, 13, 255}, {15, 12, 9, 255});
+        renderer.DrawRectScreen(descBox.x, descBox.y, descBox.w, descBox.h, col::Border);
+        renderer.SetClipRect({descBox.x + 2, descBox.y + 2, descBox.w - 4, descBox.h - 4});
+        font.DrawTextWrapped(_(r.desc), descBox.x + 10, descBox.y + 10, descBox.w - 20, textFont, col::Text, false);
+        renderer.ResetClipRect();
+
         ui::DrawButton(
             renderer, font, l.startBtn, _("START RESEARCH"), ui::ButtonStyle::Primary, over(l.startBtn), canStart);
     }
-    // What the last click said (no laboratory, not enough credits, ...)
-    if (!m_hudNotification.empty())
-        font.DrawString(
-            ui::FitText(font, m_hudNotification, ui::FONT_SMALL, l.tree.w - 20),
-            l.tree.x + 10,
-            l.tree.Bottom() - 14,
-            ui::FONT_SMALL,
-            col::Danger,
-            false);
-    else if (!hasLab)
-        font.DrawString(
-            faction == Faction::Confederation ? _("Build a Tech Center to start research")
-                                              : _("Build a Laboratory to start research"),
-            l.tree.x + 10,
-            l.tree.Bottom() - 14,
-            ui::FONT_SMALL,
-            col::TextMuted,
-            false);
+
     if (m_researchCombo.open == 0)
     {
         ui::DrawComboList(

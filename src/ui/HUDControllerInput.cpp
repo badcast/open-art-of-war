@@ -231,15 +231,38 @@ bool HUDController::HandleHudClick(
     bool &outOpenObjectives,
     std::vector<int> &selectedUnits)
 {
+    const bool pressed = leftMouseDown && !m_prevLeftDown;
+    m_prevLeftDown = leftMouseDown;
     if (!leftMouseDown)
         m_radarDragging = false;
     // A radar drag owns the mouse until the button is released, also over the map (no box selection)
     if (m_radarDragging)
         return true;
-    if (!IsOverSidebar(mx, windowW))
-        return false;
 
     SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset, !m_observer && m_speedEnabled);
+    const int gridRows = (ItemCountForTab(m_activeTab) + SidebarLayout::kCols - 1) / SidebarLayout::kCols;
+    const int gridContentH
+        = gridRows > 0 ? gridRows * (SidebarLayout::kCellH + SidebarLayout::kGap) - SidebarLayout::kGap : 0;
+    const float maxScrollPx = std::max(0.0f, static_cast<float>(gridContentH - l.grid.h));
+    ui::UpdateSmoothList(
+        m_gridScroll[m_activeTab],
+        l.grid,
+        {},
+        gridContentH,
+        SidebarLayout::kCellH + SidebarLayout::kGap,
+        mx,
+        my,
+        leftMouseDown,
+        pressed,
+        m_gridPressX,
+        m_gridPressY,
+        wheelSteps,
+        leftClicked,
+        false);
+    if (m_gridScroll[m_activeTab].dragging)
+        return true;
+    if (!IsOverSidebar(mx, windowW))
+        return false;
 
     // Radar: wheel and the +/- buttons zoom, click or drag moves the camera
     if (l.radar.Contains(mx, my))
@@ -280,15 +303,13 @@ bool HUDController::HandleHudClick(
         return true;
     }
 
-    int maxScroll = MaxScrollRows(m_activeTab, l.grid.h);
-    m_scrollRow[m_activeTab] = std::clamp(m_scrollRow[m_activeTab] - wheelSteps, 0, maxScroll);
-
     if (!m_observer && rightClicked && l.grid.Contains(mx, my))
     {
         int count = ItemCountForTab(m_activeTab);
+        const int scrollPx = m_gridScroll[m_activeTab].PixelOffset();
         for (int i = 0; i < count; ++i)
         {
-            UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
+            UiRect c = l.Cell(i, scrollPx);
             if (c.Contains(mx, my))
             {
                 ActivateCell(m_activeTab, ItemAt(m_activeTab, i), true, economy, entities, map, selectedUnits);
@@ -386,14 +407,22 @@ bool HUDController::HandleHudClick(
             return true;
         }
     }
-    if (maxScroll > 0 && l.scrollUp.Contains(mx, my))
+    if (maxScrollPx > 0.0f && l.scrollUp.Contains(mx, my))
     {
-        m_scrollRow[m_activeTab] = std::max(0, m_scrollRow[m_activeTab] - 1);
+        m_gridScroll[m_activeTab].velocity = 0.0f;
+        m_gridScroll[m_activeTab].target = std::clamp(
+            m_gridScroll[m_activeTab].target - static_cast<float>(SidebarLayout::kCellH + SidebarLayout::kGap),
+            0.0f,
+            maxScrollPx);
         return true;
     }
-    if (maxScroll > 0 && l.scrollDown.Contains(mx, my))
+    if (maxScrollPx > 0.0f && l.scrollDown.Contains(mx, my))
     {
-        m_scrollRow[m_activeTab] = std::min(maxScroll, m_scrollRow[m_activeTab] + 1);
+        m_gridScroll[m_activeTab].velocity = 0.0f;
+        m_gridScroll[m_activeTab].target = std::clamp(
+            m_gridScroll[m_activeTab].target + static_cast<float>(SidebarLayout::kCellH + SidebarLayout::kGap),
+            0.0f,
+            maxScrollPx);
         return true;
     }
     if ((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && l.primaryBtn.Contains(mx, my))
@@ -404,10 +433,11 @@ bool HUDController::HandleHudClick(
     if (l.grid.Contains(mx, my))
     {
         int count = ItemCountForTab(m_activeTab);
+        const int scrollPx = m_gridScroll[m_activeTab].PixelOffset();
         for (int i = 0; i < count; ++i)
         {
-            UiRect c = l.Cell(i, m_scrollRow[m_activeTab]);
-            if (c.Contains(mx, my) && c.y >= l.grid.y && c.Bottom() <= l.grid.Bottom() + SidebarLayout::kGap)
+            UiRect c = l.Cell(i, scrollPx);
+            if (c.Contains(mx, my))
             {
                 if ((m_activeTab == TabInfantry || m_activeTab == TabVehicles) && InfinityBtn(c).Contains(mx, my))
                 {

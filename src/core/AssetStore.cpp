@@ -147,7 +147,7 @@ void InstallBundledData()
 #endif
 
 // "assets/maps/m0.json", "./assets/x", "../assets/x" -> "maps/m0.json"; false for non-asset paths
-bool AssetKey(const std::string &path, std::string &key)
+bool AssetKey(std::string_view path, std::string &key)
 {
     fs::path normal = fs::path(path).lexically_normal();
     auto it = normal.begin();
@@ -195,7 +195,7 @@ bool ReadFile(const fs::path &p, std::vector<std::uint8_t> &out)
 bool LoadBlob(
     const fs::path &filePath,
     std::map<std::string, std::vector<std::uint8_t>> &files,
-    const std::string &only = "",
+    std::string_view only = "",
     std::string *outCertificate = nullptr,
     std::map<std::string, std::string> *outFileHashes = nullptr)
 {
@@ -589,7 +589,7 @@ bool HasSessionOverlay()
 namespace
 {
 // The overlay's file for `path`, when there is one
-bool OverlayRead(State &s, const std::string &path, std::vector<std::uint8_t> *out)
+bool OverlayRead(State &s, std::string_view path, std::vector<std::uint8_t> *out)
 {
     std::lock_guard<std::mutex> guard(s.lock);
     if (s.overlay.empty())
@@ -605,7 +605,7 @@ bool OverlayRead(State &s, const std::string &path, std::vector<std::uint8_t> *o
     return true;
 }
 // The file of the topmost enabled mod that has `path`
-bool ModRead(State &s, const std::string &path, std::vector<std::uint8_t> *out)
+bool ModRead(State &s, std::string_view path, std::vector<std::uint8_t> *out)
 {
     std::lock_guard<std::mutex> guard(s.lock);
     if (s.mods.empty())
@@ -657,13 +657,12 @@ bool HasModLayers()
     return !s.mods.empty();
 }
 
-bool ReadArchive(
-    const std::string &file, std::map<std::string, std::vector<std::uint8_t>> &files, const std::string &only)
+bool ReadArchive(std::string_view file, std::map<std::string, std::vector<std::uint8_t>> &files, std::string_view only)
 {
-    return LoadBlob(fs::path(file), files, only);
+    return LoadBlob(fs::path(file), files, std::string(only));
 }
 
-bool Exists(const std::string &path)
+bool Exists(std::string_view path)
 {
     State &s = state();
     if (OverlayRead(s, path, nullptr) || ModRead(s, path, nullptr))
@@ -679,7 +678,7 @@ bool Exists(const std::string &path)
     return fs::exists(fs::path(UserDirLocked(s)) / key, ec) || BlobHas(s, key);
 }
 
-bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out)
+bool ReadBytes(std::string_view path, std::vector<std::uint8_t> &out)
 {
     State &s = state();
     if (OverlayRead(s, path, &out) || ModRead(s, path, &out))
@@ -693,7 +692,7 @@ bool ReadBytes(const std::string &path, std::vector<std::uint8_t> &out)
     return BlobRead(s, key, out);
 }
 
-bool ReadText(const std::string &path, std::string &out)
+bool ReadText(std::string_view path, std::string &out)
 {
     std::vector<std::uint8_t> bytes;
     if (!ReadBytes(path, bytes))
@@ -702,7 +701,7 @@ bool ReadText(const std::string &path, std::string &out)
     return true;
 }
 
-std::vector<std::string> List(const std::string &dir, const std::string &extension)
+std::vector<std::string> List(std::string_view dir, std::string_view extension)
 {
     State &s = state();
     std::set<std::string> names;
@@ -772,10 +771,10 @@ std::vector<std::string> List(const std::string &dir, const std::string &extensi
     return result;
 }
 
-std::string WritablePath(const std::string &path)
+std::string WritablePath(std::string_view path)
 {
     State &s = state();
-    std::string target = path;
+    std::string target(path);
     if (s.mode == Mode::Blob)
     {
         std::string key;
@@ -791,12 +790,12 @@ std::string WritablePath(const std::string &path)
     return target;
 }
 
-std::string RealDirectory(const std::string &dir)
+std::string RealDirectory(std::string_view dir)
 {
     State &s = state();
     std::string key;
     if (s.mode != Mode::Blob || !AssetKey(dir, key))
-        return dir;
+        return std::string(dir);
 
     std::lock_guard<std::mutex> guard(s.lock);
     const fs::path out = fs::path(UserDirLocked(s)) / "cache" / key;
@@ -822,11 +821,11 @@ std::string UserDataDir()
     return UserDirLocked(s);
 }
 
-void SetUserDataDir(const std::string &dir)
+void SetUserDataDir(std::string_view dir)
 {
     State &s = state();
     std::lock_guard<std::mutex> guard(s.lock);
-    s.userDir = dir;
+    s.userDir.assign(dir);
     std::error_code ec;
     fs::create_directories(dir, ec);
 }

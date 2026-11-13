@@ -104,14 +104,14 @@ std::string Clock(std::uint32_t ticks)
     return buf;
 }
 
-std::string TitleOf(const std::string &path)
+std::string TitleOf(std::string_view path)
 {
     return std::filesystem::path(path).stem().string();
 }
 
 } // namespace
 
-bool Application::OpenReplay(const std::string &path)
+bool Application::OpenReplay(std::string_view path)
 {
     if (!m_entities || !m_map || m_headless)
         return false;
@@ -367,16 +367,16 @@ void Application::UpdateReplayInput(double frameTime)
     const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
     // The open list of the view combo box takes the input first
     const std::vector<ObserverPlayer> viewPlayers = ObserverPlayers();
-    if (m_replayUi.comboOpen >= 0)
+    int pressX = 0, pressY = 0;
+    const bool down = m_input->IsLeftMouseDown();
+    const bool pressed = m_input->ConsumeLeftPress(pressX, pressY) && down;
+    if (m_replayUi.combo.open >= 0)
     {
-        ui::ComboState cs;
-        cs.open = 0;
-        cs.scroll = m_replayUi.comboScroll;
         int picked = -1;
         float lx, ly;
         const bool clicked = m_input->WasLeftClickIssued(lx, ly);
         ui::ComboUpdate(
-            cs,
+            m_replayUi.combo,
             bar.view,
             static_cast<int>(viewPlayers.size()) + 1,
             m_windowH,
@@ -384,10 +384,11 @@ void Application::UpdateReplayInput(double frameTime)
             my,
             clicked,
             m_input->ConsumeWheel(),
-            picked);
-        m_replayUi.comboScroll = cs.scroll;
-        if (cs.open < 0)
-            m_replayUi.comboOpen = -1;
+            picked,
+            down,
+            pressed,
+            pressX,
+            pressY);
         if (picked >= 0)
             ReplayWatch(picked == 0 ? -1 : viewPlayers[picked - 1].slot);
     }
@@ -414,8 +415,8 @@ void Application::UpdateReplayInput(double frameTime)
                 restart = true;
             else if (bar.view.Contains(mx, my))
             {
-                m_replayUi.comboOpen = 0;
-                m_replayUi.comboScroll = 0;
+                m_replayUi.combo.open = 0;
+                m_replayUi.combo.scroll = 0;
             }
             else if (bar.follow.Contains(mx, my))
                 toggleFollow = true;
@@ -700,7 +701,7 @@ void Application::RenderReplayBar()
         *m_fontRenderer,
         l.view,
         ui::FitText(*m_fontRenderer, viewName, ui::FONT_SMALL_BOLD, l.view.w - 40),
-        m_replayUi.comboOpen >= 0,
+        m_replayUi.combo.open >= 0,
         hot(l.view));
     ui::DrawCheckbox(
         *m_renderer, *m_fontRenderer, l.voice, _("Voice the interface"), m_replayUi.interfaceSound, hot(l.voice));
@@ -766,7 +767,7 @@ void Application::RenderReplayBar()
     }
 
     // The open view list, over everything
-    if (m_replayUi.comboOpen >= 0)
+    if (m_replayUi.combo.open >= 0)
     {
         std::vector<std::string> items {_("Observer (all)")};
         std::vector<SDL_Color> swatches {col::TextDim};
@@ -779,11 +780,18 @@ void Application::RenderReplayBar()
                 current = index;
             ++index;
         }
-        ui::ComboState cs;
-        cs.open = 0;
-        cs.scroll = m_replayUi.comboScroll;
         ui::DrawComboList(
-            *m_renderer, *m_fontRenderer, l.view, items, current, cs, m_windowH, mx, my, nullptr, &swatches);
+            *m_renderer,
+            *m_fontRenderer,
+            l.view,
+            items,
+            current,
+            m_replayUi.combo,
+            m_windowH,
+            mx,
+            my,
+            nullptr,
+            &swatches);
     }
 }
 
@@ -842,7 +850,7 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
             m_renderer->FillRectScreen(x + 4, ry, w - 8, rowH - 2, col::Hover);
         m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, isDefeated ? col::TextMuted : ArmyColor(p.color));
         m_renderer->DrawRectScreen(x + colName, cy - 7, 14, 14, col::Border);
-        auto text = [&](int cx, const std::string &t, SDL_Color c, int width) {
+        auto text = [&](int cx, std::string_view t, SDL_Color c, int width) {
             m_fontRenderer->DrawString(
                 ui::FitText(*m_fontRenderer, t, ui::FONT_BODY, width),
                 x + cx,
@@ -990,7 +998,7 @@ void Application::LocalTickRan(std::uint32_t tick)
     }
 }
 
-void Application::FinishLocalReplay(const std::string &outcome)
+void Application::FinishLocalReplay(std::string_view outcome)
 {
     if (m_gameplayController)
         m_gameplayController->simulation().SetRecordHook(nullptr);

@@ -37,7 +37,7 @@ float AttackFrameTime(const AnimTiming &t, int archetypeId)
     return (archetypeId == 7 || archetypeId == 18) ? 0.04f : 0.07f;
 }
 
-float DefaultAttackPose(const std::string &projectile)
+float DefaultAttackPose(std::string_view projectile)
 {
     return (projectile == "bullet" || projectile == "sniper") ? 0.12f : 0.22f;
 }

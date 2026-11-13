@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar::Net
 {
@@ -17,8 +18,8 @@ public:
     StatusPage(const StatusPage &) = delete;
     StatusPage &operator=(const StatusPage &) = delete;
 
-    bool open(std::uint16_t port, const std::string &bindAddress, std::string &error);
-    void serve(const std::string &json);
+    bool open(std::uint16_t port, std::string_view bindAddress, std::string &error);
+    void serve(std::string_view json);
 
 private:
     struct Impl;

@@ -7,6 +7,7 @@
 #include "game/Match.hpp"
 #include "game/Players.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar::ui
@@ -41,7 +42,7 @@ inline std::vector<std::string> ArmyCapChoices()
     return out;
 }
 // A tech level (data/capabilities.yaml) as shown: the known ones translated, any other by its name
-inline std::string TechLevelName(const std::string &level)
+inline std::string TechLevelName(std::string_view level)
 {
     if (level == "basic")
         return _("Basic");
@@ -51,7 +52,7 @@ inline std::string TechLevelName(const std::string &level)
         return _("Advanced");
     if (level == "full")
         return _("Full");
-    std::string out = level;
+    std::string out(level);
     if (!out.empty() && out[0] >= 'a' && out[0] <= 'z')
         out[0] = static_cast<char>(out[0] - 'a' + 'A');
     return out;

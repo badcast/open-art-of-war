@@ -103,7 +103,7 @@ YAML::Node ReadYamlFile(const std::filesystem::path &path)
     }
 }
 
-bool WriteFileAtomic(const std::filesystem::path &path, const std::string &text, std::string &error)
+bool WriteFileAtomic(const std::filesystem::path &path, std::string_view text, std::string &error)
 {
     std::filesystem::path tmp = path;
     tmp += ".tmp";

@@ -31,11 +31,11 @@ constexpr std::uint32_t kJoinTimeoutMs = 15000;
 } // namespace
 
 HostAnnouncer::HostAnnouncer(
-    const std::string &master,
+    std::string_view master,
     std::uint16_t masterPort,
     Transport &gameSocket,
     std::uint16_t gamePort,
-    const std::string &lanIp)
+    std::string_view lanIp)
     : m_master(master, masterPort)
     , m_socket(gameSocket)
     , m_host(master)
@@ -79,7 +79,7 @@ void HostAnnouncer::update(std::uint32_t nowMs, const RoomInfo &room, bool liste
     }
 }
 
-HostedJoin::HostedJoin(const std::string &master, std::uint16_t masterPort, const std::string &code)
+HostedJoin::HostedJoin(std::string_view master, std::uint16_t masterPort, std::string_view code)
     : m_master(master, masterPort)
     , m_host(master)
     , m_port(masterPort)

@@ -362,7 +362,7 @@ void AIController::UpdateStagingPoint(const TileMap &map, Pathfinder &pathfinder
 
 void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfinder &pathfinder)
 {
-    if (m_enemyHqX <= 0 && m_enemyHqY <= 0)
+    if (m_noFoesLeft || (m_enemyHqX <= 0 && m_enemyHqY <= 0))
         return;
     pathfinder.SetEntityManager(&entities);
 
@@ -385,7 +385,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
         }
         if (u->state == ActionState::Idle && u->targetEntityId == 0 && !u->isAttackMoving && !u->waitingForPath)
         {
-            if (distStaging > 5)
+            if (distStaging > 7)
             {
                 toStage.push_back(u->id);
             }
@@ -422,6 +422,7 @@ void AIController::UpdateStaging(TileMap &map, EntityManager &entities, Pathfind
                 u->pathIndex = 0;
                 u->targetTileX = slotX;
                 u->targetTileY = slotY;
+                u->isAttackMoving = true;
                 u->state = ActionState::Move;
                 u->waitingForPath = isPartial;
             }
@@ -437,10 +438,13 @@ void AIController::FindAttackObjective(const EntityManager &entities, const Tile
         return; // everybody hostile is out: nobody to attack
     float bestBldgDist = 1e9f;
 
-    // The closest enemy structure the computer knows of (walls on the way get breached), otherwise the closest
-    // enemy unit it sees, otherwise the enemy's starting position
+    // The closest living enemy structure the computer knows of (walls on the way get breached), otherwise the closest
+    // enemy unit it sees, otherwise the current foe anchor or any remaining living foe
     for (const auto &known : m_knownBuildings)
     {
+        const Entity *e = entities.GetEntity(known.first);
+        if (!e || !e->alive || e->state == ActionState::Die || !IsFoe(*e))
+            continue;
         const int cx = known.second.first, cy = known.second.second;
         float d = DetMath::Hypot(static_cast<float>(cx - m_enemyHqX), static_cast<float>(cy - m_enemyHqY));
         if (d < bestBldgDist)
@@ -474,6 +478,25 @@ void AIController::FindAttackObjective(const EntityManager &entities, const Tile
     {
         outX = m_playerHqX;
         outY = m_playerHqY;
+    }
+    if (outX < 0)
+    {
+        float bestDist = 1e9f;
+        bool foundBuilding = false;
+        for (const auto &e : entities.GetAllEntities())
+        {
+            if (!e.alive || e.state == ActionState::Die || !IsFoe(e))
+                continue;
+            const float d
+                = DetMath::Hypot(static_cast<float>(e.tileX - m_enemyHqX), static_cast<float>(e.tileY - m_enemyHqY));
+            if ((e.isBuilding && !foundBuilding) || (e.isBuilding == foundBuilding && d < bestDist))
+            {
+                foundBuilding = e.isBuilding;
+                bestDist = d;
+                outX = e.tileX;
+                outY = e.tileY;
+            }
+        }
     }
     if (outX >= 0)
     {
@@ -515,11 +538,14 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         if (u->targetEntityId != 0 || u->state == ActionState::Attack || u->state == ActionState::Transform)
             continue;
         const int distStaging = std::max(std::abs(u->tileX - m_stagingX), std::abs(u->tileY - m_stagingY));
-        const bool idle = (u->state == ActionState::Idle && !u->isAttackMoving) || u->blockedTimer >= 2.0f;
+        const bool blocked = u->blockedTimer >= 2.0f;
+        const bool idle = (u->state == ActionState::Idle && !u->isAttackMoving) || blocked;
         if (idle)
             idleReserve.push_back(u->id);
-        if (!u->isAttackMoving
-            && (distStaging <= 7 || (idle && (distStaging <= 16 || IsNearBase(*u, ownStructures, 4.0f)))))
+        const bool inStagingPocket = distStaging <= 7 && !u->waitingForPath
+                                     && (u->state == ActionState::Idle || u->state == ActionState::Move);
+        const bool nearStaging = distStaging <= 16 || IsNearBase(*u, ownStructures, 4.0f);
+        if (inStagingPocket || (idle && nearStaging && (!u->isAttackMoving || blocked)))
         {
             ready.push_back(u->id);
         }
@@ -571,6 +597,7 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         {
             entities.GetUnit(id)->groupHold = false;
             m_defenders.erase(id);
+            m_waveRoster.erase(id);
         }
         const int wave = m_waveCount + 1;
         const int squadId = m_squadController.CreateSquad(
@@ -636,7 +663,10 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     ready = std::move(allReady);
     for (int id : ready)
+    {
         m_defenders.erase(id);
+        m_waveRoster.erase(id);
+    }
 
     int targetX, targetY;
     FindAttackObjective(entities, map, targetX, targetY);

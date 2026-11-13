@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Host-relayed lockstep. Players only send their commands; the host gathers them into turns on its own
@@ -69,7 +70,7 @@ public:
     void update(std::uint32_t nowMs);
 
     // The room: the map (and how many start positions it has) and everybody's picks
-    void setLobbyMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
+    void setLobbyMap(std::string_view map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
     // A file the room hands out on request (the game's compressed map); a dedicated room gets them from
     // its owner. At most kMaxStoredFiles / kMaxStoredBytes are kept, the oldest go first.
     void offerFile(std::uint64_t hash, std::vector<std::uint8_t> bytes);
@@ -185,7 +186,7 @@ private:
     // Compares the world hashes of every tick all players that still send hashes have reported
     void checkHashes();
     void adaptInputDelay();
-    void reject(std::size_t connection, RejectReason reason, const std::string &detail);
+    void reject(std::size_t connection, RejectReason reason, std::string_view detail);
 
     HostConfig m_config;
     std::vector<std::unique_ptr<Transport>> m_transports;
@@ -215,8 +216,8 @@ private:
     std::vector<std::pair<std::uint32_t, std::uint64_t>> m_replayChecksums; // ticks every connected player agrees on
     std::int64_t m_replayStartedAt {0};
     bool m_replayOpen {false};
-    void logLine(const std::string &line) const;
-    void finishReplay(const std::string &reason);
+    void logLine(std::string_view line) const;
+    void finishReplay(std::string_view reason);
     std::vector<TransportEvent> m_events;
     std::vector<std::uint8_t> m_buffer;
     static constexpr std::uint32_t kMaxSyncMs = 30000;
@@ -292,7 +293,7 @@ public:
     }
     void sendLobbyChoice(const LobbyChoice &choice);
     // Dedicated server rooms, the owner only
-    void sendOwnerSetMap(const std::string &map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
+    void sendOwnerSetMap(std::string_view map, std::uint8_t spawnCount, std::uint64_t mapHash = 0);
     // Files: ask the room for one / give the dedicated room one to hand out (owner)
     void requestFile(std::uint64_t hash);
     void uploadFile(std::uint64_t hash, const std::vector<std::uint8_t> &bytes);
@@ -300,7 +301,7 @@ public:
     bool takeFile(std::uint64_t &hash, std::vector<std::uint8_t> &bytes);
     // Data sync (joining a host whose simulation data differ): the host's list, once it arrived
     bool takeDataManifest(std::vector<DataEntry> &files);
-    void requestDataFile(const std::string &path);
+    void requestDataFile(std::string_view path);
     // A data file that arrived (empty bytes: the host does not serve it); false when none is waiting
     bool takeDataFile(FilePathData &out);
     // Says hello again with the data hash the client has now (after the fetched files were installed)
@@ -366,7 +367,7 @@ public:
         return m_desyncTick;
     }
 
-    void sendChat(const std::string &text, bool teamOnly);
+    void sendChat(std::string_view text, bool teamOnly);
     std::vector<Chat> takeChat();
 
     std::uint32_t roundTripMs() const;

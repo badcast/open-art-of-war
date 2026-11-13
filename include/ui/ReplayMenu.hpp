@@ -4,6 +4,7 @@
 #include "ui/UiKit.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenArtOfWar
@@ -26,9 +27,9 @@ public:
 
     // Reads the folder again (call when the screen opens)
     void Refresh();
-    void SetNotice(const std::string &text)
+    void SetNotice(std::string_view text)
     {
-        m_notice = text;
+        m_notice = std::string(text);
     }
     Result Update(InputManager &input, int windowW, int windowH);
     void Render(Renderer &renderer, BitmapFontRenderer &font, int windowW, int windowH);
@@ -44,16 +45,15 @@ private:
     };
     struct Layout
     {
-        ui::UiRect dialog, list, details, openBtn, backBtn;
-        int rowH {34};
+        ui::UiRect dialog, list, track, details, openBtn, backBtn;
+        int rowH {42};
         int rows {0};
     };
     static Layout MakeLayout(int windowW, int windowH);
-    void ClampScroll(int rows);
 
     std::vector<Entry> m_entries;
     int m_selected {0};
-    int m_top {0};
+    ui::SmoothListScroll m_scroll;
     int m_mouseX {0}, m_mouseY {0};
     std::uint32_t m_lastClickMs {0};
     int m_lastClickRow {-1};

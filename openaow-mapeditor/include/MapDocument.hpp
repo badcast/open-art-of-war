@@ -3,6 +3,7 @@
 #include "core/Config.hpp"
 #include "game/TileMap.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -52,8 +53,8 @@ public:
     MapDocument();
 
     void NewMap(int width, int height, int tilesetId, std::uint8_t fillTile = 0);
-    bool LoadMap(const std::string &path);
-    bool SaveMap(const std::string &path);
+    bool LoadMap(std::string_view path);
+    bool SaveMap(std::string_view path);
 
     // Decoration footprints come from the sprite data; without it every decoration covers one tile
     void SetTextureManager(const TextureManager *textures)
@@ -87,9 +88,9 @@ public:
     {
         return m_name;
     }
-    void SetName(const std::string &name)
+    void SetName(std::string_view name)
     {
-        m_name = name;
+        m_name = std::string(name);
         m_modified = true;
     }
     // In-game title of the map ("title" key of the map file), empty when it has none

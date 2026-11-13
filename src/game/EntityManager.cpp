@@ -27,9 +27,9 @@ namespace OpenArtOfWar
 std::vector<BuildingBlueprint> EntityManager::s_blueprints;
 std::vector<BuildingBlueprint> EntityManager::s_factionBlueprints[2];
 
-std::string EntityManager::DescriptionKey(const std::string &characterId)
+std::string EntityManager::DescriptionKey(std::string_view characterId)
 {
-    return characterId + ".description";
+    return std::string(characterId) + ".description";
 }
 
 int EntityManager::ApplyMovingUnitDamage(int baseDamage, const Entity *target, ProjectileType kind)
@@ -325,7 +325,7 @@ bool EntityManager::HasBuildingType(UnitType type, PlayerId owner, bool mustBeCo
     return false;
 }
 
-std::uint16_t EntityManager::InternSound(const std::string &name)
+std::uint16_t EntityManager::InternSound(std::string_view name)
 {
     if (name.empty())
         return 0;
@@ -334,7 +334,7 @@ std::uint16_t EntityManager::InternSound(const std::string &name)
             return static_cast<std::uint16_t>(i + 1);
     if (m_soundNames.size() >= 0xFFFE)
         return 0;
-    m_soundNames.push_back(name);
+    m_soundNames.emplace_back(name);
     return static_cast<std::uint16_t>(m_soundNames.size());
 }
 

@@ -77,22 +77,22 @@ void DrawLine(
     renderer.DrawThickLineScreen(ax, ay, bx, by, widthPx, color);
 }
 
-SDL_Color ParseHexColor(const std::string &text, SDL_Color fallback)
+SDL_Color ParseHexColor(std::string_view text, SDL_Color fallback)
 {
-    std::string s = text;
-    if (!s.empty() && s[0] == '#')
-        s.erase(0, 1);
-    if (s.size() != 6 && s.size() != 8)
+    if (!text.empty() && text.front() == '#')
+        text.remove_prefix(1);
+    if (text.size() != 6 && text.size() != 8)
         return fallback;
-    for (char c : s)
+    for (char c : text)
     {
         if (!std::isxdigit(static_cast<unsigned char>(c)))
             return fallback;
     }
+    const std::string s(text);
     auto byte = [&](std::size_t i) {
         return static_cast<Uint8>(std::stoi(s.substr(i, 2), nullptr, 16));
     };
-    return {byte(0), byte(2), byte(4), s.size() == 8 ? byte(6) : static_cast<Uint8>(255)};
+    return {byte(0), byte(2), byte(4), text.size() == 8 ? byte(6) : static_cast<Uint8>(255)};
 }
 
 } // namespace OpenArtOfWar::RenderUtility

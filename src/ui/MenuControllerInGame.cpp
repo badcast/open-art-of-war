@@ -187,7 +187,7 @@ bool MenuController::UpdateInGameMenu(const FrameContext &ctx, int mx, int my, b
                 m_inGameSettingsOpen = true;
                 SoundRequests::Play("ui_show_dialog");
                 m_settingsSelected = 0;
-                m_settingsTop = 0;
+                m_settingsScroll.Reset();
                 break;
             case 3: // Sound & Music
                 sound.ToggleMute();
@@ -224,7 +224,7 @@ bool MenuController::UpdateInGameMenu(const FrameContext &ctx, int mx, int my, b
         return true;
     }
     if (UpdateMusicPlayer(
-            leftClicked, false, 0, 0, input.IsLeftMouseDown(), mx, my, windowH, false, sound, m_scrollDrag))
+            leftClicked, false, 0, 0, input.IsLeftMouseDown(), mx, my, windowW, windowH, false, sound, m_scrollDrag))
         return true;
     PauseLayout l = pauseLayout(windowW, windowH);
     for (int i = 0; i < kPauseItems; ++i)
@@ -343,7 +343,7 @@ void MenuController::RenderInGamePauseMenu(
                                     : (i == kPauseItems - 1 ? ui::ButtonStyle::Danger : ui::ButtonStyle::Secondary);
         ui::DrawButton(renderer, fontRenderer, l.items[i], items[i], style, hot);
     }
-    RenderMusicPlayer(renderer, fontRenderer, sound, windowH, false, m_mouseX, m_mouseY);
+    RenderMusicPlayer(renderer, fontRenderer, sound, windowW, windowH, false, m_mouseX, m_mouseY);
     ui::DrawConfirm(renderer, fontRenderer, windowW, windowH, m_confirm, m_mouseX, m_mouseY);
 }
 
@@ -355,31 +355,45 @@ void MenuController::RenderMissionDialog(Renderer &renderer, BitmapFontRenderer 
     const UiRect content = ui::DrawDialog(renderer, fontRenderer, windowW, windowH, d, m_missionDialog.title);
     const UiRect btn = DialogFooterButton(d, 220);
     const int bottom = btn.y - 12;
+    const UiRect commsWell {content.x, content.y, content.w, std::max(48, bottom - content.y - 4)};
+    ui::DrawPanel(renderer, commsWell, ui::WithAlpha(col::PanelSunken, 220), ui::WithAlpha(col::Border, 175));
+
+    const int innerX = commsWell.x + 14;
+    const int innerW = std::max(60, commsWell.w - 28);
     // Speaker in the accent colour, the line below it; body text gets smaller when the dialogue is long
     int scale = ui::FONT_BODY;
     for (int attempt = 0; attempt < 2; ++attempt)
     {
-        int h = 0;
+        int h = 12;
         for (const DialogLine &line : m_missionDialog.lines)
         {
-            // Estimate of the wrapped height (word wrap leaves some room at the line ends)
             const int width = fontRenderer.GetTextWidth(line.text, scale);
-            const int rows = 1 + width / std::max(1, content.w * 9 / 10);
-            h += 22 + rows * fontRenderer.GetTextHeight(scale) + 14;
+            const int rows = 1 + width / std::max(1, innerW * 9 / 10);
+            h += 24 + rows * fontRenderer.GetTextHeight(scale) + 16;
         }
-        if (content.y + h <= bottom)
+        if (commsWell.y + h <= commsWell.Bottom() - 8)
             break;
         scale = ui::FONT_SMALL;
     }
-    int y = content.y;
-    for (const DialogLine &line : m_missionDialog.lines)
+    int y = commsWell.y + 12;
+    for (std::size_t idx = 0; idx < m_missionDialog.lines.size(); ++idx)
     {
-        if (y >= bottom)
+        const DialogLine &line = m_missionDialog.lines[idx];
+        if (y >= commsWell.Bottom() - 16)
             break;
+        if (idx > 0)
+        {
+            renderer.FillRectScreen(innerX, y - 6, innerW, 1, ui::WithAlpha(col::Border, 110));
+            y += 4;
+        }
         if (!line.speaker.empty())
-            fontRenderer.DrawString(line.speaker, content.x, y, ui::FONT_SMALL_BOLD, col::Accent, false);
+        {
+            renderer.FillRectScreen(innerX, y + 2, 3, 14, col::Accent);
+            fontRenderer.DrawString(line.speaker, innerX + 9, y, ui::FONT_SMALL_BOLD, col::Accent, true);
+        }
         y += 22;
-        y += fontRenderer.DrawTextWrapped(line.text, content.x, y, content.w, scale, col::Text, false) + 14;
+        y += fontRenderer.DrawTextWrapped(line.text, innerX + 9, y, std::max(40, innerW - 9), scale, col::Text, false)
+             + 14;
     }
     ui::DrawButton(
         renderer, fontRenderer, btn, _("ACKNOWLEDGED"), ui::ButtonStyle::Primary, btn.Contains(m_mouseX, m_mouseY));

@@ -38,7 +38,7 @@ void ReadSpot(const nlohmann::json &j, const char *key, NightConfig::Spot &spot)
 }
 } // namespace
 
-bool NightConfig::Load(const std::string &path)
+bool NightConfig::Load(std::string_view path)
 {
     std::string text;
     if (!Assets::ReadText(path, text))

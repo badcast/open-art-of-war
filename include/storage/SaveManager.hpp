@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -22,7 +23,7 @@ class SaveManager
 public:
     // Empty path: <user directory>/savegame.json. An older ./saves/savegame.json (or the one in the user
     // directory's saves folder) is copied over the first time when the new file does not exist yet.
-    explicit SaveManager(const std::string &saveFilePath = "");
+    explicit SaveManager(std::string_view saveFilePath = {});
 
     bool Save(const SaveData &data);
     bool Load(SaveData &outData);

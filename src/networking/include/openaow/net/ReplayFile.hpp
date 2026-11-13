@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -35,15 +36,15 @@ constexpr std::size_t kMaxReplayNameLength = 128;
 constexpr std::size_t kMaxReplayTurns = 2u * 1000u * 1000u;
 
 // Extra file names: relative, below maps/ or data/, only [A-Za-z0-9._-] and '/', no ".." and no empty parts
-bool validReplayFileName(const std::string &name);
+bool validReplayFileName(std::string_view name);
 
 // "open-art-of-war-YYYYMMDD-HHMMSS_<map>.awr" for a match that started at `when` (local time); the map name is
 // reduced to safe characters
-std::string replayFileName(const std::string &mapName, std::int64_t when);
+std::string replayFileName(std::string_view mapName, std::int64_t when);
 
 // Writes `data` to `path` (through a temporary file and a rename; missing folders are created). False with `error`.
-bool writeReplay(const std::string &path, const ReplayData &data, std::string &error);
+bool writeReplay(std::string_view path, const ReplayData &data, std::string &error);
 // Reads and checks a file. False with `error` for anything that is not a well-formed replay within the limits.
-bool readReplay(const std::string &path, ReplayData &out, std::string &error);
+bool readReplay(std::string_view path, ReplayData &out, std::string &error);
 
 } // namespace OpenArtOfWar::Net

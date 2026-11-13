@@ -5,6 +5,7 @@
 #include "core/Localization.hpp"
 #include "game/Missions.hpp"
 #include <string>
+#include <string_view>
 #include <vector>
 #include <functional>
 
@@ -61,7 +62,7 @@ public:
     // `usePrebuilt`: the map's own buildings/units/walls if it has them, or the full starting base (HQ, power
     // plant, barracks and 4 units); false = from scratch (only HQ and power plant, no units, no walls)
     bool LoadSkirmish(
-        const std::string &mapPath,
+        std::string_view mapPath,
         TileMap &map,
         EntityManager &entities,
         Economy &economy,
@@ -88,7 +89,7 @@ public:
     }
     // Where the bases of a map go (up to 8): its "start_positions" (the number of players the map is made for);
     // a map without them has the two classic spots (playerPos / enemyPos)
-    static std::vector<std::pair<int, int>> StartPositions(const std::string &mapPath);
+    static std::vector<std::pair<int, int>> StartPositions(std::string_view mapPath);
 
     // Starts the current mission or custom game map over
     bool Restart(TileMap &map, EntityManager &entities, Economy &economy, Pathfinder &pathfinder);

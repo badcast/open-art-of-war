@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 
 namespace OpenArtOfWar
 {
@@ -16,13 +17,25 @@ class EnvironmentConfig
 {
 public:
     // The path comes from assets/main.yaml (LoaderResources::environment())
-    bool Load(const std::string &assetPath = LoaderResources::Environment());
-    inline bool load(const std::string &assetPath = LoaderResources::Environment())
+    bool Load(std::string_view assetPath);
+    inline bool Load()
+    {
+        return Load(LoaderResources::Environment());
+    }
+    inline bool load()
+    {
+        return Load(LoaderResources::Environment());
+    }
+    inline bool load(std::string_view assetPath)
     {
         return Load(assetPath);
     }
     // The "settings" section of the factory file: the player's options as they are before settings.json is read
-    static nlohmann::json FactorySettings(const std::string &assetPath = LoaderResources::Environment());
+    static nlohmann::json FactorySettings(std::string_view assetPath);
+    static inline nlohmann::json FactorySettings()
+    {
+        return FactorySettings(LoaderResources::Environment());
+    }
     // Writes the runtime sections into settings.json if anything changed (atomically: temp file + rename)
     bool Save();
 
@@ -31,9 +44,9 @@ public:
         return m_root;
     }
     // Section `name`; an empty object when it is missing
-    const nlohmann::json &Section(const std::string &name) const;
+    const nlohmann::json &Section(std::string_view name) const;
     // Writable section, created on demand; marks the config as changed
-    nlohmann::json &Edit(const std::string &name);
+    nlohmann::json &Edit(std::string_view name);
 
     bool IsDirty() const
     {

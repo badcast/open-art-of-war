@@ -1024,7 +1024,7 @@ void SpawnPrebuilt(
 } // namespace
 
 bool MissionController::LoadSkirmish(
-    const std::string &mapPath,
+    std::string_view mapPath,
     TileMap &map,
     EntityManager &entities,
     Economy &economy,
@@ -1247,7 +1247,7 @@ bool MissionController::LoadSkirmish(
     return true;
 }
 
-std::vector<std::pair<int, int>> MissionController::StartPositions(const std::string &mapPath)
+std::vector<std::pair<int, int>> MissionController::StartPositions(std::string_view mapPath)
 {
     std::string text;
     if (!Assets::ReadText(mapPath, text))

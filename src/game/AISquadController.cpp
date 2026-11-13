@@ -1594,19 +1594,21 @@ void AISquadController::Tick(
             if (idleUnitIds.empty())
                 break;
 
-            // Objective gone: move on to the nearest remaining player structure
+            // Objective gone: move on to the nearest remaining hostile structure, or hostile unit if none remain
             int bestX = -1, bestY = -1;
             float bestDist = 1e9f;
+            bool foundBuilding = false;
             for (const auto &entity : entities.GetAllEntities())
             {
-                if (!entity.alive || entity.state == ActionState::Die || !entity.isBuilding
-                    || entity.owner >= kMaxPlayers || !Players::Hostile(entity.owner, squad.owner))
+                if (!entity.alive || entity.state == ActionState::Die || entity.owner >= kMaxPlayers
+                    || !Players::Hostile(entity.owner, squad.owner))
                 {
                     continue;
                 }
-                float dist = DetMath::Hypot(entity.tileX - centroidX, entity.tileY - centroidY);
-                if (dist < bestDist)
+                const float dist = DetMath::Hypot(entity.tileX - centroidX, entity.tileY - centroidY);
+                if ((entity.isBuilding && !foundBuilding) || (entity.isBuilding == foundBuilding && dist < bestDist))
                 {
+                    foundBuilding = entity.isBuilding;
                     bestDist = dist;
                     bestX = entity.tileX;
                     bestY = entity.tileY;
@@ -1614,7 +1616,19 @@ void AISquadController::Tick(
             }
             if (bestX >= 0)
             {
-                OrderLeg(squad, idleUnitIds, bestX, bestY, entities, pathfinder);
+                const bool targetChanged = (squad.targetX != bestX || squad.targetY != bestY);
+                squad.targetX = bestX;
+                squad.targetY = bestY;
+                if (targetChanged && bestDist > 20.0f)
+                {
+                    squad.leaderId = PickLeader(squad, entities, tactics);
+                    RebuildRoute(squad, entities, pathfinder);
+                    AdvanceMarch(squad, map, entities, pathfinder, chokes, tactics);
+                }
+                else
+                {
+                    OrderLeg(squad, idleUnitIds, bestX, bestY, entities, pathfinder);
+                }
             }
             else if (idleUnitIds.size() == squad.unitIds.size())
             {

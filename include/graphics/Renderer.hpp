@@ -183,6 +183,18 @@ public:
         SDL_Texture *tex, int x, int y, int w = 0, int h = 0, int anchor = Anchor::TOP | Anchor::LEFT);
     void DrawRawSpriteScreen(
         int spriteId, int screenX, int screenY, float scale = 1.0f, Faction faction = Faction::Resistance);
+    // Draws a sprite frame subregion (trimmed by inset* in frame logical units) stretched into dstRect.
+    void DrawSpritePartScreen(
+        int spriteId,
+        const SDL_FRect &dstRect,
+        float insetLeft = 0.0f,
+        float insetTop = 0.0f,
+        float insetRight = 0.0f,
+        float insetBottom = 0.0f,
+        SDL_FlipMode flip = SDL_FLIP_NONE,
+        Faction faction = Faction::Resistance,
+        Uint8 alpha = 255,
+        SDL_Color tint = {255, 255, 255, 255});
     void DrawCompositeScreen(
         int compId, int screenX, int screenY, float scale = 1.0f, Faction faction = Faction::Resistance, int depth = 0);
 
@@ -293,6 +305,7 @@ private:
     SDL_Rect m_clipPrevViewport {0, 0, 0, 0};
     bool m_clipPrevViewportSet {false};
     bool m_clipTargetActive {false};
+    bool m_clipBackgroundTranslucent {false};
     float m_clipScale {1.0f};
     SDL_Texture *m_glowTexture {nullptr}; // white radial falloff with a soft rim (selection bubble)
     int m_maskW {0};
