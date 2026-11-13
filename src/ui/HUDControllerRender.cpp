@@ -284,7 +284,7 @@ void HUDController::DrawRadar(
     RadarView view = radarView(radarRect, mapWidth, mapHeight, m_radarZoom, m_radarCenterX, m_radarCenterY);
     if (view.w > 0 && view.h > 0)
     {
-        renderer.SetClipRect({view.ox, view.oy, view.w, view.h});
+        // No hardware scissor here: on devices it cut the whole radar away. The surplus is painted over instead.
         renderer.FillRectScreen(view.ox, view.oy, view.w, view.h, {14, 30, 22, 255});
         const bool fogEnabled = m_radarFog && map.IsFogEnabled() && !m_showAll;
         const int minTileX = std::max(0, static_cast<int>(view.viewX));
@@ -456,8 +456,35 @@ void HUDController::DrawRadar(
             frameY,
             frameWidth,
             frameHeight);
-        renderer.DrawRectScreen(frameX, frameY, std::max(6, frameWidth), std::max(4, frameHeight), {255, 255, 255, 220});
-        renderer.ResetClipRect();
+        {
+            // The frame's four sides, each cut to the radar's picture by hand (no scissor)
+            const int fw = std::max(6, frameWidth), fh = std::max(4, frameHeight);
+            const SDL_Color white {255, 255, 255, 220};
+            auto side = [&](int x, int y, int w, int h) {
+                const int x0 = std::max(x, view.ox), y0 = std::max(y, view.oy);
+                const int x1 = std::min(x + w, view.ox + view.w), y1 = std::min(y + h, view.oy + view.h);
+                if (x1 > x0 && y1 > y0)
+                    renderer.FillRectScreen(x0, y0, x1 - x0, y1 - y0, white);
+            };
+            side(frameX, frameY, fw, 1);
+            side(frameX, frameY + fh - 1, fw, 1);
+            side(frameX, frameY, 1, fh);
+            side(frameX + fw - 1, frameY, 1, fh);
+        }
+        {
+            const SDL_Color back {6, 12, 10, 255};
+            const int top = std::max(radarRect.y, view.oy), bottom = std::min(radarRect.Bottom(), view.oy + view.h);
+            if (view.oy > radarRect.y)
+                renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, view.oy - radarRect.y, back);
+            if (view.oy + view.h < radarRect.Bottom())
+                renderer.FillRectScreen(
+                    radarRect.x, view.oy + view.h, radarRect.w, radarRect.Bottom() - (view.oy + view.h), back);
+            if (bottom > top && view.ox > radarRect.x)
+                renderer.FillRectScreen(radarRect.x, top, view.ox - radarRect.x, bottom - top, back);
+            if (bottom > top && view.ox + view.w < radarRect.Right())
+                renderer.FillRectScreen(
+                    view.ox + view.w, top, radarRect.Right() - (view.ox + view.w), bottom - top, back);
+        }
     }
     renderer.DrawRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, col::BorderStrong);
 

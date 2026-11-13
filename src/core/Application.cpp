@@ -1491,7 +1491,7 @@ void Application::Render()
             const int bottom = std::min(worldCam.GetViewportHeight(), static_cast<int>(std::ceil(y1)));
             // An offscreen target is cleared black already; a hardware scissor on it misbehaves behind the logical
             // presentation of the touch build (a dark slab over the picture), so the margins are filled instead
-            offscreenWorld = scene || (divisor > 1 && m_lowResTarget);
+            offscreenWorld = scene || (divisor > 1 && m_lowResTarget) || m_touchUi;
             if (!offscreenWorld)
                 m_renderer->SetClipRect({left, top, std::max(0, right - left), std::max(0, bottom - top)});
             else
