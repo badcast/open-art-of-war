@@ -514,7 +514,7 @@ bool HUDController::UpdateResearchWindow(const FrameContext &ctx, int mx, int my
     EntityManager &entities = ctx.entities;
     if (!m_researchOpen)
         return false;
-    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
+    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? m_observerBarHeight : 0);
     const float sc = m_researchScale * l.u;                       // (the touch profile: bigger with the screen)
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);
@@ -968,7 +968,7 @@ void HUDController::RenderResearchWindow(
 {
     if (!m_researchOpen)
         return;
-    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? kObserverBarHeight : 0);
+    const WindowLayout l = windowLayout(windowW, windowH, m_observer ? m_observerBarHeight : 0);
     const float sc = m_researchScale * l.u;                       // (the touch profile: bigger with the screen)
     const Faction faction = Players::FactionOf(Players::Local()); // (an observer: the watched player's)
     const TreeLayout tree = buildTree(faction);

@@ -126,6 +126,20 @@ struct FlatSkinScope
     FlatSkinScope &operator=(const FlatSkinScope &) = delete;
 };
 
+// A toast: a plate that slides in from the left edge of the screen, stays, then slides back out to the left.
+// `slide`: 0 = out of sight, 1 = in place (ToastSlide gives it from the time since the toast appeared).
+float ToastSlide(float elapsedSeconds, float totalSeconds, float inSeconds = 0.25f, float outSeconds = 0.30f);
+void DrawToast(
+    Renderer &r,
+    BitmapFontRenderer &font,
+    int x,
+    int y,
+    int height,
+    int maxWidth,
+    std::string_view text,
+    float slide,
+    SDL_Color accent);
+
 // Panel chrome backed by sprite_dialog_items borders/corners/fill (with flat fallback if sheets aren't loaded)
 void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill = color::Panel, SDL_Color border = color::Border);
 

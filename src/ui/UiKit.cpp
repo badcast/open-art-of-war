@@ -200,6 +200,53 @@ bool FlatSkin()
     return g_flatSkin;
 }
 
+float ToastSlide(float elapsedSeconds, float totalSeconds, float inSeconds, float outSeconds)
+{
+    if (elapsedSeconds < 0.0f || elapsedSeconds >= totalSeconds)
+        return 0.0f;
+    float t = 1.0f;
+    if (elapsedSeconds < inSeconds)
+    {
+        const float k = elapsedSeconds / std::max(0.001f, inSeconds);
+        t = 1.0f - (1.0f - k) * (1.0f - k) * (1.0f - k); // eases out: fast, then settles
+    }
+    else if (totalSeconds - elapsedSeconds < outSeconds)
+    {
+        const float k = (totalSeconds - elapsedSeconds) / std::max(0.001f, outSeconds);
+        t = k * k * k; // eases in: leaves slowly, then fast
+    }
+    return std::clamp(t, 0.0f, 1.0f);
+}
+
+void DrawToast(
+    Renderer &r,
+    BitmapFontRenderer &font,
+    int x,
+    int y,
+    int height,
+    int maxWidth,
+    std::string_view text,
+    float slide,
+    SDL_Color accent)
+{
+    if (slide <= 0.0f || text.empty())
+        return;
+    const int pad = std::max(8, height / 3);
+    const int width = std::min(maxWidth, font.GetTextWidth(std::string(text), FONT_BODY_BOLD) + 2 * pad + 4);
+    const int drawX = x - static_cast<int>(std::lround((1.0f - slide) * static_cast<float>(width + x)));
+    r.FillRectScreen(drawX, y, width, height, {10, 13, 18, 228});
+    r.DrawRectScreen(drawX, y, width, height, {160, 172, 190, 150});
+    r.FillRectScreen(drawX + 1, y + 1, 4, height - 2, accent);
+    font.DrawString(
+        FitText(font, text, FONT_BODY_BOLD, std::max(20, width - 2 * pad - 4)),
+        drawX + 4 + pad,
+        y + height / 2,
+        FONT_BODY_BOLD,
+        color::Text,
+        false,
+        Anchor::LEFT | Anchor::VCENTER);
+}
+
 void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill, SDL_Color border)
 {
     if (rect.w <= 0 || rect.h <= 0)

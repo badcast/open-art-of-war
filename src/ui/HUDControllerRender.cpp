@@ -725,6 +725,15 @@ void HUDController::DrawRadar(
     }
 }
 
+void HUDController::DrawHudToast(
+    Renderer &renderer, BitmapFontRenderer &fontRenderer, int x, int y, int height, int maxWidth) const
+{
+    if (m_hudNotificationTimer <= 0.0f || m_hudNotification.empty())
+        return;
+    const float slide = ui::ToastSlide(m_hudNotificationTotal - m_hudNotificationTimer, m_hudNotificationTotal);
+    ui::DrawToast(renderer, fontRenderer, x, y, height, maxWidth, m_hudNotification, slide, col::Accent);
+}
+
 void HUDController::SetTacticalConfig(const nlohmann::json &section)
 {
     if (!section.is_object())
@@ -1281,19 +1290,7 @@ void HUDController::RenderGameHud(
             ui::DrawPanel(renderer, infoRect, col::PanelSunken, col::Border);
             int textWidth = infoRect.w - 20;
 
-            if (!m_hudNotification.empty())
-            {
-                renderer.FillRectScreen(infoRect.x, infoRect.y, 3, infoRect.h, col::Accent);
-                fontRenderer.DrawTextWrapped(
-                    m_hudNotification,
-                    infoRect.x + 10,
-                    infoRect.y + 8,
-                    textWidth,
-                    ui::FONT_SMALL_BOLD,
-                    col::Accent,
-                    false);
-            }
-            else if (!hoverTitle.empty())
+            if (!hoverTitle.empty())
             {
                 fontRenderer.DrawString(
                     ui::FitText(fontRenderer, hoverTitle, ui::FONT_SMALL_BOLD, textWidth),
@@ -1448,6 +1445,28 @@ void HUDController::RenderGameHud(
                     ui::FONT_SMALL_BOLD);
             }
         }
+    }
+
+    // The notification: a toast sliding in from the left at the top of the map
+    DrawHudToast(
+        renderer,
+        fontRenderer,
+        12,
+        m_topInset + (m_observer ? m_observerBarHeight + 10 : 12),
+        32,
+        std::max(120, camera.GetViewportWidth() / 2));
+
+    // What is selected: at the bottom of the map, in the middle (the count of the selected units / buildings)
+    if (!m_observer && !selected.empty())
+    {
+        fontRenderer.DrawString(
+            std::to_string(selected.size()) + " " + _("SELECTED"),
+            camera.GetViewportWidth() / 2,
+            windowHeight - 16,
+            ui::FONT_SMALL_BOLD,
+            col::Text,
+            true,
+            Anchor::HCENTER | Anchor::VCENTER);
     }
 }
 

@@ -45,6 +45,8 @@ TouchHUD::Layout TouchHUD::MakeLayout(
             return m_placing;
         if (name == "tactical")
             return m_tactical;
+        if (name == "observer")
+            return m_observer;
         if (name == "panel_open")
             return m_panel != Panel::None;
         if (name == "panel_build")
@@ -849,7 +851,8 @@ void TouchHUD::RenderGameHud(
         return col::Accent;
     }();
 
-    // Credits and power (TouchHUD flat tactical slate plate matching touch buttons)
+    // Credits and power (TouchHUD flat tactical slate plate matching touch buttons); an observer has the bar instead
+    if (!m_observer)
     {
         const UiRect &resourcesRect = layout.resources;
         const int padX = scalePx(10);
@@ -1123,31 +1126,40 @@ void TouchHUD::RenderGameHud(
     {
         const std::string info = std::to_string(selected.size()) + " " + _("SELECTED");
         const int labelY = (m_panel != Panel::None ? layout.cards.y : windowHeight - scalePx(68)) - scalePx(22);
-        fontRenderer.DrawString(info, layout.radar.Right() + scalePx(8), labelY, ui::FONT_SMALL_BOLD, col::Text, true);
+        // At the bottom, in the middle of the free span between the radar and the right edge
+        fontRenderer.DrawString(
+            info,
+            (layout.radar.Right() + windowWidth) / 2,
+            labelY,
+            ui::FONT_SMALL_BOLD,
+            col::Text,
+            true,
+            Anchor::HCENTER | Anchor::VCENTER);
     }
 
-    // The line of text at the top: a notice, or what a mode wants from the next tap
-    std::string notice = m_hudNotificationTimer > 0.0f ? m_hudNotification : std::string();
-    if (notice.empty() && m_attackMoveMode)
+    // The timed notification slides in from the left; what a mode wants from the next tap stands in the same place
+    const int noticeY = m_observer ? std::max(layout.notice.y, m_observerBarHeight + scalePx(8)) : layout.notice.y;
+    DrawHudToast(renderer, fontRenderer, scalePx(8), noticeY, layout.notice.h, std::max(120, windowWidth * 2 / 3));
+    std::string notice;
+    const bool toastShown = m_hudNotificationTimer > 0.0f && !m_hudNotification.empty();
+    if (!toastShown && m_attackMoveMode)
         notice = _("TAP THE TARGET: ATTACK-MOVE");
-    if (notice.empty() && m_placing)
+    if (!toastShown && notice.empty() && m_placing)
         notice = _("TAP A LOCATION, THEN TAP THE BUILDING");
-    if (notice.empty() && !hasCombat && m_lastHasProducer && !m_statsOpen && !IsResearchWindowOpen())
+    if (!toastShown && notice.empty() && !hasCombat && m_lastHasProducer && !m_statsOpen && !IsResearchWindowOpen())
         notice = _("DOUBLE-TAP MAP: SET RALLY POINT");
     if (!notice.empty())
     {
-        const int maxWidth = std::max(120, windowWidth - scalePx(16));
-        const int noticeWidth = std::min(maxWidth, fontRenderer.GetTextWidth(notice, ui::FONT_BODY_BOLD) + scalePx(24));
-        const UiRect noticeRect {windowWidth / 2 - noticeWidth / 2, layout.notice.y, noticeWidth, layout.notice.h};
-        ui::DrawPanel(renderer, noticeRect, {10, 13, 18, 220}, col::Accent);
-        fontRenderer.DrawString(
-            ui::FitText(fontRenderer, notice, ui::FONT_BODY_BOLD, std::max(40, noticeWidth - scalePx(16))),
-            noticeRect.CenterX(),
-            noticeRect.CenterY(),
-            ui::FONT_BODY_BOLD,
-            col::Accent,
-            false,
-            Anchor::HCENTER | Anchor::VCENTER);
+        ui::DrawToast(
+            renderer,
+            fontRenderer,
+            scalePx(8),
+            noticeY,
+            layout.notice.h,
+            std::max(120, windowWidth * 2 / 3),
+            notice,
+            1.0f,
+            col::Accent);
     }
     (void) mouseY;
 }

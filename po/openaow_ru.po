@@ -2811,3 +2811,9 @@ msgstr "Союзники"
 
 msgid "BUILDING IS UNAVAILABLE IN THE TACTICAL VIEW"
 msgstr "ПОСТРОЙКА НЕДОСТУПНА В ТАКТИЧЕСКОМ ВИДЕ"
+
+msgid "VOICE: ON"
+msgstr "ОЗВУЧКА: ВКЛ"
+
+msgid "VOICE: OFF"
+msgstr "ОЗВУЧКА: ВЫКЛ"

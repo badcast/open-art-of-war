@@ -236,6 +236,7 @@ private:
     int m_pendingDialogId {0}; // campaign dialogue still to open (MissionDialogs id), 0 = none
     float m_dialogTimer {0.0f};
     int m_lastGroupKey {-1};
+    bool m_observer {false}; // watching a replay / a match: no group column
     bool m_ownUnitsSelected {false}; // own units are selected (the "+" button shows)
     int m_activeGroup {-1}; // the group picked last (what the "x" button deletes when the selection is no group)
     std::uint64_t m_lastGroupTicks {0};

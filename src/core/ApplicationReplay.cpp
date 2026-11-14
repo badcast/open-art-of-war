@@ -53,46 +53,65 @@ namespace col = ui::color;
 
 constexpr float kSpeeds[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f};
 constexpr int kSpeedCount = 7;
-constexpr int kBarHeight = 64; // a thin row for the sound check box on top, the controls under it
-constexpr int kTopRow = 26;
+constexpr int kBarPad = 6;
 
 struct BarLayout
 {
     ui::UiRect bar, voice, play, slower, speed, faster, restart, progress, view, follow, stats, research, exit;
 };
 
-// `replay`: a recording (with the progress bar and the restart button); otherwise a live match being watched
-BarLayout MakeBar(int viewW, bool replay)
+// Scale of the observer bar: the touch interface gets big, finger-sized controls
+float BarScale(bool touch, int windowH)
+{
+    return touch ? std::clamp(static_cast<float>(windowH) / 600.0f, 1.3f, 2.0f) : 1.0f;
+}
+
+// Two rows (more on a narrow screen): the playback controls with the progress and EXIT, then the view, FOLLOW,
+// STATS, RESEARCH and VOICE. `replay`: a recording (with the progress bar and the restart button); otherwise a live
+// match being watched.
+BarLayout MakeBar(int viewW, bool replay, float u)
 {
     BarLayout l;
-    const int h = kBarHeight - kTopRow - 8;
-    const int y = kTopRow + 2;
-    l.bar = {0, 0, viewW, kBarHeight};
-    l.voice = {8, 3, 230, kTopRow - 5};
-    int x = 8;
+    const auto px = [&](int v) {
+        return std::max(1, static_cast<int>(std::lround(v * u)));
+    };
+    const int h = px(30), pad = px(kBarPad), gap = px(6);
+    int y = pad;
+
+    // Row 1: playback at the left, EXIT at the right, the progress between them
+    int x = pad;
     auto place = [&](ui::UiRect &r, int w) {
-        r = {x, y, w, h};
-        x += w + 6;
+        r = {x, y, px(w), h};
+        x += px(w) + gap;
     };
-    place(l.play, 76);
-    place(l.slower, 30);
+    place(l.play, 84);
+    place(l.slower, 34);
     place(l.speed, 52);
-    place(l.faster, 30);
+    place(l.faster, 34);
     if (replay)
-        place(l.restart, 30);
-    int right = viewW - 8;
-    auto placeRight = [&](ui::UiRect &r, int w) {
-        right -= w;
-        r = {right, y, w, h};
-        right -= 6;
+        place(l.restart, 34);
+    l.exit = {viewW - pad - px(76), y, px(76), h};
+    const int progressRight = l.exit.x - gap;
+    l.progress = {x, y, std::max(px(60), progressRight - x), h};
+
+    // The rest flows left to right, wrapping when a row is full
+    y += h + gap;
+    x = pad;
+    auto flow = [&](ui::UiRect &r, int w) {
+        if (x > pad && x + px(w) > viewW - pad)
+        {
+            x = pad;
+            y += h + gap;
+        }
+        r = {x, y, px(w), h};
+        x += px(w) + gap;
     };
-    placeRight(l.exit, 70);
-    placeRight(l.follow, 120);
-    placeRight(l.view, 190);
-    // The thin top row: the sound check box at the left, the statistics and the research at the right
-    l.stats = {viewW - 8 - 120, 3, 120, kTopRow - 5};
-    l.research = {l.stats.x - 6 - 140, 3, 140, kTopRow - 5};
-    l.progress = {x + 6, y + 6, std::max(60, right - x - 6), h - 12};
+    flow(l.view, 190);
+    flow(l.follow, 120);
+    flow(l.stats, 90);
+    flow(l.research, 120);
+    flow(l.voice, 118);
+    l.bar = {0, 0, viewW, y + h + pad};
     return l;
 }
 
@@ -363,7 +382,8 @@ void Application::UpdateReplayInput(double frameTime)
     bool openResearch = false;
 
     // The bar (a click on it is taken before the game sees it)
-    const BarLayout bar = MakeBar(m_camera->GetViewportWidth(), replay);
+    const BarLayout bar = MakeBar(m_camera->GetViewportWidth(), replay, BarScale(m_touchUi, m_windowH));
+    m_hudController->SetObserverBarHeight(bar.bar.h);
     const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
     // The open list of the view combo box takes the input first
     const std::vector<ObserverPlayer> viewPlayers = ObserverPlayers();
@@ -624,7 +644,9 @@ void Application::RenderReplayBar()
         return;
     const bool replay = m_replay != nullptr;
     const int viewW = m_camera->GetViewportWidth();
-    const BarLayout l = MakeBar(viewW, replay);
+    const BarLayout l = MakeBar(viewW, replay, BarScale(m_touchUi, m_windowH));
+    m_hudController->SetObserverBarHeight(l.bar.h);
+    const ui::FlatSkinScope flatSkin; // the bar wears the look of the touch interface
     const int mx = m_input->GetMouseScreenX(), my = m_input->GetMouseScreenY();
     Simulation &sim = m_gameplayController->simulation();
     const std::uint32_t total = replay ? std::max<std::uint32_t>(1, m_replay->info().ticks) : 1u;
@@ -634,8 +656,8 @@ void Application::RenderReplayBar()
     if (m_replayUi.stats)
         RenderObserverStats(players);
 
-    ui::FillVerticalGradient(*m_renderer, l.bar, ui::WithAlpha(col::Panel, 245), ui::WithAlpha(col::PanelSunken, 230));
-    m_renderer->FillRectScreen(0, kBarHeight - 1, viewW, 1, col::Border);
+    m_renderer->FillRectScreen(l.bar.x, l.bar.y, l.bar.w, l.bar.h, {12, 16, 22, 232});
+    m_renderer->FillRectScreen(0, l.bar.h - 1, viewW, 1, {160, 172, 190, 150});
     auto hot = [&](const ui::UiRect &r) {
         return r.Contains(mx, my);
     };
@@ -679,8 +701,10 @@ void Application::RenderReplayBar()
     // Progress and time (a live match: its clock only)
     if (replay)
     {
-        m_renderer->FillRectScreen(l.progress.x, l.progress.y, l.progress.w, l.progress.h, col::PanelSunken);
-        ui::DrawProgressBar(*m_renderer, l.progress, static_cast<float>(tick) / static_cast<float>(total), col::Accent);
+        const ui::UiRect track {l.progress.x, l.progress.y + l.progress.h / 4, l.progress.w, std::max(4, l.progress.h / 2)};
+        m_renderer->FillRectScreen(track.x, track.y, track.w, track.h, {8, 11, 16, 220});
+        ui::DrawProgressBar(*m_renderer, track, static_cast<float>(tick) / static_cast<float>(total), col::Accent);
+        m_renderer->DrawRectScreen(track.x, track.y, track.w, track.h, {160, 172, 190, 110});
     }
     m_fontRenderer->DrawString(
         replay ? Clock(tick) + " / " + Clock(total) : std::string(_("Watching")) + "   " + Clock(tick),
@@ -703,8 +727,13 @@ void Application::RenderReplayBar()
         ui::FitText(*m_fontRenderer, viewName, ui::FONT_SMALL_BOLD, l.view.w - 40),
         m_replayUi.combo.open >= 0,
         hot(l.view));
-    ui::DrawCheckbox(
-        *m_renderer, *m_fontRenderer, l.voice, _("Voice the interface"), m_replayUi.interfaceSound, hot(l.voice));
+    ui::DrawButton(
+        *m_renderer,
+        *m_fontRenderer,
+        l.voice,
+        m_replayUi.interfaceSound ? _("VOICE: ON") : _("VOICE: OFF"),
+        m_replayUi.interfaceSound ? ui::ButtonStyle::Primary : ui::ButtonStyle::Secondary,
+        hot(l.voice));
     ui::DrawButton(
         *m_renderer,
         *m_fontRenderer,
@@ -737,7 +766,7 @@ void Application::RenderReplayBar()
             std::string(_("This replay does not play back the same here (differs at tick")) + " "
                 + std::to_string(m_replay->MismatchTick()) + ")",
             viewW / 2,
-            kBarHeight + 10,
+            l.bar.h + 10,
             ui::FONT_BODY_BOLD,
             col::Danger,
             true,
@@ -748,7 +777,7 @@ void Application::RenderReplayBar()
         m_fontRenderer->DrawString(
             _("Recorded by another game build: it may play out differently."),
             viewW / 2,
-            kBarHeight + 10,
+            l.bar.h + 10,
             ui::FONT_BODY_BOLD,
             col::Accent,
             true,
@@ -813,7 +842,7 @@ void Application::RenderObserverStats(const std::vector<ObserverPlayer> &players
     const int colName = 14, colCredits = 220, colArmy = 300, colKills = 370, colLosses = 470, colResearch = 560;
     const int w = std::min(m_camera->GetViewportWidth() - 24, 900);
     const int h = headH + static_cast<int>(players.size()) * rowH + 10 + (hasDefeated ? rowH : 0);
-    const int x = 12, y = kBarHeight + 34;
+    const int x = 12, y = MakeBar(m_camera->GetViewportWidth(), m_replay != nullptr, BarScale(m_touchUi, m_windowH)).bar.h + 34;
     m_renderer->FillRectScreen(x, y, w, h, ui::WithAlpha(col::Panel, 236));
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
     m_renderer->FillRectScreen(x, y, w, 2, col::Accent);

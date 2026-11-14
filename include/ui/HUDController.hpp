@@ -266,6 +266,11 @@ public:
     }
 
     // Vertical space reserved above the sidebar (debug toolbar)
+    // Height of the bar a replay / a watched match shows over the map (the research window starts under it)
+    void SetObserverBarHeight(int height)
+    {
+        m_observerBarHeight = height;
+    }
     void SetTopInset(int inset)
     {
         m_topInset = inset;
@@ -384,6 +389,11 @@ public:
     {
         m_hudNotification = std::string(msg);
         m_hudNotificationTimer = time;
+        m_hudNotificationTotal = time;
+    }
+    int ObserverBarHeight() const
+    {
+        return m_observerBarHeight;
     }
 
 protected:
@@ -437,6 +447,9 @@ protected:
     int m_primaryFactoryId {0};
     std::string m_hudNotification;
     float m_hudNotificationTimer {0.0f};
+    float m_hudNotificationTotal {3.0f};
+    // The notification as a toast sliding in from the left of the map (and out again), at (x, y)
+    void DrawHudToast(Renderer &renderer, BitmapFontRenderer &fontRenderer, int x, int y, int height, int maxWidth) const;
 
     Simulation *m_sim {nullptr};
     std::function<ResearchProgress(PlayerId)> m_researchProbe; // whose research is shown (observers: any player)
@@ -452,7 +465,7 @@ protected:
     int m_tacticalGridAlpha {28};    // 0 = no grid lines on the tactical map
     int m_tacticalGridMinPx {28};    // lines are drawn every 1, 2, 4... tiles so that they stay this far apart
     bool m_observer {false};                      // watching a replay
-    static constexpr int kObserverBarHeight = 64; // the bar of a replay / a watched match over the screen
+    int m_observerBarHeight {64}; // the bar of a replay / a watched match over the screen
     bool m_showAll {false};                       // a replay's observer sees the whole map
     mutable RadarAlert m_radarAlert;              // updated while the radar is drawn
     int m_radarZoom {1};                          // 1 = whole map, up to kRadarMaxZoom

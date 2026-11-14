@@ -261,9 +261,14 @@ void Application::TrackNetPlayers(std::uint32_t nowMs)
     }
 }
 
+namespace
+{
+constexpr std::uint32_t kNoticeShowMs = 7000;
+} // namespace
+
 void Application::PushNotice(std::string_view text, std::uint32_t nowMs)
 {
-    constexpr std::uint32_t kShowMs = 7000;
+    constexpr std::uint32_t kShowMs = kNoticeShowMs;
     constexpr std::size_t kMaxNotices = 5;
     m_notices.push_back({std::string(text), nowMs + kShowMs});
     if (m_notices.size() > kMaxNotices)
@@ -281,29 +286,25 @@ void Application::RenderNotices()
             m_state == AppState::SkirmishPlaying || m_state == AppState::CampaignPlaying || m_state == AppState::Paused
             || m_state == AppState::Victory || m_state == AppState::Defeat))
         return;
+    // Toasts at the left of the map, one under another: each slides in from the left edge, stays and slides out again
     const int viewW = m_camera->GetViewportWidth();
-    int y = 86; // under the network banner
+    const bool observing = (m_replay || m_spectating) && m_hudController;
+    int y = observing ? m_hudController->ObserverBarHeight() + 10 : 86; // under the network banner / the bar
+    const int height = m_touchUi ? 44 : 32;
     for (const Notice &n : m_notices)
     {
-        // The last second fades out
-        const std::uint32_t left = n.untilMs - nowMs;
-        const float alpha = std::min(1.0f, left / 1000.0f);
-        auto fade = [&](SDL_Color c) {
-            return ui::WithAlpha(c, static_cast<std::uint8_t>(c.a * alpha));
-        };
-        const int w = m_fontRenderer->GetTextWidth(n.text, ui::FONT_BODY_BOLD) + 32;
-        const int x = (viewW - w) / 2;
-        m_renderer->FillRectScreen(x, y, w, 28, fade(ui::color::Panel));
-        m_renderer->FillRectScreen(x, y, 3, 28, fade(ui::color::Danger));
-        m_fontRenderer->DrawString(
+        const float elapsed = static_cast<float>(kNoticeShowMs - (n.untilMs - nowMs)) / 1000.0f;
+        ui::DrawToast(
+            *m_renderer,
+            *m_fontRenderer,
+            12,
+            y,
+            height,
+            std::max(160, viewW / 2),
             n.text,
-            x + w / 2,
-            y + 14,
-            ui::FONT_BODY_BOLD,
-            fade(ui::color::Text),
-            false,
-            Anchor::HCENTER | Anchor::VCENTER);
-        y += 32;
+            ui::ToastSlide(elapsed, static_cast<float>(kNoticeShowMs) / 1000.0f),
+            ui::color::Danger);
+        y += height + 6;
     }
 }
 

@@ -301,6 +301,8 @@ GameplayController::GroupColumn GameplayController::GroupColumnLayout(int mapVie
 {
     (void) mapViewWidth;
     GroupColumn col;
+    if (m_observer) // a replay / a watched match has no groups to command
+        return col;
     int count = 0;
     for (const auto &group : m_groups)
         count += group.unitIds.empty() ? 0 : 1;
@@ -770,6 +772,7 @@ void GameplayController::Update(const FrameContext &context)
     if (mission.GetLoadSerial() != m_missionSerial)
         ResetForMission(mission, hud, entities, map);
     PruneGroups(entities);
+    m_observer = hud.IsObserver();
     m_ownUnitsSelected = false;
     for (int unitId : m_selectedUnits)
         m_ownUnitsSelected = m_ownUnitsSelected || IsLiveOwnUnit(entities.GetEntity(unitId));
