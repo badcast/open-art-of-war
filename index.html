@@ -263,6 +263,16 @@
             gap: 10px;
             margin-bottom: 20px;
         }
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+        }
+        .stars-badge img {
+            height: 20px;
+            width: auto;
+        }
         .hero-platforms {
             margin: 0;
             color: var(--text-muted);
@@ -618,6 +628,8 @@
             gap: 40px;
         }
         .about-text { color: var(--text-dim); font-size: 16px; }
+        .about-text a strong { color: var(--accent); }
+        .about-text a:hover strong { color: var(--accent-bright); }
         .about-links {
             padding: 22px;
             align-self: start;
@@ -640,6 +652,18 @@
             border-bottom: 1px solid var(--border);
         }
         .about-links li:last-child a { border-bottom: 0; }
+        .about-links .links-sub { margin-top: 20px; }
+        .about-links li.link-pair {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .about-links li.link-pair:last-child { border-bottom: 0; }
+        .about-links li.link-pair a { border-bottom: 0; }
+        .about-links li.link-pair a + a { color: var(--text-dim); font-size: 14px; }
+        .about-links li.link-pair a + a:hover { color: var(--accent); }
 
         /* Footer */
         .site-footer {
@@ -838,9 +862,15 @@
                     <p class="hero-desc" data-i18n="hero_desc">A free, open-source real-time strategy game inspired by <strong>Art of War 2: Liberation of Peru</strong>. Two campaigns, skirmishes against the AI, a map editor and multiplayer for up to <strong>8 players</strong> across PC and mobile.</p>
                     <div class="hero-actions">
                         <a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener" class="btn btn-primary" data-i18n="btn_download">Download</a>
+                        <a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener" class="btn" data-i18n="btn_source">Source code</a>
                         <a href="https://boosty.to/badcast/donate" target="_blank" rel="noopener noreferrer" class="btn" data-i18n="btn_support">Support on Boosty</a>
                     </div>
-                    <p class="hero-platforms" data-i18n="hero_platforms">Windows · Linux · macOS · Android · iOS — GNU GPLv3. In active development.</p>
+                    <div class="hero-meta">
+                        <a href="https://github.com/badcast/open-art-of-war/stargazers" target="_blank" rel="noopener" class="stars-badge">
+                            <img src="https://img.shields.io/github/stars/badcast/open-art-of-war?style=flat-square&amp;logo=github&amp;label=Stars&amp;color=e8b04a&amp;labelColor=100d0a" alt="GitHub stars" height="20">
+                        </a>
+                        <p class="hero-platforms" data-i18n="hero_platforms">Windows · Linux · macOS · Android · iOS — GNU GPLv3. In active development.</p>
+                    </div>
 
                     <div class="panel player">
                         <audio id="ost-audio" preload="none" src="./music/mainmenu.ogg"></audio>
@@ -1023,7 +1053,7 @@
                     <div class="about-text">
                         <p data-i18n="story_p1">I have long been a fan of classic strategy games like <strong>Red Alert 1 and 2</strong>. Back in the days of push-button <strong>Nokia</strong> phones, my friends and I spent hours playing <strong>Art of War 2: Liberation of Peru</strong>, discussing tactics and planning tank assaults.</p>
                         <p data-i18n="story_p2">For years I hoped to see this series on PC. There is a third installment, but the second one is where I still feel the real classic RTS: careful balance, a fair economy and the thrill of every battle.</p>
-                        <p data-i18n="story_p3">Inspired by <strong>Warzone 2100</strong> and <strong>OpenRA</strong>, I started this project to give the game a second life on big screens with proper controls and multiplayer. Sincere thanks to <strong>Gear Games</strong> and everyone who made the game we grew up with.</p>
+                        <p data-i18n="story_p3">Inspired by <a href="https://wz2100.net" target="_blank" rel="noopener"><strong>Warzone 2100</strong></a> and <a href="https://www.openra.net" target="_blank" rel="noopener"><strong>OpenRA</strong></a>, I started this project to give the game a second life on big screens with proper controls and multiplayer. Sincere thanks to <strong>Gear Games</strong> and everyone who made the game we grew up with.</p>
                     </div>
                     <div class="panel about-links">
                         <h3 data-i18n="links_title">Links</h3>
@@ -1033,6 +1063,11 @@
                             <li><a href="https://github.com/badcast/open-art-of-war/issues" target="_blank" rel="noopener" data-i18n="link_issues">Report an issue</a></li>
                             <li><a href="https://t.me/+EkC17x8nKy05NDdi" target="_blank" rel="noopener noreferrer" data-i18n="link_telegram">Telegram chat</a></li>
                             <li><a href="https://boosty.to/badcast/donate" target="_blank" rel="noopener noreferrer" data-i18n="btn_support">Support on Boosty</a></li>
+                        </ul>
+                        <h3 class="links-sub" data-i18n="favorites_title">Favourites</h3>
+                        <ul>
+                            <li class="link-pair"><a href="https://wz2100.net" target="_blank" rel="noopener">Warzone 2100</a><a href="https://github.com/Warzone2100/warzone2100" target="_blank" rel="noopener">GitHub</a></li>
+                            <li class="link-pair"><a href="https://www.openra.net" target="_blank" rel="noopener">OpenRA</a><a href="https://github.com/OpenRA/OpenRA" target="_blank" rel="noopener">GitHub</a></li>
                         </ul>
                     </div>
                 </div>
@@ -1269,6 +1304,7 @@
                 nav_about: 'About',
                 hero_desc: 'A free, open-source real-time strategy game inspired by <strong>Art of War 2: Liberation of Peru</strong>. Two campaigns, skirmishes against the AI, a map editor and multiplayer for up to <strong>8 players</strong> across PC and mobile.',
                 btn_download: 'Download',
+                btn_source: 'Source code',
                 btn_support: 'Support on Boosty',
                 hero_platforms: 'Windows · Linux · macOS · Android · iOS — GNU GPLv3. In active development.',
                 ost_label: 'Soundtrack',
@@ -1353,8 +1389,9 @@
                 about_title: 'About the project',
                 story_p1: 'I have long been a fan of classic strategy games like <strong>Red Alert 1 and 2</strong>. Back in the days of push-button <strong>Nokia</strong> phones, my friends and I spent hours playing <strong>Art of War 2: Liberation of Peru</strong>, discussing tactics and planning tank assaults.',
                 story_p2: 'For years I hoped to see this series on PC. There is a third installment, but the second one is where I still feel the real classic RTS: careful balance, a fair economy and the thrill of every battle.',
-                story_p3: 'Inspired by <strong>Warzone 2100</strong> and <strong>OpenRA</strong>, I started this project to give the game a second life on big screens with proper controls and multiplayer. Sincere thanks to <strong>Gear Games</strong> and everyone who made the game we grew up with.',
+                story_p3: 'Inspired by <a href="https://wz2100.net" target="_blank" rel="noopener"><strong>Warzone 2100</strong></a> and <a href="https://www.openra.net" target="_blank" rel="noopener"><strong>OpenRA</strong></a>, I started this project to give the game a second life on big screens with proper controls and multiplayer. Sincere thanks to <strong>Gear Games</strong> and everyone who made the game we grew up with.',
                 links_title: 'Links',
+                favorites_title: 'Favourites',
                 link_releases: 'Releases',
                 link_issues: 'Report an issue',
                 link_telegram: 'Telegram chat',
@@ -1369,6 +1406,7 @@
                 nav_about: 'О проекте',
                 hero_desc: 'Свободная стратегия в реальном времени с открытым кодом, вдохновлённая <strong>Art of War 2: Liberation of Peru</strong>. Две кампании, схватки с компьютером, редактор карт и сетевая игра до <strong>8 человек</strong> на ПК и телефонах.',
                 btn_download: 'Скачать',
+                btn_source: 'Исходный код',
                 btn_support: 'Поддержать на Boosty',
                 hero_platforms: 'Windows · Linux · macOS · Android · iOS — GNU GPLv3. Проект в активной разработке.',
                 ost_label: 'Саундтрек',
@@ -1453,8 +1491,9 @@
                 about_title: 'О проекте',
                 story_p1: 'Я давний фанат классических стратегий <strong>Red Alert 1 и 2</strong>. Ещё во времена кнопочных телефонов <strong>Nokia</strong> мы с друзьями часами играли в <strong>Art of War 2: Liberation of Peru</strong>, обсуждая тактики и планируя танковые штурмы.',
                 story_p2: 'Я долго ждал эту серию на ПК. Третья часть существует, но именно во второй я чувствую настоящую классику стратегий: выверенный баланс, честную экономику и азарт каждого боя.',
-                story_p3: 'Вдохновившись <strong>Warzone 2100</strong> и <strong>OpenRA</strong>, я начал этот проект, чтобы дать любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми боями. Искренне благодарю студию <strong>Gear Games</strong> и всех, кто подарил нам игру, на которой мы выросли.',
+                story_p3: 'Вдохновившись <a href="https://wz2100.net" target="_blank" rel="noopener"><strong>Warzone 2100</strong></a> и <a href="https://www.openra.net" target="_blank" rel="noopener"><strong>OpenRA</strong></a>, я начал этот проект, чтобы дать любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми боями. Искренне благодарю студию <strong>Gear Games</strong> и всех, кто подарил нам игру, на которой мы выросли.',
                 links_title: 'Ссылки',
+                favorites_title: 'Избранное',
                 link_releases: 'Релизы',
                 link_issues: 'Сообщить об ошибке',
                 link_telegram: 'Чат в Telegram',
@@ -1507,7 +1546,7 @@
         }
 
         // Server status
-        const srvHost = window.location.hostname || 'openaow.imister.tech';
+        const srvHost = 'openaow.imister.tech';
         const srvPort = 38100;
         let srvState = 'checking';
         let srvData = null;
