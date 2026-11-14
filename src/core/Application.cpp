@@ -61,6 +61,16 @@ namespace OpenArtOfWar
 
 namespace
 {
+bool SDLCALL AppLifecycleEventWatch(void *userdata, SDL_Event *event)
+{
+    if (userdata && event)
+        static_cast<Application *>(userdata)->OnLifecycleEvent(static_cast<int>(event->type));
+    return true;
+}
+} // namespace
+
+namespace
+{
 // OAOW_NET_TRACE=1: every 20th tick the hash of a snapshot, to compare the authority with a replica by eye or script
 void SnapshotTrace(const char *who, const WorldSnapshot &snap)
 {
@@ -110,7 +120,13 @@ bool Application::Init(int windowWidth, int windowHeight)
         if (!m_headless && SDL_Init(SDL_INIT_VIDEO))
         {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game data not found", errorMessage, nullptr);
-            SDL_Quit();
+            if (m_lifecycleWatchAdded)
+    {
+        SDL_RemoveEventWatch(&AppLifecycleEventWatch, this);
+        m_lifecycleWatchAdded = false;
+    }
+
+    SDL_Quit();
         }
         return false;
     }
@@ -136,7 +152,13 @@ bool Application::Init(int windowWidth, int windowHeight)
             if (!m_headless && SDL_Init(SDL_INIT_VIDEO))
             {
                 SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game data check failed", message.c_str(), nullptr);
-                SDL_Quit();
+                if (m_lifecycleWatchAdded)
+    {
+        SDL_RemoveEventWatch(&AppLifecycleEventWatch, this);
+        m_lifecycleWatchAdded = false;
+    }
+
+    SDL_Quit();
             }
             return false;
         }
@@ -152,7 +174,13 @@ bool Application::Init(int windowWidth, int windowHeight)
         if (!m_headless && SDL_Init(SDL_INIT_VIDEO))
         {
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game data check failed", message.c_str(), nullptr);
-            SDL_Quit();
+            if (m_lifecycleWatchAdded)
+    {
+        SDL_RemoveEventWatch(&AppLifecycleEventWatch, this);
+        m_lifecycleWatchAdded = false;
+    }
+
+    SDL_Quit();
         }
         return false;
     }
@@ -195,6 +223,7 @@ bool Application::Init(int windowWidth, int windowHeight)
         std::cerr << "[Application] SDL_Init failed: " << SDL_GetError() << std::endl;
         return false;
     }
+    m_lifecycleWatchAdded = SDL_AddEventWatch(&AppLifecycleEventWatch, this);
 
     m_env.load(LoaderResources::environment());
 
@@ -453,8 +482,67 @@ void Application::Shutdown()
         m_window = nullptr;
     }
 
+    if (m_lifecycleWatchAdded)
+    {
+        SDL_RemoveEventWatch(&AppLifecycleEventWatch, this);
+        m_lifecycleWatchAdded = false;
+    }
+
     SDL_Quit();
     m_running = false;
+}
+
+void Application::OnLifecycleEvent(int eventType)
+{
+    switch (eventType)
+    {
+        case SDL_EVENT_WILL_ENTER_BACKGROUND:
+        case SDL_EVENT_DID_ENTER_BACKGROUND:
+            m_inBackground.store(true);
+            break;
+        case SDL_EVENT_WILL_ENTER_FOREGROUND:
+        case SDL_EVENT_DID_ENTER_FOREGROUND:
+            m_inBackground.store(false);
+            m_renderTargetsLost.store(true);
+            break;
+        case SDL_EVENT_TERMINATING:
+            m_running = false;
+            break;
+        case SDL_EVENT_RENDER_TARGETS_RESET:
+            m_renderTargetsLost.store(true);
+            break;
+        case SDL_EVENT_RENDER_DEVICE_RESET:
+            m_renderDeviceLost.store(true);
+            break;
+        default:
+            break;
+    }
+}
+
+void Application::ResetRenderTargets(bool deviceLost)
+{
+    if (m_lowResTarget)
+    {
+        SDL_DestroyTexture(m_lowResTarget);
+        m_lowResTarget = nullptr;
+    }
+    m_lowResW = 0;
+    m_lowResH = 0;
+    if (m_renderer)
+        m_renderer->ResetRenderTargets();
+    if (m_nightLighting)
+        m_nightLighting->Shutdown();
+    if (m_effects)
+        m_effects->ResetTargets();
+    if (deviceLost)
+    {
+        if (m_texManager)
+        {
+            m_texManager->ReloadSprites();
+            m_texManager->PinUiCommon();
+        }
+        m_loadingPreview.Clear();
+    }
 }
 
 void Application::SetDebugMode(bool debug)
@@ -590,6 +678,22 @@ void Application::Run()
         }
 
         HandleEvents();
+        if (m_inBackground.load())
+        {
+            UpdateNetwork(static_cast<std::uint32_t>(SDL_GetTicks()));
+            SDL_Delay(50);
+            prevTime = clock::now();
+            continue;
+        }
+        if (m_renderDeviceLost.exchange(false))
+        {
+            m_renderTargetsLost.store(false);
+            ResetRenderTargets(true);
+        }
+        else if (m_renderTargetsLost.exchange(false))
+        {
+            ResetRenderTargets(false);
+        }
         if (m_resourceManager)
             m_resourceManager->Tick(SDL_GetTicks());
         // One clock for all network timing: SDL ticks, the same the lobby's Start button uses (epoch
@@ -1074,6 +1178,11 @@ void Application::HandleEvents()
         {
             SyncWindowSize(event.window.data1, event.window.data2);
         }
+        if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND)
+        {
+            m_renderTargetsLost.store(true);
+            SyncWindowSize();
+        }
 
         // A click on a button, list entry or cameo the last frame drew under the mouse
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT
@@ -1279,6 +1388,7 @@ void Application::Update(float deltaTime)
             || m_input->WasLeftClickIssued(lx, ly))
         {
             m_state = AppState::MainMenu;
+            m_menuController->StartMainMenuIntro();
         }
     }
     else if (m_state == AppState::MainMenu)
@@ -1323,6 +1433,8 @@ void Application::Update(float deltaTime)
     }
     else if (m_state == AppState::MenuHelp || m_state == AppState::MenuAbout)
     {
+        if (m_state == AppState::MenuAbout && m_menuController->IsAboutOutroActive())
+            m_menuController->UpdateAboutOutro(deltaTime);
         m_menuController->UpdateInfoScreen(*m_input, m_state);
     }
     else if (m_state == AppState::Briefing)
@@ -1576,7 +1688,14 @@ void Application::Render()
     else if (m_state == AppState::MenuAbout)
     {
         if (m_aboutScene)
+        {
             m_aboutScene->Render(*m_renderer, *m_fontRenderer, m_aboutCredits, m_windowW, m_windowH);
+            if (m_menuController->IsAboutOutroActive())
+            {
+                m_menuController->RenderMainMenu(
+                    *m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH, false);
+            }
+        }
         else
         {
             m_menuController->RenderMainMenu(
@@ -1890,8 +2009,8 @@ void Application::Render()
 
         // Training progress above Barracks / Factories, rally lines of the selected ones
         m_hudController->RenderProductionOverlay(*m_renderer, *m_fontRenderer, *m_entities, *m_map, *m_camera);
-        // Not enough power: blinking lightnings over the buildings that stopped
-        m_hudController->RenderPowerAlerts(*m_renderer, *m_entities, *m_economy, *m_camera);
+        // Not enough power: blinking lightnings at the center of buildings that stopped
+        m_hudController->RenderPowerAlerts(*m_renderer, *m_entities, *m_map, *m_economy, *m_camera);
 
         shake.Restore();
 
@@ -1984,7 +2103,9 @@ void Application::Render()
         m_gameplayController->RenderDebugSpawnDropdown(*m_renderer, *m_fontRenderer, m_windowH);
 
         if (m_menuController->IsMissionDialogOpen())
+        {
             m_menuController->RenderMissionDialog(*m_renderer, *m_fontRenderer, m_windowW, m_windowH);
+        }
         if (m_menuController->IsObjectivesDialogOpen())
         {
             m_menuController->RenderObjectivesDialog(
@@ -2045,7 +2166,9 @@ void Application::Render()
     if ((m_replay || m_spectating) && m_state == AppState::SkirmishPlaying)
         RenderReplayBar();
     if (m_videoConfirmActive)
+    {
         RenderVideoConfirm();
+    }
 
 #if defined(AOW_DEBUG)
     // Debug Overlay (Dear ImGui)

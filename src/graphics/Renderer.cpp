@@ -158,6 +158,17 @@ SDL_FRect FrameSource(const SpriteFrame &f)
 }
 } // namespace
 
+void Renderer::ResetRenderTargets()
+{
+    if (m_clipTex)
+    {
+        SDL_DestroyTexture(m_clipTex);
+        m_clipTex = nullptr;
+    }
+    m_clipTexW = 0;
+    m_clipTexH = 0;
+}
+
 void Renderer::Clear(SDL_Color clearColor)
 {
     SDL_SetRenderDrawColor(m_renderer, clearColor.r, clearColor.g, clearColor.b, clearColor.a);

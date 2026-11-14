@@ -3,6 +3,7 @@
 #include "core/LoaderResources.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
+#include "game/Players.hpp"
 #include "ui/TouchHUD.hpp"
 #include "ui/UiKit.hpp"
 #include "ui/UiLayout.hpp"
@@ -274,6 +275,28 @@ int main()
         Check(
             !touchHud.TouchPansCamera() && !touchHud.OwnsMapInput(),
             "TouchHUD restores always-on box selection when leaving building mode");
+
+        EntityManager entities;
+        TileMap map;
+        Economy economy;
+        Camera camera(1280, 720);
+        camera.SetZoom(1.0f);
+        camera.SetPosition(0.0f, 0.0f);
+        const int barracksId
+            = entities.SpawnBuildingByIndex(10, 14, 14, Faction::Resistance, 1.0f, Players::Local());
+        Check(barracksId > 0, "spawn own Barracks for touch panel test");
+        if (barracksId > 0)
+        {
+            touchHud.FocusBuilding(barracksId, entities);
+            const std::size_t panelsBefore = touchHud.TouchPanels(1280, 720).size();
+            bool openMenu = false, openObjectives = false;
+            std::vector<int> selectedUnits;
+            const bool consumed = touchHud.HandleHudClick(
+                435, 290, true, false, false, 0, 1280, 720, economy, entities, map, camera, openMenu,
+                openObjectives, selectedUnits);
+            Check(!consumed, "touch on building reaches map selection while cards are open");
+            Check(touchHud.TouchPanels(1280, 720).size() == panelsBefore, "touch on building keeps cards open");
+        }
     }
 
     if (g_failures == 0)
@@ -288,6 +311,7 @@ int main()
                 "touch main menu item stays on screen and clear of the music player");
         }
     }
+    Check(menu_detail::TouchMainMenuItemRect(0, 1280, 720).w == 380, "touch menu buttons retain their width");
 
     // The touch panels share an offscreen crop: contents must survive at normal and scaled output sizes.
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");

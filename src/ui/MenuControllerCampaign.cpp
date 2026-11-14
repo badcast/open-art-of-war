@@ -77,24 +77,58 @@ std::string HandicapText(int index)
 
 // Custom game: the table of players in the details panel (columns: level / name, faction, team, colour, remove)
 // The seat table takes the whole width of the details (as in the network room); the map picture sits under it on the
+// Campaign mission select
+struct CampaignLayout
+{
+    UiRect dialog;
+    UiRect list;
+    UiRect details;
+    UiRect startBtn;
+    UiRect backBtn;
+    UiRect sideBtn[1];    // combo: the side the player commands (Resistance / Confederation)
+    UiRect difficultyBtn; // combo: AI difficulty, right of the side combo
+    UiRect editorBtn;     // opens the map editor with the selected map, left of Start
+    UiRect baseCheckbox;  // custom game: start with a base (check box under the picture)
+    UiRect fogCheckbox;   // custom game: fog of war checkbox
+    UiRect speedCheckbox; // custom game: allow speed control checkbox
+    UiRect creditsBtn;    // custom game: starting credits (top right of the details)
+    UiRect timeBtn;       // custom game: time of day (left of the credits)
+    UiRect techBtn;       // custom game: tech level of the match (left of the time of day)
+    int customHeaderLineY {0};
+    int customRowsTop {0};
+    int itemH {42};
+    int itemGap {4};
+    bool touch {false};
+
+    UiRect Item(int rowIndex) const
+    {
+        return {list.x, list.y + rowIndex * (itemH + itemGap), list.w, itemH};
+    }
+    UiRect ItemAt(int rowIndex, int scrollPx) const
+    {
+        return {list.x, list.y + rowIndex * (itemH + itemGap) - scrollPx, list.w, itemH};
+    }
+};
+
 // left, the options and the map size on its right
-int CustomRowH(const UiRect &detailsRect)
+int CustomRowH(const CampaignLayout &layout)
 {
-    return std::clamp((detailsRect.h - 118 - 150 - 30) / 8, 34, 46);
+    const int headerUsed = std::max(0, layout.customRowsTop - layout.details.y);
+    return std::clamp((layout.details.h - headerUsed - 150 - 30) / 8, 34, 46);
 }
 
-UiRect CustomRow(const UiRect &detailsRect, int rowIndex)
+UiRect CustomRow(const CampaignLayout &layout, int rowIndex)
 {
-    const int rowHeight = CustomRowH(detailsRect);
-    return {detailsRect.x + 20, detailsRect.y + 118 + rowIndex * rowHeight, detailsRect.w - 40, rowHeight - 4};
+    const int rowHeight = CustomRowH(layout);
+    return {layout.details.x + 20, layout.customRowsTop + rowIndex * rowHeight, layout.details.w - 40, rowHeight - 4};
 }
 
-UiRect CustomCell(const UiRect &detailsRect, int rowIndex, int kind)
+UiRect CustomCell(const CampaignLayout &layout, int rowIndex, int kind)
 {
     // (rowIndex is a start position of the map; kind 0 what holds it, 1 faction, 2 team, 3 colour, 7 handicap,
     // 8 army size, 9 tech level). The cells share the width of the row, so they stretch with the window
     static constexpr int kColumnShare[7] = {23, 17, 8, 8, 12, 15, 17};
-    const UiRect rowRect = CustomRow(detailsRect, rowIndex);
+    const UiRect rowRect = CustomRow(layout, rowIndex);
     const int columnIndex = kind == 1   ? 1
                             : kind == 2 ? 2
                             : kind == 3 ? 3
@@ -115,44 +149,13 @@ UiRect CustomCell(const UiRect &detailsRect, int rowIndex, int kind)
         rowRect.h};
 }
 
-UiRect CustomPreviewArea(const UiRect &detailsRect)
+UiRect CustomPreviewArea(const CampaignLayout &layout)
 {
-    const int top = detailsRect.y + 118 + 8 * CustomRowH(detailsRect) + 12;
-    const int size
-        = std::clamp(std::min(detailsRect.Bottom() - 16 - top, static_cast<int>(detailsRect.w * 0.45f)), 120, 460);
-    return {detailsRect.x + 20, top, size, size};
+    const int top = layout.customRowsTop + 8 * CustomRowH(layout) + 12;
+    const int size = std::clamp(
+        std::min(layout.details.Bottom() - 16 - top, static_cast<int>(layout.details.w * 0.45f)), 120, 460);
+    return {layout.details.x + 20, top, size, size};
 }
-
-// Campaign mission select
-struct CampaignLayout
-{
-    UiRect dialog;
-    UiRect list;
-    UiRect details;
-    UiRect startBtn;
-    UiRect backBtn;
-    UiRect sideBtn[1];    // combo: the side the player commands (Resistance / Confederation)
-    UiRect difficultyBtn; // combo: AI difficulty, right of the side combo
-    UiRect editorBtn;     // opens the map editor with the selected map, left of Start
-    UiRect baseCheckbox;  // custom game: start with a base (check box under the picture)
-    UiRect fogCheckbox;   // custom game: fog of war checkbox
-    UiRect speedCheckbox; // custom game: allow speed control checkbox
-    UiRect creditsBtn;    // custom game: starting credits (top right of the details)
-    UiRect timeBtn;       // custom game: time of day (left of the credits)
-    UiRect techBtn;       // custom game: tech level of the match (left of the time of day)
-    int itemH {42};
-    int itemGap {4};
-    bool touch {false};
-
-    UiRect Item(int rowIndex) const
-    {
-        return {list.x, list.y + rowIndex * (itemH + itemGap), list.w, itemH};
-    }
-    UiRect ItemAt(int rowIndex, int scrollPx) const
-    {
-        return {list.x, list.y + rowIndex * (itemH + itemGap) - scrollPx, list.w, itemH};
-    }
-};
 
 CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCount)
 {
@@ -179,7 +182,9 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
         layout.creditsBtn = solved.Rect("credits");
         layout.timeBtn = solved.Rect("time");
         layout.techBtn = solved.Rect("tech");
-        const UiRect previewRect = CustomPreviewArea(layout.details);
+        layout.customHeaderLineY = std::max(layout.details.y + 58, layout.creditsBtn.Bottom() + 10);
+        layout.customRowsTop = layout.customHeaderLineY + 46;
+        const UiRect previewRect = CustomPreviewArea(layout);
         const int optionsX = previewRect.Right() + 20;
         const int cbH = layout.touch ? 36 : 32;
         const int cbStep = layout.touch ? 40 : 36;
@@ -207,7 +212,9 @@ CampaignLayout campaignLayout(int windowWidth, int windowHeight, int missionCoun
     layout.creditsBtn = {layout.details.Right() - 20 - 200, layout.details.y + 10, 200, 36};
     layout.timeBtn = {layout.creditsBtn.x - 12 - 160, layout.details.y + 10, 160, 36};
     layout.techBtn = {layout.timeBtn.x - 12 - 180, layout.details.y + 10, 180, 36};
-    const UiRect previewRect = CustomPreviewArea(layout.details);
+    layout.customHeaderLineY = std::max(layout.details.y + 58, layout.creditsBtn.Bottom() + 10);
+    layout.customRowsTop = layout.customHeaderLineY + 46;
+    const UiRect previewRect = CustomPreviewArea(layout);
     const int optionsX = previewRect.Right() + 20;
     layout.fogCheckbox = {optionsX, previewRect.y, layout.details.Right() - 20 - optionsX, 32};
     layout.baseCheckbox = {optionsX, previewRect.y + 36, layout.details.Right() - 20 - optionsX, 32};
@@ -507,7 +514,7 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
         EnsureCustomSlots();
     auto comboField = [&](int comboId) {
         if (comboId >= kComboSlot)
-            return CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10);
+            return CustomCell(layout, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10);
         if (comboId >= kComboMapPlayers && comboId <= kComboMapSort)
             return MapFilterBtn(layout, comboId - kComboMapPlayers);
         return comboId == kComboSide      ? layout.sideBtn[0]
@@ -654,23 +661,22 @@ bool MenuController::UpdateCampaignSelect(const FrameContext &context, int mouse
         }
         if (hasLayoutChoice)
         {
-            const UiRect &detailsRect = layout.details;
             const SkirmishMapInfo &mapInfo = m_skirmishMaps[m_skirmishSelected];
             const int spotCount = std::min(mapInfo.players, kMaxPlayers);
             for (int spotIndex = 0; spotIndex < spotCount; ++spotIndex)
             {
-                if (CustomCell(detailsRect, spotIndex, 0).Contains(mouseX, mouseY))
+                if (CustomCell(layout, spotIndex, 0).Contains(mouseX, mouseY))
                     return openCombo(kComboSlot + spotIndex * 10);
                 const int slotIndex = CustomSlotAt(spotIndex);
                 if (slotIndex < 0)
                     continue;
                 for (int kind : {1, 2, 3, 7, 8, 9})
-                    if (CustomCell(detailsRect, spotIndex, kind).Contains(mouseX, mouseY))
+                    if (CustomCell(layout, spotIndex, kind).Contains(mouseX, mouseY))
                         return openCombo(kComboSlot + spotIndex * 10 + kind);
             }
             // An open start position on the map: the person takes it
             {
-                const UiRect previewRect = CustomPreviewArea(detailsRect);
+                const UiRect previewRect = CustomPreviewArea(layout);
                 if (m_spotsPath == mapInfo.path && mapInfo.width > 0 && mapInfo.height > 0
                     && previewRect.Contains(mouseX, mouseY))
                 {
@@ -911,14 +917,15 @@ void MenuController::RenderCampaignMissionSelect(
 
         int contentX = detailsRect.x + 20;
         int contentWidth = detailsRect.w - 40;
-        const int titleWidth = contentWidth - 220 - 172 - 192 - 118;
+        const int titleWidth = std::max(80, layout.techBtn.x - contentX - 16);
         fontRenderer.DrawString(
             ui::FitText(fontRenderer, mapInfo.DisplayName(), ui::FONT_H2, titleWidth),
             contentX,
-            detailsRect.y + 18,
+            layout.techBtn.CenterY(),
             ui::FONT_H2,
             col::Accent,
-            true);
+            true,
+            Anchor::LEFT | Anchor::VCENTER);
         ui::DrawComboField(
             renderer,
             fontRenderer,
@@ -940,12 +947,12 @@ void MenuController::RenderCampaignMissionSelect(
             ui::TechLevelLabel(m_skirmishTechLevel, false),
             m_combo.open == kComboTech,
             layout.techBtn.Contains(m_mouseX, m_mouseY));
-        renderer.FillRectScreen(contentX, detailsRect.y + 74, contentWidth, 1, col::Border);
+        renderer.FillRectScreen(contentX, layout.customHeaderLineY, contentWidth, 1, col::Border);
         ui::DrawCaption(
             fontRenderer,
             renderer,
             contentX,
-            detailsRect.y + 80,
+            layout.customHeaderLineY + 6,
             std::string(_("PLAYERS")) + " (" + std::to_string(m_customSlots.size() - (m_customSpectator ? 1u : 0u))
                 + ")");
         // Column captions, the same order as in the network room
@@ -958,11 +965,11 @@ void MenuController::RenderCampaignMissionSelect(
                  {8, _("Army")},
                  {9, _("Tech")}})
         {
-            const UiRect cell = CustomCell(detailsRect, 0, kind);
+            const UiRect cell = CustomCell(layout, 0, kind);
             fontRenderer.DrawString(
                 ui::FitText(fontRenderer, text, ui::FONT_SMALL, cell.w),
                 cell.x + 2,
-                detailsRect.y + 100,
+                layout.customHeaderLineY + 26,
                 ui::FONT_SMALL,
                 col::TextMuted,
                 false);
@@ -972,7 +979,7 @@ void MenuController::RenderCampaignMissionSelect(
         {
             const int slotIndex = CustomSlotAt(spotIndex);
             const bool blocked = ((m_customBlocked >> spotIndex) & 1u) != 0;
-            const UiRect rowRect = CustomRow(detailsRect, spotIndex);
+            const UiRect rowRect = CustomRow(layout, spotIndex);
             ui::DrawPanel(
                 renderer,
                 rowRect,
@@ -987,7 +994,7 @@ void MenuController::RenderCampaignMissionSelect(
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
             auto combo = [&](int kind, std::string_view text, SDL_Color textColor = col::Text) {
-                const UiRect cell = CustomCell(detailsRect, spotIndex, kind);
+                const UiRect cell = CustomCell(layout, spotIndex, kind);
                 ui::DrawComboField(
                     renderer,
                     fontRenderer,
@@ -1026,7 +1033,7 @@ void MenuController::RenderCampaignMissionSelect(
             combo(
                 9, ui::TechLevelLabel(customSlot.techLevel, true), customSlot.techLevel < 0 ? col::TextDim : col::Text);
             combo(3, "");
-            const UiRect colorCellRect = CustomCell(detailsRect, spotIndex, 3);
+            const UiRect colorCellRect = CustomCell(layout, spotIndex, 3);
             renderer.FillRectScreen(
                 colorCellRect.x + 6,
                 colorCellRect.y + 6,
@@ -1040,7 +1047,7 @@ void MenuController::RenderCampaignMissionSelect(
                 colorCellRect.h - 12,
                 col::BorderStrong);
         }
-        const UiRect previewRect = CustomPreviewArea(detailsRect);
+        const UiRect previewRect = CustomPreviewArea(layout);
         int previewWidth = 0, previewHeight = 0;
         SDL_Texture *previewTexture = m_mapPreview.Get(
             renderer.GetSdlRenderer(), textureManager, mapInfo.path, mapInfo.path, {}, previewWidth, previewHeight);
@@ -1245,7 +1252,7 @@ void MenuController::RenderCampaignMissionSelect(
         const int comboId = m_combo.open;
         const UiRect fieldRect
             = comboId >= kComboSlot
-                  ? CustomCell(layout.details, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10)
+                  ? CustomCell(layout, (comboId - kComboSlot) / 10, (comboId - kComboSlot) % 10)
                   : (comboId >= kComboMapPlayers && comboId <= kComboMapSort
                          ? MapFilterBtn(layout, comboId - kComboMapPlayers)
                      : comboId == kComboSide    ? layout.sideBtn[0]

@@ -14,6 +14,7 @@
 #include "graphics/RenderBackend.hpp"
 #include "net/WorldSnapshot.hpp"
 #include <array>
+#include <atomic>
 #include <deque>
 #include <map>
 #include <memory>
@@ -80,6 +81,7 @@ public:
 #if defined(AOW_DEBUG)
 #endif
     void Shutdown();
+    void OnLifecycleEvent(int eventType);
     void SetDebugMode(bool debug);
     bool IsDebugMode() const
     {
@@ -173,6 +175,11 @@ private:
     void UpdateVideoConfirm(float deltaTime);
     void RenderVideoConfirm();
     void SyncWindowSize(int w = 0, int h = 0);
+    void ResetRenderTargets(bool deviceLost);
+    std::atomic<bool> m_inBackground {false};
+    std::atomic<bool> m_renderTargetsLost {false};
+    std::atomic<bool> m_renderDeviceLost {false};
+    bool m_lifecycleWatchAdded {false};
     void RenderFpsCounter();
     // Settings "Network statistics": ping, jitter, loss, traffic, turn buffer (network lobby and match)
     void RenderNetStats();

@@ -309,8 +309,8 @@ GameplayController::GroupColumn GameplayController::GroupColumnLayout(int mapVie
     const int top = 64, bottom = m_touchMode ? 230 : 24;
     const float base = m_touchMode ? 1.25f : 1.0f;
     // Only the touch interface has the "+" / "x" buttons (the PC one has the hotkeys, Ctrl+1..0), and only while
-    // there is a group or a selection to make one of; they are twice as big as the cards' unit
-    constexpr int kButtonFactor = 2;
+    // there is a group or a selection to make one of; keep them finger-sized without covering as much of the map
+    constexpr float kButtonFactor = 1.7f;
     col.buttons = m_touchMode && (count > 0 || m_ownUnitsSelected);
     const int buttons = col.buttons ? 2 : 0;
     const int gaps = std::max(0, count + buttons - 1);
@@ -318,7 +318,7 @@ GameplayController::GroupColumn GameplayController::GroupColumnLayout(int mapVie
         buttons * kGroupButtonHeight * kButtonFactor + count * kGroupSlotHeight + gaps * kGroupGap);
     const float avail = static_cast<float>(std::max(80, windowHeight - top - bottom));
     const float scale = std::clamp(std::min(base, avail / needed), 0.55f, base);
-    auto px = [&](int v) { return std::max(1, static_cast<int>(std::lround(v * scale))); };
+    auto px = [&](float v) { return std::max(1, static_cast<int>(std::lround(v * scale))); };
     const int w = px(kGroupSlotWidth), slotH = px(kGroupSlotHeight), gap = px(kGroupGap);
     const int buttonH = px(kGroupButtonHeight * kButtonFactor), buttonW = px(kGroupSlotWidth * kButtonFactor);
     const int total = buttons * buttonH + count * slotH + gaps * gap;
@@ -1362,12 +1362,12 @@ void GameplayController::Update(const FrameContext &context)
                     }
                     m_touchRallyBuildings.clear();
                     m_touchRallyTicks = 0;
-                    touchOrdered = true; // the building stays selected: its focus is kept
+                    touchOrdered = true;
                 }
                 else if (!m_selectedUnits.empty())
                 {
-                    // 1st tap on the map remembers the selected unit-producing building(s) so that a 2nd tap at the
-                    // same spot sets their rally point; the focus stays on them.
+                    // 1st tap on the map clears the building selection, but remembers producers so that a 2nd tap
+                    // at the same spot can still set their rally point.
                     m_touchRallyBuildings.clear();
                     for (int unitId : m_selectedUnits)
                     {
@@ -1382,17 +1382,12 @@ void GameplayController::Update(const FrameContext &context)
                     m_touchRallyTicks = m_touchRallyBuildings.empty() ? 0 : nowTicks;
                     m_touchRallyX = mouseX;
                     m_touchRallyY = mouseY;
-                    // A Barracks / Factory in focus keeps it on a single tap (a second tap there sets its rally
-                    // point); any other selection ends here
-                    if (m_touchRallyBuildings.empty())
+                    for (int unitId : m_selectedUnits)
                     {
-                        for (int unitId : m_selectedUnits)
-                        {
-                            if (Entity *e = entities.GetEntity(unitId))
-                                e->selected = false;
-                        }
-                        m_selectedUnits.clear();
+                        if (Entity *e = entities.GetEntity(unitId))
+                            e->selected = false;
                     }
+                    m_selectedUnits.clear();
                     touchOrdered = true;
                 }
             }

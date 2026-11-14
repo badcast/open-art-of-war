@@ -5,6 +5,11 @@
 
 namespace OpenArtOfWar::menu_detail
 {
+inline int TouchPlayerWidth(int windowW)
+{
+    return std::min(windowW - 48, 560);
+}
+
 inline ui::UiRect TouchMainMenuItemRect(int index, int windowW, int windowH)
 {
     constexpr int count = 10;
@@ -13,7 +18,7 @@ inline ui::UiRect TouchMainMenuItemRect(int index, int windowW, int windowH)
     const int width = std::min(maxRightW, std::clamp(windowW / 3, 280, 380));
     const int titleTop = std::max(14, windowH / 28);
     const int minTop = titleTop + 102;
-    const int playerW = std::min(windowW - 48, 440);
+    const int playerW = TouchPlayerWidth(windowW);
     const int playerX = std::max(24, (windowW - playerW) / 2);
     const int playerTop = windowH - 134; // touch player panel (80) + bottom margin (20) + seek gap (34)
     const int bottomReserve = (left + width > playerX - 12) ? (windowH - (playerTop - 12)) : 16;

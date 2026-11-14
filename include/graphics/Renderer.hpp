@@ -24,6 +24,7 @@ public:
     {
         m_showShadows = show;
     }
+    void ResetRenderTargets();
     Renderer(SDL_Renderer *sdlRenderer, TextureManager *textureManager);
 
     void Clear(SDL_Color clearColor = {0, 0, 0, 255});

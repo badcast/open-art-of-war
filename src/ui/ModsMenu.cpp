@@ -109,20 +109,21 @@ ModsMenu::Layout ModsMenu::MakeLayout(int windowW, int windowH)
     Layout l;
     const bool touch = uilayout::MenuProfile(uilayout::Current(), "confirm") == "touch";
     l.dialog = ui::CenteredRect(windowW, windowH, 980, 580);
-    const int pad = 18, titleH = 52, footerH = 60;
-    const int bodyY = l.dialog.y + titleH + pad;
-    const int bodyH = l.dialog.h - titleH - footerH - pad * 2;
+    const int pad = 20, titleH = 52, btnH = 44;
+    const int bodyY = l.dialog.y + titleH + 16;
+    const int by = l.dialog.Bottom() - pad - btnH;
+    const int bodyH = std::max(80, by - 12 - bodyY);
     const int listW = (l.dialog.w - pad * 3) * 5 / 11;
     l.rowH = touch ? 50 : 42;
     l.list = {l.dialog.x + pad, bodyY, listW - 10, bodyH};
     l.track = {l.list.Right() + 4, l.list.y, 6, l.list.h};
-    l.details = {l.list.Right() + pad + 6, bodyY, l.dialog.w - listW - pad * 3, bodyH};
+    const int detailsX = l.track.Right() + 12;
+    l.details = {detailsX, bodyY, std::max(80, l.dialog.Right() - pad - detailsX), bodyH};
     l.rows = std::max(1, l.list.h / l.rowH);
-    const int by = l.dialog.Bottom() - footerH + 8;
-    l.backBtn = {l.dialog.x + pad, by, 160, 44};
-    l.upBtn = {l.backBtn.Right() + 12, by, 120, 44};
-    l.downBtn = {l.upBtn.Right() + 8, by, 120, 44};
-    l.applyBtn = {l.dialog.Right() - pad - 200, by, 200, 44};
+    l.backBtn = {l.dialog.x + pad, by, 160, btnH};
+    l.upBtn = {l.backBtn.Right() + 12, by, 120, btnH};
+    l.downBtn = {l.upBtn.Right() + 8, by, 120, btnH};
+    l.applyBtn = {l.dialog.Right() - pad - 200, by, 200, btnH};
     return l;
 }
 

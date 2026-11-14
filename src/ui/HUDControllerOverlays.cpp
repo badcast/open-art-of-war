@@ -30,6 +30,19 @@ namespace
 // Build radius of a headquarters / command center: purple
 const SDL_Color kBuildRadiusColor {160, 80, 230, 90};
 
+bool IsBuildingVisibleToLocal(const Building &b, const TileMap &map)
+{
+    const PlayerId local = Players::Local();
+    if (local == kNoPlayer || b.owner == local || !Players::Hostile(b.owner, local))
+        return true;
+    const std::uint8_t team = Players::TeamOf(local);
+    for (int dy = 0; dy < b.buildHeight; ++dy)
+        for (int dx = 0; dx < b.buildWidth; ++dx)
+            if (map.IsVisibleTo(b.tileX + dx, b.tileY + dy, team))
+                return true;
+    return false;
+}
+
 } // namespace
 
 bool HUDController::PowerIconBlinkOn()
@@ -38,31 +51,41 @@ bool HUDController::PowerIconBlinkOn()
 }
 
 void HUDController::RenderPowerAlerts(
-    Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const
+    Renderer &renderer,
+    const EntityManager &entities,
+    const TileMap &map,
+    const Economy & /*economy*/,
+    const Camera &camera) const
 {
-    if (!economy.HasPowerDeficit() || !PowerIconBlinkOn())
+    if (!PowerIconBlinkOn())
         return;
     const float zoom = camera.GetZoom();
     const float scale = std::clamp(zoom, 0.75f, 1.5f);
+    renderer.SetDrawOwner(kNoPlayer);
     for (const auto &e : entities.GetAllEntities())
     {
         const Building *b = e.AsBuilding();
-        if (!b || !b->alive || b->state == ActionState::Die || b->owner != Players::Local() || b->buildProgress < 1.0f
-            || b->isPowered)
+        if (!b || !b->alive || b->state == ActionState::Die || b->buildProgress < 1.0f || b->isPowered)
             continue;
         // Only what consumes power (power plants and power-free buildings keep working)
         const BuildingConfig *cfg = entities.GetBuildingConfig(b->rawBuildingType);
         if (!cfg || cfg->powerCost >= 0)
             continue;
+        if (!IsBuildingVisibleToLocal(*b, map))
+            continue;
         float sx = 0.0f, sy = 0.0f;
-        camera.WorldToScreen((b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH, b->tileY * TILE_HEIGHT, sx, sy);
-        // Over the roof: the top of the footprint, a little above
-        const int w = static_cast<int>(23 * scale), h = static_cast<int>(19 * scale);
-        renderer.DrawRawSpriteScreen(
-            PowerIconSprite(),
-            static_cast<int>(sx) - w / 2,
-            static_cast<int>(sy) - h - static_cast<int>(10 * zoom),
-            scale);
+        camera.WorldToScreen(
+            (b->tileX + b->buildWidth * 0.5f) * TILE_WIDTH,
+            (b->tileY + b->buildHeight * 0.5f) * TILE_HEIGHT,
+            sx,
+            sy);
+        // Centered on the building, tinted with the owner's army color and semi-transparent
+        const float w = 23.0f * scale, h = 19.0f * scale;
+        const SDL_FRect dst {sx - w * 0.5f, sy - h * 0.5f, w, h};
+        const int colorIndex = b->owner < kMaxPlayers ? Players::Slot(b->owner).color : 0;
+        const SDL_Color army = colorIndex >= 1 ? ArmyColor(colorIndex) : SDL_Color {255, 220, 80, 255};
+        renderer.DrawSpritePartScreen(
+            PowerIconSprite(), dst, 0.0f, 0.0f, 0.0f, 0.0f, SDL_FLIP_NONE, Faction::Resistance, 185, army);
     }
 }
 

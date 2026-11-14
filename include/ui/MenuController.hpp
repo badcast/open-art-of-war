@@ -180,6 +180,23 @@ public:
     bool UpdateCampaignSelect(const FrameContext &ctx, int mx, int my, bool leftClicked);
 
     void UpdateMainMenu(const FrameContext &ctx, bool &running);
+    void StartMainMenuIntro()
+    {
+        m_mainMenuIntro = 0.0f;
+        m_aboutOutro = false;
+    }
+    bool IsAboutOutroActive() const
+    {
+        return m_aboutOutro && m_mainMenuIntro > 0.0f;
+    }
+    void UpdateAboutOutro(float deltaTime)
+    {
+        if (!m_aboutOutro)
+            return;
+        m_mainMenuIntro = std::max(0.0f, m_mainMenuIntro - std::max(0.0f, deltaTime) / 0.65f);
+        if (m_mainMenuIntro <= 0.0f)
+            m_aboutOutro = false;
+    }
 
     void UpdateSettings(InputManager &input, int windowW, int windowH, AppState &state);
 
@@ -248,6 +265,8 @@ private:
     std::string m_editorNotice; // why the map editor did not start, shown in the selection dialog
     MapPreview m_mapPreview;    // pictures of the maps in the selection dialog
     int m_selectedMenuItem {0};
+    float m_mainMenuIntro {1.0f}; // starts after the splash; other menu entries stay immediate
+    bool m_aboutOutro {false};
     bool m_inGameMenuOpen {false};
     int m_inGameMenuSelected {0};
     bool m_objectivesDialogOpen {false};

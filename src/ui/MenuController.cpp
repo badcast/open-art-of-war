@@ -59,6 +59,18 @@ int MainMenuTitleY(int windowH)
     return std::max(36, windowH / 9);
 }
 
+int MainMenuIntroOffset(float progress, int distance)
+{
+    const float remaining = 1.0f - std::clamp(progress, 0.0f, 1.0f);
+    return static_cast<int>(-remaining * remaining * remaining * distance);
+}
+
+int MusicPlayerIntroOffsetY(float progress, int windowW, int windowH)
+{
+    const int dropDist = std::max(1, windowH - menu_detail::playerLayout(windowW, windowH).seek.y + 8);
+    return -MainMenuIntroOffset(progress, dropDist);
+}
+
 UiRect MainMenuItemRect(int i, int windowW, int windowH)
 {
     // ui/layout.yaml (screen main_menu); the numbers below stand in when the file has no such screen
@@ -162,6 +174,7 @@ void MenuController::ActivateMenuItem(
             break;
         case 8:
             state = AppState::MenuAbout;
+            m_aboutOutro = true;
             break;
         case 9:
             running = false;
@@ -173,6 +186,8 @@ void MenuController::ActivateMenuItem(
 
 void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
 {
+    m_aboutOutro = false;
+    m_mainMenuIntro = std::min(1.0f, m_mainMenuIntro + std::max(0.0f, ctx.deltaTime) / 0.65f);
     InputManager &input = ctx.input;
     const int windowW = ctx.windowW;
     const int windowH = ctx.windowH;
@@ -212,13 +227,30 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
 
     int px = 0, py = 0;
     const bool pressed = input.ConsumeLeftPress(px, py);
-    if (UpdateMusicPlayer(
-            clicked, pressed, px, py, input.IsLeftMouseDown(), tapX, tapY, windowW, windowH, true, sound, m_scrollDrag))
+    const int playerOffsetY = MusicPlayerIntroOffsetY(m_mainMenuIntro, windowW, windowH);
+    if (UpdateMusicPlayer(clicked,
+                          pressed,
+                          px,
+                          py,
+                          input.IsLeftMouseDown(),
+                          tapX,
+                          tapY,
+                          windowW,
+                          windowH,
+                          true,
+                          sound,
+                          m_scrollDrag,
+                          0,
+                          playerOffsetY))
         return;
 
+    const int introDistance = std::max({600, windowW / 2, MainMenuItemRect(0, windowW, windowH).Right()});
+    const int introOffset = MainMenuIntroOffset(m_mainMenuIntro, introDistance);
     for (int i = 0; i < kMainMenuItems; ++i)
     {
-        if (MainMenuItemRect(i, windowW, windowH).Contains(tapX, tapY))
+        UiRect item = MainMenuItemRect(i, windowW, windowH);
+        item.x += introOffset;
+        if (item.Contains(tapX, tapY))
         {
             m_selectedMenuItem = i;
             if (clicked)
@@ -288,7 +320,10 @@ void MenuController::UpdateInfoScreen(InputManager &input, AppState &state)
         clicked = false;
     if (clicked || input.IsKeyJustPressed(SDL_SCANCODE_ESCAPE) || input.IsConfirmJustPressed())
     {
+        const bool wasAbout = (state == AppState::MenuAbout);
         state = AppState::MainMenu;
+        if (wasAbout)
+            StartMainMenuIntro();
         m_infoScroll.Reset();
         m_infoTotal = 0;
         m_infoListRect = {};
@@ -352,6 +387,8 @@ void MenuController::RenderMainMenu(
         return;
     }
 
+    const int introDistance = std::max({600, windowW / 2, MainMenuItemRect(0, windowW, windowH).Right()});
+    const int introOffset = MainMenuIntroOffset(m_mainMenuIntro, introDistance);
     if (drawBackdrop)
     {
         renderer.FillRectScreen(0, 0, windowW, windowH, col::Backdrop);
@@ -369,7 +406,7 @@ void MenuController::RenderMainMenu(
             renderer.DrawTextureScreen(titleTex, tx, 0, tw, th);
             renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 95});
             if (tx > 0)
-                renderer.FillRectScreen(0, 0, tx, windowH, col::Backdrop);
+                renderer.FillRectScreen(introOffset, 0, tx, windowH, col::Backdrop);
             m_backdropFx.render(renderer, texManager, tx, windowW, windowH, SDL_GetTicks());
         }
         else
@@ -401,16 +438,20 @@ void MenuController::RenderMainMenu(
                 backdropWidth,
                 item.x + 25 + fontRenderer.GetTextWidth(_(kMainMenuLabels[i]), touchMenu ? ui::FONT_H1 : ui::FONT_H2));
         }
-        renderer.FillRectScreen(0, 0, std::min(windowW, backdropWidth + 24), windowH, {0, 0, 0, 150});
+        const int frameWidth = std::min(windowW, backdropWidth + 24);
+        const int frameOffset = MainMenuIntroOffset(m_mainMenuIntro, frameWidth);
+        renderer.FillRectScreen(frameOffset, 0, frameWidth, windowH, {0, 0, 0, 150});
     }
-    fontRenderer.DrawString("OPEN ART OF WAR", x, titleY, ui::FONT_HERO, col::Accent, true);
-    fontRenderer.DrawString(_("RESISTANCE ARISEN"), x + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
-    renderer.FillRectScreen(x + 2, titleY + 86, 72, 3, col::Accent);
+    fontRenderer.DrawString("OPEN ART OF WAR", x + introOffset, titleY, ui::FONT_HERO, col::Accent, true);
+    fontRenderer.DrawString(
+        _("RESISTANCE ARISEN"), x + introOffset + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
+    renderer.FillRectScreen(x + introOffset + 2, titleY + 86, 72, 3, col::Accent);
 
     // Menu items
     for (int i = 0; i < kMainMenuItems; ++i)
     {
         UiRect r = MainMenuItemRect(i, windowW, windowH);
+        r.x += introOffset;
         if (r.Contains(m_mouseX, m_mouseY))
             SoundRequests::MarkHover();
         bool selected = (i == m_selectedMenuItem);
@@ -466,7 +507,8 @@ void MenuController::RenderMainMenu(
     fontRenderer.DrawString(
         ver, windowW - 24, windowH - 30, ui::FONT_SMALL, col::White, true, Anchor::RIGHT | Anchor::TOP);
 
-    RenderMusicPlayer(renderer, fontRenderer, sound, windowW, windowH, true, m_mouseX, m_mouseY);
+    const int playerOffsetY = MusicPlayerIntroOffsetY(m_mainMenuIntro, windowW, windowH);
+    RenderMusicPlayer(renderer, fontRenderer, sound, windowW, windowH, true, m_mouseX, m_mouseY, 0, playerOffsetY);
 
     if (m_campaignSelectOpen)
     {

@@ -203,9 +203,13 @@ public:
         const EntityManager &entities,
         const TileMap &map,
         const Camera &camera) const;
-    // Not enough power: a blinking lightning over every finished building of the player that needs power
+    // Not enough power: a blinking lightning at the center of every finished building that needs power
     void RenderPowerAlerts(
-        Renderer &renderer, const EntityManager &entities, const Economy &economy, const Camera &camera) const;
+        Renderer &renderer,
+        const EntityManager &entities,
+        const TileMap &map,
+        const Economy &economy,
+        const Camera &camera) const;
     // The lightning icon of the game (sprite of the sheets) and its blinking, shared with the power header
     static int PowerIconSprite(); // the lightning of the power readout (sprite ui_power_icon.icon)
     static bool PowerIconBlinkOn();

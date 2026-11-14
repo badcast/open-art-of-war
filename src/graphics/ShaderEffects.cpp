@@ -161,6 +161,30 @@ void ShaderEffects::Shutdown()
     m_device = nullptr;
 }
 
+void ShaderEffects::ResetTargets()
+{
+    if (m_scene)
+    {
+        SDL_DestroyTexture(m_scene);
+        m_scene = nullptr;
+    }
+    if (m_glowA)
+    {
+        SDL_DestroyTexture(m_glowA);
+        m_glowA = nullptr;
+    }
+    if (m_glowB)
+    {
+        SDL_DestroyTexture(m_glowB);
+        m_glowB = nullptr;
+    }
+    m_sceneW = m_sceneH = 0;
+    m_glowW = m_glowH = 0;
+    m_glowBW = m_glowBH = 0;
+    m_current = nullptr;
+    m_locked = false;
+}
+
 void ShaderEffects::Configure(ColorGrade grade, bool glow, bool sharp)
 {
     m_grade = grade;

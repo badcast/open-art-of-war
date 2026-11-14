@@ -56,6 +56,7 @@ public:
 
     bool Init(SDL_Renderer *renderer);
     void Shutdown();
+    void ResetTargets();
     bool Available() const
     {
         return m_available;

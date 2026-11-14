@@ -348,11 +348,9 @@ void TouchHUD::FocusBuilding(int buildingId, const EntityManager &entities)
             m_panel = Panel::Build;
             break;
         case UnitType::ResearchLab:
-            m_panel = Panel::None;
             OpenResearchWindow();
             break;
         default:
-            m_panel = Panel::None;
             break;
     }
 }
@@ -681,13 +679,21 @@ bool TouchHUD::HandleHudClick(
         m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
     if (!onPanel)
     {
-        // A tap on the map closes the open cards; if a building is selected, let GameplayController
-        // also process this 1st tap so it resets building focus (and arms double-tap rally point).
+        // Let a tap on an own building reach GameplayController without closing the open cards.
+        // Empty ground still closes them and clears a building selection there.
         if (leftClicked && m_panel != Panel::None)
         {
-            m_panel = Panel::None;
-            if (!hasBuilding)
-                return true;
+            float worldX = 0.0f, worldY = 0.0f;
+            camera.ScreenToWorld(static_cast<float>(mouseX), static_cast<float>(mouseY), worldX, worldY);
+            const Building *tappedBuilding = entities.GetBuilding(entities.GetUnitAt(worldX, worldY));
+            const bool selectingOwnBuilding
+                = tappedBuilding && tappedBuilding->alive && tappedBuilding->owner == Players::Local();
+            if (!selectingOwnBuilding)
+            {
+                m_panel = Panel::None;
+                if (!hasBuilding)
+                    return true;
+            }
         }
         return false;
     }

@@ -530,6 +530,9 @@ void HUDController::DrawRadar(
             int pixelX, pixelY, pixelWidth, pixelHeight;
             if (building)
             {
+                const SDL_Color baseColor = RadarOwnerColor(entity.owner, entity.faction, false);
+                const SDL_Color buildingColor
+                    = entity.selected ? ui::Mix(baseColor, SDL_Color {255, 255, 255, 255}, 0.18f) : baseColor;
                 cellRect(
                     static_cast<float>(building->tileX),
                     static_cast<float>(building->tileY),
@@ -548,8 +551,7 @@ void HUDController::DrawRadar(
                     pixelY -= (sideY - pixelHeight) / 2;
                     pixelWidth = side;
                     pixelHeight = sideY;
-                    fillClamped(
-                        pixelX, pixelY, pixelWidth, pixelHeight, RadarOwnerColor(entity.owner, entity.faction, false));
+                    fillClamped(pixelX, pixelY, pixelWidth, pixelHeight, buildingColor);
                 }
                 else
                 {
@@ -558,7 +560,7 @@ void HUDController::DrawRadar(
                         pixelY,
                         std::max(3, pixelWidth),
                         std::max(3, pixelHeight),
-                        RadarOwnerColor(entity.owner, entity.faction, false));
+                        buildingColor);
                 }
             }
             else
