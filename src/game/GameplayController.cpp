@@ -1366,8 +1366,8 @@ void GameplayController::Update(const FrameContext &context)
                 }
                 else if (!m_selectedUnits.empty())
                 {
-                    // 1st tap on the map clears the building selection, but remembers producers so that a 2nd tap
-                    // at the same spot can still set their rally point.
+                    // 1st tap on the map: remember producers; the selection is dropped after the double-tap window
+                    // unless a 2nd tap at the same spot sets their rally point (the focus then stays).
                     m_touchRallyBuildings.clear();
                     for (int unitId : m_selectedUnits)
                     {
@@ -1382,12 +1382,15 @@ void GameplayController::Update(const FrameContext &context)
                     m_touchRallyTicks = m_touchRallyBuildings.empty() ? 0 : nowTicks;
                     m_touchRallyX = mouseX;
                     m_touchRallyY = mouseY;
-                    for (int unitId : m_selectedUnits)
+                    if (m_touchRallyBuildings.empty())
                     {
-                        if (Entity *e = entities.GetEntity(unitId))
-                            e->selected = false;
+                        for (int unitId : m_selectedUnits)
+                        {
+                            if (Entity *e = entities.GetEntity(unitId))
+                                e->selected = false;
+                        }
+                        m_selectedUnits.clear();
                     }
-                    m_selectedUnits.clear();
                     touchOrdered = true;
                 }
             }
@@ -1396,6 +1399,19 @@ void GameplayController::Update(const FrameContext &context)
                 m_touchRallyBuildings.clear();
                 m_touchRallyTicks = 0;
             }
+        }
+
+        // Touch: a single tap on the map with producers selected drops the focus once the double-tap window passed
+        if (m_touchMode && !m_touchRallyBuildings.empty() && SDL_GetTicks() - m_touchRallyTicks >= 450)
+        {
+            for (int unitId : m_selectedUnits)
+            {
+                if (Entity *e = entities.GetEntity(unitId))
+                    e->selected = false;
+            }
+            m_selectedUnits.clear();
+            m_touchRallyBuildings.clear();
+            m_touchRallyTicks = 0;
         }
 
         // Left-Click single unit selection on map

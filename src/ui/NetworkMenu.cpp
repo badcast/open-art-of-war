@@ -198,18 +198,19 @@ void DrawField(
     const UiRect &rect,
     std::string_view text,
     std::string_view placeholder,
-    bool focused)
+    bool focused,
+    int fontId = ui::FONT_BODY)
 {
     ui::DrawPanel(renderer, rect, col::PanelSunken, focused ? col::Accent : col::Border);
     const bool empty = text.empty();
-    std::string shown = ui::FitText(font, empty ? placeholder : text, ui::FONT_BODY, rect.w - 24);
+    std::string shown = ui::FitText(font, empty ? placeholder : text, fontId, rect.w - 24);
     if (focused)
         shown += (SDL_GetTicks() / 500) % 2 ? "_" : " ";
     font.DrawString(
         shown,
         rect.x + 10,
         rect.CenterY(),
-        ui::FONT_BODY,
+        fontId,
         empty && !focused ? col::TextMuted : col::Text,
         false,
         Anchor::LEFT | Anchor::VCENTER);
@@ -248,8 +249,9 @@ NetworkMenu::BrowserLayout NetworkMenu::browserLayout(int windowW, int windowH) 
     // Where things stand is ui/layout.yaml (screen network)
     BrowserLayout layout;
     const bool isLan = m_tab == Tab::Lan;
+    const std::string &profile = uilayout::MenuProfile(uilayout::Current(), "network");
     const uilayout::Solved solved
-        = uilayout::Current().Solve("network", "pc", windowW, windowH, [isLan](std::string_view name) {
+        = uilayout::Current().Solve("network", profile, windowW, windowH, [isLan](std::string_view name) {
               return name == (isLan ? "tab_lan" : "tab_internet");
           });
     layout.dialog = solved.Rect("dialog");
@@ -1811,22 +1813,29 @@ void NetworkMenu::Render(
             layout.backBtn.Contains(m_mouseX, m_mouseY));
         return;
     }
+    const bool touch = uilayout::MenuProfile(uilayout::Current(), "network") == "touch";
+    const int labelFont = touch ? ui::FONT_H2 : ui::FONT_BODY_BOLD;
+    const int fieldFont = touch ? ui::FONT_H2 : ui::FONT_BODY;
+    const int hintFont = touch ? ui::FONT_BODY : ui::FONT_SMALL;
+    const int rowTitleFont = touch ? ui::FONT_H2 : ui::FONT_BODY_BOLD;
+    const int rowSubFont = touch ? ui::FONT_BODY : ui::FONT_SMALL;
     ui::DrawDialog(renderer, font, windowW, windowH, layout.dialog, _("NETWORK GAME"));
     font.DrawString(
         _("Your name"),
-        layout.dialog.x + 24,
+        layout.addressField.x,
         layout.nameField.CenterY(),
-        ui::FONT_BODY_BOLD,
+        labelFont,
         col::Text,
         false,
         Anchor::LEFT | Anchor::VCENTER);
     DrawField(
-        renderer, font, layout.nameField, settings.playerName, _("Your name in the game"), m_focus == Field::Name);
+        renderer, font, layout.nameField, settings.playerName, _("Your name in the game"), m_focus == Field::Name,
+        fieldFont);
     font.DrawString(
         _("Password"),
-        layout.nameField.Right() + 16,
+        layout.nameField.Right() + (touch ? 20 : 16),
         layout.nameField.CenterY(),
-        ui::FONT_BODY_BOLD,
+        labelFont,
         col::Text,
         false,
         Anchor::LEFT | Anchor::VCENTER);
@@ -1836,12 +1845,13 @@ void NetworkMenu::Render(
         layout.passwordField,
         std::string(m_password.size(), '*'),
         _("Optional"),
-        m_focus == Field::Password);
+        m_focus == Field::Password,
+        fieldFont);
     font.DrawString(
         _("Connect by address (the host forwards UDP port 38100)"),
         layout.addressField.x,
-        layout.addressField.y - 18,
-        ui::FONT_SMALL,
+        layout.addressField.y - (touch ? 22 : 18),
+        hintFont,
         col::TextDim,
         false);
     DrawField(
@@ -1850,7 +1860,8 @@ void NetworkMenu::Render(
         layout.addressField,
         settings.lastAddress,
         _("IP address or hostname"),
-        m_focus == Field::Address);
+        m_focus == Field::Address,
+        fieldFont);
     ui::DrawButton(
         renderer,
         font,
@@ -1892,7 +1903,7 @@ void NetworkMenu::Render(
                 _("Looking for games on the local network..."),
                 layout.list.CenterX(),
                 layout.list.CenterY(),
-                ui::FONT_BODY,
+                touch ? ui::FONT_H2 : ui::FONT_BODY,
                 col::TextDim,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
@@ -1920,18 +1931,18 @@ void NetworkMenu::Render(
                 continue;
             const LanGame &game = lan[i];
             font.DrawString(
-                ui::FitText(font, game.name, ui::FONT_BODY_BOLD, row.w * 26 / 100),
+                ui::FitText(font, game.name, rowTitleFont, row.w * 26 / 100),
                 row.x + 10,
                 row.CenterY(),
-                ui::FONT_BODY_BOLD,
+                rowTitleFont,
                 col::Text,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, game.map, ui::FONT_SMALL, row.w * 30 / 100),
+                ui::FitText(font, game.map, rowSubFont, row.w * 30 / 100),
                 row.x + row.w * 28 / 100,
                 row.CenterY(),
-                ui::FONT_SMALL,
+                rowSubFont,
                 col::TextDim,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
@@ -1939,7 +1950,7 @@ void NetworkMenu::Render(
                 std::to_string(game.players) + "/" + std::to_string(game.maxPlayers),
                 row.x + row.w * 62 / 100,
                 row.CenterY(),
-                ui::FONT_SMALL,
+                rowSubFont,
                 col::Text,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
@@ -1947,7 +1958,7 @@ void NetworkMenu::Render(
                 std::to_string(game.pingMs) + " ms",
                 row.Right() - 10,
                 row.CenterY(),
-                ui::FONT_SMALL,
+                rowSubFont,
                 game.pingMs < 60 ? col::Ok : col::Accent,
                 false,
                 Anchor::RIGHT | Anchor::VCENTER);
@@ -1985,7 +1996,7 @@ void NetworkMenu::Render(
                 _("No open rooms: create one, or join by code"),
                 layout.serverList.CenterX(),
                 layout.serverList.CenterY(),
-                ui::FONT_SMALL,
+                touch ? ui::FONT_H2 : ui::FONT_BODY,
                 col::TextDim,
                 false,
                 Anchor::HCENTER | Anchor::VCENTER);
@@ -2017,23 +2028,23 @@ void NetworkMenu::Render(
                 game.code,
                 row.x + 10,
                 row.CenterY(),
-                ui::FONT_SMALL_BOLD,
+                touch ? ui::FONT_BODY_BOLD : ui::FONT_SMALL_BOLD,
                 game.port == 0 ? col::Info : col::Accent,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, game.name, ui::FONT_BODY_BOLD, row.w * 30 / 100),
-                row.x + 110,
+                ui::FitText(font, game.name, rowTitleFont, row.w * 30 / 100),
+                row.x + (touch ? 130 : 110),
                 row.CenterY(),
-                ui::FONT_BODY_BOLD,
+                rowTitleFont,
                 col::Text,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
             font.DrawString(
-                ui::FitText(font, game.map, ui::FONT_SMALL, row.w * 30 / 100),
+                ui::FitText(font, game.map, rowSubFont, row.w * 30 / 100),
                 row.x + row.w * 45 / 100,
                 row.CenterY(),
-                ui::FONT_SMALL,
+                rowSubFont,
                 col::TextDim,
                 false,
                 Anchor::LEFT | Anchor::VCENTER);
@@ -2041,7 +2052,7 @@ void NetworkMenu::Render(
                 std::to_string(game.players) + "/" + std::to_string(game.maxPlayers),
                 row.Right() - 10,
                 row.CenterY(),
-                ui::FONT_SMALL,
+                rowSubFont,
                 col::Text,
                 false,
                 Anchor::RIGHT | Anchor::VCENTER);
@@ -2060,11 +2071,11 @@ void NetworkMenu::Render(
             _("Room code"),
             layout.serverList.x,
             layout.codeField.CenterY(),
-            ui::FONT_BODY_BOLD,
+            labelFont,
             col::Text,
             false,
             Anchor::LEFT | Anchor::VCENTER);
-        DrawField(renderer, font, layout.codeField, m_joinCode, _("6 characters"), m_focus == Field::Code);
+        DrawField(renderer, font, layout.codeField, m_joinCode, _("6 characters"), m_focus == Field::Code, fieldFont);
         ui::DrawButton(
             renderer,
             font,
