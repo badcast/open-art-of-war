@@ -545,7 +545,7 @@ std::vector<SettingsRow> BuildSettingsRows(
             _("Minimum zoom"),
             _("How far the mouse wheel zooms out"),
             s.zoomMin,
-            0.5f,
+            0.2f,
             1.0f,
             0.05f,
             [](float v) { return Number(v, 2) + "x"; },

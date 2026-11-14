@@ -243,6 +243,7 @@ inline SidebarLayout sidebarLayout(int windowW, int windowH, int top, bool showS
 struct RadarView
 {
     float scale {1.0f};
+    float scaleY {1.0f}; // pixels per tile down the screen (the tactical view's tiles are not square)
     int ox {0};
     int oy {0};
     int w {0};
@@ -256,7 +257,7 @@ struct RadarView
     }
     float ToScreenY(float tileY) const
     {
-        return oy + (tileY - viewY) * scale;
+        return oy + (tileY - viewY) * scaleY;
     }
 };
 
@@ -269,6 +270,7 @@ inline RadarView radarView(
     const float innerW = static_cast<float>(radar.w - 4);
     const float innerH = static_cast<float>(radar.h - 4);
     v.scale = std::min(innerW / mapW, innerH / mapH) * std::max(1, zoom);
+    v.scaleY = v.scale;
     auto axis = [&](float inner, int mapSize, float center, int start, int size, int &o, int &len, float &view) {
         const float tiles = inner / v.scale;
         if (tiles >= mapSize)

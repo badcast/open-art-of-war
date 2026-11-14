@@ -140,8 +140,9 @@ void HUDController::RenderProductionOverlay(
                 Anchor::HCENTER | Anchor::VCENTER);
         }
 
-        // Rally line from the exit to the rally point, only while the building is selected
-        if (!b->selected)
+        // Rally line from the exit to the rally point, only while the building is selected (the tactical view has
+        // no rally points)
+        if (!b->selected || m_tactical)
             continue;
         int rx = 0, ry = 0;
         RallyPointOf(*b, map, rx, ry);

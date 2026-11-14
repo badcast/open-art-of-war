@@ -87,7 +87,9 @@ void Application::ApplyGraphics()
     if (m_renderer)
         m_renderer->SetShowShadows(m_settings.showShadows);
     if (m_camera)
-        m_camera->SetZoomLimits(m_settings.zoomMin, m_settings.zoomMax);
+        // The tactical view reaches further out than the player's minimum zoom (tactical_view.min_zoom)
+        m_camera->SetZoomLimits(
+            std::min(m_settings.zoomMin, m_env.Section("tactical_view").value("min_zoom", 0.1f)), m_settings.zoomMax);
     const bool effects = m_effects && m_effects->Available();
     if (m_effects && m_nightLighting) // the night's light map keeps the picture at gpu_base: the grade gives it back
         m_effects->SetNightExposureScale(1.0f / m_nightLighting->Config().gpuBase);

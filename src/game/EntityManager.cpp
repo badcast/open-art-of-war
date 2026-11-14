@@ -719,7 +719,7 @@ void EntityManager::GetUnitsInBox(
     }
 }
 
-int EntityManager::GetUnitAt(float worldX, float worldY, float tolerance) const
+int EntityManager::GetUnitAt(float worldX, float worldY, float tolerance, float minBuildingWorld) const
 {
     float bestDist = tolerance;
     int bestId = 0;
@@ -733,6 +733,18 @@ int EntityManager::GetUnitAt(float worldX, float worldY, float tolerance) const
             float maxX = (b->tileX + b->buildWidth) * TILE_WIDTH;
             float minY = b->tileY * TILE_HEIGHT;
             float maxY = (b->tileY + b->buildHeight) * TILE_HEIGHT;
+            if (maxX - minX < minBuildingWorld)
+            {
+                const float mid = (minX + maxX) * 0.5f;
+                minX = mid - minBuildingWorld * 0.5f;
+                maxX = mid + minBuildingWorld * 0.5f;
+            }
+            if (maxY - minY < minBuildingWorld)
+            {
+                const float mid = (minY + maxY) * 0.5f;
+                minY = mid - minBuildingWorld * 0.5f;
+                maxY = mid + minBuildingWorld * 0.5f;
+            }
             if (worldX >= minX && worldX <= maxX && worldY >= minY && worldY <= maxY)
             {
                 return b->id;

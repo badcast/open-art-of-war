@@ -68,7 +68,7 @@ int UnitCameoCompId(int archetype)
 
 void HUDController::SetActiveTab(int tab)
 {
-    if (tab >= 0 && tab < TabCount)
+    if (tab >= 0 && tab < TabCount && !(m_tactical && tab == TabBuild))
         m_activeTab = tab;
 }
 

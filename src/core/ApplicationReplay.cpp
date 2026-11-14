@@ -509,7 +509,7 @@ void Application::UpdateReplayInput(double frameTime)
         {
             const float zoomNow = m_camera->GetZoom();
             const float k = static_cast<float>(std::min(1.0, frameTime * (m_replay ? 5.0 : 2.0)));
-            const float newZoom = std::clamp(zoomNow + (zoom - zoomNow) * k, 0.5f, 4.0f);
+            const float newZoom = std::clamp(zoomNow + (zoom - zoomNow) * k, 0.2f, 4.0f);
             const float curX = m_camera->GetX() + m_camera->GetViewportWidth() / zoomNow * 0.5f;
             const float curY = m_camera->GetY() + m_camera->GetViewportHeight() / zoomNow * 0.5f;
             if (std::fabs(newZoom - zoomNow) > 0.0005f)

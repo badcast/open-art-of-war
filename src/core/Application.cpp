@@ -327,6 +327,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     else
         m_hudController = std::make_unique<HUDController>();
     m_hudController->SetRadarAlertConfig(m_env.Section("radar_alert"));
+    m_hudController->SetTacticalConfig(m_env.Section("tactical_view"));
     HUDController::SetBuildGridConfig(m_env.Section("build_grid"));
     m_cameraShake.Configure(m_env.Section("camera_shake"));
     HUDController::SetShowBuildGrid(m_settings.showBuildGrid);
@@ -1223,6 +1224,7 @@ void Application::Update(float deltaTime)
     if (m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying)
     {
         const std::uint32_t tickBefore = m_gameplayController->simulation().Tick();
+        UpdateTacticalView();
         m_gameplayController->Update(MakeFrameContext(deltaTime));
         if (m_gameplayController->simulation().Tick() != tickBefore)
             LocalTickRan(tickBefore);
@@ -1635,12 +1637,14 @@ void Application::Render()
             m_camera->SetPosition(shake.x + ox / zoom, shake.y + oy / zoom);
         }
 
+        // Zoomed far out the world is not drawn: the radar map takes its place (after the picture below)
+        const bool tactical = UpdateTacticalView();
         // The world is drawn into a smaller target at low / medium quality and scaled up afterwards
-        const int divisor = RenderDivisor();
+        const int divisor = tactical ? 1 : RenderDivisor();
         const Camera lowCam = divisor > 1 ? m_camera->ScaledDown(divisor) : *m_camera;
         const Camera &worldCam = divisor > 1 ? lowCam : *m_camera;
         // Shader effects: the world goes into an offscreen picture, graded and upscaled on the way to the screen
-        SDL_Texture *scene = m_effects && m_effects->PostActive()
+        SDL_Texture *scene = m_effects && m_effects->PostActive() && !tactical
                                  ? m_effects->SceneTarget(worldCam.GetViewportWidth(), worldCam.GetViewportHeight())
                                  : nullptr;
         if (scene)
@@ -1712,6 +1716,9 @@ void Application::Render()
         bool disableFog
             = overlayNoFog || m_gameplayController->IsRevealFog() || !m_map->IsFogEnabled() || ReplayShowsAll();
         int globalAnimTick = static_cast<int>(m_globalAnimTimer * 8.0f);
+        bool isDebug = m_debugMode || (m_gameplayController && m_gameplayController->IsDebugMode());
+        if (!tactical)
+        {
         m_map->RenderTerrain(*m_renderer, worldCam, !disableFog, globalAnimTick);
 
         // Layer 1: Ground Remnants (Strictly 1 layer above ground, underneath decorations, walls, buildings & units)
@@ -1723,7 +1730,6 @@ void Application::Render()
         m_map->RenderDecorations(*m_renderer, worldCam, !disableFog, globalAnimTick);
 
         // Layer 3..4: Living Walls, Buildings, Units, FX
-        bool isDebug = m_debugMode || (m_gameplayController && m_gameplayController->IsDebugMode());
         m_entities->render(
             *m_renderer,
             worldCam,
@@ -1738,6 +1744,7 @@ void Application::Render()
         {
             // Low graphics: the fog in plain tiles, without smoothed edges
             m_map->RenderFog(*m_renderer, worldCam, m_settings.graphicsQuality > 0);
+        }
         }
 
         if (offscreenWorld)
@@ -1763,13 +1770,14 @@ void Application::Render()
                         black);
             }
         }
-        RenderMapEdgeFade(worldCam);
+        if (!tactical)
+            RenderMapEdgeFade(worldCam);
         m_renderer->ResetClipRect();
         m_renderer->EndWorldPass();
 
         // Night: the light map over the world picture (buildings, explosions, fire); without shader effects it also
         // darkens it, the SDL GPU renderer's Night grade does that itself
-        if (m_night && m_nightLighting)
+        if (m_night && m_nightLighting && !tactical)
         {
             const bool gpu = m_effects && m_effects->Available();
             if (gpu)
@@ -1823,6 +1831,19 @@ void Application::Render()
                 0.0f, 0.0f, static_cast<float>(m_lowResW * divisor), static_cast<float>(m_lowResH * divisor)};
             SDL_RenderTexture(m_sdlRenderer, m_lowResTarget, nullptr, &dst);
             SDL_SetRenderClipRect(m_sdlRenderer, nullptr);
+        }
+
+        // The radar map over the empty picture (orders, selection and production bars are drawn over it below)
+        if (tactical)
+        {
+            m_hudController->SetRadarFog(!disableFog);
+            m_hudController->DrawTacticalMap(
+                *m_renderer,
+                *m_fontRenderer,
+                {0, 0, m_camera->GetViewportWidth(), m_camera->GetViewportHeight()},
+                *m_entities,
+                *m_map,
+                *m_camera);
         }
 
         // Render Debug Passability Grid (70% Transparency Green/Red)

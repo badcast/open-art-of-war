@@ -301,6 +301,31 @@ public:
     // Build grid (option "Show grid when building"; colors and thickness: section build_grid of game_environment.yaml)
     static void SetShowBuildGrid(bool on);
     static void SetBuildGridConfig(const nlohmann::json &section);
+    // Tactical view (the zoom fell under `tactical_view.zoom_threshold` of game_environment.json): the world is
+    // replaced by a full-screen radar map, units and orders work, building and rally points do not
+    void SetTacticalConfig(const nlohmann::json &section);
+    float TacticalZoomThreshold() const
+    {
+        return m_tacticalZoomThreshold;
+    }
+    // Smallest side of a building's square on the tactical map, screen pixels
+    float TacticalBuildingMinPx() const
+    {
+        return m_tacticalBuildingMinPx;
+    }
+    void SetTactical(bool on);
+    bool IsTactical() const
+    {
+        return m_tactical;
+    }
+    // The tactical map over `area` (the map viewport), drawn from the camera's own mapping
+    void DrawTacticalMap(
+        Renderer &renderer,
+        BitmapFontRenderer &fontRenderer,
+        const ui::UiRect &area,
+        const EntityManager &entities,
+        const TileMap &map,
+        const Camera &camera);
     // Radar alarm settings (section "radar_alert" of game_environment.json)
     void SetRadarAlertConfig(const nlohmann::json &section)
     {
@@ -372,7 +397,8 @@ protected:
         const Camera &camera,
         int mx,
         int my,
-        bool zoomButtons = true);
+        bool zoomButtons = true,
+        bool tactical = false);
     // Cells of a tab: what the local player's tech level (data/capabilities.yaml) allows, in catalog order
     int ItemCountForTab(int tab) const;
     // The catalog index (blueprint / unit cameo / order) shown in the tab's cell `slot`, -1 past the end
@@ -420,6 +446,11 @@ protected:
 
     float m_destroyArmed {0.0f}; // > 0: the next click on "Destroy" really blows the selection up
     bool m_radarFog {true};
+    bool m_tactical {false};
+    float m_tacticalZoomThreshold {1.25f};
+    float m_tacticalBuildingMinPx {10.0f};
+    int m_tacticalGridAlpha {28};    // 0 = no grid lines on the tactical map
+    int m_tacticalGridMinPx {28};    // lines are drawn every 1, 2, 4... tiles so that they stay this far apart
     bool m_observer {false};                      // watching a replay
     static constexpr int kObserverBarHeight = 64; // the bar of a replay / a watched match over the screen
     bool m_showAll {false};                       // a replay's observer sees the whole map

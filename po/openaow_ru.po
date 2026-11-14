@@ -2808,3 +2808,6 @@ msgstr "ДВОЙНОЙ ТАП ПО КАРТЕ: ТОЧКА СБОРА"
 
 msgid "Allies"
 msgstr "Союзники"
+
+msgid "BUILDING IS UNAVAILABLE IN THE TACTICAL VIEW"
+msgstr "ПОСТРОЙКА НЕДОСТУПНА В ТАКТИЧЕСКОМ ВИДЕ"

@@ -43,6 +43,8 @@ TouchHUD::Layout TouchHUD::MakeLayout(
     const uilayout::Conditions conditions = [&](std::string_view name) {
         if (name == "placing")
             return m_placing;
+        if (name == "tactical")
+            return m_tactical;
         if (name == "panel_open")
             return m_panel != Panel::None;
         if (name == "panel_build")
@@ -334,6 +336,11 @@ void TouchHUD::FocusBuilding(int buildingId, const EntityManager &entities)
             m_panel = Panel::Units;
             break;
         case UnitType::Headquarters:
+            if (m_tactical)
+            {
+                m_panel = Panel::None;
+                break;
+            }
             SetActiveTab(TabBuild);
             m_seenTab = TabBuild;
             m_panel = Panel::Build;
@@ -378,6 +385,8 @@ void TouchHUD::Press(
             OpenResearchWindow();
             break;
         case Act::DockBuild:
+            if (m_tactical)
+                break;
             m_panel = m_panel == Panel::Build ? Panel::None : Panel::Build;
             m_activeTab = TabBuild;
             m_attackMoveMode = false;
@@ -511,6 +520,15 @@ bool TouchHUD::HandleHudClick(
     bool &outOpenObjectives,
     std::vector<int> &selectedUnits)
 {
+    if (m_tactical && (m_panel == Panel::Build || m_placing))
+    {
+        // The tactical view has no building: the build panel and a ghost on the map go away
+        m_panel = Panel::None;
+        m_placing = false;
+        m_buildMode = false;
+        if (m_activeTab == TabBuild)
+            m_activeTab = m_unitTab;
+    }
     SyncPanelWithTab();
     if (m_destroyArmed > 0.0f && OwnSelectedBuildings(entities, selectedUnits).empty())
         m_destroyArmed = 0.0f;

@@ -52,7 +52,12 @@ void HUDController::ActivateCell(
         case TabBuild:
         {
             const auto &blueprints = EntityManager::GetBlueprints();
-            if (!entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true))
+            if (m_tactical)
+            {
+                SoundRequests::Play("ui_error");
+                SetNotification(_("BUILDING IS UNAVAILABLE IN THE TACTICAL VIEW"));
+            }
+            else if (!entities.HasBuildingType(UnitType::Headquarters, Players::Local(), true))
             {
                 SoundRequests::Play("ui_error");
                 SetNotification(_("HEADQUARTERS REQUIRED TO BUILD!"));
@@ -403,6 +408,12 @@ bool HUDController::HandleHudClick(
     {
         if (l.tabs[t].Contains(mx, my))
         {
+            if (m_tactical && t == TabBuild)
+            {
+                SoundRequests::Play("ui_error");
+                SetNotification(_("BUILDING IS UNAVAILABLE IN THE TACTICAL VIEW"));
+                return true;
+            }
             m_activeTab = t;
             return true;
         }

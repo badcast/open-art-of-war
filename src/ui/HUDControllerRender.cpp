@@ -354,9 +354,24 @@ void HUDController::DrawRadar(
     const Camera &camera,
     int mouseX,
     int mouseY,
-    bool zoomButtons)
+    bool zoomButtons,
+    bool tactical)
 {
-    renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
+    // The tactical map is tinted with the local player's army colour: dark ground, darker space round the map
+    SDL_Color groundColor {14, 30, 22, 255}, spaceColor {6, 12, 10, 255}, grassColor {30, 54, 40, 255};
+    if (tactical)
+    {
+        const int colorIndex = Players::Slot(Players::Local()).color;
+        const SDL_Color army = colorIndex >= 1 ? ArmyColor(colorIndex) : SDL_Color {60, 120, 90, 255};
+        auto shade = [&](float k) {
+            return SDL_Color {
+                static_cast<Uint8>(army.r * k), static_cast<Uint8>(army.g * k), static_cast<Uint8>(army.b * k), 255};
+        };
+        groundColor = shade(0.22f);
+        spaceColor = shade(0.09f);
+        grassColor = shade(0.42f); // what is not walkable (grass, trees, cliffs): the same hue, lighter than the ground
+    }
+    renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, spaceColor);
     const int mapWidth = map.GetWidth();
     const int mapHeight = map.GetHeight();
     // A zoomed radar follows the camera, except while the player drags on it (that moves the camera)
@@ -368,10 +383,23 @@ void HUDController::DrawRadar(
         m_radarCenterY = camCenterY;
     }
     RadarView view = radarView(radarRect, mapWidth, mapHeight, m_radarZoom, m_radarCenterX, m_radarCenterY);
+    if (tactical)
+    {
+        // The camera's own mapping (tiles are 30 x 20 world pixels), so every click lands where it is drawn
+        view = RadarView {};
+        view.scale = camera.GetZoom() * TILE_WIDTH;
+        view.scaleY = camera.GetZoom() * TILE_HEIGHT;
+        view.viewX = camera.GetX() / TILE_WIDTH;
+        view.viewY = camera.GetY() / TILE_HEIGHT;
+        view.ox = radarRect.x;
+        view.oy = radarRect.y;
+        view.w = radarRect.w;
+        view.h = radarRect.h;
+    }
     if (view.w > 0 && view.h > 0)
     {
         const SDL_Rect radarClip {view.ox, view.oy, view.w, view.h};
-        renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
+        renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, spaceColor);
         auto fillClamped = [&](int x, int y, int w, int h, SDL_Color color) {
             const int x0 = std::max(x, view.ox);
             const int y0 = std::max(y, view.oy);
@@ -380,12 +408,22 @@ void HUDController::DrawRadar(
             if (x1 > x0 && y1 > y0)
                 renderer.FillRectScreen(x0, y0, x1 - x0, y1 - y0, color);
         };
-        renderer.FillRectScreen(view.ox, view.oy, view.w, view.h, {14, 30, 22, 255});
+        if (tactical)
+        {
+            // The map's own ground is lighter than the space the view shows beyond it
+            const int gx0 = static_cast<int>(std::lround(view.ToScreenX(0.0f)));
+            const int gy0 = static_cast<int>(std::lround(view.ToScreenY(0.0f)));
+            const int gx1 = static_cast<int>(std::lround(view.ToScreenX(static_cast<float>(mapWidth))));
+            const int gy1 = static_cast<int>(std::lround(view.ToScreenY(static_cast<float>(mapHeight))));
+            fillClamped(gx0, gy0, gx1 - gx0, gy1 - gy0, groundColor);
+        }
+        else
+            renderer.FillRectScreen(view.ox, view.oy, view.w, view.h, {14, 30, 22, 255});
         const bool fogEnabled = m_radarFog && map.IsFogEnabled() && !m_showAll;
         const int minTileX = std::max(0, static_cast<int>(view.viewX));
         const int minTileY = std::max(0, static_cast<int>(view.viewY));
         const int maxTileX = std::min(mapWidth, static_cast<int>(std::ceil(view.viewX + view.w / view.scale)) + 1);
-        const int maxTileY = std::min(mapHeight, static_cast<int>(std::ceil(view.viewY + view.h / view.scale)) + 1);
+        const int maxTileY = std::min(mapHeight, static_cast<int>(std::ceil(view.viewY + view.h / view.scaleY)) + 1);
         // Cells from rounded edges: neighbours meet exactly, nothing shimmers as the view moves
         auto cellRect = [&](float tileX,
                             float tileY,
@@ -437,8 +475,32 @@ void HUDController::DrawRadar(
                 else if (map.GetWall(tileX, tileY) == 0 && !map.IsPassable(tileX, tileY)) // an unseen wall is no
                                                                                           // terrain
                 {
-                    fillClamped(pixelX, pixelY, pixelWidth, pixelHeight, {30, 54, 40, 255});
+                    fillClamped(pixelX, pixelY, pixelWidth, pixelHeight, grassColor);
                 }
+            }
+        }
+
+        // Tactical map: translucent grid lines over the map, coarser when zoomed far out
+        if (tactical && m_tacticalGridAlpha > 0)
+        {
+            int step = 1;
+            while (step < 64 && std::min(view.scale, view.scaleY) * static_cast<float>(step) < m_tacticalGridMinPx)
+                step *= 2;
+            const SDL_Color lineColor {255, 255, 255, static_cast<Uint8>(m_tacticalGridAlpha)};
+            const SDL_Color majorColor {255, 255, 255, static_cast<Uint8>(std::min(255, m_tacticalGridAlpha * 2))};
+            const int gy0 = static_cast<int>(std::lround(view.ToScreenY(0.0f)));
+            const int gy1 = static_cast<int>(std::lround(view.ToScreenY(static_cast<float>(mapHeight))));
+            const int gx0 = static_cast<int>(std::lround(view.ToScreenX(0.0f)));
+            const int gx1 = static_cast<int>(std::lround(view.ToScreenX(static_cast<float>(mapWidth))));
+            for (int tx = (minTileX / step) * step; tx <= maxTileX && tx <= mapWidth; tx += step)
+            {
+                const int px = static_cast<int>(std::lround(view.ToScreenX(static_cast<float>(tx))));
+                fillClamped(px, gy0, 1, gy1 - gy0, tx % (step * 4) == 0 ? majorColor : lineColor);
+            }
+            for (int ty = (minTileY / step) * step; ty <= maxTileY && ty <= mapHeight; ty += step)
+            {
+                const int py = static_cast<int>(std::lround(view.ToScreenY(static_cast<float>(ty))));
+                fillClamped(gx0, py, gx1 - gx0, 1, ty % (step * 4) == 0 ? majorColor : lineColor);
             }
         }
 
@@ -477,12 +539,27 @@ void HUDController::DrawRadar(
                     pixelY,
                     pixelWidth,
                     pixelHeight);
-                fillClamped(
-                    pixelX,
-                    pixelY,
-                    std::max(3, pixelWidth),
-                    std::max(3, pixelHeight),
-                    RadarOwnerColor(entity.owner, entity.faction, false));
+                if (tactical)
+                {
+                    // A small building stays a clear square around its middle: it must be easy to hit and to see
+                    const int minSide = static_cast<int>(m_tacticalBuildingMinPx);
+                    const int side = std::max(pixelWidth, minSide), sideY = std::max(pixelHeight, minSide);
+                    pixelX -= (side - pixelWidth) / 2;
+                    pixelY -= (sideY - pixelHeight) / 2;
+                    pixelWidth = side;
+                    pixelHeight = sideY;
+                    fillClamped(
+                        pixelX, pixelY, pixelWidth, pixelHeight, RadarOwnerColor(entity.owner, entity.faction, false));
+                }
+                else
+                {
+                    fillClamped(
+                        pixelX,
+                        pixelY,
+                        std::max(3, pixelWidth),
+                        std::max(3, pixelHeight),
+                        RadarOwnerColor(entity.owner, entity.faction, false));
+                }
             }
             else
             {
@@ -495,7 +572,7 @@ void HUDController::DrawRadar(
                     pixelY,
                     pixelWidth,
                     pixelHeight);
-                const int unitSize = std::max(2, std::min(pixelWidth, pixelHeight));
+                const int unitSize = std::max(tactical ? 5 : 2, std::min(pixelWidth, pixelHeight));
                 fillClamped(
                     pixelX + (pixelWidth - unitSize) / 2,
                     pixelY + (pixelHeight - unitSize) / 2,
@@ -503,7 +580,18 @@ void HUDController::DrawRadar(
                     unitSize,
                     RadarOwnerColor(entity.owner, entity.faction, true));
             }
-            if (!enemyOnRadar && !isOwn && entity.faction != Faction::Neutral
+            if (tactical && entity.selected && isOwn)
+            {
+                // Selected: a white frame round the dot
+                const int cx = pixelX + pixelWidth / 2, cy = pixelY + pixelHeight / 2;
+                const int half = std::max(pixelWidth, pixelHeight) / 2 + 2;
+                const SDL_Color white {255, 255, 255, 235};
+                fillClamped(cx - half, cy - half, 2 * half, 1, white);
+                fillClamped(cx - half, cy + half - 1, 2 * half, 1, white);
+                fillClamped(cx - half, cy - half, 1, 2 * half, white);
+                fillClamped(cx + half - 1, cy - half, 1, 2 * half, white);
+            }
+            if (!tactical && !enemyOnRadar && !isOwn && entity.faction != Faction::Neutral
                 && Players::Hostile(entity.owner, Players::Local())
                 && (!building || m_radarAlert.config.includeBuildings))
             {
@@ -520,7 +608,9 @@ void HUDController::DrawRadar(
 
         // Radar alarm: red waves and a flashing dot at the contact (true circles in screen pixels)
         const std::uint64_t nowMs = SDL_GetTicks();
-        m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
+        if (!tactical)
+            m_radarAlert.Update(nowMs, enemyOnRadar, contactX, contactY);
+        // (the tactical map only shows the alarm the sidebar radar keeps up to date)
         if (m_radarAlert.Active())
         {
             const RadarAlertConfig &alertConfig = m_radarAlert.config;
@@ -553,6 +643,7 @@ void HUDController::DrawRadar(
             frameY,
             frameWidth,
             frameHeight);
+        if (!tactical)
         {
             // The frame's four sides, each cut to the radar's picture by hand (no scissor)
             const int fw = std::max(6, frameWidth), fh = std::max(4, frameHeight);
@@ -583,6 +674,8 @@ void HUDController::DrawRadar(
                     view.ox + view.w, top, radarRect.Right() - (view.ox + view.w), bottom - top, back);
         }
     }
+    if (tactical)
+        return;
     ui::DrawPanelFrame(renderer, radarRect, col::BorderStrong);
 
     // Radar alarm: the radar's sides flash red, the band fading inward
@@ -630,6 +723,40 @@ void HUDController::DrawRadar(
             false,
             Anchor::LEFT | Anchor::VCENTER);
     }
+}
+
+void HUDController::SetTacticalConfig(const nlohmann::json &section)
+{
+    if (!section.is_object())
+        return;
+    m_tacticalZoomThreshold = std::clamp(section.value("zoom_threshold", m_tacticalZoomThreshold), 0.1f, 4.0f);
+    m_tacticalBuildingMinPx = std::clamp(section.value("building_min_px", m_tacticalBuildingMinPx), 3.0f, 64.0f);
+    m_tacticalGridAlpha = std::clamp(section.value("grid_alpha", m_tacticalGridAlpha), 0, 255);
+    m_tacticalGridMinPx = std::clamp(section.value("grid_min_px", m_tacticalGridMinPx), 8, 200);
+}
+
+void HUDController::SetTactical(bool on)
+{
+    if (on == m_tactical)
+        return;
+    m_tactical = on;
+    if (on)
+    {
+        m_buildMode = false; // no building here: a half-placed one goes away with the picture
+        if (m_activeTab == TabBuild)
+            m_activeTab = TabInfantry;
+    }
+}
+
+void HUDController::DrawTacticalMap(
+    Renderer &renderer,
+    BitmapFontRenderer &fontRenderer,
+    const UiRect &area,
+    const EntityManager &entities,
+    const TileMap &map,
+    const Camera &camera)
+{
+    DrawRadar(renderer, fontRenderer, area, entities, map, camera, -1, -1, false, true);
 }
 
 void HUDController::RenderGameHud(
@@ -756,7 +883,7 @@ void HUDController::RenderGameHud(
             bool hovered = tabRect.Contains(mouseX, mouseY);
             if (hovered)
                 SoundRequests::MarkHover();
-            ui::DrawTab(renderer, tabRect, active, hovered, col::Accent);
+            ui::DrawTab(renderer, tabRect, active, hovered && !(m_tactical && tabIndex == TabBuild), col::Accent);
 
             if (TabIcon(tabIndex) >= 0)
             {
@@ -777,7 +904,7 @@ void HUDController::RenderGameHud(
                         tabRect.y + 2,
                         tabRect.w - 4,
                         tabRect.h - 4,
-                        {8, 10, 14, hovered ? Uint8(30) : Uint8(65)});
+                        {8, 10, 14, (m_tactical && tabIndex == TabBuild) ? Uint8(170) : (hovered ? Uint8(30) : Uint8(65))});
             }
             else
             {

@@ -29,7 +29,7 @@ screens:
 
 ## HUD, profile `touch`
 Conditions: `placing`, `panel_open`, `panel_build`, `panel_units`, `units_inf`, `units_veh`,
-`attack_mode`, `sell_armed`, `has_combat`, `has_building`, `has_selection`.
+`tactical` (zoomed out into the radar map: no building), `attack_mode`, `sell_armed`, `has_combat`, `has_building`, `has_selection`.
 Actions: `menu goals tech dock_build dock_units attack_move stop hold siege clear select_all repair sell
 confirm cancel units_infantry units_vehicles scroll_left scroll_right`.
 

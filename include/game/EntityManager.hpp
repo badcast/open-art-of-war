@@ -709,7 +709,9 @@ public:
         float maxWorldY,
         PlayerId owner,
         std::vector<int> &outUnitIds);
-    int GetUnitAt(float worldX, float worldY, float tolerance = 15.0f) const;
+    // The unit or building under the point. `minBuildingWorld`: a building smaller than this (world pixels, per
+    // side) is hit as if it were that big, round its middle (the tactical map draws small buildings as big dots)
+    int GetUnitAt(float worldX, float worldY, float tolerance = 15.0f, float minBuildingWorld = 0.0f) const;
 
     Entity *GetEntity(int id);
     const Entity *GetEntity(int id) const;

@@ -132,6 +132,15 @@ void GameplayController::PruneGroups(const EntityManager &entities)
     }
 }
 
+int GameplayController::PickAt(
+    const EntityManager &entities, const Camera &camera, const HUDController &hud, float wx, float wy) const
+{
+    if (!m_tactical)
+        return entities.GetUnitAt(wx, wy);
+    const float zoom = std::max(0.01f, camera.GetZoom());
+    return entities.GetUnitAt(wx, wy, std::max(15.0f, 9.0f / zoom), hud.TacticalBuildingMinPx() / zoom);
+}
+
 void GameplayController::SelectGroup(int index, EntityManager &entities)
 {
     if (index < 0 || index >= static_cast<int>(m_groups.size()) || m_groups[index].unitIds.empty())
@@ -1128,8 +1137,11 @@ void GameplayController::Update(const FrameContext &context)
                 }
             }
 
-            // Only Barracks / Factories selected: right click moves their rally point
-            if (combatUnits.empty())
+            // Only Barracks / Factories selected: right click moves their rally point (not in the tactical view)
+            if (combatUnits.empty() && m_tactical)
+            {
+            }
+            else if (combatUnits.empty())
             {
                 SimCommand command = Command(CommandType::SetRally);
                 command.ids.assign(m_selectedUnits.begin(), m_selectedUnits.end());
@@ -1159,7 +1171,7 @@ void GameplayController::Update(const FrameContext &context)
                 if (entity && entity->alive && !entity->isBuilding)
                     combatUnits.push_back(unitId);
             }
-            const Entity *tappedEntity = entities.GetEntity(entities.GetUnitAt(leftClickWorldX, leftClickWorldY));
+            const Entity *tappedEntity = entities.GetEntity(PickAt(entities, camera, hud, leftClickWorldX, leftClickWorldY));
             // A tap on an own unit or building selects it (the unit selection ends), it is no order
             const bool tappedOwn = tappedEntity && tappedEntity->alive && tappedEntity->owner == Players::Local();
             const std::uint64_t nowTicks = SDL_GetTicks();
@@ -1214,7 +1226,7 @@ void GameplayController::Update(const FrameContext &context)
                     for (int unitId : m_selectedUnits)
                     {
                         const Building *building = entities.GetBuilding(unitId);
-                        if (building && building->alive
+                        if (!m_tactical && building && building->alive
                             && (building->owner == Players::Local() || (m_debugMode && m_controlAllFactions))
                             && building->IsUnitProducer())
                         {
@@ -1244,7 +1256,7 @@ void GameplayController::Update(const FrameContext &context)
         if (!touchOrdered && !hud.IsAttackMoveMode() && leftClicked && mouseX < mapViewWidth
             && (!m_debugMode || mouseY > 30))
         {
-            int clickedEntityId = entities.GetUnitAt(leftClickWorldX, leftClickWorldY);
+            int clickedEntityId = PickAt(entities, camera, hud, leftClickWorldX, leftClickWorldY);
             const Building *clickedBuilding = entities.GetBuilding(clickedEntityId);
             const bool ownProducer
                 = clickedBuilding && clickedBuilding->owner == Players::Local() && clickedBuilding->IsUnitProducer();

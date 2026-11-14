@@ -73,7 +73,7 @@ struct Settings
     int edgePanMargin {5};     // 5..30 pixels (screen border thickness for mouse scrolling)
 
     static constexpr int kArmyColors = 8;
-    static constexpr float kZoomLowest = 0.5f;
+    static constexpr float kZoomLowest = 0.2f;
     static constexpr float kZoomHighest = 4.0f;
     static constexpr int kMinEdgePanMargin = 5;
     static constexpr int kMaxEdgePanMargin = 30;

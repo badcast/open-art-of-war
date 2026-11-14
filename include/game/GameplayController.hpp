@@ -73,6 +73,11 @@ public:
     {
         m_touchMode = on;
     }
+    // Tactical view (the map is zoomed out into a radar): units and orders work, rally points do not
+    void SetTactical(bool on)
+    {
+        m_tactical = on;
+    }
     void SetDebugMode(bool enabled);
     bool IsDebugMode() const
     {
@@ -186,6 +191,8 @@ private:
 
     void PruneGroups(const EntityManager &entities);
     void SelectGroup(int index, EntityManager &entities);
+    // The unit or building under a map point; the tactical view picks with a tolerance that is constant on the screen
+    int PickAt(const EntityManager &entities, const Camera &camera, const HUDController &hud, float wx, float wy) const;
     void HandleControlGroupKeys(InputManager &input, EntityManager &entities, Camera &camera);
     int GroupBarHit(int mx, int my, int mapViewW, int windowH) const;
     int GroupOfUnits(const std::vector<int> &unitIds) const;
@@ -212,6 +219,7 @@ private:
     std::uint64_t m_lastGroupTicks {0};
     int m_lastClickId {0};
     bool m_touchMode {false};
+    bool m_tactical {false};
     std::uint64_t m_touchOrderTicks {0}; // the last tap that ordered (a second one close by is an attack-move)
     int m_touchOrderX {-1000};
     int m_touchOrderY {-1000};

@@ -189,6 +189,8 @@ private:
     void UpdateGameChat(std::uint32_t nowMs);
     void RenderGameChat();
     void RenderMenuFade();
+    // Tactical view: in a game, a zoom under tactical_view.zoom_threshold turns the picture into the radar map
+    bool UpdateTacticalView();
     // Tab held in a match: every player with faction, colour, name and efficiency points
     void RenderScoreboard();
     // Sound effects of the frame: the interface's requests, the world, unit replies, victory / defeat

@@ -48,6 +48,19 @@
 namespace OpenArtOfWar
 {
 
+bool Application::UpdateTacticalView()
+{
+    const bool inGame = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying
+                        || m_state == AppState::Paused || m_state == AppState::Victory || m_state == AppState::Defeat;
+    const bool tactical
+        = inGame && m_hudController && m_camera && m_camera->GetZoom() < m_hudController->TacticalZoomThreshold();
+    if (m_hudController)
+        m_hudController->SetTactical(tactical);
+    if (m_gameplayController)
+        m_gameplayController->SetTactical(tactical);
+    return tactical;
+}
+
 // The edge of the map melts into the dark background instead of ending in a hard line
 void Application::RenderMapEdgeFade(const Camera &camera)
 {
