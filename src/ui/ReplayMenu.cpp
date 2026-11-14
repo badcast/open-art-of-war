@@ -265,8 +265,6 @@ void ReplayMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int window
             renderer.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, col::Hover);
         else if (hovered)
             renderer.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, ui::WithAlpha(col::Hover, 140));
-        if (selected)
-            renderer.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, col::Accent);
         if (r.CenterY() - 10 < l.list.y || r.CenterY() + 10 > l.list.Bottom())
             continue;
         std::string title = e.ok ? FormatTime(e.info.recordedAt) + "  " + MapName(e.info.map) : e.name;

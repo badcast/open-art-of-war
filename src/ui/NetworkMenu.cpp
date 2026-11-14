@@ -1414,8 +1414,6 @@ void NetworkMenu::Render(
                     itemRect.w - 4,
                     bgH,
                     selected ? col::Hover : (hot ? col::PanelRaised : col::PanelSunken));
-                if (selected)
-                    renderer.FillRectScreen(itemRect.x + 2, clipTop, 3, bgH, col::Accent);
                 if (itemRect.CenterY() - 8 >= layout.mapList.y && itemRect.CenterY() + 8 <= layout.mapList.Bottom())
                 {
                     font.DrawString(

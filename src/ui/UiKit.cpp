@@ -232,14 +232,13 @@ void DrawToast(
     if (slide <= 0.0f || text.empty())
         return;
     const int pad = std::max(8, height / 3);
-    const int width = std::min(maxWidth, font.GetTextWidth(std::string(text), FONT_BODY_BOLD) + 2 * pad + 4);
+    const int width = std::min(maxWidth, font.GetTextWidth(std::string(text), FONT_BODY_BOLD) + 2 * pad);
     const int drawX = x - static_cast<int>(std::lround((1.0f - slide) * static_cast<float>(width + x)));
     r.FillRectScreen(drawX, y, width, height, {10, 13, 18, 228});
     r.DrawRectScreen(drawX, y, width, height, {160, 172, 190, 150});
-    r.FillRectScreen(drawX + 1, y + 1, 4, height - 2, accent);
     font.DrawString(
-        FitText(font, text, FONT_BODY_BOLD, std::max(20, width - 2 * pad - 4)),
-        drawX + 4 + pad,
+        FitText(font, text, FONT_BODY_BOLD, std::max(20, width - 2 * pad)),
+        drawX + pad,
         y + height / 2,
         FONT_BODY_BOLD,
         color::Text,
@@ -385,11 +384,9 @@ UiRect DrawDialog(
         WithAlpha(Mix(color::PanelRaised, color::AccentDeep, 0.25f), 220));
     if (rect.w > 28)
         r.FillRectScreen(rect.x + 14, rect.y + 5, rect.w - 28, 1, WithAlpha(color::Accent, 72));
-    // Tactical left marker pill beside title text
-    r.FillRectScreen(rect.x + 16, rect.y + 15, 4, 22, color::Accent);
     font.DrawString(
-        FitText(font, title, FONT_H2, std::max(40, rect.w - 48)),
-        rect.x + 28,
+        FitText(font, title, FONT_H2, std::max(40, rect.w - 36)),
+        rect.x + 16,
         rect.y + titleH / 2,
         FONT_H2,
         color::Text,
@@ -461,7 +458,7 @@ void DrawButtonChrome(
     const SDL_Color topCol = ScaleAlpha(topFill, opacity);
     const SDL_Color botCol = ScaleAlpha(bottomFill, opacity);
     const SDL_Color rimCol = ScaleAlpha(border, opacity);
-    const SDL_Color barCol = ScaleAlpha(accentBar, opacity);
+    (void) accentBar;
 
     const SDL_Color flatCol = Mix(topCol, botCol, 0.5f);
     if (flatCol.a > 0)
@@ -475,12 +472,6 @@ void DrawButtonChrome(
 
     if (rimCol.a > 0 && !horizontalGradient)
         r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, rimCol);
-
-    if (barCol.a > 0 && rect.w >= 12 && rect.h >= 6)
-    {
-        const int barW = horizontalGradient ? 4 : 3;
-        r.FillRectScreen(rect.x + 1, rect.y + 1, barW, rect.h - 2, barCol);
-    }
 }
 
 void DrawButton(
@@ -1135,9 +1126,8 @@ void DrawConfirm(
     const int wellH = std::max(44, c.yes.y - content.y - 16);
     const UiRect well {content.x + 8, content.y + 2, std::max(40, content.w - 16), wellH};
     DrawPanel(r, well, WithAlpha(color::PanelSunken, 220), WithAlpha(color::Border, 165));
-    r.FillRectScreen(well.x + 2, well.y + 6, 3, std::max(8, well.h - 12), color::Danger);
     font.DrawTextWrapped(
-        state.text, well.x + 18, well.y + 14, std::max(40, well.w - 32), FONT_BODY, color::Text, false);
+        state.text, well.x + 14, well.y + 14, std::max(40, well.w - 28), FONT_BODY, color::Text, false);
     DrawButton(r, font, c.yes, _("YES"), ButtonStyle::Danger, c.yes.Contains(mx, my));
     DrawButton(r, font, c.no, _("NO"), ButtonStyle::Secondary, c.no.Contains(mx, my));
 }
@@ -1258,12 +1248,10 @@ void DrawComboList(
         if (i == current)
         {
             r.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, Mix(color::AccentDeep, color::Accent, 0.25f));
-            r.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, color::Accent);
         }
         else if (hot)
         {
             r.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, Mix(color::Hover, color::AccentDeep, 0.22f));
-            r.FillRectScreen(bgRect.x, bgRect.y, 2, bgRect.h, color::BorderStrong);
         }
         if (item.CenterY() - 8 < clip.y || item.CenterY() + 8 > clip.Bottom())
             continue;
@@ -1528,8 +1516,9 @@ void DrawLoadingScreen(
 
 void DrawCaption(BitmapFontRenderer &font, Renderer &r, int x, int y, std::string_view text, SDL_Color tick)
 {
-    r.FillRectScreen(x, y + 3, 3, 10, tick);
-    font.DrawString(text, x + 9, y, FONT_SMALL_BOLD, color::TextDim, false);
+    (void) r;
+    (void) tick;
+    font.DrawString(text, x, y, FONT_SMALL_BOLD, color::TextDim, false);
 }
 
 std::string FitText(const BitmapFontRenderer &font, std::string_view text, int scale, int maxWidth)

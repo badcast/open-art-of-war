@@ -284,6 +284,14 @@ bool Application::Init(int windowWidth, int windowHeight)
         sizes.large = f.value("size_large", sizes.large);
         sizes.title = f.value("size_title", sizes.title);
         sizes.hero = f.value("size_hero", sizes.hero);
+        if (m_touchUi)
+        {
+            sizes.small = std::round(sizes.small * 1.25f);
+            sizes.medium = std::round(sizes.medium * 1.25f);
+            sizes.large = std::round(sizes.large * 1.20f);
+            sizes.title = std::round(sizes.title * 1.15f);
+            sizes.hero = std::round(sizes.hero * 1.10f);
+        }
         m_fontRenderer = std::make_unique<BitmapFontRenderer>(
             m_sdlRenderer, LoaderResources::FontRegular(), LoaderResources::FontBold(), sizes);
     }

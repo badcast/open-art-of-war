@@ -1161,6 +1161,23 @@ void TouchHUD::RenderGameHud(
             = ResolveButtonColors(button.style, button.active, hovered, button.disabled, armed, armyColor);
 
         renderer.FillRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, colors.fill);
+        if (button.act == Act::Tech && !button.disabled)
+        {
+            const ResearchProgress researchNow = ResearchShown();
+            if (researchNow.active >= 0 && button.r.w > 4 && button.r.h > 4)
+            {
+                const float progress
+                    = std::clamp(researchNow.timer / std::max(0.001f, researchNow.duration), 0.0f, 1.0f);
+                const int fillW = static_cast<int>(std::lround((button.r.w - 2) * progress));
+                if (fillW > 0)
+                {
+                    renderer.FillRectScreen(
+                        button.r.x + 1, button.r.y + 1, fillW, button.r.h - 2, ui::WithAlpha(col::Accent, 120));
+                    if (button.r.h > 5)
+                        renderer.FillRectScreen(button.r.x + 1, button.r.Bottom() - 4, fillW, 3, col::Accent);
+                }
+            }
+        }
         renderer.DrawRectScreen(button.r.x, button.r.y, button.r.w, button.r.h, colors.border);
         if (!button.disabled && button.active && button.r.h > 4)
             renderer.FillRectScreen(

@@ -973,8 +973,6 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
             = (l.list.Contains(m_mouseX, m_mouseY) && r.Contains(m_mouseX, m_mouseY)) || i == m_settingsSelected;
         const UiRect bgRect {r.x, clipTop, r.w, clipBot - clipTop};
         ui::DrawPanel(renderer, bgRect, hot ? col::Hover : col::PanelRaised, hot ? col::BorderStrong : col::Border);
-        if (hot)
-            renderer.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, col::Accent);
         if (r.CenterY() - 12 < l.list.y || r.CenterY() + 12 > l.list.Bottom())
             continue;
         const SDL_Color text = row.enabled ? col::Text : col::TextMuted;

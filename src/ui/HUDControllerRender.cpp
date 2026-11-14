@@ -43,6 +43,62 @@ int TabIcon(int tab)
     return SpriteHandle(iconName, SpriteKind::Part, "sidebar tab icon");
 }
 
+void DrawSidebarIconButton(
+    Renderer &renderer,
+    BitmapFontRenderer &fontRenderer,
+    const UiRect &rect,
+    int iconSpriteId,
+    std::string_view label,
+    bool hovered,
+    float progress = -1.0f)
+{
+    ui::DrawButton(renderer, fontRenderer, rect, "", ui::ButtonStyle::Secondary, hovered);
+    if (progress >= 0.0f && rect.w > 4 && rect.h > 4)
+    {
+        const float clamped = std::clamp(progress, 0.0f, 1.0f);
+        const int fillW = static_cast<int>(std::lround((rect.w - 2) * clamped));
+        if (fillW > 0)
+            renderer.FillRectScreen(rect.x + 1, rect.y + 1, fillW, rect.h - 2, ui::WithAlpha(col::Accent, 145));
+        if (fillW > 0 && rect.h > 5)
+            renderer.FillRectScreen(rect.x + 1, rect.Bottom() - 4, fillW, 3, col::Accent);
+    }
+
+    int textLeft = rect.x + 6;
+    if (iconSpriteId >= 0 && rect.w > 24 && rect.h > 14)
+    {
+        const int iconSz = std::clamp(rect.h - 12, 14, 18);
+        const int iconX = rect.x + 7;
+        const int iconY = rect.CenterY() - iconSz / 2;
+        renderer.DrawSpritePartScreen(
+            iconSpriteId,
+            {static_cast<float>(iconX),
+             static_cast<float>(iconY),
+             static_cast<float>(iconSz),
+             static_cast<float>(iconSz)},
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            SDL_FLIP_NONE,
+            Faction::Resistance,
+            hovered ? 245 : 210,
+            SDL_Color {255, 255, 255, 255});
+        textLeft = iconX + iconSz + 4;
+    }
+
+    const int textAreaW = std::max(12, rect.Right() - textLeft - 4);
+    const std::string fitted = ui::FitText(fontRenderer, label, ui::FONT_SMALL, textAreaW);
+    const SDL_Color textCol = hovered ? col::White : ui::Mix(col::Text, col::White, 0.25f);
+    fontRenderer.DrawString(
+        fitted,
+        textLeft + textAreaW / 2,
+        rect.CenterY(),
+        ui::FONT_SMALL,
+        textCol,
+        progress >= 0.0f,
+        Anchor::HCENTER | Anchor::VCENTER);
+}
+
 constexpr int kCameoWidth = 60; // native cameo composite size
 
 // A true circle outline in screen pixels (64 segments), clipped to `clip`
@@ -840,19 +896,22 @@ void HUDController::RenderGameHud(
     DrawRadar(renderer, fontRenderer, layout.radar, entities, map, camera, mouseX, mouseY);
 
     // --- Menu / objectives -------------------------------------------------------------------
-    ui::DrawButton(
+    static const CachedSprite sMenuIcon("ui_touch.menu", SpriteKind::Frame);
+    static const CachedSprite sGoalsIcon("ui_touch.goals", SpriteKind::Frame);
+    static const CachedSprite sTechIcon("ui_touch.tech", SpriteKind::Frame);
+    DrawSidebarIconButton(
         renderer,
         fontRenderer,
         layout.menuBtn,
-        ui::FitText(fontRenderer, _("MENU"), ui::FONT_SMALL, layout.menuBtn.w - 8),
-        ui::ButtonStyle::Secondary,
+        sMenuIcon.Get(),
+        _("MENU"),
         layout.menuBtn.Contains(mouseX, mouseY));
-    ui::DrawButton(
+    DrawSidebarIconButton(
         renderer,
         fontRenderer,
         layout.objectivesBtn,
-        ui::FitText(fontRenderer, _("OBJECTIVES"), ui::FONT_SMALL, layout.objectivesBtn.w - 8),
-        ui::ButtonStyle::Secondary,
+        sGoalsIcon.Get(),
+        _("OBJECTIVES"),
         layout.objectivesBtn.Contains(mouseX, mouseY));
     if (!m_observer && m_speedEnabled)
     {
@@ -889,13 +948,33 @@ void HUDController::RenderGameHud(
     // A replay's observer has no buildings to command: only the radar, the header and the menu stay
     if (!m_observer)
     {
-        ui::DrawButton(
-            renderer,
-            fontRenderer,
-            layout.researchBtn,
-            ui::FitText(fontRenderer, _("RESEARCH NEW TECHNOLOGIES"), ui::FONT_SMALL, layout.researchBtn.w - 12),
-            ui::ButtonStyle::Secondary,
-            layout.researchBtn.Contains(mouseX, mouseY));
+        const ResearchProgress researchNow = ResearchShown();
+        if (researchNow.active >= 0)
+        {
+            const float progress
+                = std::clamp(researchNow.timer / std::max(0.001f, researchNow.duration), 0.0f, 1.0f);
+            const int pct = static_cast<int>(std::lround(progress * 100.0f));
+            const std::string label
+                = std::string(_(researchDef(PlayerFaction(), researchNow.active).name)) + " " + std::to_string(pct) + "%";
+            DrawSidebarIconButton(
+                renderer,
+                fontRenderer,
+                layout.researchBtn,
+                sTechIcon.Get(),
+                label,
+                layout.researchBtn.Contains(mouseX, mouseY),
+                progress);
+        }
+        else
+        {
+            DrawSidebarIconButton(
+                renderer,
+                fontRenderer,
+                layout.researchBtn,
+                sTechIcon.Get(),
+                _("RESEARCH NEW TECHNOLOGIES"),
+                layout.researchBtn.Contains(mouseX, mouseY));
+        }
         // --- Tabs ----------------------------------------------------------------------------------
         for (int tabIndex = 0; tabIndex < TabCount; ++tabIndex)
         {
@@ -1234,10 +1313,39 @@ void HUDController::RenderGameHud(
                         = active ? col::Accent : (hovered ? ui::Mix(col::Accent, col::White, 0.2f) : col::BorderStrong);
                     const SDL_Color cardCorners = (active || hovered) ? col::Accent : col::BorderStrong;
                     ui::DrawButtonChrome(renderer, cellRect, cardTop, cardBot, cardBorder, {0, 0, 0, 0}, cardCorners);
+                    static const CachedSprite sOrderIcons[7] = {
+                        {"ui_touch.attack", SpriteKind::Frame}, // ATTACK-MOVE
+                        {"ui_touch.siege", SpriteKind::Frame},  // SIEGE
+                        {"ui_touch.stop", SpriteKind::Frame},   // STOP
+                        {"ui_touch.hold", SpriteKind::Frame},   // DEFEND
+                        {"ui_touch.goals", SpriteKind::Frame},  // GUARD
+                        {"ui_touch.hold", SpriteKind::Frame},   // HOLD GROUND
+                        {"ui_touch.attack", SpriteKind::Frame}, // PURSUE
+                    };
+                    const int orderIconId = (i >= 0 && i < 7) ? sOrderIcons[i].Get() : -1;
+                    if (orderIconId >= 0)
+                    {
+                        const int iconSz = std::clamp(cellRect.h / 3, 20, 28);
+                        const SDL_Color iconTint = active ? col::Accent : SDL_Color {255, 255, 255, 255};
+                        renderer.DrawSpritePartScreen(
+                            orderIconId,
+                            {static_cast<float>(cellRect.CenterX() - iconSz / 2),
+                             static_cast<float>(cellRect.y + 10),
+                             static_cast<float>(iconSz),
+                             static_cast<float>(iconSz)},
+                            0.0f,
+                            0.0f,
+                            0.0f,
+                            0.0f,
+                            SDL_FLIP_NONE,
+                            Faction::Resistance,
+                            (active || hovered) ? 245 : 210,
+                            iconTint);
+                    }
                     fontRenderer.DrawString(
                         ui::FitText(fontRenderer, _(orderDef.name), ui::FONT_BODY_BOLD, cellRect.w - 16),
                         cellRect.CenterX(),
-                        cellRect.CenterY() + 6,
+                        orderIconId >= 0 ? cellRect.CenterY() + 14 : cellRect.CenterY() + 6,
                         ui::FONT_BODY_BOLD,
                         active ? col::Accent : (hovered ? col::White : col::Text),
                         true,

@@ -71,6 +71,15 @@ int MusicPlayerIntroOffsetY(float progress, int windowW, int windowH)
     return -MainMenuIntroOffset(progress, dropDist);
 }
 
+// The player of the main menu sits above the version plate (bottom right, top at windowH - 36) when it would reach it
+int MainMenuPlayerLift(int windowW, int windowH, int minLeft)
+{
+    const menu_detail::PlayerLayout l = menu_detail::playerLayout(windowW, windowH, 0, 0, minLeft);
+    if (l.panel.Right() <= windowW - 200)
+        return 0;
+    return -std::max(0, l.panel.Bottom() - (windowH - 36) + 8);
+}
+
 UiRect MainMenuItemRect(int i, int windowW, int windowH)
 {
     // ui/layout.yaml (screen main_menu); the numbers below stand in when the file has no such screen
@@ -228,6 +237,8 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
     int px = 0, py = 0;
     const bool pressed = input.ConsumeLeftPress(px, py);
     const int playerOffsetY = MusicPlayerIntroOffsetY(m_mainMenuIntro, windowW, windowH);
+    const int playerMinLeft = m_mainMenuFrameWidth > 0 ? m_mainMenuFrameWidth + 16 : 24;
+    const int playerLift = MainMenuPlayerLift(windowW, windowH, playerMinLeft);
     if (UpdateMusicPlayer(clicked,
                           pressed,
                           px,
@@ -241,7 +252,8 @@ void MenuController::UpdateMainMenu(const FrameContext &ctx, bool &running)
                           sound,
                           m_scrollDrag,
                           0,
-                          playerOffsetY))
+                          playerOffsetY + playerLift,
+                          playerMinLeft))
         return;
 
     const int introDistance = std::max({600, windowW / 2, MainMenuItemRect(0, windowW, windowH).Right()});
@@ -420,6 +432,20 @@ void MenuController::RenderMainMenu(
     const uilayout::Layout &layoutFile = uilayout::Current();
     const std::string profile = uilayout::MenuProfile(layoutFile, "main_menu");
     const bool touchMenu = profile == "touch";
+    auto pickMenuFont = [&](int itemH) {
+        const int candidates[] = {
+            touchMenu ? ui::FONT_H1 : ui::FONT_H2,
+            ui::FONT_H2,
+            ui::FONT_BODY_BOLD,
+            ui::FONT_SMALL_BOLD,
+        };
+        for (int f : candidates)
+        {
+            if (fontRenderer.GetTextHeight(f) <= itemH - 4)
+                return f;
+        }
+        return ui::FONT_SMALL_BOLD;
+    };
     if (layoutFile.Has("main_menu", profile))
     {
         const UiRect t = layoutFile.Solve("main_menu", profile, windowW, windowH, {}).Rect("title");
@@ -436,11 +462,16 @@ void MenuController::RenderMainMenu(
             const UiRect item = MainMenuItemRect(i, windowW, windowH);
             backdropWidth = std::max(
                 backdropWidth,
-                item.x + 25 + fontRenderer.GetTextWidth(_(kMainMenuLabels[i]), touchMenu ? ui::FONT_H1 : ui::FONT_H2));
+                item.x + 25 + fontRenderer.GetTextWidth(_(kMainMenuLabels[i]), pickMenuFont(item.h)));
         }
         const int frameWidth = std::min(windowW, backdropWidth + 24);
+        m_mainMenuFrameWidth = frameWidth;
         const int frameOffset = MainMenuIntroOffset(m_mainMenuIntro, frameWidth);
         renderer.FillRectScreen(frameOffset, 0, frameWidth, windowH, {0, 0, 0, 150});
+    }
+    else
+    {
+        m_mainMenuFrameWidth = 0;
     }
     fontRenderer.DrawString("OPEN ART OF WAR", x + introOffset, titleY, ui::FONT_HERO, col::Accent, true);
     fontRenderer.DrawString(
@@ -463,8 +494,6 @@ void MenuController::RenderMainMenu(
             = selected ? ui::Mix(col::Hover, isExit ? col::DangerDeep : ui::color::AccentDeep, 0.56f)
                        : ui::WithAlpha(ui::Mix(col::PanelRaised, ui::color::Info, 0.10f), 195);
         renderer.FillRectScreen(r.x, r.y, r.w, r.h, plateFill);
-        if (selected && r.w >= 8 && r.h >= 4)
-            renderer.FillRectScreen(r.x + 1, r.y + 1, 4, r.h - 2, itemAccent);
 
         const SDL_Color rimStart = selected ? ui::WithAlpha(itemAccent, 185) : ui::WithAlpha(col::BorderStrong, 95);
         if (r.w > 2)
@@ -477,11 +506,13 @@ void MenuController::RenderMainMenu(
         const SDL_Color idleCol
             = touchMenu ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
         const SDL_Color textCol = selected ? (isExit ? SDL_Color {255, 204, 194, 255} : col::White) : idleCol;
+        const int itemFont = pickMenuFont(r.h);
+        const int textX = r.x + 20 + (selected ? 6 : 0);
         fontRenderer.DrawString(
-            label,
-            r.x + 20 + (selected ? 6 : 0),
+            ui::FitText(fontRenderer, label, itemFont, std::max(40, r.Right() - textX - 8)),
+            textX,
             r.CenterY(),
-            touchMenu ? ui::FONT_H1 : ui::FONT_H2,
+            itemFont,
             textCol,
             selected,
             Anchor::LEFT | Anchor::VCENTER);
@@ -503,12 +534,23 @@ void MenuController::RenderMainMenu(
         fontRenderer.GetTextWidth(ver, ui::FONT_SMALL) + thikn * 2 + 8,
         fontRenderer.GetTextHeight(ui::FONT_SMALL) + thikn * 2};
     ui::DrawPanel(renderer, verRect, ui::WithAlpha(col::Panel, 230), col::BorderStrong);
-    renderer.FillRectScreen(verRect.x + 1, verRect.y + 3, 2, std::max(1, verRect.h - 6), col::Accent);
     fontRenderer.DrawString(
         ver, windowW - 24, windowH - 30, ui::FONT_SMALL, col::White, true, Anchor::RIGHT | Anchor::TOP);
 
     const int playerOffsetY = MusicPlayerIntroOffsetY(m_mainMenuIntro, windowW, windowH);
-    RenderMusicPlayer(renderer, fontRenderer, sound, windowW, windowH, true, m_mouseX, m_mouseY, 0, playerOffsetY);
+    const int playerMinLeft = m_mainMenuFrameWidth > 0 ? m_mainMenuFrameWidth + 16 : 24;
+    RenderMusicPlayer(
+        renderer,
+        fontRenderer,
+        sound,
+        windowW,
+        windowH,
+        true,
+        m_mouseX,
+        m_mouseY,
+        0,
+        playerOffsetY + MainMenuPlayerLift(windowW, windowH, playerMinLeft),
+        playerMinLeft);
 
     if (m_campaignSelectOpen)
     {

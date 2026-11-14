@@ -223,18 +223,24 @@ void NightLighting::Apply(
     bool gpu,
     const std::vector<EntityManager::LightSpot> &lights,
     int w,
-    int h)
+    int h,
+    float strength)
 {
-    if (!renderer || w <= 0 || h <= 0 || !EnsureTextures(renderer, w, h))
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    if (strength <= 0.001f || !renderer || w <= 0 || h <= 0 || !EnsureTextures(renderer, w, h))
         return;
     SDL_Texture *target = SDL_GetRenderTarget(renderer);
     SDL_Rect clip;
     const bool clipped = SDL_RenderClipEnabled(renderer) && SDL_GetRenderClipRect(renderer, &clip);
     SDL_SetRenderClipRect(renderer, nullptr);
     const NightConfig &c = m_config;
-    const SDL_Color base
+    const SDL_Color nightBase
         = gpu ? SDL_Color {static_cast<Uint8>(c.gpuBase * 255.0f), static_cast<Uint8>(c.gpuBase * 255.0f), static_cast<Uint8>(c.gpuBase * 255.0f), 255}
               : c.nightColor;
+    auto lerpChannel = [strength](Uint8 nightVal) -> Uint8 {
+        return static_cast<Uint8>(std::lround(255.0f + (static_cast<float>(nightVal) - 255.0f) * strength));
+    };
+    const SDL_Color base {lerpChannel(nightBase.r), lerpChannel(nightBase.g), lerpChannel(nightBase.b), 255};
 
     // The light map: the night, and every light added onto it
     SDL_SetRenderTarget(renderer, m_light);
@@ -256,7 +262,7 @@ void NightLighting::Apply(
             if (l.kind != Kind::Building)
                 continue;
             float k = c.buildingIntensity * (l.powered ? 1.0f : c.buildingUnpowered)
-                      * (l.complete ? 1.0f : c.buildingUnderConstruction);
+                      * (l.complete ? 1.0f : c.buildingUnderConstruction) * strength;
             if (k <= 0.0f)
                 continue;
             float sx, sy;
@@ -280,7 +286,7 @@ void NightLighting::Apply(
                                                                       : nullptr;
         if (!spot)
             continue;
-        float k = spot->intensity;
+        float k = spot->intensity * strength;
         if (l.kind == Kind::Explosion)
             k *= 1.0f - c.explosionFade * l.age;
         else if (l.kind == Kind::MuzzleFlash)

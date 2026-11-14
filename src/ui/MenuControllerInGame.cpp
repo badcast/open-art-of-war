@@ -388,11 +388,10 @@ void MenuController::RenderMissionDialog(Renderer &renderer, BitmapFontRenderer 
         }
         if (!line.speaker.empty())
         {
-            renderer.FillRectScreen(innerX, y + 2, 3, 14, col::Accent);
-            fontRenderer.DrawString(line.speaker, innerX + 9, y, ui::FONT_SMALL_BOLD, col::Accent, true);
+            fontRenderer.DrawString(line.speaker, innerX, y, ui::FONT_SMALL_BOLD, col::Accent, true);
         }
         y += 22;
-        y += fontRenderer.DrawTextWrapped(line.text, innerX + 9, y, std::max(40, innerW - 9), scale, col::Text, false)
+        y += fontRenderer.DrawTextWrapped(line.text, innerX, y, std::max(40, innerW), scale, col::Text, false)
              + 14;
     }
     ui::DrawButton(

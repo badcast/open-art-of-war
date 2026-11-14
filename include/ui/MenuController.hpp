@@ -266,6 +266,7 @@ private:
     MapPreview m_mapPreview;    // pictures of the maps in the selection dialog
     int m_selectedMenuItem {0};
     float m_mainMenuIntro {1.0f}; // starts after the splash; other menu entries stay immediate
+    int m_mainMenuFrameWidth {0};
     bool m_aboutOutro {false};
     bool m_inGameMenuOpen {false};
     int m_inGameMenuSelected {0};

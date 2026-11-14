@@ -35,6 +35,8 @@ public:
     float SimulationSeconds() const;
     float CameraZoom() const;
     int ProducedUnits(unsigned player) const;
+    int ProducingFactories(unsigned player) const;
+    int MaxLivingUnitsOfAnyType() const;
     int InitialUnits(unsigned player) const;
     int MovedInitialUnits(unsigned player) const;
     int DamagedInitialUnits(unsigned player) const;

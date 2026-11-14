@@ -4,6 +4,7 @@
 
 #include "core/AssetStore.hpp"
 #include "core/JsonFile.hpp"
+#include "core/LoaderResources.hpp"
 #include "core/Localization.hpp"
 #include "core/Utility.hpp"
 #include "game/Building.hpp"
@@ -15,6 +16,7 @@
 #include "game/TileMap.hpp"
 #include "graphics/BitmapFontRenderer.hpp"
 #include "graphics/Camera.hpp"
+#include "graphics/NightLighting.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/ShaderEffects.hpp"
 #include "graphics/TextureManager.hpp"
@@ -73,6 +75,7 @@ struct AboutSimulation::Impl
     bool allTechnologies {true};
     float productionSpeed {10.0f}, minZoom {0.1f}, maxZoom {1.25f};
     int maxUnits {1200};
+    int maxUnitsPerType {40};
     View startView {37.5f, 37.0f, 1.0f};
     std::string mapPath {"assets/maps/aboutmap.json"};
     std::string music {"Machinimasound - Nightshift"};
@@ -96,8 +99,27 @@ struct AboutSimulation::Impl
     float fadeSeconds {0.7f}, creditsDuration {20.0f}, elapsed {0.0f}, creditsTime {0.0f};
     float accumulator {0.0f}, animTime {0.0f};
     float rallyTimer {0.0f};
+    NightLighting nightLighting;
+    bool nightConfigured {false};
+    bool startNight {true};
+    float nightHoldSeconds {12.0f};
+    float dawnTransitionSeconds {18.0f};
+    float dayNightTime {0.0f};
     bool resetPending {false};
     unsigned worldGeneration {0};
+
+    float NightStrength() const
+    {
+        if (!startNight)
+            return 0.0f;
+        if (dayNightTime <= nightHoldSeconds)
+            return 1.0f;
+        const float t = (dayNightTime - nightHoldSeconds) / std::max(0.01f, dawnTransitionSeconds);
+        if (t >= 1.0f)
+            return 0.0f;
+        const float s = 1.0f - t;
+        return s * s * (3.0f - 2.0f * s);
+    }
     enum class Phase
     {
         Moving,
@@ -167,6 +189,7 @@ struct AboutSimulation::Impl
             allTechnologies = cfg.value("all_technologies", allTechnologies);
             productionSpeed = std::clamp(cfg.value("production_speed_multiplier", productionSpeed), 0.1f, 100.0f);
             maxUnits = std::clamp(cfg.value("max_units", maxUnits), 1, 100000);
+            maxUnitsPerType = std::clamp(cfg.value("max_units_per_type", maxUnitsPerType), 1, 100000);
             if (cfg.contains("camera") && cfg["camera"].is_object())
             {
                 const auto &cam = cfg["camera"];
@@ -176,6 +199,13 @@ struct AboutSimulation::Impl
             }
             fadeSeconds = std::clamp(cfg.value("fade_seconds", fadeSeconds), 0.1f, 5.0f);
             creditsDuration = std::clamp(cfg.value("credits_time", creditsDuration), 1.0f, 3600.0f);
+            if (cfg.contains("night") && cfg["night"].is_object())
+            {
+                const auto &night = cfg["night"];
+                startNight = night.value("enabled", startNight);
+                nightHoldSeconds = std::max(0.0f, night.value("hold_seconds", nightHoldSeconds));
+                dawnTransitionSeconds = std::max(0.1f, night.value("transition_seconds", dawnTransitionSeconds));
+            }
             if (cfg.contains("shots") && cfg["shots"].is_array())
                 for (const auto &item : cfg["shots"])
                 {
@@ -222,6 +252,7 @@ struct AboutSimulation::Impl
             side.clear();
         nextOrder = 0;
         rallyTimer = 0.0f;
+        dayNightTime = 0.0f;
         produced = {};
         initialUnits = {};
         for (auto &positions : initialPositions)
@@ -329,19 +360,30 @@ void AboutSimulation::Update(float deltaTime, SoundEngine *sound)
     const float dt = std::clamp(deltaTime, 0.0f, 0.25f);
     s.creditsTime += dt;
     s.elapsed += dt;
+    s.dayNightTime += dt;
     // Never catch up several expensive battle ticks in one menu frame on slower devices.
     s.accumulator = std::min(s.accumulator + dt, 2.0f * kTick);
     if (s.accumulator >= kTick)
     {
         s.entities.SnapshotRenderState();
         int livingUnits = 0;
+        std::array<int, 19> livingByType {};
         for (const Entity &entity : s.entities.GetAllEntities())
-            if (entity.AsUnit() && entity.alive && entity.state != ActionState::Die)
-                ++livingUnits;
+            if (const Unit *unit = entity.AsUnit())
+                if (unit->alive && unit->state != ActionState::Die)
+                {
+                    ++livingUnits;
+                    if (unit->archetypeId >= 0 && unit->archetypeId < static_cast<int>(livingByType.size()))
+                        ++livingByType[static_cast<std::size_t>(unit->archetypeId)];
+                }
+        auto underTypeLimit = [&](int archetypeId) {
+            return archetypeId < 0 || archetypeId >= static_cast<int>(livingByType.size())
+                   || livingByType[static_cast<std::size_t>(archetypeId)] < s.maxUnitsPerType;
+        };
         for (auto &side : s.factories)
             for (auto &production : side)
             {
-                const Building *factory = s.entities.GetBuilding(production.id);
+                Building *factory = s.entities.GetBuilding(production.id);
                 if (!factory || !factory->alive)
                     continue;
                 const Faction faction = factory->faction;
@@ -353,13 +395,17 @@ void AboutSimulation::Update(float deltaTime, SoundEngine *sound)
                     for (int candidate = 0; candidate <= 13; ++candidate)
                     {
                         const UnitConfig *option = s.entities.GetUnitConfig(candidate);
+                        const int form = ProductionForm(owner, candidate);
                         if (option && option->faction == faction && !option->isSiegeMode
                             && option->producedIn == (vehicle ? "factory" : "barracks")
-                            && IsUnitUnlocked(owner, candidate))
+                            && IsUnitUnlocked(owner, candidate) && underTypeLimit(form))
                             choices.push_back(candidate);
                     }
                     if (choices.empty())
+                    {
+                        factory->isProducing = false;
                         continue;
+                    }
                     production.archetype = choices[static_cast<std::size_t>(
                         Utility::Rng().Range(0, static_cast<int>(choices.size()) - 1))];
                 }
@@ -368,9 +414,11 @@ void AboutSimulation::Update(float deltaTime, SoundEngine *sound)
                 const float normalTime = config ? config->buildTime : 4.5f;
                 const float buildTime = std::max(kTick, normalTime / s.productionSpeed);
                 production.elapsed = std::min(buildTime, production.elapsed + kTick);
+                const bool canSpawn = livingUnits < s.maxUnits && underTypeLimit(archetype);
+                factory->isProducing = (production.elapsed < buildTime) || canSpawn;
                 if (production.elapsed < buildTime)
                     continue;
-                if (livingUnits >= s.maxUnits)
+                if (!canSpawn)
                     continue;
                 int x = factory->tileX + factory->buildWidth, y = factory->tileY + factory->buildHeight;
                 EntityManager::NearestOpenTile(s.map, x, y);
@@ -383,6 +431,8 @@ void AboutSimulation::Update(float deltaTime, SoundEngine *sound)
                         ++s.produced[owner];
                     if (archetype >= 0 && archetype < static_cast<int>(s.producedTypes.size()))
                         s.producedTypes[static_cast<std::size_t>(archetype)] = true;
+                    if (archetype >= 0 && archetype < static_cast<int>(livingByType.size()))
+                        ++livingByType[static_cast<std::size_t>(archetype)];
                     production.elapsed = 0.0f;
                     production.archetype = -1;
                     ++livingUnits;
@@ -523,6 +573,21 @@ void AboutSimulation::Render(
     s.map.RenderDecorations(r, s.camera, false, tick);
     s.entities.Render(r, s.camera, s.map, false, tick, false, false);
     r.EndWorldPass();
+    const float nightStrength = s.NightStrength();
+    if (nightStrength > 0.001f)
+    {
+        if (!s.nightConfigured)
+        {
+            NightConfig nightCfg;
+            nightCfg.Load(LoaderResources::Nights());
+            s.nightLighting.Configure(nightCfg);
+            s.nightConfigured = true;
+        }
+        std::vector<EntityManager::LightSpot> &lights = s.nightLighting.Lights();
+        s.entities.CollectLights(s.map, false, lights);
+        s.nightLighting.Apply(
+            r.GetSdlRenderer(), s.camera, s.map, false, false, lights, width, height, nightStrength);
+    }
     float dark = 0.0f;
     if (s.phase == Impl::Phase::FadeOut)
         dark = std::min(1.0f, s.elapsed / s.fadeSeconds);
@@ -618,6 +683,32 @@ int AboutSimulation::DistinctProducedTypes() const
 int AboutSimulation::ProducedUnits(unsigned player) const
 {
     return player < m_impl->produced.size() ? m_impl->produced[player] : 0;
+}
+int AboutSimulation::ProducingFactories(unsigned player) const
+{
+    if (player >= m_impl->factories.size())
+        return 0;
+    int count = 0;
+    for (const auto &production : m_impl->factories[player])
+    {
+        const Building *factory = m_impl->entities.GetBuilding(production.id);
+        if (factory && factory->alive && factory->isProducing)
+            ++count;
+    }
+    return count;
+}
+int AboutSimulation::MaxLivingUnitsOfAnyType() const
+{
+    std::array<int, 19> counts {};
+    int best = 0;
+    for (const Entity &entity : m_impl->entities.GetAllEntities())
+        if (const Unit *unit = entity.AsUnit())
+            if (unit->alive && unit->state != ActionState::Die && unit->archetypeId >= 0
+                && unit->archetypeId < static_cast<int>(counts.size()))
+            {
+                best = std::max(best, ++counts[static_cast<std::size_t>(unit->archetypeId)]);
+            }
+    return best;
 }
 int AboutSimulation::InitialUnits(unsigned player) const
 {

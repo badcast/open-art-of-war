@@ -53,13 +53,18 @@ struct PlayerLayout
     UiRect panel, prev, next, name, seek;
 };
 
-inline PlayerLayout playerLayout(int windowW, int windowH, int offsetX = 0, int offsetY = 0)
+inline PlayerLayout playerLayout(int windowW, int windowH, int offsetX = 0, int offsetY = 0, int minLeft = 24)
 {
     PlayerLayout l;
     const bool touch = uilayout::MenuProfile(uilayout::Current(), "main_menu") == "touch";
     const int btnSz = touch ? 80 : 40;
-    const int w = touch ? TouchPlayerWidth(windowW) : std::min(windowW - 48, 460);
-    const int x = std::max(24, (windowW - w) / 2);
+    const int baseW = touch ? TouchPlayerWidth(windowW) : std::min(windowW - 48, 460);
+    // Centred on the screen; when the centre would put it over the menu frame on the left (`minLeft`), it moves
+    // right to the frame's edge, and narrows when even that does not leave it room
+    const int clampedLeft = std::max(24, minLeft);
+    const int availW = std::max(260, windowW - clampedLeft - 24);
+    const int w = std::min(baseW, availW);
+    const int x = std::min(std::max(clampedLeft, (windowW - w) / 2), std::max(24, windowW - w - 24));
     l.panel = {x, windowH - (touch ? 20 : 24) - btnSz, w, btnSz};
     l.prev = {l.panel.x, l.panel.y, btnSz, btnSz};
     l.next = {l.panel.Right() - btnSz, l.panel.y, btnSz, btnSz};
@@ -118,9 +123,10 @@ inline bool UpdateMusicPlayer(
     SoundEngine &sound,
     int &drag,
     int offsetX = 0,
-    int offsetY = 0)
+    int offsetY = 0,
+    int minLeft = 24)
 {
-    const PlayerLayout l = playerLayout(windowW, windowH, offsetX, offsetY);
+    const PlayerLayout l = playerLayout(windowW, windowH, offsetX, offsetY, minLeft);
     if (drag == 3)
     {
         if (!down)
@@ -171,13 +177,14 @@ inline void RenderMusicPlayer(
     int mx,
     int my,
     int offsetX = 0,
-    int offsetY = 0)
+    int offsetY = 0,
+    int minLeft = 24)
 {
     static const CachedSprite sPrevSprite("ui_music_player.prev", SpriteKind::Frame);
     static const CachedSprite sNextSprite("ui_music_player.next", SpriteKind::Frame);
     static const CachedSprite sNoteSprite("ui_music_player.note", SpriteKind::Frame);
 
-    const PlayerLayout l = playerLayout(windowW, windowH, offsetX, offsetY);
+    const PlayerLayout l = playerLayout(windowW, windowH, offsetX, offsetY, minLeft);
     const bool touch = l.prev.h >= 72;
     renderer.FillRectScreen(l.name.x, l.name.y, l.name.w, l.name.h, col::PanelSunken);
     renderer.DrawRectScreen(l.name.x, l.name.y, l.name.w, l.name.h, col::Border);

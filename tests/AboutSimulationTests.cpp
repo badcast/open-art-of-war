@@ -212,6 +212,7 @@ int main()
                     SDL_DestroySurface(image);
                 }
                 const unsigned initialWorld = scene.WorldGeneration();
+                ok = scene.ProducingFactories(0) > 0 && scene.ProducingFactories(1) > 0 && ok;
                 advance(scene, 60);
                 ok = scene.ProducedUnits(0) > 0 && scene.ProducedUnits(1) > 0 && scene.DistinctProducedTypes() > 1
                      && ok;
@@ -244,7 +245,22 @@ int main()
             ok = capped.SimulationSeconds() <= 0.051f && ok;
             advance(capped, 59);
             ok = capped.InitialUnits(0) > 1 && capped.InitialUnits(1) > 1 && capped.ProducedUnits(0) == 0
-                 && capped.ProducedUnits(1) == 0 && ok;
+                 && capped.ProducedUnits(1) == 0 && capped.ProducingFactories(0) == 0
+                 && capped.ProducingFactories(1) == 0 && ok;
+        }
+        {
+            std::ofstream config(configPath);
+            config << "map: assets/maps/aboutmap.json\nmax_units: 500\nmax_units_per_type: 1\n"
+                      "production_speed_multiplier: 100\n";
+        }
+        {
+            AboutSimulation perTypeCapped;
+            ok = perTypeCapped.Start(textures, 960, 720, configPath.string()) && ok;
+            const int initialMax = perTypeCapped.MaxLivingUnitsOfAnyType();
+            advance(perTypeCapped, 120);
+            // Existing map units may already exceed 1 of a type, so production must not push any type higher
+            // above the cap (or above 1 if initially <= 1).
+            ok = perTypeCapped.MaxLivingUnitsOfAnyType() <= std::max(1, initialMax) && ok;
         }
         // Battle cue playback is separate from voices and announcer lines.
         {

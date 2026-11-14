@@ -746,13 +746,12 @@ void Renderer::DrawBuildingSpriteWorld(
             }
             else if (part->state == 10)
             {
-                // Offline / No-power indicator icon (Buildings 0, 6, 8, 12) centered on the building
+                // Static idle/unpowered roof part (e.g. radar dish / HQ hat) shown instead of the animated part
+                // while under construction or unpowered, at its authored (px, py) offset
                 bool needsPower = (buildingType != 5 && buildingType != 13);
                 if ((underConstruction || (!isPowered && needsPower)) && part->isComp == 1)
                 {
-                    const float centerX = worldX + (bdef->width * OpenArtOfWar::TILE_WIDTH * 0.5f);
-                    const float centerY = worldY + (bdef->height * OpenArtOfWar::TILE_HEIGHT * 0.5f);
-                    DrawCompositeCentered(part->child, centerX, centerY, camera, faction);
+                    DrawCompositeWorld(part->child, px, py, camera, faction);
                 }
             }
         }

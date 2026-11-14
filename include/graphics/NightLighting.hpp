@@ -75,7 +75,8 @@ public:
         bool gpu,
         const std::vector<EntityManager::LightSpot> &lights,
         int w,
-        int h);
+        int h,
+        float strength = 1.0f);
     void Shutdown();
     // The list of this frame's lights, kept between frames (no allocation each frame)
     std::vector<EntityManager::LightSpot> &Lights()
