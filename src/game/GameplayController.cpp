@@ -9,6 +9,8 @@
 #include "game/Sides.hpp"
 #include "core/Localization.hpp"
 #include "ui/HUDController.hpp"
+#include "ui/TouchHUD.hpp"
+#include "graphics/ShaderEffects.hpp"
 #include "ui/UiKit.hpp"
 #include "ui/MenuController.hpp"
 #include "input/InputManager.hpp"
@@ -99,9 +101,14 @@ bool IsLiveOwnUnit(const Entity *entity)
            && entity->owner == Players::Local();
 }
 
-constexpr int kGroupSlotWidth = 96;
-constexpr int kGroupSlotHeight = 62;
-constexpr int kGroupSlotGap = 6;
+// The column of control groups on the left of the map: "+" on top, the groups, "x" at the bottom
+constexpr int kGroupSlotWidth = 84;
+constexpr int kGroupSlotHeight = 52;
+constexpr int kGroupButtonHeight = 34;
+constexpr int kGroupGap = 4;
+constexpr int kGroupMargin = 8;
+constexpr int kGroupPlus = 100;  // GroupBarHit: the "+" button
+constexpr int kGroupMinus = 101; // GroupBarHit: the "x" button
 
 } // namespace
 
@@ -201,24 +208,7 @@ void GameplayController::HandleControlGroupKeys(InputManager &input, EntityManag
         if (ctrlHeld)
         {
             // Ctrl+N: the selected own units become group N (a unit belongs to one group at a time)
-            std::vector<int> units;
-            for (int unitId : m_selectedUnits)
-            {
-                if (IsLiveOwnUnit(entities.GetEntity(unitId)))
-                    units.push_back(unitId);
-            }
-            for (auto &group : m_groups)
-            {
-                group.unitIds.erase(
-                    std::remove_if(
-                        group.unitIds.begin(),
-                        group.unitIds.end(),
-                        [&](int unitId) { return std::find(units.begin(), units.end(), unitId) != units.end(); }),
-                    group.unitIds.end());
-            }
-            m_groups[groupIndex].unitIds = units;
-            m_groups[groupIndex].leaderId = 0;
-            PruneGroups(entities);
+            AssignGroup(groupIndex, entities);
         }
         else
         {
@@ -235,6 +225,127 @@ void GameplayController::HandleControlGroupKeys(InputManager &input, EntityManag
             SelectGroup(groupIndex, entities);
         }
     }
+}
+
+void GameplayController::AssignGroup(int groupIndex, EntityManager &entities)
+{
+    std::vector<int> units;
+    for (int unitId : m_selectedUnits)
+    {
+        if (IsLiveOwnUnit(entities.GetEntity(unitId)))
+            units.push_back(unitId);
+    }
+    for (auto &group : m_groups)
+    {
+        group.unitIds.erase(
+            std::remove_if(
+                group.unitIds.begin(),
+                group.unitIds.end(),
+                [&](int unitId) { return std::find(units.begin(), units.end(), unitId) != units.end(); }),
+            group.unitIds.end());
+    }
+    m_groups[groupIndex].unitIds = units;
+    m_groups[groupIndex].leaderId = 0;
+    m_activeGroup = units.empty() ? -1 : groupIndex;
+    PruneGroups(entities);
+}
+
+void GameplayController::DeleteGroup(int groupIndex)
+{
+    if (groupIndex < 0 || groupIndex >= static_cast<int>(m_groups.size()))
+        return;
+    m_groups[groupIndex] = ControlGroup {};
+    if (m_activeGroup == groupIndex)
+        m_activeGroup = -1;
+}
+
+int GameplayController::GroupToDelete() const
+{
+    const int selectedGroup = GroupOfUnits(m_selectedUnits);
+    if (selectedGroup >= 0)
+        return selectedGroup;
+    if (m_activeGroup >= 0 && m_activeGroup < static_cast<int>(m_groups.size())
+        && !m_groups[m_activeGroup].unitIds.empty())
+        return m_activeGroup;
+    return -1;
+}
+
+void GameplayController::PressGroupButton(int hit, EntityManager &entities)
+{
+    if (hit == kGroupPlus)
+    {
+        int freeIndex = -1;
+        for (int i = 0; i < static_cast<int>(m_groups.size()) && freeIndex < 0; ++i)
+            freeIndex = m_groups[i].unitIds.empty() ? i : -1;
+        bool anyOwn = false;
+        for (int unitId : m_selectedUnits)
+            anyOwn = anyOwn || IsLiveOwnUnit(entities.GetEntity(unitId));
+        if (freeIndex < 0 || !anyOwn)
+        {
+            SoundRequests::Play("ui_error");
+            return;
+        }
+        AssignGroup(freeIndex, entities);
+    }
+    else if (hit == kGroupMinus)
+    {
+        const int target = GroupToDelete();
+        if (target < 0)
+            SoundRequests::Play("ui_error");
+        else
+            DeleteGroup(target);
+    }
+}
+
+GameplayController::GroupColumn GameplayController::GroupColumnLayout(int mapViewWidth, int windowHeight) const
+{
+    (void) mapViewWidth;
+    GroupColumn col;
+    int count = 0;
+    for (const auto &group : m_groups)
+        count += group.unitIds.empty() ? 0 : 1;
+    const int top = 64, bottom = m_touchMode ? 230 : 24;
+    const float base = m_touchMode ? 1.25f : 1.0f;
+    // Only the touch interface has the "+" / "x" buttons (the PC one has the hotkeys, Ctrl+1..0), and only while
+    // there is a group or a selection to make one of; they are twice as big as the cards' unit
+    constexpr int kButtonFactor = 2;
+    col.buttons = m_touchMode && (count > 0 || m_ownUnitsSelected);
+    const int buttons = col.buttons ? 2 : 0;
+    const int gaps = std::max(0, count + buttons - 1);
+    const float needed = static_cast<float>(
+        buttons * kGroupButtonHeight * kButtonFactor + count * kGroupSlotHeight + gaps * kGroupGap);
+    const float avail = static_cast<float>(std::max(80, windowHeight - top - bottom));
+    const float scale = std::clamp(std::min(base, avail / needed), 0.55f, base);
+    auto px = [&](int v) { return std::max(1, static_cast<int>(std::lround(v * scale))); };
+    const int w = px(kGroupSlotWidth), slotH = px(kGroupSlotHeight), gap = px(kGroupGap);
+    const int buttonH = px(kGroupButtonHeight * kButtonFactor), buttonW = px(kGroupSlotWidth * kButtonFactor);
+    const int total = buttons * buttonH + count * slotH + gaps * gap;
+    int y = top + std::max(0, (static_cast<int>(avail) - total) / 2);
+    const int x = kGroupMargin;
+    col.scale = scale;
+    col.panel = {x, y, col.buttons ? std::max(w, buttonW) : (count > 0 ? w : 0), count + buttons > 0 ? total : 0};
+    if (col.buttons)
+    {
+        col.plus = {x, y, buttonW, buttonH};
+        y += buttonH + gap;
+    }
+    for (int i = 0; i < static_cast<int>(m_groups.size()); ++i)
+    {
+        if (m_groups[i].unitIds.empty())
+            continue;
+        col.slot[i] = {x, y, w, slotH};
+        col.has[i] = true;
+        y += slotH + gap;
+    }
+    if (col.buttons)
+        col.minus = {x, y, buttonW, buttonH};
+    return col;
+}
+
+SDL_Rect GameplayController::GroupPanelRect(int mapViewWidth, int windowHeight) const
+{
+    const GroupColumn col = GroupColumnLayout(mapViewWidth, windowHeight);
+    return col.panel;
 }
 
 int GameplayController::GroupOfUnits(const std::vector<int> &unitIds) const
@@ -396,21 +507,18 @@ void GameplayController::OrderAt(const std::vector<int> &units, float worldX, fl
 
 int GameplayController::GroupBarHit(int mouseX, int mouseY, int mapViewWidth, int windowHeight) const
 {
-    int count = 0;
-    for (const auto &group : m_groups)
-        count += group.unitIds.empty() ? 0 : 1;
-    if (count == 0)
-        return -1;
-    const int totalWidth = count * kGroupSlotWidth + (count - 1) * kGroupSlotGap;
-    int slotX = (mapViewWidth - totalWidth) / 2;
-    const int slotY = windowHeight - kGroupSlotHeight - 10;
-    for (int groupIndex = 0; groupIndex < static_cast<int>(m_groups.size()); ++groupIndex)
+    const GroupColumn col = GroupColumnLayout(mapViewWidth, windowHeight);
+    auto inside = [&](const SDL_Rect &r) {
+        return mouseX >= r.x && mouseX < r.x + r.w && mouseY >= r.y && mouseY < r.y + r.h;
+    };
+    if (col.buttons && inside(col.plus))
+        return kGroupPlus;
+    if (col.buttons && inside(col.minus))
+        return kGroupMinus;
+    for (int i = 0; i < static_cast<int>(m_groups.size()); ++i)
     {
-        if (m_groups[groupIndex].unitIds.empty())
-            continue;
-        if (mouseX >= slotX && mouseX < slotX + kGroupSlotWidth && mouseY >= slotY && mouseY < slotY + kGroupSlotHeight)
-            return groupIndex;
-        slotX += kGroupSlotWidth + kGroupSlotGap;
+        if (col.has[i] && inside(col.slot[i]))
+            return i;
     }
     return -1;
 }
@@ -493,30 +601,54 @@ void GameplayController::RenderGroupBar(
     int mouseX,
     int mouseY) const
 {
-    int count = 0;
-    for (const auto &group : m_groups)
-        count += group.unitIds.empty() ? 0 : 1;
-    if (count == 0)
-        return;
+    const GroupColumn col = GroupColumnLayout(mapViewWidth, windowHeight);
+    const float scale = col.scale;
+    const int colorIndex = Players::Slot(Players::Local()).color;
+    const SDL_Color army = colorIndex >= 1 ? ArmyColor(colorIndex) : ui::color::Accent;
+    auto plate = [&](const SDL_Rect &r, ui::ButtonStyle style, bool active, bool hovered, bool disabled) {
+        const TouchHUD::ButtonColors colors = TouchHUD::ResolveButtonColors(style, active, hovered, disabled, false, army);
+        renderer.FillRectScreen(r.x, r.y, r.w, r.h, colors.fill);
+        renderer.DrawRectScreen(r.x, r.y, r.w, r.h, colors.border);
+        if (active && !disabled && r.h > 4)
+            renderer.FillRectScreen(r.x + 1, r.y + r.h - 3, std::max(0, r.w - 2), 2, colors.activeBar);
+        return colors;
+    };
+    auto hoverOf = [&](const SDL_Rect &r) {
+        return mouseX >= r.x && mouseX < r.x + r.w && mouseY >= r.y && mouseY < r.y + r.h;
+    };
 
-    const int totalWidth = count * kGroupSlotWidth + (count - 1) * kGroupSlotGap;
-    int slotX = (mapViewWidth - totalWidth) / 2;
-    const int slotY = windowHeight - kGroupSlotHeight - 10;
-    const SDL_Color topColor {28, 70, 92, 235};
-    const SDL_Color bottomColor {12, 30, 44, 235};
-    const SDL_Color edgeColor {70, 150, 180, 255};
+    // "+": the selection becomes a new group (free when own units are selected and a slot is free)
+    if (col.buttons)
+    {
+        bool anyOwn = false;
+        for (int unitId : m_selectedUnits)
+            anyOwn = anyOwn || IsLiveOwnUnit(entities.GetEntity(unitId));
+        int groups = 0;
+        for (const auto &group : m_groups)
+            groups += group.unitIds.empty() ? 0 : 1;
+        const bool enabled = anyOwn && groups < static_cast<int>(m_groups.size());
+        const bool hovered = enabled && hoverOf(col.plus);
+        if (hovered)
+            SoundRequests::MarkHover();
+        const auto colors = plate(col.plus, ui::ButtonStyle::Secondary, false, hovered, !enabled);
+        const int arm = std::max(5, static_cast<int>(col.plus.h * 0.28f));
+        const int cx = col.plus.x + col.plus.w / 2, cy = col.plus.y + col.plus.h / 2;
+        const SDL_Color glyph = ui::WithAlpha(colors.iconTint, colors.iconAlpha);
+        renderer.FillRectScreen(cx - arm, cy - 1, 2 * arm + 1, 3, glyph);
+        renderer.FillRectScreen(cx - 1, cy - arm, 3, 2 * arm + 1, glyph);
+    }
 
     for (int groupIndex = 0; groupIndex < static_cast<int>(m_groups.size()); ++groupIndex)
     {
-        const ControlGroup &group = m_groups[groupIndex];
-        if (group.unitIds.empty())
+        if (!col.has[groupIndex])
             continue;
-        const ui::UiRect slot {slotX, slotY, kGroupSlotWidth, kGroupSlotHeight};
-        slotX += kGroupSlotWidth + kGroupSlotGap;
-
+        const ControlGroup &group = m_groups[groupIndex];
+        const SDL_Rect &slot = col.slot[groupIndex];
         const bool selected
             = (m_selectedUnits.size() == group.unitIds.size() && GroupOfUnits(m_selectedUnits) == groupIndex);
-        const bool hovered = slot.Contains(mouseX, mouseY);
+        const bool hovered = hoverOf(slot);
+        if (hovered)
+            SoundRequests::MarkHover();
         int leaderId = group.leaderId;
         bool marching = false;
         for (const auto &squad : m_sim.Squads(Players::Local()).GetSquads())
@@ -529,27 +661,28 @@ void GameplayController::RenderGroupBar(
                 break;
             }
         }
+        plate(slot, ui::ButtonStyle::Secondary, selected, hovered, false);
 
-        ui::FillVerticalGradient(renderer, slot, hovered ? ui::Mix(topColor, edgeColor, 0.25f) : topColor, bottomColor);
-        const Unit *leader = entities.GetUnit(leaderId);
-        if (leader)
+        renderer.SetClipRect({slot.x + 1, slot.y + 1, slot.w - 2, slot.h - 2});
+        if (const Unit *leader = entities.GetUnit(leaderId))
         {
-            int cameoCompId = UnitCameoCompId(leader->archetypeId);
+            const int cameoCompId = UnitCameoCompId(leader->archetypeId);
             if (cameoCompId >= 0)
                 renderer.SetDrawOwner(leader->owner);
             renderer.SetStructureFaction(leader->faction);
+            const float cameoScale = 0.72f * scale;
             renderer.DrawCompositeScreen(
-                cameoCompId, slot.x + (slot.w - 60) / 2 + 6, slot.y + 6, 1.0f, leader->faction);
+                cameoCompId, slot.x + static_cast<int>(3 * scale), slot.y + static_cast<int>(4 * scale), cameoScale, leader->faction);
             renderer.SetStructureFaction(Faction::Neutral);
             renderer.SetDrawOwner(kNoPlayer);
         }
+        renderer.ResetClipRect();
 
-        // Group health
+        // Group health along the bottom edge
         int totalHp = 0, totalMaxHp = 0;
         for (int unitId : group.unitIds)
         {
-            // A unit may have died since the groups were pruned at the start of the frame
-            const Entity *entity = entities.GetEntity(unitId);
+            const Entity *entity = entities.GetEntity(unitId); // a unit may have died since the groups were pruned
             if (!entity)
                 continue;
             totalHp += entity->currentHp;
@@ -558,46 +691,45 @@ void GameplayController::RenderGroupBar(
         const float hpRatio = totalMaxHp > 0 ? static_cast<float>(totalHp) / static_cast<float>(totalMaxHp) : 0.0f;
         const SDL_Color hpColor
             = hpRatio > 0.6f ? ui::color::Ok : (hpRatio > 0.3f ? ui::color::Accent : ui::color::Danger);
-        renderer.FillRectScreen(slot.x + 4, slot.Bottom() - 7, slot.w - 8, 3, {6, 10, 14, 220});
-        renderer.FillRectScreen(slot.x + 4, slot.Bottom() - 7, static_cast<int>((slot.w - 8) * hpRatio), 3, hpColor);
+        const int hpY = slot.y + slot.h - std::max(4, static_cast<int>(6 * scale));
+        renderer.FillRectScreen(slot.x + 3, hpY, slot.w - 6, 3, {8, 11, 16, 220});
+        renderer.FillRectScreen(slot.x + 3, hpY, static_cast<int>((slot.w - 6) * hpRatio), 3, hpColor);
 
-        // Key chip, unit count, march indicator
-        const std::string keyLabel = std::to_string((groupIndex + 1) % 10);
-        renderer.FillRectScreen(
-            slot.x + 3, slot.y + 3, 18, 18, selected ? ui::color::Accent : SDL_Color {8, 20, 30, 230});
+        // Key number (top right; blue-ish while marching) and the unit count
         font.DrawString(
-            keyLabel,
-            slot.x + 12,
-            slot.y + 12,
+            std::to_string((groupIndex + 1) % 10),
+            slot.x + slot.w - 7,
+            slot.y + static_cast<int>(11 * scale),
             ui::FONT_SMALL_BOLD,
-            selected ? ui::color::AccentText : ui::color::Text,
-            false,
-            Anchor::HCENTER | Anchor::VCENTER);
-        font.DrawString(
-            "\xC3\x97" + std::to_string(group.unitIds.size()),
-            slot.Right() - 6,
-            slot.Bottom() - 16,
-            ui::FONT_SMALL_BOLD,
-            ui::color::Text,
+            marching ? ui::color::Info : ui::color::White,
             true,
             Anchor::RIGHT | Anchor::VCENTER);
-        if (marching)
-        {
-            font.DrawString(
-                _("MARCH"),
-                slot.x + 6,
-                slot.Bottom() - 16,
-                ui::FONT_SMALL_BOLD,
-                ui::color::Info,
-                true,
-                Anchor::LEFT | Anchor::VCENTER);
-        }
+        font.DrawString(
+            "\xC3\x97" + std::to_string(group.unitIds.size()),
+            slot.x + slot.w - 5,
+            hpY - static_cast<int>(9 * scale),
+            ui::FONT_SMALL_BOLD,
+            ui::WithAlpha(ui::color::White, 235),
+            true,
+            Anchor::RIGHT | Anchor::VCENTER);
+    }
 
-        SDL_Color borderColor = selected ? ui::color::Accent : (hovered ? edgeColor : SDL_Color {40, 90, 112, 255});
-        renderer.DrawRectScreen(slot.x, slot.y, slot.w, slot.h, borderColor);
-        if (selected)
-            renderer.DrawRectScreen(
-                slot.x + 1, slot.y + 1, slot.w - 2, slot.h - 2, ui::WithAlpha(ui::color::Accent, 110));
+    // "x": deletes the selected group (the last one picked when the selection is no group)
+    if (col.buttons)
+    {
+        const bool enabled = GroupToDelete() >= 0;
+        const bool hovered = enabled && hoverOf(col.minus);
+        if (hovered)
+            SoundRequests::MarkHover();
+        const auto colors = plate(col.minus, ui::ButtonStyle::Danger, false, hovered, !enabled);
+        const int arm = std::max(4, static_cast<int>(col.minus.h * 0.22f));
+        const int cx = col.minus.x + col.minus.w / 2, cy = col.minus.y + col.minus.h / 2;
+        const SDL_Color glyph = ui::WithAlpha(colors.iconTint, enabled ? 235 : 130);
+        for (int k = -1; k <= 1; ++k)
+        {
+            renderer.DrawLineScreen(cx - arm + k, cy - arm, cx + arm + k, cy + arm, glyph);
+            renderer.DrawLineScreen(cx - arm + k, cy + arm, cx + arm + k, cy - arm, glyph);
+        }
     }
 }
 
@@ -638,6 +770,9 @@ void GameplayController::Update(const FrameContext &context)
     if (mission.GetLoadSerial() != m_missionSerial)
         ResetForMission(mission, hud, entities, map);
     PruneGroups(entities);
+    m_ownUnitsSelected = false;
+    for (int unitId : m_selectedUnits)
+        m_ownUnitsSelected = m_ownUnitsSelected || IsLiveOwnUnit(entities.GetEntity(unitId));
 
     // Replicas skip SimulationStep, so keep HUD timers, primary producers, and replicated events updated here.
     auto updateReplicaHud = [&]() {
@@ -759,7 +894,15 @@ void GameplayController::Update(const FrameContext &context)
         if (groupSlot >= 0)
         {
             if (leftClicked)
-                SelectGroup(groupSlot, entities);
+            {
+                if (groupSlot >= kGroupPlus)
+                    PressGroupButton(groupSlot, entities);
+                else
+                {
+                    SelectGroup(groupSlot, entities);
+                    m_activeGroup = groupSlot;
+                }
+            }
             mapInputConsumed = true;
             input.CancelSelectionBox();
         }
@@ -1195,7 +1338,7 @@ void GameplayController::Update(const FrameContext &context)
                 const bool isSecondRallyTap = !m_touchRallyBuildings.empty() && nowTicks - m_touchRallyTicks < 450
                                               && std::abs(mouseX - m_touchRallyX) <= 40
                                               && std::abs(mouseY - m_touchRallyY) <= 40;
-                if (isSecondRallyTap && m_selectedUnits.empty())
+                if (isSecondRallyTap)
                 {
                     SimCommand command = Command(CommandType::SetRally);
                     for (int unitId : m_touchRallyBuildings)
@@ -1216,12 +1359,12 @@ void GameplayController::Update(const FrameContext &context)
                     }
                     m_touchRallyBuildings.clear();
                     m_touchRallyTicks = 0;
-                    touchOrdered = true;
+                    touchOrdered = true; // the building stays selected: its focus is kept
                 }
                 else if (!m_selectedUnits.empty())
                 {
-                    // 1st tap anywhere on the map resets building focus, and remembers unit-producing
-                    // building(s) so a 2nd tap at the same spot sets their rally point.
+                    // 1st tap on the map remembers the selected unit-producing building(s) so that a 2nd tap at the
+                    // same spot sets their rally point; the focus stays on them.
                     m_touchRallyBuildings.clear();
                     for (int unitId : m_selectedUnits)
                     {
@@ -1236,12 +1379,17 @@ void GameplayController::Update(const FrameContext &context)
                     m_touchRallyTicks = m_touchRallyBuildings.empty() ? 0 : nowTicks;
                     m_touchRallyX = mouseX;
                     m_touchRallyY = mouseY;
-                    for (int unitId : m_selectedUnits)
+                    // A Barracks / Factory in focus keeps it on a single tap (a second tap there sets its rally
+                    // point); any other selection ends here
+                    if (m_touchRallyBuildings.empty())
                     {
-                        if (Entity *e = entities.GetEntity(unitId))
-                            e->selected = false;
+                        for (int unitId : m_selectedUnits)
+                        {
+                            if (Entity *e = entities.GetEntity(unitId))
+                                e->selected = false;
+                        }
+                        m_selectedUnits.clear();
                     }
-                    m_selectedUnits.clear();
                     touchOrdered = true;
                 }
             }

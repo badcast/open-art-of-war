@@ -183,10 +183,40 @@ void DrawPanelFrame(Renderer &r, const UiRect &rect, SDL_Color border)
         r.DrawRectScreen(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, WithAlpha(color::PanelSunken, border.a));
 }
 
+namespace
+{
+bool g_flatSkin = false;
+const SDL_Color kSlate {12, 16, 22, 255};
+const SDL_Color kSlateRim {160, 172, 190, 255};
+} // namespace
+
+void SetFlatSkin(bool on)
+{
+    g_flatSkin = on;
+}
+
+bool FlatSkin()
+{
+    return g_flatSkin;
+}
+
 void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill, SDL_Color border)
 {
     if (rect.w <= 0 || rect.h <= 0)
         return;
+    if (g_flatSkin)
+    {
+        if (fill.a > 0)
+        {
+            SDL_Color flat = Mix(kSlate, fill, 0.22f);
+            flat.a = fill.a;
+            r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, flat);
+        }
+        SDL_Color rim = Mix(kSlateRim, border, 0.25f);
+        rim.a = 150;
+        r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, rim);
+        return;
+    }
     if (fill.a > 0)
         r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
     DrawPanelFrame(r, rect, border);
@@ -203,6 +233,25 @@ void DrawTab(
 {
     if (rect.w <= 0 || rect.h <= 0)
         return;
+
+    if (g_flatSkin)
+    {
+        SDL_Color fill = active ? Mix(kSlate, accent, 0.42f) : Mix(kSlate, accent, hovered ? 0.22f : 0.08f);
+        fill.a = active ? 224 : (hovered ? 215 : 195);
+        SDL_Color rim = Mix(accent, color::White, active ? 0.50f : (hovered ? 0.55f : 0.30f));
+        rim.a = active ? 245 : (hovered ? 240 : 190);
+        r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
+        r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, rim);
+        if (active && rect.h > 4)
+            r.FillRectScreen(rect.x + 1, rect.Bottom() - 3, std::max(0, rect.w - 2), 2, WithAlpha(Mix(accent, color::White, 0.65f), 245));
+        if (font && !label.empty())
+        {
+            const std::string drawn = FitText(*font, label, FONT_BODY_BOLD, std::max(0, rect.w - 16));
+            font->DrawString(
+                drawn, rect.CenterX(), rect.CenterY(), FONT_BODY_BOLD, color::White, true, Anchor::HCENTER | Anchor::VCENTER);
+        }
+        return;
+    }
 
     const SDL_Color topFill = active
                                   ? Mix(color::PanelRaised, accent, 0.38f)
@@ -450,6 +499,39 @@ void DrawButton(
         border = Mix(color::Border, color::AccentDeep, 0.28f);
         corners = WithAlpha(color::Accent, 76);
         text = Mix(color::TextDim, color::TextMuted, 0.45f);
+    }
+
+    if (g_flatSkin && style != ButtonStyle::Ghost)
+    {
+        // The touch interface's plates: the army colour darkened for the fill, lightened for the rim
+        const SDL_Color army = color::Accent;
+        const float luma = 0.299f * army.r + 0.587f * army.g + 0.114f * army.b;
+        const SDL_Color rich = luma > 165.0f ? Mix(army, color::PanelSunken, 0.32f) : army;
+        SDL_Color fill, rim;
+        if (!enabled)
+        {
+            fill = WithAlpha(Mix(rich, color::PanelSunken, 0.72f), 140);
+            rim = WithAlpha(Mix(rich, color::Border, 0.50f), 140);
+        }
+        else if (style == ButtonStyle::Danger)
+        {
+            fill = hovered ? SDL_Color {186, 42, 34, 224} : SDL_Color {142, 34, 28, 200};
+            rim = hovered ? SDL_Color {255, 118, 106, 242} : SDL_Color {226, 86, 76, 215};
+        }
+        else if (style == ButtonStyle::Primary)
+        {
+            fill = WithAlpha(hovered ? Mix(rich, color::White, 0.14f) : Mix(rich, color::PanelSunken, 0.10f), 224);
+            rim = WithAlpha(Mix(army, color::White, hovered ? 0.72f : 0.50f), 245);
+        }
+        else
+        {
+            fill = WithAlpha(Mix(rich, color::PanelSunken, hovered ? 0.24f : 0.42f), hovered ? 215 : 195);
+            rim = WithAlpha(Mix(army, color::White, hovered ? 0.55f : 0.35f), hovered ? 240 : 215);
+        }
+        topFill = botFill = fill;
+        border = rim;
+        corners = {0, 0, 0, 0};
+        text = enabled ? WithAlpha(color::White, 240) : WithAlpha(color::White, 130);
     }
 
     DrawButtonChrome(r, rect, topFill, botFill, border, accentBar, corners, opacity, false);

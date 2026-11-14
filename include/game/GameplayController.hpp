@@ -3,6 +3,7 @@
 #include "core/Config.hpp"
 #include "core/FrameContext.hpp"
 #include "game/Simulation.hpp"
+#include <SDL3/SDL_rect.h>
 #include <array>
 #include <memory>
 #include <cstdint>
@@ -154,7 +155,10 @@ public:
     }
     // The computer player of a match in that slot, null when the slot is a person's (or empty)
     const AIController *MatchAi(PlayerId player) const;
-    // Bar of the non-empty control groups at the bottom of the map view
+    // The column of the control groups, left of the map, centred: "+" over it, "x" under it (screen rect, to keep
+    // touch panning off it)
+    SDL_Rect GroupPanelRect(int mapViewW, int windowH) const;
+    // The column of the non-empty control groups with its "+" / "x" buttons
     void RenderGroupBar(
         Renderer &renderer,
         BitmapFontRenderer &font,
@@ -191,6 +195,22 @@ private:
 
     void PruneGroups(const EntityManager &entities);
     void SelectGroup(int index, EntityManager &entities);
+    // The selected own units become group `index` (a unit belongs to one group at a time)
+    void AssignGroup(int index, EntityManager &entities);
+    void DeleteGroup(int index);
+    // The group the "x" button deletes: the one the selection is, else the last one picked; -1 when none
+    int GroupToDelete() const;
+    // hit: kGroupPlus / kGroupMinus of GroupBarHit
+    void PressGroupButton(int hit, EntityManager &entities);
+    struct GroupColumn
+    {
+        SDL_Rect panel {0, 0, 0, 0}, plus {0, 0, 0, 0}, minus {0, 0, 0, 0};
+        std::array<SDL_Rect, 10> slot {};
+        std::array<bool, 10> has {};
+        float scale {1.0f};
+        bool buttons {false}; // "+" / "x" are shown (touch, with a group or a selection)
+    };
+    GroupColumn GroupColumnLayout(int mapViewW, int windowH) const;
     // The unit or building under a map point; the tactical view picks with a tolerance that is constant on the screen
     int PickAt(const EntityManager &entities, const Camera &camera, const HUDController &hud, float wx, float wy) const;
     void HandleControlGroupKeys(InputManager &input, EntityManager &entities, Camera &camera);
@@ -216,6 +236,8 @@ private:
     int m_pendingDialogId {0}; // campaign dialogue still to open (MissionDialogs id), 0 = none
     float m_dialogTimer {0.0f};
     int m_lastGroupKey {-1};
+    bool m_ownUnitsSelected {false}; // own units are selected (the "+" button shows)
+    int m_activeGroup {-1}; // the group picked last (what the "x" button deletes when the selection is no group)
     std::uint64_t m_lastGroupTicks {0};
     int m_lastClickId {0};
     bool m_touchMode {false};

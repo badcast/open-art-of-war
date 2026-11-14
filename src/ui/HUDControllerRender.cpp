@@ -773,15 +773,25 @@ void HUDController::RenderGameHud(
     const std::vector<int> &selected)
 {
     SidebarLayout layout = sidebarLayout(windowWidth, windowHeight, m_topInset, !m_observer && m_speedEnabled);
+    const ui::FlatSkinScope flatSkin; // the sidebar wears the look of the touch interface
 
     // Frame
-    ui::DrawPanel(renderer, layout.panel, col::Panel, col::BorderStrong);
+    {
+        // The background of the sidebar is a dark shade of the army colour
+        const int colorIndex = Players::Slot(Players::Local()).color;
+        const SDL_Color army = colorIndex >= 1 ? ArmyColor(colorIndex) : col::Accent;
+        const SDL_Color tint {
+            static_cast<Uint8>(army.r * 0.20f + 8), static_cast<Uint8>(army.g * 0.20f + 8),
+            static_cast<Uint8>(army.b * 0.20f + 8), 245};
+        renderer.FillRectScreen(layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h, tint);
+        ui::DrawPanel(renderer, layout.panel, {0, 0, 0, 0}, col::BorderStrong);
+    }
 
     // --- Header: credits & power ---------------------------------------------------------
     {
         const UiRect &headerRect = layout.header;
         std::string credits = "$ " + std::to_string(economy.GetCredits());
-        fontRenderer.DrawString(credits, headerRect.x, headerRect.y - 2, ui::FONT_H2, col::Accent, true);
+        fontRenderer.DrawString(credits, headerRect.x, headerRect.y - 2, ui::FONT_H2, col::White, true);
 
         int powerProduced = economy.GetPowerProduced();
         int powerConsumed = economy.GetPowerConsumed();

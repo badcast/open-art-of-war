@@ -106,6 +106,26 @@ SDL_Color Mix(SDL_Color a, SDL_Color b, float t);
 void FillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Color bottom);
 void FillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right);
 
+// Flat "slate" skin of the in-game HUD, the look of the touch interface: flat dark plates, a pale rim and the army
+// colour for buttons, tabs and the active bar. Panels, tabs and buttons drawn while it is on use it.
+void SetFlatSkin(bool on);
+bool FlatSkin();
+struct FlatSkinScope
+{
+    bool previous;
+    FlatSkinScope()
+        : previous(FlatSkin())
+    {
+        SetFlatSkin(true);
+    }
+    ~FlatSkinScope()
+    {
+        SetFlatSkin(previous);
+    }
+    FlatSkinScope(const FlatSkinScope &) = delete;
+    FlatSkinScope &operator=(const FlatSkinScope &) = delete;
+};
+
 // Panel chrome backed by sprite_dialog_items borders/corners/fill (with flat fallback if sheets aren't loaded)
 void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill = color::Panel, SDL_Color border = color::Border);
 

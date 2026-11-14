@@ -1020,7 +1020,12 @@ void Application::HandleEvents()
         m_input->SetTouchPan(m_hudController->TouchPansCamera());
         m_input->SetTouchPlacementGhost(m_hudController->TouchPlacementGhost());
         m_input->SetTouchScrollPanel(m_hudController->TouchScrollPanel(m_windowW, m_windowH));
-        m_input->SetTouchUiRects(m_hudController->TouchPanels(m_windowW, m_windowH));
+        {
+            std::vector<SDL_Rect> panels = m_hudController->TouchPanels(m_windowW, m_windowH);
+            if (m_gameplayController) // the control group column keeps the one-finger pan off it
+                panels.push_back(m_gameplayController->GroupPanelRect(m_camera->GetViewportWidth(), m_windowH));
+            m_input->SetTouchUiRects(panels);
+        }
     }
     const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
     m_input->SetMenuOpen(
