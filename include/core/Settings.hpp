@@ -28,7 +28,7 @@ enum class SettingsArea
 struct Settings
 {
     // Video
-    WindowMode windowMode {WindowMode::Windowed};
+    WindowMode windowMode {WindowMode::Borderless};
     int windowW {1280};
     int windowH {720};
     int fullscreenW {1920}; // display mode of the exclusive fullscreen

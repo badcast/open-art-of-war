@@ -295,6 +295,7 @@ private:
     float m_glowStrength {0.0f};
     int m_structureTeam {0}; // see setStructureFaction
     bool m_showShadows {true};
+    bool ShouldSkipShadow(int page) const;
     std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
     mutable std::unordered_map<int, std::array<float, 5>> m_compBoundsCache; // GetCompositeBounds cache: {valid, minX, minY, maxX, maxY}
     std::vector<bool> m_tintedSheet; // images whose colour mod carries an army colour right now

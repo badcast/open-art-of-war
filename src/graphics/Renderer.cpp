@@ -179,6 +179,14 @@ void Renderer::Present()
     SDL_RenderPresent(m_renderer);
 }
 
+bool Renderer::ShouldSkipShadow(int page) const
+{
+    if (m_showShadows)
+        return false;
+    const int shadowPage = Sprites().ImageOf("shared_shadows");
+    return shadowPage >= 0 && page == shadowPage;
+}
+
 void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, const Camera &camera, Faction faction)
 {
     if (!m_texManager)
@@ -186,7 +194,7 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
     const auto *frame = m_texManager->GetSpriteFrame(spriteId);
     if (!frame || frame->width <= 0 || frame->height <= 0 || frame->srcW <= 0 || frame->srcH <= 0)
         return;
-    if (!m_showShadows && frame->page == Sprites().ImageOf("shared_shadows"))
+    if (ShouldSkipShadow(frame->page))
         return;
 
     // The Resistance draws from its own image of the object where there is one
@@ -432,7 +440,7 @@ void Renderer::RenderCompositePartsRotated(
             const auto *sf = tm->GetSpriteFrame(part->child);
             if (!sf || sf->srcW <= 0 || sf->srcH <= 0)
                 continue;
-            if (!m_showShadows && sf->page == Sprites().ImageOf("shared_shadows"))
+            if (ShouldSkipShadow(sf->page))
                 continue;
             int page = faction == Faction::Resistance ? tm->ResistancePage(sf->page) : sf->page;
             SDL_Texture *sheet = BindSheet(page, faction, sf->recolor);
@@ -484,6 +492,8 @@ void Renderer::DrawAnimSequenceWorldRotated(
         float baseOy = static_cast<float>(f->oy);
         const auto *sf = m_texManager->GetSpriteFrame(f->child);
         if (!sf || sf->srcW <= 0 || sf->srcH <= 0)
+            return;
+        if (ShouldSkipShadow(sf->page))
             return;
         int page = faction == Faction::Resistance ? m_texManager->ResistancePage(sf->page) : sf->page;
         SDL_Texture *sheet = BindSheet(page, faction, sf->recolor);
