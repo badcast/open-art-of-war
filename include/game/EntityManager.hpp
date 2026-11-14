@@ -631,7 +631,7 @@ public:
         Render(renderer, camera, map, fogEnabled, globalAnimTick, debugMode, showAllHealth);
     }
     // What shines: projectiles and explosions (the glow pass of the shader effects draws them once more)
-    void RenderEmissive(Renderer &renderer, const Camera &camera) const;
+    void RenderEmissive(Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled) const;
     // What lights up its surroundings at night (explosions, flames, rockets and shells in flight, buildings), in
     // world pixels: only those in sight when `fog` is on. How far and how bright: NightLighting (data/nights.json).
     // Drawing only

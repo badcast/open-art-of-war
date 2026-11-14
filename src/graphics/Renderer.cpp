@@ -725,11 +725,13 @@ void Renderer::DrawBuildingSpriteWorld(
             }
             else if (part->state == 10)
             {
-                // Offline / No-power indicator icon (Buildings 0, 6, 8, 12)
+                // Offline / No-power indicator icon (Buildings 0, 6, 8, 12) centered on the building
                 bool needsPower = (buildingType != 5 && buildingType != 13);
                 if ((underConstruction || (!isPowered && needsPower)) && part->isComp == 1)
                 {
-                    DrawCompositeWorld(part->child, px, py, camera, faction);
+                    const float centerX = worldX + (bdef->width * OpenArtOfWar::TILE_WIDTH * 0.5f);
+                    const float centerY = worldY + (bdef->height * OpenArtOfWar::TILE_HEIGHT * 0.5f);
+                    DrawCompositeCentered(part->child, centerX, centerY, camera, faction);
                 }
             }
         }

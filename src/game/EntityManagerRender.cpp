@@ -450,8 +450,7 @@ void EntityManager::Render(
                 hpRatio,
                 b->turretFacing,
                 isAttacking,
-                // (an opponent's missing power is not shown: no offline sign, its parts keep working)
-                b->isPowered || Players::Hostile(b->owner, Players::Local()));
+                b->isPowered);
             renderer.SetDrawOwner(b->owner);
             renderer.DrawBuildingWorld(
                 btype,
@@ -466,8 +465,7 @@ void EntityManager::Render(
                 hpRatio,
                 b->turretFacing,
                 isAttacking,
-                // (an opponent's missing power is not shown: no offline sign, its parts keep working)
-                b->isPowered || Players::Hostile(b->owner, Players::Local()));
+                b->isPowered);
             renderer.SetAnimatedPartsVisible(true);
             renderer.SetSpriteGlow({255, 255, 255, 255}, 0.0f);
         }
@@ -556,12 +554,16 @@ void EntityManager::Render(
     {
         if (!puff.active)
             continue;
+        if (fogEnabled
+            && map.GetFogState(static_cast<int>(puff.x / TILE_WIDTH), static_cast<int>(puff.y / TILE_HEIGHT))
+                   != FogState::Visible)
+            continue;
         int frame = static_cast<int>((puff.lifetime / puff.maxLifetime) * 6.0f);
         renderer.DrawSmokePuffWorld(frame, puff.x, puff.y, camera);
     }
 
     // 5..6. Projectiles and explosions (drawn again by the glow pass of the shader effects)
-    RenderEmissive(renderer, camera);
+    RenderEmissive(renderer, camera, map, fogEnabled);
 }
 
 void EntityManager::CollectLights(const TileMap &map, bool fog, std::vector<LightSpot> &out) const
@@ -632,8 +634,15 @@ void EntityManager::CollectLights(const TileMap &map, bool fog, std::vector<Ligh
     }
 }
 
-void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) const
+void EntityManager::RenderEmissive(
+    Renderer &renderer, const Camera &camera, const TileMap &map, bool fogEnabled) const
 {
+    auto seen = [&](float x, float y) {
+        return !fogEnabled
+               || map.GetFogState(static_cast<int>(x / TILE_WIDTH), static_cast<int>(y / TILE_HEIGHT))
+                      == FogState::Visible;
+    };
+
     // Projectiles
     for (const auto &proj : m_projectiles)
     {
@@ -648,6 +657,8 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
             px = proj.prevRenderX + (px - proj.prevRenderX) * m_renderAlpha;
             py = proj.prevRenderY + (py - proj.prevRenderY) * m_renderAlpha;
         }
+        if (!seen(px, py))
+            continue;
         renderer.SetDrawOwner(proj.owner);
         renderer.DrawProjectileWorld(
             spec.sprite,
@@ -662,6 +673,8 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
     // Flamethrower jets: the 12 frames of the flame over the jet's time
     for (const auto &burst : m_flameBursts)
     {
+        if (!seen(burst.startX, burst.startY) && !seen(burst.targetX, burst.targetY))
+            continue;
         const float angle = DetMath::Atan2(burst.targetY - burst.startY, burst.targetX - burst.startX);
         const float prog = burst.duration > 0.0f ? std::clamp(burst.age / burst.duration, 0.0f, 1.0f) : 1.0f;
         const int flameFrame = std::clamp(static_cast<int>(prog * 11.0f), 0, 11);
@@ -675,7 +688,7 @@ void EntityManager::RenderEmissive(Renderer &renderer, const Camera &camera) con
     renderer.SetDrawOwner(kNoPlayer);
     for (const auto &exp : m_explosions)
     {
-        if (!exp.active || exp.delay > 0.0f)
+        if (!exp.active || exp.delay > 0.0f || !seen(exp.x, exp.y))
             continue;
         float ox = 0.0f, oy = 0.0f;
         ExplosionCentering(exp.animId, ox, oy);

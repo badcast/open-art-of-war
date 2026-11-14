@@ -1819,7 +1819,7 @@ void Application::Render()
             {
                 const Camera glowCam = m_camera->ScaledDown(kGlowDivisor);
                 m_effects->BeginGlow(glowCam.GetViewportWidth(), glowCam.GetViewportHeight());
-                m_entities->RenderEmissive(*m_renderer, glowCam);
+                m_entities->RenderEmissive(*m_renderer, glowCam, *m_map, !disableFog);
                 m_effects->EndGlow();
             }
             SDL_SetRenderTarget(m_sdlRenderer, nullptr);
