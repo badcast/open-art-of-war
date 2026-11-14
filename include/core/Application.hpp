@@ -5,6 +5,7 @@
 #include "core/Config.hpp"
 #include "core/EnvironmentConfig.hpp"
 #include "core/FrameContext.hpp"
+#include "core/ResourceManager.hpp"
 #include "ui/MapPreview.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Settings.hpp"
@@ -398,6 +399,7 @@ private:
         std::string input;
         std::vector<Notice> lines; // received messages, shown for a while
     } m_gameChat;
+    std::unique_ptr<ResourceManager> m_resourceManager;
     std::unique_ptr<TextureManager> m_texManager;
     std::unique_ptr<Renderer> m_renderer;
     std::unique_ptr<Camera> m_camera;

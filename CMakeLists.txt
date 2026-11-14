@@ -114,6 +114,7 @@ set(ENGINE_SOURCES
     src/core/ApplicationOverlays.cpp
     src/core/Localization.cpp
     src/core/AssetStore.cpp
+    src/core/ResourceManager.cpp
     src/core/Mods.cpp
     src/core/Sha256.cpp
     src/core/LoaderResources.cpp
@@ -622,3 +623,10 @@ set_target_properties(openaow-mods-tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 add_test(NAME openaow-mods-tests COMMAND openaow-mods-tests)
+
+add_executable(openaow-resource-cache-tests tests/ResourceCacheTests.cpp)
+target_link_libraries(openaow-resource-cache-tests PRIVATE openaow-core)
+set_target_properties(openaow-resource-cache-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-resource-cache-tests COMMAND openaow-resource-cache-tests)

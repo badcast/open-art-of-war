@@ -1,5 +1,6 @@
 #include "ui/MapPreview.hpp"
 #include "core/AssetStore.hpp"
+#include "core/ResourceManager.hpp"
 #include "game/TileCollision.hpp"
 #include "graphics/TextureManager.hpp"
 #include <algorithm>
@@ -10,17 +11,32 @@ namespace OpenArtOfWar
 
 MapPreview::~MapPreview()
 {
+    BindResourceManager(nullptr);
     Clear();
+}
+
+void MapPreview::BindResourceManager(ResourceManager *manager, std::string cacheName)
+{
+    if (m_resourceManager)
+        m_resourceManager->UnregisterCache(m_cacheName);
+    m_resourceManager = manager;
+    m_cacheName = std::move(cacheName);
+    if (!m_resourceManager)
+        return;
+
+    m_resourceManager->RegisterCache(
+        m_cacheName,
+        [this](std::uint64_t nowMs, bool forceAllUnpinned) {
+            return m_cache.EvictUnused(nowMs, forceAllUnpinned ? 0 : 30000, 32 * 1024 * 1024);
+        },
+        [this]() {
+            return m_cache.Stats();
+        });
 }
 
 void MapPreview::Clear()
 {
-    for (auto &[key, entry] : m_cache)
-    {
-        if (entry.texture)
-            SDL_DestroyTexture(entry.texture);
-    }
-    m_cache.clear();
+    m_cache.Clear();
 }
 
 SDL_Texture *MapPreview::Get(
@@ -32,15 +48,16 @@ SDL_Texture *MapPreview::Get(
     int &width,
     int &height)
 {
-    const auto cached = m_cache.find(key);
-    if (cached != m_cache.end())
+    const std::uint64_t nowMs = SDL_GetTicks();
+    if (Entry *cached = m_cache.Find(key, nowMs))
     {
-        width = cached->second.width;
-        height = cached->second.height;
-        return cached->second.texture;
+        width = cached->width;
+        height = cached->height;
+        return cached->texture;
     }
 
-    Entry entry;
+    auto entry = std::make_unique<Entry>();
+    std::size_t bytes = 0;
     std::string text;
     nlohmann::json doc;
     if (Assets::ReadText(mapPath, text))
@@ -97,18 +114,22 @@ SDL_Texture *MapPreview::Get(
                 }
             }
 
-            entry.texture = SDL_CreateTextureFromSurface(renderer, surface);
-            if (entry.texture)
-                SDL_SetTextureScaleMode(entry.texture, SDL_SCALEMODE_NEAREST);
-            entry.width = w;
-            entry.height = h;
+            entry->texture = SDL_CreateTextureFromSurface(renderer, surface);
+            if (entry->texture)
+            {
+                SDL_SetTextureScaleMode(entry->texture, SDL_SCALEMODE_NEAREST);
+                bytes = static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 4;
+            }
+            entry->width = w;
+            entry->height = h;
             SDL_DestroySurface(surface);
         }
     }
-    m_cache.insert_or_assign(std::string(key), entry);
-    width = entry.width;
-    height = entry.height;
-    return entry.texture;
+    width = entry->width;
+    height = entry->height;
+    SDL_Texture *tex = entry->texture;
+    m_cache.Insert(key, std::move(entry), bytes, nowMs);
+    return tex;
 }
 
 } // namespace OpenArtOfWar

@@ -241,7 +241,10 @@ bool Application::Init(int windowWidth, int windowHeight)
         if (Assets::ReadText(LoaderResources::UiTheme(), uiText))
             ui::LoadTheme(uiText);
     }
+    m_resourceManager = std::make_unique<ResourceManager>();
     m_texManager = std::make_unique<TextureManager>(m_sdlRenderer);
+    m_texManager->BindResourceManager(m_resourceManager.get());
+    m_loadingPreview.BindResourceManager(m_resourceManager.get(), "loading_preview");
     m_renderer = std::make_unique<Renderer>(m_sdlRenderer, m_texManager.get());
     {
         // Font files from assets/main.yaml, their sizes from section "font" of game_environment.yaml
@@ -260,6 +263,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     // Initialize core subsystems
     ShowLoading(_("Loading graphics..."), 0.12f);
     m_texManager->LoadAllAssets();
+    m_texManager->PinUiCommon();
     ShowLoading(_("Preparing the renderer..."), 0.55f);
     m_effects = std::make_unique<ShaderEffects>();
     if (!m_headless)
@@ -430,7 +434,13 @@ void Application::Shutdown()
         m_lowResTarget = nullptr;
     }
     if (m_texManager)
+    {
         m_texManager->Cleanup();
+        m_texManager->BindResourceManager(nullptr);
+    }
+    m_loadingPreview.Clear();
+    m_loadingPreview.BindResourceManager(nullptr);
+    m_resourceManager.reset();
 
     if (m_sdlRenderer)
     {
@@ -580,6 +590,8 @@ void Application::Run()
         }
 
         HandleEvents();
+        if (m_resourceManager)
+            m_resourceManager->Tick(SDL_GetTicks());
         // One clock for all network timing: SDL ticks, the same the lobby's Start button uses (epoch
         // milliseconds here made a host started from the menu close thousands of turns at once)
         UpdateNetwork(static_cast<std::uint32_t>(SDL_GetTicks()));
@@ -2039,7 +2051,8 @@ void Application::Render()
     // Debug Overlay (Dear ImGui)
     if (m_debug)
     {
-        m_debug->render(*m_map, *m_entities, *m_economy, *m_mission, *m_sound, *m_camera, *m_aiController, m_fps);
+        m_debug->render(
+            *m_map, *m_entities, *m_economy, *m_mission, *m_sound, *m_camera, *m_aiController, m_fps, m_resourceManager.get());
     }
 #endif
 

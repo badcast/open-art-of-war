@@ -1,6 +1,7 @@
 #if defined(AOW_DEBUG)
 
 #include "debug/DebugOverlay.hpp"
+#include "core/ResourceManager.hpp"
 #include "game/Players.hpp"
 #include "game/TileMap.hpp"
 #include "game/EntityManager.hpp"
@@ -41,7 +42,8 @@ void DebugOverlay::Render(
     SoundEngine &sound,
     Camera &camera,
     AIController &ai,
-    float fps)
+    float fps,
+    ResourceManager *resources)
 {
     if (!m_visible)
         return;
@@ -150,6 +152,32 @@ void DebugOverlay::Render(
         if (ImGui::CollapsingHeader("AI Control & Thoughts", ImGuiTreeNodeFlags_DefaultOpen))
         {
             RenderAiPanel(ai, entities);
+        }
+
+        if (resources && ImGui::CollapsingHeader("Resources (Asset Cache)", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const ResourceCacheStats total = resources->GetTotalStats();
+            ImGui::Text(
+                "Total: %zu entries (%zu pinned) | %.2f MB | Evicted: %llu",
+                total.entryCount,
+                total.pinnedCount,
+                static_cast<double>(total.totalBytes) / (1024.0 * 1024.0),
+                static_cast<unsigned long long>(total.evictions));
+            if (ImGui::Button("Unload Unused Now"))
+            {
+                resources->UnloadUnusedNow(SDL_GetTicks());
+            }
+            for (const auto &entry : resources->GetAllStats())
+            {
+                ImGui::BulletText(
+                    "%s: %zu (%zu pinned), %.2f MB, hits %llu / misses %llu",
+                    entry.name.c_str(),
+                    entry.stats.entryCount,
+                    entry.stats.pinnedCount,
+                    static_cast<double>(entry.stats.totalBytes) / (1024.0 * 1024.0),
+                    static_cast<unsigned long long>(entry.stats.hits),
+                    static_cast<unsigned long long>(entry.stats.misses));
+            }
         }
 
         // 3. Mission & Levels

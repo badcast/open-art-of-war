@@ -1,6 +1,7 @@
 #include "graphics/TextureManager.hpp"
 #include "core/AssetStore.hpp"
 #include "core/LoaderResources.hpp"
+#include "core/ResourceManager.hpp"
 #include "graphics/SpriteRegistry.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -19,37 +20,97 @@ TextureManager::TextureManager(SDL_Renderer *renderer)
 
 TextureManager::~TextureManager()
 {
+    BindResourceManager(nullptr);
     Cleanup();
+}
+
+void TextureManager::BindResourceManager(ResourceManager *manager)
+{
+    if (m_resourceManager == manager)
+        return;
+    if (m_resourceManager)
+    {
+        m_resourceManager->UnregisterCache("textures");
+        m_resourceManager->UnregisterCache("recolored_sheets");
+        m_resourceManager->UnregisterCache("sheet_surfaces");
+    }
+    m_resourceManager = manager;
+    if (!m_resourceManager)
+        return;
+
+    m_resourceManager->RegisterCache(
+        "textures",
+        [this](std::uint64_t nowMs, bool forceAllUnpinned) {
+            const auto &policy = m_resourceManager->DefaultPolicy();
+            return m_textureCache.EvictUnused(
+                nowMs, forceAllUnpinned ? 0 : policy.maxIdleMs, policy.maxBudgetBytes);
+        },
+        [this]() {
+            return m_textureCache.Stats();
+        });
+
+    m_resourceManager->RegisterCache(
+        "recolored_sheets",
+        [this](std::uint64_t nowMs, bool forceAllUnpinned) {
+            const auto &policy = m_resourceManager->DefaultPolicy();
+            return m_recoloredSheets.EvictUnused(
+                nowMs, forceAllUnpinned ? 0 : policy.maxIdleMs, policy.maxBudgetBytes / 2);
+        },
+        [this]() {
+            return m_recoloredSheets.Stats();
+        });
+
+    m_resourceManager->RegisterCache(
+        "sheet_surfaces",
+        [this](std::uint64_t nowMs, bool forceAllUnpinned) {
+            // CPU surfaces are only needed briefly for GetTileColor / recoloring
+            return m_sheetSurfaces.EvictUnused(
+                nowMs, forceAllUnpinned ? 0 : 15000, 64 * 1024 * 1024);
+        },
+        [this]() {
+            return m_sheetSurfaces.Stats();
+        });
+}
+
+void TextureManager::PinUiCommon()
+{
+    for (const char *name : {"menu_bg", "logo", "title"})
+    {
+        auto it = m_uiTexturePaths.find(name);
+        if (it != m_uiTexturePaths.end())
+        {
+            LoadTexture(it->second);
+            m_textureCache.Pin(it->second);
+        }
+    }
+}
+
+void TextureManager::PinSheet(int page)
+{
+    if (page < 0 || page >= static_cast<int>(m_imagePaths.size()) || m_imagePaths[page].empty())
+        return;
+    const std::string &path = m_imagePaths[page];
+    GetSpriteSheet(page);
+    if (m_textureCache.Pin(path))
+        m_pinnedSheets.push_back(path);
+}
+
+void TextureManager::UnpinAllSheets()
+{
+    for (const std::string &path : m_pinnedSheets)
+        m_textureCache.Unpin(path);
+    m_pinnedSheets.clear();
 }
 
 void TextureManager::Cleanup()
 {
-    for (auto &[path, tex] : m_textureCache)
-    {
-        if (tex)
-        {
-            SDL_DestroyTexture(tex);
-        }
-    }
-    m_textureCache.clear();
-    for (auto &[key, tex] : m_recoloredSheets)
-    {
-        if (tex)
-        {
-            SDL_DestroyTexture(tex);
-        }
-    }
-    m_recoloredSheets.clear();
-    for (SDL_Surface *surface : m_sheetSurfaces)
-    {
-        if (surface)
-            SDL_DestroySurface(surface);
-    }
-    m_sheetSurfaces.clear();
+    m_pinnedSheets.clear();
+    m_textureCache.Clear();
+    m_recoloredSheets.Clear();
+    m_sheetSurfaces.Clear();
     m_tileColors.clear();
-    m_spriteSheets.clear();
     m_tilesets.clear();
-    m_uiTextures.clear();
+    m_uiTexturePaths.clear();
     m_spriteFrames.clear();
 
     m_compositeRanges.clear();
@@ -70,89 +131,76 @@ void TextureManager::Cleanup()
     m_terrainPages.clear();
 }
 
-SDL_Texture *TextureManager::LoadTexture(std::string_view filePath)
+SDL_Texture *TextureManager::LoadTexture(std::string_view filePath) const
 {
-    auto it = m_textureCache.find(filePath);
-    if (it != m_textureCache.end())
-    {
-        return it->second;
-    }
+    const std::uint64_t nowMs = SDL_GetTicks();
+    if (SDL_Texture *cached = m_textureCache.Find(filePath, nowMs))
+        return cached;
 
-    // SDL3 decodes PNG natively; all game art is PNG
-    std::vector<std::uint8_t> pngData;
-    SDL_Surface *surface = nullptr;
-    if (Assets::ReadBytes(filePath, pngData) && !pngData.empty())
-    {
-        surface = SDL_LoadPNG_IO(SDL_IOFromConstMem(pngData.data(), pngData.size()), true);
-    }
-    if (!surface)
-    {
-        std::cerr << "[TextureManager] Failed to load image: " << filePath << " (" << SDL_GetError() << ")"
-                  << std::endl;
-        return nullptr;
-    }
+    return m_textureCache.GetOrLoad(
+        filePath,
+        [&](std::size_t &outBytes) -> ResourceCache<SDL_Texture, SdlTextureDeleter>::Ptr {
+            // SDL3 decodes PNG natively; all game art is PNG
+            std::vector<std::uint8_t> pngData;
+            SDL_Surface *surface = nullptr;
+            if (Assets::ReadBytes(filePath, pngData) && !pngData.empty())
+            {
+                surface = SDL_LoadPNG_IO(SDL_IOFromConstMem(pngData.data(), pngData.size()), true);
+            }
+            if (!surface)
+            {
+                std::cerr << "[TextureManager] Failed to load image: " << filePath << " (" << SDL_GetError() << ")"
+                          << std::endl;
+                return nullptr;
+            }
 
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(m_renderer, surface);
-    SDL_DestroySurface(surface);
-    if (texture)
-    {
-        // Pixel art: keep hard pixel edges when the camera zooms (SDL3 defaults to linear filtering)
-        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
-    }
-
-    if (!texture)
-    {
-        std::cerr << "[TextureManager] Failed to create texture: " << filePath << " (" << SDL_GetError() << ")"
-                  << std::endl;
-        return nullptr;
-    }
-
-    m_textureCache[std::string(filePath)] = texture;
-    return texture;
+            const std::size_t bytes
+                = static_cast<std::size_t>(std::max(1, surface->w)) * static_cast<std::size_t>(std::max(1, surface->h)) * 4;
+            SDL_Texture *texture = SDL_CreateTextureFromSurface(m_renderer, surface);
+            SDL_DestroySurface(surface);
+            if (!texture)
+            {
+                std::cerr << "[TextureManager] Failed to create texture: " << filePath << " (" << SDL_GetError() << ")"
+                          << std::endl;
+                return nullptr;
+            }
+            // Pixel art: keep hard pixel edges when the camera zooms (SDL3 defaults to linear filtering)
+            SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+            outBytes = bytes;
+            return ResourceCache<SDL_Texture, SdlTextureDeleter>::Ptr(texture);
+        },
+        nowMs);
 }
 
 bool TextureManager::LoadAllAssets()
 {
-    std::cout << "[TextureManager] Loading game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
+    std::cout << "[TextureManager] Indexing game assets from: " << LoaderResources::AssetRoot() << "..." << std::endl;
 
     LoadSprites();
 
-    // 4. Load UI screens
+    // Register UI texture paths for lazy loading on first GetUiTexture() call
+    m_uiTexturePaths.clear();
     for (const auto &[name, path] : LoaderResources::UiTextures())
-        m_uiTextures[name] = LoadTexture(path);
+        m_uiTexturePaths[name] = path;
 
-    std::cout << "[TextureManager] Asset textures loaded successfully." << std::endl;
+    std::cout << "[TextureManager] Asset metadata indexed (lazy GPU loading enabled)." << std::endl;
     return true;
 }
 
 void TextureManager::ReloadSprites()
 {
-    // Forget every texture and surface made from the sprite images, then read them again
+    // Forget every texture and surface made from the sprite images, then re-index them
+    UnpinAllSheets();
     for (const std::string &path : m_imagePaths)
     {
-        const auto it = m_textureCache.find(path);
-        if (it != m_textureCache.end())
-        {
-            if (it->second)
-                SDL_DestroyTexture(it->second);
-            m_textureCache.erase(it);
-        }
+        if (!path.empty())
+            m_textureCache.Remove(path);
     }
-    for (auto &[key, tex] : m_recoloredSheets)
-        if (tex)
-            SDL_DestroyTexture(tex);
-    m_recoloredSheets.clear();
-    for (SDL_Surface *surface : m_sheetSurfaces)
-        if (surface)
-            SDL_DestroySurface(surface);
-    m_sheetSurfaces.clear();
+    m_recoloredSheets.Clear();
+    m_sheetSurfaces.Clear();
     m_tileColors.clear();
     OpenArtOfWar::ReloadSprites();
     LoadSprites();
-    SDL_ScaleMode terrain = m_terrainScaleMode, sprite = m_spriteScaleMode;
-    for (std::size_t i = 0; i < m_spriteSheets.size(); ++i)
-        if (m_spriteSheets[i])
-            SDL_SetTextureScaleMode(m_spriteSheets[i], m_terrainPages[i] ? terrain : sprite);
 }
 
 void TextureManager::LoadSprites()
@@ -172,10 +220,9 @@ void TextureManager::LoadSprites()
     m_buildings = t.buildings;
     m_buildingParts = t.buildingParts;
 
-    // 2. Their images; the Resistance images of objects that have one follow as pages ImageCount() + i
+    // 2. Index image paths lazily; Resistance images follow as pages ImageCount() + i
     m_imageCount = static_cast<int>(t.images.size());
     m_imagePaths.assign(2 * m_imageCount, std::string());
-    m_spriteSheets.assign(2 * m_imageCount, nullptr);
     m_terrainPages.assign(2 * m_imageCount, false);
     for (int i = 0; i < m_imageCount; ++i)
     {
@@ -197,7 +244,6 @@ void TextureManager::LoadSprites()
             if (path.empty() || !hasFrames)
                 continue;
             m_imagePaths[page] = path;
-            m_spriteSheets[page] = LoadTexture(path);
         }
     }
     std::cout << "[TextureManager] " << m_imageCount << " sprite objects, " << m_spriteFrames.size() << " frames, "
@@ -351,7 +397,7 @@ void TextureManager::LoadSpriteBindings()
 void TextureManager::CollectTerrainPages()
 {
     // Terrain images say so in their meta (LoadAllAssets); nothing to work out
-    m_terrainPages.resize(m_spriteSheets.size(), false);
+    m_terrainPages.resize(m_imagePaths.size(), false);
 }
 
 SDL_ScaleMode TextureManager::SmoothPixelScaleMode()
@@ -365,7 +411,7 @@ SDL_ScaleMode TextureManager::SmoothPixelScaleMode()
 
 void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
 {
-    if (m_terrainPages.size() != m_spriteSheets.size())
+    if (m_terrainPages.size() != m_imagePaths.size())
         CollectTerrainPages();
     const SDL_ScaleMode smooth = SmoothPixelScaleMode();
     m_terrainScaleMode = linear ? smooth : SDL_SCALEMODE_NEAREST;
@@ -373,19 +419,21 @@ void TextureManager::SetSpriteFiltering(bool linear, bool sharpPixels)
     m_spriteScaleMode = sharpPixels ? SDL_SCALEMODE_LINEAR : m_terrainScaleMode;
     const SDL_ScaleMode mode = m_terrainScaleMode;
     const SDL_ScaleMode spriteMode = m_spriteScaleMode;
-    for (std::size_t i = 0; i < m_spriteSheets.size(); ++i)
+    const std::uint64_t nowMs = SDL_GetTicks();
+    for (std::size_t i = 0; i < m_imagePaths.size(); ++i)
     {
-        if (m_spriteSheets[i])
-            SDL_SetTextureScaleMode(m_spriteSheets[i], m_terrainPages[i] ? mode : spriteMode);
-    }
-    for (auto &[key, tex] : m_recoloredSheets)
-    {
-        if (!tex)
+        if (m_imagePaths[i].empty())
             continue;
+        if (SDL_Texture *tex = m_textureCache.Find(m_imagePaths[i], nowMs))
+            SDL_SetTextureScaleMode(tex, m_terrainPages[i] ? mode : spriteMode);
+    }
+    m_recoloredSheets.ForEach([&](std::uint64_t key, SDL_Texture *tex) {
+        if (!tex)
+            return;
         const std::size_t page = static_cast<std::size_t>(key >> 32);
         const bool terrain = page < m_terrainPages.size() && m_terrainPages[page];
         SDL_SetTextureScaleMode(tex, terrain ? mode : spriteMode);
-    }
+    });
     for (SDL_Texture *texture : m_tilesets)
     {
         if (texture)
@@ -441,16 +489,16 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
 {
     if (team != 1 && team != 2)
         return GetSpriteSheet(page);
-    if (page < 0 || page >= static_cast<int>(m_spriteSheets.size()))
+    if (page < 0 || page >= static_cast<int>(m_imagePaths.size()) || m_imagePaths[page].empty())
         return nullptr;
 
+    const std::uint64_t nowMs = SDL_GetTicks();
     const std::uint64_t key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(page)) << 32)
                               | (static_cast<std::uint64_t>(static_cast<std::uint8_t>(team)) << 24)
                               | (static_cast<std::uint64_t>(color.r) << 16) | (static_cast<std::uint64_t>(color.g) << 8)
                               | static_cast<std::uint64_t>(color.b);
-    auto it = m_recoloredSheets.find(key);
-    if (it != m_recoloredSheets.end())
-        return it->second;
+    if (SDL_Texture *cached = m_recoloredSheets.Find(key, nowMs))
+        return cached;
 
     SDL_Surface *base = SheetSurface(page);
     if (!base)
@@ -504,26 +552,35 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
         }
     }
 
+    const std::size_t bytes
+        = static_cast<std::size_t>(std::max(1, copy->w)) * static_cast<std::size_t>(std::max(1, copy->h)) * 4;
     SDL_Texture *tex = SDL_CreateTextureFromSurface(m_renderer, copy);
     SDL_DestroySurface(copy);
     if (tex)
     {
-        if (m_terrainPages.size() != m_spriteSheets.size())
+        if (m_terrainPages.size() != m_imagePaths.size())
             CollectTerrainPages();
         const bool terrain = page < static_cast<int>(m_terrainPages.size()) && m_terrainPages[page];
         SDL_SetTextureScaleMode(tex, terrain ? m_terrainScaleMode : m_spriteScaleMode);
+        m_recoloredSheets.Insert(key, ResourceCache<SDL_Texture, SdlTextureDeleter, std::uint64_t>::Ptr(tex), bytes, nowMs);
+        return tex;
     }
-    m_recoloredSheets[key] = tex;
-    return tex ? tex : GetSpriteSheet(page);
+    return GetSpriteSheet(page);
 }
 
 SDL_Texture *TextureManager::GetSpriteSheet(int page) const
 {
-    if (page >= 0 && page < static_cast<int>(m_spriteSheets.size()))
+    if (page < 0 || page >= static_cast<int>(m_imagePaths.size()) || m_imagePaths[page].empty())
+        return nullptr;
+    const std::string &path = m_imagePaths[page];
+    const bool alreadyLoaded = m_textureCache.Contains(path);
+    SDL_Texture *tex = LoadTexture(path);
+    if (tex && !alreadyLoaded)
     {
-        return m_spriteSheets[page];
+        const bool terrain = page < static_cast<int>(m_terrainPages.size()) && m_terrainPages[page];
+        SDL_SetTextureScaleMode(tex, terrain ? m_terrainScaleMode : m_spriteScaleMode);
     }
-    return nullptr;
+    return tex;
 }
 
 SDL_Texture *TextureManager::GetTileset(int index) const
@@ -537,10 +594,10 @@ SDL_Texture *TextureManager::GetTileset(int index) const
 
 SDL_Texture *TextureManager::GetUiTexture(std::string_view name) const
 {
-    auto it = m_uiTextures.find(name);
-    if (it != m_uiTextures.end())
+    auto it = m_uiTexturePaths.find(name);
+    if (it != m_uiTexturePaths.end())
     {
-        return it->second;
+        return LoadTexture(it->second);
     }
     return nullptr;
 }
@@ -648,26 +705,33 @@ SDL_Surface *TextureManager::SheetSurface(int page)
 {
     if (page < 0 || page >= static_cast<int>(m_imagePaths.size()) || m_imagePaths[page].empty())
         return nullptr;
-    if (m_sheetSurfaces.size() < m_imagePaths.size())
-        m_sheetSurfaces.resize(m_imagePaths.size(), nullptr);
-    if (!m_sheetSurfaces[page])
-    {
-        std::vector<std::uint8_t> png;
-        if (!Assets::ReadBytes(m_imagePaths[page], png) || png.empty())
-            return nullptr;
-        SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
-        if (!loaded)
-            return nullptr;
-        m_sheetSurfaces[page] = SDL_ConvertSurface(loaded, SDL_PIXELFORMAT_RGBA32);
-        SDL_DestroySurface(loaded);
-    }
-    return m_sheetSurfaces[page];
+    const std::uint64_t nowMs = SDL_GetTicks();
+    return m_sheetSurfaces.GetOrLoad(
+        page,
+        [&](std::size_t &outBytes) -> ResourceCache<SDL_Surface, SdlSurfaceDeleter, int>::Ptr {
+            std::vector<std::uint8_t> png;
+            if (!Assets::ReadBytes(m_imagePaths[page], png) || png.empty())
+                return nullptr;
+            SDL_Surface *loaded = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
+            if (!loaded)
+                return nullptr;
+            SDL_Surface *converted = SDL_ConvertSurface(loaded, SDL_PIXELFORMAT_RGBA32);
+            SDL_DestroySurface(loaded);
+            if (!converted)
+                return nullptr;
+            outBytes = static_cast<std::size_t>(std::max(1, converted->h))
+                       * static_cast<std::size_t>(std::max(1, converted->pitch));
+            return ResourceCache<SDL_Surface, SdlSurfaceDeleter, int>::Ptr(converted);
+        },
+        nowMs);
 }
 
 int TextureManager::ResistancePage(int page) const
 {
-    if (page >= 0 && page < m_imageCount && m_spriteSheets[page + m_imageCount])
-        return page + m_imageCount;
+    const int resPage = page + m_imageCount;
+    if (page >= 0 && page < m_imageCount && resPage < static_cast<int>(m_imagePaths.size())
+        && !m_imagePaths[resPage].empty())
+        return resPage;
     return page;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/LoaderResources.hpp"
+#include "core/ResourceCache.hpp"
 
 #include <SDL3/SDL.h>
 #include <functional>
@@ -13,6 +14,26 @@
 
 namespace OpenArtOfWar
 {
+
+class ResourceManager;
+
+struct SdlTextureDeleter
+{
+    void operator()(SDL_Texture *tex) const noexcept
+    {
+        if (tex)
+            SDL_DestroyTexture(tex);
+    }
+};
+
+struct SdlSurfaceDeleter
+{
+    void operator()(SDL_Surface *surf) const noexcept
+    {
+        if (surf)
+            SDL_DestroySurface(surf);
+    }
+};
 
 struct SpriteFrame
 {
@@ -123,7 +144,12 @@ public:
     bool LoadAllAssets();
     // The sprites again from disk (metas and images; the editors after a change), with the bindings of the characters
     void ReloadSprites();
-    SDL_Texture *LoadTexture(std::string_view filePath);
+    SDL_Texture *LoadTexture(std::string_view filePath) const;
+
+    void BindResourceManager(ResourceManager *manager);
+    void PinUiCommon();
+    void PinSheet(int page);
+    void UnpinAllSheets();
 
     // Map graphics (sprite sheets and tilesets): smooth when scaled (true) or hard pixel edges (false).
     // `sharpPixels` (pixel-art filter of the shader effects) needs linear samples on the sprite sheets but
@@ -192,19 +218,20 @@ private:
     void SumCompositeColor(int compId, int depth, long long &r, long long &g, long long &b, long long &weight);
 
     SDL_Renderer *m_renderer {nullptr};
-    std::map<std::string, SDL_Texture *, std::less<>> m_textureCache;
-    std::vector<SDL_Texture *> m_spriteSheets;
-    std::unordered_map<std::uint64_t, SDL_Texture *> m_recoloredSheets;
+    ResourceManager *m_resourceManager {nullptr};
+    mutable ResourceCache<SDL_Texture, SdlTextureDeleter, std::string> m_textureCache;
+    mutable ResourceCache<SDL_Texture, SdlTextureDeleter, std::uint64_t> m_recoloredSheets;
+    mutable ResourceCache<SDL_Surface, SdlSurfaceDeleter, int> m_sheetSurfaces;
     SDL_ScaleMode m_terrainScaleMode {SDL_SCALEMODE_NEAREST};
     SDL_ScaleMode m_spriteScaleMode {SDL_SCALEMODE_NEAREST};
     std::vector<std::string> m_imagePaths; // per page (Resistance pages included)
     int m_imageCount {0};
-    std::vector<SDL_Surface *> m_sheetSurfaces; // decoded pages, loaded by getTileColor only
     std::unordered_map<int, SDL_Color> m_tileColors;
     std::vector<SDL_Texture *> m_tilesets;
     std::vector<bool> m_terrainPages; // sheet pages that hold terrain tiles (worked out on first use)
     void CollectTerrainPages();
-    std::map<std::string, SDL_Texture *, std::less<>> m_uiTextures;
+    std::map<std::string, std::string, std::less<>> m_uiTexturePaths;
+    std::vector<std::string> m_pinnedSheets;
     std::vector<SpriteFrame> m_spriteFrames;
 
     // Decoded graphics tables

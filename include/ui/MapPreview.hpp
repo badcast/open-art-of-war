@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/ResourceCache.hpp"
 #include <SDL3/SDL.h>
 #include <functional>
-#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,6 +10,7 @@
 namespace OpenArtOfWar
 {
 
+class ResourceManager;
 class TextureManager;
 
 // A building or base shown on the preview
@@ -40,6 +41,7 @@ public:
         const std::vector<PreviewMarker> &markers,
         int &width,
         int &height);
+    void BindResourceManager(ResourceManager *manager, std::string cacheName = "map_previews");
     void Clear();
 
 private:
@@ -48,8 +50,15 @@ private:
         SDL_Texture *texture {nullptr};
         int width {0};
         int height {0};
+        ~Entry()
+        {
+            if (texture)
+                SDL_DestroyTexture(texture);
+        }
     };
-    std::map<std::string, Entry, std::less<>> m_cache;
+    ResourceManager *m_resourceManager {nullptr};
+    std::string m_cacheName {"map_previews"};
+    ResourceCache<Entry> m_cache;
 };
 
 } // namespace OpenArtOfWar

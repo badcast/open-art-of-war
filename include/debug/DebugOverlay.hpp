@@ -16,6 +16,7 @@ class Economy;
 class MissionController;
 class SoundEngine;
 class Camera;
+class ResourceManager;
 
 class DebugOverlay
 {
@@ -41,7 +42,8 @@ public:
         SoundEngine &sound,
         Camera &camera,
         AIController &ai,
-        float fps);
+        float fps,
+        ResourceManager *resources = nullptr);
     inline void render(
         TileMap &map,
         EntityManager &entities,
@@ -50,9 +52,10 @@ public:
         SoundEngine &sound,
         Camera &camera,
         AIController &ai,
-        float fps)
+        float fps,
+        ResourceManager *resources = nullptr)
     {
-        Render(map, entities, economy, mission, sound, camera, ai, fps);
+        Render(map, entities, economy, mission, sound, camera, ai, fps, resources);
     }
 
     bool IsFogDisabled() const
