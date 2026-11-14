@@ -580,6 +580,9 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
         }
         if (send == 0 || (send < groupSize && !idleTimeout))
             return;
+        // A timeout never sends one or two units while production goes on
+        if (send < groupSize && m_hasProduction && send < std::max(3, groupSize / 2))
+            return;
         int targetX, targetY;
         FindAttackObjective(entities, map, targetX, targetY);
         if (targetX < 0)
@@ -640,7 +643,8 @@ void AIController::UpdateWaveLaunch(float deltaTime, TileMap &map, EntityManager
 
     int required = static_cast<int>(m_currentPlan.archetypes.size());
     const bool idleWave
-        = (!isProducing && m_waveAssemblyTimer >= 12.0f) || (m_waveCooldown <= 0.0f && m_waveAssemblyTimer >= 20.0f);
+        = ((!isProducing && m_waveAssemblyTimer >= 12.0f) || (m_waveCooldown <= 0.0f && m_waveAssemblyTimer >= 20.0f))
+          && (!m_hasProduction || static_cast<int>(allReady.size()) >= kMinAttackWave);
     if ((required == 0 || m_waveCooldown > 0.0f) && !idleWave)
         return;
 

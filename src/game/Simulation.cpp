@@ -354,9 +354,10 @@ void Simulation::OrderUnitsAt(
             // Clicked right on a wall: attack it (even an own one, when ordered so)
             entities.IssueAttackWallOrder(units, destX, destY, pathfinder);
         }
-        else if (!(asGroup && MarchAsGroup(player, units, destX, destY, true, ctx)))
+        else if (!(asGroup && MarchAsGroup(player, units, destX, destY, false, ctx)))
         {
-            // (a control group marches like an AI wave: it fights whatever it meets on the way)
+            // (a control group keeps together like an AI wave, but a Move stays a Move: it goes on to the point and
+            // only shoots at what comes into range on the way; fighting its way there is the attack-move)
             entities.IssueMoveOrder(units, destX, destY, pathfinder, false);
         }
     }
@@ -502,6 +503,8 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             break;
         }
         case CommandType::Stop:
+            // (out of a marching group too: it would send the unit on again)
+            m_squads[cmd.player].ReleaseUnits(OwnUnits(cmd, ctx), entities);
             ClearOrders(OwnUnits(cmd, ctx), entities);
             for (int id : OwnUnits(cmd, ctx))
             {
@@ -510,9 +513,13 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
                     continue;
                 u->path.clear();
                 u->pathIndex = 0;
+                u->ClearMoveTarget(); // a goal left behind would keep the unit "on its way" (short sight, no home)
                 u->targetEntityId = 0;
+                u->orderedTargetId = 0;
                 u->targetWallTileX = -1;
                 u->targetWallTileY = -1;
+                u->isManualWallTarget = false;
+                u->blockedTimer = 0.0f;
                 u->isAttackMoving = false;
                 u->groupOrder = false;
                 u->holdPosition = false;
@@ -521,6 +528,8 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             }
             break;
         case CommandType::HoldPosition:
+            // (out of a marching group too: its next leg would clear the hold)
+            m_squads[cmd.player].ReleaseUnits(OwnUnits(cmd, ctx), entities);
             ClearOrders(OwnUnits(cmd, ctx), entities);
             for (int id : OwnUnits(cmd, ctx))
             {

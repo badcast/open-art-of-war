@@ -191,7 +191,7 @@ struct MineSnap
 
 struct WorldSnapshot
 {
-    static constexpr std::uint8_t kVersion = 9;
+    static constexpr std::uint8_t kVersion = 10; // byte 0 version; payload [1..end) is zstd-compressed
 
     std::uint32_t tick {0};
     std::uint32_t baseTick {0};
@@ -224,7 +224,7 @@ struct WorldSnapshot
     // Authority: adds the shots in flight and takes (empties) the events collected since the last call
     void CaptureEffects(EntityManager &entities);
 
-    // Bytes for AuthorityState::bytes; Decode refuses another version, a damaged or truncated buffer
+    // Bytes for AuthorityState::bytes (byte 0 = kVersion, rest zstd-compressed); Decode refuses bad/oversized frames
     std::vector<std::uint8_t> Encode() const;
     static bool Decode(const std::uint8_t *data, std::size_t size, WorldSnapshot &out);
 

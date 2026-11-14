@@ -355,9 +355,12 @@ void AISquadController::OrderLeg(
     EntityManager &entities,
     Pathfinder &pathfinder)
 {
-    // The computer always goes by auto-attack (units answer fire on the way); a plain Move is only for a retreat
-    (void) squad;
-    entities.IssueAttackMoveOrder(unitIds, targetX, targetY, pathfinder);
+    // The computer always goes by auto-attack (units answer fire on the way); a plain Move is a player group's
+    // Move order: it keeps going and only shoots at what is in range
+    if (squad.attackMove)
+        entities.IssueAttackMoveOrder(unitIds, targetX, targetY, pathfinder);
+    else
+        entities.IssueMoveOrder(unitIds, targetX, targetY, pathfinder, false);
     CapDetours(squad, entities, pathfinder.GetMap());
 }
 
@@ -1244,10 +1247,20 @@ void AISquadController::Tick(
         for (int unitId : squad.unitIds)
         {
             Unit *unit = entities.GetUnit(unitId);
-            if (unit->targetEntityId != 0 || unit->targetWallTileX >= 0)
+            // A wall being breached stays (the way is shut without it), and so does an enemy within reach (one that
+            // blocks the way, or one a waiting member shoots at): only a chase is called off
+            if (unit->targetEntityId == 0)
+                continue;
+            const Entity *chased = entities.GetEntity(unit->targetEntityId);
+            const bool withinReach
+                = chased && chased->alive && chased->state != ActionState::Die
+                  && DetMath::Hypot(
+                         static_cast<float>(chased->tileX - unit->tileX),
+                         static_cast<float>(chased->tileY - unit->tileY))
+                         <= unit->attackRange + 1.0f;
+            if (!withinReach)
             {
                 unit->targetEntityId = 0;
-                unit->targetWallTileX = unit->targetWallTileY = -1;
                 if (unit->state == ActionState::Attack)
                     unit->state = ActionState::Idle;
                 if (squad.state == AISquadState::Marching && unitId != squad.leaderId)

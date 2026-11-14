@@ -630,6 +630,12 @@ void GameplayController::Update(const FrameContext &context)
         ResetForMission(mission, hud, entities, map);
     PruneGroups(entities);
 
+    // Replicas skip SimulationStep, so keep HUD timers, primary producers, and replicated events updated here.
+    auto updateReplicaHud = [&]() {
+        if (!m_sim.AdvancesWorld())
+            hud.Update(deltaTime, entities, economy, m_sim.TakeEvents());
+    };
+
     // Wheel steps of this frame: over the map they zoom (below, only when no window covers the map); steps that
     // arrive while a window is open are dropped so nothing jumps when it closes
     const int mapWheel = input.ConsumeMapWheel();
@@ -656,6 +662,7 @@ void GameplayController::Update(const FrameContext &context)
             // A network match or observer playback goes on while a player reads its menus
             if ((mission.IsOnlineMatch() || hud.IsObserver()) && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+            updateReplicaHud();
             return;
         }
     }
@@ -678,13 +685,17 @@ void GameplayController::Update(const FrameContext &context)
             SimContext simContext {entities, map, pathfinder, economy, aiController};
             m_sim.ApplyCommands(simContext);
         }
+        updateReplicaHud();
         return;
     }
 
     // 1b. Campaign mission dialogue: the mission waits while it is read
     if (menu.IsMissionDialogOpen()
         && menu.UpdateMissionDialog(input, mouseX, mouseY, leftClicked, windowWidth, windowHeight))
+    {
+        updateReplicaHud();
         return;
+    }
 
     // 2. In-Game Pause Menu
     if (menu.IsInGameMenuOpen())
@@ -693,6 +704,7 @@ void GameplayController::Update(const FrameContext &context)
         {
             if ((mission.IsOnlineMatch() || hud.IsObserver()) && appState == AppState::SkirmishPlaying && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+            updateReplicaHud();
             return;
         }
     }
@@ -1099,6 +1111,7 @@ void GameplayController::Update(const FrameContext &context)
             menu.SetInGameMenuOpen(true);
             if (mission.IsOnlineMatch() && !m_simHold)
                 SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+            updateReplicaHud();
             return;
         }
 
@@ -1165,25 +1178,65 @@ void GameplayController::Update(const FrameContext &context)
                 m_touchOrderY = mouseY;
                 touchOrdered = true;
             }
-            else if (combatUnits.empty() && !tappedOwn && !m_selectedUnits.empty())
+            else if (combatUnits.empty() && !tappedOwn)
             {
-                // Unit-producing building(s) selected: every tap on the map sets their rally point
-                // immediately and keeps the building selected so subsequent taps move the rally point too.
-                SimCommand command = Command(CommandType::SetRally);
-                for (int unitId : m_selectedUnits)
+                const bool isSecondRallyTap = !m_touchRallyBuildings.empty() && nowTicks - m_touchRallyTicks < 450
+                                              && std::abs(mouseX - m_touchRallyX) <= 40
+                                              && std::abs(mouseY - m_touchRallyY) <= 40;
+                if (isSecondRallyTap && m_selectedUnits.empty())
                 {
-                    const Building *building = entities.GetBuilding(unitId);
-                    if (building && building->alive && building->owner == Players::Local()
-                        && building->IsUnitProducer())
-                        command.ids.push_back(static_cast<std::uint32_t>(unitId));
-                }
-                if (!command.ids.empty())
-                {
-                    command.x = static_cast<std::int32_t>(leftClickWorldX);
-                    command.y = static_cast<std::int32_t>(leftClickWorldY);
-                    m_sim.Issue(std::move(command));
+                    SimCommand command = Command(CommandType::SetRally);
+                    for (int unitId : m_touchRallyBuildings)
+                    {
+                        const Building *building = entities.GetBuilding(unitId);
+                        if (building && building->alive
+                            && (building->owner == Players::Local() || (m_debugMode && m_controlAllFactions))
+                            && building->IsUnitProducer())
+                        {
+                            command.ids.push_back(static_cast<std::uint32_t>(unitId));
+                        }
+                    }
+                    if (!command.ids.empty())
+                    {
+                        command.x = static_cast<std::int32_t>(leftClickWorldX);
+                        command.y = static_cast<std::int32_t>(leftClickWorldY);
+                        m_sim.Issue(std::move(command));
+                    }
+                    m_touchRallyBuildings.clear();
+                    m_touchRallyTicks = 0;
                     touchOrdered = true;
                 }
+                else if (!m_selectedUnits.empty())
+                {
+                    // 1st tap anywhere on the map resets building focus, and remembers unit-producing
+                    // building(s) so a 2nd tap at the same spot sets their rally point.
+                    m_touchRallyBuildings.clear();
+                    for (int unitId : m_selectedUnits)
+                    {
+                        const Building *building = entities.GetBuilding(unitId);
+                        if (building && building->alive
+                            && (building->owner == Players::Local() || (m_debugMode && m_controlAllFactions))
+                            && building->IsUnitProducer())
+                        {
+                            m_touchRallyBuildings.push_back(unitId);
+                        }
+                    }
+                    m_touchRallyTicks = m_touchRallyBuildings.empty() ? 0 : nowTicks;
+                    m_touchRallyX = mouseX;
+                    m_touchRallyY = mouseY;
+                    for (int unitId : m_selectedUnits)
+                    {
+                        if (Entity *e = entities.GetEntity(unitId))
+                            e->selected = false;
+                    }
+                    m_selectedUnits.clear();
+                    touchOrdered = true;
+                }
+            }
+            else if (tappedOwn)
+            {
+                m_touchRallyBuildings.clear();
+                m_touchRallyTicks = 0;
             }
         }
 
@@ -1325,6 +1378,7 @@ void GameplayController::Update(const FrameContext &context)
 
     if (!m_simHold)
         SimulationStep(deltaTime, map, pathfinder, entities, economy, aiController, mission, hud, appState);
+    updateReplicaHud();
 }
 
 void GameplayController::SimulationStep(

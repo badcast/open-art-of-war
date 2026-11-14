@@ -185,8 +185,19 @@ void Unit::UpdateImpl(float deltaTime, TileMap &map, Pathfinder &pathfinder, con
         }
     }
 
+    // A firing pose without anything to fire at: infantry keeps the pose while it has a target, and the target can be
+    // taken away from outside (a new order, the squad, the computer player dropping a stale march order when an enemy
+    // is eliminated). Nothing else ends the pose then, and whoever hands out orders only looks at idle units.
+    if (state == ActionState::Attack && attackAnimTimer <= 0.0f && targetEntityId == 0 && targetWallTileX < 0
+        && burstShotsRemaining <= 0)
+    {
+        const bool canWalkOn = !path.empty() && pathIndex < path.size() && !isSiegeMode && moveSpeed > 0.0f;
+        state = canWalkOn ? ActionState::Move : ActionState::Idle;
+        animFrame = 0;
+    }
+
     // If pursuing a target beyond attack range, compute path (unless in Siege Mode)
-    if (targetEntityId != 0 && state != ActionState::Move && !isSiegeMode && moveSpeed > 0.0f)
+    if (targetEntityId != 0 && state != ActionState::Move && !isSiegeMode && moveSpeed > 0.0f && !HoldsGround())
     {
         Entity *target = delegates.getEntity ? delegates.getEntity(targetEntityId) : nullptr;
         if (target && target->alive && target->state != ActionState::Die)

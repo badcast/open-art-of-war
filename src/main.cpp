@@ -18,7 +18,7 @@ namespace
 {
 const char *const kHelp = R"(Usage: openaow [options]
 
-Open Art Of War: Freedom for Liberty. Run it from the folder that holds ./assets.
+Open Art Of War: Resistance Arisen. Run it from the folder that holds ./assets.
 
 Single player:
   --map=<name|path>             start a custom game on this map (a name from assets/maps or a .json path)
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "========================================================" << std::endl;
-    std::cout << "Open Art Of War: Freedom for Liberty" << std::endl;
+    std::cout << "Open Art Of War: Resistance Arisen" << std::endl;
     if (debugMode)
     {
         std::cout << "[DEBUG MODE ENABLED: Navigation Inspection & Full Enemy Control]" << std::endl;

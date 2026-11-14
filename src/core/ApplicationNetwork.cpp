@@ -63,7 +63,9 @@ namespace OpenArtOfWar
 // headquarters every 5 seconds, so two headless peers have real command traffic and fights to agree on
 bool Application::AuthorityModeWanted() const
 {
-    return m_env.Section("network").value("authority_mode", false) || DebugEnv("OAOW_AUTHORITY") != nullptr;
+    if (const char *lockstep = DebugEnv("OAOW_LOCKSTEP"); lockstep && lockstep[0] != '\0' && lockstep[0] != '0')
+        return false;
+    return m_env.Section("network").value("authority_mode", true) || DebugEnv("OAOW_AUTHORITY") != nullptr;
 }
 
 void Application::DriveNetworkBot(std::uint32_t tick)

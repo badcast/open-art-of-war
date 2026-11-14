@@ -177,6 +177,8 @@ int EntityManager::FreeEntitySlots(PlayerId owner) const
             ++own;
     }
     int room = m_entityLimit - live;
+    if (room <= 0)
+        return 0;
     if (owner < kMaxPlayers && Players::IsActive(owner))
     {
         int players = 0;

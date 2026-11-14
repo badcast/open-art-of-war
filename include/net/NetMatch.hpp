@@ -167,7 +167,7 @@ public:
     // Once, when the host's setup has arrived (local set to this computer's slot)
     bool TakeStartedMatch(MatchSetup &out);
 
-    // Authority mode (setting network.authority_mode, off by default while snapshots are being built): the room owner's
+    // Authority mode (setting network.authority_mode, on by default; OAOW_LOCKSTEP=1 opts out): the room owner's
     // game simulates the world, the other games are replicas that only send commands (TASKNEW.md)
     // On the room owner this is the wish that goes into the match setup; on every game the setup of the started
     // match overrides it (TakeStartedMatch), so everybody plays the same way.

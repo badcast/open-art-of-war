@@ -42,6 +42,7 @@ public:
     {
         return m_placing || m_buildMode;
     }
+    void FocusBuilding(int buildingId, const EntityManager &entities) override;
 
     bool HandleHudClick(
         int mx,

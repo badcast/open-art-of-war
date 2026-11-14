@@ -286,17 +286,22 @@ void ModsMenu::Render(Renderer &renderer, BitmapFontRenderer &font, int windowW,
         if (m_entries[i].enabled)
             ++order;
         const ui::UiRect r {l.list.x + 2, l.list.y + i * l.rowH - scrollOff, l.list.w - 4, l.rowH - 2};
-        if (r.Bottom() <= l.list.y || r.y >= l.list.Bottom())
+        const int clipTop = std::max(r.y, l.list.y + 1);
+        const int clipBot = std::min(r.Bottom(), l.list.Bottom() - 1);
+        if (clipBot <= clipTop)
             continue;
         const Entry &e = m_entries[i];
         const bool selected = i == m_selected;
         const bool hovered = l.list.Contains(m_mouseX, m_mouseY) && r.Contains(m_mouseX, m_mouseY);
+        const ui::UiRect bgRect {r.x, clipTop, r.w, clipBot - clipTop};
         if (selected)
-            ui::FillHorizontalGradient(renderer, r, ui::WithAlpha(col::Hover, 255), ui::WithAlpha(col::Hover, 40));
+            renderer.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, col::Hover);
         else if (hovered)
-            renderer.FillRectScreen(r.x, r.y, r.w, r.h, ui::WithAlpha(col::Hover, 140));
+            renderer.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, ui::WithAlpha(col::Hover, 140));
         if (selected)
-            renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
+            renderer.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, col::Accent);
+        if (r.CenterY() - 10 < l.list.y || r.CenterY() + 10 > l.list.Bottom())
+            continue;
         ui::DrawCheckbox(
             renderer,
             font,

@@ -642,6 +642,9 @@ void Unit::FireOnTheMove(float deltaTime, TileMap &map, const UnitDelegates &del
     float sx = GetUnitCenterPixelX(), sy = GetUnitCenterPixelY();
     float dstX = target->GetUnitCenterPixelX(), dstY = target->GetUnitCenterPixelY();
     int targetDir8 = Utility::Dir8FromVector(dstX - sx, dstY - sy);
+    // A vehicle with a fixed gun only fires at what lies ahead of it (infantry aims as it runs)
+    if (!hasRotatingTurret && !IsInfantry() && targetDir8 != facingDirection)
+        return;
     if (!StepTurretToward(targetDir8, deltaTime))
         return;
 

@@ -575,8 +575,8 @@ msgstr "Хардкор"
 msgid "Interface language"
 msgstr "Язык интерфейса"
 
-msgid "FREEDOM FOR LIBERTY"
-msgstr "FREEDOM FOR LIBERTY"
+msgid "RESISTANCE ARISEN"
+msgstr "RESISTANCE ARISEN"
 
 msgid "LMB"
 msgstr "ЛКМ"
@@ -2802,3 +2802,9 @@ msgstr "возраст"
 
 msgid "TAP MAP: SET RALLY POINT"
 msgstr "КОСНИТЕСЬ КАРТЫ: ТОЧКА СБОРА"
+
+msgid "DOUBLE-TAP MAP: SET RALLY POINT"
+msgstr "ДВОЙНОЙ ТАП ПО КАРТЕ: ТОЧКА СБОРА"
+
+msgid "Allies"
+msgstr "Союзники"

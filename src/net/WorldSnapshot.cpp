@@ -10,9 +10,12 @@
 #include "game/Unit.hpp"
 #include "openaow/net/BitStream.hpp"
 
+#include <zstd.h>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 
 namespace OpenArtOfWar
 {
@@ -21,7 +24,20 @@ namespace
 {
 constexpr std::size_t kMaxBytes = 2 * 1024 * 1024;
 constexpr std::size_t kMaxEntities = 20000;
+constexpr int kZstdLevel = ZSTD_CLEVEL_DEFAULT;
 constexpr float kSubStep = 16.0f; // sub-tile offsets in 1/16 pixel
+
+std::size_t CompressFrame(const std::uint8_t *src, std::size_t srcSize, std::uint8_t *dst, std::size_t dstCap)
+{
+    thread_local std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> ctx(ZSTD_createCCtx(), &ZSTD_freeCCtx);
+    if (!ctx)
+        return ZSTD_compress(dst, dstCap, src, srcSize, kZstdLevel);
+    ZSTD_CCtx_reset(ctx.get(), ZSTD_reset_session_only);
+    ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_compressionLevel, kZstdLevel);
+    ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_contentSizeFlag, 1);
+    ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_checksumFlag, 1);
+    return ZSTD_compress2(ctx.get(), dst, dstCap, src, srcSize);
+}
 
 std::int32_t Quantise(float v)
 {
@@ -280,12 +296,43 @@ void WorldSnapshot::ApplyWalls(TileMap &map) const
 {
     if (!hasWalls)
         return;
-    for (int y = 0; y < map.GetHeight(); ++y)
-        for (int x = 0; x < map.GetWidth(); ++x)
-            if (map.GetWall(x, y) != 0)
-                map.SetWall(x, y, Faction::Neutral, 0); // gone unless the list has it again
+    const int width = map.GetWidth();
+    const int height = map.GetHeight();
+    if (width <= 0 || height <= 0)
+        return;
+    std::vector<std::uint8_t> wanted(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
     for (const WallSnap &w : walls)
-        map.SetWall(w.x, w.y, static_cast<Faction>(w.faction), w.hpPercent, w.owner);
+    {
+        if (w.x >= 0 && w.x < width && w.y >= 0 && w.y < height)
+            wanted[static_cast<std::size_t>(w.y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(w.x)]
+                = 1;
+    }
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            if (map.GetWall(x, y) != 0
+                && wanted[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)]
+                       == 0)
+            {
+                map.SetWall(x, y, Faction::Neutral, 0); // gone unless the list has it again
+            }
+        }
+    }
+    for (const WallSnap &w : walls)
+    {
+        if (w.x < 0 || w.x >= width || w.y < 0 || w.y >= height)
+            continue;
+        const Faction faction = static_cast<Faction>(w.faction);
+        const PlayerId expectedOwner = w.owner == kNoPlayer ? Players::OwnerOf(faction) : w.owner;
+        const int curHp = map.GetWallHp(w.x, w.y);
+        const int curPct = std::clamp(curHp * 100 / std::max(1, map.GetWallMaxHp(w.x, w.y)), 1, 100);
+        if (map.GetWall(w.x, w.y) == 0 || map.GetWallFaction(w.x, w.y) != faction
+            || map.GetWallOwner(w.x, w.y) != expectedOwner || curPct != w.hpPercent)
+        {
+            map.SetWall(w.x, w.y, faction, w.hpPercent, w.owner);
+        }
+    }
 }
 
 void WorldSnapshot::CaptureEffects(EntityManager &entities)
@@ -353,9 +400,10 @@ void WorldSnapshot::CaptureEffects(EntityManager &entities)
 
 std::vector<std::uint8_t> WorldSnapshot::Encode() const
 {
-    std::vector<std::uint8_t> buffer(kMaxBytes);
-    Net::BitWriter w(buffer.data(), buffer.size());
-    w.writeU8(kVersion);
+    thread_local std::vector<std::uint8_t> raw(kMaxBytes);
+    if (raw.size() < kMaxBytes)
+        raw.resize(kMaxBytes);
+    Net::BitWriter w(raw.data(), raw.size());
     w.writeU32(tick);
     w.writeU32(baseTick);
     w.writeBool(full);
@@ -500,18 +548,37 @@ std::vector<std::uint8_t> WorldSnapshot::Encode() const
         w.writeVarInt(m.composite);
         w.writeFloat(m.seconds);
     }
-    const std::size_t size = w.finish();
-    if (w.overflowed())
+    const std::size_t rawSize = w.finish();
+    if (w.overflowed() || rawSize == 0)
         return {};
-    buffer.resize(size);
-    return buffer;
+    std::vector<std::uint8_t> out(1 + ZSTD_compressBound(rawSize));
+    out[0] = kVersion;
+    const std::size_t compressedSize = CompressFrame(raw.data(), rawSize, out.data() + 1, out.size() - 1);
+    if (ZSTD_isError(compressedSize) || 1 + compressedSize > kMaxBytes)
+        return {};
+    out.resize(1 + compressedSize);
+    return out;
 }
 
 bool WorldSnapshot::Decode(const std::uint8_t *data, std::size_t size, WorldSnapshot &out)
 {
-    Net::BitReader r(data, size);
-    if (r.readU8() != kVersion)
+    if (!data || size < 2 || data[0] != kVersion)
         return false;
+    const std::uint8_t *compressed = data + 1;
+    const std::size_t compressedSize = size - 1;
+    // Bounded decompression: reject unknown, zero, or > kMaxBytes frame content sizes before allocating
+    const unsigned long long rawSize = ZSTD_getFrameContentSize(compressed, compressedSize);
+    if (rawSize == ZSTD_CONTENTSIZE_ERROR || rawSize == ZSTD_CONTENTSIZE_UNKNOWN || rawSize == 0
+        || rawSize > kMaxBytes)
+        return false;
+    const std::size_t frameSize = ZSTD_findFrameCompressedSize(compressed, compressedSize);
+    if (ZSTD_isError(frameSize) || frameSize != compressedSize)
+        return false;
+    std::vector<std::uint8_t> raw(static_cast<std::size_t>(rawSize));
+    const std::size_t decompressed = ZSTD_decompress(raw.data(), raw.size(), compressed, compressedSize);
+    if (ZSTD_isError(decompressed) || decompressed != raw.size())
+        return false;
+    Net::BitReader r(raw.data(), raw.size());
     WorldSnapshot s;
     s.tick = r.readU32();
     s.baseTick = r.readU32();

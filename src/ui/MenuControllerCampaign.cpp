@@ -823,16 +823,19 @@ void MenuController::RenderCampaignMissionSelect(
     for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex)
     {
         UiRect itemRect = layout.ItemAt(itemIndex, scrollOff);
-        if (itemRect.Bottom() <= layout.list.y || itemRect.y >= layout.list.Bottom())
+        const int clipTop = std::max(itemRect.y, layout.list.y);
+        const int clipBot = std::min(itemRect.Bottom(), layout.list.Bottom());
+        if (clipBot <= clipTop)
             continue;
         bool isSelected = (itemIndex == selected);
         bool hovered = layout.list.Contains(m_mouseX, m_mouseY) && itemRect.Contains(m_mouseX, m_mouseY);
         if (hovered)
             SoundRequests::MarkHover();
 
+        const UiRect bgRect {itemRect.x, clipTop, itemRect.w, clipBot - clipTop};
         ui::DrawButtonChrome(
             renderer,
-            itemRect,
+            bgRect,
             isSelected ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.45f)
                        : (hovered ? ui::Mix(col::Hover, ui::color::AccentDeep, 0.22f)
                                   : ui::Mix(col::PanelRaised, ui::color::AccentDeep, 0.10f)),
@@ -840,6 +843,9 @@ void MenuController::RenderCampaignMissionSelect(
             isSelected ? col::Accent : (hovered ? col::BorderStrong : ui::Mix(col::Border, col::AccentDeep, 0.25f)),
             isSelected ? col::Accent : (hovered ? col::BorderStrong : SDL_Color {0, 0, 0, 0}),
             isSelected ? col::Accent : SDL_Color {0, 0, 0, 0});
+
+        if (itemRect.CenterY() - 8 < layout.list.y || itemRect.CenterY() + 8 > layout.list.Bottom())
+            continue;
 
         std::string numberText = std::to_string(itemIndex + 1);
         fontRenderer.DrawString(

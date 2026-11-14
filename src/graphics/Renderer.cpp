@@ -13,7 +13,10 @@ namespace OpenArtOfWar
 Renderer::Renderer(SDL_Renderer *sdlRenderer, TextureManager *textureManager)
     : m_renderer(sdlRenderer)
     , m_texManager(textureManager)
-{}
+{
+    const char *api = sdlRenderer ? SDL_GetRendererName(sdlRenderer) : nullptr;
+    m_syncBeforePresent = api && SDL_strcmp(api, "vulkan") == 0;
+}
 
 Renderer::~Renderer()
 {
@@ -93,6 +96,7 @@ void Renderer::EndWorldPass()
 {
     m_drawOwner = kNoPlayer;
     m_structureTeam = 0;
+    m_glowStrength = 0.0f;
     PlainState();
 }
 
@@ -162,6 +166,16 @@ void Renderer::Clear(SDL_Color clearColor)
 
 void Renderer::Present()
 {
+    // SDL's Vulkan renderer (not SDL GPU) keeps one set of vertex buffers for all frames and only waits for the frame
+    // submitted a swapchain length ago: on a GPU that lags a frame behind, the next frame overwrites vertices that are
+    // still being drawn (text and sprites land on wrong quads, white slabs). Reading one pixel back submits the
+    // frame and waits for the GPU, so the buffers are idle before they are reused.
+    if (m_syncBeforePresent && !SDL_GetRenderTarget(m_renderer))
+    {
+        const SDL_Rect one {0, 0, 1, 1};
+        if (SDL_Surface *pixel = SDL_RenderReadPixels(m_renderer, &one))
+            SDL_DestroySurface(pixel);
+    }
     SDL_RenderPresent(m_renderer);
 }
 
@@ -205,6 +219,7 @@ void Renderer::DrawRawSpriteWorld(int spriteId, float worldX, float worldY, cons
     if (m_glowStrength > 0.0f)
     {
         // The same pixels once more, added in the glow colour: only the sprite itself shines
+        PlainState();
         SDL_SetTextureBlendMode(sheet, SDL_BLENDMODE_ADD);
         SDL_SetTextureColorMod(sheet, m_glowColor.r, m_glowColor.g, m_glowColor.b);
         SDL_SetTextureAlphaMod(sheet, static_cast<Uint8>(std::clamp(m_glowStrength, 0.0f, 1.0f) * 255.0f));
@@ -294,10 +309,24 @@ bool Renderer::GetCompositeBounds(int compId, float &minX, float &minY, float &m
     minX = minY = maxX = maxY = 0.0f;
     if (!m_texManager || compId < 0)
         return false;
+    if (const auto it = m_compBoundsCache.find(compId); it != m_compBoundsCache.end())
+    {
+        if (it->second[0] == 0.0f)
+            return false;
+        minX = it->second[1];
+        minY = it->second[2];
+        maxX = it->second[3];
+        maxY = it->second[4];
+        return true;
+    }
     float box[4] {0, 0, 0, 0};
     bool any = false;
     if (!CompositeBox(*m_texManager, compId, 0.0f, 0.0f, 0, box, any))
+    {
+        m_compBoundsCache[compId] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
         return false;
+    }
+    m_compBoundsCache[compId] = {1.0f, box[0], box[1], box[2], box[3]};
     minX = box[0];
     minY = box[1];
     maxX = box[2];
@@ -1189,6 +1218,8 @@ void Renderer::DrawRawSpriteScreen(int spriteId, int screenX, int screenY, float
            std::max(1.0f, std::round(frame->width * scale)),
            std::max(1.0f, std::round(frame->height * scale))};
     SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
+    if (m_drawOwner < kMaxPlayers)
+        PlainState();
 }
 
 void Renderer::DrawSpritePartScreen(
@@ -1245,6 +1276,8 @@ void Renderer::DrawSpritePartScreen(
         SDL_RenderTexture(m_renderer, sheet, &srcRect, &dstRect);
     else
         SDL_RenderTextureRotated(m_renderer, sheet, &srcRect, &dstRect, 0.0, nullptr, flip);
+    if (m_drawOwner < kMaxPlayers)
+        PlainState();
     if (customTint)
         SDL_SetTextureColorMod(sheet, 255, 255, 255);
     if (alpha != 255)
@@ -1303,6 +1336,19 @@ void Renderer::ApplyAnchor(int &x, int &y, int w, int h, int anchor) const
 
 void Renderer::SetClipRect(const SDL_Rect &rect)
 {
+    float sx = 1.0f, sy = 1.0f;
+    SDL_GetRenderScale(m_renderer, &sx, &sy);
+    const bool scaled = std::abs(sx - 1.0f) > 0.001f || std::abs(sy - 1.0f) > 0.001f;
+#if OAOW_TOUCH
+    const bool bypassScissor = !m_clipTargetActive;
+#else
+    const bool bypassScissor = scaled && !m_clipTargetActive;
+#endif
+    if (bypassScissor)
+    {
+        SDL_SetRenderClipRect(m_renderer, nullptr);
+        return;
+    }
     SDL_SetRenderClipRect(m_renderer, &rect);
 }
 
@@ -1336,8 +1382,13 @@ bool Renderer::BeginClipTarget(const SDL_Rect &rect, SDL_Color background)
     SDL_SetRenderScale(m_renderer, scale, scale);
     SDL_SetRenderViewport(m_renderer, m_clipPrevViewportSet ? &m_clipPrevViewport : nullptr);
     SDL_SetRenderClipRect(m_renderer, nullptr);
+    PlainState();
+    SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_NONE);
     SDL_SetRenderDrawColor(m_renderer, background.r, background.g, background.b, background.a);
-    SDL_RenderClear(m_renderer);
+    const SDL_FRect clearRect {
+        static_cast<float>(rect.x), static_cast<float>(rect.y), static_cast<float>(rect.w), static_cast<float>(rect.h)};
+    SDL_RenderFillRect(m_renderer, &clearRect);
+    SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
     m_clipTargetRect = rect;
     m_clipScale = scale;
     m_clipBackgroundTranslucent = background.a < 255;

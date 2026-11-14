@@ -45,9 +45,49 @@ int TabIcon(int tab)
 
 constexpr int kCameoWidth = 60; // native cameo composite size
 
-// A true circle outline in screen pixels (64 segments)
-void DrawCircleScreen(Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color)
+// A true circle outline in screen pixels (64 segments), clipped to `clip`
+void DrawCircleScreen(
+    Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color, const SDL_Rect &clip)
 {
+    if (clip.w <= 0 || clip.h <= 0)
+        return;
+    const float xmin = static_cast<float>(clip.x);
+    const float ymin = static_cast<float>(clip.y);
+    const float xmax = static_cast<float>(clip.x + clip.w - 1);
+    const float ymax = static_cast<float>(clip.y + clip.h - 1);
+    auto clipAndDraw = [&](float x0, float y0, float x1, float y1) {
+        float t0 = 0.0f, t1 = 1.0f;
+        const float dx = x1 - x0, dy = y1 - y0;
+        auto clipEdge = [&](float p, float q) {
+            if (std::abs(p) < 1e-6f)
+                return q >= 0.0f;
+            const float r = q / p;
+            if (p < 0.0f)
+            {
+                if (r > t1)
+                    return false;
+                if (r > t0)
+                    t0 = r;
+            }
+            else
+            {
+                if (r < t0)
+                    return false;
+                if (r < t1)
+                    t1 = r;
+            }
+            return true;
+        };
+        if (!clipEdge(-dx, x0 - xmin) || !clipEdge(dx, xmax - x0) || !clipEdge(-dy, y0 - ymin)
+            || !clipEdge(dy, ymax - y0))
+            return;
+        renderer.DrawLineScreen(
+            static_cast<int>(std::lround(x0 + t0 * dx)),
+            static_cast<int>(std::lround(y0 + t0 * dy)),
+            static_cast<int>(std::lround(x0 + t1 * dx)),
+            static_cast<int>(std::lround(y0 + t1 * dy)),
+            color);
+    };
     constexpr int kSegments = 64;
     float prevX = centerX + radius;
     float prevY = centerY;
@@ -56,28 +96,30 @@ void DrawCircleScreen(Renderer &renderer, float centerX, float centerY, float ra
         const float angle = 6.28318530718f * static_cast<float>(i) / kSegments;
         const float nextX = centerX + radius * std::cos(angle);
         const float nextY = centerY + radius * std::sin(angle);
-        renderer.DrawLineScreen(
-            static_cast<int>(std::lround(prevX)),
-            static_cast<int>(std::lround(prevY)),
-            static_cast<int>(std::lround(nextX)),
-            static_cast<int>(std::lround(nextY)),
-            color);
+        clipAndDraw(prevX, prevY, nextX, nextY);
         prevX = nextX;
         prevY = nextY;
     }
 }
 
-// A filled disc, one horizontal span per pixel row
-void FillCircleScreen(Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color)
+// A filled disc, one horizontal span per pixel row, clipped to `clip`
+void FillCircleScreen(
+    Renderer &renderer, float centerX, float centerY, float radius, SDL_Color color, const SDL_Rect &clip)
 {
+    if (clip.w <= 0 || clip.h <= 0)
+        return;
     const int intRadius = static_cast<int>(std::ceil(radius));
+    const int cy = static_cast<int>(std::lround(centerY));
     for (int offsetY = -intRadius; offsetY <= intRadius; ++offsetY)
     {
+        const int py = cy + offsetY;
+        if (py < clip.y || py >= clip.y + clip.h)
+            continue;
         const float span = std::sqrt(std::max(0.0f, radius * radius - static_cast<float>(offsetY * offsetY)));
-        const int leftX = static_cast<int>(std::lround(centerX - span));
-        const int rightX = static_cast<int>(std::lround(centerX + span));
-        renderer.FillRectScreen(
-            leftX, static_cast<int>(std::lround(centerY)) + offsetY, std::max(1, rightX - leftX), 1, color);
+        const int leftX = std::max(clip.x, static_cast<int>(std::lround(centerX - span)));
+        const int rightX = std::min(clip.x + clip.w, static_cast<int>(std::lround(centerX + span)));
+        if (rightX > leftX)
+            renderer.FillRectScreen(leftX, py, rightX - leftX, 1, color);
     }
 }
 
@@ -328,17 +370,8 @@ void HUDController::DrawRadar(
     RadarView view = radarView(radarRect, mapWidth, mapHeight, m_radarZoom, m_radarCenterX, m_radarCenterY);
     if (view.w > 0 && view.h > 0)
     {
-        const SDL_Rect radarInner {
-            radarRect.x + 1, radarRect.y + 1, std::max(0, radarRect.w - 2), std::max(0, radarRect.h - 2)};
-        // Clip into an offscreen target when supported (safe against zoomed tiles/alert waves overflowing);
-        // otherwise keep hardware clip + explicit bounds clamping so nothing spills outside radarRect.
-        const bool softClip
-            = radarInner.w > 0 && radarInner.h > 0 && renderer.BeginClipTarget(radarInner, {6, 12, 10, 255});
-        if (!softClip)
-        {
-            renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
-            renderer.SetClipRect({view.ox, view.oy, view.w, view.h});
-        }
+        const SDL_Rect radarClip {view.ox, view.oy, view.w, view.h};
+        renderer.FillRectScreen(radarRect.x, radarRect.y, radarRect.w, radarRect.h, {6, 12, 10, 255});
         auto fillClamped = [&](int x, int y, int w, int h, SDL_Color color) {
             const int x0 = std::max(x, view.ox);
             const int y0 = std::max(y, view.oy);
@@ -501,10 +534,10 @@ void HUDController::DrawRadar(
                 SDL_Color waveColor = alertConfig.color;
                 waveColor.a = static_cast<Uint8>(alertConfig.color.a * opacity);
                 for (int k = 0; k < alertConfig.waveThicknessPx; ++k)
-                    DrawCircleScreen(renderer, centerX, centerY, radius + static_cast<float>(k), waveColor);
+                    DrawCircleScreen(renderer, centerX, centerY, radius + static_cast<float>(k), waveColor, radarClip);
             }
             if (m_radarAlert.BlinkOn(nowMs) && alertConfig.dotRadiusPx > 0.0f)
-                FillCircleScreen(renderer, centerX, centerY, alertConfig.dotRadiusPx, alertConfig.color);
+                FillCircleScreen(renderer, centerX, centerY, alertConfig.dotRadiusPx, alertConfig.color, radarClip);
         }
 
         // Camera frame from rounded edges (truncating position and size separately made it wobble)
@@ -549,10 +582,6 @@ void HUDController::DrawRadar(
                 renderer.FillRectScreen(
                     view.ox + view.w, top, radarRect.Right() - (view.ox + view.w), bottom - top, back);
         }
-        if (softClip)
-            renderer.EndClipTarget(255);
-        else
-            renderer.ResetClipRect();
     }
     ui::DrawPanelFrame(renderer, radarRect, col::BorderStrong);
 
@@ -731,28 +760,29 @@ void HUDController::RenderGameHud(
 
             if (TabIcon(tabIndex) >= 0)
             {
-                renderer.SetClipRect({tabRect.x + 1, tabRect.y + 1, tabRect.w - 2, tabRect.h - 4});
+                const int insetBottom = active ? 5 : 4;
+                renderer.SetClipRect({tabRect.x + 2, tabRect.y + 2, tabRect.w - 4, tabRect.h - insetBottom});
                 float iconScale = 0.75f;
                 int iconWidth = static_cast<int>(kCameoWidth * iconScale);
                 renderer.SetDrawOwner(Players::Local());
                 renderer.SetStructureFaction(PlayerFaction());
                 renderer.DrawCompositeScreen(
-                    TabIcon(tabIndex), tabRect.CenterX() - iconWidth / 2, tabRect.y + 6, iconScale, PlayerFaction());
+                    TabIcon(tabIndex), tabRect.CenterX() - iconWidth / 2, tabRect.y + 5, iconScale, PlayerFaction());
                 renderer.SetStructureFaction(Faction::Neutral);
                 renderer.SetDrawOwner(kNoPlayer);
                 renderer.ResetClipRect();
                 if (!active)
                     renderer.FillRectScreen(
-                        tabRect.x + 1,
-                        tabRect.y + 1,
-                        tabRect.w - 2,
+                        tabRect.x + 2,
+                        tabRect.y + 2,
+                        tabRect.w - 4,
                         tabRect.h - 4,
-                        {10, 12, 16, hovered ? Uint8(60) : Uint8(110)});
+                        {8, 10, 14, hovered ? Uint8(30) : Uint8(65)});
             }
             else
             {
-                DrawCrosshair(
-                    renderer, tabRect.CenterX(), tabRect.CenterY() - 1, 16, SDL_Color {255, 255, 255, 200});
+                const SDL_Color crossColor = active ? col::White : (hovered ? col::Text : col::TextDim);
+                DrawCrosshair(renderer, tabRect.CenterX(), tabRect.CenterY() - 1, 16, crossColor);
             }
         }
 

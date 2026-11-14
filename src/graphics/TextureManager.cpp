@@ -462,7 +462,8 @@ SDL_Texture *TextureManager::GetRecoloredSpriteSheet(int page, int team, SDL_Col
     float teamH = 0.0f, teamS = 0.0f, teamV = 0.0f;
     RgbToHsv(color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, teamH, teamS, teamV);
     const float gain = team == 2 ? 1.7f : 1.0f;
-    const float satFactor = gain * (0.6f + 0.5f * teamS);
+    const float satScale = teamS < 0.25f ? (teamS * 3.0f) : (0.6f + 0.5f * teamS);
+    const float satFactor = gain * satScale;
 
     for (int y = 0; y < copy->h; ++y)
     {

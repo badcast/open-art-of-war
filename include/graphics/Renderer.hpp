@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <unordered_map>
 #include <utility>
 
@@ -295,9 +296,11 @@ private:
     int m_structureTeam {0}; // see setStructureFaction
     bool m_showShadows {true};
     std::unordered_map<int, std::pair<float, float>> m_compCenterOffset; // CompositeCenterOffset cache
+    mutable std::unordered_map<int, std::array<float, 5>> m_compBoundsCache; // GetCompositeBounds cache: {valid, minX, minY, maxX, maxY}
     std::vector<bool> m_tintedSheet; // images whose colour mod carries an army colour right now
 
     SDL_Renderer *m_renderer {nullptr};
+    bool m_syncBeforePresent {false}; // SDL Vulkan renderer: wait for the GPU before Present (see Present)
     TextureManager *m_texManager {nullptr};
     SDL_Texture *m_maskTexture {nullptr};
     SDL_Texture *m_clipTex {nullptr}; // BeginClipTarget's picture

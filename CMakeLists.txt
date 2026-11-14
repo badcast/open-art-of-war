@@ -397,7 +397,7 @@ function(openaow_executable target output)
             set(OAOW_MANIFEST_IN "manifest-game.in")
             set(OAOW_RC_IN "manifest-game.rc.in")
             set(OAOW_ICON_PATH "${PROJECT_SOURCE_DIR}/docs/app-game-icon.ico")
-            set(OAOW_DESCRIPTION "Open Art Of War: Freedom for Liberty")
+            set(OAOW_DESCRIPTION "Open Art Of War: Resistance Arisen")
         elseif(target STREQUAL "openaow-charactereditor")
             set(OAOW_MANIFEST_NAME "OpenArtOfWar.CharacterEditor")
             set(OAOW_MANIFEST_IN "manifest-charactereditor.in")
@@ -536,6 +536,13 @@ set_target_properties(openaow-ai-defense-tests PROPERTIES
     BUILD_RPATH "${OAOW_TESTS_RPATH}")
 # (it reads the unit and building definitions: run where ./assets is)
 add_test(NAME openaow-ai-defense-tests COMMAND openaow-ai-defense-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+add_executable(openaow-unit-orders-tests tests/UnitOrdersTests.cpp)
+target_link_libraries(openaow-unit-orders-tests PRIVATE openaow-core)
+set_target_properties(openaow-unit-orders-tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OAOW_TESTS_DIR}"
+    BUILD_RPATH "${OAOW_TESTS_RPATH}")
+add_test(NAME openaow-unit-orders-tests COMMAND openaow-unit-orders-tests WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 add_executable(openaow-worldsnapshot-tests tests/WorldSnapshotTests.cpp)
 target_link_libraries(openaow-worldsnapshot-tests PRIVATE openaow-core)

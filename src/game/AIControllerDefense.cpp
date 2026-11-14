@@ -83,8 +83,10 @@ bool AIController::IsNearBase(
 {
     const float hqPixelX = m_enemyHqX * TILE_WIDTH + TILE_WIDTH * 0.5f;
     const float hqPixelY = m_enemyHqY * TILE_HEIGHT + TILE_HEIGHT * 0.5f;
-    if (DetMath::Hypot(entity.GetUnitCenterPixelX() - hqPixelX, entity.GetUnitCenterPixelY() - hqPixelY)
-        <= (kHqZoneTiles + extraTiles) * TILE_WIDTH)
+    // measured in tiles on both axes (a tile is wider than it is high)
+    if (DetMath::Hypot(
+            (entity.GetUnitCenterPixelX() - hqPixelX) / TILE_WIDTH, (entity.GetUnitCenterPixelY() - hqPixelY) / TILE_HEIGHT)
+        <= kHqZoneTiles + extraTiles)
         return true;
     for (const Building *building : ownStructures)
     {
@@ -135,7 +137,8 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
     std::sort(threatIds.begin(), threatIds.end());
     threatIds.erase(std::unique(threatIds.begin(), threatIds.end()), threatIds.end());
 
-    // Troops chasing an enemy outside the base switch to the offensive and never return to base
+    // Troops chasing an enemy out of the base give up the chase and go home
+    std::vector<int> returning;
     for (auto &entity : entities.GetAllEntities())
     {
         Unit *unit = entity.AsUnit();
@@ -152,10 +155,15 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         const Entity *target = entities.GetEntity(unit->targetEntityId);
         if (!target || IsNearBase(*target, ownBuildings, kBaseChaseTiles))
             continue;
+        // Back toward the staging point; out of the defender set it is reserve again (the next wave can use it)
         m_defenders.erase(unit->id);
         m_waveRoster.erase(unit->id);
-        m_offensive.insert(unit->id);
+        m_offensive.erase(unit->id);
+        returning.push_back(unit->id);
     }
+    if (!returning.empty())
+        entities.IssueAttackMoveOrder(
+            returning, m_stagingX >= 0 ? m_stagingX : m_enemyHqX, m_stagingY >= 0 ? m_stagingY : m_enemyHqY, pathfinder);
 
     // Enemy troops at the base, gathered into attacks (several attacks from several sides are told apart)
     struct Attack
@@ -209,6 +217,7 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
         matchedAttack->strength += value;
     }
 
+    std::vector<int> strayed;
     // Defenders that died or joined a squad are none any more; with the base quiet again all of them are released
     for (auto it = m_defenders.begin(); it != m_defenders.end();)
     {
@@ -220,13 +229,17 @@ void AIController::UpdateBaseDefense(EntityManager &entities, Pathfinder &pathfi
                 && !m_squadController.IsSquadMember(it->first) && !m_garrison.count(it->first) && !atBase(*unit))
             {
                 m_waveRoster.erase(it->first);
-                m_offensive.insert(it->first);
+                m_offensive.erase(it->first);
+                strayed.push_back(it->first);
             }
             it = m_defenders.erase(it);
         }
         else
             ++it;
     }
+    if (!strayed.empty())
+        entities.IssueAttackMoveOrder(
+            strayed, m_stagingX >= 0 ? m_stagingX : m_enemyHqX, m_stagingY >= 0 ? m_stagingY : m_enemyHqY, pathfinder);
     if (attacks.empty())
     {
         m_lastThreatId = 0;

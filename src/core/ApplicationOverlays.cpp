@@ -51,38 +51,7 @@ namespace OpenArtOfWar
 // The edge of the map melts into the dark background instead of ending in a hard line
 void Application::RenderMapEdgeFade(const Camera &camera)
 {
-    if (!m_map)
-        return;
-    float x0, y0, x1, y1;
-    camera.WorldToScreen(0.0f, 0.0f, x0, y0);
-    camera.WorldToScreen(
-        static_cast<float>(m_map->GetWidth() * TILE_WIDTH),
-        static_cast<float>(m_map->GetHeight() * TILE_HEIGHT),
-        x1,
-        y1);
-    const int viewW = camera.GetViewportWidth(), viewH = camera.GetViewportHeight();
-    const int depth = std::max(4, static_cast<int>(1.6f * TILE_HEIGHT * camera.GetZoom()));
-    const int left = static_cast<int>(std::floor(x0)), top = static_cast<int>(std::floor(y0));
-    const int right = static_cast<int>(std::ceil(x1)), bottom = static_cast<int>(std::ceil(y1));
-    auto shade = [&](int i) {
-        const float t = 1.0f - static_cast<float>(i) / depth;
-        return SDL_Color {0, 0, 0, static_cast<Uint8>(215.0f * t * t)};
-    };
-    const int yFrom = std::max(0, top), yTo = std::min(viewH - 1, bottom - 1);
-    const int xFrom = std::max(0, left), xTo = std::min(viewW - 1, right - 1);
-    for (int i = 0; i < depth; ++i)
-    {
-        const SDL_Color c = shade(i);
-        const int lx = left + i, rx = right - 1 - i, ty = top + i, by = bottom - 1 - i;
-        if (lx >= 0 && lx < viewW)
-            m_renderer->DrawLineScreen(lx, yFrom, lx, yTo, c);
-        if (rx >= 0 && rx < viewW)
-            m_renderer->DrawLineScreen(rx, yFrom, rx, yTo, c);
-        if (ty >= 0 && ty < viewH)
-            m_renderer->DrawLineScreen(xFrom, ty, xTo, ty, c);
-        if (by >= 0 && by < viewH)
-            m_renderer->DrawLineScreen(xFrom, by, xTo, by, c);
-    }
+    (void)camera;
 }
 
 void Application::DrawLoadingFrame(
@@ -110,14 +79,14 @@ void Application::DrawLoadingFrame(
     SDL_SetRenderDrawColor(m_sdlRenderer, 8, 10, 14, 255);
     SDL_RenderClear(m_sdlRenderer);
     ui::DrawLoadingScreen(*m_renderer, *m_fontRenderer, w, h, title, status, progress, SDL_GetTicks(), preview, pw, ph);
-    SDL_RenderPresent(m_sdlRenderer);
+    m_renderer->Present();
 }
 
 void Application::ShowLoading(std::string_view status, float progress)
 {
     if (m_headless || !m_sdlRenderer || !m_renderer || !m_fontRenderer)
         return;
-    DrawLoadingFrame("OPEN ART OF WAR: FREEDOM FOR LIBERTY", status, progress, nullptr, 0, 0);
+    DrawLoadingFrame("OPEN ART OF WAR: RESISTANCE ARISEN", status, progress, nullptr, 0, 0);
 }
 
 void Application::BeginMapLoading(std::string_view title, std::string_view mapPath)
@@ -338,6 +307,7 @@ void Application::RenderScoreboard()
     struct Row
     {
         PlayerId id;
+        int team {0};
         std::string name;
         std::string faction;
         SDL_Color color;
@@ -356,6 +326,7 @@ void Application::RenderScoreboard()
         const PlayerSlot &slot = Players::Slot(id);
         Row r;
         r.id = id;
+        r.team = slot.team;
         r.gone = false;
         r.defeated = m_entities->IsEliminated(id);
         if (!slot.human)
@@ -387,21 +358,41 @@ void Application::RenderScoreboard()
     }
     if (rows.empty())
         return;
-    // Best first; the same points: in slot order
-    std::stable_sort(rows.begin(), rows.end(), [](const Row &a, const Row &b) {
+    const int localTeam = Players::Slot(Players::Local()).team;
+    // Group by team (local player's team first), then alive before defeated, then best points
+    std::stable_sort(rows.begin(), rows.end(), [localTeam](const Row &a, const Row &b) {
+        const bool aLocal = (a.team == localTeam);
+        const bool bLocal = (b.team == localTeam);
+        if (aLocal != bLocal)
+            return aLocal;
+        if (a.team != b.team)
+            return a.team < b.team;
         if (a.defeated != b.defeated)
             return !a.defeated;
         return a.points > b.points;
     });
-    const bool hasDefeated = std::any_of(rows.begin(), rows.end(), [](const Row &r) { return r.defeated; });
+    int teamCount = 0;
+    {
+        int prevTeam = -1;
+        for (const Row &r : rows)
+        {
+            if (r.team != prevTeam)
+            {
+                ++teamCount;
+                prevTeam = r.team;
+            }
+        }
+    }
 
     const int viewW = m_camera->GetViewportWidth();
-    const int rowH = 30, headH = 84;
+    const int rowH = 30, teamHeaderH = 26, headH = 84;
     // Columns: colour swatch + name | faction | colour | efficiency | kills | losses
     const int colName = 16, colFaction = 250, colColor = 410, colPoints = 520, colKills = 620, colLosses = 700;
     const int w = std::min(viewW - 32, 780);
-    const int h = headH + static_cast<int>(rows.size()) * rowH + 34 + (hasDefeated ? rowH : 0);
-    const int x = (viewW - w) / 2, y = std::max(72, (m_windowH - h) / 3);
+    const int h = std::min(
+        m_windowH - 40,
+        headH + static_cast<int>(rows.size()) * rowH + teamCount * teamHeaderH + 34);
+    const int x = (viewW - w) / 2, y = std::max(20, (m_windowH - h) / 3);
     m_renderer->FillRectScreen(x, y, w, h, col::Panel);
     m_renderer->DrawRectScreen(x, y, w, h, col::BorderStrong);
     m_renderer->FillRectScreen(x, y, w, 2, col::Accent);
@@ -437,18 +428,46 @@ void Application::RenderScoreboard()
     m_fontRenderer->DrawString(_("Kills"), x + colKills, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     m_fontRenderer->DrawString(_("Losses"), x + colLosses, hy, ui::FONT_SMALL_BOLD, col::TextDim, false);
     int ry = y + headH;
-    bool defeatedHeading = false;
+    int currentTeam = -1;
     for (const Row &r : rows)
     {
-        if (r.defeated && !defeatedHeading)
+        if (r.team != currentTeam)
         {
-            m_fontRenderer->DrawString(_("Defeated"), x + colName, ry + 6, ui::FONT_SMALL_BOLD, col::TextMuted, false);
-            ry += rowH;
-            defeatedHeading = true;
+            if (ry + teamHeaderH > y + h - 24)
+                break;
+            currentTeam = r.team;
+            int teamPoints = 0;
+            for (const Row &tr : rows)
+            {
+                if (tr.team == currentTeam)
+                    teamPoints += tr.points;
+            }
+            const bool isAllyTeam = (currentTeam == localTeam);
+            const SDL_Color teamColor = isAllyTeam ? col::Ok : col::Danger;
+            m_renderer->FillRectScreen(x + 8, ry + 2, w - 16, teamHeaderH - 4, ui::WithAlpha(teamColor, 28));
+            m_renderer->FillRectScreen(x + 8, ry + 2, 3, teamHeaderH - 4, teamColor);
+            m_renderer->DrawRectScreen(x + 8, ry + 2, w - 16, teamHeaderH - 4, ui::WithAlpha(teamColor, 110));
+            std::string teamLabel = std::string(_("Team")) + " " + std::to_string(currentTeam + 1);
+            if (isAllyTeam)
+                teamLabel += std::string(" (") + _("Allies") + ")";
+            const int tcy = ry + teamHeaderH / 2;
+            m_fontRenderer->DrawString(
+                teamLabel, x + colName + 6, tcy, ui::FONT_SMALL_BOLD, teamColor, false, Anchor::LEFT | Anchor::VCENTER);
+            m_fontRenderer->DrawString(
+                std::to_string(teamPoints),
+                x + colPoints,
+                tcy,
+                ui::FONT_SMALL_BOLD,
+                teamColor,
+                false,
+                Anchor::LEFT | Anchor::VCENTER);
+            ry += teamHeaderH;
         }
+        if (ry + rowH > y + h - 24)
+            break;
         const bool me = r.id == Players::Local();
         if (me)
-            m_renderer->FillRectScreen(x + 4, ry, w - 8, rowH - 2, col::Hover);
+            m_renderer->FillRectScreen(x + 8, ry, w - 16, rowH - 2, ui::WithAlpha(col::Accent, 32));
         const int cy = ry + rowH / 2 - 1;
         const SDL_Color text = (r.gone || r.defeated) ? col::TextMuted : col::Text;
         m_renderer->FillRectScreen(x + colName, cy - 7, 14, 14, r.defeated ? col::TextMuted : r.color);
@@ -456,8 +475,10 @@ void Application::RenderScoreboard()
         std::string name = r.name;
         if (r.gone)
             name += std::string(" (") + _("left") + ")";
+        if (r.defeated)
+            name += std::string(" (") + _("Defeated") + ")";
         m_fontRenderer->DrawString(
-            name,
+            ui::FitText(*m_fontRenderer, name, me ? ui::FONT_BODY_BOLD : ui::FONT_BODY, colFaction - colName - 30),
             x + colName + 22,
             cy,
             me ? ui::FONT_BODY_BOLD : ui::FONT_BODY,
@@ -485,7 +506,7 @@ void Application::RenderScoreboard()
     m_fontRenderer->DrawString(
         _("Efficiency: a point for every 10 credits of enemy forces destroyed"),
         x + colName,
-        ry + 10,
+        y + h - 22,
         ui::FONT_SMALL,
         col::TextMuted,
         false);

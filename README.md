@@ -1,4 +1,4 @@
-# Open Art Of War: Freedom for Liberty
+# Open Art Of War: Resistance Arisen
 
 <div align="center">
 
@@ -32,7 +32,7 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 <details>
 <summary>In Russian</summary>
 
-**Open Art Of War: Freedom for Liberty** - открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS, Android и iOS. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков и редакторы.
+**Open Art Of War: Resistance Arisen** - открытое воссоздание классической стратегии Art of War 2 для Linux, Windows, macOS, Android и iOS. Доступны кампании за две стороны, бои с компьютером, сетевая игра до восьми игроков, выделенный сервер ([`openaow-server`](openaow-server/README.md)) и редакторы.
 
 > **Статус:** проект находится в разработке и тестировании. Графика и звук оригинальной игры не входят в лицензию движка. Перед запуском необходимо подготовить игровые ресурсы.
 
@@ -44,7 +44,7 @@ A native, open-source, **cross-platform real-time strategy game** recreating **A
 ## Features
 
 - **Two factions and campaigns:** Resistance - *Liberation of Peru*; Confederation - *Global Confederation*.
-- **Skirmishes and multiplayer:** custom maps, computer opponents, teams and up to eight players; LAN discovery, direct connections and server rooms.
+- **Skirmishes, multiplayer and dedicated server:** custom maps, computer opponents, teams and up to eight players; LAN discovery, direct connections, P2P NAT hole-punching and standalone headless [dedicated server](openaow-server/README.md) (`openaow-server`) rooms.
 - **Classic RTS gameplay:** base building, power, economy, research, fog of war, attack-move and control groups.
 - **Desktop and touch controls:** mouse and keyboard on desktop; touch selection, contextual commands, camera gestures and a landscape HUD on Android and iOS.
 - **Configurable graphics:** zoom, quality settings, renderer fallback and shader effects where supported.
@@ -191,7 +191,15 @@ Choose **Network game** from the main menu and enter a player name.
 
 The host chooses the map and computer opponents. Players choose their faction, team, colour and start position, then mark themselves ready. Missing maps are transferred through the lobby.
 
-Opening the game menu does not pause a network match. The game supports reconnecting and checks simulation consistency between peers.
+Opening the game menu does not pause a network match. Network matches run in **Authority/Replica** mode by default (with deterministic lockstep fallback via `OAOW_LOCKSTEP=1` and for replays) and support seamless reconnecting. In Authority/Replica mode, the room owner simulates the world and streams real-time **world snapshots** (`WorldSnapshot`) optimized specifically for low-latency RTS transmission:
+
+- **Per-player fog-of-war filtering** and **ack-tracked delta encoding** (`AuthorityAck`) send only visible, changed entities, walls, and transient combat events.
+- **Compact binary encoding** quantises unit sub-tile positions to `1/16 px` steps and packs fields with varints before compression.
+- **Tuned Zstandard (`zstd`) compression** (`ZSTD_compress2` at `ZSTD_CLEVEL_DEFAULT` with frame checksums, content-size headers, a reused `thread_local` compression context, and bounded `2 MiB` single-frame decode) cuts snapshot traffic roughly 4.5x on full keyframes while keeping authority CPU overhead minimal; ENet also adds CRC-32 datagram integrity and range-coder wire compression, while `openaow-server` forwards compressed snapshot payloads directly without re-encoding.
+
+### Dedicated server (`openaow-server`)
+
+The repository includes a standalone headless **dedicated server** (`openaow-server`) that provides the public room directory, on-demand dedicated game rooms, P2P NAT hole-punching rendezvous (preserving local/mobile hosting), HTTP JSON status monitoring and `.awr` match replay recording—requiring no graphics, audio or game assets. See the full [Dedicated Server Guide](openaow-server/README.md) for CLI flags, `--config` JSON options and deployment notes.
 
 <details>
 <summary>Command-line examples and dedicated server</summary>
@@ -210,9 +218,9 @@ Opening the game menu does not pause a network match. The game supports reconnec
 ./build/openaow-server --help
 ```
 
-The server needs no graphics or game assets. Default ports are UDP `38100` for discovery and room access, UDP `38110–38199` for rooms, and TCP `38100` for the HTTP status endpoint. See the [systemd service example](openaow-server/openaow-server.service) for Linux hosting.
+The server needs no graphics or game assets. Default ports are UDP `38100` for discovery and room access, UDP `38110–38199` for rooms, and TCP `38100` for the HTTP status endpoint. See the [Dedicated Server README](openaow-server/README.md) and [systemd service example](openaow-server/openaow-server.service) for Linux hosting.
 
-The simulation uses deterministic lockstep: players exchange commands and each peer simulates the world. Network defaults are configured in `assets/data/game_environment.yaml`.
+Network matches use Authority/Replica state synchronization by default (with deterministic lockstep fallback). Network defaults are configured in `assets/data/game_environment.yaml`.
 
 </details>
 
@@ -233,6 +241,7 @@ The game stores preferences and progress in its per-user application directory, 
 
 | Guide | Contents |
 | --- | --- |
+| [Dedicated server](openaow-server/README.md) | Headless dedicated server (`openaow-server`), CLI/`--config` flags, ports, HTTP status and replays |
 | [Android](android-setup/README.md) | Android build setup, assets, touch controls and device checks |
 | [iOS](ios-setup/README.md) | macOS/Xcode build setup, Metal shaders, `GAME_DATA_URLS` and sideloading |
 | [Tests & debugging](TESTS.md) | Test suites, debug builds and diagnostic tools |

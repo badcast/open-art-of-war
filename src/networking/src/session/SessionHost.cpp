@@ -296,7 +296,7 @@ void SessionHost::applyChoice(std::uint8_t slot, LobbyChoice choice, bool ownerE
             choice.spawn = m_slots[slot].choice.spawn;
     }
     choice.team &= 7;
-    choice.color &= 15;
+    choice.color = choice.color <= 8 ? choice.color : 0;
     if (!ownerEdit || choice.handicap > 5)
         choice.handicap = m_slots[slot].choice.handicap;
     if (!ownerEdit || choice.armyCap > 7)
@@ -534,7 +534,10 @@ void SessionHost::update(std::uint32_t nowMs)
             for (SlotState &slot : m_slots)
                 slot = SlotState {};
             m_running = false;
+            m_authoritySlot = -1;
             m_paused = false;
+            m_desynced = false;
+            m_desyncTick = 0;
             m_nextTurn = 0;
             m_turnLog.clear();
             m_leftPending.clear();
@@ -579,6 +582,8 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
                 + m_transports[c.transport]->peerAddress(c.peer));
             m_slots[c.slot].connected = false;
             m_slots[c.slot].goneMs = nowMs;
+            m_slots[c.slot].authorityAcked = false;
+            m_slots[c.slot].authorityAckTick = 0;
             // In the room the slot is free again; in a match it waits for the player to come back (for a while)
             if (!m_running)
                 m_slots[c.slot] = SlotState {};
@@ -639,8 +644,22 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
         case MsgType::AuthorityAck:
         {
             AuthorityAck ack;
-            if (!m_running || slot == m_authoritySlot || !decode(r, ack) || ack.matchId != m_matchId)
+            if (!m_running || m_authoritySlot < 0 || m_authoritySlot >= kMaxPlayers
+                || static_cast<int>(slot) == m_authoritySlot || !decode(r, ack) || ack.matchId != m_matchId)
                 return;
+            SlotState &sender = m_slots[slot];
+            if (ack.tick == 0)
+            {
+                sender.authorityAcked = false;
+                sender.authorityAckTick = 0;
+            }
+            else
+            {
+                if (sender.authorityAcked && ack.tick <= sender.authorityAckTick)
+                    return;
+                sender.authorityAcked = true;
+                sender.authorityAckTick = ack.tick;
+            }
             const SlotState &authority = m_slots[m_authoritySlot];
             if (authority.used && authority.connected && authority.connection < m_connections.size())
             {
@@ -653,7 +672,8 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
         }
         case MsgType::AuthorityState:
         {
-            if (!m_running || slot != m_authoritySlot || e.data.size() > kMaxAuthorityStateBytes + 32)
+            if (!m_running || m_authoritySlot < 0 || m_authoritySlot >= kMaxPlayers
+                || static_cast<int>(slot) != m_authoritySlot || e.data.size() > kMaxAuthorityStateBytes + 32)
                 return;
             AuthorityState state;
             if (!decode(r, state))
@@ -661,7 +681,8 @@ void SessionHost::handle(std::size_t connection, const TransportEvent &e, std::u
             if (state.matchId != m_matchId || state.recipient == slot)
                 return;
             const SlotState &recipient = m_slots[state.recipient];
-            if (recipient.used && recipient.connected && recipient.connection < m_connections.size())
+            if (recipient.used && recipient.connected && recipient.connection < m_connections.size()
+                && (!recipient.authorityAcked || state.tick > recipient.authorityAckTick))
                 sendTo(recipient.connection, Channel::Bulk, e.data.data(), e.data.size());
             break;
         }
@@ -875,6 +896,8 @@ void SessionHost::handleHello(std::size_t connection, const Hello &hello, std::u
                 }
             }
             m_slots[slot].connected = false;
+            if (m_running)
+                broadcastRoster();
         }
     }
     const bool resumed = slot >= 0;
@@ -922,6 +945,11 @@ void SessionHost::handleHello(std::size_t connection, const Hello &hello, std::u
     }
     SlotState &s = m_slots[slot];
     s.connected = true;
+    if (resumed)
+    {
+        s.authorityAcked = false;
+        s.authorityAckTick = 0;
+    }
     s.name = hello.playerName.empty() ? "Player " + std::to_string(slot + 1) : hello.playerName;
     m_connections[connection].slot = slot;
     {
@@ -958,6 +986,22 @@ void SessionHost::handleHello(std::size_t connection, const Hello &hello, std::u
         sendTo(connection, Channel::Lockstep, m_buffer.data(), sw.finish());
         for (const std::vector<std::uint8_t> &bundle : m_turnLog)
             sendTo(connection, Channel::Lockstep, bundle.data(), bundle.size());
+        if (m_paused && m_pausedBy < kMaxPlayers)
+        {
+            BitWriter pw(m_buffer.data(), m_buffer.size());
+            encode(pw, PauseState {true, m_pausedBy, m_slots[m_pausedBy].pausesLeft});
+            sendTo(connection, Channel::Lockstep, m_buffer.data(), pw.finish());
+        }
+        if (m_authoritySlot >= 0 && m_authoritySlot < kMaxPlayers && static_cast<int>(slot) != m_authoritySlot)
+        {
+            const SlotState &authority = m_slots[m_authoritySlot];
+            if (authority.used && authority.connected && authority.connection < m_connections.size())
+            {
+                BitWriter aw(m_buffer.data(), m_buffer.size());
+                encode(aw, AuthorityAck {static_cast<std::uint8_t>(slot), m_matchId, 0});
+                sendTo(authority.connection, Channel::Control, m_buffer.data(), aw.finish());
+            }
+        }
     }
 }
 
@@ -990,6 +1034,8 @@ void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowM
     ++m_matchId;
     m_running = true;
     m_paused = false;
+    m_desynced = false;
+    m_desyncTick = 0;
     for (SlotState &s : m_slots)
         s.pausesLeft = m_config.pausesPerPlayer;
     m_startMs = nowMs + firstTurnDelayMs;
@@ -1003,6 +1049,8 @@ void SessionHost::startMatch(std::vector<std::uint8_t> setup, std::uint32_t nowM
     {
         s.hashed = false;
         s.hashTick = 0;
+        s.authorityAcked = false;
+        s.authorityAckTick = 0;
     }
     m_replayStartedAt = static_cast<std::int64_t>(std::time(nullptr));
     m_replayOpen = !m_config.replayDir.empty();

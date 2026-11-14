@@ -162,6 +162,8 @@ private:
         std::uint32_t goneMs {0};   // when the connection was lost (a running match keeps the slot for a while)
         bool hashed {false};        // sent a world hash in this match
         std::uint32_t hashTick {0}; // the newest tick it sent a hash for
+        bool authorityAcked {false};
+        std::uint32_t authorityAckTick {0};
     };
 
     // A team colour (1..8) nobody else in the room has: `preferred` when it is free, else the first free one.
@@ -402,6 +404,8 @@ private:
     std::deque<AuthorityState>
         m_authorityStates; // in arrival order, every one is delivered (one-time events ride on them)
     std::deque<AuthorityAck> m_authorityAcks;
+    std::array<bool, kMaxPlayers> m_authorityAcked {};
+    std::array<std::uint32_t, kMaxPlayers> m_authorityAckTicks {};
     std::uint32_t m_matchId {0};
     std::uint8_t m_authoritySlot {0};
     std::uint32_t m_authorityStateTick {0};

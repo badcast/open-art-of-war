@@ -1,418 +1,1366 @@
 <!DOCTYPE html>
-<html lang="ru" class="scroll-smooth">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Open Art Of War: Freedom for Liberty — Классическая RTS на ПК и Android</title>
-    <meta name="description" content="Open Art Of War: Freedom for Liberty — свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под GNU GPLv3 с сетевой игрой до 8 человек, кампаниями и современной графикой.">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
+    <title>Open Art Of War: Resistance Arisen — Классическая RTS на ПК и Android</title>
+    <meta name="description" content="Open Art Of War: Resistance Arisen — свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под GNU GPLv3: кампании, редактор карт и сетевая игра до 8 человек.">
+    <meta name="theme-color" content="#080a0e">
+    <link rel="icon" href="./app-game-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <meta name="theme-color" content="#07080b">
-    <link rel="icon" href="./app-game-icon.png">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        obsidian: '#07080b',
-                        charcoal: '#0c0f14',
-                        bunker: '#141922',
-                        steel: '#9ba3b0',
-                        amber: {
-                            DEFAULT: '#e5a024',
-                            bright: '#f3b33d',
-                            dim: '#9e6b10'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        display: ['Chakra Petch', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --bg: #080a0e;
+            --scrim: rgba(4, 6, 9, 0.88);
+            --panel: #171310;
+            --panel-raised: #231c17;
+            --panel-sunken: #100d0a;
+            --border: #5a4230;
+            --border-strong: #8c6642;
+            --hover: #33281f;
+            --accent: #e8b04a;
+            --accent-bright: #f3c063;
+            --accent-deep: #78541e;
+            --accent-text: #181208;
+            --text: #ede6dc;
+            --text-dim: #b4a898;
+            --text-muted: #7d7265;
+            --ok: #68cc7c;
+            --danger: #e2584a;
+            --info: #60aee8;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-display: 'Chakra Petch', 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 84px;
+        }
+
         body {
-            background-color: #07080b;
-            color: #e2e8f0;
-            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-size: 15px;
+            line-height: 1.55;
             overflow-x: hidden;
         }
 
-        /* Signature Game Menu Selection Style ("Settings" highlight bar from screenshot) */
-        .aow-menu-item {
-            position: relative;
-            border-left: 3px solid transparent;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        img {
+            display: block;
+            max-width: 100%;
         }
 
-        .aow-menu-item:hover,
-        .aow-menu-item.active {
-            border-left-color: #e5a024;
-            background: linear-gradient(90deg, rgba(229, 160, 36, 0.22) 0%, rgba(229, 160, 36, 0.05) 60%, rgba(12, 15, 20, 0) 100%);
-            color: #ffffff;
+        a {
+            color: inherit;
+            text-decoration: none;
         }
 
-        /* Tactical Card with Left Amber Bar on Hover */
-        .aow-card {
-            background: linear-gradient(180deg, rgba(20, 25, 34, 0.88) 0%, rgba(10, 13, 18, 0.96) 100%);
-            border: 1px solid rgba(155, 163, 176, 0.14);
-            border-left: 3px solid rgba(229, 160, 36, 0.4);
-            transition: all 0.25s ease;
+        button {
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
         }
 
-        .aow-card:hover {
-            border-color: rgba(229, 160, 36, 0.45);
-            border-left: 3px solid #e5a024;
-            box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.8), inset 24px 0 36px -24px rgba(229, 160, 36, 0.16);
-            transform: translateY(-2px);
+        :focus-visible {
+            outline: 2px solid var(--accent-bright);
+            outline-offset: 2px;
         }
 
-        /* Subtle Scanline & Tactical Vignette Background */
-        .tactical-bg {
-            background-image: 
-                radial-gradient(circle at 80% 18%, rgba(229, 160, 36, 0.09) 0%, transparent 45%),
-                radial-gradient(circle at 15% 75%, rgba(229, 160, 36, 0.05) 0%, transparent 40%),
-                linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-            background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
-        }
-
-        /* Thumbnail Active Ring */
-        .thumb-btn.active {
-            border-color: #e5a024;
-            box-shadow: 0 0 0 2px rgba(229, 160, 36, 0.35);
-        }
-
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #07080b;
+            background: var(--panel-sunken);
         }
         ::-webkit-scrollbar-thumb {
-            background: #222938;
-            border-radius: 4px;
-            border: 1px solid rgba(229, 160, 36, 0.3);
+            background: var(--border);
+            border: 1px solid var(--panel-sunken);
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #e5a024;
+            background: var(--accent);
         }
 
-        html { scroll-padding-top: 110px; }
-        :focus-visible { outline: 2px solid #f3b33d; outline-offset: 4px; }
-        img { max-width: 100%; }
-        .grid > *, .brand, .soundtrack { min-width: 0; }
-        #hero { isolation: isolate; }
-        #hero::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #07080bf2, #07080bb8), url('./Screenshots/screen-network-skulmap.png') center/cover; opacity: .65; }
-        #hero::after { content: ''; position: absolute; inset: auto 0 0; height: 110px; background: linear-gradient(transparent, #07080b); z-index: -1; }
-        #hero h1 { text-shadow: 0 4px 35px #e5a02435; }
-        #hero-main-img { object-fit: contain; }
-        #hero-slide-tag { display: none; }
-        .mobile-nav { display: none; }
-        .support-link { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid #f15f2c65; border-radius: 6px; color: #ffab80; background: #f15f2c0c; font-size: 14px; transition: background .2s; }
-        .support-link:hover { background: #f15f2c22; }
-        .support-brand { margin-left: auto; font-weight: 700; color: #f58049; }
-        .soundtrack { padding: 20px; border: 1px solid #e5a02440; border-radius: 12px; background: linear-gradient(140deg,#1d2028,#0c0f14 70%); box-shadow: 0 16px 40px #0004; }
-        .soundtrack-heading { display: flex; justify-content: space-between; color: #e5a024; font: 10px 'JetBrains Mono',monospace; letter-spacing: .15em; }
-        .soundtrack-art { color: #e5a024; opacity: .4; margin: 18px 0; }
-        .soundtrack-art svg { width: 100%; height: 40px; }
-        .soundtrack.is-playing .soundtrack-art { opacity: 1; filter: drop-shadow(0 0 6px #e5a02466); }
-        .soundtrack-title { font-size: 14px; font-weight: 600; line-height: 1.6; }
-        .soundtrack-author { color: #e5a024; font-size: 12px; margin-top: 4px; }
-        .soundtrack-timeline { display: flex; gap: 12px; align-items: center; margin: 18px 0 10px; font: 11px monospace; color: #9ba3b0; }
-        .soundtrack input { accent-color: #e5a024; min-width: 0; cursor: pointer; }
-        #ost-seek { flex: 1; width: 100%; }
-        .soundtrack-controls { display: flex; gap: 8px; align-items: center; }
-        .soundtrack-controls button { width: 44px; height: 44px; flex-shrink: 0; border: 1px solid #ffffff20; border-radius: 6px; background: #ffffff06; font-size: 22px; }
-        .soundtrack-controls button:hover { border-color: #e5a024; }
-        #ost-play { background: #e5a024; color: #07080b; font-size: 15px; }
-        .soundtrack-volume { margin-left: auto; display: grid; gap: 4px; width: 100px; font-size: 10px; color: #9ba3b0; }
-        .soundtrack-volume input { width: 100%; }
-        .soundtrack-status { color: #9ba3b0; font-size: 11px; line-height: 1.5; margin-top: 12px; }
-        @media (max-width: 1100px) {
-            header .desktop-nav { display: none; }
-            .mobile-nav { display: flex; gap: 24px; padding: 10px 16px; overflow-x: auto; white-space: nowrap; border-top: 1px solid #ffffff0d; font-size: 12px; color: #9ba3b0; }
+        .container {
+            width: 100%;
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
-        @media (max-width: 480px) {
-            header .brand .font-display { font-size: 13px; letter-spacing: .03em; }
-            header .brand .text-\[10px\] { font-size: 8px; letter-spacing: .08em; }
-            header .brand .inline-block { display: none; }
-            header a[href*="github.com"] { padding: 10px; }
-            header a[href*="github.com"] span { display: none; }
-            #hero h1 { font-size: 36px; }
-            #hero-main-img { min-height: 210px; }
-            #hero-main-img + div { position: relative; background: #0c0f14; gap: 8px; padding: 12px; }
-            #hero .aspect-\[16\/9\]:has(#hero-main-img) { aspect-ratio: auto; }
-            .soundtrack { padding: 16px; }
+
+        /* Dialog chrome matching in-game dialog_items */
+        .aow-panel {
+            position: relative;
+            background: linear-gradient(180deg, var(--panel-raised) 0%, var(--panel) 100%);
+            border: 1px solid var(--border-strong);
+            box-shadow: inset 0 0 0 1px var(--panel-sunken), 0 12px 32px rgba(0, 0, 0, 0.55);
         }
+
+        .aow-sunken {
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .aow-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: linear-gradient(180deg, var(--panel-raised) 0%, var(--panel-sunken) 100%);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .aow-btn:hover {
+            background: var(--hover);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .aow-btn-primary {
+            background: linear-gradient(180deg, var(--accent-bright) 0%, var(--accent) 100%);
+            border-color: var(--accent-bright);
+            color: var(--accent-text);
+        }
+        .aow-btn-primary:hover {
+            background: var(--accent-bright);
+            border-color: #fff;
+            color: var(--accent-text);
+        }
+
+        .aow-tab {
+            position: relative;
+            padding: 10px 18px;
+            background: linear-gradient(180deg, #211a14 0%, var(--panel-sunken) 100%);
+            border: 1px solid var(--border);
+            border-bottom: 3px solid transparent;
+            color: var(--text-dim);
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .aow-tab:hover {
+            background: linear-gradient(180deg, var(--hover) 0%, var(--panel-sunken) 100%);
+            border-color: var(--border-strong);
+            border-bottom-color: rgba(232, 176, 74, 0.45);
+            color: var(--text);
+        }
+        .aow-tab.active {
+            background: linear-gradient(180deg, #3a2b1c 0%, #1c150f 100%);
+            border-color: var(--accent);
+            border-bottom: 3px solid var(--accent);
+            color: #fff;
+        }
+
+        .section {
+            padding: 44px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .eyebrow {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: clamp(22px, 3vw, 28px);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        /* Header */
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(16, 13, 10, 0.96);
+            border-bottom: 2px solid var(--border-strong);
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            height: 60px;
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .brand-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0.06em;
+            color: var(--accent);
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .brand-sub {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .nav-links a {
+            padding: 7px 11px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-dim);
+            border: 1px solid transparent;
+            transition: color 0.15s, background 0.15s, border-color 0.15s;
+        }
+        .nav-links a:hover {
+            color: #fff;
+            background: var(--hover);
+            border-color: var(--border);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .lang-switch {
+            display: inline-flex;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            padding: 2px;
+        }
+        .lang-switch button {
+            border: 0;
+            background: transparent;
+            padding: 4px 9px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+        .lang-switch button.active {
+            background: var(--accent);
+            color: var(--accent-text);
+        }
+
+        .mobile-nav {
+            display: none;
+            gap: 16px;
+            padding: 8px 20px;
+            overflow-x: auto;
+            white-space: nowrap;
+            border-top: 1px solid var(--border);
+            background: var(--panel-sunken);
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* Hero */
+        .hero {
+            position: relative;
+            padding: 32px 0 44px;
+            border-bottom: 1px solid var(--border);
+            background:
+                linear-gradient(90deg, rgba(8, 10, 14, 0.94) 0%, rgba(8, 10, 14, 0.82) 55%, rgba(8, 10, 14, 0.9) 100%),
+                url('./Screenshots/screen-network-skulmap.png') center / cover no-repeat;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+        .tag-accent {
+            border-color: var(--accent-deep);
+            color: var(--accent-bright);
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: clamp(32px, 4.5vw, 48px);
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.03em;
+            color: var(--accent);
+        }
+
+        .hero-sub {
+            margin: 6px 0 0;
+            font-family: var(--font-display);
+            font-size: 17px;
+            letter-spacing: 0.16em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .hero-rule {
+            width: 56px;
+            height: 3px;
+            background: var(--accent);
+            margin: 14px 0;
+        }
+
+        .hero-desc {
+            margin: 0 0 20px;
+            color: var(--text-dim);
+            font-size: 15px;
+        }
+        .hero-desc strong {
+            color: var(--text);
+        }
+
+        .hero-cta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .hero-menu {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 18px;
+        }
+        .hero-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            text-align: left;
+            padding: 9px 12px;
+            background: rgba(16, 13, 10, 0.85);
+            border: 1px solid var(--border);
+            border-left: 3px solid transparent;
+            color: var(--text-dim);
+            font-size: 13px;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .hero-menu-item:hover,
+        .hero-menu-item.active {
+            background: linear-gradient(90deg, rgba(232, 176, 74, 0.18) 0%, var(--panel) 100%);
+            border-color: var(--border-strong);
+            border-left-color: var(--accent);
+            color: #fff;
+        }
+        .hero-menu-num {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--accent);
+        }
+
+        /* Soundtrack */
+        .soundtrack {
+            padding: 14px 16px;
+        }
+        .soundtrack-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .soundtrack-title {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .soundtrack-author {
+            margin: 2px 0 10px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        .soundtrack-timeline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+        .soundtrack input[type="range"] {
+            accent-color: var(--accent);
+            min-width: 0;
+            cursor: pointer;
+        }
+        #ost-seek {
+            flex: 1;
+        }
+        .soundtrack-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .soundtrack-controls button {
+            width: 34px;
+            height: 34px;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .soundtrack-controls button:hover {
+            border-color: var(--accent);
+        }
+        #ost-play {
+            background: var(--accent);
+            border-color: var(--accent-bright);
+            color: var(--accent-text);
+            font-size: 12px;
+        }
+        .soundtrack-volume {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .soundtrack-volume input {
+            width: 78px;
+        }
+        .soundtrack-status {
+            margin: 8px 0 0;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Viewer */
+        .viewer-frame {
+            padding: 10px;
+        }
+        .viewer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+        .viewer-title {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .viewer-stage {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: #060709;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .viewer-stage img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .viewer-overlay {
+            position: absolute;
+            inset: auto 0 0;
+            padding: 14px;
+            background: linear-gradient(transparent, rgba(8, 10, 14, 0.94) 45%);
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .viewer-desc {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text);
+        }
+        .viewer-arrows {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .viewer-arrows button {
+            width: 32px;
+            height: 32px;
+            background: var(--panel);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            font-size: 18px;
+            line-height: 1;
+        }
+        .viewer-arrows button:hover {
+            background: var(--accent);
+            border-color: var(--accent-bright);
+            color: var(--accent-text);
+        }
+
+        .thumb-strip {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .thumb-btn {
+            padding: 0;
+            aspect-ratio: 16 / 9;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            opacity: 0.72;
+            transition: opacity 0.15s, border-color 0.15s;
+        }
+        .thumb-btn:hover,
+        .thumb-btn.active {
+            opacity: 1;
+            border-color: var(--accent);
+        }
+        .thumb-btn img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Tabbed Overview */
+        .tabs-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .feature-item {
+            padding: 18px;
+        }
+        .feature-tag {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+        .feature-item h3 {
+            margin: 0 0 8px;
+            font-family: var(--font-display);
+            font-size: 17px;
+            color: var(--text);
+        }
+        .feature-item p {
+            margin: 0;
+            font-size: 13.5px;
+            color: var(--text-dim);
+        }
+
+        /* Controls Table */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .control-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px 16px;
+        }
+        .key-cap {
+            flex-shrink: 0;
+            min-width: 132px;
+            padding: 5px 8px;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border-strong);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-bright);
+            text-align: center;
+        }
+        .control-row h4 {
+            margin: 0 0 3px;
+            font-family: var(--font-display);
+            font-size: 15px;
+            color: var(--text);
+        }
+        .control-row p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        /* Story */
+        .story-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+            gap: 20px;
+            padding: 24px;
+        }
+        .story-body p {
+            margin: 0 0 12px;
+            color: var(--text-dim);
+        }
+        .story-body p:last-child {
+            margin-bottom: 0;
+        }
+        .story-body strong {
+            color: var(--text);
+        }
+        .story-aside {
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 14px;
+        }
+        .story-aside h3 {
+            margin: 0 0 8px;
+            font-family: var(--font-display);
+            font-size: 18px;
+            color: var(--accent);
+        }
+        .story-aside p {
+            margin: 0;
+            font-size: 13.5px;
+            color: var(--text-dim);
+        }
+        .story-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        /* Screenshots Grid */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .gallery-card {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+            padding: 0;
+            overflow: hidden;
+        }
+        .gallery-card:hover {
+            border-color: var(--accent);
+        }
+        .gallery-thumb {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: var(--panel-sunken);
+            overflow: hidden;
+        }
+        .gallery-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .gallery-idx {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 2px 7px;
+            background: rgba(16, 13, 10, 0.9);
+            border: 1px solid var(--border);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--accent);
+        }
+        .gallery-info {
+            padding: 12px 14px;
+        }
+        .gallery-info h3 {
+            margin: 0 0 4px;
+            font-family: var(--font-display);
+            font-size: 15px;
+            color: var(--text);
+        }
+        .gallery-info p {
+            margin: 0;
+            font-size: 12.5px;
+            color: var(--text-dim);
+        }
+
+        /* Server Section */
+        .srv-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+        }
+        .srv-status-plain {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-bright);
+            min-width: 92px;
+            white-space: nowrap;
+        }
+        .srv-status-plain.is-online {
+            color: var(--ok);
+        }
+        .srv-status-plain.is-offline {
+            color: var(--danger);
+        }
+        #srv-refresh-btn {
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        #srv-refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        .srv-host-meta {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        .srv-host-meta strong {
+            color: var(--text);
+        }
+        .srv-updated {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-box {
+            padding: 14px 16px;
+        }
+        .stat-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+        }
+        .stat-val {
+            margin-top: 6px;
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+        }
+        .stat-val.accent {
+            color: var(--accent);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-family: var(--font-mono);
+            font-size: 12.5px;
+        }
+        th {
+            padding: 11px 14px;
+            background: var(--panel-raised);
+            border-bottom: 1px solid var(--border-strong);
+            color: var(--text-dim);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        tr:hover td {
+            background: rgba(232, 176, 74, 0.05);
+        }
+        .table-empty {
+            padding: 28px 16px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .room-code {
+            display: inline-block;
+            padding: 2px 7px;
+            background: var(--panel-sunken);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            letter-spacing: 0.08em;
+        }
+        .state-tag {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 11px;
+            border: 1px solid var(--border);
+        }
+        .state-match {
+            border-color: var(--accent);
+            color: var(--accent-bright);
+            background: rgba(232, 176, 74, 0.12);
+        }
+        .state-lobby {
+            border-color: var(--ok);
+            color: var(--ok);
+            background: rgba(104, 204, 124, 0.12);
+        }
+        .state-priv {
+            margin-left: 6px;
+            border-color: var(--text-muted);
+            color: var(--text-dim);
+            font-size: 10px;
+        }
+
+        /* Download */
+        .dl-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .dl-card {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .dl-card h3 {
+            margin: 4px 0 8px;
+            font-family: var(--font-display);
+            font-size: 20px;
+            color: var(--text);
+        }
+        .dl-card p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        /* Footer */
+        .site-footer {
+            padding: 32px 0;
+            background: var(--panel-sunken);
+            font-size: 12.5px;
+            color: var(--text-dim);
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1.2fr;
+            gap: 24px;
+            margin-bottom: 20px;
+        }
+        .footer-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--accent);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .footer-links {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 5px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+        .footer-links a:hover {
+            color: var(--accent);
+        }
+        .footer-bottom {
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Lightbox */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            background: var(--scrim);
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 18px;
+        }
+        .lightbox.open {
+            display: flex;
+        }
+        .lb-top {
+            max-width: 1240px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+        .lb-stage {
+            position: relative;
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 14px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        .lb-stage img {
+            max-height: 78vh;
+            max-width: 100%;
+            border: 1px solid var(--border-strong);
+            background: #060709;
+            object-fit: contain;
+        }
+        .lb-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 42px;
+            height: 42px;
+            background: var(--panel);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            font-size: 22px;
+        }
+        .lb-nav:hover {
+            background: var(--accent);
+            color: var(--accent-text);
+        }
+        .lb-prev { left: 10px; }
+        .lb-next { right: 10px; }
+        .lb-caption {
+            max-width: 820px;
+            width: 100%;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 980px) {
+            .nav-links { display: none; }
+            .mobile-nav { display: flex; }
+            .hero-grid,
+            .features-grid,
+            .gallery-grid,
+            .story-grid,
+            .footer-grid {
+                grid-template-columns: 1fr;
+            }
+            .controls-grid,
+            .dl-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 560px) {
+            .thumb-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .viewer-overlay { position: static; background: var(--panel-sunken); border-top: 1px solid var(--border); }
+            .control-row { flex-direction: column; gap: 8px; }
+            .key-cap { min-width: 0; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto !important; }
-            *, *::before, *::after { animation: none !important; transition: none !important; }
+            html { scroll-behavior: auto; }
+            * { transition: none !important; }
         }
     </style>
 </head>
-<body class="tactical-bg selection:bg-amber selection:text-obsidian">
+<body>
 
-    <!-- TOP NAVIGATION BAR -->
-    <header class="sticky top-0 z-40 bg-obsidian/90 backdrop-blur-md border-b border-white/10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <!-- Brand Title -->
-            <a href="#" class="flex items-center gap-3 group brand">
-                <div>
-                    <div class="font-display font-bold text-lg sm:text-xl tracking-wider text-amber group-hover:text-amber-bright transition">
-                        OPEN ART OF WAR
-                    </div>
-                    <div class="text-[10px] font-mono tracking-[0.22em] text-steel uppercase -mt-1 flex items-center gap-2">
-                        <span>FREEDOM FOR LIBERTY</span>
-                        <span class="inline-block w-6 h-[2px] bg-amber"></span>
-                    </div>
-                </div>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="#" class="brand">
+                <span class="brand-title">OPEN ART OF WAR</span>
+                <span class="brand-sub">RESISTANCE ARISEN</span>
             </a>
 
-            <!-- Desktop Navigation Links -->
-            <nav class="desktop-nav hidden md:flex items-center gap-1 text-sm font-medium text-steel">
-                <a href="#story" class="px-3 py-1.5 rounded hover:text-white hover:bg-white/5 transition" data-i18n="nav_story">О проекте</a>
-                <a href="#features" class="px-3 py-1.5 rounded hover:text-white hover:bg-white/5 transition" data-i18n="nav_features">Особенности</a>
-                <a href="#screenshots" class="px-3 py-1.5 rounded hover:text-white hover:bg-white/5 transition" data-i18n="nav_screenshots">Скриншоты</a>
-                <a href="#controls" class="px-3 py-1.5 rounded hover:text-white hover:bg-white/5 transition" data-i18n="nav_controls">Управление</a>
-                <a href="#download" class="px-3 py-1.5 rounded hover:text-white hover:bg-white/5 transition" data-i18n="nav_download">Скачать</a>
+            <nav class="nav-links" aria-label="Основная навигация">
+                <a href="#features" onclick="openOverviewTab('features')" data-i18n="nav_features">Особенности</a>
+                <a href="#controls" onclick="openOverviewTab('controls')" data-i18n="nav_controls">Управление</a>
+                <a href="#story" onclick="openOverviewTab('story')" data-i18n="nav_story">О проекте</a>
+                <a href="#screenshots" data-i18n="nav_screenshots">Скриншоты</a>
+                <a href="#server" data-i18n="nav_server">Сервер</a>
+                <a href="#download" data-i18n="nav_download">Скачать</a>
             </nav>
 
-            <!-- Right Actions: Language Toggle & GitHub -->
-            <div class="flex items-center gap-2.5">
-                <!-- Language Switcher RU / EN -->
-                <div class="inline-flex rounded bg-bunker p-0.5 border border-white/10 text-xs font-mono">
-                    <button id="lang-ru" onclick="setLanguage('ru')" class="px-2.5 py-1 rounded bg-amber text-obsidian font-bold transition">RU</button>
-                    <button id="lang-en" onclick="setLanguage('en')" class="px-2.5 py-1 rounded text-steel hover:text-white transition">EN</button>
+            <div class="header-actions">
+                <div class="lang-switch" role="group" aria-label="Язык">
+                    <button id="lang-ru" type="button" class="active" onclick="setLanguage('ru')">RU</button>
+                    <button id="lang-en" type="button" onclick="setLanguage('en')">EN</button>
                 </div>
 
-                <a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded bg-bunker hover:bg-amber hover:text-obsidian text-slate-200 border border-amber/40 text-xs sm:text-sm font-semibold transition shadow-sm">
-                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    <span>GitHub</span>
+                <a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener noreferrer" class="aow-btn" style="padding: 6px 12px; font-size: 12px;">
+                    GitHub
                 </a>
             </div>
         </div>
-        <nav class="mobile-nav" aria-label="Навигация">
-            <a href="#story" data-i18n="nav_story">О проекте</a>
-            <a href="#features" data-i18n="nav_features">Особенности</a>
+        <nav class="mobile-nav" aria-label="Мобильная навигация">
+            <a href="#features" onclick="openOverviewTab('features')" data-i18n="nav_features">Особенности</a>
+            <a href="#controls" onclick="openOverviewTab('controls')" data-i18n="nav_controls">Управление</a>
+            <a href="#story" onclick="openOverviewTab('story')" data-i18n="nav_story">О проекте</a>
             <a href="#screenshots" data-i18n="nav_screenshots">Скриншоты</a>
+            <a href="#server" data-i18n="nav_server">Сервер</a>
             <a href="#download" data-i18n="nav_download">Скачать</a>
         </nav>
     </header>
 
-    <!-- HERO SECTION -->
-    <section id="hero" class="relative pt-8 pb-16 lg:pt-12 lg:pb-24 border-b border-white/10 overflow-hidden">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            
-            <!-- Clean Gamer Badges Row -->
-            <div class="flex flex-wrap items-center gap-2.5 mb-8">
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-bunker border border-white/10 text-xs font-mono text-slate-200">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    Windows • Linux • macOS • Android
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-bunker border border-amber/30 text-xs font-mono text-amber" data-i18n="badge_multiplayer">
-                    ⚔️ ПК + Android • до 8 игроков
-                </span>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-bunker border border-white/10 text-xs font-mono text-steel" data-i18n="badge_campaigns">
-                    🎖️ 2 сюжетные кампании + Редактор карт
-                </span>
-                <a href="https://github.com/badcast/open-art-of-war/stargazers" target="_blank" rel="noopener" class="inline-flex items-center">
-                    <img src="https://img.shields.io/github/stars/badcast/open-art-of-war?style=flat-square&logo=github&label=Stars&color=e5a024&labelColor=141922" alt="GitHub Stars" class="h-6 rounded">
+    <section id="hero" class="hero">
+        <div class="container">
+            <div class="hero-meta">
+                <span class="tag tag-accent" data-i18n="hero_tag">СВОБОДНАЯ RTS • GNU GPLv3</span>
+                <span class="tag">Windows • Linux • macOS • Android</span>
+                <span class="tag" data-i18n="badge_multiplayer">Сеть до 8 игроков (ПК + Android)</span>
+                <a href="https://github.com/badcast/open-art-of-war/stargazers" target="_blank" rel="noopener">
+                    <img src="https://img.shields.io/github/stars/badcast/open-art-of-war?style=flat-square&logo=github&label=Stars&color=e8b04a&labelColor=100d0a" alt="GitHub Stars" style="height: 24px;">
                 </a>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-                
-                <!-- Left Column: Title, Gamer Pitch & Download Buttons -->
-                <div class="lg:col-span-5 space-y-6">
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber/10 border border-amber/30 text-amber text-xs font-mono mb-3">
-                            <span class="w-2 h-2 rounded-full bg-amber animate-ping"></span>
-                            <span data-i18n="hero_tag">СВОБОДНАЯ RTS • GNU GPLv3</span>
-                        </div>
-                        <h1 class="font-display font-bold text-4xl sm:text-5xl text-amber tracking-wide leading-none">
-                            OPEN ART OF WAR
-                        </h1>
-                        <p class="font-display text-lg sm:text-xl text-slate-300 tracking-[0.18em] uppercase mt-1.5">
-                            FREEDOM FOR LIBERTY
-                        </p>
-                        <div class="w-16 h-1 bg-amber mt-3"></div>
-                    </div>
+            <div class="hero-grid">
+                <div>
+                    <h1>OPEN ART OF WAR</h1>
+                    <p class="hero-sub">RESISTANCE ARISEN</p>
+                    <div class="hero-rule"></div>
 
-                    <p class="text-steel text-base sm:text-lg leading-relaxed" data-i18n="hero_desc">
-                        Свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под лицензией <strong class="text-amber">GNU GPLv3</strong>, вдохновлённый <strong class="text-white">«Art of War 2: Liberation of Peru»</strong>. Стройте базы, исследуйте технологии, ведите танковые дивизии в бой в двух сюжетных кампаниях или сражайтесь с друзьями по сети до <strong class="text-amber">8 игроков</strong> с современным ПК-управлением и обновлённой графикой.
+                    <p class="hero-desc" data-i18n="hero_desc">
+                        Свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под лицензией <strong>GNU GPLv3</strong>, вдохновлённый <strong>«Art of War 2: Liberation of Peru»</strong>. Две сюжетные кампании, редактор карт, сетевая игра до <strong>8 человек</strong> и управление для мыши и клавиатуры.
                     </p>
 
-                    <!-- Main Call to Action Buttons -->
-                    <div class="flex flex-wrap items-center gap-3 pt-1">
-                        <a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener"
-                           class="inline-flex items-center gap-2.5 px-6 py-3.5 rounded bg-amber hover:bg-amber-bright text-obsidian font-display font-bold tracking-wider uppercase text-sm transition shadow-lg shadow-amber/20">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
-                            <span data-i18n="btn_download">Скачать игру</span>
+                    <div class="hero-cta">
+                        <a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener" class="aow-btn aow-btn-primary" data-i18n="btn_download">
+                            Скачать игру
                         </a>
-                        <a href="#screenshots"
-                           class="inline-flex items-center gap-2 px-5 py-3.5 rounded bg-bunker hover:bg-white/10 text-white border border-white/15 font-display font-semibold tracking-wider uppercase text-sm transition">
-                            <span data-i18n="btn_gallery">Все скриншоты</span>
+                        <a href="#screenshots" class="aow-btn" data-i18n="btn_gallery">
+                            Скриншоты
+                        </a>
+                        <a href="https://boosty.to/badcast/donate" target="_blank" rel="noopener noreferrer" class="aow-btn" data-i18n="support_project">
+                            Поддержать (Boosty)
                         </a>
                     </div>
 
-                    <a class="support-link" href="https://boosty.to/badcast/donate" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span> <span data-i18n="support_project">Поддержать проект</span><span class="support-brand">Boosty</span></a>
-
-                    <!-- Game Menu Style Quick Feature Highlights -->
-                    <div class="pt-2 space-y-1.5 border-t border-white/10">
-                        <div onclick="selectHeroSlide(0)" class="aow-menu-item active px-3.5 py-2 cursor-pointer rounded-r flex items-center justify-between text-sm">
-                            <span class="font-medium" data-i18n="menu_1">🎖️ Две кампании: Сопротивление и Конфедерация</span>
-                            <span class="text-xs font-mono text-amber">01</span>
-                        </div>
-                        <div onclick="selectHeroSlide(1)" class="aow-menu-item px-3.5 py-2 cursor-pointer rounded-r flex items-center justify-between text-sm">
-                            <span class="font-medium" data-i18n="menu_2">🌐 Играйте вместе с телефона и ПК — до 8 игроков</span>
-                            <span class="text-xs font-mono text-steel">02</span>
-                        </div>
-                        <div onclick="selectHeroSlide(3)" class="aow-menu-item px-3.5 py-2 cursor-pointer rounded-r flex items-center justify-between text-sm">
-                            <span class="font-medium" data-i18n="menu_3">✨ Ночные и закатные карты, свечение выстрелов и взрывов</span>
-                            <span class="text-xs font-mono text-steel">03</span>
-                        </div>
+                    <div class="hero-menu">
+                        <button type="button" onclick="selectHeroSlide(0)" class="hero-menu-item active">
+                            <span data-i18n="menu_1">Две кампании: Сопротивление и Конфедерация</span>
+                            <span class="hero-menu-num">01</span>
+                        </button>
+                        <button type="button" onclick="selectHeroSlide(1)" class="hero-menu-item">
+                            <span data-i18n="menu_2">Кроссплатформенная сеть ПК + Android до 8 игроков</span>
+                            <span class="hero-menu-num">02</span>
+                        </button>
+                        <button type="button" onclick="selectHeroSlide(3)" class="hero-menu-item">
+                            <span data-i18n="menu_3">Режимы освещения, свечение взрывов и фильтр пиксель-арта</span>
+                            <span class="hero-menu-num">03</span>
+                        </button>
                     </div>
 
-                    <div class="soundtrack" id="soundtrack">
-                        <div class="soundtrack-heading"><span data-i18n="ost_label">САУНДТРЕК ИГРЫ</span><span id="ost-track-number">01 / 02</span></div>
-                        <div class="soundtrack-art" aria-hidden="true"><svg viewBox="0 0 480 48" preserveAspectRatio="none"><path d="M0 24h12l4-6 4 12 4-22 4 32 4-16h16l4-10 4 20 4-30 4 40 4-20h16l4-18 4 36 4-42 4 48 4-24h16l4-12 4 24 4-34 4 44 4-22h24l4-8 4 16 4-28 4 40 4-20h20l4-18 4 36 4-42 4 48 4-24h20l4-8 4 16 4-28 4 40 4-20h24l4-14 4 28 4-38 4 48 4-24h20l4-8 4 16 4-28 4 40 4-20h24l4-8 4 16 4-24 4 32 4-16h40" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
-                        <p class="soundtrack-title">Open Art Of War: Freedom for Liberty (Main Theme)</p>
+                    <div class="aow-panel soundtrack" id="soundtrack">
+                        <div class="soundtrack-top">
+                            <span data-i18n="ost_label">Саундтрек игры</span>
+                            <span id="ost-track-number">01 / 02</span>
+                        </div>
+                        <p class="soundtrack-title">Open Art Of War: Resistance Arisen (Main Theme)</p>
                         <p class="soundtrack-author">Light Mister <span id="ost-track-title">· 01</span></p>
                         <audio id="ost-audio" preload="none" src="./music/mainmenu.ogg"></audio>
-                        <div class="soundtrack-timeline"><span id="ost-time-cur">0:00</span><input id="ost-seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="Позиция воспроизведения" disabled><span id="ost-duration">--:--</span></div>
+                        <div class="soundtrack-timeline">
+                            <span id="ost-time-cur">0:00</span>
+                            <input id="ost-seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="Позиция воспроизведения" disabled>
+                            <span id="ost-duration">--:--</span>
+                        </div>
                         <div class="soundtrack-controls">
-                            <button onclick="prevTrack()" aria-label="Предыдущий трек">‹</button>
-                            <button id="ost-play" onclick="toggleMusic()" aria-label="Воспроизвести" aria-pressed="false"><span id="ost-play-icon">▶</span></button>
-                            <button onclick="nextTrack()" aria-label="Следующий трек">›</button>
-                            <label class="soundtrack-volume"><span data-i18n="ost_volume">Громкость</span><input id="ost-volume" type="range" min="0" max="1" step="0.01" value="0.65" aria-label="Громкость"></label>
+                            <button type="button" onclick="prevTrack()" aria-label="Предыдущий трек">‹</button>
+                            <button type="button" id="ost-play" onclick="toggleMusic()" aria-label="Воспроизвести" aria-pressed="false"><span id="ost-play-icon">▶</span></button>
+                            <button type="button" onclick="nextTrack()" aria-label="Следующий трек">›</button>
+                            <label class="soundtrack-volume">
+                                <span data-i18n="ost_volume">Громкость</span>
+                                <input id="ost-volume" type="range" min="0" max="1" step="0.01" value="0.65" aria-label="Громкость">
+                            </label>
                         </div>
                         <p id="ost-status" role="status" class="soundtrack-status">Нажмите ▶, чтобы слушать</p>
                     </div>
                 </div>
 
-                <!-- Right Column: Main Screenshot Viewer (`./Screenshots/screen-mainmenu.png` + 6-Thumb Strip) -->
-                <div class="lg:col-span-7 space-y-3">
-                    <div class="relative rounded-xl overflow-hidden border border-amber/30 shadow-2xl shadow-black bg-charcoal group">
-                        
-                        <!-- Window Header Bar -->
-                        <div class="bg-obsidian/95 px-4 py-2.5 border-b border-white/10 flex items-center justify-between gap-2 text-xs font-mono text-steel">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2.5 h-2.5 rounded-full bg-red-500/75"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-amber/75"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/75"></span>
-                                <span id="hero-slide-caption" class="ml-1.5 text-slate-200 font-medium">Главное меню игры</span>
-                            </div>
-                            <button onclick="openLightbox(currentHeroIndex)" class="px-2.5 py-0.5 rounded bg-amber/15 hover:bg-amber hover:text-obsidian text-amber border border-amber/30 transition text-[11px] flex items-center gap-1">
-                                <span>🔍</span>
-                                <span data-i18n="btn_enlarge">На весь экран</span>
-                            </button>
-                        </div>
+                <div class="aow-panel viewer-frame">
+                    <div class="viewer-bar">
+                        <span id="hero-slide-caption" class="viewer-title">Главное меню</span>
+                        <button type="button" onclick="openLightbox(currentHeroIndex)" class="aow-btn" style="padding: 4px 10px; font-size: 11px;" data-i18n="btn_enlarge">
+                            На весь экран
+                        </button>
+                    </div>
 
-                        <!-- Main Hero Image Frame -->
-                        <div class="relative aspect-[16/9] w-full bg-[#060709] cursor-pointer overflow-hidden" onclick="openLightbox(currentHeroIndex)">
-                            <img id="hero-main-img"
-                                 src="./Screenshots/screen-mainmenu.png"
-                                 alt="Open Art Of War Main Menu"
-                                 class="w-full h-full object-cover transition duration-300 group-hover:scale-[1.01]"
-                                 onerror="renderStylizedFallback(this, 0)">
-
-                            <!-- Bottom Overlay Caption & Prev/Next Arrows -->
-                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 flex items-end justify-between">
-                                <div>
-                                    <span id="hero-slide-tag" class="text-[11px] font-mono uppercase tracking-wider text-amber block">./Screenshots/screen-mainmenu.png</span>
-                                    <p id="hero-slide-desc" class="text-xs sm:text-sm text-slate-200 mt-0.5">Классическая атмосфера главного меню, выбор кампании, одиночных сражений и сетевой игры.</p>
-                                </div>
-                                <div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
-                                    <button onclick="stepHeroSlide(-1)" class="w-8 h-8 rounded bg-obsidian/85 hover:bg-amber hover:text-obsidian text-white border border-white/20 flex items-center justify-center transition" title="Предыдущий скриншот">‹</button>
-                                    <button onclick="stepHeroSlide(1)" class="w-8 h-8 rounded bg-obsidian/85 hover:bg-amber hover:text-obsidian text-white border border-white/20 flex items-center justify-center transition" title="Следующий скриншот">›</button>
-                                </div>
+                    <div class="viewer-stage" onclick="openLightbox(currentHeroIndex)">
+                        <img id="hero-main-img" src="./Screenshots/screen-mainmenu.png" alt="Open Art Of War Main Menu" onerror="renderStylizedFallback(this, 0)">
+                        <div class="viewer-overlay">
+                            <p id="hero-slide-desc" class="viewer-desc">Классическая атмосфера главного меню, выбор кампании, одиночных сражений и сетевой игры.</p>
+                            <div class="viewer-arrows" onclick="event.stopPropagation()">
+                                <button type="button" onclick="stepHeroSlide(-1)" title="Предыдущий скриншот">‹</button>
+                                <button type="button" onclick="stepHeroSlide(1)" title="Следующий скриншот">›</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 6 Thumbnail Switcher Bar underneath Hero Frame -->
-                    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                        <button onclick="selectHeroSlide(0)" class="thumb-btn active relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-mainmenu.png" alt="Main Menu" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 0)">
-                        </button>
-                        <button onclick="selectHeroSlide(1)" class="thumb-btn relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-network-play.png" alt="Network Play" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 1)">
-                        </button>
-                        <button onclick="selectHeroSlide(2)" class="thumb-btn relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-network-skulmap.png" alt="Network Skull Map" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 2)">
-                        </button>
-                        <button onclick="selectHeroSlide(3)" class="thumb-btn relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-features.png" alt="Features & Shaders" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 3)">
-                        </button>
-                        <button onclick="selectHeroSlide(4)" class="thumb-btn relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-maps.png" alt="Maps" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 4)">
-                        </button>
-                        <button onclick="selectHeroSlide(5)" class="thumb-btn relative aspect-[16/9] rounded-lg overflow-hidden border border-white/15 bg-charcoal group">
-                            <img src="./Screenshots/screen-loadmap.png" alt="Load Map" class="w-full h-full object-cover group-hover:opacity-100 opacity-80 transition" onerror="renderStylizedFallback(this, 5)">
-                        </button>
+                    <div class="thumb-strip">
+                        <button type="button" onclick="selectHeroSlide(0)" class="thumb-btn active"><img src="./Screenshots/screen-mainmenu.png" alt="Main Menu" onerror="renderStylizedFallback(this, 0)"></button>
+                        <button type="button" onclick="selectHeroSlide(1)" class="thumb-btn"><img src="./Screenshots/screen-network-play.png" alt="Network Play" onerror="renderStylizedFallback(this, 1)"></button>
+                        <button type="button" onclick="selectHeroSlide(2)" class="thumb-btn"><img src="./Screenshots/screen-network-skulmap.png" alt="Skull Map" onerror="renderStylizedFallback(this, 2)"></button>
+                        <button type="button" onclick="selectHeroSlide(3)" class="thumb-btn"><img src="./Screenshots/screen-features.png" alt="Features" onerror="renderStylizedFallback(this, 3)"></button>
+                        <button type="button" onclick="selectHeroSlide(4)" class="thumb-btn"><img src="./Screenshots/screen-maps.png" alt="Maps" onerror="renderStylizedFallback(this, 4)"></button>
+                        <button type="button" onclick="selectHeroSlide(5)" class="thumb-btn"><img src="./Screenshots/screen-loadmap.png" alt="Load Map" onerror="renderStylizedFallback(this, 5)"></button>
                     </div>
                 </div>
-
             </div>
         </div>
     </section>
 
-    <!-- ORIGINS & NOSTALGIA STORY SECTION -->
-    <section id="story" class="py-16 lg:py-20 border-b border-white/10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+    <section id="overview" class="section">
+        <span id="features"></span>
+        <span id="controls"></span>
+        <span id="story"></span>
+        <div class="container">
+            <div class="section-head">
                 <div>
-                    <div class="text-xs font-mono uppercase tracking-widest text-amber mb-1" data-i18n="story_sub">ОТ АВТОРА ПРОЕКТА</div>
-                    <h2 class="font-display font-bold text-2xl sm:text-3xl text-white tracking-wide" data-i18n="story_title">
-                        ИСТОРИЯ И ВДОХНОВЕНИЕ
-                    </h2>
-                    <div class="w-12 h-0.5 bg-amber mt-2"></div>
+                    <div class="eyebrow" data-i18n="ov_sub">Справочник командира</div>
+                    <h2 class="section-title" data-i18n="ov_title">Об игре и управлении</h2>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-                    <span class="px-3 py-1 rounded bg-bunker border border-white/10 text-slate-200">Command &amp; Conquer: Red Alert 1 &amp; 2</span>
-                    <span class="px-3 py-1 rounded bg-bunker border border-white/10 text-slate-200">Эпоха Nokia J2ME</span>
-                    <span class="px-3 py-1 rounded bg-amber/15 border border-amber/40 text-amber">Warzone 2100 &amp; OpenRA ❤️</span>
+                <div class="tabs-row" role="tablist" style="margin-bottom: 0;">
+                    <button type="button" id="ov-tab-features" class="aow-tab active" role="tab" aria-selected="true" onclick="openOverviewTab('features')" data-i18n="tab_features">Особенности</button>
+                    <button type="button" id="ov-tab-controls" class="aow-tab" role="tab" aria-selected="false" onclick="openOverviewTab('controls')" data-i18n="tab_controls">Управление</button>
+                    <button type="button" id="ov-tab-story" class="aow-tab" role="tab" aria-selected="false" onclick="openOverviewTab('story')" data-i18n="tab_story">О проекте</button>
                 </div>
             </div>
 
-            <div class="aow-card rounded-2xl p-6 sm:p-10">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                    <div class="lg:col-span-8 space-y-4 text-base sm:text-lg leading-relaxed">
-                        <p class="text-slate-100" data-i18n="story_p1">
-                            Я давний фанат классических стратегий <strong class="text-amber">Red Alert 1 и 2</strong>. Ещё во времена старых кнопочных телефонов <strong class="text-white">Nokia</strong> мы с друзьями собирались вместе и часами напролёт играли в <strong class="text-white">Art of War 2: Liberation of Peru</strong>, обсуждая тактики и планируя танковые штурмы.
+            <div id="ov-panel-features" class="tab-panel active">
+                <div class="features-grid">
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f1_tag">Сюжет и схватка</div>
+                        <h3 data-i18n="f1_title">Две полноценные кампании</h3>
+                        <p data-i18n="f1_desc">Пройдите кампании за Сопротивление («Освобождение Перу») и Глобальную Конфедерацию или запускайте одиночные схватки против компьютера.</p>
+                    </div>
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f2_tag">Мультиплеер до 8 игроков</div>
+                        <h3 data-i18n="f2_title">Кроссплатформенная сеть</h3>
+                        <p data-i18n="f2_desc">Совместная игра между Android, Windows, Linux и macOS. Локальная сеть, публичный сервер и подключение по короткому коду комнаты.</p>
+                    </div>
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f3_tag">Комфорт на ПК</div>
+                        <h3 data-i18n="f3_title">Классическое RTS-управление</h3>
+                        <p data-i18n="f3_desc">Выделение рамкой, контрольные группы со строем, приказ «Атаковать с хода», осадный режим для снайперов и артиллерии, масштабируемый радар.</p>
+                    </div>
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f4_tag">Графика</div>
+                        <h3 data-i18n="f4_title">Освещение и эффекты</h3>
+                        <p data-i18n="f4_desc">Поддержка высоких разрешений и полноэкранного режима, пресеты времени суток (день, закат, ночь), свечение выстрелов и чёткий пиксель-арт.</p>
+                    </div>
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f5_tag">Тактика</div>
+                        <h3 data-i18n="f5_title">Боты и 24 технологии</h3>
+                        <p data-i18n="f5_desc">Стройте базу, изучайте до 24 улучшений в лаборатории для каждой фракции и сражайтесь против компьютерных противников нескольких уровней сложности.</p>
+                    </div>
+                    <div class="aow-panel feature-item">
+                        <div class="feature-tag" data-i18n="f6_tag">Редактор</div>
+                        <h3 data-i18n="f6_title">Встроенный редактор карт</h3>
+                        <p data-i18n="f6_desc">Создавайте собственные карты с укреплениями и точками старта. В сетевых комнатах пользовательские карты передаются автоматически.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ov-panel-controls" class="tab-panel">
+                <div class="controls-grid">
+                    <div class="aow-panel control-row">
+                        <span class="key-cap" data-i18n="c1_key">ЛКМ / Рамка</span>
+                        <div>
+                            <h4 data-i18n="c1_title">Выбор войск</h4>
+                            <p data-i18n="c1_desc">Клик или выделение рамкой. Двойной клик выбирает все юниты этого типа.</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap" data-i18n="c2_key">ПКМ</span>
+                        <div>
+                            <h4 data-i18n="c2_title">Движение и атака</h4>
+                            <p data-i18n="c2_desc">Отправка войск в точку, атака цели или установка точки сбора завода.</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap">Ctrl + 1..0</span>
+                        <div>
+                            <h4 data-i18n="c3_title">Контрольные группы</h4>
+                            <p data-i18n="c3_desc">Назначить отряд на цифру. Нажатие 1..0 выбирает группу (дважды — центрирует камеру).</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap" data-i18n="c4_key">Q + ЛКМ</span>
+                        <div>
+                            <h4 data-i18n="c4_title">Атака с хода</h4>
+                            <p data-i18n="c4_desc">Отряд движется к точке, автоматически вступая в бой со всеми врагами на пути.</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap">G</span>
+                        <div>
+                            <h4 data-i18n="c5_title">Осадный режим</h4>
+                            <p data-i18n="c5_desc">Переключение дальнобойного режима для Снайперов и тяжёлой артиллерии «Носорог».</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap" data-i18n="c6_key">WASD / Колесо</span>
+                        <div>
+                            <h4 data-i18n="c6_title">Обзор и масштаб</h4>
+                            <p data-i18n="c6_desc">Перемещение камеры клавишами, стрелками или зажатым колесом мыши; колесо меняет зум.</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap" data-i18n="c7_key">Радар (+ / -)</span>
+                        <div>
+                            <h4 data-i18n="c7_title">Миникарта</h4>
+                            <p data-i18n="c7_desc">Быстрый переход кликом по радару и масштабирование миникарты колесом мыши.</p>
+                        </div>
+                    </div>
+                    <div class="aow-panel control-row">
+                        <span class="key-cap">F11 / P / Esc</span>
+                        <div>
+                            <h4 data-i18n="c8_title">Экран и пауза</h4>
+                            <p data-i18n="c8_desc">F11 — полный экран, P — тактическая пауза в сети, Esc — меню настроек.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ov-panel-story" class="tab-panel">
+                <div class="aow-panel story-grid">
+                    <div class="story-body">
+                        <p data-i18n="story_p1">
+                            Я давний фанат классических стратегий <strong>Red Alert 1 и 2</strong>. Ещё во времена старых кнопочных телефонов <strong>Nokia</strong> мы с друзьями собирались вместе и часами напролёт играли в <strong>Art of War 2: Liberation of Peru</strong>, обсуждая тактики и планируя танковые штурмы.
                         </p>
-                        <p class="text-steel" data-i18n="story_p2">
+                        <p data-i18n="story_p2">
                             Я очень долго ждал выхода этой серии в большой мир на ПК — да, существует третья часть, но именно во второй части я чувствую ту самую настоящую классику стратегий: выверенный баланс, честную экономику и азарт каждого сражения.
                         </p>
-                        <p class="text-slate-200" data-i18n="story_p3">
-                            Вдохновившись такими легендарными сообществами, как <strong class="text-amber">Warzone 2100</strong> и <strong class="text-amber">OpenRA</strong> <span class="text-red-500">❤️</span>, я создал этот проект, чтобы подарить любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми баталиями. Искренне благодарен студии <strong class="text-white">Gear Games</strong> и людям, которые подарили нам этот проект, из которого мы выросли!
+                        <p data-i18n="story_p3">
+                            Вдохновившись такими сообществами, как <strong>Warzone 2100</strong> и <strong>OpenRA</strong>, я создал этот проект, чтобы подарить любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми баталиями. Искренне благодарен студии <strong>Gear Games</strong> и людям, которые подарили нам игру, на которой мы выросли.
                         </p>
                     </div>
-
-                    <!-- Highlight Quote Box -->
-                    <div class="lg:col-span-4 bg-obsidian/90 rounded-xl p-6 border border-amber/30 space-y-4">
-                        <div class="text-amber font-display font-bold text-lg tracking-wide" data-i18n="story_box_title">
-                            Любовь к классике RTS ❤️
+                    <div class="aow-sunken story-aside">
+                        <div>
+                            <h3 data-i18n="story_box_title">Классическая RTS без ограничений</h3>
+                            <p data-i18n="story_box_desc">Без микротранзакций, таймеров ожидания и мобильных ограничений — только стратегия в реальном времени с открытым кодом.</p>
                         </div>
-                        <p class="text-xs sm:text-sm text-steel leading-relaxed" data-i18n="story_box_desc">
-                            Никаких микротранзакций, ожидания таймеров или мобильных ограничений — только чистая стратегия в реальном времени, созданная игроками для игроков.
-                        </p>
-                        <div class="pt-3 border-t border-white/10 flex items-center justify-between text-xs font-mono text-amber">
-                            <span>Gear Games Tribute</span>
-                            <span>100% Free &amp; Open</span>
+                        <div class="story-tags">
+                            <span class="tag">Red Alert 1 &amp; 2</span>
+                            <span class="tag">Nokia J2ME</span>
+                            <span class="tag">Warzone 2100 &amp; OpenRA</span>
+                            <span class="tag tag-accent">Gear Games Tribute</span>
                         </div>
                     </div>
                 </div>
@@ -420,423 +1368,303 @@
         </div>
     </section>
 
-    <!-- SCREENSHOTS GALLERY SECTION (All 6 Screenshots from `./Screenshots/`) -->
-    <section id="screenshots" class="py-16 lg:py-20 border-b border-white/10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
+    <section id="screenshots" class="section">
+        <div class="container">
+            <div class="section-head">
                 <div>
-                    <div class="text-xs font-mono uppercase tracking-widest text-amber mb-1" data-i18n="gal_sub">КАДРЫ ИЗ ИГРЫ</div>
-                    <h2 class="font-display font-bold text-2xl sm:text-3xl text-white tracking-wide" data-i18n="gal_title">
-                        ГАЛЕРЕЯ СКРИНШОТОВ
-                    </h2>
-                    <div class="w-12 h-0.5 bg-amber mt-2"></div>
+                    <div class="eyebrow" data-i18n="gal_sub">Кадры из игры</div>
+                    <h2 class="section-title" data-i18n="gal_title">Галерея скриншотов</h2>
                 </div>
-                <p class="text-xs sm:text-sm text-steel" data-i18n="gal_hint">
-                    Нажмите на любой скриншот, чтобы открыть его в полном размере
-                </p>
+                <span class="tag" data-i18n="gal_hint">Нажмите на скриншот для просмотра в полном размере</span>
             </div>
 
-            <!-- 6 Screenshot Cards Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                <!-- 1. screen-mainmenu.png -->
-                <div onclick="openLightbox(0)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-mainmenu.png" alt="Главное меню" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 0)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">01 / 06</div>
+            <div class="gallery-grid">
+                <button type="button" onclick="openLightbox(0)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-mainmenu.png" alt="Главное меню" onerror="renderStylizedFallback(this, 0)">
+                        <span class="gallery-idx">01 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s0_title">Главное меню</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s0_desc">Фирменный стиль, встроенный музыкальный плеер и быстрый переход к кампаниям и сетевой игре.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s0_title">Главное меню</h3>
+                        <p data-i18n="s0_desc">Фирменный стиль, встроенный плеер и быстрый переход к кампаниям и сети.</p>
                     </div>
-                </div>
+                </button>
 
-                <!-- 2. screen-network-play.png -->
-                <div onclick="openLightbox(1)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-network-play.png" alt="Сетевое лобби" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 1)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">02 / 06</div>
+                <button type="button" onclick="openLightbox(1)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-network-play.png" alt="Сетевое лобби" onerror="renderStylizedFallback(this, 1)">
+                        <span class="gallery-idx">02 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s1_title">Сетевая игра и лобби</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s1_desc">Комнаты до 8 игроков, выбор фракции, команды, цвета армии, стартовых позиций и ботов ИИ.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s1_title">Сетевая игра и лобби</h3>
+                        <p data-i18n="s1_desc">Комнаты до 8 игроков, выбор фракции, команды, цвета, позиций старта и ботов.</p>
                     </div>
-                </div>
+                </button>
 
-                <!-- 3. screen-network-skulmap.png -->
-                <div onclick="openLightbox(2)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-network-skulmap.png" alt="Сетевая битва на карте" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 2)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">03 / 06</div>
+                <button type="button" onclick="openLightbox(2)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-network-skulmap.png" alt="Сетевая битва" onerror="renderStylizedFallback(this, 2)">
+                        <span class="gallery-idx">03 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s2_title">Сетевая битва на карте</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s2_desc">Масштабные командные сражения в реальном времени с синхронным управлением войсками.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s2_title">Сетевая битва на карте</h3>
+                        <p data-i18n="s2_desc">Командные сражения в реальном времени с синхронным управлением войсками.</p>
                     </div>
-                </div>
+                </button>
 
-                <!-- 4. screen-features.png -->
-                <div onclick="openLightbox(3)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-features.png" alt="Геймплей и эффекты" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 3)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">04 / 06</div>
+                <button type="button" onclick="openLightbox(3)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-features.png" alt="Геймплей и эффекты" onerror="renderStylizedFallback(this, 3)">
+                        <span class="gallery-idx">04 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s3_title">Геймплей и графические эффекты</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s3_desc">Динамическое освещение, свечение взрывов и выстрелов, туман войны и удобная боковая панель приказов.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s3_title">Геймплей и эффекты</h3>
+                        <p data-i18n="s3_desc">Динамическое освещение, свечение выстрелов и взрывов, туман войны и панель приказов.</p>
                     </div>
-                </div>
+                </button>
 
-                <!-- 5. screen-maps.png -->
-                <div onclick="openLightbox(4)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-maps.png" alt="Карты и схватки" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 4)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">05 / 06</div>
+                <button type="button" onclick="openLightbox(4)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-maps.png" alt="Карты" onerror="renderStylizedFallback(this, 4)">
+                        <span class="gallery-idx">05 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s4_title">Разнообразие карт</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s4_desc">Десятки тактических карт с переправами, узкими ущельями, базами и ресурсами.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s4_title">Разнообразие карт</h3>
+                        <p data-i18n="s4_desc">Десятки карт с переправами, ущельями, базами и ресурсными полями.</p>
                     </div>
-                </div>
+                </button>
 
-                <!-- 6. screen-loadmap.png -->
-                <div onclick="openLightbox(5)" class="aow-card rounded-xl overflow-hidden cursor-pointer group">
-                    <div class="relative aspect-[16/9] bg-obsidian overflow-hidden">
-                        <img src="./Screenshots/screen-loadmap.png" alt="Выбор и загрузка карт" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="renderStylizedFallback(this, 5)">
-                        <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-obsidian/80 border border-white/15 font-mono text-[10px] text-amber">06 / 06</div>
+                <button type="button" onclick="openLightbox(5)" class="aow-panel gallery-card">
+                    <div class="gallery-thumb">
+                        <img src="./Screenshots/screen-loadmap.png" alt="Выбор карты" onerror="renderStylizedFallback(this, 5)">
+                        <span class="gallery-idx">06 / 06</span>
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-display font-bold text-base text-white group-hover:text-amber transition" data-i18n="s5_title">Выбор карты и настройка боя</h3>
-                        <p class="text-xs text-steel mt-1" data-i18n="s5_desc">Предпросмотр карт перед матчем, выбор уровня сложности ИИ и автоматическая передача новых карт по сети.</p>
+                    <div class="gallery-info">
+                        <h3 data-i18n="s5_title">Выбор карты и настройка боя</h3>
+                        <p data-i18n="s5_desc">Предпросмотр карт перед матчем, сложность ботов и передача карт по сети.</p>
                     </div>
-                </div>
-
+                </button>
             </div>
         </div>
     </section>
 
-    <!-- GAMEPLAY FEATURES SECTION (Player-Focused, Zero Tech Jargon) -->
-    <section id="features" class="py-16 lg:py-20 border-b border-white/10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="mb-12">
-                <div class="text-xs font-mono uppercase tracking-widest text-amber mb-1" data-i18n="feat_sub">ВОЗМОЖНОСТИ ИГРЫ</div>
-                <h2 class="font-display font-bold text-2xl sm:text-3xl text-white tracking-wide" data-i18n="feat_title">
-                    ПОЧЕМУ СТОИТ СЫГРАТЬ
-                </h2>
-                <div class="w-12 h-0.5 bg-amber mt-2"></div>
+    <section id="server" class="section">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow" data-i18n="srv_eyebrow">Мониторинг и сеть</div>
+                    <h2 class="section-title" data-i18n="srv_title">Сервер и активные комнаты</h2>
+                </div>
+
+                <div class="aow-panel srv-bar">
+                    <span id="srv-status-text" class="srv-status-plain" data-i18n="srv_status_checking">Проверка...</span>
+                    <div class="srv-host-meta">
+                        <span data-i18n="srv_host_prefix">Хост:</span>
+                        <strong id="srv-host-label">openaow.imister.tech:38100</strong>
+                        <span> | </span>
+                        <span id="srv-server-name" style="color: var(--accent-bright);">—</span>
+                    </div>
+                    <span id="srv-last-updated" class="srv-updated">—</span>
+                    <button type="button" id="srv-refresh-btn" onclick="fetchServerStatus(true)" class="aow-btn" style="padding: 5px 12px; font-size: 11px;" data-i18n="srv_refresh_btn">
+                        Обновить
+                    </button>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Feature 1 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f1_tag">СЮЖЕТ И СХВАТКА</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f1_title">Две полноценные кампании</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f1_desc">
-                        Пройдите классические кампании за Сопротивление (<em>«Освобождение Перу»</em>) и за Глобальную Конфедерацию, либо устраивайте одиночные битвы на любой карте против компьютера.
-                    </p>
+            <div id="srv-panel-live">
+                <div class="stats-grid">
+                    <div class="aow-panel stat-box">
+                        <div class="stat-label" data-i18n="srv_stat_rooms">Активные комнаты</div>
+                        <div id="srv-count-rooms" class="stat-val">—</div>
+                    </div>
+                    <div class="aow-panel stat-box">
+                        <div class="stat-label" data-i18n="srv_stat_players">Игроков в комнатах</div>
+                        <div id="srv-count-players" class="stat-val">—</div>
+                    </div>
+                    <div class="aow-panel stat-box">
+                        <div class="stat-label" data-i18n="srv_stat_matches">Идёт боёв</div>
+                        <div id="srv-count-matches" class="stat-val accent">—</div>
+                    </div>
+                    <div class="aow-panel stat-box">
+                        <div class="stat-label" data-i18n="srv_stat_master">Клиентов в лобби</div>
+                        <div id="srv-count-master" class="stat-val">—</div>
+                    </div>
                 </div>
 
-                <!-- Feature 2 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f2_tag">МУЛЬТИПЛЕЕР ДО 8 ИГРОКОВ</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f2_title">Кроссплатформенная сетевая игра</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f2_desc">
-                        Играйте вместе с телефона на Android и с ПК на Windows, Linux или macOS — до 8 игроков в одном матче. Сетевая игра и сервер кроссплатформенные: объединяйтесь по локальной сети с автоматическим поиском игр, подключайтесь к комнатам на публичном сервере или приглашайте друзей по короткому коду комнаты без настройки роутера.
-                    </p>
-                </div>
-
-                <!-- Feature 3 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f3_tag">КОМФОРТ НА ПК</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f3_title">Современное RTS-управление</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f3_desc">
-                        Выделение войск рамкой мыши, контрольные группы с движением в строю, приказ «Атаковать с хода», осадный режим для снайперов и артиллерии, а также масштабируемый радар.
-                    </p>
-                </div>
-
-                <!-- Feature 4 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f4_tag">АТМОСФЕРА И ЭФФЕКТЫ</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f4_title">Сочная графика и освещение</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f4_desc">
-                        Поддержка высоких разрешений и полноэкранного режима, атмосферные режимы освещения (день, закат, ночь), мягкое свечение выстрелов и взрывов, фильтр чёткого пиксель-арта.
-                    </p>
-                </div>
-
-                <!-- Feature 5 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f5_tag">ТАКТИЧЕСКИЙ ВЫЗОВ</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f5_title">Умный противник и 24 технологии</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f5_desc">
-                        Стройте электростанции, казармы и заводы, изучайте до 24 улучшений в лаборатории для каждой стороны и сражайтесь против ИИ, который собирает ударные кулаки и штурмует базу волнами.
-                    </p>
-                </div>
-
-                <!-- Feature 6 -->
-                <div class="aow-card rounded-xl p-6">
-                    <div class="text-amber font-mono text-xs uppercase tracking-wider mb-2" data-i18n="f6_tag">ТВОРЧЕСТВО</div>
-                    <h3 class="font-display font-bold text-xl text-white mb-2" data-i18n="f6_title">Встроенный редактор карт</h3>
-                    <p class="text-sm text-steel leading-relaxed" data-i18n="f6_desc">
-                        Создавайте собственные поля сражений, расставляйте укрепления и стартовые точки. В сетевой игре новые карты автоматически передаются всем участникам комнаты.
-                    </p>
+                <div class="aow-panel table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-i18n="srv_col_code">Код</th>
+                                <th data-i18n="srv_col_name">Комната</th>
+                                <th data-i18n="srv_col_map">Карта</th>
+                                <th data-i18n="srv_col_players">Игроки</th>
+                                <th data-i18n="srv_col_state">Статус</th>
+                                <th data-i18n="srv_col_port">Порт UDP</th>
+                                <th data-i18n="srv_col_version">Версия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="srv-rooms-tbody"></tbody>
+                    </table>
+                    <div id="srv-rooms-empty" class="table-empty" data-i18n="srv_loading_rooms">Опрос статуса сервера...</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- CONTROLS GUIDE SECTION -->
-    <section id="controls" class="py-16 lg:py-20 border-b border-white/10">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="mb-10">
-                <div class="text-xs font-mono uppercase tracking-widest text-amber mb-1" data-i18n="ctrl_sub">ГОРЯЧИЕ КЛАВИШИ И МЫШЬ</div>
-                <h2 class="font-display font-bold text-2xl sm:text-3xl text-white tracking-wide" data-i18n="ctrl_title">
-                    УПРАВЛЕНИЕ В БОЮ
-                </h2>
-                <div class="w-12 h-0.5 bg-amber mt-2"></div>
+    <section id="download" class="section" style="border-bottom: 0;">
+        <div class="container">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow" data-i18n="dl_badge">Windows • Linux • macOS • Android</div>
+                    <h2 class="section-title" data-i18n="dl_title">Скачать и запустить</h2>
+                </div>
+                <span style="font-size: 13.5px; color: var(--text-dim);" data-i18n="dl_desc">Скачайте клиент игры и пакет игровых ресурсов.</span>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3" data-i18n="c1_key">ЛКМ / Рамка</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c1_title">Выбор войск</h4>
-                    <p class="text-xs text-steel" data-i18n="c1_desc">Клик или выделение рамкой. Двойной клик выбирает все юниты этого типа.</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3" data-i18n="c2_key">ПКМ (Правый клик)</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c2_title">Движение и атака</h4>
-                    <p class="text-xs text-steel" data-i18n="c2_desc">Отправка войск в точку, приказ атаковать врага или установка точки сбора завода.</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3">Ctrl + 1..0</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c3_title">Контрольные группы</h4>
-                    <p class="text-xs text-steel" data-i18n="c3_desc">Назначить отряд на цифру. Нажатие 1..0 выбирает группу (дважды — центрирует камеру).</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3" data-i18n="c4_key">Q + ЛКМ</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c4_title">Атака с хода</h4>
-                    <p class="text-xs text-steel" data-i18n="c4_desc">Отряд движется в указанную точку, автоматически вступая в бой со всеми врагами на пути.</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3">G</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c5_title">Осадный режим</h4>
-                    <p class="text-xs text-steel" data-i18n="c5_desc">Переключение дальнобойного режима для Снайперов и тяжёлой артиллерии «Носорог».</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3" data-i18n="c6_key">W A S D / Колесо</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c6_title">Обзор и масштаб</h4>
-                    <p class="text-xs text-steel" data-i18n="c6_desc">Перемещение камеры клавишами, стрелками или зажатым колесом мыши; вращение колеса меняет зум.</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3" data-i18n="c7_key">Радар (+ / -)</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c7_title">Тактическая миникарта</h4>
-                    <p class="text-xs text-steel" data-i18n="c7_desc">Быстрое перемещение камеры кликом по радару и масштабирование миникарты колесом мыши.</p>
-                </div>
-
-                <div class="aow-card rounded-xl p-5">
-                    <div class="font-mono text-xs text-amber bg-amber/10 border border-amber/30 inline-block px-2.5 py-1 rounded mb-3">F11 / P / Esc</div>
-                    <h4 class="font-display font-bold text-white text-base mb-1" data-i18n="c8_title">Экран и пауза</h4>
-                    <p class="text-xs text-steel" data-i18n="c8_desc">F11 — полный экран, P — тактическая пауза в сетевой игре, Esc — меню настроек.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- DOWNLOAD & HOW TO PLAY SECTION -->
-    <section id="download" class="py-16 lg:py-24 border-b border-white/10">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded bg-amber/15 border border-amber/30 text-amber text-xs font-mono mb-4" data-i18n="dl_badge">
-                ГОТОВО К БОЮ • WINDOWS / LINUX / MACOS / ANDROID
-            </div>
-            <h2 class="font-display font-bold text-3xl sm:text-4xl text-white tracking-wide" data-i18n="dl_title">
-                НАЧНИТЕ ИГРАТЬ ПРЯМО СЕЙЧАС
-            </h2>
-            <p class="text-steel max-w-2xl mx-auto mt-3 text-sm sm:text-base leading-relaxed" data-i18n="dl_desc">
-                Скачайте актуальную версию игры и фанатскую сборку игровых ресурсов и вступайте в сражение!
-            </p>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10 text-left">
-                <!-- Card 1: Game Client -->
-                <div class="aow-card rounded-xl p-6 sm:p-8 flex flex-col justify-between">
+            <div class="dl-grid">
+                <div class="aow-panel dl-card">
                     <div>
-                        <span class="text-xs font-mono text-amber uppercase tracking-wider" data-i18n="dl_step1">ШАГ 1 • ИГРОВОЙ КЛИЕНТ</span>
-                        <h3 class="font-display font-bold text-xl text-white mt-1 mb-2" data-i18n="dl_card1_title">Скачать Open Art Of War</h3>
-                        <p class="text-sm text-steel leading-relaxed mb-6" data-i18n="dl_card1_desc">
-                            Загрузите сборку для вашей операционной системы (Windows, Linux, macOS или Android) со страницы официальных релизов проекта.
-                        </p>
+                        <div class="eyebrow" data-i18n="dl_step1">Шаг 1 • Игровой клиент</div>
+                        <h3 data-i18n="dl_card1_title">Open Art Of War</h3>
+                        <p data-i18n="dl_card1_desc">Готовые сборки для Windows, Linux, macOS и Android публикуются на странице релизов проекта.</p>
                     </div>
-                    <a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener"
-                       class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded bg-amber hover:bg-amber-bright text-obsidian font-display font-bold uppercase tracking-wider text-sm transition">
-                        <span data-i18n="dl_btn1">Перейти к загрузке (Releases)</span>
-                        <span>→</span>
+                    <a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener" class="aow-btn aow-btn-primary" data-i18n="dl_btn1">
+                        Перейти к релизам
                     </a>
                 </div>
 
-                <!-- Card 2: Community Assets Pack -->
-                <div class="aow-card rounded-xl p-6 sm:p-8 flex flex-col justify-between">
+                <div class="aow-panel dl-card">
                     <div>
-                        <span class="text-xs font-mono text-amber uppercase tracking-wider" data-i18n="dl_step2">ШАГ 2 • РЕСУРСЫ ИГРЫ</span>
-                        <h3 class="font-display font-bold text-xl text-white mt-1 mb-2" data-i18n="dl_card2_title">Фанатская сборка ассетов</h3>
-                        <p class="text-sm text-steel leading-relaxed mb-6" data-i18n="dl_card2_desc">
-                            Для запуска игры поместите фанатскую сборку графики и звука (<code>assets.blob</code> или папку <code>assets/</code>) рядом с игрой.
-                        </p>
+                        <div class="eyebrow" data-i18n="dl_step2">Шаг 2 • Ресурсы игры</div>
+                        <h3 data-i18n="dl_card2_title">Пакет ассетов</h3>
+                        <p data-i18n="dl_card2_desc">Для запуска поместите фанатскую сборку графики и звука (<code>assets.blob</code> или папку <code>assets/</code>) рядом с игрой.</p>
                     </div>
-                    <a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener"
-                       class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded bg-bunker hover:bg-white/10 text-white border border-amber/40 font-display font-semibold uppercase tracking-wider text-sm transition">
-                        <span data-i18n="dl_btn2">Открыть страницу на GitHub</span>
-                        <span>→</span>
+                    <a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener" class="aow-btn" data-i18n="dl_btn2">
+                        Открыть репозиторий GitHub
                     </a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- FOOTER & LEGAL DISCLAIMER -->
-    <footer class="py-12 bg-obsidian text-steel text-xs">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Col 1 -->
-                <div class="space-y-2">
-                    <div class="font-display font-bold text-lg text-amber tracking-wider">OPEN ART OF WAR</div>
-                    <p class="text-steel/80 leading-relaxed" data-i18n="footer_about">
-                        Freedom for Liberty — свободный некоммерческий RTS-проект для ПК и Android. Исходный код открыт под GNU GPLv3.
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-title">Open Art Of War</div>
+                    <p style="margin: 0;" data-i18n="footer_about">
+                        Resistance Arisen — свободный некоммерческий RTS-проект для ПК и Android. Исходный код открыт под GNU GPLv3.
                     </p>
                 </div>
-
-                <!-- Col 2 -->
-                <div class="space-y-2 font-mono">
-                    <div class="text-white font-semibold uppercase tracking-wider" data-i18n="footer_links">Ссылки проекта</div>
-                    <ul class="space-y-1.5">
-                        <li><a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener" class="hover:text-amber transition">→ GitHub: badcast/open-art-of-war</a></li>
-                        <li><a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener" class="hover:text-amber transition" data-i18n="footer_rel">→ Скачать релизы</a></li>
-                        <li><a href="#screenshots" class="hover:text-amber transition" data-i18n="footer_gal">→ Галерея скриншотов</a></li>
+                <div>
+                    <div class="footer-title" data-i18n="footer_links">Ссылки</div>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/badcast/open-art-of-war" target="_blank" rel="noopener">GitHub: badcast/open-art-of-war</a></li>
+                        <li><a href="https://github.com/badcast/open-art-of-war/releases" target="_blank" rel="noopener" data-i18n="footer_rel">Релизы</a></li>
+                        <li><a href="https://boosty.to/badcast/donate" target="_blank" rel="noopener noreferrer" data-i18n="support_project">Поддержать (Boosty)</a></li>
                     </ul>
                 </div>
-
-                <!-- Col 3: Respectful Legal Notice -->
-                <div class="space-y-2">
-                    <div class="text-white font-mono font-semibold uppercase tracking-wider" data-i18n="footer_legal_title">Правовая информация</div>
-                    <p class="text-steel/80 leading-relaxed" data-i18n="footer_legal_desc">
-                        Исходный код проекта распространяется под лицензией <strong class="text-slate-200">GNU GPLv3</strong>. Для запуска используется отдельный свободно распространяемый фанатский пак игровых ресурсов.
+                <div>
+                    <div class="footer-title" data-i18n="footer_legal_title">Лицензия</div>
+                    <p style="margin: 0;" data-i18n="footer_legal_desc">
+                        Исходный код распространяется под лицензией <strong>GNU GPLv3</strong>. Для запуска используется отдельный свободно распространяемый фанатский пак игровых ресурсов.
                     </p>
                 </div>
             </div>
-
-            <div class="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono text-steel/60">
-                <div>Open Art Of War: Freedom for Liberty • Version 1.0.0</div>
-                <div>Inspired by Command &amp; Conquer: Red Alert, Warzone 2100 &amp; OpenRA ❤️</div>
+            <div class="footer-bottom">
+                <span>Open Art Of War: Resistance Arisen</span>
+                <span>Inspired by Red Alert, Warzone 2100 &amp; OpenRA</span>
             </div>
         </div>
     </footer>
 
-    <!-- FULLSCREEN LIGHTBOX MODAL FOR SCREENSHOTS -->
-    <div id="lightbox-modal" class="fixed inset-0 z-50 hidden bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 select-none" onclick="closeLightbox()">
-        <!-- Top Bar -->
-        <div class="max-w-7xl w-full mx-auto flex items-center justify-between text-xs font-mono text-steel" onclick="event.stopPropagation()">
-            <div class="flex items-center gap-3">
-                <span id="lb-counter" class="px-2.5 py-1 rounded bg-amber text-obsidian font-bold">01 / 06</span>
-                <span id="lb-title" class="text-white font-display font-bold text-sm sm:text-base">Главное меню</span>
-                <span id="lb-path" class="hidden sm:inline text-steel/60">./Screenshots/screen-mainmenu.png</span>
+    <div id="lightbox-modal" class="lightbox" onclick="closeLightbox()">
+        <div class="lb-top" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span id="lb-counter" class="tag tag-accent">01 / 06</span>
+                <span id="lb-title" style="color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 15px;">Главное меню</span>
+                <span id="lb-path" style="color: var(--text-muted);">./Screenshots/screen-mainmenu.png</span>
             </div>
-            <button onclick="closeLightbox()" class="px-3 py-1.5 rounded bg-bunker hover:bg-amber hover:text-obsidian text-white border border-white/15 transition">
-                ✕ ESC
-            </button>
+            <button type="button" onclick="closeLightbox()" class="aow-btn" style="padding: 5px 12px; font-size: 11px;">ESC</button>
         </div>
 
-        <!-- Center Image Container -->
-        <div class="relative flex-1 flex items-center justify-center my-4 max-w-6xl w-full mx-auto overflow-hidden" onclick="event.stopPropagation()">
-            <button onclick="stepLightbox(-1)" class="absolute left-2 sm:left-4 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-obsidian/80 hover:bg-amber hover:text-obsidian text-white border border-white/20 flex items-center justify-center text-xl transition">‹</button>
-            <img id="lb-img" src="./Screenshots/screen-mainmenu.png" alt="Screenshot Preview" class="max-h-[78vh] max-w-full rounded-lg border border-white/15 shadow-2xl object-contain" onerror="renderStylizedFallback(this, currentLightboxIndex)">
-            <button onclick="stepLightbox(1)" class="absolute right-2 sm:right-4 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-obsidian/80 hover:bg-amber hover:text-obsidian text-white border border-white/20 flex items-center justify-center text-xl transition">›</button>
+        <div class="lb-stage" onclick="event.stopPropagation()">
+            <button type="button" onclick="stepLightbox(-1)" class="lb-nav lb-prev" aria-label="Предыдущий">‹</button>
+            <img id="lb-img" src="./Screenshots/screen-mainmenu.png" alt="Screenshot Preview" onerror="renderStylizedFallback(this, currentLightboxIndex)">
+            <button type="button" onclick="stepLightbox(1)" class="lb-nav lb-next" aria-label="Следующий">›</button>
         </div>
 
-        <!-- Bottom Caption -->
-        <div class="max-w-3xl w-full mx-auto text-center" onclick="event.stopPropagation()">
-            <p id="lb-desc" class="text-xs sm:text-sm text-slate-200"></p>
+        <div class="lb-caption" onclick="event.stopPropagation()">
+            <p id="lb-desc" style="margin: 0;"></p>
         </div>
     </div>
 
-    <!-- SCRIPTS: Screenshot Data, Gallery, Lightbox, OGG Soundtrack & RU/EN Localization -->
     <script>
         let currentLang = 'ru';
         let currentHeroIndex = 0;
         let currentLightboxIndex = 0;
 
-        // Exact 6 screenshots from `./Screenshots/` folder
         const screenshotsData = [
             {
                 src: './Screenshots/screen-mainmenu.png',
                 title_ru: 'Главное меню',
                 title_en: 'Main Menu',
-                desc_ru: 'Классическая атмосфера главного меню, выбор кампании, одиночных сражений и сетевой игры.',
-                desc_en: 'Classic tactical main menu with quick access to campaigns, custom skirmishes, and network play.'
+                desc_ru: 'Главное меню игры: встроенный музыкальный плеер, кампании, одиночные сражения и сетевая игра.',
+                desc_en: 'Main menu with built-in music player, campaigns, skirmishes, and multiplayer.'
             },
             {
                 src: './Screenshots/screen-network-play.png',
                 title_ru: 'Сетевая игра и лобби',
                 title_en: 'Network Play & Lobby',
-                desc_ru: 'Комнаты до 8 игроков, выбор фракции, команды, цвета армии, стартовых позиций и ботов ИИ.',
-                desc_en: 'Multiplayer rooms for up to 8 players with faction, team, army color, spawn point, and AI bot selection.'
+                desc_ru: 'Комнаты до 8 игроков, выбор фракции, команды, цвета армии, стартовых позиций и ботов.',
+                desc_en: 'Rooms for up to 8 players with faction, team, army color, spawn point, and bot selection.'
             },
             {
                 src: './Screenshots/screen-network-skulmap.png',
                 title_ru: 'Сетевая битва на карте',
                 title_en: 'Multiplayer Battle on Skull Map',
-                desc_ru: 'Масштабные командные сражения в реальном времени с синхронным управлением войсками.',
-                desc_en: ' Intense real-time multiplayer team battles across iconic tactical battlefields.'
+                desc_ru: 'Командные сражения в реальном времени с синхронным управлением войсками.',
+                desc_en: 'Real-time multiplayer team battles with synchronized unit control.'
             },
             {
                 src: './Screenshots/screen-features.png',
-                title_ru: 'Геймплей и графические эффекты',
+                title_ru: 'Геймплей и эффекты',
                 title_en: 'Gameplay & Visual Effects',
-                desc_ru: 'Динамическое освещение, свечение взрывов и выстрелов, туман войны и удобная боковая панель приказов.',
-                desc_en: 'Dynamic lighting, explosion and shot glow, fog of war, and a modern command sidebar.'
+                desc_ru: 'Динамическое освещение, свечение выстрелов и взрывов, туман войны и панель приказов.',
+                desc_en: 'Dynamic lighting, weapon and explosion glow, fog of war, and command sidebar.'
             },
             {
                 src: './Screenshots/screen-maps.png',
                 title_ru: 'Разнообразие карт',
-                title_en: 'Tactical Maps & Skirmishes',
-                desc_ru: 'Десятки тактических карт с переправами, узкими ущельями, базами и ресурсами.',
-                desc_en: 'Dozens of maps featuring river crossings, chokepoints, fortified bases, and resource fields.'
+                title_en: 'Tactical Maps',
+                desc_ru: 'Десятки карт с переправами, узкими ущельями, базами и ресурсными полями.',
+                desc_en: 'Dozens of maps featuring river crossings, chokepoints, bases, and resource fields.'
             },
             {
                 src: './Screenshots/screen-loadmap.png',
                 title_ru: 'Выбор карты и настройка боя',
-                title_en: 'Map Selection & Match Setup',
-                desc_ru: 'Предпросмотр карт перед матчем, выбор уровня сложности ИИ и автоматическая передача карт по сети.',
-                desc_en: 'Pre-match map preview, AI difficulty configuration, and automatic map sharing in multiplayer.'
+                title_en: 'Map Selection & Setup',
+                desc_ru: 'Предпросмотр карт перед матчем, сложность ботов и автоматическая передача карт по сети.',
+                desc_en: 'Pre-match map preview, bot difficulty selection, and automatic map transfer in multiplayer.'
             }
         ];
 
-        // Stylized SVG Fallback if previewing without the local `./Screenshots/` directory mounted
         function renderStylizedFallback(imgEl, idx) {
             const item = screenshotsData[idx] || screenshotsData[0];
             const title = currentLang === 'ru' ? item.title_ru : item.title_en;
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-                <defs>
-                    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="#07080b"/>
-                        <stop offset="60%" stop-color="#121722"/>
-                        <stop offset="100%" stop-color="#291d12"/>
-                    </linearGradient>
-                </defs>
-                <rect width="1280" height="720" fill="url(#bg)"/>
-                <rect x="40" y="40" width="1200" height="640" rx="12" fill="none" stroke="#e5a024" stroke-opacity="0.35" stroke-width="2"/>
-                <rect x="80" y="260" width="6" height="140" fill="#e5a024"/>
-                <text x="115" y="305" fill="#e5a024" font-family="sans-serif" font-weight="bold" font-size="44">OPEN ART OF WAR</text>
-                <text x="115" y="355" fill="#ffffff" font-family="sans-serif" font-weight="bold" font-size="28">${title}</text>
-                <text x="115" y="395" fill="#9ba3b0" font-family="monospace" font-size="20">${item.src}</text>
+                <rect width="1280" height="720" fill="#100d0a"/>
+                <rect x="32" y="32" width="1216" height="656" fill="#171310" stroke="#8c6642" stroke-width="2"/>
+                <rect x="72" y="270" width="6" height="120" fill="#e8b04a"/>
+                <text x="102" y="312" fill="#e8b04a" font-family="sans-serif" font-weight="bold" font-size="40">OPEN ART OF WAR</text>
+                <text x="102" y="356" fill="#ede6dc" font-family="sans-serif" font-weight="bold" font-size="24">${title}</text>
+                <text x="102" y="390" fill="#b4a898" font-family="monospace" font-size="16">${item.src}</text>
             </svg>`;
             imgEl.onerror = null;
             imgEl.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
         }
 
-        // Hero Carousel Controls
         function selectHeroSlide(idx) {
             currentHeroIndex = (idx + screenshotsData.length) % screenshotsData.length;
             const item = screenshotsData[currentHeroIndex];
@@ -845,11 +1673,14 @@
             heroImg.src = item.src;
 
             document.getElementById('hero-slide-caption').textContent = currentLang === 'ru' ? item.title_ru : item.title_en;
-            document.getElementById('hero-slide-tag').textContent = item.src;
             document.getElementById('hero-slide-desc').textContent = currentLang === 'ru' ? item.desc_ru : item.desc_en;
 
             document.querySelectorAll('.thumb-btn').forEach((btn, i) => {
                 btn.classList.toggle('active', i === currentHeroIndex);
+            });
+            const menuMap = { 0: 0, 1: 1, 3: 2 };
+            document.querySelectorAll('.hero-menu-item').forEach((btn, i) => {
+                btn.classList.toggle('active', menuMap[currentHeroIndex] === i);
             });
         }
 
@@ -857,16 +1688,29 @@
             selectHeroSlide(currentHeroIndex + dir);
         }
 
-        // Lightbox Controls
+        function openOverviewTab(tab) {
+            const tabs = ['features', 'controls', 'story'];
+            tabs.forEach((name) => {
+                const btn = document.getElementById('ov-tab-' + name);
+                const panel = document.getElementById('ov-panel-' + name);
+                const active = name === tab;
+                if (btn) {
+                    btn.classList.toggle('active', active);
+                    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+                }
+                if (panel) panel.classList.toggle('active', active);
+            });
+        }
+
         function openLightbox(idx) {
             currentLightboxIndex = (idx + screenshotsData.length) % screenshotsData.length;
             updateLightboxContent();
-            document.getElementById('lightbox-modal').classList.remove('hidden');
+            document.getElementById('lightbox-modal').classList.add('open');
             document.body.style.overflow = 'hidden';
         }
 
         function closeLightbox() {
-            document.getElementById('lightbox-modal').classList.add('hidden');
+            document.getElementById('lightbox-modal').classList.remove('open');
             document.body.style.overflow = '';
         }
 
@@ -889,13 +1733,13 @@
 
         window.addEventListener('keydown', (e) => {
             const modal = document.getElementById('lightbox-modal');
-            if (modal.classList.contains('hidden')) return;
+            if (!modal.classList.contains('open')) return;
             if (e.key === 'Escape') closeLightbox();
             if (e.key === 'ArrowLeft') stepLightbox(-1);
             if (e.key === 'ArrowRight') stepLightbox(1);
         });
 
-        // Local soundtrack files are supplied separately; no automatic playback.
+        // Soundtrack player
         const tracks = ['./music/mainmenu.ogg', './music/mainmenu_01.ogg'];
         const audio = document.getElementById('ost-audio');
         const seek = document.getElementById('ost-seek');
@@ -903,24 +1747,28 @@
         let playRequest = 0;
         let musicStatus = 'ready';
         audio.volume = 0.65;
+
         const musicMessages = {
-            ru: {ready: 'Нажмите ▶, чтобы слушать', loading: 'Загрузка трека…', playing: 'Сейчас играет', paused: 'На паузе', error: 'Трек пока недоступен. Музыка появится позже.'},
-            en: {ready: 'Press ▶ to listen', loading: 'Loading track…', playing: 'Now playing', paused: 'Paused', error: 'Track unavailable. Music will be added later.'}
+            ru: { ready: 'Нажмите ▶, чтобы слушать', loading: 'Загрузка трека…', playing: 'Сейчас играет', paused: 'На паузе', error: 'Трек пока недоступен.' },
+            en: { ready: 'Press ▶ to listen', loading: 'Loading track…', playing: 'Now playing', paused: 'Paused', error: 'Track unavailable.' }
         };
+
         function showMusicStatus(state) {
             musicStatus = state;
             document.getElementById('ost-status').textContent = musicMessages[currentLang][state];
         }
+
         function updateMusicUI() {
             const playing = !audio.paused && !audio.ended;
             document.getElementById('ost-play-icon').textContent = playing ? '❚❚' : '▶';
             document.getElementById('ost-play').setAttribute('aria-pressed', String(playing));
             document.getElementById('ost-play').setAttribute('aria-label', currentLang === 'ru' ? (playing ? 'Пауза' : 'Воспроизвести') : (playing ? 'Pause' : 'Play'));
-            document.getElementById('soundtrack').classList.toggle('is-playing', playing);
         }
+
         function formatTime(value) {
             return Number.isFinite(value) ? Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0') : '--:--';
         }
+
         function updateTimeline() {
             const valid = Number.isFinite(audio.duration) && audio.duration > 0;
             seek.disabled = !valid;
@@ -928,6 +1776,7 @@
             document.getElementById('ost-time-cur').textContent = formatTime(audio.currentTime);
             document.getElementById('ost-duration').textContent = formatTime(audio.duration);
         }
+
         async function playMusic() {
             const request = ++playRequest;
             showMusicStatus('loading');
@@ -939,10 +1788,12 @@
             }
             updateMusicUI();
         }
+
         function toggleMusic() {
             if (audio.paused) { if (audio.error) audio.load(); playMusic(); }
             else { ++playRequest; audio.pause(); showMusicStatus('paused'); }
         }
+
         function changeTrack(direction, continuePlaying = !audio.paused) {
             ++playRequest;
             audio.pause();
@@ -955,220 +1806,270 @@
             showMusicStatus('ready');
             if (continuePlaying) playMusic();
         }
+
         function prevTrack() { changeTrack(-1); }
         function nextTrack() { changeTrack(1); }
+
         audio.addEventListener('ended', () => changeTrack(1, true));
         audio.addEventListener('error', () => { showMusicStatus('error'); updateMusicUI(); });
-        ['play', 'pause', 'ended'].forEach(event => audio.addEventListener(event, updateMusicUI));
-        ['timeupdate', 'loadedmetadata', 'durationchange', 'emptied'].forEach(event => audio.addEventListener(event, updateTimeline));
+        ['play', 'pause', 'ended'].forEach(ev => audio.addEventListener(ev, updateMusicUI));
+        ['timeupdate', 'loadedmetadata', 'durationchange', 'emptied'].forEach(ev => audio.addEventListener(ev, updateTimeline));
         seek.addEventListener('input', () => { if (Number.isFinite(audio.duration)) audio.currentTime = seek.value / 100 * audio.duration; });
-        document.getElementById('ost-volume').addEventListener('input', event => { audio.volume = Number(event.target.value); });
+        document.getElementById('ost-volume').addEventListener('input', ev => { audio.volume = Number(ev.target.value); });
 
-        // Complete RU / EN Dictionary
+        // Localization
         const i18n = {
             ru: {
-                support_project: 'Поддержать проект',
-                ost_label: 'САУНДТРЕК ИГРЫ',
+                nav_features: 'Особенности',
+                nav_controls: 'Управление',
+                nav_story: 'О проекте',
+                nav_screenshots: 'Скриншоты',
+                nav_server: 'Сервер',
+                nav_download: 'Скачать',
+                hero_tag: 'СВОБОДНАЯ RTS • GNU GPLv3',
+                badge_multiplayer: 'Сеть до 8 игроков (ПК + Android)',
+                hero_desc: 'Свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под лицензией <strong>GNU GPLv3</strong>, вдохновлённый <strong>«Art of War 2: Liberation of Peru»</strong>. Две сюжетные кампании, редактор карт, сетевая игра до <strong>8 человек</strong> и управление для мыши и клавиатуры.',
+                btn_download: 'Скачать игру',
+                btn_gallery: 'Скриншоты',
+                support_project: 'Поддержать (Boosty)',
+                menu_1: 'Две кампании: Сопротивление и Конфедерация',
+                menu_2: 'Кроссплатформенная сеть ПК + Android до 8 игроков',
+                menu_3: 'Режимы освещения, свечение взрывов и фильтр пиксель-арта',
+                ost_label: 'Саундтрек игры',
                 ost_volume: 'Громкость',
-                nav_story: "О проекте",
-                nav_features: "Особенности",
-                nav_screenshots: "Скриншоты",
-                nav_controls: "Управление",
-                nav_download: "Скачать",
-                badge_multiplayer: "⚔️ ПК + Android • до 8 игроков",
-                badge_campaigns: "🎖️ 2 сюжетные кампании + Редактор карт",
-                hero_tag: "СВОБОДНАЯ RTS • GNU GPLv3",
-                hero_desc: 'Свободный некоммерческий RTS-проект для ПК и Android с открытым исходным кодом под лицензией <strong class="text-amber">GNU GPLv3</strong>, вдохновлённый <strong class="text-white">«Art of War 2: Liberation of Peru»</strong>. Стройте базы, исследуйте технологии, ведите танковые дивизии в бой в двух сюжетных кампаниях или сражайтесь с друзьями по сети до <strong class="text-amber">8 игроков</strong> с современным ПК-управлением и обновлённой графикой.',
-                btn_download: "Скачать игру",
-                btn_gallery: "Все скриншоты",
-                btn_enlarge: "На весь экран",
-                menu_1: "🎖️ Две кампании: Сопротивление и Конфедерация",
-                menu_2: "🌐 Играйте вместе с телефона и ПК — до 8 игроков",
-                menu_3: "✨ Ночные и закатные карты, свечение выстрелов и взрывов",
-                story_sub: "ОТ АВТОРА ПРОЕКТА",
-                story_title: "ИСТОРИЯ И ВДОХНОВЕНИЕ",
-                story_p1: 'Я давний фанат классических стратегий <strong class="text-amber">Red Alert 1 и 2</strong>. Ещё во времена старых кнопочных телефонов <strong class="text-white">Nokia</strong> мы с друзьями собирались вместе и часами напролёт играли в <strong class="text-white">Art of War 2: Liberation of Peru</strong>, обсуждая тактики и планируя танковые штурмы.',
+                btn_enlarge: 'На весь экран',
+                ov_sub: 'Справочник командира',
+                ov_title: 'Об игре и управлении',
+                tab_features: 'Особенности',
+                tab_controls: 'Управление',
+                tab_story: 'О проекте',
+                f1_tag: 'Сюжет и схватка',
+                f1_title: 'Две полноценные кампании',
+                f1_desc: 'Пройдите кампании за Сопротивление («Освобождение Перу») и Глобальную Конфедерацию или запускайте одиночные схватки против компьютера.',
+                f2_tag: 'Мультиплеер до 8 игроков',
+                f2_title: 'Кроссплатформенная сеть',
+                f2_desc: 'Совместная игра между Android, Windows, Linux и macOS. Локальная сеть, публичный сервер и подключение по короткому коду комнаты.',
+                f3_tag: 'Комфорт на ПК',
+                f3_title: 'Классическое RTS-управление',
+                f3_desc: 'Выделение рамкой, контрольные группы со строем, приказ «Атаковать с хода», осадный режим для снайперов и артиллерии, масштабируемый радар.',
+                f4_tag: 'Графика',
+                f4_title: 'Освещение и эффекты',
+                f4_desc: 'Поддержка высоких разрешений и полноэкранного режима, пресеты времени суток (день, закат, ночь), свечение выстрелов и чёткий пиксель-арт.',
+                f5_tag: 'Тактика',
+                f5_title: 'Боты и 24 технологии',
+                f5_desc: 'Стройте базу, изучайте до 24 улучшений в лаборатории для каждой фракции и сражайтесь против компьютерных противников нескольких уровней сложности.',
+                f6_tag: 'Редактор',
+                f6_title: 'Встроенный редактор карт',
+                f6_desc: 'Создавайте собственные карты с укреплениями и точками старта. В сетевых комнатах пользовательские карты передаются автоматически.',
+                c1_key: 'ЛКМ / Рамка',
+                c1_title: 'Выбор войск',
+                c1_desc: 'Клик или выделение рамкой. Двойной клик выбирает все юниты этого типа.',
+                c2_key: 'ПКМ',
+                c2_title: 'Движение и атака',
+                c2_desc: 'Отправка войск в точку, атака цели или установка точки сбора завода.',
+                c3_title: 'Контрольные группы',
+                c3_desc: 'Назначить отряд на цифру. Нажатие 1..0 выбирает группу (дважды — центрирует камеру).',
+                c4_key: 'Q + ЛКМ',
+                c4_title: 'Атака с хода',
+                c4_desc: 'Отряд движется к точке, автоматически вступая в бой со всеми врагами на пути.',
+                c5_title: 'Осадный режим',
+                c5_desc: 'Переключение дальнобойного режима для Снайперов и тяжёлой артиллерии «Носорог».',
+                c6_key: 'WASD / Колесо',
+                c6_title: 'Обзор и масштаб',
+                c6_desc: 'Перемещение камеры клавишами, стрелками или зажатым колесом мыши; колесо меняет зум.',
+                c7_key: 'Радар (+ / -)',
+                c7_title: 'Миникарта',
+                c7_desc: 'Быстрый переход кликом по радару и масштабирование миникарты колесом мыши.',
+                c8_title: 'Экран и пауза',
+                c8_desc: 'F11 — полный экран, P — тактическая пауза в сети, Esc — меню настроек.',
+                story_p1: 'Я давний фанат классических стратегий <strong>Red Alert 1 и 2</strong>. Ещё во времена старых кнопочных телефонов <strong>Nokia</strong> мы с друзьями собирались вместе и часами напролёт играли в <strong>Art of War 2: Liberation of Peru</strong>, обсуждая тактики и планируя танковые штурмы.',
                 story_p2: 'Я очень долго ждал выхода этой серии в большой мир на ПК — да, существует третья часть, но именно во второй части я чувствую ту самую настоящую классику стратегий: выверенный баланс, честную экономику и азарт каждого сражения.',
-                story_p3: 'Вдохновившись такими легендарными сообществами, как <strong class="text-amber">Warzone 2100</strong> и <strong class="text-amber">OpenRA</strong> <span class="text-red-500">❤️</span>, я создал этот проект, чтобы подарить любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми баталиями. Искренне благодарен студии <strong class="text-white">Gear Games</strong> и людям, которые подарили нам этот проект, из которого мы выросли!',
-                story_box_title: "Любовь к классике RTS ❤️",
-                story_box_desc: "Никаких микротранзакций, ожидания таймеров или мобильных ограничений — только чистая стратегия в реальном времени, созданная игроками для игроков.",
-                gal_sub: "КАДРЫ ИЗ ИГРЫ",
-                gal_title: "ГАЛЕРЕЯ СКРИНШОТОВ",
-                gal_hint: "Нажмите на любой скриншот, чтобы открыть его в полном размере",
-                s0_title: "Главное меню",
-                s0_desc: "Фирменный стиль, встроенный музыкальный плеер и быстрый переход к кампаниям и сетевой игре.",
-                s1_title: "Сетевая игра и лобби",
-                s1_desc: "Комнаты до 8 игроков, выбор фракции, команды, цвета армии, стартовых позиций и ботов ИИ.",
-                s2_title: "Сетевая битва на карте",
-                s2_desc: "Масштабные командные сражения в реальном времени с синхронным управлением войсками.",
-                s3_title: "Геймплей и графические эффекты",
-                s3_desc: "Динамическое освещение, свечение взрывов и выстрелов, туман войны и удобная боковая панель приказов.",
-                s4_title: "Разнообразие карт",
-                s4_desc: "Десятки тактических карт с переправами, узкими ущельями, базами и ресурсами.",
-                s5_title: "Выбор карты и настройка боя",
-                s5_desc: "Предпросмотр карт перед матчем, выбор уровня сложности ИИ и автоматическая передача новых карт по сети.",
-                feat_sub: "ВОЗМОЖНОСТИ ИГРЫ",
-                feat_title: "ПОЧЕМУ СТОИТ СЫГРАТЬ",
-                f1_tag: "СЮЖЕТ И СХВАТКА",
-                f1_title: "Две полноценные кампании",
-                f1_desc: "Пройдите классические кампании за Сопротивление («Освобождение Перу») и за Глобальную Конфедерацию, либо устраивайте одиночные битвы на любой карте против компьютера.",
-                f2_tag: "МУЛЬТИПЛЕЕР ДО 8 ИГРОКОВ",
-                f2_title: "Кроссплатформенная сетевая игра",
-                f2_desc: "Играйте вместе с телефона на Android и с ПК на Windows, Linux или macOS — до 8 игроков в одном матче. Сетевая игра и сервер кроссплатформенные: объединяйтесь по локальной сети с автоматическим поиском игр, подключайтесь к комнатам на публичном сервере или приглашайте друзей по короткому коду комнаты без настройки роутера.",
-                f3_tag: "КОМФОРТ НА ПК",
-                f3_title: "Современное RTS-управление",
-                f3_desc: "Выделение войск рамкой мыши, контрольные группы с движением в строю, приказ «Атаковать с хода», осадный режим для снайперов и артиллерии, а также масштабируемый радар.",
-                f4_tag: "АТМОСФЕРА И ЭФФЕКТЫ",
-                f4_title: "Сочная графика и освещение",
-                f4_desc: "Поддержка высоких разрешений и полноэкранного режима, атмосферные режимы освещения (день, закат, ночь), мягкое свечение выстрелов и взрывов, фильтр чёткого пиксель-арта.",
-                f5_tag: "ТАКТИЧЕСКИЙ ВЫЗОВ",
-                f5_title: "Умный противник и 24 технологии",
-                f5_desc: "Стройте электростанции, казармы и заводы, изучайте до 24 улучшений в лаборатории для каждой стороны и сражайтесь против ИИ, который собирает ударные кулаки и штурмует базу волнами.",
-                f6_tag: "ТВОРЧЕСТВО",
-                f6_title: "Встроенный редактор карт",
-                f6_desc: "Создавайте собственные поля сражений, расставляйте укрепления и стартовые точки. В сетевой игре новые карты автоматически передаются всем участникам комнаты.",
-                ctrl_sub: "ГОРЯЧИЕ КЛАВИШИ И МЫШЬ",
-                ctrl_title: "УПРАВЛЕНИЕ В БОЮ",
-                c1_key: "ЛКМ / Рамка",
-                c1_title: "Выбор войск",
-                c1_desc: "Клик или выделение рамкой. Двойной клик выбирает все юниты этого типа.",
-                c2_key: "ПКМ (Правый клик)",
-                c2_title: "Движение и атака",
-                c2_desc: "Отправка войск в точку, приказ атаковать врага или установка точки сбора завода.",
-                c3_title: "Контрольные группы",
-                c3_desc: "Назначить отряд на цифру. Нажатие 1..0 выбирает группу (дважды — центрирует камеру).",
-                c4_key: "Q + ЛКМ",
-                c4_title: "Атака с хода",
-                c4_desc: "Отряд движется в указанную точку, автоматически вступая в бой со всеми врагами на пути.",
-                c5_title: "Осадный режим",
-                c5_desc: "Переключение дальнобойного режима для Снайперов и тяжёлой артиллерии «Носорог».",
-                c6_key: "W A S D / Колесо",
-                c6_title: "Обзор и масштаб",
-                c6_desc: "Перемещение камеры клавишами, стрелками или зажатым колесом мыши; вращение колеса меняет зум.",
-                c7_key: "Радар (+ / -)",
-                c7_title: "Тактическая миникарта",
-                c7_desc: "Быстрое перемещение камеры кликом по радару и масштабирование миникарты колесом мыши.",
-                c8_title: "Экран и пауза",
-                c8_desc: "F11 — полный экран, P — тактическая пауза в сетевой игре, Esc — меню настроек.",
-                dl_badge: "ГОТОВО К БОЮ • WINDOWS / LINUX / MACOS / ANDROID",
-                dl_title: "НАЧНИТЕ ИГРАТЬ ПРЯМО СЕЙЧАС",
-                dl_desc: "Скачайте актуальную версию игры и фанатскую сборку игровых ресурсов и вступайте в сражение!",
-                dl_step1: "ШАГ 1 • ИГРОВОЙ КЛИЕНТ",
-                dl_card1_title: "Скачать Open Art Of War",
-                dl_card1_desc: "Загрузите сборку для вашей операционной системы (Windows, Linux, macOS или Android) со страницы официальных релизов проекта.",
-                dl_btn1: "Перейти к загрузке (Releases)",
-                dl_step2: "ШАГ 2 • РЕСУРСЫ ИГРЫ",
-                dl_card2_title: "Фанатская сборка ассетов",
-                dl_card2_desc: "Для запуска игры поместите фанатскую сборку графики и звука (assets.blob или папку assets/) рядом с игрой.",
-                dl_btn2: "Открыть страницу на GitHub",
-                footer_about: "Freedom for Liberty — свободный некоммерческий RTS-проект для ПК и Android. Исходный код открыт под GNU GPLv3.",
-                footer_links: "Ссылки проекта",
-                footer_rel: "→ Скачать релизы",
-                footer_gal: "→ Галерея скриншотов",
-                footer_legal_title: "Правовая информация",
-                footer_legal_desc: 'Исходный код проекта распространяется под лицензией <strong class="text-slate-200">GNU GPLv3</strong>. Для запуска используется отдельный свободно распространяемый фанатский пак игровых ресурсов.'
+                story_p3: 'Вдохновившись такими сообществами, как <strong>Warzone 2100</strong> и <strong>OpenRA</strong>, я создал этот проект, чтобы подарить любимой игре вторую жизнь на больших экранах с удобным управлением и сетевыми баталиями. Искренне благодарен студии <strong>Gear Games</strong> и людям, которые подарили нам игру, на которой мы выросли.',
+                story_box_title: 'Классическая RTS без ограничений',
+                story_box_desc: 'Без микротранзакций, таймеров ожидания и мобильных ограничений — только стратегия в реальном времени с открытым кодом.',
+                gal_sub: 'Кадры из игры',
+                gal_title: 'Галерея скриншотов',
+                gal_hint: 'Нажмите на скриншот для просмотра в полном размере',
+                s0_title: 'Главное меню',
+                s0_desc: 'Фирменный стиль, встроенный плеер и быстрый переход к кампаниям и сети.',
+                s1_title: 'Сетевая игра и лобби',
+                s1_desc: 'Комнаты до 8 игроков, выбор фракции, команды, цвета, позиций старта и ботов.',
+                s2_title: 'Сетевая битва на карте',
+                s2_desc: 'Командные сражения в реальном времени с синхронным управлением войсками.',
+                s3_title: 'Геймплей и эффекты',
+                s3_desc: 'Динамическое освещение, свечение выстрелов и взрывов, туман войны и панель приказов.',
+                s4_title: 'Разнообразие карт',
+                s4_desc: 'Десятки карт с переправами, ущельями, базами и ресурсными полями.',
+                s5_title: 'Выбор карты и настройка боя',
+                s5_desc: 'Предпросмотр карт перед матчем, сложность ботов и передача карт по сети.',
+                srv_eyebrow: 'Мониторинг и сеть',
+                srv_title: 'Сервер и активные комнаты',
+                srv_status_checking: 'Проверка...',
+                srv_status_online: 'Работает',
+                srv_status_offline: 'Не отвечает',
+                srv_host_prefix: 'Хост:',
+                srv_refresh_btn: 'Обновить',
+                srv_updated_prefix: 'Обновлено:',
+                srv_stat_rooms: 'Активные комнаты',
+                srv_stat_players: 'Игроков в комнатах',
+                srv_stat_matches: 'Идёт боёв',
+                srv_stat_master: 'Клиентов в лобби',
+                srv_col_code: 'Код',
+                srv_col_name: 'Комната',
+                srv_col_map: 'Карта',
+                srv_col_players: 'Игроки',
+                srv_col_state: 'Статус',
+                srv_col_port: 'Порт UDP',
+                srv_col_version: 'Версия',
+                srv_loading_rooms: 'Опрос статуса сервера...',
+                srv_no_rooms: 'Сервер онлайн, активных комнат пока нет.',
+                srv_offline_msg: 'Не удалось получить статус сервера',
+                srv_state_match: 'В БОЮ',
+                srv_state_lobby: 'ОЖИДАНИЕ',
+                srv_vis_private: 'СКРЫТАЯ',
+                srv_unnamed_room: 'Без названия',
+                dl_badge: 'Windows • Linux • macOS • Android',
+                dl_title: 'Скачать и запустить',
+                dl_desc: 'Скачайте клиент игры и пакет игровых ресурсов.',
+                dl_step1: 'Шаг 1 • Игровой клиент',
+                dl_card1_title: 'Open Art Of War',
+                dl_card1_desc: 'Готовые сборки для Windows, Linux, macOS и Android публикуются на странице релизов проекта.',
+                dl_btn1: 'Перейти к релизам',
+                dl_step2: 'Шаг 2 • Ресурсы игры',
+                dl_card2_title: 'Пакет ассетов',
+                dl_card2_desc: 'Для запуска поместите фанатскую сборку графики и звука (<code>assets.blob</code> или папку <code>assets/</code>) рядом с игрой.',
+                dl_btn2: 'Открыть репозиторий GitHub',
+                footer_about: 'Resistance Arisen — свободный некоммерческий RTS-проект для ПК и Android. Исходный код открыт под GNU GPLv3.',
+                footer_links: 'Ссылки',
+                footer_rel: 'Релизы',
+                footer_legal_title: 'Лицензия',
+                footer_legal_desc: 'Исходный код распространяется под лицензией <strong>GNU GPLv3</strong>. Для запуска используется отдельный свободно распространяемый фанатский пак игровых ресурсов.'
             },
             en: {
-                support_project: 'Support the project',
-                ost_label: 'GAME SOUNDTRACK',
+                nav_features: 'Features',
+                nav_controls: 'Controls',
+                nav_story: 'Story',
+                nav_screenshots: 'Screenshots',
+                nav_server: 'Server',
+                nav_download: 'Download',
+                hero_tag: 'OPEN-SOURCE RTS • GNU GPLv3',
+                badge_multiplayer: 'Up to 8 Players (PC + Android)',
+                hero_desc: 'A free, non-commercial RTS project for PC and Android licensed under <strong>GNU GPLv3</strong>, inspired by <strong>"Art of War 2: Liberation of Peru"</strong>. Two story campaigns, a map editor, multiplayer for up to <strong>8 players</strong>, and mouse-and-keyboard controls.',
+                btn_download: 'Download Game',
+                btn_gallery: 'Screenshots',
+                support_project: 'Support (Boosty)',
+                menu_1: 'Two Campaigns: Resistance & Confederation',
+                menu_2: 'Cross-Platform PC + Android Multiplayer (up to 8 players)',
+                menu_3: 'Lighting presets, explosion glow, and pixel-art filter',
+                ost_label: 'Game Soundtrack',
                 ost_volume: 'Volume',
-                nav_story: "Story",
-                nav_features: "Features",
-                nav_screenshots: "Screenshots",
-                nav_controls: "Controls",
-                nav_download: "Download",
-                badge_multiplayer: "⚔️ PC + Android • Up to 8 Players",
-                badge_campaigns: "🎖️ 2 Story Campaigns + Map Editor",
-                hero_tag: "OPEN-SOURCE RTS • GNU GPLv3",
-                hero_desc: 'A free, non-commercial RTS project for PC and Android with source code licensed under <strong class="text-amber">GNU GPLv3</strong>, inspired by <strong class="text-white">"Art of War 2: Liberation of Peru"</strong>. Build bases, research technologies, command tank divisions across two story campaigns, or battle friends online with up to <strong class="text-amber">8 players</strong> featuring modern PC controls and enhanced visuals.',
-                btn_download: "Download Game",
-                btn_gallery: "View Screenshots",
-                btn_enlarge: "Fullscreen",
-                menu_1: "🎖️ Two Campaigns: Resistance & Confederation",
-                menu_2: "🌐 Play together on phone and PC — up to 8 players",
-                menu_3: "✨ Dusk/Night Lighting, Explosion Glow & Pixel Filter",
-                story_sub: "FROM THE CREATOR",
-                story_title: "ORIGINS & INSPIRATION",
-                story_p1: 'I have always been a huge fan of classic real-time strategy games like <strong class="text-amber">Command &amp; Conquer: Red Alert 1 &amp; 2</strong>. Back in the era of old push-button <strong class="text-white">Nokia</strong> phones, my friends and I used to gather together and spend hours playing <strong class="text-white">Art of War 2: Liberation of Peru</strong>.',
-                story_p2: 'For a long time, I waited for a desktop release of this series to come out into the world — yes, there is a third installment, but it is in the second part that I truly feel the soul of classic strategy: tight balance, fair economy, and pure tactical excitement.',
-                story_p3: 'Deeply inspired by open-source revival projects like <strong class="text-amber">Warzone 2100</strong> and <strong class="text-amber">OpenRA</strong> <span class="text-red-500">❤️</span>, I created this project to give this beloved strategy game a second life on modern PC screens. Sincere gratitude to <strong class="text-white">Gear Games</strong> and the creators who gave us the project we grew up on!',
-                story_box_title: "Pure Classic RTS Spirit ❤️",
-                story_box_desc: "No microtransactions, no timers, no mobile limitations — just pure real-time strategy crafted by players, for players.",
-                gal_sub: "IN-GAME FOOTAGE",
-                gal_title: "SCREENSHOTS GALLERY",
-                gal_hint: "Click any screenshot to inspect it in full resolution",
-                s0_title: "Main Menu",
-                s0_desc: "Signature tactical atmosphere, built-in soundtrack player, and instant access to campaigns and multiplayer.",
-                s1_title: "Network Play & Lobby",
-                s1_desc: "Rooms for up to 8 players with faction, team, army color, start position, and AI bot customization.",
-                s2_title: "Multiplayer Battle",
-                s2_desc: "Large-scale real-time team battles with synchronized unit command.",
-                s3_title: "Gameplay & Visual Effects",
-                s3_desc: "Dynamic lighting, weapon and explosion glow, fog of war, and a convenient right-hand command sidebar.",
-                s4_title: "Tactical Maps",
-                s4_desc: "Dozens of maps with river crossings, narrow canyons, fortified bases, and resource fields.",
-                s5_title: "Map Selection & Setup",
-                s5_desc: "Pre-match map preview, AI difficulty selection, and automatic custom map sharing over the network.",
-                feat_sub: "GAMEPLAY HIGHLIGHTS",
-                feat_title: "KEY FEATURES",
-                f1_tag: "STORY & SKIRMISH",
-                f1_title: "Two Full Campaigns",
-                f1_desc: "Play through both classic campaigns — Resistance (Liberation of Peru) and Global Confederation — or set up custom skirmishes on any map against the AI.",
-                f2_tag: "UP TO 8 PLAYERS",
-                f2_title: "Cross-Platform Multiplayer",
-                f2_desc: "Play together on Android phones and Windows, Linux or macOS PCs — up to 8 players in the same match. Multiplayer and the server are cross-platform: play on LAN with automatic game discovery, join public server rooms, or invite friends using a short room code without port forwarding.",
-                f3_tag: "PC ERGONOMICS",
-                f3_title: "Modern RTS Controls",
-                f3_desc: "Box selection, formation control groups, attack-move orders, siege mode for Snipers and Rhino artillery, plus a zoomable tactical radar.",
-                f4_tag: "ATMOSPHERE & SHADERS",
-                f4_title: "Enhanced Visuals & Lighting",
-                f4_desc: "High-resolution and fullscreen support, atmospheric lighting presets (day, dusk, night), explosion and shot glow, and a crisp pixel-art filter.",
-                f5_tag: "TACTICAL DEPTH",
-                f5_title: "Smart AI & 24 Technologies",
-                f5_desc: "Build power plants, barracks, and factories, research 24 upgrades per faction, and battle a multi-layered AI that coordinates squad waves.",
-                f6_tag: "CREATIVITY",
-                f6_title: "Built-In Map Editor",
-                f6_desc: "Design your own battlefields, place fortifications, and share them effortlessly — custom maps transfer automatically in multiplayer rooms.",
-                ctrl_sub: "KEYBOARD & MOUSE",
-                ctrl_title: "BATTLEFIELD CONTROLS",
-                c1_key: "Left-Click / Drag",
-                c1_title: "Select Units",
-                c1_desc: "Click or drag a selection box. Double-click a unit or factory to select all of that type.",
-                c2_key: "Right-Click",
-                c2_title: "Move & Attack",
-                c2_desc: "Order units to move, attack an enemy target, or set a production rally point.",
-                c3_title: "Control Groups",
-                c3_desc: "Bind selected units to a number. Press 1..0 to select, or double-tap to center the camera.",
-                c4_key: "Q + Left-Click",
-                c4_title: "Attack-Move",
-                c4_desc: "Units march toward the destination and automatically engage any enemies encountered along the way.",
-                c5_title: "Siege Mode",
-                c5_desc: "Toggle long-range siege stance for Snipers and heavy Rhino artillery units.",
-                c6_key: "W A S D / Wheel",
-                c6_title: "Camera & Zoom",
-                c6_desc: "Pan the camera with WASD, arrow keys, or middle-mouse drag; scroll the mouse wheel to zoom.",
-                c7_key: "Radar (+ / -)",
-                c7_title: "Tactical Minimap",
-                c7_desc: "Click or drag on the radar to move the camera and use the mouse wheel to zoom the minimap.",
-                c8_title: "Fullscreen & Pause",
-                c8_desc: "F11 toggles fullscreen, P pauses network matches, and Esc opens the game menu.",
-                dl_badge: "READY FOR ACTION • WINDOWS / LINUX / MACOS / ANDROID",
-                dl_title: "START PLAYING TODAY",
-                dl_desc: "Download the latest release along with the community asset pack and jump straight into command!",
-                dl_step1: "STEP 1 • GAME CLIENT",
-                dl_card1_title: "Download Open Art Of War",
-                dl_card1_desc: "Get the ready-to-run package for your operating system (Windows, Linux, macOS, or Android) from the official GitHub Releases page.",
-                dl_btn1: "Go to Releases",
-                dl_step2: "STEP 2 • GAME ASSETS",
-                dl_card2_title: "Community Asset Pack",
-                dl_card2_desc: "Place the fan-made community asset pack (assets.blob or assets/ folder) next to the game executable.",
-                dl_btn2: "Open GitHub Repository",
-                footer_about: "Freedom for Liberty — a free, non-commercial RTS project for PC and Android. Source code available under GNU GPLv3.",
-                footer_links: "Project Links",
-                footer_rel: "→ Download Releases",
-                footer_gal: "→ Screenshots Gallery",
-                footer_legal_title: "Legal Disclaimer",
-                footer_legal_desc: 'The project source code is distributed under the <strong class="text-slate-200">GNU GPLv3</strong> license. The game uses a separate, freely distributed fan-made asset pack.'
+                btn_enlarge: 'Fullscreen',
+                ov_sub: 'Commander Reference',
+                ov_title: 'Overview & Controls',
+                tab_features: 'Features',
+                tab_controls: 'Controls',
+                tab_story: 'Story',
+                f1_tag: 'Story & Skirmish',
+                f1_title: 'Two Full Campaigns',
+                f1_desc: 'Play through both the Resistance (Liberation of Peru) and Global Confederation campaigns, or launch skirmishes against computer opponents.',
+                f2_tag: 'Up to 8 Players',
+                f2_title: 'Cross-Platform Multiplayer',
+                f2_desc: 'Play together across Android, Windows, Linux, and macOS via LAN discovery, public server rooms, or a short 6-character room code.',
+                f3_tag: 'PC Controls',
+                f3_title: 'Classic RTS Ergonomics',
+                f3_desc: 'Box selection, formation control groups, attack-move orders, siege mode for Snipers and Rhino artillery, and a zoomable tactical radar.',
+                f4_tag: 'Visuals',
+                f4_title: 'Lighting & Effects',
+                f4_desc: 'High-resolution and fullscreen support, day/dusk/night lighting presets, weapon and explosion glow, and a crisp pixel-art filter.',
+                f5_tag: 'Tactics',
+                f5_title: 'Bots & 24 Technologies',
+                f5_desc: 'Build your base, research up to 24 upgrades per faction, and fight computer opponents across multiple difficulty levels.',
+                f6_tag: 'Editor',
+                f6_title: 'Built-In Map Editor',
+                f6_desc: 'Create custom battlefields with fortifications and spawn points. Custom maps transfer automatically in multiplayer rooms.',
+                c1_key: 'LMB / Drag',
+                c1_title: 'Select Units',
+                c1_desc: 'Click or drag a selection box. Double-click selects all units of that type.',
+                c2_key: 'RMB',
+                c2_title: 'Move & Attack',
+                c2_desc: 'Move units, attack an enemy target, or set a factory rally point.',
+                c3_title: 'Control Groups',
+                c3_desc: 'Bind selected units to a number. Press 1..0 to select (double-tap to center camera).',
+                c4_key: 'Q + LMB',
+                c4_title: 'Attack-Move',
+                c4_desc: 'Units march to the destination and engage enemies encountered along the way.',
+                c5_title: 'Siege Mode',
+                c5_desc: 'Toggle long-range siege stance for Snipers and heavy Rhino artillery.',
+                c6_key: 'WASD / Wheel',
+                c6_title: 'Camera & Zoom',
+                c6_desc: 'Pan with WASD, arrow keys, or middle-mouse drag; scroll the wheel to zoom.',
+                c7_key: 'Radar (+ / -)',
+                c7_title: 'Minimap',
+                c7_desc: 'Click the radar to jump the camera and scroll the wheel to zoom the minimap.',
+                c8_title: 'Screen & Pause',
+                c8_desc: 'F11 toggles fullscreen, P pauses network matches, and Esc opens settings.',
+                story_p1: 'I have long been a fan of classic strategy games like <strong>Red Alert 1 and 2</strong>. Back in the days of push-button <strong>Nokia</strong> phones, my friends and I used to gather and spend hours playing <strong>Art of War 2: Liberation of Peru</strong>, discussing tactics and planning tank assaults.',
+                story_p2: 'For years I hoped to see this series on PC — there is a third installment, yet the second part still captures classic RTS balance, fair economy, and tactical excitement.',
+                story_p3: 'Inspired by open-source projects like <strong>Warzone 2100</strong> and <strong>OpenRA</strong>, I started this project to bring the game to large screens with proper PC controls and multiplayer. Sincere thanks to <strong>Gear Games</strong> and the creators who built the game we grew up with.',
+                story_box_title: 'Classic RTS Without Limits',
+                story_box_desc: 'No microtransactions, wait timers, or mobile restrictions — just open-source real-time strategy.',
+                gal_sub: 'In-Game Footage',
+                gal_title: 'Screenshots Gallery',
+                gal_hint: 'Click any screenshot to view it in full resolution',
+                s0_title: 'Main Menu',
+                s0_desc: 'Main menu with built-in music player, campaigns, skirmishes, and multiplayer.',
+                s1_title: 'Network Play & Lobby',
+                s1_desc: 'Rooms for up to 8 players with faction, team, army color, spawn point, and bot selection.',
+                s2_title: 'Multiplayer Battle on Skull Map',
+                s2_desc: 'Real-time multiplayer team battles with synchronized unit control.',
+                s3_title: 'Gameplay & Visual Effects',
+                s3_desc: 'Dynamic lighting, weapon and explosion glow, fog of war, and command sidebar.',
+                s4_title: 'Tactical Maps',
+                s4_desc: 'Dozens of maps featuring river crossings, chokepoints, bases, and resource fields.',
+                s5_title: 'Map Selection & Setup',
+                s5_desc: 'Pre-match map preview, bot difficulty selection, and automatic map transfer in multiplayer.',
+                srv_eyebrow: 'Telemetry & Network',
+                srv_title: 'Server & Active Rooms',
+                srv_status_checking: 'Checking...',
+                srv_status_online: 'Online',
+                srv_status_offline: 'Offline',
+                srv_host_prefix: 'Host:',
+                srv_refresh_btn: 'Refresh',
+                srv_updated_prefix: 'Updated:',
+                srv_stat_rooms: 'Active Rooms',
+                srv_stat_players: 'Players in Rooms',
+                srv_stat_matches: 'Running Matches',
+                srv_stat_master: 'Lobby Peers',
+                srv_col_code: 'Code',
+                srv_col_name: 'Room',
+                srv_col_map: 'Map',
+                srv_col_players: 'Players',
+                srv_col_state: 'Status',
+                srv_col_port: 'UDP Port',
+                srv_col_version: 'Version',
+                srv_loading_rooms: 'Querying server status...',
+                srv_no_rooms: 'Server is online; no active rooms right now.',
+                srv_offline_msg: 'Could not reach server status endpoint',
+                srv_state_match: 'IN MATCH',
+                srv_state_lobby: 'LOBBY',
+                srv_vis_private: 'PRIVATE',
+                srv_unnamed_room: 'Unnamed Room',
+                dl_badge: 'Windows • Linux • macOS • Android',
+                dl_title: 'Download & Play',
+                dl_desc: 'Download the game client and the community asset pack.',
+                dl_step1: 'Step 1 • Game Client',
+                dl_card1_title: 'Open Art Of War',
+                dl_card1_desc: 'Ready-to-run builds for Windows, Linux, macOS, and Android are published on the GitHub Releases page.',
+                dl_btn1: 'Go to Releases',
+                dl_step2: 'Step 2 • Game Assets',
+                dl_card2_title: 'Asset Pack',
+                dl_card2_desc: 'Place the fan-made graphics and audio pack (<code>assets.blob</code> or <code>assets/</code> folder) next to the game executable.',
+                dl_btn2: 'Open GitHub Repository',
+                footer_about: 'Resistance Arisen — a free, non-commercial RTS project for PC and Android. Source code licensed under GNU GPLv3.',
+                footer_links: 'Links',
+                footer_rel: 'Releases',
+                footer_legal_title: 'License',
+                footer_legal_desc: 'Source code is distributed under <strong>GNU GPLv3</strong>. The game uses a separate, freely distributed fan-made asset pack.'
             }
         };
 
@@ -1177,26 +2078,193 @@
             document.documentElement.lang = currentLang;
             showMusicStatus(musicStatus);
             updateMusicUI();
+
             const dict = i18n[currentLang];
-            document.querySelectorAll('[data-i18n]').forEach(el => {
+            document.querySelectorAll('[data-i18n]').forEach((el) => {
                 const key = el.getAttribute('data-i18n');
-                if (dict[key]) {
-                    el.innerHTML = dict[key];
-                }
+                if (dict[key]) el.innerHTML = dict[key];
             });
 
-            const btnRu = document.getElementById('lang-ru');
-            const btnEn = document.getElementById('lang-en');
-            if (currentLang === 'ru') {
-                btnRu.className = 'px-2.5 py-1 rounded bg-amber text-obsidian font-bold transition';
-                btnEn.className = 'px-2.5 py-1 rounded text-steel hover:text-white transition';
-            } else {
-                btnEn.className = 'px-2.5 py-1 rounded bg-amber text-obsidian font-bold transition';
-                btnRu.className = 'px-2.5 py-1 rounded text-steel hover:text-white transition';
-            }
+            document.getElementById('lang-ru').classList.toggle('active', currentLang === 'ru');
+            document.getElementById('lang-en').classList.toggle('active', currentLang === 'en');
 
             selectHeroSlide(currentHeroIndex);
+            if (typeof renderServerStatus === 'function') renderServerStatus();
         }
+
+        // Server telemetry
+        var srvHost = window.location.hostname || 'openaow.imister.tech';
+        var srvPort = 38100;
+        var srvState = 'checking';
+        var srvData = null;
+        var srvLastChecked = null;
+        var srvInFlight = false;
+
+        function escapeServerHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function srvTranslate(key) {
+            const lang = document.documentElement.lang === 'en' ? 'en' : 'ru';
+            const dict = i18n[lang] || i18n.ru;
+            return dict[key] || i18n.ru[key] || key;
+        }
+
+        function renderServerStatus() {
+
+            const hostLabel = document.getElementById('srv-host-label');
+            const serverNameEl = document.getElementById('srv-server-name');
+            const statusTextEl = document.getElementById('srv-status-text');
+            const updatedEl = document.getElementById('srv-last-updated');
+            const roomsCountEl = document.getElementById('srv-count-rooms');
+            const playersCountEl = document.getElementById('srv-count-players');
+            const matchesCountEl = document.getElementById('srv-count-matches');
+            const masterCountEl = document.getElementById('srv-count-master');
+            const tbodyEl = document.getElementById('srv-rooms-tbody');
+            const emptyEl = document.getElementById('srv-rooms-empty');
+
+            if (hostLabel) hostLabel.textContent = srvHost + ':' + srvPort;
+
+            if (statusTextEl) {
+                statusTextEl.classList.remove('is-online', 'is-offline');
+
+                if (srvState === 'online') {
+                    statusTextEl.classList.add('is-online');
+                    statusTextEl.textContent = srvTranslate('srv_status_online');
+                } else if (srvState === 'offline') {
+                    statusTextEl.classList.add('is-offline');
+                    statusTextEl.textContent = srvTranslate('srv_status_offline');
+                } else {
+                    statusTextEl.textContent = srvTranslate('srv_status_checking');
+                }
+            }
+
+            if (updatedEl) {
+                updatedEl.textContent = srvLastChecked
+                    ? (srvTranslate('srv_updated_prefix') + ' ' + srvLastChecked.toLocaleTimeString())
+                    : '—';
+            }
+
+            if (srvState === 'online' && srvData) {
+                if (serverNameEl) serverNameEl.textContent = srvData.name || 'OpenAOW server';
+                if (roomsCountEl) roomsCountEl.textContent = String(srvData.rooms ?? 0);
+                if (playersCountEl) playersCountEl.textContent = String(srvData.players ?? 0);
+                if (matchesCountEl) matchesCountEl.textContent = String(srvData.matches ?? 0);
+                if (masterCountEl) masterCountEl.textContent = String(srvData.master_clients ?? 0);
+
+                if (tbodyEl && emptyEl) {
+                    const rooms = Array.isArray(srvData.list) ? srvData.list : [];
+                    if (rooms.length === 0) {
+                        tbodyEl.innerHTML = '';
+                        emptyEl.textContent = srvTranslate('srv_no_rooms');
+                        emptyEl.classList.remove('hidden');
+                    } else {
+                        emptyEl.classList.add('hidden');
+                        tbodyEl.innerHTML = rooms.map((room) => {
+                            const code = escapeServerHtml(room.code || '------');
+                            const roomName = escapeServerHtml(room.name || srvTranslate('srv_unnamed_room'));
+                            const rawMap = String(room.map || '');
+                            const shortMap = rawMap.replace(/^.*[/\\]/, '').replace(/\.json$/i, '') || '—';
+                            const players = Number(room.players ?? 0);
+                            const running = Boolean(room.running);
+                            const listed = room.listed !== false;
+                            const port = Number(room.port || 0) || '—';
+                            const version = escapeServerHtml(room.version || '—');
+
+                            const stateBadge = running
+                                ? '<span class="state-tag state-match">' + escapeServerHtml(srvTranslate('srv_state_match')) + '</span>'
+                                : '<span class="state-tag state-lobby">' + escapeServerHtml(srvTranslate('srv_state_lobby')) + '</span>';
+                            const privBadge = listed
+                                ? ''
+                                : '<span class="state-tag state-priv">' + escapeServerHtml(srvTranslate('srv_vis_private')) + '</span>';
+
+                            return '<tr>' +
+                                '<td><span class="room-code">' + code + '</span></td>' +
+                                '<td style="font-family: var(--font-sans); font-weight: 500;">' + roomName + privBadge + '</td>' +
+                                '<td style="color: var(--text-dim);" title="' + escapeServerHtml(rawMap) + '">' + escapeServerHtml(shortMap) + '</td>' +
+                                '<td>' + players + '</td>' +
+                                '<td>' + stateBadge + '</td>' +
+                                '<td style="color: var(--text-dim);">' + port + '</td>' +
+                                '<td style="color: var(--text-muted);">' + version + '</td>' +
+                                '</tr>';
+                        }).join('');
+                    }
+                }
+            } else {
+                if (serverNameEl) serverNameEl.textContent = '—';
+                if (roomsCountEl) roomsCountEl.textContent = '—';
+                if (playersCountEl) playersCountEl.textContent = '—';
+                if (matchesCountEl) matchesCountEl.textContent = '—';
+                if (masterCountEl) masterCountEl.textContent = '—';
+
+                if (tbodyEl && emptyEl) {
+                    tbodyEl.innerHTML = '';
+                    emptyEl.classList.remove('hidden');
+                    emptyEl.textContent = srvState === 'offline'
+                        ? (srvTranslate('srv_offline_msg') + ' (' + srvHost + ':' + srvPort + ')')
+                        : srvTranslate('srv_loading_rooms');
+                }
+            }
+        }
+
+        async function fetchServerStatus(manual = false) {
+            if (srvInFlight) return;
+            srvInFlight = true;
+
+            const refreshBtn = document.getElementById('srv-refresh-btn');
+            if (refreshBtn) refreshBtn.disabled = true;
+
+            if (srvData === null && srvLastChecked === null) {
+                srvState = 'checking';
+                renderServerStatus();
+            }
+
+            const directUrl = 'http://' + srvHost + ':' + srvPort + '/';
+            const candidates = window.location.protocol === 'https:'
+                ? ['/status.json', '/api/status', directUrl]
+                : [directUrl, '/status.json', '/api/status'];
+
+            let loaded = null;
+            for (const url of candidates) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 4000);
+                try {
+                    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    if (data && typeof data === 'object' && ('rooms' in data || 'list' in data || 'master_clients' in data)) {
+                        loaded = data;
+                        break;
+                    }
+                } catch (_err) {
+                    // Try next endpoint candidate
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+
+            srvLastChecked = new Date();
+            if (loaded) {
+                srvData = loaded;
+                srvState = 'online';
+            } else {
+                srvData = null;
+                srvState = 'offline';
+            }
+
+            srvInFlight = false;
+            if (refreshBtn) refreshBtn.disabled = false;
+            renderServerStatus();
+        }
+
+        renderServerStatus();
+        fetchServerStatus(false);
+        setInterval(() => fetchServerStatus(false), 15000);
     </script>
 </body>
 </html>

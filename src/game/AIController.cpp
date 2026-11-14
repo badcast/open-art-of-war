@@ -1042,6 +1042,23 @@ void AIController::UpdateOffensive(const TileMap &map, EntityManager &entities, 
     }
     if (send.empty())
         return;
+    const AIDifficulty difficulty = GetEffectiveDifficulty();
+    if ((difficulty == AIDifficulty::Hard || difficulty == AIDifficulty::Hardcore) && send.size() >= 2)
+    {
+        // Survivors regroup into a squad (released members come back through RecallReleasedUnits)
+        const int squadId = m_squadController.CreateSquad(
+            send, tx, ty, m_waveCount, entities, pathfinder, m_currentDifficultyConfig.tactics);
+        if (squadId != 0)
+        {
+            for (int id : send)
+                m_offensive.erase(id);
+            Think(
+                "ATTACK",
+                "Survivors regroup as G" + std::to_string(squadId) + " with " + std::to_string(send.size())
+                    + " unit(s) toward (" + std::to_string(tx) + ", " + std::to_string(ty) + ")");
+            return;
+        }
+    }
     entities.IssueAttackMoveOrder(send, tx, ty, pathfinder);
     std::ostringstream msg;
     msg << send.size() << " unit(s) on the offensive go on to (" << tx << ", " << ty << ")";

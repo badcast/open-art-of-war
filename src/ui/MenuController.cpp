@@ -345,11 +345,18 @@ void MenuController::RenderMainMenu(
     int windowH,
     bool drawBackdrop)
 {
+    if (m_campaignSelectOpen)
+    {
+        renderer.FillRectScreen(0, 0, windowW, windowH, col::Backdrop);
+        RenderCampaignMissionSelect(renderer, texManager, fontRenderer, windowW, windowH);
+        return;
+    }
+
     if (drawBackdrop)
     {
         renderer.FillRectScreen(0, 0, windowW, windowH, col::Backdrop);
 
-        // Key art anchored to the right edge, blended into the dark backdrop
+        // Key art anchored to the right edge over dark backdrop (no per-pixel fade gradients)
         SDL_Texture *titleTex = texManager.GetUiTexture("title");
         if (titleTex)
         {
@@ -360,27 +367,15 @@ void MenuController::RenderMainMenu(
                 tw = static_cast<int>(th * texW / texH); // whatever size the key art has, it is not stretched
             int tx = windowW - tw;
             renderer.DrawTextureScreen(titleTex, tx, 0, tw, th);
-            renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 70});
-            int fadeW = std::min(tw, 320);
-            ui::FillHorizontalGradient(
-                renderer, {tx, 0, fadeW, windowH}, col::Backdrop, ui::WithAlpha(col::Backdrop, 0));
+            renderer.FillRectScreen(tx, 0, tw, th, {8, 10, 14, 95});
             if (tx > 0)
                 renderer.FillRectScreen(0, 0, tx, windowH, col::Backdrop);
             m_backdropFx.render(renderer, texManager, tx, windowW, windowH, SDL_GetTicks());
-            // The blasts melt into the key art instead of ending at a hard edge
-            if (tx > 0)
-                ui::FillHorizontalGradient(
-                    renderer,
-                    {std::max(0, tx - 200), 0, std::min(tx, 200), windowH},
-                    ui::WithAlpha(col::Backdrop, 0),
-                    col::Backdrop);
         }
         else
         {
             m_backdropFx.render(renderer, texManager, windowW * 55 / 100, windowW, windowH, SDL_GetTicks());
         }
-        ui::FillVerticalGradient(
-            renderer, {0, windowH - 160, windowW, 160}, ui::WithAlpha(col::Backdrop, 0), col::Backdrop);
     }
     // Title block
     int x = MainMenuColumnX(windowW);
@@ -398,7 +393,7 @@ void MenuController::RenderMainMenu(
     {
         int backdropWidth = std::max(
             x + fontRenderer.GetTextWidth("OPEN ART OF WAR", ui::FONT_HERO),
-            x + 2 + fontRenderer.GetTextWidth(_("FREEDOM FOR LIBERTY"), ui::FONT_BODY_BOLD));
+            x + 2 + fontRenderer.GetTextWidth(_("RESISTANCE ARISEN"), ui::FONT_BODY_BOLD));
         for (int i = 0; i < kMainMenuItems; ++i)
         {
             const UiRect item = MainMenuItemRect(i, windowW, windowH);
@@ -409,7 +404,7 @@ void MenuController::RenderMainMenu(
         renderer.FillRectScreen(0, 0, std::min(windowW, backdropWidth + 24), windowH, {0, 0, 0, 150});
     }
     fontRenderer.DrawString("OPEN ART OF WAR", x, titleY, ui::FONT_HERO, col::Accent, true);
-    fontRenderer.DrawString(_("FREEDOM FOR LIBERTY"), x + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
+    fontRenderer.DrawString(_("RESISTANCE ARISEN"), x + 2, titleY + 58, ui::FONT_BODY_BOLD, col::TextDim, false);
     renderer.FillRectScreen(x + 2, titleY + 86, 72, 3, col::Accent);
 
     // Menu items
@@ -423,20 +418,20 @@ void MenuController::RenderMainMenu(
         std::string label = _(kMainMenuLabels[i]);
 
         const SDL_Color itemAccent = isExit ? col::Danger : col::Accent;
-        const SDL_Color plateLeft
+        const SDL_Color plateFill
             = selected ? ui::Mix(col::Hover, isExit ? col::DangerDeep : ui::color::AccentDeep, 0.56f)
                        : ui::WithAlpha(ui::Mix(col::PanelRaised, ui::color::Info, 0.10f), 195);
-        const SDL_Color plateRight = selected ? ui::WithAlpha(col::Panel, 24) : ui::WithAlpha(col::Panel, 12);
-        const SDL_Color barCol = selected ? itemAccent : SDL_Color {0, 0, 0, 0};
-        ui::DrawButtonChrome(renderer, r, plateLeft, plateRight, {0, 0, 0, 0}, barCol, {0, 0, 0, 0}, 255, true);
+        renderer.FillRectScreen(r.x, r.y, r.w, r.h, plateFill);
+        if (selected && r.w >= 8 && r.h >= 4)
+            renderer.FillRectScreen(r.x + 1, r.y + 1, 4, r.h - 2, itemAccent);
 
         const SDL_Color rimStart = selected ? ui::WithAlpha(itemAccent, 185) : ui::WithAlpha(col::BorderStrong, 95);
-        ui::FillHorizontalGradient(renderer, {r.x + 1, r.y, r.w - 2, 1}, rimStart, ui::WithAlpha(rimStart, 0));
-        ui::FillHorizontalGradient(
-            renderer,
-            {r.x + 1, r.Bottom() - 1, r.w - 2, 1},
-            ui::WithAlpha(rimStart, static_cast<Uint8>(rimStart.a / 2)),
-            ui::WithAlpha(rimStart, 0));
+        if (r.w > 2)
+        {
+            renderer.FillRectScreen(r.x + 1, r.y, r.w - 2, 1, rimStart);
+            renderer.FillRectScreen(
+                r.x + 1, r.Bottom() - 1, r.w - 2, 1, ui::WithAlpha(rimStart, static_cast<Uint8>(rimStart.a / 2)));
+        }
 
         const SDL_Color idleCol
             = touchMenu ? (isExit ? SDL_Color {255, 190, 180, 255} : col::Text) : col::TextDim;
@@ -452,8 +447,7 @@ void MenuController::RenderMainMenu(
         if (i == kMainMenuItems - 2)
         {
             // Separator between the game modes / info items and Exit
-            ui::FillHorizontalGradient(
-                renderer, {r.x + 12, r.Bottom() + 2, 220, 1}, col::BorderStrong, ui::WithAlpha(col::Border, 0));
+            renderer.FillRectScreen(r.x + 12, r.Bottom() + 2, 220, 1, col::BorderStrong);
         }
     }
 
@@ -509,9 +503,9 @@ void MenuController::RenderInfoDialog(
     for (int i = firstLine; i < total; ++i)
     {
         const int y = content.y + i * kLineH - scrollPx;
-        if (y >= m_infoListRect.Bottom())
+        if (y + kLineH > m_infoListRect.Bottom())
             break;
-        if (!lines[i].empty())
+        if (y >= m_infoListRect.y && !lines[i].empty())
         {
             fontRenderer.DrawString(
                 ui::FitText(fontRenderer, lines[i], ui::FONT_BODY, content.w - 14),
@@ -657,7 +651,7 @@ std::vector<std::string> MusicCredits()
 std::vector<std::string> MenuController::AboutLines() const
 {
     std::vector<std::string> lines = {
-        "Open Art Of War: Freedom for Liberty",
+        "Open Art Of War: Resistance Arisen",
         std::string(_("Version")) + ": " + OAOW_VERSION,
         std::string(_("Author")) + ": badcast",
         "https://github.com/badcast/open-art-of-war",

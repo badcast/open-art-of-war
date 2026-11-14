@@ -44,6 +44,7 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
             b->wreckStages = d.wreckStages;
         }
     }
+    const std::unordered_set<int> prevVisible = m_replicaVisible;
     m_replicaVisible.clear();
     for (const EntitySnap &e : snapshot.entities)
         if (e.alive && static_cast<ActionState>(e.state) != ActionState::Die)
@@ -78,14 +79,19 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
                     return true;
                 if (snapshot.full && listed.count(e->id) == 0)
                     return true;
-                for (const EntitySnap &s : snapshot.entities) // another kind under the same id
-                    if (s.id == static_cast<std::uint32_t>(e->id) && s.alive)
-                    {
-                        if (s.isBuilding != (e->AsBuilding() != nullptr))
-                            return true;
-                        const Unit *u = e->AsUnit();
-                        return u && u->archetypeId != s.archetype;
-                    }
+                const auto targetId = static_cast<std::uint32_t>(e->id);
+                const auto it = std::lower_bound(
+                    snapshot.entities.begin(),
+                    snapshot.entities.end(),
+                    targetId,
+                    [](const EntitySnap &s, std::uint32_t eid) { return s.id < eid; });
+                if (it != snapshot.entities.end() && it->id == targetId && it->alive)
+                {
+                    if (it->isBuilding != (e->AsBuilding() != nullptr))
+                        return true;
+                    const Unit *u = e->AsUnit();
+                    return u && u->archetypeId != it->archetype;
+                }
                 return false;
             }),
         m_entities.Raw().end());
@@ -137,6 +143,8 @@ bool EntityManager::ApplySnapshot(const WorldSnapshot &snapshot)
         e->alive = s.alive;
         e->turretFacing = s.turret;
         e->targetEntityId = static_cast<int>(s.target);
+        if (prevVisible.count(id) == 0)
+            e->hasPrevRender = false;
         if (Unit *u = e->AsUnit())
         {
             u->facingDirection = s.facing;

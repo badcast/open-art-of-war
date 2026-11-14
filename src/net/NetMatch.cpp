@@ -331,6 +331,9 @@ void NetMatch::leave()
     m_sync = DataSync {};
     m_synced = false;
     m_syncText.clear();
+    m_lastTick = 0;
+    m_lastViewX = m_lastViewY = -100000;
+    m_lastViewZoom = 0;
     m_scheduledTurn = 0;
     m_replicaSentTurn = 0;
     m_lastTickMs = 0;
@@ -948,6 +951,9 @@ bool NetMatch::TakeStartedMatch(MatchSetup &out)
     out.mapPath = file;
     m_authorityMode = out.authorityMode;
     m_takenStarts = m_client->matchStarts();
+    m_lastTick = 0;
+    m_lastViewX = m_lastViewY = -100000;
+    m_lastViewZoom = 0;
     m_scheduledTurn = 0;
     m_replicaSentTurn = 0;
     m_lastTickMs = 0;
@@ -975,6 +981,11 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         if (ack.sender >= kMaxPlayers)
             continue;
         auto &peer = m_snapshotPeers[ack.sender];
+        if (ack.tick == 0)
+        {
+            peer = SnapshotPeer {};
+            continue;
+        }
         const auto found = std::find_if(
             peer.history.begin(), peer.history.end(), [&](const WorldSnapshot &s) { return s.tick == ack.tick; });
         if (found != peer.history.end() && (!peer.hasAck || ack.tick > peer.ack))
@@ -983,18 +994,24 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
             peer.hasAck = true;
         }
     }
+    std::array<bool, kMaxPlayers> connectedSlots {};
+    for (const Net::RosterEntry &p : m_client->roster().players)
+    {
+        if (p.slot < kMaxPlayers && p.connected)
+            connectedSlots[p.slot] = true;
+    }
+    for (std::size_t s = 0; s < kMaxPlayers; ++s)
+    {
+        if (!connectedSlots[s])
+            m_snapshotPeers[s] = SnapshotPeer {};
+    }
     bool published = false;
     std::size_t publishedBytes = 0;
     for (const Net::RosterEntry &p : m_client->roster().players)
     {
-        if (p.slot >= kMaxPlayers || p.slot == m_client->slot())
+        if (p.slot >= kMaxPlayers || p.slot == m_client->slot() || !p.connected)
             continue;
         auto &peer = m_snapshotPeers[p.slot];
-        if (!p.connected)
-        {
-            peer = SnapshotPeer {};
-            continue;
-        }
         WorldSnapshot current = snapshot;
         current.FilterForPlayer(entities, map, p.slot);
         current.deaths.erase(
@@ -1052,14 +1069,14 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
         current.explosions.clear();
         current.deaths.clear();
         current.groundMarks.clear();
-        current.hasWalls = false;
-        current.walls.clear();
         if (DebugEnv("OAOW_NET_TRACE") && current.tick % 20 == 0)
         {
             // What this recipient is entitled to see, hashed: the replica prints the hash of what it holds (`repl`)
             std::uint64_t h = 1469598103934665603ull;
             WorldSnapshot plain = current;
             plain.hiddenAlive.clear();
+            plain.hasWalls = false;
+            plain.walls.clear();
             const std::vector<std::uint8_t> bytes = plain.Encode();
             for (std::uint8_t b : bytes)
                 h = (h ^ b) * 1099511628211ull;
@@ -1087,6 +1104,7 @@ void NetMatch::PublishSnapshot(const WorldSnapshot &snapshot, const EntityManage
 bool NetMatch::TakeSnapshot(WorldSnapshot &out)
 {
     Net::AuthorityState state;
+    bool sentNack = false;
     while (m_client && m_client->takeAuthorityState(state))
     {
         if (!WorldSnapshot::Decode(state.bytes.data(), state.bytes.size(), out) || out.tick != state.tick)
@@ -1098,10 +1116,18 @@ bool NetMatch::TakeSnapshot(WorldSnapshot &out)
                       return s.tick == out.baseTick;
                   });
             if (base == m_replicaSnapshots.end() || !out.ExpandFrom(*base))
+            {
+                if (!sentNack)
+                {
+                    m_client->sendAuthorityAck(0);
+                    sentNack = true;
+                }
                 continue;
+            }
         }
         m_hasSnapshotStat = true;
         m_snapshotBytes = state.bytes.size();
+        m_lastTick = std::max(m_lastTick, out.tick);
         ++m_snapshotCount;
         m_lastSnapshotMs = m_nowMs;
         return true;
@@ -1131,16 +1157,18 @@ void NetMatch::AckSnapshot(const WorldSnapshot &snapshot)
 void NetMatch::PumpReplica(std::uint32_t nowMs)
 {
     (void) nowMs;
-    if (!IsReplica())
+    if (!m_client || !IsReplica())
         return;
+    const std::uint32_t tpt = std::max<std::uint32_t>(1, m_client->ticksPerTurn());
     // Nobody simulates the turns here: only the authority applies them
     while (const Net::TurnBundle *bundle = m_client->turn(m_scheduledTurn))
     {
         m_recorder.OnBundle(*bundle);
+        m_lastTick = std::max(m_lastTick, (bundle->turn + 1) * tpt - 1);
         m_client->dropTurnsBefore(m_scheduledTurn);
         ++m_scheduledTurn;
     }
-    if (m_outgoing.empty())
+    if (m_outgoing.empty() || paused())
         return;
     // The host's newest turn is the clock here: what the player did goes out for a turn a little ahead of it
     const std::uint32_t turn = m_client->turnsReceived() + m_client->inputDelay();
@@ -1186,6 +1214,8 @@ bool NetMatch::CanRunTick(std::uint32_t tick)
 {
     if (!m_client || !m_sim)
         return true;
+    if (paused())
+        return false;
     if (!m_sim->AdvancesWorld())
         return false; // a replica never ticks on its own
     const std::uint32_t tpt = std::max<std::uint32_t>(1, m_client->ticksPerTurn());

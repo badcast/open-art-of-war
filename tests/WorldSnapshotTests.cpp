@@ -7,6 +7,7 @@
 #include "game/Building.hpp"
 #include "net/WorldSnapshot.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <limits>
 
@@ -80,6 +81,31 @@ WorldSnapshot Sample()
     s.groundMarks = {{10.0f, 20.0f, 1784, 30.0f}};
     s.deaths = {{4, 49, 44, -4.125f, 2.75f, 12.5f, 247, 1741, 5, true}};
     return s;
+}
+
+bool ZstdFrameContentSize(const std::vector<std::uint8_t> &encoded, std::uint64_t &rawSize)
+{
+    if (encoded.size() < 6 || encoded[0] != WorldSnapshot::kVersion)
+        return false;
+    // Zstd frame magic (RFC 8878): 0x28 0xB5 0x2F 0xFD
+    if (encoded[1] != 0x28 || encoded[2] != 0xB5 || encoded[3] != 0x2F || encoded[4] != 0xFD)
+        return false;
+    const std::uint8_t fhd = encoded[5];
+    const int fcsFlag = (fhd >> 6) & 3;
+    const bool singleSegment = ((fhd >> 5) & 1) != 0;
+    const int dictFlag = fhd & 3;
+    static constexpr std::size_t kDictBytes[4] = {0, 1, 2, 4};
+    const std::size_t pos = 6 + (singleSegment ? 0 : 1) + kDictBytes[dictFlag];
+    const std::size_t fcsBytes = fcsFlag == 0 ? (singleSegment ? 1 : 0) : (1u << fcsFlag);
+    if (fcsBytes == 0 || pos + fcsBytes > encoded.size())
+        return false;
+    std::uint64_t value = 0;
+    for (std::size_t i = 0; i < fcsBytes; ++i)
+        value |= static_cast<std::uint64_t>(encoded[pos + i]) << (8 * i);
+    if (fcsFlag == 1)
+        value += 256;
+    rawSize = value;
+    return true;
 }
 } // namespace
 
@@ -359,7 +385,211 @@ int main()
         Check(end2.result == 2 && end3.result == 1, "last standing team receives victory");
     }
 
+    // Zstd compression: frame format, shrinkage on typical skirmish snapshots, determinism, and hostile frames
+    std::uint64_t sampleRawBytes = 0;
+    std::uint64_t skirmishRawBytes = 0;
+    std::size_t skirmishCompressedBytes = 0;
+    std::uint64_t deltaRawBytes = 0;
+    std::size_t deltaCompressedBytes = 0;
+    {
+        Check(bytes.size() >= 6 && bytes[0] == WorldSnapshot::kVersion
+                  && ZstdFrameContentSize(bytes, sampleRawBytes) && sampleRawBytes > 0,
+              "sample snapshot carries version byte and zstd frame with explicit content size");
+
+        WorldSnapshot skirmish;
+        skirmish.tick = 1800;
+        skirmish.full = true;
+        skirmish.economies = {{0, 2400, 300, 180}, {1, 1950, 250, 160}};
+        skirmish.research = {{0, 7, 4, 11.5f, 30.0f}, {1, 3, -1, 0.0f, 20.0f}};
+        skirmish.hasWalls = true;
+        for (int i = 0; i < 200; ++i)
+        {
+            skirmish.walls.push_back(
+                {static_cast<std::int16_t>(10 + (i % 40)), static_cast<std::int16_t>(20 + (i / 40)), 0, 100, 0});
+        }
+        for (std::uint32_t i = 1; i <= 300; ++i)
+        {
+            EntitySnap e;
+            e.id = i;
+            e.isBuilding = (i > 270);
+            e.type = e.isBuilding ? 17 : 8;
+            e.archetype = e.isBuilding ? 0 : static_cast<std::int32_t>(i % 4);
+            e.rawBuilding = e.isBuilding ? static_cast<std::int32_t>(i % 6) : -1;
+            e.faction = static_cast<std::uint8_t>(i % 2);
+            e.owner = static_cast<std::uint8_t>(i % 2);
+            e.tileX = 30 + static_cast<std::int32_t>(i % 32);
+            e.tileY = 40 + static_cast<std::int32_t>(i / 32);
+            e.subX = 0.0f;
+            e.subY = 0.0f;
+            e.hp = e.isBuilding ? 1200 : 100;
+            e.maxHp = e.hp;
+            e.state = 1;
+            e.facing = static_cast<std::int32_t>(i % 8);
+            e.turret = e.facing;
+            if (e.isBuilding)
+            {
+                e.buildPermille = 1000;
+                e.powered = true;
+                e.rallyX = 35;
+                e.rallyY = 45;
+            }
+            skirmish.entities.push_back(std::move(e));
+        }
+
+        const std::vector<std::uint8_t> skirmishBytes = skirmish.Encode();
+        skirmishCompressedBytes = skirmishBytes.size();
+        Check(!skirmishBytes.empty() && ZstdFrameContentSize(skirmishBytes, skirmishRawBytes),
+              "skirmish snapshot encodes with zstd frame");
+        Check(skirmishCompressedBytes < skirmishRawBytes + 1,
+              "zstd compresses typical world snapshot smaller than raw payload");
+
+        WorldSnapshot skirmishBack;
+        Check(WorldSnapshot::Decode(skirmishBytes.data(), skirmishBytes.size(), skirmishBack)
+                  && skirmishBack == skirmish,
+              "skirmish snapshot round trips");
+        Check(skirmishBack.Encode() == skirmishBytes, "skirmish re-encode is deterministic");
+
+        WorldSnapshot nextSkirmish = skirmish;
+        nextSkirmish.tick = 1802;
+        for (int i = 0; i < 10; ++i)
+        {
+            nextSkirmish.entities[i].tileX += 1;
+            nextSkirmish.entities[i].subX = 2.5f;
+        }
+        const WorldSnapshot skirmishDelta = nextSkirmish.DeltaFrom(skirmish);
+        const std::vector<std::uint8_t> deltaEnc = skirmishDelta.Encode();
+        deltaCompressedBytes = deltaEnc.size();
+        Check(!deltaEnc.empty() && ZstdFrameContentSize(deltaEnc, deltaRawBytes),
+              "skirmish delta encodes with zstd frame");
+        WorldSnapshot deltaDec;
+        Check(WorldSnapshot::Decode(deltaEnc.data(), deltaEnc.size(), deltaDec) && deltaDec == skirmishDelta
+                  && deltaDec.Encode() == deltaEnc && deltaDec.ExpandFrom(skirmish)
+                  && deltaDec.entities == nextSkirmish.entities,
+              "skirmish delta round trips deterministically and expands");
+
+        // Corrupt, truncated, trailing-frame, unknown-size, and oversized zstd frames must fail cleanly
+        WorldSnapshot dest = Sample();
+        Check(!WorldSnapshot::Decode(nullptr, 0, dest) && dest == Sample(), "null buffer is refused");
+
+        for (std::size_t cut = 2; cut < std::min<std::size_t>(bytes.size(), 12); ++cut)
+        {
+            Check(!WorldSnapshot::Decode(bytes.data(), cut, dest) && dest == Sample(),
+                  "truncated zstd frame header/body is refused");
+        }
+
+        std::vector<std::uint8_t> badMagic = bytes;
+        badMagic[1] ^= 0xFFu;
+        Check(!WorldSnapshot::Decode(badMagic.data(), badMagic.size(), dest) && dest == Sample(),
+              "corrupted zstd magic is refused");
+
+        std::vector<std::uint8_t> badBody = bytes;
+        badBody[badBody.size() / 2] ^= 0x55u;
+        Check(!WorldSnapshot::Decode(badBody.data(), badBody.size(), dest) && dest == Sample(),
+              "corrupted zstd frame body fails checksum/decode");
+
+        std::vector<std::uint8_t> badChecksum = bytes;
+        if (!badChecksum.empty())
+            badChecksum[badChecksum.size() - 1] ^= 0x01u;
+        Check(!WorldSnapshot::Decode(badChecksum.data(), badChecksum.size(), dest) && dest == Sample(),
+              "corrupted zstd checksum is refused");
+
+        std::vector<std::uint8_t> twoFrames = bytes;
+        twoFrames.insert(twoFrames.end(), bytes.begin() + 1, bytes.end());
+        Check(!WorldSnapshot::Decode(twoFrames.data(), twoFrames.size(), dest) && dest == Sample(),
+              "concatenated trailing zstd frame is refused");
+
+        // Streaming zstd frame with ZSTD_CONTENTSIZE_UNKNOWN (FHD = 0x00, Window = 0x00, empty last block)
+        const std::vector<std::uint8_t> unknownSizeFrame = {
+            WorldSnapshot::kVersion, 0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x01, 0x00, 0x00};
+        Check(!WorldSnapshot::Decode(unknownSizeFrame.data(), unknownSizeFrame.size(), dest) && dest == Sample(),
+              "zstd frame with unknown content size is refused");
+
+        // Zero content size zstd frame (FHD = 0x20: Single_Segment=1, FCS_Field_Size=0 -> 1-byte FCS = 0)
+        const std::vector<std::uint8_t> zeroSizeFrame = {
+            WorldSnapshot::kVersion, 0x28, 0xB5, 0x2F, 0xFD, 0x20, 0x00, 0x01, 0x00, 0x00};
+        Check(!WorldSnapshot::Decode(zeroSizeFrame.data(), zeroSizeFrame.size(), dest) && dest == Sample(),
+              "zstd frame with zero content size is refused");
+
+        // Oversized zstd frame claiming kMaxBytes + 1 (2 MiB + 1 = 0x00200001, FHD = 0xA0: Single_Segment=1, 4-byte FCS)
+        const std::vector<std::uint8_t> oversizedFrame = {
+            WorldSnapshot::kVersion, 0x28, 0xB5, 0x2F, 0xFD, 0xA0, 0x01, 0x00, 0x20, 0x00, 0x01, 0x00, 0x00};
+        Check(!WorldSnapshot::Decode(oversizedFrame.data(), oversizedFrame.size(), dest) && dest == Sample(),
+              "oversized zstd frame exceeding kMaxBytes is refused");
+    }
+
+    // Wall delta omission/emission and diffed ApplyWalls
+    {
+        TileMap authMap;
+        authMap.InitBlankArena(16, 16);
+        authMap.SetWall(2, 2, Faction::Resistance, 100, 0);
+        authMap.SetWall(3, 2, Faction::Confederation, 80, 1);
+        authMap.SetWall(4, 2, Faction::Resistance, 60, 2);
+
+        TileMap replMap;
+        replMap.InitBlankArena(16, 16);
+
+        WorldSnapshot wBase;
+        wBase.tick = 100;
+        wBase.full = true;
+        wBase.CaptureWalls(authMap);
+        Check(wBase.hasWalls && wBase.walls.size() == 3, "CaptureWalls records all wall tiles");
+        wBase.ApplyWalls(replMap);
+        Check(replMap.IsWall(2, 2) && replMap.GetWallFaction(2, 2) == Faction::Resistance
+                  && replMap.GetWallOwner(2, 2) == 0 && replMap.GetWallHp(2, 2) == 150,
+              "ApplyWalls creates resistance wall");
+        Check(replMap.IsWall(3, 2) && replMap.GetWallFaction(3, 2) == Faction::Confederation
+                  && replMap.GetWallOwner(3, 2) == 1 && replMap.GetWallHp(3, 2) == 120,
+              "ApplyWalls creates damaged confederation wall");
+        Check(replMap.IsWall(4, 2) && replMap.GetWallOwner(4, 2) == 2 && replMap.GetWallHp(4, 2) == 90,
+              "ApplyWalls creates wall with explicit owner");
+
+        // Unchanged walls must be stripped by DeltaFrom
+        WorldSnapshot wSame;
+        wSame.tick = 102;
+        wSame.full = true;
+        wSame.CaptureWalls(authMap);
+        const WorldSnapshot dSame = wSame.DeltaFrom(wBase);
+        Check(!dSame.hasWalls && dSame.walls.empty(), "DeltaFrom strips unchanged walls");
+
+        // Damaged wall -> delta emits walls and ApplyWalls updates only the damaged tile
+        authMap.SetWall(3, 2, Faction::Confederation, 40, 1);
+        WorldSnapshot wDamaged;
+        wDamaged.tick = 104;
+        wDamaged.full = true;
+        wDamaged.CaptureWalls(authMap);
+        const WorldSnapshot dDamaged = wDamaged.DeltaFrom(wSame);
+        Check(dDamaged.hasWalls && dDamaged.walls.size() == 3, "DeltaFrom emits walls on damage change");
+        dDamaged.ApplyWalls(replMap);
+        Check(replMap.GetWallHp(3, 2) == 60 && replMap.GetWallHp(2, 2) == 150 && replMap.GetWallHp(4, 2) == 90,
+              "ApplyWalls updates damaged wall while preserving unchanged walls");
+
+        // Added + removed wall -> delta emits walls and ApplyWalls adds/removes cleanly
+        authMap.SetWall(2, 2, Faction::Neutral, 0);
+        authMap.SetWall(5, 5, Faction::Resistance, 100, 0);
+        WorldSnapshot wAddedRemoved;
+        wAddedRemoved.tick = 106;
+        wAddedRemoved.full = true;
+        wAddedRemoved.CaptureWalls(authMap);
+        const WorldSnapshot dAddedRemoved = wAddedRemoved.DeltaFrom(wDamaged);
+        Check(dAddedRemoved.hasWalls && dAddedRemoved.walls.size() == 3,
+              "DeltaFrom emits walls on add/remove change");
+        dAddedRemoved.ApplyWalls(replMap);
+        Check(!replMap.IsWall(2, 2) && replMap.IsWall(5, 5) && replMap.GetWallFaction(5, 5) == Faction::Resistance
+                  && replMap.GetWallOwner(5, 5) == 0 && replMap.GetWallHp(5, 5) == 150
+                  && replMap.GetWallHp(3, 2) == 60 && replMap.GetWallHp(4, 2) == 90,
+              "ApplyWalls removes vanished wall, adds new wall, and preserves untouched walls");
+    }
+
     if (failures == 0)
-        std::printf("world snapshot tests: ok (%zu bytes)\n", bytes.size());
+    {
+        std::printf(
+            "world snapshot tests: ok (sample %zu/%llu B, skirmish %zu/%llu B, delta %zu/%llu B)\n",
+            bytes.size(),
+            static_cast<unsigned long long>(sampleRawBytes + 1),
+            skirmishCompressedBytes,
+            static_cast<unsigned long long>(skirmishRawBytes + 1),
+            deltaCompressedBytes,
+            static_cast<unsigned long long>(deltaRawBytes + 1));
+    }
     return failures == 0 ? 0 : 1;
 }

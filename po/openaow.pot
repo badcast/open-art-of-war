@@ -575,8 +575,8 @@ msgstr "Hardcore"
 msgid "Interface language"
 msgstr "Interface language"
 
-msgid "FREEDOM FOR LIBERTY"
-msgstr "FREEDOM FOR LIBERTY"
+msgid "RESISTANCE ARISEN"
+msgstr "RESISTANCE ARISEN"
 
 msgid "LMB"
 msgstr "LMB"
@@ -2787,3 +2787,12 @@ msgstr "B"
 
 msgid "age"
 msgstr "age"
+
+msgid "TAP MAP: SET RALLY POINT"
+msgstr "TAP MAP: SET RALLY POINT"
+
+msgid "DOUBLE-TAP MAP: SET RALLY POINT"
+msgstr "DOUBLE-TAP MAP: SET RALLY POINT"
+
+msgid "Allies"
+msgstr "Allies"

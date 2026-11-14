@@ -131,7 +131,7 @@ public:
 
     // A building of the player was selected: the sidebar switches to what it does
     // (Barracks -> infantry, Factory -> vehicles, lab -> research) and it becomes the primary one
-    void FocusBuilding(int buildingId, const EntityManager &entities);
+    virtual void FocusBuilding(int buildingId, const EntityManager &entities);
 
     // Drops per-mission state (running research, primary buildings, build mode)
     void ResetForMission();

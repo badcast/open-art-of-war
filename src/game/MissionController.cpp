@@ -23,7 +23,9 @@
 #include <cmath>
 #include <filesystem>
 #include <queue>
+#include <string>
 #include <tuple>
+#include <unordered_map>
 
 namespace OpenArtOfWar
 {
@@ -1249,13 +1251,19 @@ bool MissionController::LoadSkirmish(
 
 std::vector<std::pair<int, int>> MissionController::StartPositions(std::string_view mapPath)
 {
+    static std::unordered_map<std::string, std::vector<std::pair<int, int>>> s_cache;
+    const std::string key(mapPath);
+    if (const auto it = s_cache.find(key); it != s_cache.end())
+        return it->second;
     std::string text;
     if (!Assets::ReadText(mapPath, text))
         return {};
     const nlohmann::json mapJson = nlohmann::json::parse(text, nullptr, false);
     if (!mapJson.is_object())
         return {};
-    return StartPositionsOf(mapJson, mapJson.value("width", 64), mapJson.value("height", 64));
+    auto positions = StartPositionsOf(mapJson, mapJson.value("width", 64), mapJson.value("height", 64));
+    s_cache.emplace(key, positions);
+    return positions;
 }
 
 bool MissionController::LoadMatch(

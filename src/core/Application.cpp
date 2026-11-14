@@ -29,6 +29,7 @@
 #include "openaow/net/Discovery.hpp"
 #include "openaow/net/MasterClient.hpp"
 #include "game/Match.hpp"
+#include "game/Research.hpp"
 #include "game/Simulation.hpp"
 #include "graphics/Camera.hpp"
 #include "graphics/CameraShake.hpp"
@@ -199,7 +200,7 @@ bool Application::Init(int windowWidth, int windowHeight)
 
     // Hidden until a renderer is up: trying one API after the other must not flicker on the screen
     m_window = SDL_CreateWindow(
-        "Open Art Of War: Freedom for Liberty",
+        "Open Art Of War: Resistance Arisen",
         m_settings.windowW,
         m_settings.windowH,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
@@ -697,17 +698,7 @@ void Application::Run()
                             SimContext ctx {*m_entities, *m_map, *m_pathfinder, *m_economy, *m_aiController};
                             WorldSnapshot snap = WorldSnapshot::CaptureEntities(*m_entities, tick);
                             snap.CaptureEffects(*m_entities);
-                            {
-                                // Walls: when the set changed, and once a second in case a snapshot was lost
-                                WorldSnapshot walls;
-                                walls.CaptureWalls(*m_map);
-                                if (walls.walls != m_sentWalls || tick % 20 == 0)
-                                {
-                                    snap.hasWalls = true;
-                                    snap.walls = walls.walls;
-                                    m_sentWalls = std::move(walls.walls);
-                                }
-                            }
+                            snap.CaptureWalls(*m_map);
                             sim.FillEconomies(ctx, snap);
                             sim.FillResearch(snap);
                             m_net->PublishSnapshot(snap, *m_entities, *m_map);
@@ -740,9 +731,30 @@ void Application::Run()
                 {
                     // A replica never advances the world (state comes from the authority): commands go out, the UI
                     // lives
+                    struct ReplicaSyncTracker
+                    {
+                        int missionSerial {-1};
+                        bool researchReady {false};
+                        std::uint32_t researchMask {0};
+                        std::uint32_t seenBuildings {0};
+                        std::uint32_t eliminated {0};
+                        std::uint32_t lastViewBucket {0xFFFFFFFFu};
+                    };
+                    static ReplicaSyncTracker tracker;
+                    const int missionSerial = m_mission ? m_mission->GetLoadSerial() : -1;
+                    if (tracker.missionSerial != missionSerial)
+                    {
+                        tracker = ReplicaSyncTracker {};
+                        tracker.missionSerial = missionSerial;
+                    }
+
+                    const bool paused = m_net->paused();
                     m_net->PumpReplica(nowMs);
-                    m_replicaSince += frameTime;
-                    m_entities->UpdateVisualEffects(static_cast<float>(frameTime));
+                    if (!paused)
+                    {
+                        m_replicaSince += frameTime;
+                        m_entities->UpdateVisualEffects(static_cast<float>(frameTime));
+                    }
                     WorldSnapshot snap;
                     while (m_net->TakeSnapshot(snap))
                     {
@@ -760,6 +772,52 @@ void Application::Run()
                             *m_map); // nobody simulates here: the fog follows the replicated entities
                         sim.ApplyEconomies(snap, ctx);
                         sim.ApplyResearch(snap, ctx);
+
+                        const PlayerId localPlayer = Players::Local();
+                        if (localPlayer < kMaxPlayers)
+                        {
+                            std::uint32_t newResearchMask = 0;
+                            for (int i = 0; i < kResearchCount; ++i)
+                            {
+                                if (IsResearched(localPlayer, i))
+                                    newResearchMask |= (1u << i);
+                            }
+                            if (tracker.researchReady || snap.tick <= 2)
+                            {
+                                const std::uint32_t completedNow = newResearchMask & ~tracker.researchMask;
+                                for (int i = 0; i < kResearchCount; ++i)
+                                {
+                                    if (completedNow & (1u << i))
+                                        sim.NoteEvent({SimEvent::Type::ResearchCompleted, localPlayer, i});
+                                }
+                            }
+                            tracker.researchMask = newResearchMask;
+                            tracker.researchReady = true;
+                        }
+                        if (m_mission && m_mission->IsMatch())
+                        {
+                            std::uint32_t hasBuildings = 0;
+                            for (const Entity &e : m_entities->GetAllEntities())
+                            {
+                                if (e.alive && e.state != ActionState::Die && e.isBuilding && e.owner < kMaxPlayers)
+                                    hasBuildings |= (1u << e.owner);
+                            }
+                            tracker.seenBuildings |= hasBuildings;
+                            const bool fogOn = m_map->IsFogEnabled();
+                            for (PlayerId p = 0; p < kMaxPlayers; ++p)
+                            {
+                                if (!Players::IsActive(p) || (tracker.eliminated & (1u << p)))
+                                    continue;
+                                const bool trackable
+                                    = !fogOn || (localPlayer < kMaxPlayers && !Players::Hostile(p, localPlayer));
+                                if (trackable && (tracker.seenBuildings & (1u << p)) && !(hasBuildings & (1u << p)))
+                                {
+                                    tracker.eliminated |= (1u << p);
+                                    sim.NoteEvent({SimEvent::Type::PlayerEliminated, p, 0});
+                                }
+                            }
+                        }
+
                         if (DebugEnv("OAOW_NET_TRACE"))
                         {
                             // The replica's own capture of the world it just built: must equal what was sent
@@ -802,11 +860,22 @@ void Application::Run()
                                 mine.economies.end());
                             SnapshotTrace("repl", mine);
                         }
+                        const std::uint32_t viewBucket = snap.tick / NetMatch::kViewIntervalTicks;
+                        if (m_camera && viewBucket != tracker.lastViewBucket)
+                        {
+                            tracker.lastViewBucket = viewBucket;
+                            const float zoom = std::max(0.01f, m_camera->GetZoom());
+                            m_net->SendView(
+                                m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f,
+                                m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f,
+                                zoom);
+                        }
                         m_lastReplicaTick = snap.tick;
                         m_replicaSince = 0.0;
                         m_net->NoteTickRan(nowMs);
                     }
-                    DriveNetworkBot(m_lastReplicaTick);
+                    if (!paused)
+                        DriveNetworkBot(m_lastReplicaTick);
                     accumulator = 0.0;
                     m_gameplayController->SetSimulationHold(true);
                     Update(static_cast<float>(frameTime));
@@ -1284,6 +1353,7 @@ void Application::Update(float deltaTime)
         m_endScreenTimer = 0.0f;
     }
 
+    const bool campaignSelectOpen = m_menuController && m_menuController->IsCampaignSelectOpen();
     if (m_aboutScene && (m_state == AppState::MainMenu || m_state == AppState::MenuAbout))
     {
         if (m_state == AppState::MenuAbout && !m_aboutViewActive)
@@ -1297,7 +1367,8 @@ void Application::Update(float deltaTime)
             m_aboutViewActive = false;
             m_aboutMusicPlaying = false;
         }
-        m_aboutScene->Update(deltaTime, m_sound.get());
+        if (!campaignSelectOpen)
+            m_aboutScene->Update(deltaTime, m_sound.get());
     }
     else if (m_aboutScene)
     {
@@ -1342,6 +1413,8 @@ void Application::UpdateCameraShake(double frameTime)
             m_entities->TakeBuildingBlasts();
         return;
     }
+    if (m_net && m_net->paused())
+        return;
     const float zoom = std::max(0.01f, m_camera->GetZoom());
     const float midX = m_camera->GetX() + m_camera->GetViewportWidth() / zoom * 0.5f;
     const float midY = m_camera->GetY() + m_camera->GetViewportHeight() / zoom * 0.5f;
@@ -1470,7 +1543,8 @@ void Application::Render()
     }
     else if (m_state == AppState::MainMenu)
     {
-        if (m_aboutScene)
+        const bool campaignOpen = m_menuController && m_menuController->IsCampaignSelectOpen();
+        if (m_aboutScene && !campaignOpen)
             m_aboutScene->Render(*m_renderer, *m_fontRenderer, {}, m_windowW, m_windowH, false);
         m_menuController->RenderMainMenu(
             *m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH, !m_aboutScene);
@@ -1508,7 +1582,7 @@ void Application::Render()
     }
     else if (m_state == AppState::MenuNetwork)
     {
-        m_menuController->RenderMainMenu(*m_renderer, *m_texManager, *m_fontRenderer, *m_sound, m_windowW, m_windowH);
+        m_renderer->FillRectScreen(0, 0, m_windowW, m_windowH, ui::color::Backdrop);
         m_networkMenu->render(
             *m_renderer,
             *m_fontRenderer,
@@ -1798,6 +1872,7 @@ void Application::Render()
             int mouseTileY = static_cast<int>(m_input->GetMouseWorldY() / TILE_HEIGHT);
             m_hudController->RenderBuildGhost(
                 *m_renderer, *m_map, *m_camera, mouseTileX, mouseTileY, *m_economy, *m_entities);
+            m_renderer->EndWorldPass();
         }
 
         // Render Debug Spawn Ghost in Debug Spawn Mode
@@ -1896,16 +1971,7 @@ void Application::Render()
             int viewW = m_camera->GetViewportWidth();
             m_renderer->FillRectScreen(0, 0, viewW, m_windowH, ui::color::Scrim);
             ui::UiRect band {0, m_windowH / 2 - 70, viewW, 140};
-            ui::FillHorizontalGradient(
-                *m_renderer,
-                {band.x, band.y, band.w / 2, band.h},
-                ui::WithAlpha(ui::color::Panel, 0),
-                ui::color::Panel);
-            ui::FillHorizontalGradient(
-                *m_renderer,
-                {band.CenterX(), band.y, band.w - band.w / 2, band.h},
-                ui::color::Panel,
-                ui::WithAlpha(ui::color::Panel, 0));
+            m_renderer->FillRectScreen(band.x, band.y, band.w, band.h, ui::color::Panel);
             SDL_Color accent = won ? ui::color::Ok : ui::color::Danger;
             m_renderer->FillRectScreen(band.CenterX() - 120, band.y, 240, 2, accent);
             m_renderer->FillRectScreen(band.CenterX() - 120, band.Bottom() - 2, 240, 2, accent);

@@ -1781,6 +1781,420 @@ void testAuthorityRelay()
     CHECK(host.playerCount() == 0);
 }
 
+// Authority/Replica transport robustness: cross-channel reordering (AuthorityState overtaking StartMatch),
+// out-of-order and stale AuthorityState/AuthorityAck filtering, paused-match reconnect, slot takeover,
+// late-joiner rejection, and real ENet UDP >MTU + delta round-trips.
+void testAuthorityTransport()
+{
+    std::printf("[authority transport]\n");
+
+    struct InterceptState
+    {
+        bool holdStartMatch {false};
+        bool bufferStates {false};
+        std::vector<TransportEvent> heldStartMatch;
+        std::vector<TransportEvent> heldStates;
+        std::vector<TransportEvent> injectedIncoming;
+        std::vector<std::pair<Channel, std::vector<std::uint8_t>>> sentLog;
+        std::function<void(PeerId, Channel, const std::uint8_t *, std::size_t)> rawSend;
+    };
+
+    class InterceptTransport : public Transport
+    {
+    public:
+        InterceptTransport(std::unique_ptr<Transport> inner, std::shared_ptr<InterceptState> state)
+            : m_inner(std::move(inner))
+            , m_state(std::move(state))
+        {
+            m_state->rawSend = [this](PeerId peer, Channel ch, const std::uint8_t *data, std::size_t size) {
+                m_inner->send(peer, ch, data, size);
+            };
+        }
+        ~InterceptTransport() override
+        {
+            m_state->rawSend = {};
+        }
+        void send(PeerId peer, Channel channel, const std::uint8_t *data, std::size_t size) override
+        {
+            m_state->sentLog.emplace_back(channel, std::vector<std::uint8_t>(data, data + size));
+            m_inner->send(peer, channel, data, size);
+        }
+        void poll(std::vector<TransportEvent> &out) override
+        {
+            if (!m_state->injectedIncoming.empty())
+            {
+                for (auto &ev : m_state->injectedIncoming)
+                    out.push_back(std::move(ev));
+                m_state->injectedIncoming.clear();
+            }
+            std::vector<TransportEvent> raw;
+            m_inner->poll(raw);
+            for (auto &ev : raw)
+            {
+                if (ev.type == TransportEvent::Type::Received && !ev.data.empty())
+                {
+                    BitReader r(ev.data.data(), ev.data.size());
+                    const MsgType type = readType(r);
+                    if (m_state->holdStartMatch && type == MsgType::StartMatch)
+                    {
+                        m_state->heldStartMatch.push_back(std::move(ev));
+                        continue;
+                    }
+                    if (m_state->bufferStates && type == MsgType::AuthorityState)
+                    {
+                        m_state->heldStates.push_back(std::move(ev));
+                        continue;
+                    }
+                }
+                out.push_back(std::move(ev));
+            }
+        }
+        void disconnect(PeerId peer) override
+        {
+            m_inner->disconnect(peer);
+        }
+        std::uint32_t roundTripMs(PeerId peer) const override
+        {
+            return m_inner->roundTripMs(peer);
+        }
+        std::string peerAddress(PeerId peer) const override
+        {
+            return m_inner->peerAddress(peer);
+        }
+
+    private:
+        std::unique_ptr<Transport> m_inner;
+        std::shared_ptr<InterceptState> m_state;
+    };
+
+    auto encodeState = [](const AuthorityState &s) {
+        std::vector<std::uint8_t> buf(s.bytes.size() + 32);
+        BitWriter w(buf.data(), buf.size());
+        encode(w, s);
+        buf.resize(w.finish());
+        return buf;
+    };
+    auto encodeAck = [](const AuthorityAck &a) {
+        std::vector<std::uint8_t> buf(32);
+        BitWriter w(buf.data(), buf.size());
+        encode(w, a);
+        buf.resize(w.finish());
+        return buf;
+    };
+
+    // 1. Cross-channel reordering, out-of-order AuthorityState, stale AuthorityAck, and reconnect/takeover
+    {
+        LoopbackHub hub;
+        HostConfig hc;
+        hc.identity = testIdentity();
+        hc.turnMs = 100;
+        hc.reconnectWindowMs = 500;
+        SessionHost host(hc);
+        host.addTransport(hub.server());
+
+        auto authState = std::make_shared<InterceptState>();
+        auto replState = std::make_shared<InterceptState>();
+        auto auth = std::make_unique<SessionClient>(
+            std::make_unique<InterceptTransport>(hub.client(), authState), clientConfig("Auth"));
+        auto repl = std::make_unique<SessionClient>(
+            std::make_unique<InterceptTransport>(hub.client(), replState), clientConfig("Repl"));
+
+        std::uint32_t now = 0;
+        auto step = [&](std::uint32_t ms) {
+            for (std::uint32_t t = 0; t < ms; t += 10)
+            {
+                now += 10;
+                if (auth)
+                    auth->update(now);
+                if (repl)
+                    repl->update(now);
+                host.update(now);
+                if (auth)
+                    auth->update(now);
+                if (repl)
+                    repl->update(now);
+            }
+        };
+
+        step(50);
+        CHECK(auth->state() == SessionClient::State::Joined && repl->state() == SessionClient::State::Joined);
+        CHECK(auth->slot() == 0 && repl->slot() == 1);
+
+        // Out-of-range LobbyChoice::color (> 8) is clamped to 0 (Classic) instead of 9..15.
+        {
+            LobbyChoice badColor;
+            badColor.color = 12;
+            repl->sendLobbyChoice(badColor);
+            step(20);
+            CHECK(repl->lobby().slots.size() == 2 && repl->lobby().slots[1].choice.color == 0);
+        }
+
+        // Hold StartMatch on replica to simulate Channel::Bulk AuthorityState overtaking Channel::Lockstep StartMatch.
+        replState->holdStartMatch = true;
+        host.startMatch({1, 2, 3}, now, 200);
+        step(20);
+        CHECK(auth->matchStarted());
+        CHECK(!repl->matchStarted());
+        CHECK(replState->heldStartMatch.size() == 1);
+
+        // Inject a foreign-matchId snapshot before StartMatch arrives, plus send a real snapshot from authority.
+        replState->injectedIncoming.push_back(
+            {TransportEvent::Type::Received, 0, Channel::Bulk, encodeState(AuthorityState {1, 999, 4, {0xAA}})});
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 5, {0x55}}));
+        step(20);
+
+        AuthorityState got;
+        // Must not expose buffered snapshots before StartMatch establishes matchId & authoritySlot.
+        CHECK(!repl->takeAuthorityState(got));
+
+        // Release StartMatch: foreign matchId=999 is purged, valid matchId=1 tick=5 is delivered.
+        replState->holdStartMatch = false;
+        for (auto &ev : replState->heldStartMatch)
+            replState->injectedIncoming.push_back(std::move(ev));
+        replState->heldStartMatch.clear();
+        repl->update(now);
+        CHECK(repl->matchStarted());
+        CHECK(repl->takeAuthorityState(got) && got.tick == 5 && got.bytes == std::vector<std::uint8_t> {0x55});
+        CHECK(!repl->takeAuthorityState(got));
+        CHECK(repl->sendAuthorityAck(5));
+        step(20);
+        AuthorityAck ack;
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 5);
+
+        // Out-of-order AuthorityState delivery: buffer tick 10, 15, 20 and deliver reversed [20, 15, 10].
+        replState->bufferStates = true;
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 10, {10}}));
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 15, {15}}));
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 20, {20}}));
+        step(20);
+        CHECK(replState->heldStates.size() == 3);
+        replState->bufferStates = false;
+        for (auto it = replState->heldStates.rbegin(); it != replState->heldStates.rend(); ++it)
+            replState->injectedIncoming.push_back(std::move(*it));
+        replState->heldStates.clear();
+        repl->update(now);
+
+        // Reject 20 (unacked), accept & ack 15 -> tick 10 must be dropped as stale.
+        CHECK(repl->takeAuthorityState(got) && got.tick == 20);
+        CHECK(repl->takeAuthorityState(got) && got.tick == 15);
+        CHECK(repl->sendAuthorityAck(15));
+        CHECK(!repl->takeAuthorityState(got)); // tick 10 <= acked 15 is dropped
+
+        // Duplicate/stale sendAuthorityAck is refused locally without sending over the wire.
+        const std::size_t sentBefore = replState->sentLog.size();
+        CHECK(!repl->sendAuthorityAck(15));
+        CHECK(!repl->sendAuthorityAck(14));
+        CHECK(replState->sentLog.size() == sentBefore);
+
+        // Authority receives tick 15 ack; host & authority both drop stale/duplicate/spoofed acks.
+        step(20);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 15);
+        CHECK(!auth->takeAuthorityAck(ack));
+
+        // Inject raw stale (14), duplicate (15), wrong-matchId (999), and valid (18) acks from replica -> host.
+        replState->rawSend(0, Channel::Control, encodeAck(AuthorityAck {2, 1, 14}).data(), encodeAck({2, 1, 14}).size());
+        replState->rawSend(0, Channel::Control, encodeAck(AuthorityAck {2, 1, 15}).data(), encodeAck({2, 1, 15}).size());
+        replState->rawSend(0, Channel::Control, encodeAck(AuthorityAck {1, 999, 99}).data(), encodeAck({1, 999, 99}).size());
+        const auto spoofSenderValidAck = encodeAck(AuthorityAck {2, 1, 18});
+        replState->rawSend(0, Channel::Control, spoofSenderValidAck.data(), spoofSenderValidAck.size());
+        step(20);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 18);
+        CHECK(!auth->takeAuthorityAck(ack));
+
+        // Authority client directly drops out-of-order/duplicate AuthorityAck even if injected on its transport.
+        const auto directStale = encodeAck(AuthorityAck {1, 1, 17});
+        const auto directDup = encodeAck(AuthorityAck {1, 1, 18});
+        authState->injectedIncoming.push_back({TransportEvent::Type::Received, 0, Channel::Control, directStale});
+        authState->injectedIncoming.push_back({TransportEvent::Type::Received, 0, Channel::Control, directDup});
+        auth->update(now);
+        CHECK(!auth->takeAuthorityAck(ack));
+
+        // SessionHost drops AuthorityState for ticks <= recipient's acknowledged tick (18).
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 18, {0x18}}));
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 17, {0x17}}));
+        step(20);
+        CHECK(!repl->takeAuthorityState(got));
+
+        // Explicit NACK (tick == 0) resets host & authority ack tracking and reaches the authority.
+        CHECK(repl->sendAuthorityAck(0));
+        step(20);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 0);
+        CHECK(!auth->takeAuthorityAck(ack));
+        // After tick == 0 reset, host forwards tick 18 again (verified via bufferStates) and subsequent ticks ack cleanly.
+        replState->bufferStates = true;
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 18, {0x18}}));
+        step(20);
+        CHECK(replState->heldStates.size() == 1);
+        replState->bufferStates = false;
+        replState->heldStates.clear();
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 19, {0x19}}));
+        step(20);
+        CHECK(repl->takeAuthorityState(got) && got.tick == 19);
+        CHECK(repl->sendAuthorityAck(19));
+        step(20);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 19);
+
+        // Pause the match, disconnect replica, and reconnect at the exact same tick (19).
+        const SessionToken replToken = repl->token();
+        repl->requestPause(true);
+        step(20);
+        CHECK(host.paused() && auth->pauseState().paused);
+
+        repl->disconnect();
+        step(20);
+        repl.reset();
+        replState.reset();
+
+        // Stranger (late joiner without token) is rejected while match is active.
+        {
+            SessionClient stranger(hub.client(), clientConfig("Late"));
+            for (int i = 0; i < 4; ++i)
+            {
+                stranger.update(now);
+                host.update(now);
+                stranger.update(now);
+            }
+            CHECK(stranger.state() == SessionClient::State::Rejected && stranger.rejectReason() == RejectReason::MatchRunning);
+        }
+
+        // Reconnect replica with its token while paused: receives StartMatch, active PauseState, and same-tick full state.
+        ClientConfig reconCfg = clientConfig("Repl");
+        reconCfg.token = replToken;
+        auto repl2State = std::make_shared<InterceptState>();
+        repl = std::make_unique<SessionClient>(
+            std::make_unique<InterceptTransport>(hub.client(), repl2State), reconCfg);
+        step(30);
+        CHECK(repl->state() == SessionClient::State::Joined && repl->matchStarted());
+        CHECK(repl->pauseState().paused && repl->pauseState().bySlot == 1);
+        // Host notifies the authority with AuthorityAck(tick=0) immediately on replica reconnect.
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 0);
+        CHECK(!auth->takeAuthorityAck(ack));
+
+        // Full snapshot at tick 19 (same tick as pre-disconnect ack) must be forwarded and acked cleanly.
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 19, {0xAA, 0xBB}}));
+        step(20);
+        CHECK(repl->takeAuthorityState(got) && got.tick == 19 && got.bytes == std::vector<std::uint8_t>({0xAA, 0xBB}));
+        CHECK(repl->sendAuthorityAck(19));
+        step(20);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 19);
+
+        // Slot takeover while match is running: old connection didn't disconnect first, new connection takes over.
+        ClientConfig takeoverCfg = clientConfig("Repl");
+        takeoverCfg.token = replToken;
+        auto repl3State = std::make_shared<InterceptState>();
+        auto replTakeover = std::make_unique<SessionClient>(
+            std::make_unique<InterceptTransport>(hub.client(), repl3State), takeoverCfg);
+        for (int i = 0; i < 4; ++i)
+        {
+            replTakeover->update(now);
+            repl->update(now);
+            auth->update(now);
+            host.update(now);
+            replTakeover->update(now);
+            repl->update(now);
+            auth->update(now);
+        }
+        CHECK(replTakeover->state() == SessionClient::State::Joined && replTakeover->matchStarted());
+        CHECK(repl->state() == SessionClient::State::Disconnected);
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 0);
+        // Takeover client can receive and ack tick 19 again because host & authority reset per-slot ack state.
+        CHECK(auth->sendAuthorityState(AuthorityState {1, 0, 19, {0xCC, 0xDD}}));
+        for (int i = 0; i < 4; ++i)
+        {
+            now += 10;
+            auth->update(now);
+            replTakeover->update(now);
+            host.update(now);
+            auth->update(now);
+            replTakeover->update(now);
+        }
+        CHECK(replTakeover->takeAuthorityState(got) && got.tick == 19 && got.bytes == std::vector<std::uint8_t>({0xCC, 0xDD}));
+        CHECK(replTakeover->sendAuthorityAck(19));
+        for (int i = 0; i < 4; ++i)
+        {
+            now += 10;
+            auth->update(now);
+            replTakeover->update(now);
+            host.update(now);
+            auth->update(now);
+            replTakeover->update(now);
+        }
+        CHECK(auth->takeAuthorityAck(ack) && ack.sender == 1 && ack.tick == 19);
+    }
+
+    // 2. Real ENet UDP round-trip through SessionHost + SessionClient: >MTU full snapshot, delta snapshot, and acks
+    {
+        HostConfig hc;
+        hc.identity = testIdentity();
+        SessionHost host(hc);
+        std::uint16_t port = 0;
+        std::string error;
+        host.addTransport(createEnetServer(0, 4, &error, &port));
+        CHECK(port != 0);
+
+        SessionClient auth(createEnetClient("127.0.0.1", port, &error), clientConfig("AuthEnet"));
+        SessionClient repl(createEnetClient("127.0.0.1", port, &error), clientConfig("ReplEnet"));
+        const auto start = std::chrono::steady_clock::now();
+        auto nowMs = [&] {
+            return static_cast<std::uint32_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
+                    .count());
+        };
+        auto spin = [&](const std::function<bool()> &done, std::uint32_t timeoutMs) {
+            const std::uint32_t limit = nowMs() + timeoutMs;
+            while (nowMs() < limit)
+            {
+                const std::uint32_t now = nowMs();
+                auth.update(now);
+                repl.update(now);
+                host.update(now);
+                if (done())
+                    return true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+            return false;
+        };
+
+        CHECK(spin(
+            [&] {
+                return auth.state() == SessionClient::State::Joined && repl.state() == SessionClient::State::Joined
+                       && auth.roster().players.size() == 2;
+            },
+            3000));
+        host.startMatch({4, 2}, nowMs(), 100);
+        CHECK(spin([&] { return auth.matchStarted() && repl.matchStarted(); }, 3000));
+
+        // >MTU full snapshot (32 KiB) forces ENet fragmentation on Channel::Bulk.
+        AuthorityState full;
+        full.recipient = repl.slot();
+        full.tick = 20;
+        full.bytes.resize(32 * 1024);
+        for (std::size_t i = 0; i < full.bytes.size(); ++i)
+            full.bytes[i] = static_cast<std::uint8_t>((i * 131 + 7) & 0xFF);
+        CHECK(auth.sendAuthorityState(full));
+
+        AuthorityState got;
+        CHECK(spin([&] { return repl.takeAuthorityState(got); }, 4000));
+        CHECK(got.tick == 20 && got.bytes == full.bytes);
+        CHECK(repl.sendAuthorityAck(20));
+
+        AuthorityAck ack;
+        CHECK(spin([&] { return auth.takeAuthorityAck(ack); }, 3000));
+        CHECK(ack.sender == repl.slot() && ack.tick == 20);
+
+        // Stale snapshot after ack + smaller (<MTU) delta snapshot.
+        AuthorityState stale {repl.slot(), 0, 19, {1, 2, 3}};
+        AuthorityState delta {repl.slot(), 0, 22, {9, 8, 7, 6}};
+        CHECK(auth.sendAuthorityState(stale));
+        CHECK(auth.sendAuthorityState(delta));
+        CHECK(spin([&] { return repl.takeAuthorityState(got); }, 3000));
+        CHECK(got.tick == 22 && got.bytes == delta.bytes);
+        CHECK(repl.sendAuthorityAck(22));
+        CHECK(spin([&] { return auth.takeAuthorityAck(ack); }, 3000));
+        CHECK(ack.sender == repl.slot() && ack.tick == 22);
+    }
+}
+
 } // namespace
 
 int main()
@@ -1793,6 +2207,7 @@ int main()
     testEnetLoopback();
     testLockstepSession();
     testAuthorityRelay();
+    testAuthorityTransport();
     testServerReplay();
     testDataSync();
     testLobby();

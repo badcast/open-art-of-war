@@ -28,6 +28,7 @@ Legend: `[x]` done, `[ ]` to do, `[~]` in progress.
 
 - [ ] Keep lockstep as a mode (replays, `openaow-determinism-tests`) or remove it completely after step 8?
 - [ ] Find the root cause of the current desyncs first? (needs the dump of the second side; only slot 0 dumps exist)
+- [ ] Is the deployed relay (openaow.imister.tech) built from a tree that has `AuthorityState`/`AuthorityAck` and the new `StartMatch` layout? `kProtocolVersion` is 1 on both sides, so an old relay is not refused at Hello.
 
 ## Codex review of step 0 (read-only, findings to fix)
 
@@ -36,7 +37,9 @@ Legend: `[x]` done, `[ ]` to do, `[~]` in progress.
 - [x] `sendAuthorityState` refuses pre-match, self-addressed, oversized, and locally known missing/disconnected recipients. Boundary, truncation, and real ENet fragmentation of a 2 MiB snapshot pass. A successful send is not an end-to-end delivery acknowledgement.
 - [x] The authority slot is announced in `StartMatch`; the match ends when the authority is given up. Covered by network tests.
 - [x] Replica guard now also in `Simulation` (ApplyCommands, UpdateEconomies, UpdateOrderQueues, UpdateResearch, UpdateSquads).
-- [x] (now 2, `matchId` added to `StartMatch`/`AuthorityState`) `kProtocolVersion` is still 1: bump with the first network-visible change, not at step 8.
+- [x] `matchId` and `authoritySlot` were added to `StartMatch`/`AuthorityState` (and `authorityMode` trails `MatchSetup`) while
+      `kProtocolVersion` stayed 1, so the wire changed without a version bump: a relay built before this change passes the
+      Hello check but drops `AuthorityState`/`AuthorityAck` and sends the old `StartMatch` layout.
 - Desync suspects: `Hypot` normalisation in movement (`Unit.cpp:442`), float bits hashed in `Simulation.cpp:63,776`;
   `DetMath::Hypot` change in the working tree already removes `std::hypot`. FMA is off for GCC/Clang only
   (`CMakeLists.txt:29`), not MSVC. Need paired dumps of the same tick + build flags of both machines.
@@ -73,64 +76,65 @@ Medium:
 
 ## Step 1 — roles in `NetMatch`
 
-- [x] Host sets `Authority`, clients set `Replica` at match start (`NetMatch::Attach`; opt-in setting `network.authority_mode`, default off until step 5; `StartMatch.authoritySlot` tells every peer who simulates)
+- [x] Host sets `Authority`, clients set `Replica` at match start (`NetMatch::Attach`; `AuthorityModeWanted()` now defaults to `true`, keeping `OAOW_LOCKSTEP=1` fallback and local `NetMatch::host` P2P/mobile hosting; `StartMatch.authoritySlot` tells every peer who simulates)
 - [x] Clients send their commands to the host and do not schedule them locally (`NetMatch::PumpReplica`, replica branch in `Application.cpp`)
 - [~] Host applies received commands on its next tick (still via `TurnBundle` consumed by the authority only; dropping input-delay turns is a later cleanup)
 - [x] AI players, missions, victory/defeat run only on the host; team-based `result` is filtered and sent to clients (`AuthorityMatchContinues` keeps 3+ team authority hosts ticking after own defeat)
-- [x] Test: loopback peers (`ReplicaLoopbackTests.cpp`), host simulates, client world stays untouched without snapshots, full + delta, 3-team elimination, `PlayerLeft`, and reconnect recovery
+- [x] Test: loopback peers (`ReplicaLoopbackTests.cpp`), host simulates, client world stays untouched without snapshots, full + delta, 3-team elimination, `PlayerLeft`, pause freeze, running skirmish, and reconnect recovery
 
 ## Step 2 — snapshot format (`src/net/WorldSnapshot.cpp`, header in `include/net/`)
 
 - [x] Define the content: entities (id, type, owner, tile + sub-tile offset, hp, state, facing, turret, target, orders,
-      production queue), economies, research, mines, walls/map changes, removed ids
-- [~] `WorldSnapshot::CaptureEntities(EntityManager&, tick)` done; todo: economies (owned by `Simulation::m_economies`, needs an accessor), research, mines, walls, viewer filter; `Apply` is step 3
-- [x] Version number in the header; unknown version = refuse
+      production queue), economies, research, mines, walls/map changes, visual effects/deaths, match result, removed/hidden ids
+- [x] `WorldSnapshot` capture & viewer filter implemented (`CaptureEntities`, `CaptureEffects`, `CaptureWalls`, `FillEconomies`, `FillResearch`, `FilterForPlayer`)
+- [x] Version number in the header (`kVersion = 10`); unknown version = refuse
 - [x] Round-trip test (`tests/WorldSnapshotTests.cpp`, ctest `openaow-worldsnapshot-tests`): world → snapshot → fresh world → snapshot must be byte-identical
-- [~] Coordinates quantised to 1/16 px and varints used; zstd compression still to do
+- [x] Coordinates quantised to 1/16 px, varints, and zstd compression (`ZSTD_compress2` with `ZSTD_c_contentSizeFlag=1` and `ZSTD_c_checksumFlag=1`; bounded decode via `ZSTD_getFrameContentSize` / `ZSTD_findFrameCompressedSize` capped at `kMaxBytes`; verified in `WorldSnapshotTests.cpp`)
 
 ## Step 3 — entities accept state from outside
 
-- [x] `EntityManager::ApplySnapshot` (`src/game/EntityManagerReplica.cpp`): create / update / delete by id without running behaviour code (economies via `Simulation::ApplyEconomies`, walls via `WorldSnapshot::ApplyWalls` (snapshot v3, sent on change and once a second), fog recomputed on the replica; mines, research, rubble/craters still missing)
-- [ ] Replica never runs `Unit::Update`, combat, economy, AI, pathfinding
-- [~] `ApplySnapshot` calls `SnapshotRenderState` first; render-time interpolation factor for replicas is step 5
-- [~] Test: apply to an empty world, follow a moving/damaged entity, kill by omission (`WorldSnapshotTests.cpp`); a running-skirmish comparison is still to do
+- [x] `EntityManager::ApplySnapshot` (`src/game/EntityManagerReplica.cpp`): create / update / delete by id without running behaviour code (economies via `Simulation::ApplyEconomies`, walls via `WorldSnapshot::ApplyWalls`, research, mines, death/wreck visuals, and fog recomputed on the replica)
+- [x] Replica never runs `Unit::Update`, combat, economy, AI, pathfinding (`SimulationStep` skips when `!m_sim.AdvancesWorld()`; audited in `GameplayController` / `EntityManagerSpawn`)
+- [x] `ApplySnapshot` calls `SnapshotRenderState` first; render-time interpolation factor for replicas implemented in Step 5
+- [x] Test: apply to an empty world, follow a moving/damaged entity, kill by omission (`WorldSnapshotTests.cpp`); running-skirmish loopback comparison with fog, combat, economy, production, research, and HUD updates covered in `tests/ReplicaLoopbackTests.cpp` (Test 9)
 
 ## Step 4 — transport of snapshots
 
-- [~] Per-recipient acknowledged snapshot history and deltas implemented; build and runtime verification pending.
-- [~] Replica acknowledges successfully applied snapshots; authority sends periodic full snapshots and falls back when the base is missing or too old. Reconnect needs live verification.
+- [x] Per-recipient acknowledged snapshot history and deltas implemented and verified (`NetTests.cpp`, `ReplicaLoopbackTests.cpp`).
+- [x] Replica acknowledges successfully applied snapshots; authority sends periodic full snapshots and falls back when the base is missing or too old; `SessionHost`/`SessionClient` enforce monotonic ack/state filtering, drop `AuthorityState` of another match at `StartMatch` (sending requires a started match), emit slot-takeover roster transitions, and resend `PauseState` on paused reconnect.
 - [x] Reliable ENet fragmentation reassembles a maximum 2 MiB authority snapshot over local UDP; larger snapshots are rejected by the existing limit.
-- [ ] Unreliable/sequenced channel for deltas, drop outdated ones (client already ignores `tick <= last`)
-- [ ] Tests in `NetTests.cpp`: loss, reorder, late joiner, reconnect
+- [x] Channel selection verified: `AuthorityState` stays on `Channel::Bulk` (reliable ordered) and `AuthorityAck` on `Channel::Control`, because `Channel::Realtime` silently upgrades `>MTU` packets to reliable fragments (or would drop full snapshots/deltas and one-shot events if unreliable fragmentation were enabled); stale ticks are filtered on `SessionHost` and `SessionClient`.
+- [x] Tests in `NetTests.cpp` (`testAuthorityTransport()`, `2458 checks, 0 failed`): out-of-order delivery, duplicate/stale/spoofed acks, late joiner (`MatchRunning`), slot takeover, paused reconnect, and >MTU (32 KiB) ENet round-trips.
 
 ## Step 5 — client rendering
 
-- [x] Interpolate positions between the two last snapshots at render time (`m_replicaSince`, `UpdateRenderAlpha`: glide over the 2 ticks between snapshots)
-- [~] Shots in flight, explosions and building blasts are carried (snapshot v2: `CaptureEffects`, `EntityManager::TakeReplicaEvents`); wrecks and craters still to do
-- [~] Sound cues and building blasts (camera shake) are carried; the announcer / voice lines are still to check
-- [ ] HUD, radar, selection, order lines, build menu work from the replica world
-- [ ] Local feedback while waiting for the host: unit reply sound, target marker, build ghost
+- [x] Interpolate positions between the two last snapshots at render time (`m_replicaSince`, `UpdateRenderAlpha`: glide over the 2 ticks between snapshots; frozen when `paused()`)
+- [x] Shots in flight, explosions, building blasts, deaths/wrecks, and craters (`groundMarks`) are carried (`WorldSnapshot` v9)
+- [x] Sound cues, building blasts (camera shake), `ResearchCompleted`, and `PlayerEliminated` events (`ReplicaSyncTracker` + `hud.Update`) are carried/forwarded
+- [x] HUD, radar, selection, order lines, and build menu work from the replica world (`GameplayController::Update` runs `hud.Update` across all UI/early-return paths on replicas)
+- [x] Local feedback while waiting for the host (unit reply sound, target marks, build ghost audited with no `!m_sim.AdvancesWorld()` blocks; live visual/touch smoke check still pending)
 
 ## Step 6 — fog of war and traffic
 
-- [~] Host filters entities by recipient visibility and hides enemy economies; verification pending. Walls and visual events retain their existing behavior.
-- [~] Entering vision sends the entity; leaving vision retains known hidden entities on the replica, including remembered buildings. Verification pending.
-- [~] Measured (live skirmish, uncompressed full snapshots): ~29 bytes per entity, 35 entities = 1013 B per snapshot = ~10 KB/s per player. Extrapolated to 500 entities ~14 KB per snapshot = ~140 KB/s per player: too much, so deltas (send only changed entities) and zstd are needed. Then tune rate and quantisation (target 20–50 KB/s)
+- [x] Host filters entities by recipient visibility, hides enemy economies and hostile mines, and retains remembered buildings/known hidden entities under fog (`WorldSnapshotTests` and `ReplicaLoopbackTests` Test 9).
+- [x] Entering vision sends the entity; leaving vision retains known hidden entities on the replica, including remembered buildings.
+- [x] Deltas and zstd compression (`WorldSnapshot` kVersion 10) implemented and tested in `WorldSnapshotTests.cpp` (sample `228 / 252 B`, 300-entity + 200-wall skirmish `1641 / 7514 B` ~4.58x smaller, 10-entity delta `173 / 226 B`).
 - [x] Stats overlay (`ApplicationOverlays.cpp`, `NetMatch::Stats`) shows snapshot size, rate and age in authority mode
 
 ## Step 7 — leave, reconnect, pause, replays
 
 - [x] Player leaves: host applies `PlayerLeft` locally, clients get the result in the next snapshot (loopback test in `ReplicaLoopbackTests.cpp`)
 - [x] Reconnect = full snapshot, no replay of past turns (loopback test in `ReplicaLoopbackTests.cpp`)
-- [~] `PauseState` blocks already-buffered authority turns and freezes replica interpolation; targeted tests and live verification remain
-- [ ] Replays: the host records input commands as now and plays them in `Authority` mode; update `docs/replay-format.md`
+- [x] `PauseState` blocks `NetMatch::CanRunTick`, freezes replica interpolation (`m_replicaSince`), visuals, shake, and `DriveNetworkBot`, and resends `PauseState` on paused reconnect (verified in `ReplicaLoopbackTests.cpp` Test 8 and `NetTests.cpp`)
+- [x] Replays & server docs: `PumpReplica` updates `m_lastTick` and calls `ReplayRecorder::OnBundle`, `SendView` records replica camera views, playback runs in `Standalone` lockstep mode; `docs/replay-format.md` updated and `openaow-server/README.md` added (English)
 
 ## Step 8 — clean up
 
-- [~] Authority/replica matches no longer send `WorldHash`; lockstep still uses hashes and desync dumps until its future is decided.
+- [x] Authority/replica matches no longer send `WorldHash` (`NetMatch::AfterTick`, skipped when `m_authorityMode`).
+- [ ] Decide the future of lockstep (`OAOW_LOCKSTEP=1` fallback, replays, `openaow-determinism-tests`).
 - [ ] Simplify `SimBuildId` / `DataSync` for clients (only the snapshot version must match; visual data check stays)
-- [ ] Bump `kProtocolVersion`
-- [ ] Update `CLAUDE.md` (network section) and `docs/`
+- [ ] Bump `kProtocolVersion` (kept at `1` until server deploy); the wire already differs from older relays, see the Codex review of step 0
+- [x] Update `CLAUDE.md` (architecture & network section) and `docs/` (`openaow-server/README.md` and `docs/replay-format.md` done)
 - [ ] Ask the user before redeploying `openaow-server` (openaow.imister.tech)
 
 ## Live check (2026-11-13)
@@ -168,7 +172,7 @@ showed "Catching up with the match: 0%" (`NetMatch::TurnsAhead` now returns 0 fo
 
 ## Snapshot delta and fog implementation (2026-11-13)
 
-Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen entities under fog. The authority retains per-recipient history, uses acknowledgements for delta bases, and reports snapshot payload bytes with `OAOW_NET_TRACE`. The replica expands deltas against the acknowledged base and acknowledges only after application. Protocol version is 3; the relay must be updated before mixed builds can connect. Unit tests were extended, but CMake could not create the requested build directory under `/home/badmister/.cache/oaow-e2e/helpers/codex-build`: it is outside the sandbox writable roots. Build, ctest (excluding NetTests), and the user’s live check remain pending.
+Snapshot v5 includes hidden-alive IDs so full snapshots preserve previously seen entities under fog. The authority retains per-recipient history, uses acknowledgements for delta bases, and reports snapshot payload bytes with `OAOW_NET_TRACE`. The replica expands deltas against the acknowledged base and acknowledges only after application. `kProtocolVersion` was later reverted to 1 (it is 1 in the code now); the relay must still be rebuilt from this tree before authority matches can run through it. Unit tests were extended, but CMake could not create the requested build directory under `/home/badmister/.cache/oaow-e2e/helpers/codex-build`: it is outside the sandbox writable roots. Build, ctest (excluding NetTests), and the user’s live check remain pending.
 
 ## Research replication in progress
 
@@ -201,3 +205,12 @@ Release build completed; all 18 CTest tests pass when the ENet test is run with 
 ## Match-end follow-up
 
 - [x] The authority publishes a final snapshot immediately when victory or defeat occurs (including odd ticks), evaluates `FilterForPlayer` per team, and continues simulating/streaming snapshots via `AuthorityMatchContinues` in 3+ team matches even if the host player is eliminated first. Covered by `WorldSnapshotTests` and `ReplicaLoopbackTests`.
+
+## Swarm follow-up (2026-11-14)
+
+- [x] `WorldSnapshot` zstd compression (`kVersion = 10`, `ZSTD_compress2` with content size and checksum flags, bounded single-frame decode in `WorldSnapshot.cpp`; verified by `openaow-worldsnapshot-tests`).
+- [x] Transport hardening (`SessionHost.cpp`/`SessionClient.cpp` monotonic ack/state filtering, `AuthorityState` of another match dropped at `StartMatch` (sending requires a started match), slot-takeover roster transition, `PauseState` resend on paused reconnect, `AuthorityState` kept on `Channel::Bulk`; `kProtocolVersion` kept at `1`; verified by `openaow-net-tests`, `2458 checks, 0 failed`).
+- [x] Replica UI/HUD/pause/replays/default (`GameplayController::Update` runs `hud.Update` across all paths, `ReplicaSyncTracker` forwards `ResearchCompleted`/`PlayerEliminated` and periodic `SendView`, `m_replicaSince`/visuals/shake/bot freeze on `paused()`, `NetMatch::CanRunTick` checks `paused()`, `PumpReplica` updates `m_lastTick` and calls `ReplayRecorder::OnBundle`, `AuthorityModeWanted()` defaults to `true` with `OAOW_LOCKSTEP=1` fallback and local `NetMatch::host` preserved; verified by `openaow-replica-tests` Tests 8 & 9 and `openaow-determinism-tests`).
+- [x] Documentation: `openaow-server/README.md` (including **Seamless Updates & Multi-Version Coexistence**), `docs/replay-format.md`, and `CLAUDE.md` updated for Authority/Replica mode.
+- [x] Phase 3 follow-up fixes: white/low-saturation army tint (`shaders/sprite.frag`, `TextureManager.cpp`), screen/glow shader state resets & `AboutSimulation::Render` `EndWorldPass()`, `Renderer::GetCompositeBounds` & `MissionController::StartPositions` caches + `NetworkMenu` map list optimization, `WorldSnapshot` reusable encode buffer & diffed `ApplyWalls`, wall-delta & `AuthorityAck(0)` NACK + reconnect recovery, `EntityManagerReplica` `O(N log N)` cleanup & safe `hasPrevRender` reset, and `LobbyChoice::color` `0..8` clamp (`NetTests` `2471 checks, 0 failed`; `openaow-worldsnapshot-tests`; `openaow-replica-tests` Test 10; `openaow-determinism-tests`; `openaow-ui-layout-tests`).
+- [ ] Pending: live two-window desktop and Android smoke check, full `ctest` after final edit, optional `FreeEntitySlots` live counter refactor, and future `kProtocolVersion` bump after `openaow-server` redeploy.

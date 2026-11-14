@@ -964,14 +964,19 @@ void MenuController::RenderMenuSettings(Renderer &renderer, BitmapFontRenderer &
     for (int i = 0; i < count; ++i)
     {
         const UiRect r = l.RowAt(i, scrollOff);
-        if (r.Bottom() <= l.list.y || r.y >= l.list.Bottom())
+        const int clipTop = std::max(r.y, l.list.y);
+        const int clipBot = std::min(r.Bottom(), l.list.Bottom());
+        if (clipBot <= clipTop)
             continue;
         const SettingsRow &row = rows[i];
         const bool hot
             = (l.list.Contains(m_mouseX, m_mouseY) && r.Contains(m_mouseX, m_mouseY)) || i == m_settingsSelected;
-        ui::DrawPanel(renderer, r, hot ? col::Hover : col::PanelRaised, hot ? col::BorderStrong : col::Border);
+        const UiRect bgRect {r.x, clipTop, r.w, clipBot - clipTop};
+        ui::DrawPanel(renderer, bgRect, hot ? col::Hover : col::PanelRaised, hot ? col::BorderStrong : col::Border);
         if (hot)
-            renderer.FillRectScreen(r.x, r.y, 3, r.h, col::Accent);
+            renderer.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, col::Accent);
+        if (r.CenterY() - 12 < l.list.y || r.CenterY() + 12 > l.list.Bottom())
+            continue;
         const SDL_Color text = row.enabled ? col::Text : col::TextMuted;
         fontRenderer.DrawString(row.label, r.x + 18, r.y + r.h * 11 / 62, ui::FONT_BODY_BOLD, text, false);
         fontRenderer.DrawString(

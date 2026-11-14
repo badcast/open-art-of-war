@@ -94,7 +94,29 @@ void SessionClient::handle(const TransportEvent &e)
         {
             Roster roster;
             if (decode(r, roster))
+            {
                 m_roster = std::move(roster);
+                std::array<bool, kMaxPlayers> connected {};
+                for (const RosterEntry &entry : m_roster.players)
+                {
+                    if (entry.slot < kMaxPlayers)
+                        connected[entry.slot] = entry.connected;
+                }
+                for (std::uint8_t s = 0; s < kMaxPlayers; ++s)
+                {
+                    if (!connected[s])
+                    {
+                        m_authorityAcked[s] = false;
+                        m_authorityAckTicks[s] = 0;
+                    }
+                }
+                m_authorityAcks.erase(
+                    std::remove_if(
+                        m_authorityAcks.begin(),
+                        m_authorityAcks.end(),
+                        [&](const AuthorityAck &a) { return a.sender >= kMaxPlayers || !connected[a.sender]; }),
+                    m_authorityAcks.end());
+            }
             break;
         }
         case MsgType::LobbyState:
@@ -123,7 +145,11 @@ void SessionClient::handle(const TransportEvent &e)
             m_authorityStateTick = 0;
             m_matchId = m.matchId;
             m_authorityAcks.clear();
+            m_authorityAcked.fill(false);
+            m_authorityAckTicks.fill(0);
             m_authoritySlot = m.authoritySlot;
+            if (m_state == State::Joined && slot() == m_authoritySlot)
+                m_authorityStates.clear();
             ++m_starts;
             m_setup = std::move(m.setup);
             m_turns.clear();
@@ -135,7 +161,8 @@ void SessionClient::handle(const TransportEvent &e)
         case MsgType::AuthorityState:
         {
             AuthorityState state;
-            if (e.data.size() <= kMaxAuthorityStateBytes + 32 && decode(r, state) && state.recipient == slot()
+            if (m_state == State::Joined && (!m_started || slot() != m_authoritySlot)
+                && e.data.size() <= kMaxAuthorityStateBytes + 32 && decode(r, state) && state.recipient == slot()
                 && (!m_started || state.matchId == m_matchId)
                 && (!m_hasAuthorityStateTick || state.tick > m_authorityStateTick))
             {
@@ -148,9 +175,26 @@ void SessionClient::handle(const TransportEvent &e)
         case MsgType::AuthorityAck:
         {
             AuthorityAck ack;
-            if (m_started && slot() == m_authoritySlot && decode(r, ack) && ack.matchId == m_matchId
-                && ack.sender != slot())
-                m_authorityAcks.push_back(ack);
+            if (m_state == State::Joined && m_started && slot() == m_authoritySlot && decode(r, ack)
+                && ack.matchId == m_matchId && ack.sender != slot())
+            {
+                if (ack.tick == 0)
+                {
+                    m_authorityAcked[ack.sender] = false;
+                    m_authorityAckTicks[ack.sender] = 0;
+                    if (m_authorityAcks.size() >= kMaxQueuedAuthorityStates)
+                        m_authorityAcks.pop_front();
+                    m_authorityAcks.push_back(ack);
+                }
+                else if (!m_authorityAcked[ack.sender] || ack.tick > m_authorityAckTicks[ack.sender])
+                {
+                    m_authorityAcked[ack.sender] = true;
+                    m_authorityAckTicks[ack.sender] = ack.tick;
+                    if (m_authorityAcks.size() >= kMaxQueuedAuthorityStates)
+                        m_authorityAcks.pop_front();
+                    m_authorityAcks.push_back(ack);
+                }
+            }
             break;
         }
         case MsgType::TurnBundle:
@@ -224,6 +268,13 @@ bool SessionClient::sendAuthorityState(const AuthorityState &state)
 
 bool SessionClient::takeAuthorityState(AuthorityState &state)
 {
+    if (m_state != State::Joined || !m_started)
+        return false;
+    if (slot() == m_authoritySlot)
+    {
+        m_authorityStates.clear();
+        return false;
+    }
     while (!m_authorityStates.empty())
     {
         state = std::move(m_authorityStates.front());
@@ -238,11 +289,20 @@ bool SessionClient::sendAuthorityAck(std::uint32_t tick)
 {
     if (m_state != State::Joined || !m_started || slot() == m_authoritySlot)
         return false;
-    // The caller acknowledges only after decoding and applying the snapshot.
-    if (!m_hasAuthorityStateTick || tick > m_authorityStateTick)
+    // tick == 0 acts as an explicit NACK / full-snapshot request; positive ticks advance the monotonic filter.
+    if (tick != 0)
     {
+        // The caller acknowledges only after decoding and applying the snapshot.
+        if (m_hasAuthorityStateTick && tick <= m_authorityStateTick)
+            return false;
         m_authorityStateTick = tick;
         m_hasAuthorityStateTick = true;
+        m_authorityStates.erase(
+            std::remove_if(
+                m_authorityStates.begin(),
+                m_authorityStates.end(),
+                [&](const AuthorityState &s) { return s.tick <= m_authorityStateTick; }),
+            m_authorityStates.end());
     }
     BitWriter w(m_buffer.data(), m_buffer.size());
     encode(w, AuthorityAck {slot(), m_matchId, tick});

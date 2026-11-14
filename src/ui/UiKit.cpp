@@ -158,360 +158,37 @@ void FillVerticalGradient(Renderer &r, const UiRect &rect, SDL_Color top, SDL_Co
 {
     if (rect.h <= 0 || rect.w <= 0)
         return;
-    for (int i = 0; i < rect.h; ++i)
-    {
-        float t = (rect.h > 1) ? static_cast<float>(i) / static_cast<float>(rect.h - 1) : 0.0f;
-        SDL_Color c = Mix(top, bottom, t);
-        r.DrawLineScreen(rect.x, rect.y + i, rect.x + rect.w - 1, rect.y + i, c);
-    }
+    const SDL_Color flat = Mix(top, bottom, 0.5f);
+    if (flat.a == 0)
+        return;
+    r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, flat);
 }
 
 void FillHorizontalGradient(Renderer &r, const UiRect &rect, SDL_Color left, SDL_Color right)
 {
     if (rect.h <= 0 || rect.w <= 0)
         return;
-    for (int i = 0; i < rect.w; ++i)
-    {
-        float t = (rect.w > 1) ? static_cast<float>(i) / static_cast<float>(rect.w - 1) : 0.0f;
-        SDL_Color c = Mix(left, right, t);
-        r.DrawLineScreen(rect.x + i, rect.y, rect.x + i, rect.y + rect.h - 1, c);
-    }
-}
-
-namespace
-{
-
-CachedSprite sPanelFill {"dialog_items.panel_fill", SpriteKind::Frame};   // 160x14 metallic scanline panel fill
-CachedSprite sTopRail {"dialog_items.top_rail", SpriteKind::Frame};       // 35x3 top horizontal bevel rail
-CachedSprite sBottomRail {"dialog_items.bottom_rail", SpriteKind::Frame}; // 33x3 bottom horizontal bevel rail
-CachedSprite sSideRail {"dialog_items.side_rail", SpriteKind::Frame};     // 4x41 vertical bevel rail (flip H for right)
-CachedSprite sCornerCap {"dialog_items.corner_cap", SpriteKind::Frame};   // 4x4 panel corner cap
-CachedSprite sTlRailV {"dialog_items.tl_rail_v", SpriteKind::Frame};      // 10x51 ornate top-left vertical rail
-CachedSprite sTlRailH {"dialog_items.tl_rail_h", SpriteKind::Frame};      // 45x6 ornate top-left horizontal rail
-CachedSprite sTlCorner {"dialog_items.tl_corner", SpriteKind::Frame};     // 11x11 ornate top-left corner bracket
-CachedSprite sBrRailV {"dialog_items.br_rail_v", SpriteKind::Frame};      // 10x46 ornate bottom-right vertical rail
-CachedSprite sBrRailH {"dialog_items.br_rail_h", SpriteKind::Frame};      // 45x6 ornate bottom-right horizontal rail
-CachedSprite sBrCorner {"dialog_items.br_corner", SpriteKind::Frame};     // 11x11 ornate bottom-right corner bracket
-CachedSprite sTabFillActive {"dialog_items.tab_fill_active", SpriteKind::Frame}; // 30x15 active tab interior fill
-CachedSprite sTabFillIdle {"dialog_items.tab_fill_idle", SpriteKind::Frame};     // 30x16 inactive tab interior fill
-CachedSprite sTabShoulderL {"dialog_items.tab_shoulder_l", SpriteKind::Frame};   // 22x9 angled top-left tab shoulder
-CachedSprite sTabShoulderR {"dialog_items.tab_shoulder_r", SpriteKind::Frame};   // 21x9 angled top-right tab shoulder
-
-bool ColorMatches(SDL_Color a, SDL_Color b)
-{
-    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
-}
-
-bool PanelSpritesReady()
-{
-    return sPanelFill.Get() >= 0 && sTopRail.Get() >= 0 && sBottomRail.Get() >= 0 && sSideRail.Get() >= 0
-           && sCornerCap.Get() >= 0;
-}
-
-bool OrnateCornerSpritesReady()
-{
-    return sTlRailV.Get() >= 0 && sTlRailH.Get() >= 0 && sTlCorner.Get() >= 0 && sBrRailV.Get() >= 0
-           && sBrRailH.Get() >= 0 && sBrCorner.Get() >= 0;
-}
-
-bool TabSpritesReady()
-{
-    return sTabFillActive.Get() >= 0 && sTabFillIdle.Get() >= 0 && sTabShoulderL.Get() >= 0 && sTabShoulderR.Get() >= 0
-           && sTopRail.Get() >= 0 && sSideRail.Get() >= 0;
-}
-
-void TileHorizSpan(
-    Renderer &r,
-    int spriteId,
-    int x,
-    int y,
-    int spanW,
-    int drawH,
-    float trimL,
-    float trimT,
-    float trimR,
-    float trimB,
-    float tileW,
-    SDL_FlipMode flip = SDL_FLIP_NONE,
-    Uint8 alpha = 255)
-{
-    if (spriteId < 0 || spanW <= 0 || drawH <= 0 || tileW <= 0.0f)
+    const SDL_Color flat = Mix(left, right, 0.5f);
+    if (flat.a == 0)
         return;
-    float curX = static_cast<float>(x);
-    float rem = static_cast<float>(spanW);
-    while (rem > 0.5f)
-    {
-        const float segW = std::min(tileW, rem);
-        const float extraR = tileW - segW;
-        r.DrawSpritePartScreen(
-            spriteId,
-            {curX, static_cast<float>(y), segW, static_cast<float>(drawH)},
-            trimL,
-            trimT,
-            trimR + extraR,
-            trimB,
-            flip,
-            Faction::Resistance,
-            alpha);
-        curX += segW;
-        rem -= segW;
-    }
+    r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, flat);
 }
-
-void TileVertSpan(
-    Renderer &r,
-    int spriteId,
-    int x,
-    int y,
-    int drawW,
-    int spanH,
-    float trimL,
-    float trimT,
-    float trimR,
-    float trimB,
-    float tileH,
-    SDL_FlipMode flip = SDL_FLIP_NONE,
-    Uint8 alpha = 255)
-{
-    if (spriteId < 0 || drawW <= 0 || spanH <= 0 || tileH <= 0.0f)
-        return;
-    float curY = static_cast<float>(y);
-    float rem = static_cast<float>(spanH);
-    while (rem > 0.5f)
-    {
-        const float segH = std::min(tileH, rem);
-        const float extraB = tileH - segH;
-        r.DrawSpritePartScreen(
-            spriteId,
-            {static_cast<float>(x), curY, static_cast<float>(drawW), segH},
-            trimL,
-            trimT,
-            trimR,
-            trimB + extraB,
-            flip,
-            Faction::Resistance,
-            alpha);
-        curY += segH;
-        rem -= segH;
-    }
-}
-
-void TilePanelInterior(Renderer &r, const UiRect &rect, Uint8 alpha)
-{
-    constexpr float kTileW = 148.0f; // 160 - (6 + 6)
-    constexpr float kTileH = 12.0f;  // 14 - (1 + 1)
-    float curY = static_cast<float>(rect.y);
-    float remY = static_cast<float>(rect.h);
-    while (remY > 0.5f)
-    {
-        const float segH = std::min(kTileH, remY);
-        const float extraB = kTileH - segH;
-        TileHorizSpan(
-            r,
-            sPanelFill.Get(),
-            rect.x,
-            static_cast<int>(curY),
-            rect.w,
-            static_cast<int>(segH),
-            6.0f,
-            1.0f,
-            6.0f,
-            1.0f + extraB,
-            kTileW,
-            SDL_FLIP_NONE,
-            alpha);
-        curY += segH;
-        remY -= segH;
-    }
-}
-
-} // namespace
 
 void DrawPanelFrame(Renderer &r, const UiRect &rect, SDL_Color border)
 {
-    if (rect.w <= 0 || rect.h <= 0)
+    if (rect.w <= 0 || rect.h <= 0 || border.a == 0)
         return;
-
-    if (!PanelSpritesReady() || rect.w < 12 || rect.h < 12)
-    {
-        r.DrawLineScreen(rect.x + 1, rect.y + 1, rect.Right() - 2, rect.y + 1, {255, 255, 255, 14});
-        r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
-        return;
-    }
-
-    const Uint8 frameAlpha = border.a > 0 ? border.a : 255;
-
-    // 4px side rails and horizontal 3px rails inset from 4x4 corner caps
-    TileHorizSpan(
-        r, sTopRail.Get(), rect.x + 4, rect.y, rect.w - 8, 3, 4.0f, 0.0f, 4.0f, 0.0f, 27.0f, SDL_FLIP_NONE, frameAlpha);
-    TileHorizSpan(
-        r,
-        sBottomRail.Get(),
-        rect.x + 4,
-        rect.Bottom() - 3,
-        rect.w - 8,
-        3,
-        4.0f,
-        0.0f,
-        4.0f,
-        0.0f,
-        25.0f,
-        SDL_FLIP_NONE,
-        frameAlpha);
-    TileVertSpan(
-        r,
-        sSideRail.Get(),
-        rect.x,
-        rect.y + 4,
-        4,
-        rect.h - 8,
-        0.0f,
-        3.0f,
-        0.0f,
-        3.0f,
-        35.0f,
-        SDL_FLIP_NONE,
-        frameAlpha);
-    TileVertSpan(
-        r,
-        sSideRail.Get(),
-        rect.Right() - 4,
-        rect.y + 4,
-        4,
-        rect.h - 8,
-        0.0f,
-        3.0f,
-        0.0f,
-        3.0f,
-        35.0f,
-        SDL_FLIP_HORIZONTAL,
-        frameAlpha);
-
-    // 4x4 corner caps on all four corners (keep top-right and bottom-left crisp on large panels too)
-    r.DrawSpritePartScreen(
-        sCornerCap.Get(),
-        {static_cast<float>(rect.x), static_cast<float>(rect.y), 4.0f, 4.0f},
-        0,
-        0,
-        0,
-        0,
-        SDL_FLIP_NONE,
-        Faction::Resistance,
-        frameAlpha);
-    r.DrawSpritePartScreen(
-        sCornerCap.Get(),
-        {static_cast<float>(rect.Right() - 4), static_cast<float>(rect.y), 4.0f, 4.0f},
-        0,
-        0,
-        0,
-        0,
-        SDL_FLIP_HORIZONTAL,
-        Faction::Resistance,
-        frameAlpha);
-    r.DrawSpritePartScreen(
-        sCornerCap.Get(),
-        {static_cast<float>(rect.x), static_cast<float>(rect.Bottom() - 4), 4.0f, 4.0f},
-        0,
-        0,
-        0,
-        0,
-        SDL_FLIP_VERTICAL,
-        Faction::Resistance,
-        frameAlpha);
-    r.DrawSpritePartScreen(
-        sCornerCap.Get(),
-        {static_cast<float>(rect.Right() - 4), static_cast<float>(rect.Bottom() - 4), 4.0f, 4.0f},
-        0,
-        0,
-        0,
-        0,
-        static_cast<SDL_FlipMode>(SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL),
-        Faction::Resistance,
-        frameAlpha);
-
-    // Ornate stepped brackets & extended corner rails for larger panels
-    if (OrnateCornerSpritesReady() && rect.w >= 140 && rect.h >= 120)
-    {
-        r.DrawSpritePartScreen(
-            sTlRailV.Get(),
-            {static_cast<float>(rect.x), static_cast<float>(rect.y + 11), 10.0f, 51.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-        r.DrawSpritePartScreen(
-            sTlRailH.Get(),
-            {static_cast<float>(rect.x + 11), static_cast<float>(rect.y), 45.0f, 6.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-        r.DrawSpritePartScreen(
-            sTlCorner.Get(),
-            {static_cast<float>(rect.x), static_cast<float>(rect.y), 11.0f, 11.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-
-        r.DrawSpritePartScreen(
-            sBrRailV.Get(),
-            {static_cast<float>(rect.Right() - 10), static_cast<float>(rect.Bottom() - 57), 10.0f, 46.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-        r.DrawSpritePartScreen(
-            sBrRailH.Get(),
-            {static_cast<float>(rect.Right() - 56), static_cast<float>(rect.Bottom() - 6), 45.0f, 6.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-        r.DrawSpritePartScreen(
-            sBrCorner.Get(),
-            {static_cast<float>(rect.Right() - 11), static_cast<float>(rect.Bottom() - 11), 11.0f, 11.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            frameAlpha);
-    }
-
-    // Preserve semantic highlight/warning/error border tinting (e.g. Accent/Danger) when non-neutral
-    if (!ColorMatches(border, color::Border) && !ColorMatches(border, color::BorderStrong) && border.a > 0)
-        r.DrawRectScreen(
-            rect.x, rect.y, rect.w, rect.h, WithAlpha(border, static_cast<Uint8>(std::min<int>(border.a, 180))));
+    r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, border);
+    if (rect.w > 4 && rect.h > 4)
+        r.DrawRectScreen(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, WithAlpha(color::PanelSunken, border.a));
 }
 
 void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill, SDL_Color border)
 {
     if (rect.w <= 0 || rect.h <= 0)
         return;
-
-    r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
-    if (PanelSpritesReady() && rect.w >= 12 && rect.h >= 12)
-    {
-        const UiRect inner {rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4};
-        TilePanelInterior(r, inner, fill.a);
-    }
+    if (fill.a > 0)
+        r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, fill);
     DrawPanelFrame(r, rect, border);
 }
 
@@ -527,150 +204,41 @@ void DrawTab(
     if (rect.w <= 0 || rect.h <= 0)
         return;
 
-    if (!TabSpritesReady() || rect.w < 44 || rect.h < 14)
+    const SDL_Color topFill = active
+                                  ? Mix(color::PanelRaised, accent, 0.38f)
+                                  : (hovered ? Mix(color::Hover, color::AccentDeep, 0.42f)
+                                             : Mix(color::PanelRaised, color::AccentDeep, 0.18f));
+    const SDL_Color botFill = active
+                                  ? Mix(color::PanelSunken, color::AccentDeep, 0.72f)
+                                  : (hovered ? Mix(color::PanelSunken, color::AccentDeep, 0.28f) : color::PanelSunken);
+    const SDL_Color border = active
+                                 ? Mix(accent, color::White, 0.18f)
+                                 : (hovered ? Mix(color::BorderStrong, accent, 0.48f)
+                                            : Mix(color::Border, color::BorderStrong, 0.55f));
+    const SDL_Color corners = active
+                                  ? Mix(accent, color::White, 0.42f)
+                                  : (hovered ? Mix(accent, color::BorderStrong, 0.35f)
+                                             : WithAlpha(color::BorderStrong, 170));
+
+    DrawButtonChrome(r, rect, topFill, botFill, border, {0, 0, 0, 0}, corners);
+
+    if (active && rect.w > 2 && rect.h > 4)
     {
-        r.FillRectScreen(
-            rect.x,
-            rect.y,
-            rect.w,
-            rect.h,
-            active ? color::Hover : (hovered ? color::PanelRaised : color::PanelSunken));
-        r.DrawRectScreen(rect.x, rect.y, rect.w, rect.h, active ? color::BorderStrong : color::Border);
-        if (active)
-            r.FillRectScreen(rect.x, rect.Bottom() - 3, rect.w, 3, accent);
+        r.FillRectScreen(rect.x + 1, rect.Bottom() - 3, rect.w - 2, 3, accent);
+        r.FillRectScreen(rect.x + 1, rect.Bottom() - 3, rect.w - 2, 1, Mix(accent, color::White, 0.35f));
     }
-    else
+    else if (hovered && rect.w > 2 && rect.h > 4)
     {
-        const SDL_Color baseFill = active ? color::Hover : (hovered ? color::PanelRaised : color::PanelSunken);
-        const Uint8 tabAlpha = active ? 245 : (hovered ? 225 : 195);
-
-        // Angled trapezoid backdrop matching sTabShoulderL (22x9) and sTabShoulderR (21x9)
-        const int shoulderH = std::min(9, rect.h);
-        for (int row = 0; row < shoulderH; ++row)
-        {
-            const int insetL = (22 * (shoulderH - 1 - row)) / shoulderH;
-            const int insetR = (21 * (shoulderH - 1 - row)) / shoulderH;
-            const int lineX = rect.x + insetL;
-            const int lineEnd = rect.Right() - 1 - insetR;
-            if (lineX <= lineEnd)
-                r.DrawLineScreen(lineX, rect.y + row, lineEnd, rect.y + row, baseFill);
-        }
-        if (rect.h > shoulderH)
-            r.FillRectScreen(rect.x + 1, rect.y + shoulderH, rect.w - 2, rect.h - shoulderH, baseFill);
-
-        // Interior sprite fill below top rail / between angled shoulders
-        const int fillSprite = active ? sTabFillActive.Get() : sTabFillIdle.Get();
-        const int fillTop = rect.y + 3;
-        const int fillH = std::max(1, rect.h - 4);
-        if (rect.w > 8)
-        {
-            r.DrawSpritePartScreen(
-                fillSprite,
-                {static_cast<float>(rect.x + 4),
-                 static_cast<float>(fillTop),
-                 static_cast<float>(rect.w - 8),
-                 static_cast<float>(fillH)},
-                2.0f,
-                1.0f,
-                2.0f,
-                1.0f,
-                SDL_FLIP_NONE,
-                Faction::Resistance,
-                tabAlpha);
-        }
-
-        // Top rail across the flat crown between the two angled shoulders
-        const int crownX = rect.x + 22;
-        const int crownW = rect.w - 43;
-        if (crownW > 0)
-            TileHorizSpan(
-                r, sTopRail.Get(), crownX, rect.y, crownW, 3, 4.0f, 0.0f, 4.0f, 0.0f, 27.0f, SDL_FLIP_NONE, tabAlpha);
-
-        // Side vertical rails below the 9px shoulders
-        if (rect.h > 9)
-        {
-            TileVertSpan(
-                r,
-                sSideRail.Get(),
-                rect.x,
-                rect.y + 9,
-                4,
-                rect.h - 9,
-                0.0f,
-                3.0f,
-                0.0f,
-                3.0f,
-                35.0f,
-                SDL_FLIP_NONE,
-                tabAlpha);
-            TileVertSpan(
-                r,
-                sSideRail.Get(),
-                rect.Right() - 4,
-                rect.y + 9,
-                4,
-                rect.h - 9,
-                0.0f,
-                3.0f,
-                0.0f,
-                3.0f,
-                35.0f,
-                SDL_FLIP_HORIZONTAL,
-                tabAlpha);
-        }
-
-        // Bottom rail for inactive tabs; active accent indicator on active tab
-        if (active)
-        {
-            r.FillRectScreen(rect.x + 3, rect.Bottom() - 3, rect.w - 6, 3, accent);
-        }
-        else
-        {
-            TileHorizSpan(
-                r,
-                sBottomRail.Get(),
-                rect.x + 4,
-                rect.Bottom() - 3,
-                rect.w - 8,
-                3,
-                4.0f,
-                0.0f,
-                4.0f,
-                0.0f,
-                25.0f,
-                SDL_FLIP_NONE,
-                tabAlpha);
-        }
-
-        // Left and right angled shoulder edges on top
-        r.DrawSpritePartScreen(
-            sTabShoulderL.Get(),
-            {static_cast<float>(rect.x), static_cast<float>(rect.y), 22.0f, 9.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            tabAlpha);
-        r.DrawSpritePartScreen(
-            sTabShoulderR.Get(),
-            {static_cast<float>(rect.Right() - 21), static_cast<float>(rect.y), 21.0f, 9.0f},
-            0,
-            0,
-            0,
-            0,
-            SDL_FLIP_NONE,
-            Faction::Resistance,
-            tabAlpha);
+        r.FillRectScreen(rect.x + 1, rect.Bottom() - 2, rect.w - 2, 2, WithAlpha(accent, 120));
     }
 
     if (font && !label.empty())
     {
-        const SDL_Color textColor = active ? color::Text : (hovered ? color::Text : color::TextMuted);
-        const std::string drawn = FitText(*font, label, FONT_BODY_BOLD, std::max(0, rect.w - 24));
+        const SDL_Color textColor = active ? color::White : (hovered ? color::Text : color::TextDim);
+        const std::string drawn = FitText(*font, label, FONT_BODY_BOLD, std::max(0, rect.w - 16));
+        const int textY = active ? rect.CenterY() - 1 : rect.CenterY();
         font->DrawString(
-            drawn, rect.CenterX(), rect.CenterY(), FONT_BODY_BOLD, textColor, true, Anchor::HCENTER | Anchor::VCENTER);
+            drawn, rect.CenterX(), textY, FONT_BODY_BOLD, textColor, true, Anchor::HCENTER | Anchor::VCENTER);
     }
 }
 
@@ -713,11 +281,12 @@ UiRect DrawDialog(
 
     const int titleH = 52;
     const int innerW = std::max(0, rect.w - 8);
-    FillVerticalGradient(
-        r,
-        {rect.x + 4, rect.y + 4, innerW, titleH - 4},
-        WithAlpha(Mix(color::PanelRaised, color::AccentDeep, 0.34f), 205),
-        WithAlpha(color::PanelSunken, 130));
+    r.FillRectScreen(
+        rect.x + 4,
+        rect.y + 4,
+        innerW,
+        titleH - 4,
+        WithAlpha(Mix(color::PanelRaised, color::AccentDeep, 0.25f), 220));
     if (rect.w > 28)
         r.FillRectScreen(rect.x + 14, rect.y + 5, rect.w - 28, 1, WithAlpha(color::Accent, 72));
     // Tactical left marker pill beside title text
@@ -739,7 +308,6 @@ UiRect DrawDialog(
     {
         const UiRect well {rect.x + 12, rect.y + titleH + 8, rect.w - 24, rect.h - titleH - 20};
         r.DrawRectScreen(well.x, well.y, well.w, well.h, WithAlpha(color::Border, 85));
-        r.DrawLineScreen(well.x + 1, well.y + 1, well.Right() - 2, well.y + 1, {255, 255, 255, 14});
     }
 
     return {rect.x + 20, rect.y + titleH + 16, rect.w - 40, rect.h - titleH - 32};
@@ -778,28 +346,6 @@ SDL_Color ScaleAlpha(SDL_Color c, Uint8 opacity)
     return c;
 }
 
-void DrawCornerBrackets(Renderer &r, const UiRect &rect, SDL_Color col, int arm)
-{
-    if (col.a == 0 || arm < 2 || rect.w < arm * 2 + 2 || rect.h < arm * 2 + 2)
-        return;
-    const int x0 = rect.x;
-    const int y0 = rect.y;
-    const int x1 = rect.Right() - arm;
-    const int y1 = rect.Bottom() - arm;
-    const int rx = rect.Right() - 1;
-    const int by = rect.Bottom() - 1;
-
-    // Four crisp L-brackets framing interactive controls
-    r.FillRectScreen(x0, y0, arm, 1, col);
-    r.FillRectScreen(x0, y0, 1, arm, col);
-    r.FillRectScreen(x1, y0, arm, 1, col);
-    r.FillRectScreen(rx, y0, 1, arm, col);
-    r.FillRectScreen(x0, by, arm, 1, col);
-    r.FillRectScreen(x0, y1, 1, arm, col);
-    r.FillRectScreen(x1, by, arm, 1, col);
-    r.FillRectScreen(rx, y1, 1, arm, col);
-}
-
 } // namespace
 
 void DrawButtonChrome(
@@ -809,7 +355,7 @@ void DrawButtonChrome(
     SDL_Color bottomFill,
     SDL_Color border,
     SDL_Color accentBar,
-    SDL_Color cornerColor,
+    [[maybe_unused]] SDL_Color cornerColor,
     Uint8 opacity,
     bool horizontalGradient)
 {
@@ -820,22 +366,13 @@ void DrawButtonChrome(
     const SDL_Color botCol = ScaleAlpha(bottomFill, opacity);
     const SDL_Color rimCol = ScaleAlpha(border, opacity);
     const SDL_Color barCol = ScaleAlpha(accentBar, opacity);
-    const SDL_Color brkCol = ScaleAlpha(cornerColor, opacity);
 
-    if (horizontalGradient)
-        FillHorizontalGradient(r, rect, topCol, botCol);
-    else
-        FillVerticalGradient(r, rect, topCol, botCol);
-
-    if (!horizontalGradient && PanelSpritesReady() && rect.w >= 12 && rect.h >= 12)
-        TilePanelInterior(r, rect, static_cast<Uint8>(44 * opacity / 255));
+    const SDL_Color flatCol = Mix(topCol, botCol, 0.5f);
+    if (flatCol.a > 0)
+        r.FillRectScreen(rect.x, rect.y, rect.w, rect.h, flatCol);
 
     if (!horizontalGradient && rect.w >= 6 && rect.h >= 6)
     {
-        SDL_Color specular = Mix(topCol, color::White, 0.32f);
-        specular.a = static_cast<Uint8>(static_cast<unsigned>(topCol.a) * 115 / 255);
-        r.FillRectScreen(rect.x + 1, rect.y + 1, rect.w - 2, 1, specular);
-
         SDL_Color shadow {4, 6, 10, static_cast<Uint8>(static_cast<unsigned>(botCol.a) * 140 / 255)};
         r.FillRectScreen(rect.x + 1, rect.Bottom() - 2, rect.w - 2, 1, shadow);
     }
@@ -847,14 +384,7 @@ void DrawButtonChrome(
     {
         const int barW = horizontalGradient ? 4 : 3;
         r.FillRectScreen(rect.x + 1, rect.y + 1, barW, rect.h - 2, barCol);
-        SDL_Color barCore = Mix(barCol, color::White, 0.35f);
-        barCore.a = static_cast<Uint8>(static_cast<unsigned>(barCol.a) * 180 / 255);
-        r.FillRectScreen(rect.x + 1, rect.y + 3, 1, std::max(1, rect.h - 6), barCore);
     }
-
-    const int arm = std::clamp(std::min(rect.w, rect.h) / 5, 3, 7);
-    if (!horizontalGradient)
-        DrawCornerBrackets(r, rect, brkCol, arm);
 }
 
 void DrawButton(
@@ -959,12 +489,10 @@ void DrawCheckbox(
                              : checked ? Mix(color::BorderStrong, color::Accent, 0.45f)
                                        : Mix(color::BorderStrong, color::AccentDeep, 0.30f);
 
-    FillVerticalGradient(r, box, topFill, botFill);
+    const SDL_Color boxFill = Mix(topFill, botFill, 0.5f);
+    if (boxFill.a > 0)
+        r.FillRectScreen(box.x, box.y, box.w, box.h, boxFill);
     r.DrawRectScreen(box.x, box.y, box.w, box.h, border);
-    if (enabled)
-    {
-        r.FillRectScreen(box.x + 1, box.y + 1, std::max(0, box.w - 2), 1, WithAlpha(color::White, 22));
-    }
 
     if (checked)
     {
@@ -1579,7 +1107,7 @@ void DrawComboList(
                                : std::clamp(static_cast<float>(state.scroll * kComboItemH), 0.0f, maxPx);
 
     r.FillRectScreen(list.x + 3, list.y + 4, list.w, list.h, {0, 0, 0, 120});
-    FillVerticalGradient(r, list, Mix(color::PanelRaised, color::AccentDeep, 0.14f), color::PanelSunken);
+    r.FillRectScreen(list.x, list.y, list.w, list.h, Mix(color::PanelRaised, color::PanelSunken, 0.55f));
     DrawPanelFrame(r, list, color::Accent);
 
     const UiRect clip {list.x + 3, list.y + 3, std::max(0, list.w - (n > visible ? 14 : 6)), std::max(0, list.h - 6)};
@@ -1588,8 +1116,11 @@ void DrawComboList(
     for (int i = 0; i < n; ++i)
     {
         const UiRect item {clip.x, list.y + 3 + i * kComboItemH - scrollOff, clip.w, kComboItemH};
-        if (item.Bottom() <= clip.y || item.y >= clip.Bottom())
+        const int topY = std::max(item.y, clip.y);
+        const int botY = std::min(item.Bottom(), clip.Bottom());
+        if (botY <= topY)
             continue;
+        const UiRect bgRect {item.x, topY, item.w, botY - topY};
         const bool off = disabled && static_cast<std::size_t>(i) < disabled->size()
                          && (*disabled)[static_cast<std::size_t>(i)] && i != current;
         const bool hot = clip.Contains(mouseX, mouseY) && item.Contains(mouseX, mouseY) && !off;
@@ -1597,15 +1128,16 @@ void DrawComboList(
             SoundRequests::MarkHover();
         if (i == current)
         {
-            FillHorizontalGradient(
-                r, item, Mix(color::AccentDeep, color::Accent, 0.25f), WithAlpha(color::AccentDeep, 140));
-            r.FillRectScreen(item.x, item.y + 2, 3, std::max(0, item.h - 4), color::Accent);
+            r.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, Mix(color::AccentDeep, color::Accent, 0.25f));
+            r.FillRectScreen(bgRect.x, bgRect.y, 3, bgRect.h, color::Accent);
         }
         else if (hot)
         {
-            FillHorizontalGradient(r, item, Mix(color::Hover, color::AccentDeep, 0.22f), color::Panel);
-            r.FillRectScreen(item.x, item.y + 4, 2, std::max(0, item.h - 8), color::BorderStrong);
+            r.FillRectScreen(bgRect.x, bgRect.y, bgRect.w, bgRect.h, Mix(color::Hover, color::AccentDeep, 0.22f));
+            r.FillRectScreen(bgRect.x, bgRect.y, 2, bgRect.h, color::BorderStrong);
         }
+        if (item.CenterY() - 8 < clip.y || item.CenterY() + 8 > clip.Bottom())
+            continue;
         int textOffset = 10;
         if (swatches && static_cast<std::size_t>(i) < swatches->size())
         {

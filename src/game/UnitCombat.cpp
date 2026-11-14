@@ -245,7 +245,10 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
 
     // Pure retreat / ground move order (!isAttackMoving && targetEntityId == 0 && targetWallTileX < 0)
     // must NOT be interrupted by auto-targeting:
-    if (state == ActionState::Move && targetEntityId == 0 && targetWallTileX < 0 && hasRotatingTurret)
+    // A plain move does not stop for a fight, but every armed unit shoots at what is in range as it goes; on an
+    // attack-move only a turret fires while the hull drives (the others stop and fight)
+    if (state == ActionState::Move && targetEntityId == 0 && targetWallTileX < 0
+        && (hasRotatingTurret || !isAttackMoving))
     {
         FireOnTheMove(deltaTime, map, delegates);
     }
@@ -669,49 +672,7 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                                     && delegates.findEnemyInAttackRange(*this) != 0;
     const bool stuckWithGoal = (state == ActionState::Idle && path.empty() && waitingForPath)
                                || (HasMoveTarget() && blockedTimer >= 3.0f && !isSiegeMode && moveSpeed > 0.0f);
-    // On auto-attack, a hostile wall beside the way is shot down with a 50% chance (decided once per unit and wall,
-    // deterministically). Low priority: runs only without a target, not under fire, and without enemies in range.
-    if (isAttackMoving && HasMoveTarget() && !isSiegeMode && moveSpeed > 0.0f && attackDamage > 0 && targetEntityId == 0
-        && targetWallTileX < 0 && !enemyInAttackRange && lastAttackedTimer <= 0.0f && wallCheckCooldown <= 0.0f)
-    {
-        wallCheckCooldown = 1.0f;
-        constexpr int kReach = 3;
-        int bestX = -1, bestY = -1, bestDist = 1 << 20;
-        for (int y = tileY - kReach; y <= tileY + kReach; ++y)
-        {
-            for (int x = tileX - kReach; x <= tileX + kReach; ++x)
-            {
-                if (map.GetWall(x, y) <= 0 || !Players::Hostile(map.GetWallOwner(x, y), owner))
-                    continue;
-                const std::uint32_t wallHash = static_cast<std::uint32_t>(id) * 73856093u
-                                               ^ static_cast<std::uint32_t>(x) * 19349663u
-                                               ^ static_cast<std::uint32_t>(y) * 83492791u;
-                if (((wallHash >> 7) & 1u) == 0u)
-                    continue; // this one is left alone
-                const int tileDist = std::abs(x - tileX) + std::abs(y - tileY);
-                if (tileDist < bestDist)
-                {
-                    bestDist = tileDist;
-                    bestX = x;
-                    bestY = y;
-                }
-            }
-        }
-        if (bestX >= 0)
-        {
-            targetWallTileX = bestX;
-            targetWallTileY = bestY;
-            if (state == ActionState::Move)
-            {
-                ClearPathState(); // the move goal stays: the way is planned again once the wall is down
-                state = ActionState::Idle;
-                animFrame = 0;
-            }
-            waitingForPath = false;
-            blockedTimer = 0.0f;
-            return;
-        }
-    }
+    // (walls beside the way are left alone: a wall is shot only when it shuts the way, below, or when ordered)
     // Held up for a while at a gap that an ally standing in it shuts (one fighting from the gap, say)
     constexpr float kGapJamSeconds = 2.0f;
     const bool jammedAtGap
@@ -938,6 +899,13 @@ void Unit::UpdateCombat(float deltaTime, TileMap &map, Pathfinder &pathfinder, c
                 // Immobile siege unit MUST drop unreachable target immediately without rotating or flickering
                 targetEntityId = 0;
                 isSupportAssisting = false;
+                // A holding unit that was already walking after this target stays where it is
+                if (HoldsGround() && !HasMoveTarget() && state == ActionState::Move)
+                {
+                    ClearPathState();
+                    state = ActionState::Idle;
+                    animFrame = 0;
+                }
                 if (state == ActionState::Attack)
                 {
                     state = ActionState::Idle;

@@ -112,7 +112,7 @@ void DrawPanel(Renderer &r, const UiRect &rect, SDL_Color fill = color::Panel, S
 // Panel border/corner frame overlay without altering interior contents
 void DrawPanelFrame(Renderer &r, const UiRect &rect, SDL_Color border = color::BorderStrong);
 
-// Tab chrome backed by sprite_dialog_items angled shoulders and tab fill (with optional centered label)
+// Sharp rectangular tactical tab plate with bottom active indicator bar
 void DrawTab(
     Renderer &r,
     const UiRect &rect,
@@ -156,7 +156,7 @@ void DrawButton(
     int fontId = FONT_BODY_BOLD,
     Uint8 opacity = 255);
 
-// Tactical beveled plate with optional scanline texture, left indicator bar, and L-shaped corner brackets
+// Tactical beveled plate with optional scanline texture and left indicator bar
 void DrawButtonChrome(
     Renderer &r,
     const UiRect &rect,

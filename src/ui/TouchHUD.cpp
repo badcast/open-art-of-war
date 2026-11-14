@@ -310,6 +310,44 @@ void TouchHUD::SyncPanelWithTab()
     }
 }
 
+void TouchHUD::FocusBuilding(int buildingId, const EntityManager &entities)
+{
+    const Building *b = entities.GetBuilding(buildingId);
+    if (!b || b->owner != Players::Local())
+        return;
+    m_buildMode = false;
+    m_placing = false;
+    switch (b->type)
+    {
+        case UnitType::Barracks:
+            m_primaryBarracksId = b->id;
+            SetActiveTab(TabInfantry);
+            m_seenTab = TabInfantry;
+            m_unitTab = TabInfantry;
+            m_panel = Panel::Units;
+            break;
+        case UnitType::Factory:
+            m_primaryFactoryId = b->id;
+            SetActiveTab(TabVehicles);
+            m_seenTab = TabVehicles;
+            m_unitTab = TabVehicles;
+            m_panel = Panel::Units;
+            break;
+        case UnitType::Headquarters:
+            SetActiveTab(TabBuild);
+            m_seenTab = TabBuild;
+            m_panel = Panel::Build;
+            break;
+        case UnitType::ResearchLab:
+            m_panel = Panel::None;
+            OpenResearchWindow();
+            break;
+        default:
+            m_panel = Panel::None;
+            break;
+    }
+}
+
 void TouchHUD::Press(
     Act act,
     const Layout &layout,
@@ -623,11 +661,13 @@ bool TouchHUD::HandleHudClick(
         m_grab = m_fingerWas = m_grabMoved = m_grabPressedOnGhost = false;
     if (!onPanel)
     {
-        // A tap on the map closes the open cards (and does nothing else: one mode at a time)
+        // A tap on the map closes the open cards; if a building is selected, let GameplayController
+        // also process this 1st tap so it resets building focus (and arms double-tap rally point).
         if (leftClicked && m_panel != Panel::None)
         {
             m_panel = Panel::None;
-            return true;
+            if (!hasBuilding)
+                return true;
         }
         return false;
     }
@@ -1075,7 +1115,7 @@ void TouchHUD::RenderGameHud(
     if (notice.empty() && m_placing)
         notice = _("TAP A LOCATION, THEN TAP THE BUILDING");
     if (notice.empty() && !hasCombat && m_lastHasProducer && !m_statsOpen && !IsResearchWindowOpen())
-        notice = _("TAP MAP: SET RALLY POINT");
+        notice = _("DOUBLE-TAP MAP: SET RALLY POINT");
     if (!notice.empty())
     {
         const int maxWidth = std::max(120, windowWidth - scalePx(16));

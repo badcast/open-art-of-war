@@ -522,6 +522,7 @@ void AboutSimulation::Render(
     s.entities.RenderGroundRemnants(r, s.camera, s.map, false);
     s.map.RenderDecorations(r, s.camera, false, tick);
     s.entities.Render(r, s.camera, s.map, false, tick, false, false);
+    r.EndWorldPass();
     float dark = 0.0f;
     if (s.phase == Impl::Phase::FadeOut)
         dark = std::min(1.0f, s.elapsed / s.fadeSeconds);

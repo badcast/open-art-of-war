@@ -53,7 +53,8 @@ void main() {
         vec3 team = rgb2hsv(v_color.rgb);
         // the rust of the Resistance is muted: its recoloured armour gets more saturation to read as the new colour
         float gain = u_params.y > 1.5 ? 1.7 : 1.0;
-        vec3 recoloured = hsv2rgb(vec3(team.x, min(1.0, hsv.y * gain * (0.6 + 0.5 * team.y)), hsv.z));
+        float satScale = team.y < 0.25 ? (team.y * 3.0) : (0.6 + 0.5 * team.y);
+        vec3 recoloured = hsv2rgb(vec3(team.x, min(1.0, hsv.y * gain * satScale), hsv.z));
         c.rgb = mix(c.rgb, recoloured, w);
         c.a *= v_color.a;
     } else {

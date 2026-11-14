@@ -251,7 +251,8 @@ int main()
         Check(ua->blockedTimer == 5.0f, "a defender on its way keeps its order");
 
         // A structure remembers its attacker for a few seconds only
-        for (int tick = 0; tick < 140; ++tick)
+        // (200 ticks: the defenders walk about 15 tiles to the shooter and need time to kill it)
+        for (int tick = 0; tick < 200; ++tick)
             w.entities.Update(0.05f, w.map, w.pf);
         const Building *hq = w.entities.GetBuilding(w.hq);
         Check(hq->lastAttackedTimer <= 0.0f && hq->lastAttackerId == 0, "a structure forgets its attacker");
@@ -455,7 +456,7 @@ int main()
                            : "a group that storms the enemy base goes on");
     }
 
-    // 4. A chase outside the base switches the unit to the offensive instead of calling it back to the base
+    // 4. A chase outside the base is given up: the unit goes back toward the staging point as reserve
     {
         World w;
         const int near = w.Own(14, 15), far = w.Own(15, 15), self = w.Own(16, 15);
@@ -469,9 +470,8 @@ int main()
         Check(w.entities.GetUnit(self)->targetEntityId == foeFar, "a unit's own target is left to its stance");
         const Unit *uf = w.entities.GetUnit(far);
         Check(
-            uf->targetEntityId == foeFar && AIDefenseTest::InOffensive(w.ai, far)
-                && !AIDefenseTest::InRoster(w.ai, far),
-            "a chase far from the base switches the unit to the offensive instead of returning it to base");
+            uf->targetEntityId == 0 && !AIDefenseTest::InOffensive(w.ai, far) && !AIDefenseTest::InRoster(w.ai, far),
+            "a chase far from the base is given up: the unit heads back to the staging point as reserve");
         Check(w.entities.GetUnit(near)->targetEntityId == foeNear, "an enemy at the base is still fought");
     }
 

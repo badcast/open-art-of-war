@@ -1393,36 +1393,45 @@ void NetworkMenu::Render(
             {
                 const SkirmishMapInfo &mapInfo = m_mapsShown[idx];
                 const ui::UiRect itemRect = layout.MapItem(static_cast<int>(idx), scrollPx);
-                if (itemRect.Bottom() < layout.mapList.y || itemRect.y > layout.mapList.Bottom())
+                const int clipTop = std::max(itemRect.y, layout.mapList.y + 1);
+                const int clipBot = std::min(itemRect.Bottom(), layout.mapList.Bottom() - 1);
+                if (clipBot <= clipTop)
                     continue;
                 const bool selected = lobby && mapInfo.path == lobby->map;
-                const bool unfit = MissionController::StartPositions(mapInfo.path).size() < inRoom;
+                const std::size_t maxPlayers = mapInfo.players > 0
+                                                   ? static_cast<std::size_t>(mapInfo.players)
+                                                   : MissionController::StartPositions(mapInfo.path).size();
+                const bool unfit = maxPlayers < inRoom;
                 const bool hot = net->ControlsRoom() && layout.mapList.Contains(m_mouseX, m_mouseY)
                                  && itemRect.Contains(m_mouseX, m_mouseY);
+                const int bgH = clipBot - clipTop;
                 renderer.FillRectScreen(
                     itemRect.x + 2,
-                    itemRect.y,
+                    clipTop,
                     itemRect.w - 4,
-                    itemRect.h,
+                    bgH,
                     selected ? col::Hover : (hot ? col::PanelRaised : col::PanelSunken));
                 if (selected)
-                    renderer.FillRectScreen(itemRect.x + 2, itemRect.y, 3, itemRect.h, col::Accent);
-                font.DrawString(
-                    ui::FitText(font, mapInfo.DisplayName(), ui::FONT_BODY, itemRect.w - 60),
-                    itemRect.x + 14,
-                    itemRect.CenterY(),
-                    ui::FONT_BODY,
-                    selected ? col::Text : (unfit ? col::TextMuted : col::TextDim),
-                    false,
-                    Anchor::LEFT | Anchor::VCENTER);
-                font.DrawString(
-                    std::to_string(mapInfo.players),
-                    itemRect.Right() - 10,
-                    itemRect.CenterY(),
-                    ui::FONT_SMALL,
-                    col::TextMuted,
-                    false,
-                    Anchor::RIGHT | Anchor::VCENTER);
+                    renderer.FillRectScreen(itemRect.x + 2, clipTop, 3, bgH, col::Accent);
+                if (itemRect.CenterY() - 8 >= layout.mapList.y && itemRect.CenterY() + 8 <= layout.mapList.Bottom())
+                {
+                    font.DrawString(
+                        ui::FitText(font, mapInfo.DisplayName(), ui::FONT_BODY, itemRect.w - 60),
+                        itemRect.x + 14,
+                        itemRect.CenterY(),
+                        ui::FONT_BODY,
+                        selected ? col::Text : (unfit ? col::TextMuted : col::TextDim),
+                        false,
+                        Anchor::LEFT | Anchor::VCENTER);
+                    font.DrawString(
+                        std::to_string(mapInfo.players),
+                        itemRect.Right() - 10,
+                        itemRect.CenterY(),
+                        ui::FONT_SMALL,
+                        col::TextMuted,
+                        false,
+                        Anchor::RIGHT | Anchor::VCENTER);
+                }
             }
             renderer.ResetClipRect();
             const ui::UiRect mapTrack {layout.mapList.Right() - 6, layout.mapList.y + 2, 5, layout.mapList.h - 4};
@@ -1578,6 +1587,8 @@ void NetworkMenu::Render(
         int chatY = layout.chatLog.y + 6;
         for (int i = first; i < static_cast<int>(m_chatLog.size()); ++i)
         {
+            if (chatY + 16 > layout.chatLog.Bottom() - 2)
+                break;
             font.DrawString(
                 ui::FitText(font, m_chatLog[i], ui::FONT_SMALL, layout.chatLog.w - 16),
                 layout.chatLog.x + 8,
@@ -1892,15 +1903,20 @@ void NetworkMenu::Render(
         for (std::size_t i = 0; i < lan.size(); ++i)
         {
             const UiRect row = layout.LanRow(static_cast<int>(i), scrollPx);
-            if (row.Bottom() < layout.list.y || row.y > layout.list.Bottom())
+            const int clipTop = std::max(row.y, layout.list.y + 1);
+            const int clipBot = std::min(row.Bottom(), layout.list.Bottom() - 1);
+            if (clipBot <= clipTop)
                 continue;
             const bool isSelected = static_cast<int>(i) == m_lanSelected;
             const bool hot = layout.list.Contains(m_mouseX, m_mouseY) && row.Contains(m_mouseX, m_mouseY);
+            const UiRect bgRow {row.x, clipTop, row.w, clipBot - clipTop};
             ui::DrawPanel(
                 renderer,
-                row,
+                bgRow,
                 isSelected ? col::Hover : col::PanelRaised,
                 isSelected ? col::Accent : (hot ? col::Accent : col::Border));
+            if (row.CenterY() - 8 < layout.list.y || row.CenterY() + 8 > layout.list.Bottom())
+                continue;
             const LanGame &game = lan[i];
             font.DrawString(
                 ui::FitText(font, game.name, ui::FONT_BODY_BOLD, row.w * 26 / 100),
@@ -1981,16 +1997,21 @@ void NetworkMenu::Render(
         for (int i = 0; i < static_cast<int>(server.size()); ++i)
         {
             const UiRect row = layout.ServerRow(i, scrollPx);
-            if (row.Bottom() < layout.serverList.y || row.y > layout.serverList.Bottom())
+            const int clipTop = std::max(row.y, layout.serverList.y + 1);
+            const int clipBot = std::min(row.Bottom(), layout.serverList.Bottom() - 1);
+            if (clipBot <= clipTop)
                 continue;
             const bool isSelected = i == m_serverSelected;
             const bool hot = layout.serverList.Contains(m_mouseX, m_mouseY) && row.Contains(m_mouseX, m_mouseY);
             const LanGame &game = server[i];
+            const UiRect bgRow {row.x, clipTop, row.w, clipBot - clipTop};
             ui::DrawPanel(
                 renderer,
-                row,
+                bgRow,
                 isSelected ? col::Hover : col::PanelRaised,
                 isSelected ? col::Accent : (hot ? col::Accent : col::Border));
+            if (row.CenterY() - 8 < layout.serverList.y || row.CenterY() + 8 > layout.serverList.Bottom())
+                continue;
             font.DrawString(
                 game.code,
                 row.x + 10,
