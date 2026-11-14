@@ -527,7 +527,8 @@ void MissionController::Update(float deltaTime, TileMap &map, EntityManager &ent
     if (m_isVictory || m_isDefeat)
         return;
 
-    m_missionTime += deltaTime;
+    if (!m_calm)
+        m_missionTime += deltaTime;
 
     // 1. Trigger scheduled script reinforcement waves (cmd 27 with delay > 0)
     int pendingEnemyWaves = 0;
@@ -931,8 +932,8 @@ struct StartingBase
     int hq, power, barracks;
     int units[4];
 };
-const StartingBase kResistanceBase {8, 9, 10, {0, 0, 2, 6}};
-const StartingBase kConfederationBase {0, 1, 2, {1, 1, 3, 9}};
+const StartingBase kResistanceBase {8, 9, 10, {0, 0, 0, 2}};
+const StartingBase kConfederationBase {0, 1, 2, {1, 1, 1, 3}};
 const StartingBase &startingBase(Faction faction)
 {
     return faction == Faction::Confederation ? kConfederationBase : kResistanceBase;

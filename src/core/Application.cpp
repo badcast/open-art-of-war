@@ -366,6 +366,7 @@ bool Application::Init(int windowWidth, int windowHeight)
     HUDController::SetShowBuildGrid(m_settings.showBuildGrid);
     m_gameplayController = std::make_unique<GameplayController>();
     m_gameplayController->SetTouchMode(m_touchUi);
+    m_gameplayController->SetTutorial(&m_tutorial);
     uilayout::SetMenuProfile(m_touchUi ? "touch" : "pc");
     m_gameplayController->LoadOverlayStyle(m_env);
     m_hudController->SetResearchProbe([this](PlayerId p) { return m_gameplayController->ResearchOf(p); });
@@ -1140,13 +1141,23 @@ void Application::HandleEvents()
             std::vector<SDL_Rect> panels = m_hudController->TouchPanels(m_windowW, m_windowH);
             if (m_gameplayController) // the control group column keeps the one-finger pan off it
                 panels.push_back(m_gameplayController->GroupPanelRect(m_camera->GetViewportWidth(), m_windowH));
+            const SDL_Rect card = m_tutorial.CardRect();
+            if (card.w > 0)
+                panels.push_back(card);
             m_input->SetTouchUiRects(panels);
         }
     }
+    else if (m_input)
+    {
+        // Mouse: a press on the tutorial's card is a click on its buttons, never the start of a box selection
+        const SDL_Rect card = m_tutorial.CardRect();
+        m_input->SetTouchUiRects(card.w > 0 ? std::vector<SDL_Rect> {card} : std::vector<SDL_Rect> {});
+    }
     const bool playing = m_state == AppState::CampaignPlaying || m_state == AppState::SkirmishPlaying;
+    // A tutorial card to answer holds the game like a menu: clicks are issued on the press
     m_input->SetMenuOpen(
         !playing || (m_menuController && m_menuController->IsAnyMenuOpen())
-        || (m_hudController && m_hudController->IsResearchWindowOpen()));
+        || (m_hudController && m_hudController->IsResearchWindowOpen()) || m_tutorial.IsModal());
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -1333,6 +1344,23 @@ void Application::Update(float deltaTime)
         m_speedSerial = m_mission->GetLoadSerial();
         m_gameSpeed = 1;
     }
+    // Tutorial: only in the first mission of a campaign played alone (GameplayController runs its steps)
+    if (m_state == AppState::CampaignPlaying && m_mission && m_mission->GetCurrentMissionId() == 0 && !m_net
+        && !m_replay && !m_spectating)
+    {
+        // Offered once per start of the mission (a restart offers it again)
+        if (m_mission->GetLoadSerial() != m_tutorialSerial)
+        {
+            m_tutorialSerial = m_mission->GetLoadSerial();
+            m_tutorial.Offer(m_touchUi);
+        }
+    }
+    else if (m_state != AppState::Paused && m_state != AppState::Briefing)
+    {
+        m_tutorial.Stop();
+        m_tutorialSerial = -1;
+    }
+
     if (m_hudController)
     {
         if (m_state != AppState::CampaignPlaying && m_state != AppState::SkirmishPlaying && m_state != AppState::Victory
@@ -2097,6 +2125,24 @@ void Application::Render()
             m_input->GetMouseScreenY(),
             m_windowW,
             m_windowH);
+
+        // The tutorial of the first mission: shade, highlighted target, its card (over the technology tree too);
+        // the mission's own dialogues and the menus cover it
+        if (m_tutorial.IsActive() && !m_menuController->IsMissionDialogOpen()
+            && !m_menuController->IsObjectivesDialogOpen() && !m_menuController->IsAnyMenuOpen())
+        {
+            m_tutorial.Render(
+                *m_renderer,
+                *m_fontRenderer,
+                *m_hudController,
+                *m_entities,
+                *m_camera,
+                m_input->GetMouseScreenX(),
+                m_input->GetMouseScreenY(),
+                m_windowW,
+                m_windowH,
+                m_camera->GetViewportWidth());
+        }
 
         // Top Debug Toolbar (--debug mode)
         m_gameplayController->RenderDebugToolbar(*m_renderer, *m_fontRenderer, m_windowW);

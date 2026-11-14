@@ -2805,3 +2805,199 @@ msgstr "VOICE: ON"
 
 msgid "VOICE: OFF"
 msgstr "VOICE: OFF"
+
+msgid "TUTORIAL"
+msgstr "TUTORIAL"
+
+msgid "WELCOME, COMMANDER"
+msgstr "WELCOME, COMMANDER"
+
+msgid "THE CAMERA"
+msgstr "THE CAMERA"
+
+msgid "SELECTING UNITS"
+msgstr "SELECTING UNITS"
+
+msgid "GIVING ORDERS"
+msgstr "GIVING ORDERS"
+
+msgid "CREDITS AND POWER"
+msgstr "CREDITS AND POWER"
+
+msgid "YOUR BARRACKS"
+msgstr "YOUR BARRACKS"
+
+msgid "TRAINING SOLDIERS"
+msgstr "TRAINING SOLDIERS"
+
+msgid "RALLY POINT"
+msgstr "RALLY POINT"
+
+
+msgid "PLACING A BUILDING"
+msgstr "PLACING A BUILDING"
+
+msgid "UNDER CONSTRUCTION"
+msgstr "UNDER CONSTRUCTION"
+
+msgid "GOOD LUCK!"
+msgstr "GOOD LUCK!"
+
+
+
+
+
+msgid "Tap one of your soldiers (highlighted) to select it.\nTo select a group: hold a finger on the map for a moment, then drag a box around the soldiers."
+msgstr "Tap one of your soldiers (highlighted) to select it.\nTo select a group: hold a finger on the map for a moment, then drag a box around the soldiers."
+
+msgid "Click one of your soldiers (highlighted) to select it.\nTo select a group: hold the left mouse button and drag a box around the soldiers."
+msgstr "Click one of your soldiers (highlighted) to select it.\nTo select a group: hold the left mouse button and drag a box around the soldiers."
+
+msgid "Tap the ground: the selected soldiers go there.\nTap twice on the same spot: they move and attack every enemy on their way (attack-move). Tap an enemy to attack it."
+msgstr "Tap the ground: the selected soldiers go there.\nTap twice on the same spot: they move and attack every enemy on their way (attack-move). Tap an enemy to attack it."
+
+
+msgid "Credits pay for buildings, units and research. Power plants give the power your buildings need: without enough power, production slows down.\nKeep an eye on both (highlighted)."
+msgstr "Credits pay for buildings, units and research. Power plants give the power your buildings need: without enough power, production slows down.\nKeep an eye on both (highlighted)."
+
+msgid "The barracks trains infantry. Tap your barracks (highlighted) to select it."
+msgstr "The barracks trains infantry. Tap your barracks (highlighted) to select it."
+
+msgid "The barracks trains infantry. Click your barracks (highlighted) to select it."
+msgstr "The barracks trains infantry. Click your barracks (highlighted) to select it."
+
+msgid "The cards show the soldiers the barracks can train. Tap the highlighted card to train one (hold a card to cancel an order)."
+msgstr "The cards show the soldiers the barracks can train. Tap the highlighted card to train one (hold a card to cancel an order)."
+
+msgid "The sidebar shows the soldiers the barracks can train. Click the highlighted card to train one (right-click cancels an order)."
+msgstr "The sidebar shows the soldiers the barracks can train. Click the highlighted card to train one (right-click cancels an order)."
+
+msgid "With the barracks selected, double-tap the ground: new soldiers will gather there (rally point). The barracks stays selected; a single tap releases it."
+msgstr "With the barracks selected, double-tap the ground: new soldiers will gather there (rally point). The barracks stays selected; a single tap releases it."
+
+msgid "With the barracks selected, right-click the ground: new soldiers will gather there (rally point)."
+msgstr "With the barracks selected, right-click the ground: new soldiers will gather there (rally point)."
+
+
+
+
+
+msgid "Tap a free spot near your base: the building moves there (green: it can stand there, red: it cannot). Drag it to adjust, then tap it again or press the highlighted confirm button."
+msgstr "Tap a free spot near your base: the building moves there (green: it can stand there, red: it cannot). Drag it to adjust, then tap it again or press the highlighted confirm button."
+
+msgid "Move the mouse to a free spot near your base (green: it can stand there, red: it cannot) and click to build. Right-click cancels."
+msgstr "Move the mouse to a free spot near your base (green: it can stand there, red: it cannot) and click to build. Right-click cancels."
+
+msgid "The lab is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+msgstr "The lab is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+
+msgid "The lab is ready. Tap the highlighted flask button (top) to open the technology tree."
+msgstr "The lab is ready. Tap the highlighted flask button (top) to open the technology tree."
+
+msgid "The lab is ready. Click RESEARCH NEW TECHNOLOGIES (highlighted) to open the technology tree."
+msgstr "The lab is ready. Click RESEARCH NEW TECHNOLOGIES (highlighted) to open the technology tree."
+
+msgid "Pick a technology in the tree and start it. Research costs credits and takes time; its effect works for all your units once it is done."
+msgstr "Pick a technology in the tree and start it. Research costs credits and takes time; its effect works for all your units once it is done."
+
+msgid "You know the basics now. Train an army, research upgrades and destroy the enemy base. The highlighted clipboard button (top) shows the goals of the mission.\nGood luck, Commander!"
+msgstr "You know the basics now. Train an army, research upgrades and destroy the enemy base. The highlighted clipboard button (top) shows the goals of the mission.\nGood luck, Commander!"
+
+msgid "You know the basics now. Train an army, research upgrades and destroy the enemy base. The OBJECTIVES button (highlighted) shows the goals of the mission.\nGood luck, Commander!"
+msgstr "You know the basics now. Train an army, research upgrades and destroy the enemy base. The OBJECTIVES button (highlighted) shows the goals of the mission.\nGood luck, Commander!"
+
+msgid "FINISH"
+msgstr "FINISH"
+
+msgid "NEXT"
+msgstr "NEXT"
+
+msgid "SKIP TUTORIAL"
+msgstr "SKIP TUTORIAL"
+
+msgid "YOUR FACTORY"
+msgstr "YOUR FACTORY"
+
+msgid "VEHICLES: THE COYOTE"
+msgstr "VEHICLES: THE COYOTE"
+
+msgid "WALLS"
+msgstr "WALLS"
+
+msgid "LAYING WALLS"
+msgstr "LAYING WALLS"
+
+msgid "GUARD TOWER"
+msgstr "GUARD TOWER"
+
+msgid "This is your first mission. Would you like to take the tutorial? It shows step by step how to control units, train soldiers and vehicles, build a base with its defenses and research technologies.\nFor the tutorial, advanced technologies are unlocked for you."
+msgstr "This is your first mission. Would you like to take the tutorial? It shows step by step how to control units, train soldiers and vehicles, build a base with its defenses and research technologies.\nFor the tutorial, advanced technologies are unlocked for you."
+
+msgid "Your mission: build up your base, train an army and destroy the enemy base.\nThe highlighted part of the screen is what the current step is about; the rest of the interface waits until the step is done. Advanced technologies are unlocked and you get extra credits for the lessons. The enemy will not attack while the tutorial runs."
+msgstr "Your mission: build up your base, train an army and destroy the enemy base.\nThe highlighted part of the screen is what the current step is about; the rest of the interface waits until the step is done. Advanced technologies are unlocked and you get extra credits for the lessons. The enemy will not attack while the tutorial runs."
+
+msgid "Move the camera: drag one finger across the map, or hold a finger at an edge of the screen. Pinch with two fingers to zoom.\nA tap on the radar (highlighted) jumps there at once."
+msgstr "Move the camera: drag one finger across the map, or hold a finger at an edge of the screen. Pinch with two fingers to zoom.\nA tap on the radar (highlighted) jumps there at once."
+
+msgid "Move the camera: push the mouse against an edge of the screen, or hold W A S D or the arrow keys. The mouse wheel zooms.\nA click on the radar (highlighted) jumps there at once."
+msgstr "Move the camera: push the mouse against an edge of the screen, or hold W A S D or the arrow keys. The mouse wheel zooms.\nA click on the radar (highlighted) jumps there at once."
+
+msgid "Right-click the ground: the selected soldiers go there. Right-click an enemy to attack it.\nQ, then a click on the ground: attack-move, they fight every enemy on their way."
+msgstr "Right-click the ground: the selected soldiers go there. Right-click an enemy to attack it.\nQ, then a click on the ground: attack-move, they fight every enemy on their way."
+
+msgid "Now let's build. The research lab develops new technologies. Open the building cards with the build button (bottom right) and tap the lab card (highlighted). The price is shown on the card."
+msgstr "Now let's build. The research lab develops new technologies. Open the building cards with the build button (bottom right) and tap the lab card (highlighted). The price is shown on the card."
+
+msgid "Now let's build. The research lab develops new technologies. Open the BUILD tab on the sidebar and click the lab card (highlighted). The price is shown on the card."
+msgstr "Now let's build. The research lab develops new technologies. Open the BUILD tab on the sidebar and click the lab card (highlighted). The price is shown on the card."
+
+msgid "Every building takes power, and the factory you build next takes a lot. Build a power plant first: tap its card (highlighted)."
+msgstr "Every building takes power, and the factory you build next takes a lot. Build a power plant first: tap its card (highlighted)."
+
+msgid "Every building takes power, and the factory you build next takes a lot. Build a power plant first: click its card (highlighted)."
+msgstr "Every building takes power, and the factory you build next takes a lot. Build a power plant first: click its card (highlighted)."
+
+msgid "The factory builds vehicles. Tap its card (highlighted)."
+msgstr "The factory builds vehicles. Tap its card (highlighted)."
+
+msgid "The factory builds vehicles. Click its card (highlighted)."
+msgstr "The factory builds vehicles. Click its card (highlighted)."
+
+msgid "The factory is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+msgstr "The factory is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+
+msgid "The factory is ready. Tap your factory (highlighted) to select it."
+msgstr "The factory is ready. Tap your factory (highlighted) to select it."
+
+msgid "The factory is ready. Click your factory (highlighted) to select it."
+msgstr "The factory is ready. Click your factory (highlighted) to select it."
+
+msgid "Tap the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+msgstr "Tap the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+
+msgid "Click the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+msgstr "Click the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+
+msgid "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Tap the bunker card (highlighted)."
+msgstr "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Tap the bunker card (highlighted)."
+
+msgid "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Click the bunker card (highlighted)."
+msgstr "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Click the bunker card (highlighted)."
+
+msgid "Walls hold the enemy back and lead attacks into the fire of your defenses. Tap the wall card (highlighted)."
+msgstr "Walls hold the enemy back and lead attacks into the fire of your defenses. Tap the wall card (highlighted)."
+
+msgid "Walls hold the enemy back and lead attacks into the fire of your defenses. Click the wall card (highlighted)."
+msgstr "Walls hold the enemy back and lead attacks into the fire of your defenses. Click the wall card (highlighted)."
+
+msgid "Walls are laid one segment at a time: tap a free spot, then tap the segment again (or the highlighted confirm button) to lay it. Lay 3 segments side by side."
+msgstr "Walls are laid one segment at a time: tap a free spot, then tap the segment again (or the highlighted confirm button) to lay it. Lay 3 segments side by side."
+
+msgid "Walls are laid one segment at a time: click 3 free spots side by side next to your base. The wall mode stays on until you right-click."
+msgstr "Walls are laid one segment at a time: click 3 free spots side by side next to your base. The wall mode stays on until you right-click."
+
+msgid "A guard tower fires at enemies from afar. If the wall is still being laid, end it with the highlighted cancel button, then tap the tower card (highlighted)."
+msgstr "A guard tower fires at enemies from afar. If the wall is still being laid, end it with the highlighted cancel button, then tap the tower card (highlighted)."
+
+msgid "A guard tower fires at enemies from afar. Click the tower card (highlighted)."
+msgstr "A guard tower fires at enemies from afar. Click the tower card (highlighted)."

@@ -10,6 +10,7 @@
 #include "core/Localization.hpp"
 #include "ui/HUDController.hpp"
 #include "ui/TouchHUD.hpp"
+#include "ui/Tutorial.hpp"
 #include "graphics/ShaderEffects.hpp"
 #include "ui/UiKit.hpp"
 #include "ui/MenuController.hpp"
@@ -801,6 +802,22 @@ void GameplayController::Update(const FrameContext &context)
     float rightClickWorldX = 0.0f, rightClickWorldY = 0.0f;
     bool rightClicked = input.WasRightClickIssued(rightClickWorldX, rightClickWorldY);
 
+    // The tutorial follows what the player does (also behind its own cards and the technology tree window)
+    if (m_tutorial && m_tutorial->IsActive())
+    {
+        m_tutorial->Update(deltaTime, entities, m_selectedUnits, hud, camera, map);
+        if (m_tutorial->TakeTechRequest())
+            m_sim.Issue(Command(CommandType::TutorialTech));
+    }
+    if (m_tutorial && m_tutorial->TakeEndRequest())
+        m_sim.Issue(Command(CommandType::TutorialEnd)); // finished or skipped: the enemy is free again
+    if (m_tutorial && m_tutorial->IsActive())
+    {
+        float focusX = 0.0f, focusY = 0.0f;
+        if (m_tutorial->TakeFocus(focusX, focusY))
+            camera.CenterOn(focusX, focusY);
+    }
+
     // 1. Objectives Dialog
     if (menu.IsObjectivesDialogOpen())
     {
@@ -854,6 +871,29 @@ void GameplayController::Update(const FrameContext &context)
             updateReplicaHud();
             return;
         }
+    }
+
+    // 3. Tutorial: a card to answer holds the game; an action step only lets the clicks of its targets through
+    if (m_tutorial && m_tutorial->IsActive())
+    {
+        if (m_tutorial->IsModal())
+        {
+            m_tutorial->HandleModalInput(
+                mouseX, mouseY, leftClicked, windowWidth, windowHeight, camera.GetViewportWidth());
+            input.CancelSelectionBox();
+            updateReplicaHud();
+            return;
+        }
+        m_tutorial->FilterInput(
+            mouseX,
+            mouseY,
+            leftClicked,
+            rightClicked,
+            hud,
+            input,
+            windowWidth,
+            windowHeight,
+            camera.GetViewportWidth());
     }
 
     // 4. Command sidebar click handling (right edge); the debug toolbar sits above it
@@ -1540,7 +1580,8 @@ void GameplayController::Update(const FrameContext &context)
     // The mission dialogue opens after its delay of playing time (menus and pauses do not count)
     if (m_pendingDialogId != 0 && hud.IsObserver())
         m_pendingDialogId = 0; // a replay of the mission: its story was read when it was played
-    if (m_pendingDialogId != 0 && !m_simHold)
+    // (it waits for the end of the tutorial: the story comes after the lessons)
+    if (m_pendingDialogId != 0 && !m_simHold && !(m_tutorial && m_tutorial->IsActive()))
     {
         m_dialogTimer += deltaTime;
         if (m_dialogTimer >= MissionDialogs::kDelaySeconds)
@@ -1596,8 +1637,10 @@ void GameplayController::SimulationStep(
     }
     else if (!m_debugMode || !m_pauseAI)
     {
+        aiController.SetCalm(m_sim.EnemyCalm());
         aiController.Update(deltaTime, map, entities, pathfinder);
     }
+    mission.SetCalm(!mission.IsMatch() && m_sim.EnemyCalm());
     mission.Update(deltaTime, map, entities, pathfinder);
     m_sim.EndTick();
 

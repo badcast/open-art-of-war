@@ -14,6 +14,7 @@ namespace OpenArtOfWar
 {
 
 class Unit;
+class Tutorial;
 class InputManager;
 class Camera;
 class TileMap;
@@ -73,6 +74,11 @@ public:
     void SetTouchMode(bool on)
     {
         m_touchMode = on;
+    }
+    // The tutorial of the first campaign mission (owned by the application): it locks the input of its steps
+    void SetTutorial(Tutorial *tutorial)
+    {
+        m_tutorial = tutorial;
     }
     // Tactical view (the map is zoomed out into a radar): units and orders work, rally points do not
     void SetTactical(bool on)
@@ -227,6 +233,7 @@ private:
     SimCommand Command(CommandType type) const;
 
     std::vector<int> m_selectedUnits;
+    Tutorial *m_tutorial {nullptr};
     std::array<ControlGroup, 10> m_groups;
     Simulation m_sim;
     // The computer players of a match, in slot order (every peer runs them alike)

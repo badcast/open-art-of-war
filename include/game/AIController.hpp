@@ -204,6 +204,12 @@ public:
     int AttackGroupCount(int readyUnits, const TileMap &map) const;
 
     void Update(float deltaTime, TileMap &map, EntityManager &entities, Pathfinder &pathfinder);
+    // The tutorial of the first campaign mission runs: no army is trained, nobody scouts or attacks (the base still
+    // defends itself)
+    void SetCalm(bool calm)
+    {
+        m_calm = calm;
+    }
 
     // Configuration
     void SetAggressiveness(float aggro)
@@ -495,6 +501,7 @@ private:
     // Units placed by the mission (base garrison) never join the waves
     std::unordered_set<int> m_garrison;
     bool m_garrisonRecorded {false};
+    bool m_calm {false};
     std::set<int> m_offensive; // went on the attack and left their squad: they go on to the objective, never home
     // The computer's own list of the troops for its next wave: a unit joins only explicitly (the computer trained it,
     // a squad released it, or it stood at the home base when the game began), never because it happens to stand

@@ -156,6 +156,82 @@ UiRect TouchHUD::CardRect(const Layout &layout, int slot) const
         height};
 }
 
+int TouchHUD::PlacingBuildingIndex() const
+{
+    const auto &blueprints = EntityManager::GetBlueprints();
+    if (!(m_placing || m_buildMode) || m_selectedBlueprint < 0
+        || m_selectedBlueprint >= static_cast<int>(blueprints.size()))
+        return -1;
+    return blueprints[static_cast<std::size_t>(m_selectedBlueprint)].buildingIndex;
+}
+
+SDL_Rect TouchHUD::TutorialRect(TutorialTarget target, int arg, int windowWidth, int windowHeight) const
+{
+    const Layout layout = MakeLayout(windowWidth, windowHeight, m_lastHasCombat, m_lastHasBuilding, m_lastSelectedCount);
+    const auto toSdl = [](const UiRect &r) {
+        return SDL_Rect {r.x, r.y, r.w, r.h};
+    };
+    const auto button = [&](Act act) {
+        for (const Button &b : layout.buttons)
+        {
+            if (b.act == act)
+                return toSdl(b.r);
+        }
+        return SDL_Rect {0, 0, 0, 0};
+    };
+    // The visible card of a tab whose item passes `match` (the card area when it is scrolled away)
+    const auto card = [&](int tab, int scrollSlot, auto match) {
+        const int first = FirstCard(layout, scrollSlot);
+        for (int slot = 0; slot < layout.cardsFit; ++slot)
+        {
+            const int item = ItemAt(tab, first + slot);
+            if (item < 0)
+                break;
+            if (!match(item))
+                continue;
+            const UiRect r = CardRect(layout, slot);
+            if (r.y >= layout.cards.y && r.Bottom() <= layout.cards.Bottom())
+                return toSdl(r);
+        }
+        return toSdl(layout.cards);
+    };
+    switch (target)
+    {
+        case TutorialTarget::Radar:
+            return toSdl(layout.radar);
+        case TutorialTarget::Resources:
+            return toSdl(layout.resources);
+        case TutorialTarget::BuildTab:
+            return button(Act::DockBuild);
+        case TutorialTarget::BuildCard:
+            if (m_placing) // another building is being placed (the wall): it ends first
+                return button(Act::Cancel);
+            if (m_panel != Panel::Build)
+                return button(Act::DockBuild);
+            return card(TabBuild, 0, [&](int item) {
+                return EntityManager::GetBlueprints()[static_cast<std::size_t>(item)].buildingIndex == arg;
+            });
+        case TutorialTarget::UnitCard:
+        {
+            const int wanted = arg == 1 ? TabVehicles : TabInfantry;
+            if (m_panel != Panel::Units)
+                return button(Act::DockUnits);
+            if (m_unitTab != wanted)
+                return button(wanted == TabVehicles ? Act::UnitsVehicles : Act::UnitsInfantry);
+            return card(m_unitTab, m_unitTab == TabInfantry ? 1 : 2, [](int) { return true; });
+        }
+        case TutorialTarget::PlaceConfirm:
+            return button(Act::Confirm);
+        case TutorialTarget::ResearchButton:
+            return button(Act::Tech);
+        case TutorialTarget::ObjectivesButton:
+            return button(Act::Goals);
+        case TutorialTarget::None:
+            break;
+    }
+    return {0, 0, 0, 0};
+}
+
 int TouchHUD::FirstCard(const Layout &layout, int scrollSlot) const
 {
     const int gap = static_cast<int>(std::lround(kCardGap * layout.u));

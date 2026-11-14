@@ -106,6 +106,11 @@ public:
     }
     // Defense missions: when the enemy's squads come and how big they are (AI difficulty tactics)
     void SetDefensePacing(float firstWaveSeconds, float waveGapSeconds, int squadPercent, float timeScale);
+    // The tutorial runs: the script's waves wait (the mission clock stands still)
+    void SetCalm(bool calm)
+    {
+        m_calm = calm;
+    }
     bool IsDefenseMission() const
     {
         return m_defenseMission;
@@ -223,6 +228,7 @@ private:
     bool m_customPrebuilt {true}; // ... and whether it was started with prebuilt bases (else from scratch)
     MissionLoadedFn m_onLoaded;
     bool m_useBuiltinWaves {false};
+    bool m_calm {false};
 };
 
 } // namespace OpenArtOfWar

@@ -204,6 +204,7 @@ set(ENGINE_SOURCES
     src/ui/MenuControllerCustom.cpp
     src/ui/UiLayout.cpp
     src/ui/TouchHUD.cpp
+    src/ui/Tutorial.cpp
     src/ui/AboutSimulation.cpp
     platform/TouchPlatform.cpp
     src/ui/HUDController.cpp

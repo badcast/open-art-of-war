@@ -7,6 +7,7 @@
 #include "core/FrameContext.hpp"
 #include "core/ResourceManager.hpp"
 #include "ui/MapPreview.hpp"
+#include "ui/Tutorial.hpp"
 #include "ui/UiKit.hpp"
 #include "core/Settings.hpp"
 #include "core/VideoModes.hpp"
@@ -350,6 +351,8 @@ private:
     static constexpr int kGameSpeedCount = 7;
     int m_gameSpeed {1};
     int m_speedSerial {-1};
+    Tutorial m_tutorial;          // hints of the first campaign mission
+    int m_tutorialSerial {-1};    // load serial the tutorial was last started for
     float GameSpeedMultiplier() const
     {
         const int idx = (m_gameSpeed < 0) ? 0 : (m_gameSpeed >= kGameSpeedCount ? kGameSpeedCount - 1 : m_gameSpeed);

@@ -35,6 +35,10 @@ enum class CommandType : std::uint8_t
                    // it only travels with the turns, so a replay can follow a player's camera
     SetRepeat,     // a: unit archetype; b: building id: the building trains that unit again and again (a second
                    // command with the same unit turns it off)
+    TutorialTech,  // the tutorial of the first campaign mission: the player plays at the "advanced" tech level and
+                   // the enemy stays calm (no attacks) until TutorialEnd (a campaign mission alone only; ignored in
+                   // any match)
+    TutorialEnd,   // the tutorial is over (finished or skipped): the enemy plays as usual again
     Count
 };
 

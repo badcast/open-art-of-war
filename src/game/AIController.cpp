@@ -953,7 +953,8 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     while (m_economyTimer >= 1.0f)
     {
         m_economyTimer -= 1.0f;
-        UpdateEconomyAndProduction(1.0f, map, entities);
+        if (!m_calm) // the tutorial: no army is built up meanwhile
+            UpdateEconomyAndProduction(1.0f, map, entities);
         UpdateResearch(1.0f, entities);
         UpdateWaveOutcome(entities);
     }
@@ -973,13 +974,16 @@ void AIController::Update(float deltaTime, TileMap &map, EntityManager &entities
     }
 
     UpdateIntel(entities);
-    UpdateScouting(deltaTime, map, entities, pathfinder);
+    if (!m_calm) // the tutorial: nobody is sent out
+        UpdateScouting(deltaTime, map, entities, pathfinder);
     UpdateWaveRoster(entities);
-    UpdateWaveLaunch(deltaTime, map, entities, pathfinder);
+    if (!m_calm)
+        UpdateWaveLaunch(deltaTime, map, entities, pathfinder);
     UpdateStaging(map, entities, pathfinder);
     m_squadController.Update(deltaTime, map, entities, pathfinder, m_chokes, m_currentDifficultyConfig.tactics);
     RecallReleasedUnits(entities); // released units stay on the offensive and never return to base
-    UpdateOffensive(map, entities, pathfinder);
+    if (!m_calm)
+        UpdateOffensive(map, entities, pathfinder);
     UpdateIdleUnits(entities, pathfinder);
 }
 

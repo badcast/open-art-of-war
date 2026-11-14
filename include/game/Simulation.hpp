@@ -137,6 +137,11 @@ public:
     {
         return m_tick;
     }
+    // The tutorial of the first campaign mission runs: the enemy builds no army and launches no attacks
+    bool EnemyCalm() const
+    {
+        return m_enemyCalm && m_tick < m_calmEndTick;
+    }
 
     // Per player (out-of-range ids get player 0's, never used by the game)
     AISquadController &Squads(PlayerId player)
@@ -220,6 +225,11 @@ private:
     std::array<AISquadController, kMaxPlayers> m_squads;
     std::vector<const AIController *> m_computerPlayers;
     bool m_matchComputerPlayers {false};
+    bool m_matchMode {false}; // started by StartMatch (custom / network game), not a campaign mission
+    bool m_enemyCalm {false}; // the tutorial runs: the mission's enemy does not attack
+    std::uint32_t m_calmEndTick {0};
+    static constexpr int kTutorialCredits = 3000;
+    static constexpr std::uint32_t kMaxCalmTicks = 20u * 60u * 20u; // the calm ends by itself after 20 minutes
     std::array<ResearchProgress, kMaxPlayers> m_research;
     std::vector<SimEvent> m_events;
     std::array<Economy, kMaxPlayers> m_economies;

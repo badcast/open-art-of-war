@@ -40,6 +40,8 @@ constexpr std::uint8_t kSchema[static_cast<int>(CommandType::Count)] = {
     Ids,                   // ToggleRepair
     X | Y | A,             // View
     A | B,                 // SetRepeat
+    0,                     // TutorialTech
+    0,                     // TutorialEnd
 };
 
 constexpr int kTypeBits = 5;

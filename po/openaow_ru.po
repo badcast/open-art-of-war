@@ -2817,3 +2817,199 @@ msgstr "ОЗВУЧКА: ВКЛ"
 
 msgid "VOICE: OFF"
 msgstr "ОЗВУЧКА: ВЫКЛ"
+
+msgid "TUTORIAL"
+msgstr "ОБУЧЕНИЕ"
+
+msgid "WELCOME, COMMANDER"
+msgstr "ДОБРО ПОЖАЛОВАТЬ, КОМАНДИР"
+
+msgid "THE CAMERA"
+msgstr "КАМЕРА"
+
+msgid "SELECTING UNITS"
+msgstr "ВЫБОР ЮНИТОВ"
+
+msgid "GIVING ORDERS"
+msgstr "ПРИКАЗЫ"
+
+msgid "CREDITS AND POWER"
+msgstr "КРЕДИТЫ И ЭНЕРГИЯ"
+
+msgid "YOUR BARRACKS"
+msgstr "ВАША КАЗАРМА"
+
+msgid "TRAINING SOLDIERS"
+msgstr "НАЙМ СОЛДАТ"
+
+msgid "RALLY POINT"
+msgstr "ТОЧКА СБОРА"
+
+
+msgid "PLACING A BUILDING"
+msgstr "УСТАНОВКА ЗДАНИЯ"
+
+msgid "UNDER CONSTRUCTION"
+msgstr "ИДЁТ СТРОИТЕЛЬСТВО"
+
+msgid "GOOD LUCK!"
+msgstr "УДАЧИ!"
+
+
+
+
+
+msgid "Tap one of your soldiers (highlighted) to select it.\nTo select a group: hold a finger on the map for a moment, then drag a box around the soldiers."
+msgstr "Коснитесь одного из своих солдат (подсвечены), чтобы выбрать его.\nЧтобы выбрать группу: задержите палец на карте, затем обведите солдат рамкой."
+
+msgid "Click one of your soldiers (highlighted) to select it.\nTo select a group: hold the left mouse button and drag a box around the soldiers."
+msgstr "Кликните по одному из своих солдат (подсвечены), чтобы выбрать его.\nЧтобы выбрать группу: зажмите левую кнопку мыши и обведите солдат рамкой."
+
+msgid "Tap the ground: the selected soldiers go there.\nTap twice on the same spot: they move and attack every enemy on their way (attack-move). Tap an enemy to attack it."
+msgstr "Коснитесь земли — выбранные солдаты пойдут туда.\nДва касания в одну точку — они пойдут, атакуя всех врагов на пути (атака в движении). Коснитесь врага, чтобы атаковать его."
+
+
+msgid "Credits pay for buildings, units and research. Power plants give the power your buildings need: without enough power, production slows down.\nKeep an eye on both (highlighted)."
+msgstr "Кредиты тратятся на здания, юнитов и исследования. Электростанции дают энергию для зданий: при нехватке энергии производство замедляется.\nСледите за обоими показателями (подсвечены)."
+
+msgid "The barracks trains infantry. Tap your barracks (highlighted) to select it."
+msgstr "Казарма готовит пехоту. Коснитесь своей казармы (подсвечена), чтобы выбрать её."
+
+msgid "The barracks trains infantry. Click your barracks (highlighted) to select it."
+msgstr "Казарма готовит пехоту. Кликните по своей казарме (подсвечена), чтобы выбрать её."
+
+msgid "The cards show the soldiers the barracks can train. Tap the highlighted card to train one (hold a card to cancel an order)."
+msgstr "Карточки показывают солдат, которых может готовить казарма. Коснитесь подсвеченной карточки, чтобы нанять одного (удержание карточки отменяет заказ)."
+
+msgid "The sidebar shows the soldiers the barracks can train. Click the highlighted card to train one (right-click cancels an order)."
+msgstr "На панели — солдаты, которых может готовить казарма. Кликните по подсвеченной карточке, чтобы нанять одного (правый клик отменяет заказ)."
+
+msgid "With the barracks selected, double-tap the ground: new soldiers will gather there (rally point). The barracks stays selected; a single tap releases it."
+msgstr "Пока казарма выбрана, дважды коснитесь земли — новые солдаты будут собираться там (точка сбора). Казарма останется выбранной; одно касание снимает выбор."
+
+msgid "With the barracks selected, right-click the ground: new soldiers will gather there (rally point)."
+msgstr "Пока казарма выбрана, сделайте правый клик по земле — новые солдаты будут собираться там (точка сбора)."
+
+
+
+
+
+msgid "Tap a free spot near your base: the building moves there (green: it can stand there, red: it cannot). Drag it to adjust, then tap it again or press the highlighted confirm button."
+msgstr "Коснитесь свободного места возле базы — здание переместится туда (зелёный: можно ставить, красный: нельзя). Перетащите для уточнения, затем коснитесь его ещё раз или нажмите подсвеченную кнопку подтверждения."
+
+msgid "Move the mouse to a free spot near your base (green: it can stand there, red: it cannot) and click to build. Right-click cancels."
+msgstr "Наведите мышь на свободное место возле базы (зелёный: можно ставить, красный: нельзя) и кликните, чтобы строить. Правый клик — отмена."
+
+msgid "The lab is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+msgstr "Лаборатория строится: полоска показывает ход стройки. Пока можно командовать солдатами."
+
+msgid "The lab is ready. Tap the highlighted flask button (top) to open the technology tree."
+msgstr "Лаборатория готова. Коснитесь подсвеченной кнопки с колбой (вверху), чтобы открыть дерево технологий."
+
+msgid "The lab is ready. Click RESEARCH NEW TECHNOLOGIES (highlighted) to open the technology tree."
+msgstr "Лаборатория готова. Нажмите «ИССЛЕДОВАТЬ НОВЫЕ ТЕХНОЛОГИИ» (подсвечено), чтобы открыть дерево технологий."
+
+msgid "Pick a technology in the tree and start it. Research costs credits and takes time; its effect works for all your units once it is done."
+msgstr "Выберите технологию в дереве и запустите исследование. Оно стоит кредитов и требует времени; когда оно завершится, эффект получат все ваши юниты."
+
+msgid "You know the basics now. Train an army, research upgrades and destroy the enemy base. The highlighted clipboard button (top) shows the goals of the mission.\nGood luck, Commander!"
+msgstr "Теперь вы знаете основы. Соберите армию, исследуйте улучшения и уничтожьте базу противника. Подсвеченная кнопка с планшетом (вверху) показывает цели миссии.\nУдачи, командир!"
+
+msgid "You know the basics now. Train an army, research upgrades and destroy the enemy base. The OBJECTIVES button (highlighted) shows the goals of the mission.\nGood luck, Commander!"
+msgstr "Теперь вы знаете основы. Соберите армию, исследуйте улучшения и уничтожьте базу противника. Кнопка «ЗАДАНИЕ» (подсвечена) показывает цели миссии.\nУдачи, командир!"
+
+msgid "FINISH"
+msgstr "ЗАВЕРШИТЬ"
+
+msgid "NEXT"
+msgstr "ДАЛЕЕ"
+
+msgid "SKIP TUTORIAL"
+msgstr "ПРОПУСТИТЬ ОБУЧЕНИЕ"
+
+msgid "YOUR FACTORY"
+msgstr "ВАШ ЗАВОД"
+
+msgid "VEHICLES: THE COYOTE"
+msgstr "ТЕХНИКА: КОЙОТ"
+
+msgid "WALLS"
+msgstr "СТЕНЫ"
+
+msgid "LAYING WALLS"
+msgstr "УКЛАДКА СТЕН"
+
+msgid "GUARD TOWER"
+msgstr "СТОРОЖЕВАЯ ВЫШКА"
+
+msgid "This is your first mission. Would you like to take the tutorial? It shows step by step how to control units, train soldiers and vehicles, build a base with its defenses and research technologies.\nFor the tutorial, advanced technologies are unlocked for you."
+msgstr "Это ваша первая миссия. Хотите пройти обучение? Оно шаг за шагом покажет, как управлять юнитами, нанимать солдат и технику, строить базу с обороной и проводить исследования.\nНа время обучения вам открыты продвинутые технологии."
+
+msgid "Your mission: build up your base, train an army and destroy the enemy base.\nThe highlighted part of the screen is what the current step is about; the rest of the interface waits until the step is done. Advanced technologies are unlocked and you get extra credits for the lessons. The enemy will not attack while the tutorial runs."
+msgstr "Ваша задача: развить базу, собрать армию и уничтожить базу противника.\nПодсвеченная часть экрана — то, чему посвящён текущий шаг; остальной интерфейс недоступен, пока шаг не выполнен. Продвинутые технологии открыты, а на уроки вы получаете дополнительные кредиты. Пока идёт обучение, враг не нападает."
+
+msgid "Move the camera: drag one finger across the map, or hold a finger at an edge of the screen. Pinch with two fingers to zoom.\nA tap on the radar (highlighted) jumps there at once."
+msgstr "Двигайте камеру: ведите одним пальцем по карте или задержите палец у края экрана. Сведите или разведите два пальца, чтобы изменить масштаб.\nКасание радара (подсвечен) сразу переносит камеру туда."
+
+msgid "Move the camera: push the mouse against an edge of the screen, or hold W A S D or the arrow keys. The mouse wheel zooms.\nA click on the radar (highlighted) jumps there at once."
+msgstr "Двигайте камеру: подведите мышь к краю экрана или удерживайте W A S D либо стрелки. Колесо мыши меняет масштаб.\nКлик по радару (подсвечен) сразу переносит камеру туда."
+
+msgid "Right-click the ground: the selected soldiers go there. Right-click an enemy to attack it.\nQ, then a click on the ground: attack-move, they fight every enemy on their way."
+msgstr "Правый клик по земле — выбранные солдаты пойдут туда. Правый клик по врагу — атаковать его.\nQ, затем клик по земле — атака в движении: они бьют всех врагов на пути."
+
+msgid "Now let's build. The research lab develops new technologies. Open the building cards with the build button (bottom right) and tap the lab card (highlighted). The price is shown on the card."
+msgstr "Теперь строим. Лаборатория разрабатывает новые технологии. Откройте карточки зданий кнопкой строительства (внизу справа) и коснитесь карточки лаборатории (подсвечена). Цена указана на карточке."
+
+msgid "Now let's build. The research lab develops new technologies. Open the BUILD tab on the sidebar and click the lab card (highlighted). The price is shown on the card."
+msgstr "Теперь строим. Лаборатория разрабатывает новые технологии. Откройте на панели вкладку «ЗДАНИЯ» и кликните по карточке лаборатории (подсвечена). Цена указана на карточке."
+
+msgid "Every building takes power, and the factory you build next takes a lot. Build a power plant first: tap its card (highlighted)."
+msgstr "Каждое здание потребляет энергию, а завод, который вы построите следом, — особенно много. Сначала постройте электростанцию: коснитесь её карточки (подсвечена)."
+
+msgid "Every building takes power, and the factory you build next takes a lot. Build a power plant first: click its card (highlighted)."
+msgstr "Каждое здание потребляет энергию, а завод, который вы построите следом, — особенно много. Сначала постройте электростанцию: кликните по её карточке (подсвечена)."
+
+msgid "The factory builds vehicles. Tap its card (highlighted)."
+msgstr "Завод выпускает технику. Коснитесь его карточки (подсвечена)."
+
+msgid "The factory builds vehicles. Click its card (highlighted)."
+msgstr "Завод выпускает технику. Кликните по его карточке (подсвечена)."
+
+msgid "The factory is being built: its bar shows the progress. Meanwhile you may move your soldiers."
+msgstr "Завод строится: полоска показывает ход стройки. Пока можно командовать солдатами."
+
+msgid "The factory is ready. Tap your factory (highlighted) to select it."
+msgstr "Завод готов. Коснитесь своего завода (подсвечен), чтобы выбрать его."
+
+msgid "The factory is ready. Click your factory (highlighted) to select it."
+msgstr "Завод готов. Кликните по своему заводу (подсвечен), чтобы выбрать его."
+
+msgid "Tap the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+msgstr "Коснитесь подсвеченной карточки, чтобы собрать Койота: быструю лёгкую машину с пулемётом — для разведки и охоты на пехоту."
+
+msgid "Click the highlighted card to build a Coyote: a fast light vehicle with a machine gun, good for scouting and for hunting infantry."
+msgstr "Кликните по подсвеченной карточке, чтобы собрать Койота: быструю лёгкую машину с пулемётом — для разведки и охоты на пехоту."
+
+msgid "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Tap the bunker card (highlighted)."
+msgstr "Теперь оборона. Бункер — укреплённая огневая точка: атакующие вашу базу попадают под его огонь. Коснитесь карточки бункера (подсвечена)."
+
+msgid "Now the defenses. A bunker is a fortified firing position: attackers of your base run into its fire. Click the bunker card (highlighted)."
+msgstr "Теперь оборона. Бункер — укреплённая огневая точка: атакующие вашу базу попадают под его огонь. Кликните по карточке бункера (подсвечена)."
+
+msgid "Walls hold the enemy back and lead attacks into the fire of your defenses. Tap the wall card (highlighted)."
+msgstr "Стены сдерживают врага и направляют атаки под огонь вашей обороны. Коснитесь карточки стены (подсвечена)."
+
+msgid "Walls hold the enemy back and lead attacks into the fire of your defenses. Click the wall card (highlighted)."
+msgstr "Стены сдерживают врага и направляют атаки под огонь вашей обороны. Кликните по карточке стены (подсвечена)."
+
+msgid "Walls are laid one segment at a time: tap a free spot, then tap the segment again (or the highlighted confirm button) to lay it. Lay 3 segments side by side."
+msgstr "Стены кладутся по одному сегменту: коснитесь свободного места, затем ещё раз коснитесь сегмента (или подсвеченной кнопки подтверждения). Положите 3 сегмента в ряд."
+
+msgid "Walls are laid one segment at a time: click 3 free spots side by side next to your base. The wall mode stays on until you right-click."
+msgstr "Стены кладутся по одному сегменту: кликните по 3 свободным клеткам в ряд возле базы. Режим укладки остаётся включённым до правого клика."
+
+msgid "A guard tower fires at enemies from afar. If the wall is still being laid, end it with the highlighted cancel button, then tap the tower card (highlighted)."
+msgstr "Сторожевая вышка бьёт врагов издалека. Если укладка стены ещё идёт, завершите её подсвеченной кнопкой отмены, затем коснитесь карточки вышки (подсвечена)."
+
+msgid "A guard tower fires at enemies from afar. Click the tower card (highlighted)."
+msgstr "Сторожевая вышка бьёт врагов издалека. Кликните по карточке вышки (подсвечена)."

@@ -43,6 +43,12 @@ public:
         return m_placing || m_buildMode;
     }
     void FocusBuilding(int buildingId, const EntityManager &entities) override;
+    SDL_Rect TutorialRect(TutorialTarget target, int arg, int windowW, int windowH) const override;
+    bool IsBuildPanelOpen() const override
+    {
+        return m_panel == Panel::Build || m_placing;
+    }
+    int PlacingBuildingIndex() const override;
 
     bool HandleHudClick(
         int mx,

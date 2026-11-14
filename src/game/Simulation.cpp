@@ -3,6 +3,7 @@
 #include "game/AIController.hpp"
 #include "game/Building.hpp"
 #include "game/BuildLimits.hpp"
+#include "game/Capabilities.hpp"
 #include "game/Economy.hpp"
 #include "game/EntityManager.hpp"
 #include "game/Mines.hpp"
@@ -160,11 +161,15 @@ void Simulation::Reset(std::uint32_t seed)
     for (auto &r : m_research)
         r = ResearchProgress {};
     m_events.clear();
+    m_matchMode = false;
+    m_enemyCalm = false;
+    m_calmEndTick = 0;
 }
 
 void Simulation::StartMatch(const MatchSetup &setup)
 {
     Reset(setup.seed);
+    m_matchMode = true;
     for (PlayerId p = 0; p < kMaxPlayers; ++p)
     {
         if (!setup.slots[p].active || p == setup.local)
@@ -725,6 +730,19 @@ void Simulation::Apply(const SimCommand &cmd, SimContext &ctx)
             entities.DestroyPlayer(cmd.player, map);
             std::cout << "[Simulation] Player " << int(cmd.player) << " left the match: its forces are destroyed"
                       << std::endl;
+            break;
+        case CommandType::TutorialTech:
+            // Only a campaign mission played alone (never a match: nobody may raise their own tech level there)
+            if (!m_matchMode)
+            {
+                Capabilities::SetPlayerLevel(cmd.player, "advanced", entities);
+                economy.AddCredits(kTutorialCredits); // the lessons build a lab, a factory and the defenses
+                m_enemyCalm = true;
+                m_calmEndTick = m_tick + kMaxCalmTicks;
+            }
+            break;
+        case CommandType::TutorialEnd:
+            m_enemyCalm = false;
             break;
         case CommandType::Count:
             break;

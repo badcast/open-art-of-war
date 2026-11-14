@@ -90,6 +90,34 @@ public:
         return {0, 0, 0, 0};
     }
 
+    // ---- Tutorial: where its targets are on the screen and what the interface shows ----
+    enum class TutorialTarget
+    {
+        None,
+        Radar,
+        Resources,      // credits and power
+        BuildTab,       // PC: the BUILD tab; touch: the BUILD button of the dock
+        BuildCard,      // the card of a building (`arg`: building_index); the tab / dock button while it is closed
+        UnitCard,       // the first unit card of the open production tab
+        PlaceConfirm,   // touch: the confirm button of the placement ghost (none on the PC)
+        ResearchButton, // opens the technology tree
+        ObjectivesButton
+    };
+    // Empty (w == 0) when the target is not on the screen
+    virtual SDL_Rect TutorialRect(TutorialTarget target, int arg, int windowW, int windowH) const;
+    // The build cards are open
+    virtual bool IsBuildPanelOpen() const
+    {
+        return m_activeTab == TabBuild;
+    }
+    // Building index of the building being placed, -1 when none
+    virtual int PlacingBuildingIndex() const;
+    // The technology the local player researches now, -1 when none
+    int ResearchActive() const
+    {
+        return ResearchShown().active;
+    }
+
     // Initial pointer position stays fixed throughout a drag.
     virtual void SetPointerPressOrigin(int x, int y)
     {

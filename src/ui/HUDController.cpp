@@ -376,4 +376,69 @@ int HUDController::MaxScrollRows(int tab, int gridHeight) const
     return std::max(0, rows - visible);
 }
 
+namespace
+{
+SDL_Rect ToSdl(const UiRect &r)
+{
+    return {r.x, r.y, r.w, r.h};
+}
+} // namespace
+
+int HUDController::PlacingBuildingIndex() const
+{
+    const auto &blueprints = EntityManager::GetBlueprints();
+    if (!m_buildMode || m_selectedBlueprint < 0 || m_selectedBlueprint >= static_cast<int>(blueprints.size()))
+        return -1;
+    return blueprints[static_cast<std::size_t>(m_selectedBlueprint)].buildingIndex;
+}
+
+SDL_Rect HUDController::TutorialRect(TutorialTarget target, int arg, int windowW, int windowH) const
+{
+    const SidebarLayout l = sidebarLayout(windowW, windowH, m_topInset, !m_observer && m_speedEnabled);
+    // A grid cell, clipped to the grid (the grid itself when the cell is scrolled out of sight)
+    const auto cell = [&](int slot) {
+        const UiRect c = l.Cell(slot, m_gridScroll[m_activeTab].PixelOffset());
+        if (c.y < l.grid.y || c.Bottom() > l.grid.Bottom())
+            return ToSdl(l.grid);
+        return ToSdl(c);
+    };
+    switch (target)
+    {
+        case TutorialTarget::Radar:
+            return ToSdl(l.radar);
+        case TutorialTarget::Resources:
+            return ToSdl(l.header);
+        case TutorialTarget::BuildTab:
+            return ToSdl(l.tabs[TabBuild]);
+        case TutorialTarget::BuildCard:
+        {
+            if (m_activeTab != TabBuild)
+                return ToSdl(l.tabs[TabBuild]);
+            const auto &blueprints = EntityManager::GetBlueprints();
+            for (int slot = 0, n = ItemCountForTab(TabBuild); slot < n; ++slot)
+            {
+                const int item = ItemAt(TabBuild, slot);
+                if (item >= 0 && blueprints[static_cast<std::size_t>(item)].buildingIndex == arg)
+                    return cell(slot);
+            }
+            return ToSdl(l.grid);
+        }
+        case TutorialTarget::UnitCard:
+        {
+            const int wanted = arg == 1 ? TabVehicles : TabInfantry;
+            if (m_activeTab != wanted)
+                return ToSdl(l.tabs[wanted]);
+            return ItemCountForTab(m_activeTab) > 0 ? cell(0) : ToSdl(l.grid);
+        }
+        case TutorialTarget::ResearchButton:
+            return ToSdl(l.researchBtn);
+        case TutorialTarget::ObjectivesButton:
+            return ToSdl(l.objectivesBtn);
+        case TutorialTarget::PlaceConfirm:
+        case TutorialTarget::None:
+            break;
+    }
+    return {0, 0, 0, 0};
+}
+
 } // namespace OpenArtOfWar
